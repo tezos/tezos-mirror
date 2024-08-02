@@ -140,279 +140,26 @@ should be taken at round 0, meaning that the time between blocks would be
 
 .. _active_stake_beta:
 
-Validator selection: staked balance and active stake
-----------------------------------------------------
+Validator selection
+-------------------
 
-Validator selection is based on the staked balance of a delegate, as in Emmy*.
-Let us first (re)define these and related concepts.
+Validator selection, that is, baking and attesting rights, are based
+on the :doc:`baking power<baking_power>` of a delegate. The baking
+power is a function of all tez owned by the delegate and its
+delegators, with :doc:`staked<staking>` tez weighted more than
+non-staked tez, and there are additional considerations such as
+overstaking and overdelegation; see the :ref:`baking power
+formula<baking_power_overview_beta>`.
 
-- The *overall balance* of a delegate is its full balance (i.e. all the tokens owned by the delegate) plus the
-  balances of all accounts that have delegated to it.
-  It must be at least ``MINIMAL_STAKE`` tez, otherwise the delegate cannot be selected as a validator.
-- The *active stake* of a delegate is the amount of tez with which
-  it participates in consensus. It is at most its maximal
-  staked balance. We explain below how it is computed.
-- The *staked balance* represents the delegate's skin in the game: in
-  the case that the delegate behaves badly, its staked balance is
-  partly :ref:`slashed<slashing_beta>`. This staked balance must be
-  at least ``MINIMAL_FROZEN_STAKE`` tez, otherwise the delegate cannot
-  be selected as a validator.
-- The *spendable balance* of a delegate is its full balance
-  minus its staked balance and unstaked frozen balance.
-
-We state next the RPCs which allow to retrieve these types of balances, and also some invariants about them
-(Note that these are just invariants, not definitions; for
-instance, the frozen deposits are computed in terms of the full balance,
-not the other way around.):
-
-- ``delegated balance`` represents the total amount of tokens delegated or staked by others to a
-  given delegate; it excludes the delegate's full balance; it is obtained
-  with ``../context/delegates/<pkh>/delegated_balance``
-- ``overall balance = full balance + delegated balance``; it is obtained with
-  ``../context/delegates/<pkh>/staking_balance``
-- ``full balance = spendable balance + staked balance + unstaked frozen balance``; it is obtained with
-  ``../context/delegates/<pkh>/full_balance``
-- ``staked balance`` is obtained with ``../context/delegates/<pkh>/frozen_deposits``
-- ``spendable balance`` is obtained with ``../context/contracts/<pkh>/balance``
-
-Until Adaptive Issuance, delegates can set an upper limit to their staked balance with the
-command ``octez-client set deposits limit for <delegate> to
-<deposit_limit>``, and unset this limit with the command ``octez-client
-unset deposits limit for <delegate>``. These commands are implemented
-using the manager operation ``Set_deposits_limit``.
-When emitting such a command in cycle ``c``, it affects the automatic deposit at
-the end of this cycle, and thus the consensus rights set for cycle ``(c + 1) +
-CONSENSUS_RIGHTS_DELAY + 1``.
-Since the deposit will be adjusted at the end of cycle ``c``, unstaked tokens
-will be available at cycle  ``c + 1 + CONSENSUS_RIGHTS_DELAY + MAX_SLASHING_PERIOD``.
-
-The active stake is computed ``CONSENSUS_RIGHTS_DELAY`` in advance: at
-the end of cycle ``c`` for cycle ``c + 1 + CONSENSUS_RIGHTS_DELAY`` (as in Emmy*),
-before updating the delegates' :ref:`activity status<active_delegate_beta>`.
-
-..
-   This entails that a delegate which was participating until cycle ``c -
-   1`` and is no longer participating in cycle ``c`,
-   will lose its rights from cycle
-   ``c + 2 * CONSENSUS_RIGHTS_DELAY + 2`` onwards -- at the end of cycle ``c +
-   CONSENSUS_RIGHTS_DELAY``, the rights for cycle ``c + 2 *
-   CONSENSUS_RIGHTS_DELAY + 1`` are computed, and only then is the delegate
-   declared passive. Here "participation" means *having baked a final
-   block* or *having a preattestation or attestation included in a final
-   block*.
-
-Intuitively, the active stake is set to 10 times the delegate's staked balance,
-without going beyond its overall balance.
-More precisely, the active stake is:
-
-- the delegate's staked balance,
-- its stakers' staked balance (up to a limit, see
-  :ref:`limit_of_staking_over_baking<staking_policy_configuration_beta>`),
-- and the liquid delegated balance + the spendable balance, up to 9 times the delegate's staked balance.
-
-Before Adaptive Issuance, each part weighs equally when computing the baking and voting rights. After Adaptive Issuance, the frozen balances (non-liquid, non-spendable) are weighed for twice as much per tez as the liquid part.
-Moreover:
-
-- Rights originating from staked tez are computed from the value at the end of the cycle;
-- Rights originating from delegated tez are computing using the minimum value over the cycle.
-
-Let's take some examples. Say that the full balance of a delegate is ``1000`` tez.
-Then, without external staking, its theoretical maximum active stake is
-``10000`` tez. The following table lists some scenarios before Adaptive Issuance (assuming for
-simplicity no changes in the delegate's full and staked balances
-during the last 5 cycles).
-
-.. list-table::
-   :widths: 20 20 20 20 20
-   :header-rows: 1
-
-   * - Overall balance
-     - Frozen deposit limit
-     - Active stake
-     - Staked balance
-     - Spendable balance
-   * - 9000
-     - --
-     - 9000
-     - 900
-     - 100
-   * - 12000
-     - --
-     - 10000
-     - 1000
-     - 0
-   * - 9000
-     - 400
-     - 4000
-     - 400
-     - 600
-   * - 12000
-     - 400
-     - 4000
-     - 400
-     - 600
-
-We note in passing that this new schema basically solves the main
-problem of over-delegation: a delegate will not fail anymore to bake
-and attest because of an insufficient balance to pay the
-deposit. However, a delegate can still be over-delegated, and it will be
-rewarded based on its active stake, not on its overall balance.
-
-
-Delegated balance used for baking rights
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-The delegated balance used for computing baking rights is the minimum
-of the total delegated amount over the whole cycle. It prevents any
-manipulation of rights through short-duration transfers.
-
-In the Paris protocol, the considered minimum is the minimum at any
-point during block applications, which can be reached in the middle of
-executing a transaction.
-
-For example, if a baker transfers tez to one of its delegators, this
-is internally treated as first removing the transferred amount from
-the total amount delegated to this baker, then adding it back. In
-between executing both updates, the total delegated amount is lower so
-it might be the new minimum over the whole cycle. In other words, the
-transferred tez risk not counting towards the baking rights that will
-be computed at the end of the cycle, even though they have been owned
-by an account delegating to this baker during the whole cycle.
-
-Besides, when the minimum is reached in the middle of a block's
-operations, the context for this minimum is not directly accessible
-via RPC. In that case, in order to retrieve this exact context, one
-needs to replay the block's balance updates on their own.
-
-In the Quebec protocol, to solve these problems, only the total
-delegated amounts **at the end of blocks** count when determining this
-minimum. This is known as the **per-block min-delegated
-feature**. This solution no longer penalizes baking rights when large
-amounts are transferred between two accounts delegated to the same
-baker. Moreover, it lets users easily retrieve via RPC the exact
-context that the minimum comes from, since it is guaranteed to
-correspond to the end of a block.
-
-The minimum delegated in the current cycle can be retrieved with RPC
-``GET
-'/chains/<chain_id>/blocks/<block_id>/context/delegates/<delegate_id>/min_delegated_in_current_cycle'``.
-This RPC returns the minimal value of the baker’s total delegated
-amount at the end of a block, from the first block of the cycle up to
-the block on which the RPC is called. It also returns the earliest
-level at the end of which this minimum has been reached in the current
-cycle.
-
-
-Example
-"""""""
-
-At level ``150``, the baker receives ``50`` tez from a contract that
-is not a delegator for this baker. Then, at level ``200``, the baker
-transfers ``150`` tez to one of its delegators. Finally, at level
-``205``, that delegator sends ``70`` tez to another contract that is
-not a delegator for this baker.
-
-The first transfer of ``50`` tez increases the baker’s ``total_delegated``
-by ``50``. Then, the transfer of ``150`` tez is internally implemented
-as removing ``150`` tez from the total delegated of the sender’s
-delegate -- which is the baker itself, then adding ``150`` tez to the
-``total_delegated`` of the destination’s delegate -- which is the same
-baker in our case. Finally, the ``70``-tez transfer just removes
-``70`` tez from the ``total_delegated`` of the same baker again.
-
-Let's say that ``blocks_per_cycle = 128`` (as on Parisnet), so the
-first level of the current cycle is ``129``, and let's say that
-``total_delegated`` was ``1000`` at the beginning of the cycle.
-
-.. list-table::
-   :widths: 14 16 14 14 14 14 14
-   :header-rows: 1
-
-   * -
-     -
-     - L129: first level of cycle
-     - L150: add 50
-     - L200: remove 150
-     - L200: add 150
-     - L205: remove 70
-   * -
-     - Baker's current ``total_delegated`` (tez)
-     - 1000
-     - 1050
-     - 900
-     - 1050
-     - 980
-   * - Quebec RPC
-     - Returned min (tez)
-     - 1000
-     - 1000
-     -
-     - 1000
-     - 980
-   * - Quebec RPC
-     - Returned level
-     - 129
-     - 129
-     -
-     - 129
-     - 205
-   * - Paris RPC
-     - Returned min (tez)
-     - 1000
-     - 1000
-     -
-     - 900
-     - 900
-   * - Paris RPC
-     - Returned level
-     - None
-     - 150
-     -
-     - 200
-     - 200
-
-Note there are empty cells in the table as RPCs cannot be called in
-the middle of the block application. Also, the
-``min_delegated_in_current_cycle`` RPC returns the value in mutez, but
-here we use tez for simplicity.
-
-* In Quebec:
-
-  - At levels ``129`` and ``150``, the earliest level at the end of
-    which the ``total_delegated`` is equal to the minimum ``1000`` is
-    the first level of the cycle, that is, level ``129``.
-
-  - At level ``200``, the ``900`` value happens in the middle of the
-    block application so it is not considered. The new end-of-block
-    value ``1050`` is not lower than the old minimum of ``1000``, so
-    ``min_delegated_in_current_cycle`` stays at (min: ``1000``, level:
-    ``129``).
-
-  - At level ``205``, the new end-of-block value ``980`` is lower than
-    the old minimum of ``1000``, so ``min_delegated_in_current_cycle``
-    becomes (min: ``980``, level: ``205``).
-
-* In Paris:
-
-  - At level ``129``, the ``total_delegated`` has not changed since
-    the start of the cycle. The Paris RPC returns level ``None`` in
-    this case.
-
-  - At level ``150``, the ``total_delegated`` has changed since the
-    start of the cycle, but the minimum is actually the initial value
-    it had at the start of the cycle. In this case, Paris RPC returns
-    the earliest level at which the ``total_delegated`` has changed,
-    that is, level ``150``.
-
-  - At level ``200``, the ``total_delegated`` reaches a new minimum
-    ``900``. Indeed, the Paris protocol does consider the values in
-    the middle of the block application, so
-    ``min_delegated_in_current_cycle`` becomes (min: ``900``, level:
-    ``200``).
-
-  - At level ``205``, the new value ``980`` is higher than the old
-    minimum of ``900``, so ``min_delegated_in_current_cycle`` is still
-    (min: ``900``, level: ``200``).
+The baking rights are determined
+:ref:`CONSENSUS_RIGHTS_DELAY<cs_constants_beta>` in advance, which is
+``2`` :ref:`cycles<def_cycle_beta>` for the Quebec protocol. More
+precisely, at the end of cycle ``n`` and beginning of cycle ``n+1``,
+the baking rights for cycle ``n+1+CONSENSUS_RIGHTS_DELAY=n+3`` are
+:doc:`randomly generated<randomness_generation>` based on the current
+:doc:`baking power<baking_power>` of each delegate that meets the
+:ref:`minimal power and own staked
+requirements<minimal_baking_power_beta>`.
 
 
 Economic Incentives
@@ -630,6 +377,16 @@ Consensus related protocol parameters
      - 30720
    * - ``DELAY_INCREMENT_PER_ROUND``
      - 4s
+   * - ``CONSENSUS_RIGHTS_DELAY``
+     - 2 cycles
+   * - ``GLOBAL_LIMIT_OF_STAKING_OVER_BAKING``
+     - 5
+   * - ``LIMIT_OF_DELEGATION_OVER_BAKING``
+     - 9
+   * - ``MINIMAL_STAKE``
+     - 6,000 ꜩ
+   * - ``MINIMAL_FROZEN_STAKE``
+     - 600 ꜩ
    * - ``MINIMAL_PARTICIPATION_RATIO``
      - 2/3
    * - ``MAX_SLASHING_PERIOD``
