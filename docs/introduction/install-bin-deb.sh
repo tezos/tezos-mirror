@@ -90,3 +90,6 @@ octez-client --version
 octez-node --version
 "octez-baker-$protocol" --version
 "octez-accuser-$protocol" --version
+
+# [test autoremove]
+sudo apt autoremove -y octez-node octez-client octez-baker octez-dal-node
