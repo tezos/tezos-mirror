@@ -212,7 +212,6 @@ module Sandbox = struct
         let* client = Client.init ~endpoint:(Client.Node node) () in
         let delegates = [get_delegate st] in
         let baker = Baker.create ~protocol node client ~delegates in
-        let* () = Baker.run baker in
         st.daemons.(h) <- (node, Some baker, Some client) ;
         return (client, baker)
 
@@ -338,12 +337,14 @@ module Rounds = struct
       unit
     in
     let nodes = Sandbox.nodes sandbox in
+    let bakers = Sandbox.bakers sandbox in
 
     (* Topology does not really matter here, as long as there is a path from any
        node to another one; let's use a ring. *)
     Log.info "Setting up nodes in ring topology" ;
     Cluster.ring nodes ;
     let* () = Cluster.start ~wait_connections:true nodes in
+    let* () = Lwt_list.iter_p Baker.run bakers in
 
     let* parameter_file =
       write_parameter_file
