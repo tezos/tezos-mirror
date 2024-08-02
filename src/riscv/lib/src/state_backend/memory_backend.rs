@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::state_backend::{self as backend, Layout};
-use std::{alloc, marker::PhantomData, ptr, slice};
+use std::{alloc, marker::PhantomData, mem, ptr, slice};
 
 /// In-memory state backend
 pub struct InMemoryBackend<L> {
@@ -145,6 +145,196 @@ impl<'backend> backend::Manager for SliceManager<'backend> {
     ) -> Self::DynRegion<LEN> {
         self.allocate_region::<u8, LEN>(loc)
     }
+
+    #[inline]
+    fn region_read<E: backend::Elem, const LEN: usize>(
+        region: &Self::Region<E, LEN>,
+        index: usize,
+    ) -> E {
+        // NOTE: This implementation must match that of SliceManagerRO.
+        E::from_stored(&region[index])
+    }
+
+    #[inline]
+    fn region_read_all<E: backend::Elem, const LEN: usize>(
+        region: &Self::Region<E, LEN>,
+    ) -> Vec<E> {
+        // NOTE: This implementation must match that of SliceManagerRO.
+
+        let mut result = region.to_vec();
+
+        // NOTE: If [E::from_stored_in_place] is inlined and ends up as a no-op, then
+        // the optimiser can hopefully eliminate the entire loop.
+        for elem in result.iter_mut() {
+            elem.from_stored_in_place();
+        }
+
+        result
+    }
+
+    #[inline]
+    fn region_read_some<E: backend::Elem, const LEN: usize>(
+        region: &Self::Region<E, LEN>,
+        offset: usize,
+        buffer: &mut [E],
+    ) {
+        // NOTE: This implementation must match that of SliceManagerRO.
+
+        let length = buffer.len();
+
+        // We copy first because this allows the compiler to pick a faster
+        // copy mechanism instead of doing the copying in the for loop.
+        buffer.copy_from_slice(&region[offset..offset + length]);
+
+        // NOTE: If [E::from_stored_in_place] is inlined and ends up as a no-op, then
+        // the optimiser can hopefully eliminate the entire loop.
+        for elem in buffer {
+            elem.from_stored_in_place();
+        }
+    }
+
+    #[inline]
+    fn region_write<E: backend::Elem, const LEN: usize>(
+        region: &mut Self::Region<E, LEN>,
+        index: usize,
+        value: E,
+    ) {
+        region[index].store(&value)
+    }
+
+    #[inline]
+    fn region_write_all<E: backend::Elem, const LEN: usize>(
+        region: &mut Self::Region<E, LEN>,
+        value: &[E],
+    ) {
+        // We copy first because this allows the compiler to pick a faster
+        // copy mechanism instead of doing the copying in the for loop.
+        region.copy_from_slice(value);
+
+        // NOTE: If [E::to_stored_in_place] is inlined and ends up as a no-op, then
+        // the optimiser can hopefully eliminate the entire loop.
+        for elem in region.iter_mut() {
+            elem.to_stored_in_place();
+        }
+    }
+
+    #[inline]
+    fn region_write_some<E: backend::Elem, const LEN: usize>(
+        region: &mut Self::Region<E, LEN>,
+        index: usize,
+        buffer: &[E],
+    ) {
+        let length = buffer.len();
+        let target = &mut region[index..index + length];
+
+        // We copy first because this allows the compiler to pick a faster
+        // copy mechanism instead of doing the copying in the for loop.
+        target.copy_from_slice(buffer);
+
+        // NOTE: If [E::to_stored_in_place] is inlined and ends up as a no-op, then
+        // the optimiser can hopefully eliminate the entire loop.
+        for elem in target {
+            elem.to_stored_in_place();
+        }
+    }
+
+    #[inline]
+    fn region_replace<E: backend::Elem, const LEN: usize>(
+        region: &mut Self::Region<E, LEN>,
+        index: usize,
+        mut value: E,
+    ) -> E {
+        value.to_stored_in_place();
+        let mut value = mem::replace(&mut region[index], value);
+        value.from_stored_in_place();
+        value
+    }
+
+    #[inline]
+    fn dyn_region_read<E: backend::Elem, const LEN: usize>(
+        region: &Self::DynRegion<LEN>,
+        address: usize,
+    ) -> E {
+        // NOTE: This implementation must match that of SliceManagerRO.
+        assert!(address + mem::size_of::<E>() <= LEN);
+
+        let mut result = unsafe {
+            region
+                .as_ptr()
+                .cast::<u8>() // Calculate the offset in bytes
+                .add(address)
+                .cast::<E>()
+                .read_unaligned()
+        };
+        result.from_stored_in_place();
+
+        result
+    }
+
+    #[inline]
+    fn dyn_region_read_all<E: backend::Elem, const LEN: usize>(
+        region: &Self::DynRegion<LEN>,
+        address: usize,
+        values: &mut [E],
+    ) {
+        // NOTE: This implementation must match that of SliceManagerRO.
+        assert!(address + mem::size_of_val(values) <= LEN);
+
+        unsafe {
+            region
+                .as_ptr()
+                .cast::<u8>() // Calculate the offset in bytes
+                .add(address)
+                .cast::<E>()
+                .copy_to(values.as_mut_ptr(), values.len())
+        };
+
+        for v in values.iter_mut() {
+            v.from_stored_in_place();
+        }
+    }
+
+    #[inline]
+    fn dyn_region_write<E: backend::Elem, const LEN: usize>(
+        region: &mut Self::DynRegion<LEN>,
+        address: usize,
+        mut value: E,
+    ) {
+        assert!(address + mem::size_of_val(&value) <= LEN);
+
+        value.to_stored_in_place();
+
+        unsafe {
+            region
+                .as_mut_ptr()
+                .cast::<u8>() // Calculate the offset in bytes
+                .add(address)
+                .cast::<E>()
+                .write_unaligned(value)
+        }
+    }
+
+    #[inline]
+    fn dyn_region_write_all<E: backend::Elem, const LEN: usize>(
+        region: &mut Self::DynRegion<LEN>,
+        address: usize,
+        values: &[E],
+    ) {
+        assert!(address + mem::size_of_val(values) <= LEN);
+
+        unsafe {
+            let ptr = region
+                .as_mut_ptr()
+                .cast::<u8>() // Calculate the offset in bytes
+                .add(address)
+                .cast::<E>();
+
+            for (i, mut value) in values.iter().copied().enumerate() {
+                value.to_stored_in_place();
+                ptr.add(i).write_unaligned(value)
+            }
+        }
+    }
 }
 
 /// Read-only manager for in-memory backing storage
@@ -161,6 +351,12 @@ impl<'backend> SliceManagerRO<'backend> {
             _lifetime: PhantomData,
         }
     }
+}
+
+macro_rules! read_only_write {
+    () => {
+        panic!("cannot write to an immutable reference to a region")
+    };
 }
 
 impl<'backend> backend::Manager for SliceManagerRO<'backend> {
@@ -183,6 +379,145 @@ impl<'backend> backend::Manager for SliceManagerRO<'backend> {
         loc: backend::Location<[u8; LEN]>,
     ) -> Self::DynRegion<LEN> {
         self.allocate_region::<u8, LEN>(loc)
+    }
+
+    #[inline]
+    fn region_read<E: backend::Elem, const LEN: usize>(
+        region: &Self::Region<E, LEN>,
+        index: usize,
+    ) -> E {
+        E::from_stored(&region[index])
+    }
+
+    #[inline]
+    fn region_read_all<E: backend::Elem, const LEN: usize>(
+        region: &Self::Region<E, LEN>,
+    ) -> Vec<E> {
+        let mut result = region.to_vec();
+
+        // NOTE: If [E::from_stored_in_place] is inlined and ends up as a no-op, then
+        // the optimiser can hopefully eliminate the entire loop.
+        for elem in result.iter_mut() {
+            elem.from_stored_in_place();
+        }
+
+        result
+    }
+
+    #[inline]
+    fn region_read_some<E: backend::Elem, const LEN: usize>(
+        region: &Self::Region<E, LEN>,
+        offset: usize,
+        buffer: &mut [E],
+    ) {
+        let length = buffer.len();
+
+        // We copy first because this allows the compiler to pick a faster
+        // copy mechanism instead of doing the copying in the for loop.
+        buffer.copy_from_slice(&region[offset..offset + length]);
+
+        // NOTE: If [E::from_stored_in_place] is inlined and ends up as a no-op, then
+        // the optimiser can hopefully eliminate the entire loop.
+        for elem in buffer {
+            elem.from_stored_in_place();
+        }
+    }
+
+    #[inline]
+    fn region_write<E: backend::Elem, const LEN: usize>(
+        _region: &mut Self::Region<E, LEN>,
+        _index: usize,
+        _value: E,
+    ) {
+        read_only_write!()
+    }
+
+    #[inline]
+    fn region_write_all<E: backend::Elem, const LEN: usize>(
+        _region: &mut Self::Region<E, LEN>,
+        _value: &[E],
+    ) {
+        read_only_write!()
+    }
+
+    #[inline]
+    fn region_write_some<E: backend::Elem, const LEN: usize>(
+        _region: &mut Self::Region<E, LEN>,
+        _index: usize,
+        _buffer: &[E],
+    ) {
+        read_only_write!()
+    }
+
+    #[inline]
+    fn region_replace<E: backend::Elem, const LEN: usize>(
+        _region: &mut Self::Region<E, LEN>,
+        _index: usize,
+        _value: E,
+    ) -> E {
+        read_only_write!()
+    }
+
+    #[inline]
+    fn dyn_region_read<E: backend::Elem, const LEN: usize>(
+        region: &Self::DynRegion<LEN>,
+        address: usize,
+    ) -> E {
+        // NOTE: This implementation must match that of SliceManagerRO.
+        assert!(address + mem::size_of::<E>() <= LEN);
+
+        let mut result = unsafe {
+            region
+                .as_ptr()
+                .cast::<u8>() // Calculate the offset in bytes
+                .add(address)
+                .cast::<E>()
+                .read_unaligned()
+        };
+        result.from_stored_in_place();
+
+        result
+    }
+
+    #[inline]
+    fn dyn_region_read_all<E: backend::Elem, const LEN: usize>(
+        region: &Self::DynRegion<LEN>,
+        address: usize,
+        values: &mut [E],
+    ) {
+        // NOTE: This implementation must match that of SliceManagerRO.
+        assert!(address + mem::size_of_val(values) <= LEN);
+
+        unsafe {
+            region
+                .as_ptr()
+                .cast::<u8>() // Calculate the offset in bytes
+                .add(address)
+                .cast::<E>()
+                .copy_to(values.as_mut_ptr(), values.len())
+        };
+
+        for v in values.iter_mut() {
+            v.from_stored_in_place();
+        }
+    }
+
+    #[inline]
+    fn dyn_region_write<E: backend::Elem, const LEN: usize>(
+        _region: &mut Self::DynRegion<LEN>,
+        _address: usize,
+        _value: E,
+    ) {
+        read_only_write!()
+    }
+
+    #[inline]
+    fn dyn_region_write_all<E: backend::Elem, const LEN: usize>(
+        _region: &mut Self::DynRegion<LEN>,
+        _address: usize,
+        _values: &[E],
+    ) {
+        read_only_write!()
     }
 }
 

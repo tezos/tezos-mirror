@@ -3,203 +3,6 @@
 // SPDX-License-Identifier: MIT
 
 use super::{Elem, Manager};
-use std::mem;
-
-macro_rules! read_only_write {
-    () => {
-        panic!("cannot write to an immutable reference to a region")
-    };
-}
-
-/// Dedicated region in a [`super::Backend`]
-pub trait Region {
-    /// Type of elements in the region
-    type Elem: Elem;
-
-    /// Number of elements in the region
-    const LEN: usize;
-
-    /// Read an element in the region.
-    fn read(&self, index: usize) -> Self::Elem;
-
-    /// Read all elements in the region.
-    fn read_all(&self) -> Vec<Self::Elem>;
-
-    /// Read `buffer.len()` elements from the region, starting at `offset`.
-    fn read_some(&self, offset: usize, buffer: &mut [Self::Elem]);
-
-    /// Update an element in the region.
-    fn write(&mut self, index: usize, value: Self::Elem);
-
-    /// Update all elements in the region.
-    fn write_all(&mut self, value: &[Self::Elem]);
-
-    /// Update a subset of elements in the region starting at `index`.
-    fn write_some(&mut self, index: usize, buffer: &[Self::Elem]);
-
-    /// Update the element in the region and return the previous value.
-    fn replace(&mut self, index: usize, value: Self::Elem) -> Self::Elem;
-}
-
-impl<E: Elem, const LEN: usize> Region for [E; LEN] {
-    type Elem = E;
-
-    const LEN: usize = LEN;
-
-    #[inline(always)]
-    fn read(&self, index: usize) -> E {
-        E::from_stored(&self[index])
-    }
-
-    #[inline(always)]
-    fn read_all(&self) -> Vec<E> {
-        let mut result = self.to_vec();
-
-        // NOTE: If [E::from_stored_in_place] is inlined and ends up as a no-op, then
-        // the optimiser can hopefully eliminate the entire loop.
-        for elem in result.iter_mut() {
-            elem.from_stored_in_place();
-        }
-
-        result
-    }
-
-    #[inline(always)]
-    fn read_some(&self, offset: usize, buffer: &mut [E]) {
-        let length = buffer.len();
-
-        // We copy first because this allows the compiler to pick a faster
-        // copy mechanism instead of doing the copying in the for loop.
-        buffer.copy_from_slice(&self[offset..offset + length]);
-
-        // NOTE: If [E::from_stored_in_place] is inlined and ends up as a no-op, then
-        // the optimiser can hopefully eliminate the entire loop.
-        for elem in buffer {
-            elem.from_stored_in_place();
-        }
-    }
-
-    #[inline(always)]
-    fn write(&mut self, index: usize, value: E) {
-        self[index].store(&value)
-    }
-
-    #[inline(always)]
-    fn write_all(&mut self, value: &[E]) {
-        // We copy first because this allows the compiler to pick a faster
-        // copy mechanism instead of doing the copying in the for loop.
-        self.copy_from_slice(value);
-
-        // NOTE: If [E::to_stored_in_place] is inlined and ends up as a no-op, then
-        // the optimiser can hopefully eliminate the entire loop.
-        for elem in self {
-            elem.to_stored_in_place();
-        }
-    }
-
-    #[inline(always)]
-    fn write_some(&mut self, index: usize, buffer: &[E]) {
-        let length = buffer.len();
-        let target = &mut self[index..index + length];
-
-        // We copy first because this allows the compiler to pick a faster
-        // copy mechanism instead of doing the copying in the for loop.
-        target.copy_from_slice(buffer);
-
-        // NOTE: If [E::to_stored_in_place] is inlined and ends up as a no-op, then
-        // the optimiser can hopefully eliminate the entire loop.
-        for elem in target {
-            elem.to_stored_in_place();
-        }
-    }
-
-    fn replace(&mut self, index: usize, mut value: E) -> E {
-        value.to_stored_in_place();
-        let mut value = mem::replace(&mut self[index], value);
-        value.from_stored_in_place();
-        value
-    }
-}
-
-impl<E: Elem, T: Region<Elem = E>> Region for &mut T {
-    type Elem = E;
-
-    const LEN: usize = T::LEN;
-
-    #[inline(always)]
-    fn read(&self, index: usize) -> E {
-        (self as &T).read(index)
-    }
-
-    #[inline(always)]
-    fn read_all(&self) -> Vec<E> {
-        (self as &T).read_all()
-    }
-
-    #[inline(always)]
-    fn read_some(&self, offset: usize, buffer: &mut [E]) {
-        (self as &T).read_some(offset, buffer)
-    }
-
-    #[inline(always)]
-    fn write(&mut self, index: usize, value: E) {
-        (self as &mut T).write(index, value)
-    }
-
-    #[inline(always)]
-    fn write_all(&mut self, value: &[E]) {
-        (self as &mut T).write_all(value)
-    }
-
-    #[inline(always)]
-    fn write_some(&mut self, index: usize, buffer: &[E]) {
-        (self as &mut T).write_some(index, buffer)
-    }
-
-    fn replace(&mut self, index: usize, value: E) -> E {
-        (self as &mut T).replace(index, value)
-    }
-}
-
-impl<E: Elem, T: Region<Elem = E>> Region for &T {
-    type Elem = E;
-
-    const LEN: usize = T::LEN;
-
-    #[inline(always)]
-    fn read(&self, index: usize) -> E {
-        (self as &T).read(index)
-    }
-
-    #[inline(always)]
-    fn read_all(&self) -> Vec<E> {
-        (self as &T).read_all()
-    }
-
-    #[inline(always)]
-    fn read_some(&self, offset: usize, buffer: &mut [E]) {
-        (self as &T).read_some(offset, buffer)
-    }
-
-    #[inline(always)]
-    fn write(&mut self, _index: usize, _value: E) {
-        read_only_write!()
-    }
-
-    #[inline(always)]
-    fn write_all(&mut self, _value: &[E]) {
-        read_only_write!()
-    }
-
-    #[inline(always)]
-    fn write_some(&mut self, _index: usize, _buffer: &[E]) {
-        read_only_write!()
-    }
-
-    fn replace(&mut self, _index: usize, _value: E) -> E {
-        read_only_write!()
-    }
-}
 
 /// Single element of type `E`
 #[repr(transparent)]
@@ -297,161 +100,43 @@ impl<E: Elem, const LEN: usize, M: Manager> Cells<E, LEN, M> {
     /// Read an element in the region.
     #[inline]
     pub fn read(&self, index: usize) -> E {
-        M::Region::read(&self.region, index)
+        M::region_read(&self.region, index)
     }
 
     /// Read all elements in the region.
     #[inline]
     pub fn read_all(&self) -> Vec<E> {
-        M::Region::read_all(&self.region)
+        M::region_read_all(&self.region)
     }
 
     /// Read `buffer.len()` elements from the region, starting at `offset`.
     #[inline]
     pub fn read_some(&self, offset: usize, buffer: &mut [E]) {
-        M::Region::read_some(&self.region, offset, buffer)
+        M::region_read_some(&self.region, offset, buffer)
     }
 
     /// Update an element in the region.
     #[inline]
     pub fn write(&mut self, index: usize, value: E) {
-        M::Region::write(&mut self.region, index, value)
+        M::region_write(&mut self.region, index, value)
     }
 
     /// Update all elements in the region.
     #[inline]
     pub fn write_all(&mut self, value: &[E]) {
-        M::Region::write_all(&mut self.region, value)
+        M::region_write_all(&mut self.region, value)
     }
 
     /// Update a subset of elements in the region starting at `index`.
     #[inline]
     pub fn write_some(&mut self, index: usize, buffer: &[E]) {
-        M::Region::write_some(&mut self.region, index, buffer)
+        M::region_write_some(&mut self.region, index, buffer)
     }
 
     /// Update the element in the region and return the previous value.
     #[inline]
     pub fn replace(&mut self, index: usize, value: E) -> E {
-        M::Region::replace(&mut self.region, index, value)
-    }
-}
-
-/// Dynamic region
-pub trait DynRegion {
-    /// Number of bytes in the region
-    const LEN: usize;
-
-    /// Read an element in the region. `address` is in bytes.
-    fn read<E: Elem>(&self, address: usize) -> E;
-
-    /// Read elements from the region. `address` is in bytes.
-    fn read_all<E: Elem>(&self, address: usize, values: &mut [E]);
-
-    /// Update an element in the region. `address` is in bytes.
-    fn write<E: Elem>(&mut self, address: usize, value: E);
-
-    /// Update multiple elements in the region. `address` is in bytes.
-    fn write_all<E: Elem>(&mut self, address: usize, values: &[E]);
-}
-
-impl<T, const LEN: usize> DynRegion for [T; LEN] {
-    const LEN: usize = mem::size_of::<T>() * LEN;
-
-    fn read<E: Elem>(&self, address: usize) -> E {
-        assert!(address + mem::size_of::<E>() <= Self::LEN);
-        let mut result = unsafe {
-            self.as_ptr()
-                .cast::<u8>() // Calculate the offset in bytes
-                .add(address)
-                .cast::<E>()
-                .read_unaligned()
-        };
-        result.from_stored_in_place();
-        result
-    }
-
-    fn read_all<E: Elem>(&self, address: usize, values: &mut [E]) {
-        assert!(address + mem::size_of_val(values) <= Self::LEN);
-        unsafe {
-            self.as_ptr()
-                .cast::<u8>() // Calculate the offset in bytes
-                .add(address)
-                .cast::<E>()
-                .copy_to(values.as_mut_ptr(), values.len())
-        };
-        for v in values.iter_mut() {
-            v.from_stored_in_place();
-        }
-    }
-
-    fn write<E: Elem>(&mut self, address: usize, mut value: E) {
-        assert!(address + mem::size_of_val(&value) <= Self::LEN);
-        value.to_stored_in_place();
-        unsafe {
-            self.as_mut_ptr()
-                .cast::<u8>() // Calculate the offset in bytes
-                .add(address)
-                .cast::<E>()
-                .write_unaligned(value)
-        }
-    }
-
-    fn write_all<E: Elem>(&mut self, address: usize, values: &[E]) {
-        assert!(address + mem::size_of_val(values) <= Self::LEN);
-
-        unsafe {
-            let ptr = self
-                .as_mut_ptr()
-                .cast::<u8>() // Calculate the offset in bytes
-                .add(address)
-                .cast::<E>();
-
-            for (i, mut value) in values.iter().copied().enumerate() {
-                value.to_stored_in_place();
-                ptr.add(i).write_unaligned(value)
-            }
-        }
-    }
-}
-
-impl<T: DynRegion> DynRegion for &mut T {
-    const LEN: usize = T::LEN;
-
-    fn read<E: Elem>(&self, address: usize) -> E {
-        (self as &T).read(address)
-    }
-
-    fn read_all<E: Elem>(&self, address: usize, values: &mut [E]) {
-        (self as &T).read_all(address, values)
-    }
-
-    fn write<E: Elem>(&mut self, address: usize, value: E) {
-        (self as &mut T).write(address, value)
-    }
-
-    fn write_all<E: Elem>(&mut self, address: usize, values: &[E]) {
-        (self as &mut T).write_all(address, values)
-    }
-}
-
-impl<T: DynRegion> DynRegion for &T {
-    const LEN: usize = T::LEN;
-
-    fn read<E: Elem>(&self, address: usize) -> E {
-        (self as &T).read(address)
-    }
-
-    fn read_all<E: Elem>(&self, address: usize, values: &mut [E]) {
-        (self as &T).read_all(address, values)
-    }
-
-    fn write<E: Elem>(&mut self, _address: usize, _value: E) {
-        read_only_write!()
-    }
-
-    fn write_all<E: Elem>(&mut self, _address: usize, _values: &[E]) {
-        read_only_write!()
+        M::region_replace(&mut self.region, index, value)
     }
 }
 
@@ -469,59 +154,35 @@ impl<const LEN: usize, M: Manager> DynCells<LEN, M> {
     /// Read an element in the region. `address` is in bytes.
     #[inline]
     pub fn read<E: Elem>(&self, address: usize) -> E {
-        M::DynRegion::read(&self.region, address)
+        M::dyn_region_read(&self.region, address)
     }
 
     /// Read elements from the region. `address` is in bytes.
     #[inline]
     pub fn read_all<E: Elem>(&self, address: usize, values: &mut [E]) {
-        M::DynRegion::read_all(&self.region, address, values)
+        M::dyn_region_read_all(&self.region, address, values)
     }
 
     /// Update an element in the region. `address` is in bytes.
     #[inline]
     pub fn write<E: Elem>(&mut self, address: usize, value: E) {
-        M::DynRegion::write(&mut self.region, address, value)
+        M::dyn_region_write(&mut self.region, address, value)
     }
 
     /// Update multiple elements in the region. `address` is in bytes.
     #[inline]
     pub fn write_all<E: Elem>(&mut self, address: usize, values: &[E]) {
-        M::DynRegion::write_all(&mut self.region, address, values)
+        M::dyn_region_write_all(&mut self.region, address, values)
     }
 }
 
-impl<const LEN: usize, M: Manager> DynRegion for DynCells<LEN, M> {
-    const LEN: usize = LEN;
-
-    #[inline]
-    fn read<E: Elem>(&self, address: usize) -> E {
-        M::DynRegion::read(&self.region, address)
-    }
-
-    #[inline]
-    fn read_all<E: Elem>(&self, address: usize, values: &mut [E]) {
-        M::DynRegion::read_all(&self.region, address, values)
-    }
-
-    #[inline]
-    fn write<E: Elem>(&mut self, address: usize, value: E) {
-        M::DynRegion::write(&mut self.region, address, value)
-    }
-
-    #[inline]
-    fn write_all<E: Elem>(&mut self, address: usize, values: &[E]) {
-        M::DynRegion::write_all(&mut self.region, address, values)
-    }
-}
 #[cfg(test)]
 pub(crate) mod tests {
-    use super::DynRegion;
     use crate::{
         backend_test, create_backend,
         state_backend::{
             layout::{Atom, Layout},
-            Array, Backend, CellRead, CellWrite, Choreographer, Elem, Location,
+            Array, Backend, CellRead, CellWrite, Choreographer, DynCells, Elem, Location,
         },
     };
 
@@ -628,20 +289,40 @@ pub(crate) mod tests {
         assert_eq!(cell1.read(), cell1_value);
     });
 
-    #[should_panic]
-    #[test]
-    fn test_dynregion_oob() {
-        const LEN: usize = 8;
+    backend_test!(
+        #[should_panic]
+        test_dynregion_oob_2,
+        F,
+        {
+            const LEN: usize = 8;
 
-        let mut flipper_array = [Flipper { a: 0, b: 0 }; LEN];
+            struct FlipperLayout;
 
-        // This should panic because we are trying to write an element at the address which corresponds to the end of the buffer
-        DynRegion::write::<Flipper>(
-            &mut flipper_array,
-            LEN * FLIPPER_SIZE,
-            Flipper { a: 1, b: 2 },
-        );
-    }
+            impl Layout for FlipperLayout {
+                type Placed = Location<[u8; LEN]>;
+
+                fn place_with(alloc: &mut Choreographer) -> Self::Placed {
+                    alloc.alloc()
+                }
+
+                type Allocated<B: super::Manager> = DynCells<LEN, B>;
+
+                fn allocate<B: super::Manager>(
+                    backend: &mut B,
+                    placed: Self::Placed,
+                ) -> Self::Allocated<B> {
+                    DynCells::bind(backend.allocate_dyn_region(placed))
+                }
+            }
+
+            let mut backend = create_backend!(FlipperLayout, F);
+            let mut state = backend.allocate(FlipperLayout::placed().into_location());
+
+            // This should panic because we are trying to write an element at the address which
+            // corresponds to the end of the buffer.
+            state.write(LEN * FLIPPER_SIZE, Flipper { a: 1, b: 2 });
+        }
+    );
 
     backend_test!(test_dynregion_stored_format, F, {
         struct FlipperLayout;
@@ -653,13 +334,13 @@ pub(crate) mod tests {
                 alloc.alloc()
             }
 
-            type Allocated<B: super::Manager> = B::DynRegion<1024>;
+            type Allocated<B: super::Manager> = DynCells<1024, B>;
 
             fn allocate<B: super::Manager>(
                 backend: &mut B,
                 placed: Self::Placed,
             ) -> Self::Allocated<B> {
-                backend.allocate_dyn_region(placed)
+                DynCells::bind(backend.allocate_dyn_region(placed))
             }
         }
 

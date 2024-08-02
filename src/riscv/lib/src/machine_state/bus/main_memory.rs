@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 use super::{Address, Addressable};
-use crate::state_backend::{self as backend, DynRegion};
+use crate::state_backend::{self as backend};
 use std::mem;
 
 /// Configuration object for memory size
@@ -37,11 +37,35 @@ gen_memory_layout!(M4G = 4 GiB);
 // inherent associated types are unstable. Hence we must go through a dummy
 // trait.
 pub trait MainMemoryLayout: backend::Layout {
-    type Data<M: backend::Manager>: backend::DynRegion;
+    type Data<M: backend::Manager>;
 
     const BYTES: usize;
 
     fn refl<M: backend::Manager>(space: backend::AllocatedOf<Self, M>) -> MainMemory<Self, M>;
+
+    /// Read an element in the region. `address` is in bytes.
+    fn data_read<E: backend::Elem, M: backend::Manager>(data: &Self::Data<M>, address: usize) -> E;
+
+    /// Read elements from the region. `address` is in bytes.
+    fn data_read_all<E: backend::Elem, M: backend::Manager>(
+        data: &Self::Data<M>,
+        address: usize,
+        values: &mut [E],
+    );
+
+    /// Update an element in the region. `address` is in bytes.
+    fn data_write<E: backend::Elem, M: backend::Manager>(
+        data: &mut Self::Data<M>,
+        address: usize,
+        value: E,
+    );
+
+    /// Update multiple elements in the region. `address` is in bytes.
+    fn data_write_all<E: backend::Elem, M: backend::Manager>(
+        data: &mut Self::Data<M>,
+        address: usize,
+        values: &[E],
+    );
 }
 
 impl<const BYTES: usize> MainMemoryLayout for Sizes<BYTES> {
@@ -51,6 +75,34 @@ impl<const BYTES: usize> MainMemoryLayout for Sizes<BYTES> {
 
     fn refl<M: backend::Manager>(space: backend::AllocatedOf<Self, M>) -> MainMemory<Self, M> {
         space
+    }
+
+    fn data_read<E: backend::Elem, M: backend::Manager>(data: &Self::Data<M>, address: usize) -> E {
+        data.read(address)
+    }
+
+    fn data_read_all<E: backend::Elem, M: backend::Manager>(
+        data: &Self::Data<M>,
+        address: usize,
+        values: &mut [E],
+    ) {
+        data.read_all(address, values);
+    }
+
+    fn data_write<E: backend::Elem, M: backend::Manager>(
+        data: &mut Self::Data<M>,
+        address: usize,
+        value: E,
+    ) {
+        data.write(address, value);
+    }
+
+    fn data_write_all<E: backend::Elem, M: backend::Manager>(
+        data: &mut Self::Data<M>,
+        address: usize,
+        values: &[E],
+    ) {
+        data.write_all(address, values);
     }
 }
 
@@ -88,7 +140,7 @@ impl<L: MainMemoryLayout, M: backend::Manager> MainMemory<L, M> {
     /// Reset to the initial state.
     pub fn reset(&mut self) {
         for i in 0..L::BYTES {
-            self.data.write(i, 0u8);
+            L::data_write(&mut self.data, i, 0u8);
         }
     }
 }
@@ -102,7 +154,7 @@ impl<E: backend::Elem, L: MainMemoryLayout, M: backend::Manager> Addressable<E>
             return Err(super::OutOfBounds);
         }
 
-        Ok(self.data.read(addr as usize))
+        Ok(L::data_read(&self.data, addr as usize))
     }
 
     #[inline(always)]
@@ -111,7 +163,7 @@ impl<E: backend::Elem, L: MainMemoryLayout, M: backend::Manager> Addressable<E>
             return Err(super::OutOfBounds);
         }
 
-        self.data.read_all(addr as usize, values);
+        L::data_read_all(&self.data, addr as usize, values);
 
         Ok(())
     }
@@ -121,7 +173,7 @@ impl<E: backend::Elem, L: MainMemoryLayout, M: backend::Manager> Addressable<E>
             return Err(super::OutOfBounds);
         }
 
-        self.data.write(addr as usize, value);
+        L::data_write(&mut self.data, addr as usize, value);
 
         Ok(())
     }
@@ -133,7 +185,7 @@ impl<E: backend::Elem, L: MainMemoryLayout, M: backend::Manager> Addressable<E>
             return Err(super::OutOfBounds);
         }
 
-        self.data.write_all(addr, values);
+        L::data_write_all(&mut self.data, addr, values);
 
         Ok(())
     }
