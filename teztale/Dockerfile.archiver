@@ -1,8 +1,0 @@
-# Must be the same as the build of .gitlab-ci.yml
-FROM ubuntu:22.04
-
-RUN apt-get update && apt-get install -y libev4 libhidapi-libusb0 ca-certificates netbase
-
-COPY archiver/main.exe /usr/local/bin/teztale-archiver
-
-ENTRYPOINT ["/usr/local/bin/teztale-archiver"]
