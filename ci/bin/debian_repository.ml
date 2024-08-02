@@ -176,13 +176,22 @@ let jobs pipeline_type =
 
   (* These jobs build the next packages in a matrix using the
      build dependencies images *)
+  let job_build_data_packages : tezos_job =
+    make_job_build_debian_packages
+      ~__POS__
+      ~name:"oc.build-data_packages"
+      ~distribution:"debian"
+      ~dependencies:(Dependent [Job job_docker_build_debian_dependencies])
+      ~script:"./scripts/ci/build-debian-packages.sh zcash"
+      ~matrix:(debian_package_release_matrix pipeline_type)
+  in
   let job_build_debian_package : tezos_job =
     make_job_build_debian_packages
       ~__POS__
       ~name:"oc.build-debian"
       ~distribution:"debian"
       ~dependencies:(Dependent [Job job_docker_build_debian_dependencies])
-      ~script:"./scripts/ci/build-debian-packages.sh"
+      ~script:"./scripts/ci/build-debian-packages.sh binaries"
       ~matrix:(debian_package_release_matrix pipeline_type)
   in
   let job_build_ubuntu_package : tezos_job =
@@ -191,7 +200,7 @@ let jobs pipeline_type =
       ~name:"oc.build-ubuntu"
       ~distribution:"ubuntu"
       ~dependencies:(Dependent [Job job_docker_build_ubuntu_dependencies])
-      ~script:"./scripts/ci/build-debian-packages.sh"
+      ~script:"./scripts/ci/build-debian-packages.sh binaries"
       ~matrix:(ubuntu_package_release_matrix pipeline_type)
   in
 
@@ -228,7 +237,12 @@ let jobs pipeline_type =
       ~__POS__
       ~name:"apt_repo_debian"
       ~prefix:true
-      ~dependencies:(Dependent [Artifacts job_build_debian_package])
+      ~dependencies:
+        (Dependent
+           [
+             Artifacts job_build_debian_package;
+             Artifacts job_build_data_packages;
+           ])
       ~image:Images.debian_bookworm
       ["./scripts/ci/create_debian_repo.sh debian bookworm"]
   in
@@ -237,7 +251,12 @@ let jobs pipeline_type =
       ~__POS__
       ~name:"apt_repo_ubuntu"
       ~prefix:true
-      ~dependencies:(Dependent [Artifacts job_build_ubuntu_package])
+      ~dependencies:
+        (Dependent
+           [
+             Artifacts job_build_ubuntu_package;
+             Artifacts job_build_data_packages;
+           ])
       ~image:Images.ubuntu_noble
       ["./scripts/ci/create_debian_repo.sh ubuntu noble jammy"]
   in
@@ -339,6 +358,7 @@ let jobs pipeline_type =
       job_build_debian_package;
       job_build_debian_package_current_a;
       job_build_debian_package_current_b;
+      job_build_data_packages;
       job_apt_repo_debian_current;
       job_apt_repo_debian;
     ]
