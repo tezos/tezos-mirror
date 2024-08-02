@@ -120,8 +120,8 @@ type t
     enabled, running all tests.
     When the scheduled pipeline is launched, the TZ_SCHEDULE_KIND
     environment variable is set to "EXTENDED_RPC_TESTS" to turn on the
-    external RPC process. Look for the [ci/bin/rpc_pipeline.ml] file
-    for more details. *)
+    external RPC process. Look for the
+    [ci/bin/custom_extended_test_pipeline.ml] file for more details. *)
 val enable_external_rpc_process : bool
 
 (** This placeholder aims to handle the activation of the
