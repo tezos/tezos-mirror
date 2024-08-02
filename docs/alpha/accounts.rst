@@ -17,6 +17,8 @@ addresses:
 Finally, addresses prefixed with ``sr1`` identify :doc:`Smart Rollups
 <./smart_rollups>`.
 
+.. _user_accounts_alpha:
+
 User accounts
 ~~~~~~~~~~~~~
 

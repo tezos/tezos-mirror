@@ -207,6 +207,8 @@ implements the exact same semantics as the PVM. The PVM is only ever
 used by the rollup node when it needs to produce a proof during the
 last step of the refutation mechanism.
 
+.. _commitments_beta:
+
 Commitments
 ^^^^^^^^^^^
 
@@ -236,9 +238,10 @@ must be wrong.
 
 An operator publishing a commitment is called a **committer**.
 Notice that, in order to publish a commitment, the operator must freeze a
-deposit of 10,000 tez. For this reason, the committer is sometimes called a
+deposit of 10,000 tez, called **frozen bonds**. For this reason, the
+committer is sometimes called a
 (smart rollup) *staker*. However, in order to avoid confusion with the
-:ref:`staker <new_staking_beta>` role in Tezos Layer 1's Proof-of-Stake mechanism, we prefer to use the term "committer" throughout this documentation.
+:doc:`staker<staking>` role in Tezos Layer 1's Proof-of-Stake mechanism, we prefer to use the term "committer" throughout this documentation.
 
 Several committers can publish (and thus stake on) the same commitment. When a
 committer *C* publishes a new commitment based on a commitment that *C*

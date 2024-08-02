@@ -2,9 +2,6 @@
 
   For operational details about the staking mechanism and its configuration, see `a staking mechanism tutorial <https://docs.google.com/document/d/1-1WTG2Vuez9D8fROTJrs42twbIErR16xyknRRBrjr-A/edit?usp=sharing>`__.
 
-
-.. _new_staking_beta:
-
 =================
 Staking mechanism
 =================
@@ -157,7 +154,8 @@ or more conveniently::
 
    octez-client unstake <amount|"everything"> for <staker>
 
-The requested amount will be **unstaked** but will remain **frozen**.
+The requested amount will be **unstaked** but will remain **frozen**,
+a.k.a. **unfinalizable**.
 After 4 cycles, unstaked frozen tokens are no longer considered at stake
 nor slashable. They are said then to be both **unstaked** and
 **finalizable**.
