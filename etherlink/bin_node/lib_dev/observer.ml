@@ -211,7 +211,7 @@ let observer_start
   let*! () = Events.is_ready ~rpc_addr ~rpc_port in
   return server
 
-let install_finalizer_observer server =
+let install_finalizer_observer ~rollup_node_tracking server =
   let open Lwt_syntax in
   Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
   let* () = Events.shutdown_node ~exit_status in
@@ -220,14 +220,17 @@ let install_finalizer_observer server =
   Misc.unwrap_error_monad @@ fun () ->
   let open Lwt_result_syntax in
   let* () = Tx_pool.shutdown () in
-  let* () = Evm_events_follower.shutdown () in
-  Evm_context.shutdown ()
+  let* () = Evm_context.shutdown () in
+  when_ rollup_node_tracking @@ fun () -> Evm_events_follower.shutdown ()
 
 let main ?kernel_path ~data_dir ~(config : Configuration.t) () =
   let open Lwt_result_syntax in
   Metrics.Info.init ~mode:"observer" ;
-  let rollup_node_endpoint = config.rollup_node_endpoint in
-  let*? {evm_node_endpoint; threshold_encryption_bundler_endpoint} =
+  let*? {
+          evm_node_endpoint;
+          threshold_encryption_bundler_endpoint;
+          rollup_node_tracking;
+        } =
     Configuration.observer_config_exn config
   in
   let* smart_rollup_address =
@@ -296,23 +299,31 @@ let main ?kernel_path ~data_dir ~(config : Configuration.t) () =
 
   let* server = observer_start config ~directory in
 
-  let (_ : Lwt_exit.clean_up_callback_id) = install_finalizer_observer server in
   let* () =
-    Evm_events_follower.start
-      {
-        rollup_node_endpoint;
-        keep_alive = config.keep_alive;
-        filter_event =
-          (function
-          | New_delayed_transaction _ | Upgrade_event _ -> false | _ -> true);
-      }
+    if rollup_node_tracking then
+      let* () =
+        Evm_events_follower.start
+          {
+            rollup_node_endpoint = config.rollup_node_endpoint;
+            keep_alive = config.keep_alive;
+            filter_event =
+              (function
+              | New_delayed_transaction _ | Upgrade_event _ -> false | _ -> true);
+          }
+      in
+      let () =
+        Rollup_node_follower.start
+          ~keep_alive:config.keep_alive
+          ~proxy:false
+          ~rollup_node_endpoint:config.rollup_node_endpoint
+          ()
+      in
+      return_unit
+    else return_unit
   in
-  let () =
-    Rollup_node_follower.start
-      ~keep_alive:config.keep_alive
-      ~proxy:false
-      ~rollup_node_endpoint
-      ()
+
+  let (_ : Lwt_exit.clean_up_callback_id) =
+    install_finalizer_observer ~rollup_node_tracking server
   in
 
   Blueprints_follower.start

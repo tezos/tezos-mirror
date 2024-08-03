@@ -55,6 +55,7 @@ type threshold_encryption_sequencer =
 type observer = {
   evm_node_endpoint : Uri.t;
   threshold_encryption_bundler_endpoint : Uri.t option;
+  rollup_node_tracking : bool;
 }
 
 type proxy = {finalized_view : bool}
@@ -119,6 +120,10 @@ let default_rpc_port = 8545
 let default_sequencer_sidecar_endpoint = Uri.of_string "127.0.0.1:5303"
 
 let default_keep_alive = false
+
+let default_rollup_node_endpoint = Uri.of_string "http://localhost:8937"
+
+let default_rollup_node_tracking = true
 
 let default_cors_origins = []
 
@@ -266,8 +271,13 @@ let threshold_encryption_sequencer_config_dft ?time_between_blocks
     }
 
 let observer_config_dft ~evm_node_endpoint
-    ?threshold_encryption_bundler_endpoint () =
-  {evm_node_endpoint; threshold_encryption_bundler_endpoint}
+    ?threshold_encryption_bundler_endpoint ?rollup_node_tracking () =
+  {
+    evm_node_endpoint;
+    threshold_encryption_bundler_endpoint;
+    rollup_node_tracking =
+      Option.value ~default:default_rollup_node_tracking rollup_node_tracking;
+  }
 
 let log_filter_config_encoding : log_filter_config Data_encoding.t =
   let open Data_encoding in
@@ -456,25 +466,37 @@ let threshold_encryption_sequencer_encoding =
 let observer_encoding =
   let open Data_encoding in
   conv
-    (fun {evm_node_endpoint; threshold_encryption_bundler_endpoint} ->
+    (fun {
+           evm_node_endpoint;
+           threshold_encryption_bundler_endpoint;
+           rollup_node_tracking;
+         } ->
       ( None,
+        None,
         None,
         Uri.to_string evm_node_endpoint,
         threshold_encryption_bundler_endpoint,
-        None ))
-    (fun (_, _, evm_node_endpoint, threshold_encryption_bundler_endpoint, _) ->
+        rollup_node_tracking ))
+    (fun ( _,
+           _,
+           _,
+           evm_node_endpoint,
+           threshold_encryption_bundler_endpoint,
+           rollup_node_tracking ) ->
       {
         evm_node_endpoint = Uri.of_string evm_node_endpoint;
         threshold_encryption_bundler_endpoint;
+        rollup_node_tracking;
       })
-    (obj5
+    (obj6
        (deprecated "preimages")
        (deprecated "preimages_endpoint")
+       (deprecated "time_between_blocks")
        (req "evm_node_endpoint" string)
        (opt
           "threshold_encryption_bundler_endpoint"
           Tezos_rpc.Encoding.uri_encoding)
-       (deprecated "time_between_blocks"))
+       (dft "rollup_node_tracking" bool default_rollup_node_tracking))
 
 let experimental_features_encoding =
   let open Data_encoding in
@@ -572,7 +594,7 @@ let encoding data_dir : t Data_encoding.t =
             tx_pool_addr_limit,
             tx_pool_tx_per_addr_limit,
             keep_alive,
-            Uri.to_string rollup_node_endpoint,
+            rollup_node_endpoint,
             verbose,
             experimental_features,
             proxy,
@@ -615,7 +637,7 @@ let encoding data_dir : t Data_encoding.t =
         tx_pool_addr_limit;
         tx_pool_tx_per_addr_limit;
         keep_alive;
-        rollup_node_endpoint = Uri.of_string rollup_node_endpoint;
+        rollup_node_endpoint;
         verbose;
         experimental_features;
         fee_history;
@@ -665,7 +687,10 @@ let encoding data_dir : t Data_encoding.t =
                 int64
                 default_tx_pool_tx_per_addr_limit)
              (dft "keep_alive" bool default_keep_alive)
-             (req "rollup_node_endpoint" string)
+             (dft
+                "rollup_node_endpoint"
+                Tezos_rpc.Encoding.uri_encoding
+                default_rollup_node_endpoint)
              (dft "verbose" Internal_event.Level.encoding Internal_event.Notice)
              (dft
                 "experimental_features"
@@ -716,13 +741,14 @@ let observer_config_exn {observer; _} =
 module Cli = struct
   let create ~data_dir ?rpc_addr ?rpc_port ?cors_origins ?cors_headers
       ?tx_pool_timeout_limit ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit
-      ~keep_alive ~rollup_node_endpoint ~verbose ?preimages ?preimages_endpoint
-      ?time_between_blocks ?max_number_of_chunks ?private_rpc_port
-      ?sequencer_key ?evm_node_endpoint ?threshold_encryption_bundler_endpoint
-      ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
-      ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
-      ?catchup_cooldown ?sequencer_sidecar_endpoint ?restricted_rpcs
-      ?proxy_finalized_view ?dal_slots () =
+      ~keep_alive ?rollup_node_endpoint ?dont_track_rollup_node ~verbose
+      ?preimages ?preimages_endpoint ?time_between_blocks ?max_number_of_chunks
+      ?private_rpc_port ?sequencer_key ?evm_node_endpoint
+      ?threshold_encryption_bundler_endpoint ?log_filter_max_nb_blocks
+      ?log_filter_max_nb_logs ?log_filter_chunk_size ?max_blueprints_lag
+      ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
+      ?sequencer_sidecar_endpoint ?restricted_rpcs ?proxy_finalized_view
+      ?dal_slots () =
     let sequencer =
       Option.map
         (fun sequencer ->
@@ -759,9 +785,11 @@ module Cli = struct
     let observer =
       Option.map
         (fun evm_node_endpoint ->
+          let rollup_node_tracking = Option.map not dont_track_rollup_node in
           observer_config_dft
             ~evm_node_endpoint
             ?threshold_encryption_bundler_endpoint
+            ?rollup_node_tracking
             ())
         evm_node_endpoint
     in
@@ -772,6 +800,9 @@ module Cli = struct
         ?max_nb_logs:log_filter_max_nb_logs
         ?chunk_size:log_filter_chunk_size
         ()
+    in
+    let rollup_node_endpoint =
+      Option.value ~default:default_rollup_node_endpoint rollup_node_endpoint
     in
     let kernel_execution =
       kernel_execution_config_dft ~data_dir ?preimages ?preimages_endpoint ()
@@ -818,14 +849,14 @@ module Cli = struct
 
   let patch_configuration_from_args ?rpc_addr ?rpc_port ?cors_origins
       ?cors_headers ?tx_pool_timeout_limit ?tx_pool_addr_limit
-      ?tx_pool_tx_per_addr_limit ~keep_alive ?rollup_node_endpoint ~verbose
-      ?preimages ?preimages_endpoint ?time_between_blocks ?max_number_of_chunks
-      ?private_rpc_port ?sequencer_key ?evm_node_endpoint
-      ?threshold_encryption_bundler_endpoint ?log_filter_max_nb_blocks
-      ?log_filter_max_nb_logs ?log_filter_chunk_size ?max_blueprints_lag
-      ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
-      ?sequencer_sidecar_endpoint ?restricted_rpcs ?proxy_finalized_view
-      ~dal_slots configuration =
+      ?tx_pool_tx_per_addr_limit ~keep_alive ?rollup_node_endpoint
+      ?dont_track_rollup_node ~verbose ?preimages ?preimages_endpoint
+      ?time_between_blocks ?max_number_of_chunks ?private_rpc_port
+      ?sequencer_key ?evm_node_endpoint ?threshold_encryption_bundler_endpoint
+      ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
+      ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
+      ?catchup_cooldown ?sequencer_sidecar_endpoint ?restricted_rpcs
+      ?proxy_finalized_view ~dal_slots configuration =
     let sequencer =
       let sequencer_config = configuration.sequencer in
       match sequencer_config with
@@ -979,6 +1010,11 @@ module Cli = struct
                 (match threshold_encryption_bundler_endpoint with
                 | None -> observer_config.threshold_encryption_bundler_endpoint
                 | endpoint -> endpoint);
+              rollup_node_tracking =
+                Option.(
+                  value
+                    ~default:observer_config.rollup_node_tracking
+                    (map not dont_track_rollup_node));
             }
       | None ->
           Option.map
@@ -986,6 +1022,7 @@ module Cli = struct
               observer_config_dft
                 ~evm_node_endpoint
                 ?threshold_encryption_bundler_endpoint
+                ?rollup_node_tracking:(Option.map not dont_track_rollup_node)
                 ())
             evm_node_endpoint
     in
@@ -1016,6 +1053,11 @@ module Cli = struct
     let restricted_rpcs =
       Option.either restricted_rpcs configuration.restricted_rpcs
     in
+    let rollup_node_endpoint =
+      Option.value
+        ~default:configuration.rollup_node_endpoint
+        rollup_node_endpoint
+    in
     {
       rpc_addr = Option.value ~default:configuration.rpc_addr rpc_addr;
       rpc_port = Option.value ~default:configuration.rpc_port rpc_port;
@@ -1043,10 +1085,7 @@ module Cli = struct
           ~default:configuration.tx_pool_tx_per_addr_limit
           tx_pool_tx_per_addr_limit;
       keep_alive = configuration.keep_alive || keep_alive;
-      rollup_node_endpoint =
-        Option.value
-          ~default:configuration.rollup_node_endpoint
-          rollup_node_endpoint;
+      rollup_node_endpoint;
       verbose = (if verbose then Debug else configuration.verbose);
       experimental_features = configuration.experimental_features;
       fee_history = configuration.fee_history;
@@ -1055,14 +1094,14 @@ module Cli = struct
 
   let create_or_read_config ~data_dir ?rpc_addr ?rpc_port ?cors_origins
       ?cors_headers ?tx_pool_timeout_limit ?tx_pool_addr_limit
-      ?tx_pool_tx_per_addr_limit ~keep_alive ?rollup_node_endpoint ~verbose
-      ?preimages ?preimages_endpoint ?time_between_blocks ?max_number_of_chunks
-      ?private_rpc_port ?sequencer_key ?evm_node_endpoint
-      ?threshold_encryption_bundler_endpoint ?max_blueprints_lag
-      ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
-      ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
-      ?sequencer_sidecar_endpoint ?restricted_rpcs ?proxy_finalized_view
-      ?dal_slots () =
+      ?tx_pool_tx_per_addr_limit ~keep_alive ?rollup_node_endpoint
+      ?dont_track_rollup_node ~verbose ?preimages ?preimages_endpoint
+      ?time_between_blocks ?max_number_of_chunks ?private_rpc_port
+      ?sequencer_key ?evm_node_endpoint ?threshold_encryption_bundler_endpoint
+      ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
+      ?catchup_cooldown ?log_filter_max_nb_blocks ?log_filter_max_nb_logs
+      ?log_filter_chunk_size ?sequencer_sidecar_endpoint ?restricted_rpcs
+      ?proxy_finalized_view ?dal_slots () =
     let open Lwt_result_syntax in
     let open Filename.Infix in
     (* Check if the data directory of the evm node is not the one of Octez
@@ -1106,6 +1145,7 @@ module Cli = struct
           ?tx_pool_addr_limit
           ?tx_pool_tx_per_addr_limit
           ?rollup_node_endpoint
+          ?dont_track_rollup_node
           ~verbose
           ?log_filter_max_nb_blocks
           ?log_filter_max_nb_logs
@@ -1118,11 +1158,6 @@ module Cli = struct
       in
       return configuration
     else
-      let*? rollup_node_endpoint =
-        Option.to_result
-          ~none:(error_missing_config ~name:"rollup_node_endpoint")
-          rollup_node_endpoint
-      in
       let config =
         create
           ~data_dir
@@ -1146,7 +1181,8 @@ module Cli = struct
           ?tx_pool_timeout_limit
           ?tx_pool_addr_limit
           ?tx_pool_tx_per_addr_limit
-          ~rollup_node_endpoint
+          ?rollup_node_endpoint
+          ?dont_track_rollup_node
           ~verbose
           ?log_filter_max_nb_blocks
           ?log_filter_max_nb_logs

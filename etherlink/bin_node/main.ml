@@ -327,6 +327,15 @@ let rollup_node_endpoint_arg =
     ~doc:"The address of a rollup node."
     Params.rollup_node_endpoint
 
+let dont_track_rollup_node_arg =
+  Tezos_clic.switch
+    ~long:"dont-track-rollup-node"
+    ~doc:
+      "Disable tracking the head of the rollup node. Tracking the state of a \
+       rollup node allows to confirm the blocks received from the upstream EVM \
+       node."
+    ()
+
 let evm_node_endpoint_arg =
   Tezos_clic.arg
     ~long:"evm-node-endpoint"
@@ -1125,11 +1134,12 @@ let rpc_command =
       Evm_node_lib_dev.Rpc.main ~data_dir ~evm_node_endpoint ~config)
 
 let start_observer ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?cors_origins
-    ?cors_headers ~verbose ?preimages ?rollup_node_endpoint ?preimages_endpoint
-    ?evm_node_endpoint ?threshold_encryption_bundler_endpoint
-    ?tx_pool_timeout_limit ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit
-    ?log_filter_chunk_size ?log_filter_max_nb_logs ?log_filter_max_nb_blocks
-    ?restricted_rpcs ?kernel () =
+    ?cors_headers ~verbose ?preimages ?rollup_node_endpoint
+    ~dont_track_rollup_node ?preimages_endpoint ?evm_node_endpoint
+    ?threshold_encryption_bundler_endpoint ?tx_pool_timeout_limit
+    ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit ?log_filter_chunk_size
+    ?log_filter_max_nb_logs ?log_filter_max_nb_blocks ?restricted_rpcs ?kernel
+    () =
   let open Lwt_result_syntax in
   let* config =
     Cli.create_or_read_config
@@ -1140,6 +1150,7 @@ let start_observer ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?cors_origins
       ?cors_origins
       ?cors_headers
       ?rollup_node_endpoint
+      ~dont_track_rollup_node
       ~verbose
       ?preimages
       ?preimages_endpoint
@@ -1188,11 +1199,12 @@ let observer_command =
        observer` command."
     (merge_options
        common_config_args
-       (args4
+       (args5
           initial_kernel_arg
           preimages_arg
           preimages_endpoint_arg
-          bundler_node_endpoint_arg))
+          bundler_node_endpoint_arg
+          dont_track_rollup_node_arg))
     (prefixes ["run"; "observer"; "with"; "endpoint"]
     @@ param
          ~name:"evm-node-endpoint"
@@ -1223,7 +1235,8 @@ let observer_command =
            ( kernel,
              preimages,
              preimages_endpoint,
-             threshold_encryption_bundler_endpoint ) )
+             threshold_encryption_bundler_endpoint,
+             dont_track_rollup_node ) )
              evm_node_endpoint
              rollup_node_endpoint
              () ->
@@ -1248,6 +1261,7 @@ let observer_command =
     ~verbose
     ?preimages
     ~rollup_node_endpoint
+    ~dont_track_rollup_node
     ?preimages_endpoint
     ~evm_node_endpoint
     ?threshold_encryption_bundler_endpoint
@@ -1644,7 +1658,7 @@ If the <evm-node-endpoint> is set then adds the configuration for the observer
 mode.|}
     (merge_options
        common_config_args
-       (args16
+       (args17
           (* sequencer and observer config*)
           preimages_arg
           preimages_endpoint_arg
@@ -1660,6 +1674,7 @@ mode.|}
           bundler_node_endpoint_arg
           sequencer_sidecar_endpoint_arg
           (* others option *)
+          dont_track_rollup_node_arg
           wallet_dir_arg
           (Tezos_clic.switch
              ~long:"force"
@@ -1699,6 +1714,7 @@ mode.|}
              evm_node_endpoint,
              threshold_encryption_bundler_endpoint,
              sequencer_sidecar_endpoint,
+             dont_track_rollup_node,
              wallet_dir,
              force,
              dal_slots ) )
@@ -1725,6 +1741,7 @@ mode.|}
           ?log_filter_chunk_size
           ~keep_alive
           ?rollup_node_endpoint
+          ~dont_track_rollup_node
           ?tx_pool_timeout_limit
           ?tx_pool_addr_limit
           ?tx_pool_tx_per_addr_limit
@@ -2206,12 +2223,13 @@ let threshold_encryption_sequencer_command =
         ())
 
 let observer_run_args =
-  Tezos_clic.args5
+  Tezos_clic.args6
     evm_node_endpoint_arg
     bundler_node_endpoint_arg
     preimages_arg
     preimages_endpoint_arg
     initial_kernel_arg
+    dont_track_rollup_node_arg
 
 let observer_simple_command =
   let open Tezos_clic in
@@ -2241,7 +2259,8 @@ let observer_simple_command =
              threshold_encryption_bundler_endpoint,
              preimages,
              preimages_endpoint,
-             kernel ) )
+             kernel,
+             dont_track_rollup_node ) )
          () ->
       let open Lwt_result_syntax in
       let* restricted_rpcs =
@@ -2257,6 +2276,7 @@ let observer_simple_command =
         ~verbose
         ?preimages
         ?rollup_node_endpoint
+        ~dont_track_rollup_node
         ?preimages_endpoint
         ?evm_node_endpoint
         ?threshold_encryption_bundler_endpoint
