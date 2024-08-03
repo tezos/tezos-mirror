@@ -694,6 +694,10 @@ let dispatch_private_request (_config : Configuration.t)
   in
   return JSONRPC.{value; id}
 
+let can_process_batch size = function
+  | Configuration.Limit l -> size <= l
+  | Unlimited -> true
+
 let generic_dispatch config ctx dir path dispatch_request =
   Directory.register0 dir (dispatch_service ~path) (fun () input ->
       let open Lwt_result_syntax in
@@ -702,7 +706,19 @@ let generic_dispatch config ctx dir path dispatch_request =
           let*! response = dispatch_request config ctx request in
           return (Singleton response)
       | Batch requests ->
-          let*! outputs = List.map_s (dispatch_request config ctx) requests in
+          let process =
+            if
+              can_process_batch
+                (List.length requests)
+                config.Configuration.rpc_batch_limit
+            then dispatch_request config ctx
+            else fun req ->
+              let value =
+                Error Rpc_errors.(invalid_request "too many requests in batch")
+              in
+              Lwt.return JSONRPC.{value; id = req.id}
+          in
+          let*! outputs = List.map_s process requests in
           return (Batch outputs))
 
 let dispatch_public config ctx dir =

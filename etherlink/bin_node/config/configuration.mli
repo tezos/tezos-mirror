@@ -100,9 +100,12 @@ type restricted_rpcs =
   | Blacklist of string list
   | Whitelist of string list
 
+type limit = Unlimited | Limit of int
+
 type t = {
   rpc_addr : string;
   rpc_port : int;
+  rpc_batch_limit : limit;
   cors_origins : string list;
   cors_headers : string list;
   log_filter : log_filter_config;
@@ -199,6 +202,7 @@ module Cli : sig
     data_dir:string ->
     ?rpc_addr:string ->
     ?rpc_port:int ->
+    ?rpc_batch_limit:limit ->
     ?cors_origins:string list ->
     ?cors_headers:string list ->
     ?tx_pool_timeout_limit:int64 ->
@@ -233,6 +237,7 @@ module Cli : sig
   val patch_configuration_from_args :
     ?rpc_addr:string ->
     ?rpc_port:int ->
+    ?rpc_batch_limit:limit ->
     ?cors_origins:string trace ->
     ?cors_headers:string trace ->
     ?tx_pool_timeout_limit:int64 ->
@@ -268,6 +273,7 @@ module Cli : sig
     data_dir:string ->
     ?rpc_addr:string ->
     ?rpc_port:int ->
+    ?rpc_batch_limit:limit ->
     ?cors_origins:string list ->
     ?cors_headers:string list ->
     ?tx_pool_timeout_limit:int64 ->

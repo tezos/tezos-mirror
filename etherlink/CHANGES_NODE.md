@@ -40,6 +40,9 @@
   circumstances.  (!14383)
 - Support running an observer node without a companion rollup node with
   `--dont-track-rollup-node`. (!14428)
+- Introduce a configuration parameter `rpc-batch-limit` and a CLI argument
+  `--rpc-batch-limit` to limit the maximum size of JSON RPC API batches.
+  (!14432)
 
 ### Bug fixes
 
