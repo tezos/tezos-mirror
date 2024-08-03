@@ -227,9 +227,13 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
     Tezos_crypto.Hashed.Smart_rollup_address.of_string_exn smart_rollup_address
   in
 
-  let module Rollup_rpc = Make (struct
-    let smart_rollup_address = smart_rollup_address_typed
-  end) in
+  let module Rollup_rpc =
+    Make
+      (struct
+        let smart_rollup_address = smart_rollup_address_typed
+      end)
+      (Evm_context)
+  in
   let* () =
     Tx_pool.start
       {

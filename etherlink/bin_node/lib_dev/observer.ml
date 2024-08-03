@@ -151,7 +151,7 @@ module Make (Ctxt : sig
 
   val smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t
 end) : Services_backend_sig.S =
-  Services_backend_sig.Make (MakeBackend (Ctxt))
+  Services_backend_sig.Make (MakeBackend (Ctxt)) (Evm_context)
 
 let callback server dir =
   let open Cohttp in

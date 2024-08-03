@@ -261,13 +261,15 @@ struct
 end
 
 module Make (Base : sig
+  module Executor : Evm_execution.S
+
   val ctxt : t
 
   val evm_node_endpoint : Uri.t
 
   val keep_alive : bool
 end) =
-  Services_backend_sig.Make (MakeBackend (Base))
+  Services_backend_sig.Make (MakeBackend (Base)) (Base.Executor)
 
 let callback server dir =
   let open Cohttp in
@@ -390,6 +392,50 @@ let main ~data_dir ~evm_node_endpoint ~(config : Configuration.t) =
 
   let rpc_backend =
     (module Make (struct
+      module Executor = struct
+        let pvm_config =
+          Config.config
+            ~preimage_directory:ctxt.preimages
+            ?preimage_endpoint:ctxt.preimages_endpoint
+            ~kernel_debug:true
+            ~destination:ctxt.smart_rollup_address
+            ()
+
+        let replay ?(log_file = "replay") ?profile
+            ?(alter_evm_state = Lwt_result_syntax.return)
+            (Ethereum_types.Qty number) =
+          let open Lwt_result_syntax in
+          let* hash = find_irmin_hash_from_number ctxt (Qty Z.(pred number)) in
+          with_evm_state ctxt hash @@ fun evm_state ->
+          let* evm_state = alter_evm_state evm_state in
+          let* blueprint =
+            Evm_store.use ctxt.store @@ fun conn ->
+            Evm_store.Blueprints.get_with_events conn (Qty number)
+          in
+          Evm_state.apply_blueprint
+            ~log_file
+            ?profile
+            ~data_dir
+            ~config:pvm_config
+            evm_state
+            blueprint.blueprint.payload
+
+        let execute ?(alter_evm_state = Lwt_result_syntax.return) input block =
+          let open Lwt_result_syntax in
+          let message =
+            List.map (fun s -> `Input s) Simulation.Encodings.(input.messages)
+          in
+          let* hash = find_irmin_hash ctxt block in
+          with_evm_state ctxt hash @@ fun evm_state ->
+          let* evm_state = alter_evm_state evm_state in
+          Evm_state.execute
+            ?log_file:input.log_kernel_debug_file
+            ~data_dir
+            ~config:pvm_config
+            evm_state
+            message
+      end
+
       let ctxt = ctxt
 
       let evm_node_endpoint = evm_node_endpoint

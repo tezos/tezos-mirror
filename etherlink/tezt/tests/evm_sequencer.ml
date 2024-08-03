@@ -4486,11 +4486,21 @@ let test_replay_rpc =
   unit
 
 let test_trace_transaction =
+  let check_trace_result ~sequencer:trace_result ~rpc:trace_result_rpc =
+    match (trace_result, trace_result_rpc) with
+    | Ok t, Ok t' -> assert (JSON.equal t t')
+    | Error _, _ ->
+        Test.fail "Trace transaction shouldn't have failed (sequnecer)"
+    | _, Error _ -> Test.fail "Trace transaction shouldn't have failed (rpc)"
+  in
   register_all
     ~kernels:Kernel.all
     ~tags:["evm"; "rpc"; "trace"]
     ~title:"Sequencer can run debug_traceTransaction"
   @@ fun {sc_rollup_node; sequencer; client; proxy; _} _protocol ->
+  (* Start a RPC node, as we also want to test that the sequencer and its RPC
+     node return the same thing. *)
+  let* rpc_node = run_new_rpc_endpoint sequencer in
   (* Transfer funds to a random address. *)
   let address = "0xB7A97043983f24991398E5a82f63F4C58a417185" in
   let* transaction_hash =
@@ -4510,9 +4520,8 @@ let test_trace_transaction =
   let* () = bake_until_sync ~sequencer ~sc_rollup_node ~proxy ~client () in
   (* Check tracing without options works *)
   let* trace_result = Rpc.trace_transaction ~transaction_hash sequencer in
-  (match trace_result with
-  | Ok _ -> ()
-  | Error _ -> Test.fail "Trace transaction shouldn't have failed") ;
+  let* trace_result_rpc = Rpc.trace_transaction ~transaction_hash rpc_node in
+  check_trace_result ~sequencer:trace_result ~rpc:trace_result_rpc ;
   (* Check tracing with a tracer without config *)
   let* trace_result =
     Rpc.trace_transaction ~transaction_hash ~tracer:"structLogger" sequencer
@@ -4528,9 +4537,14 @@ let test_trace_transaction =
       ~tracer_config:[("enableMemory", `Bool true)]
       sequencer
   in
-  (match trace_result with
-  | Ok _ -> ()
-  | Error _ -> Test.fail "Trace transaction shouldn't have failed") ;
+  let* trace_result_rpc =
+    Rpc.trace_transaction
+      ~transaction_hash
+      ~tracer:"structLogger"
+      ~tracer_config:[("enableMemory", `Bool true)]
+      rpc_node
+  in
+  check_trace_result ~sequencer:trace_result ~rpc:trace_result_rpc ;
   (* Check tracing without a tracer and a config *)
   let* trace_result =
     Rpc.trace_transaction
@@ -4544,9 +4558,19 @@ let test_trace_transaction =
         ]
       sequencer
   in
-  (match trace_result with
-  | Ok _ -> ()
-  | Error _ -> Test.fail "Trace transaction shouldn't have failed") ;
+  let* trace_result_rpc =
+    Rpc.trace_transaction
+      ~transaction_hash
+      ~tracer_config:
+        [
+          ("enableMemory", `Bool true);
+          ("enableReturnData", `Bool true);
+          ("disableStorage", `Bool true);
+          ("disableStack", `Bool true);
+        ]
+      rpc_node
+  in
+  check_trace_result ~sequencer:trace_result ~rpc:trace_result_rpc ;
   unit
 
 let test_trace_transaction_on_invalid_transaction =
@@ -4837,6 +4861,9 @@ let test_trace_call =
     ~title:"Sequencer can run debug_traceCall and return a valid log"
     ~da_fee:Wei.zero
   @@ fun {sc_rollup_node; sequencer; client; proxy = _; _} _protocol ->
+  (* Start a RPC node as well, since we will want to check it returns the
+     same result as the sequencer *)
+  let* rpc_node = run_new_rpc_endpoint sequencer in
   (* Transfer funds to a random address. *)
   let endpoint = Evm_node.endpoint sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
@@ -4895,6 +4922,17 @@ let test_trace_call =
         [("enableMemory", `Bool true); ("enableReturnData", `Bool true)]
       sequencer
   in
+  let*@ trace_rpc =
+    Rpc.trace_call
+      ~block:Latest
+      ~to_:contract_address
+      ~data:abi_string
+      ~tracer_config:
+        [("enableMemory", `Bool true); ("enableReturnData", `Bool true)]
+      rpc_node
+  in
+
+  assert (JSON.equal trace trace_rpc) ;
 
   let logs = JSON.(trace |-> "structLogs" |> as_list) in
   let returned_value =
