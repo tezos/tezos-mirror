@@ -599,7 +599,7 @@ let dispatch_request (config : Configuration.t)
             build ~f module_ parameters
         | Trace_call.Method ->
             let f (((call, block), config) : Tracer_types.call_input) =
-              let*! trace = Tracer.trace_call ~call ~block ~config in
+              let*! trace = Backend_rpc.trace_call call block config in
               process_trace_result trace
             in
             build_with_input ~f module_ parameters
