@@ -250,6 +250,11 @@ data "google_compute_image" "cos" {
   project = "cos-cloud"
 }
 
+data "google_compute_image" "debian" {
+  family  = "debian-11"
+  project = "debian-cloud"
+}
+
 # This module creates a blueprint for the VM that will be spawned.
 resource "google_compute_instance_template" "default" {
 
