@@ -126,7 +126,7 @@
   transactions to the DSN node bundler sidecar. The bundler is used
   for threshold encryption.
 - Add a new experimental mode to run a JSON RPC API endpoint reusing the
-  data-dir of a sequencer or observer EVM node. (!13208)
+  data-dir of a sequencer or observer EVM node. (!13208 !14426)
 
 ### Bug fixes
 

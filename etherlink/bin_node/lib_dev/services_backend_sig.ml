@@ -178,7 +178,7 @@ module type Backend = sig
   val smart_rollup_address : string
 end
 
-module Make (Backend : Backend) : S = struct
+module Make (Backend : Backend) (Executor : Evm_execution.S) : S = struct
   module Reader = Backend.Reader
   include Durable_storage.Make (Backend.Reader)
   include Publisher.Make (Backend.TxEncoder) (Backend.Publisher)
@@ -188,6 +188,7 @@ module Make (Backend : Backend) : S = struct
 
   include
     Tracer_sig.Make
+      (Executor)
       (struct
         let transaction_receipt = transaction_receipt
       end)

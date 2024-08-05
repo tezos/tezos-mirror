@@ -73,7 +73,8 @@ let read_output state transaction_hash =
   Lwt.return
   @@ Tracer_types.output_binary_decoder ~gas ~failed ~return_value ~struct_logs
 
-let trace_transaction ~block_number ~transaction_hash ~config =
+let trace_transaction (module Exe : Evm_execution.S) ~block_number
+    ~transaction_hash ~config =
   let open Lwt_result_syntax in
   let input = Tracer_types.input_rlp_encoder ~hash:transaction_hash config in
   let set_input state =
@@ -83,7 +84,7 @@ let trace_transaction ~block_number ~transaction_hash ~config =
     return state
   in
   let* apply_result =
-    Evm_context.replay
+    Exe.replay
       ~log_file:"trace_transaction"
       ~alter_evm_state:set_input
       block_number
@@ -97,7 +98,7 @@ let trace_transaction ~block_number ~transaction_hash ~config =
       in
       read_output evm_state root_indexed_by_hash
 
-let trace_call ~call ~block ~config =
+let trace_call (module Exe : Evm_execution.S) ~call ~block ~config =
   let open Lwt_result_syntax in
   let config_rlp = Tracer_types.input_rlp_encoder config in
   let set_config state =
@@ -120,6 +121,6 @@ let trace_call ~call ~block ~config =
       }
   in
   let* evm_state =
-    Evm_context.execute ~alter_evm_state:set_config simulation_input block
+    Exe.execute ~alter_evm_state:set_config simulation_input block
   in
   read_output evm_state None

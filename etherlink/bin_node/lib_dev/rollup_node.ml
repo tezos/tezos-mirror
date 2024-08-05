@@ -211,10 +211,10 @@ end) : Services_backend_sig.Backend = struct
         failwith "Earliest block parameter is not supported"
 
   module Tracer = struct
-    let trace_transaction ~block_number:_ ~transaction_hash:_ ~config:_ =
+    let trace_transaction _ ~block_number:_ ~transaction_hash:_ ~config:_ =
       Lwt_result_syntax.tzfail Tracer_types.Not_supported
 
-    let trace_call ~call:_ ~block:_ ~config:_ =
+    let trace_call _ ~call:_ ~block:_ ~config:_ =
       Lwt_result_syntax.tzfail Tracer_types.Not_supported
   end
 
@@ -232,4 +232,4 @@ module Make (Base : sig
 
   val finalized : bool
 end) =
-  Services_backend_sig.Make (MakeBackend (Base))
+  Services_backend_sig.Make (MakeBackend (Base)) (Evm_execution.No_execution)

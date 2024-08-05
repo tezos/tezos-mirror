@@ -9,6 +9,7 @@
     [block_number] and traces [transaction_hash] in it, with the given
     [config]. *)
 val trace_transaction :
+  (module Evm_execution.S) ->
   block_number:Ethereum_types.quantity ->
   transaction_hash:Ethereum_types.hash ->
   config:Tracer_types.config ->
@@ -17,6 +18,7 @@ val trace_transaction :
 (** [trace_call ~call ~block ~config] simulates and traces call
     [call] in block [block], with the given [config]. *)
 val trace_call :
+  (module Evm_execution.S) ->
   call:Ethereum_types.call ->
   block:Ethereum_types.Block_parameter.extended ->
   config:Tracer_types.config ->
