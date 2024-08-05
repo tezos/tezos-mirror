@@ -618,3 +618,12 @@ let upgrade_store_started =
     ~name:"upgrade_store_started"
     ~msg:"upgrading the store"
     ()
+
+let upgrade_cemented_file_skip =
+  declare_1
+    ~section
+    ~level:Info
+    ~name:"upgrade_cemented_file_skip"
+    ~msg:"File {path} does not have 32-bit offsets, skipping upgrade"
+    ~pp1:Format.pp_print_string
+    ("path", Data_encoding.string)
