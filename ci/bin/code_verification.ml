@@ -1366,7 +1366,8 @@ let jobs pipeline_type =
                  invalid commits titles in situations where that is allowed. *)
               (script_propagate_exit_code
                  "./scripts/ci/check_commit_messages.sh")
-              ~allow_failure:(With_exit_codes [65])
+              (* temporary cf issue https://gitlab.com/tezos/tezos/-/issues/7436 *)
+              ~allow_failure:Yes
           in
           [job_commit_titles]
       | Schedule_extended_test -> []
