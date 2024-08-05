@@ -10,11 +10,11 @@ type t = {
   docker_image : Env.docker_image;
   max_run_duration : int option;
   binaries_path : string;
+  os : string;
 }
 
-let make ?binaries_path ?max_run_duration ?machine_type ?docker_image () =
-  (* We don't use [env] because of dependency issue: We want the user of the
-     library to use this value function the [env] value is created. *)
+let make ?os ?binaries_path ?max_run_duration ?machine_type ?docker_image () =
+  let os = Option.value ~default:Env.os os in
   let docker_image = Option.value ~default:Env.docker_image docker_image in
   let machine_type = Option.value ~default:Env.machine_type machine_type in
   let default_binaries_path =
@@ -31,4 +31,4 @@ let make ?binaries_path ?max_run_duration ?machine_type ?docker_image () =
         if Env.no_max_run_duration then None else Some Env.max_run_duration
     | Some max_run_duration -> Some max_run_duration
   in
-  {machine_type; docker_image; max_run_duration; binaries_path}
+  {os; machine_type; docker_image; max_run_duration; binaries_path}

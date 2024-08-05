@@ -54,6 +54,7 @@ module Remote = struct
     let max_run_duration = configuration.max_run_duration in
     let ports_per_vm = Env.ports_per_vm in
     let base_port = Env.vm_base_port in
+    let os = configuration.os in
     let* () =
       Terraform.VM.deploy
         ~max_run_duration
@@ -62,6 +63,7 @@ module Remote = struct
         ~ports_per_vm
         ~number_of_vms
         ~docker_image
+        ~os
     in
     let names =
       List.init number_of_vms (fun i ->
@@ -69,8 +71,10 @@ module Remote = struct
     in
     let* zone = Env.zone () in
     let* () =
-      List.map (fun vm_name -> wait_docker_running ~vm_name ()) names
-      |> Lwt.join
+      if configuration.os = "cos" then
+        List.map (fun vm_name -> wait_docker_running ~vm_name ()) names
+        |> Lwt.join
+      else Lwt.return_unit
     in
     let ssh_private_key_filename = Env.ssh_private_key_filename () in
     let make_agent vm_name =

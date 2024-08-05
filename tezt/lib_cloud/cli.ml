@@ -86,13 +86,22 @@ let proxy =
       "Enables to run the orchestrator on a VM instead of the host machine"
     false
 
+let os =
+  Clap.default_string
+    ~section
+    ~long:"os"
+    ~description:
+      "The OS to be used for the VM (default is cos). Other possible value is \
+       'debian'."
+    "cos"
+
 let grafana =
   Clap.flag
     ~section
     ~set_long:"grafana"
     ~unset_long:"no-grafana"
     ~description:"Flag to set whether to run grafana"
-    ((not localhost) || proxy)
+    (((not localhost) || proxy) && os = "cos")
 
 let prometheus =
   Clap.flag
@@ -187,7 +196,7 @@ let no_max_run_duration =
     ~description:"Ensure the VM can only be destroyed manually."
     (* If the proxy mode is active, we don't want to use [max_run_duration]
        since it aims to run long running tests. *)
-    proxy
+    (proxy || os <> "cos")
 
 let tezt_cloud =
   Clap.optional_string
