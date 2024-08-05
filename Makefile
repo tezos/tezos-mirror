@@ -215,7 +215,6 @@ clean-old-names:
 	@rm -f octez-smart-rollup-node-PtNairob
 	@rm -f octez-smart-rollup-node-Proxford
 	@rm -f octez-smart-rollup-node-alpha
-	@rm -f octez-dsn-node
 
 # See comment of clean-old-names for an explanation regarding why we do not try
 # to generate the symbolic links from *_EXECUTABLES.
@@ -334,11 +333,6 @@ build-simulation-scenario:
 	@mkdir -p $(OCTEZ_BIN_DIR)/
 	@cp -f _build/default/devtools/testnet_experiment_tools/simulation_scenario.exe $(OCTEZ_BIN_DIR)/simulation-scenario
 	@cp -f _build/default/devtools/testnet_experiment_tools/safety_checker.exe $(OCTEZ_BIN_DIR)/safety-checker
-
-.PHONY: octez-dsn-node
-octez-dsn-node:
-	@cd etherlink/bin_dsn_node; cargo build --release
-	@cp etherlink/bin_dsn_node/target/release/dsn-node octez-dsn-node
 
 .PHONY: test-tezt
 test-tezt: build-additional-tezt-test-dependency-executables

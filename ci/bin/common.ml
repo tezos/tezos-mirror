@@ -1102,6 +1102,22 @@ let job_build_kernels ?rules () : tezos_job =
   |> enable_sccache ~key:"kernels-sccache" ~path:"$CI_PROJECT_DIR/_sccache"
   |> enable_cargo_cache
 
+let job_build_dsn_node ?rules () : tezos_job =
+  job
+    ~__POS__
+    ~name:"oc.build_dsn_node"
+    ~image:Images.rust_toolchain
+    ~stage:Stages.build
+    ?rules
+    ["make -f etherlink.mk octez-dsn-node"]
+    ~artifacts:
+      (artifacts
+         ~name:"build-dsn-node-$CI_COMMIT_REF_SLUG"
+         ~expire_in:(Duration (Days 1))
+         ~when_:On_success
+         ["octez-dsn-node"])
+  |> enable_kernels |> enable_sccache |> enable_cargo_cache
+
 module Tezt = struct
   let job ~__POS__ ?rules ?parallel ?(tag = Gcp_tezt) ~name
       ~(tezt_tests : Tezt_core.TSL_AST.t) ?(retry = 2) ?(tezt_retry = 1)

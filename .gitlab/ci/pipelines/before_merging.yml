@@ -545,6 +545,58 @@ oc.build_kernels:
     - src/riscv/tests/inline_asm/rv64-inline-asm-tests
     when: on_success
 
+oc.build_dsn_node:
+  image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
+  stage: build
+  tags:
+  - gcp
+  rules:
+  - changes:
+    - .gitlab-ci.yml
+    - .gitlab/**/*
+    - brassaia/**/*
+    - data-encoding/**/*
+    - etherlink.mk
+    - etherlink/**/*
+    - images/**/*
+    - irmin/**/*
+    - kernels.mk
+    - michelson_test_scripts/**/*
+    - resto/**/*
+    - scripts/ci/**/*
+    - src/**/*
+    - tezt/**/*
+    - tzt_reference_test_suite/**/*
+    when: on_success
+  dependencies:
+  - oc.docker:rust-toolchain:amd64
+  cache:
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  before_script:
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - make -f etherlink.mk octez-dsn-node
+  after_script:
+  - sccache --stop-server || true
+  variables:
+    CC: clang
+    NATIVE_TARGET: x86_64-unknown-linux-musl
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    CARGO_NET_OFFLINE: "false"
+  artifacts:
+    name: build-dsn-node-$CI_COMMIT_REF_SLUG
+    expire_in: 1 day
+    paths:
+    - octez-dsn-node
+    when: on_success
+
 oc.tezt:fetch-records:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
@@ -2625,6 +2677,7 @@ tezt:
   - oc.build_x86_64-released
   - oc.build_x86_64-exp-dev-extra
   - oc.build_kernels
+  - oc.build_dsn_node
   - oc.tezt:fetch-records
   dependencies:
   - oc.docker:ci:amd64
@@ -2632,6 +2685,7 @@ tezt:
   - oc.build_x86_64-released
   - oc.build_x86_64-exp-dev-extra
   - oc.build_kernels
+  - oc.build_dsn_node
   - oc.tezt:fetch-records
   timeout: 40 minutes
   before_script:
@@ -2697,6 +2751,7 @@ tezt-memory-3k:
   - oc.build_x86_64-released
   - oc.build_x86_64-exp-dev-extra
   - oc.build_kernels
+  - oc.build_dsn_node
   - oc.tezt:fetch-records
   dependencies:
   - oc.docker:ci:amd64
@@ -2704,6 +2759,7 @@ tezt-memory-3k:
   - oc.build_x86_64-released
   - oc.build_x86_64-exp-dev-extra
   - oc.build_kernels
+  - oc.build_dsn_node
   - oc.tezt:fetch-records
   before_script:
   - . ./scripts/version.sh
@@ -2768,6 +2824,7 @@ tezt-memory-4k:
   - oc.build_x86_64-released
   - oc.build_x86_64-exp-dev-extra
   - oc.build_kernels
+  - oc.build_dsn_node
   - oc.tezt:fetch-records
   dependencies:
   - oc.docker:ci:amd64
@@ -2775,6 +2832,7 @@ tezt-memory-4k:
   - oc.build_x86_64-released
   - oc.build_x86_64-exp-dev-extra
   - oc.build_kernels
+  - oc.build_dsn_node
   - oc.tezt:fetch-records
   before_script:
   - . ./scripts/version.sh
@@ -2839,6 +2897,7 @@ tezt-time-sensitive:
   - oc.build_x86_64-released
   - oc.build_x86_64-exp-dev-extra
   - oc.build_kernels
+  - oc.build_dsn_node
   - oc.tezt:fetch-records
   dependencies:
   - oc.docker:ci:amd64
@@ -2846,6 +2905,7 @@ tezt-time-sensitive:
   - oc.build_x86_64-released
   - oc.build_x86_64-exp-dev-extra
   - oc.build_kernels
+  - oc.build_dsn_node
   - oc.tezt:fetch-records
   before_script:
   - . ./scripts/version.sh
@@ -2910,6 +2970,7 @@ tezt-slow:
   - oc.build_x86_64-released
   - oc.build_x86_64-exp-dev-extra
   - oc.build_kernels
+  - oc.build_dsn_node
   - oc.tezt:fetch-records
   dependencies:
   - oc.docker:ci:amd64
@@ -2917,6 +2978,7 @@ tezt-slow:
   - oc.build_x86_64-released
   - oc.build_x86_64-exp-dev-extra
   - oc.build_kernels
+  - oc.build_dsn_node
   - oc.tezt:fetch-records
   before_script:
   - . ./scripts/version.sh
@@ -2978,6 +3040,7 @@ tezt-flaky:
   - oc.build_x86_64-released
   - oc.build_x86_64-exp-dev-extra
   - oc.build_kernels
+  - oc.build_dsn_node
   - oc.tezt:fetch-records
   dependencies:
   - oc.docker:ci:amd64
@@ -2985,6 +3048,7 @@ tezt-flaky:
   - oc.build_x86_64-released
   - oc.build_x86_64-exp-dev-extra
   - oc.build_kernels
+  - oc.build_dsn_node
   - oc.tezt:fetch-records
   before_script:
   - . ./scripts/version.sh
