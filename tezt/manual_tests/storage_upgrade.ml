@@ -18,7 +18,10 @@
 let dir_to_upgrade () =
   match Sys.getenv_opt "DIR_TO_UPGRADE" with
   | Some v -> v
-  | None -> Test.fail "cannot find dir to upgrade directory"
+  | None ->
+      Test.fail
+        "cannot find dir to upgrade directory. This directory should be \
+         provided through the `DIR_TO_UPGRADE` environment variable"
 
 type network_params = {
   network : Node.argument;
@@ -47,7 +50,9 @@ let network_constants () =
         stride = cycle_length / 3;
       }
   | Some _ | None ->
-      Test.fail "Unknown network. You can use [pariscnet, mainnet]"
+      Test.fail
+        "Unknown network. You should use this test with `NETWORK` set to \
+         `pariscnet` or `mainnet`"
 
 let run_cmd cmd =
   let* s = Lwt_unix.system cmd in
@@ -161,4 +166,90 @@ let test_v_3_2_storage_upgrade () =
   let () = print_duration d in
   unit
 
-let register () = test_v_3_2_storage_upgrade ()
+let snapshot_file () =
+  match Sys.getenv_opt "SNAPSHOT_FILE" with
+  | Some v -> v
+  | None ->
+      Test.fail
+        "cannot find snapshot file. You should provide it with the \
+         `SNAPSHOT_FILE` environment variable"
+
+let snapshot_import_dir () =
+  match Sys.getenv_opt "SNAPSHOT_IMPORT_DIR" with
+  | Some v -> v
+  | None ->
+      Test.fail
+        "cannot import snapshot dir. You should provide it with the \
+         `SNAPSHOT_IMPORT_DIR` environment variable"
+
+let check_snapshot_version ~expected_version node ~snapshot_file =
+  let p = Node.spawn_snapshot_info ~json:true node snapshot_file in
+  let* json_output = Process.check_and_read_stdout p in
+  let json_output =
+    JSON.parse ~origin:"node snapshot info --json" json_output
+  in
+  let json_snapshot_header = JSON.(json_output |-> "snapshot_header") in
+  let version = JSON.(json_snapshot_header |-> "version" |> as_int) in
+  Check.((version = expected_version) int)
+    ~error_msg:"expected version \"%R\" not found" ;
+  unit
+
+let check_snapshot_import node ~node_args ~snapshot_file =
+  let* () = Node.snapshot_import ~no_check:true node snapshot_file in
+  let params = network_constants () in
+  Log.info "Start the node to request blocks, ensuring consistency" ;
+  let* () = Node.run node node_args in
+  let* () = Node.wait_for_ready node in
+  let* client = Client.init ~endpoint:(Node node) () in
+  let* current_head = Client.level client in
+  Log.info "Checking blocks consistency up to level %d@." current_head ;
+  let stride = params.stride in
+  (* [start] is set to an arbitrary value as it only aims to be the
+     query start point of enough blocks that we iter over several
+     cycles. *)
+  let* () =
+    contiguous_blocks_query node ~start:1_000 ~length:params.cycle_length
+  in
+  let* () = sparse_blocks_query node ~last:current_head ~stride in
+  unit
+
+let test_v_3_2_snapshot_backward_compatibility () =
+  Test.register
+    ~__FILE__
+    ~title:"Check v.3.2 snapshot backward compatibility"
+    ~tags:["storage"; "snapshot"; "storage_3_2"; "snapshot_v7"]
+  @@ fun () ->
+  let args = Node.[Connections 0] in
+  let node = Node.create ~name:"node" ~data_dir:(snapshot_import_dir ()) args in
+  let params = network_constants () in
+  let* () = Node.config_init node [params.network] in
+  let snapshot_file = snapshot_file () in
+  (* Checking the snapshot version to be the legacy one. *)
+  let* () =
+    (* Legacy snapshot version is 7 *)
+    check_snapshot_version ~expected_version:7 node ~snapshot_file
+  in
+  check_snapshot_import node ~snapshot_file ~node_args:args
+
+let test_v_3_2_new_snapshot_import () =
+  Test.register
+    ~__FILE__
+    ~title:"Check v.3.2 new snapshot"
+    ~tags:["storage"; "snapshot"; "storage_v3_2"; "snapshot_v8"]
+  @@ fun () ->
+  let args = Node.[Connections 0] in
+  let node = Node.create ~name:"node" ~data_dir:(snapshot_import_dir ()) args in
+  let params = network_constants () in
+  let* () = Node.config_init node [params.network] in
+  let snapshot_file = snapshot_file () in
+  (* Checking the snapshot version is the latest one. *)
+  let* () =
+    (* Current snapshot version is 8 *)
+    check_snapshot_version ~expected_version:8 node ~snapshot_file
+  in
+  check_snapshot_import node ~snapshot_file ~node_args:args
+
+let register () =
+  test_v_3_2_storage_upgrade () ;
+  test_v_3_2_snapshot_backward_compatibility () ;
+  test_v_3_2_new_snapshot_import ()
