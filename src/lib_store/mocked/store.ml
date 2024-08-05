@@ -1818,8 +1818,8 @@ let store_dirs = ref []
 let context_dirs = ref []
 
 let init ?patch_context ?commit_genesis ?history_mode ?(readonly = false)
-    ?block_cache_limit ?context_pruning:_ ~store_dir ~context_dir
-    ~allow_testchains genesis =
+    ?block_cache_limit ?context_pruning:_ ?maintenance_delay:_ ~store_dir
+    ~context_dir ~allow_testchains genesis =
   let open Lwt_result_syntax in
   if List.mem ~equal:String.equal context_dir !context_dirs then
     Format.kasprintf
@@ -1827,7 +1827,6 @@ let init ?patch_context ?commit_genesis ?history_mode ?(readonly = false)
       "init: already initialized context in %s"
       context_dir ;
   context_dirs := context_dir :: !context_dirs ;
-
   let store_dir = Naming.store_dir ~dir_path:store_dir in
   let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
   let*! context_index, commit_genesis =
