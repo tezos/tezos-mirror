@@ -497,6 +497,7 @@ let store_was_fixed =
 
 let recover_merge =
   declare_0
+    ~alternative_color:Internal_event.Cyan
     ~section
     ~level:Notice
     ~name:"recovering_merge"
