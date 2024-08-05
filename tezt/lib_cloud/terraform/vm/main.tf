@@ -51,9 +51,25 @@ variable "max_run_duration" {
   default     = null
 }
 
+variable "os" {
+  type        = string
+  description = "Os description of the machine (default is cos). Possible value: cos, debian, archlinux"
+  default     = "cos"
+
+  validation {
+    condition     = contains(["cos", "debian"], var.os)
+    error_message = "The os value must be one of 'cos' or 'debian'"
+  }
+}
+
 # Those values should not be modified
 locals {
   artifact_registry = "europe-west1-docker.pkg.dev"
+
+  os_image_map = {
+    "cos"    = data.google_compute_image.cos.self_link
+    "debian" = data.google_compute_image.debian.self_link
+  }
 }
 
 terraform {
@@ -284,7 +300,7 @@ resource "google_compute_instance_template" "default" {
   machine_type = var.machine_type
 
   disk {
-    source_image = data.google_compute_image.cos.self_link
+    source_image = local.os_image_map[var.os]
     type         = "PERSISTENT"
     disk_type    = "pd-ssd"
     disk_size_gb = 200
