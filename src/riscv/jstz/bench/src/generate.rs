@@ -19,8 +19,6 @@ const FA2: &str = include_str!("../../fa2.js");
 
 const DEFAULT_GAS_LIMIT: u32 = 100_000;
 
-const DEFAULT_ROLLUP_ADDRESS: &str = "sr163Lv22CdE8QagCwf48PWDTquk6isQwv57";
-
 // tag + 20 byte address
 const EXTERNAL_FRAME_SIZE: usize = 21;
 
@@ -32,7 +30,9 @@ type Result<T> = std::result::Result<T, Box<dyn Error>>;
 /// The transfers are generated with a 'follow on' strategy. For example 'account 0' will
 /// have `num_accounts` minted of 'token 0'. It will then transfer all of them to 'account 1',
 /// which will transfer `num_accounts - 1` to the next account, etc.
-pub fn handle_generate(inbox_file: &Path, transfers: usize) -> Result<()> {
+pub fn handle_generate(rollup_addr: &str, inbox_file: &Path, transfers: usize) -> Result<()> {
+    let rollup_addr = SmartRollupAddress::from_b58check(rollup_addr)?;
+
     let accounts = accounts_for_transfers(transfers);
 
     if accounts == 0 {
@@ -42,8 +42,8 @@ pub fn handle_generate(inbox_file: &Path, transfers: usize) -> Result<()> {
     let mut accounts = gen_keys(accounts)?;
 
     // Level 1 - setup
-    let (fa2_address, deploy) = deploy_fa2(accounts.first_mut().unwrap())?;
-    let batch_mint = batch_mint(&mut accounts, &fa2_address)?;
+    let (fa2_address, deploy) = deploy_fa2(rollup_addr.clone(), accounts.first_mut().unwrap())?;
+    let batch_mint = batch_mint(rollup_addr.clone(), &mut accounts, &fa2_address)?;
 
     let level1 = vec![deploy, batch_mint];
 
@@ -65,7 +65,7 @@ pub fn handle_generate(inbox_file: &Path, transfers: usize) -> Result<()> {
             };
 
             let account = &mut accounts[from % len];
-            let op = transfer_op(account, &fa2_address, &transfer)?;
+            let op = transfer_op(rollup_addr.clone(), account, &fa2_address, &transfer)?;
 
             transfers.push(op);
         }
@@ -75,7 +75,7 @@ pub fn handle_generate(inbox_file: &Path, transfers: usize) -> Result<()> {
     let tokens = 0..accounts.len();
     let balances = accounts
         .iter_mut()
-        .map(|a| balance(a, &fa2_address, tokens.clone()))
+        .map(|a| balance(rollup_addr.clone(), a, &fa2_address, tokens.clone()))
         .collect::<Result<Vec<_>>>()?;
 
     // Output inbox file
@@ -122,7 +122,12 @@ where
     String::serialize(&address, ser)
 }
 
-fn transfer_op(account: &mut Account, fa2: &Address, transfer: &Transfer) -> Result<Message> {
+fn transfer_op(
+    rollup_addr: SmartRollupAddress,
+    account: &mut Account,
+    fa2: &Address,
+    transfer: &Transfer,
+) -> Result<Message> {
     let transfer = [TransferToken {
         from: &account.address,
         transfers: &[&transfer],
@@ -138,10 +143,11 @@ fn transfer_op(account: &mut Account, fa2: &Address, transfer: &Transfer) -> Res
         gas_limit: DEFAULT_GAS_LIMIT.try_into()?,
     });
 
-    account.operation_to_message(content)
+    account.operation_to_message(rollup_addr, content)
 }
 
 fn balance(
+    rollup_addr: SmartRollupAddress,
     account: &mut Account,
     fa2: &Address,
     tokens: std::ops::Range<usize>,
@@ -163,10 +169,14 @@ fn balance(
         gas_limit: DEFAULT_GAS_LIMIT.try_into()?,
     });
 
-    account.operation_to_message(content)
+    account.operation_to_message(rollup_addr, content)
 }
 
-fn batch_mint(accounts: &mut [Account], fa2: &Address) -> Result<Message> {
+fn batch_mint(
+    rollup_addr: SmartRollupAddress,
+    accounts: &mut [Account],
+    fa2: &Address,
+) -> Result<Message> {
     let amount = accounts.len() + 1;
     let mints: Vec<_> = accounts
         .iter()
@@ -189,10 +199,13 @@ fn batch_mint(accounts: &mut [Account], fa2: &Address) -> Result<Message> {
         gas_limit: DEFAULT_GAS_LIMIT.try_into()?,
     });
 
-    account.operation_to_message(content)
+    account.operation_to_message(rollup_addr, content)
 }
 
-fn deploy_fa2(account: &mut Account) -> Result<(Address, Message)> {
+fn deploy_fa2(
+    rollup_addr: SmartRollupAddress,
+    account: &mut Account,
+) -> Result<(Address, Message)> {
     let code: ParsedCode = FA2.to_string().try_into()?;
 
     let address = Address::digest(
@@ -204,7 +217,7 @@ fn deploy_fa2(account: &mut Account) -> Result<(Address, Message)> {
         account_credit: 0,
     });
 
-    let message = account.operation_to_message(content)?;
+    let message = account.operation_to_message(rollup_addr, content)?;
 
     Ok((address, message))
 }
@@ -234,7 +247,11 @@ struct Account {
 }
 
 impl Account {
-    fn operation_to_message(&mut self, content: Content) -> Result<Message> {
+    fn operation_to_message(
+        &mut self,
+        rollup_addr: SmartRollupAddress,
+        content: Content,
+    ) -> Result<Message> {
         let op = Operation {
             source: self.address.clone(),
             nonce: self.nonce,
@@ -249,7 +266,7 @@ impl Account {
 
         let frame = ExternalMessageFrame::Targetted {
             contents: bytes,
-            address: SmartRollupAddress::from_b58check(DEFAULT_ROLLUP_ADDRESS)?,
+            address: rollup_addr,
         };
 
         frame.bin_write(&mut external)?;

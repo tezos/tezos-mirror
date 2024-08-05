@@ -11,6 +11,8 @@ use std::path::Path;
 mod generate;
 mod results;
 
+const DEFAULT_ROLLUP_ADDRESS: &str = "sr163Lv22CdE8QagCwf48PWDTquk6isQwv57";
+
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
 #[derive(Debug, Parser)]
@@ -24,6 +26,8 @@ pub struct Cli {
 enum Commands {
     #[command(about = "Generate inbox.json file")]
     Generate {
+        #[arg(long, default_value = DEFAULT_ROLLUP_ADDRESS)]
+        address: String,
         #[arg(long)]
         transfers: usize,
         #[arg(long, default_value = "inbox.json")]
@@ -41,9 +45,10 @@ enum Commands {
 fn main() -> Result<()> {
     match Cli::parse().command {
         Commands::Generate {
+            address,
             inbox_file,
             transfers,
-        } => handle_generate(&inbox_file, transfers)?,
+        } => handle_generate(&address, &inbox_file, transfers)?,
         Commands::Results {
             inbox_file,
             log_file,
