@@ -183,6 +183,23 @@ let should_submit_proposal (state : Types.state) timestamp =
       let diff = Time.Protocol.(diff timestamp last_proposal_timestamp) in
       diff >= Int64.of_float time_between_blocks
 
+let produce_proposal ~(head_info : Evm_context.head) ~transactions
+    ~delayed_transactions ~timestamp =
+  let transactions =
+    List.map
+      (fun (transaction, _hash) ->
+        Threshold_encryption_types.Transaction.of_string transaction)
+      transactions
+  in
+  Threshold_encryption_types.
+    {
+      transactions;
+      delayed_transaction_hashes = delayed_transactions;
+      previous_block_hash = head_info.current_block_hash;
+      current_blueprint_number = head_info.next_blueprint_number;
+      timestamp;
+    }
+
 let submit_proposal (state : Types.state) timestamp =
   let open Lwt_result_syntax in
   let*! () =
@@ -202,49 +219,58 @@ let submit_proposal (state : Types.state) timestamp =
     in
     tzfail Threshold_encryption_proposals_handler_locked
   else
-    let* delayed_transactions, remaining_cumulative_size =
-      take_delayed_transactions state.maximum_number_of_chunks
+    let*! head_info = Evm_context.head_info () in
+    let is_going_to_upgrade =
+      match head_info.pending_upgrade with
+      | Some Evm_events.Upgrade.{hash = _; timestamp = upgrade_timestamp} ->
+          timestamp >= upgrade_timestamp
+      | None -> false
     in
-    let* transactions =
-      (* Low key optimization to avoid even checking the txpool if there is not
-         enough space for the smallest transaction. *)
-      if remaining_cumulative_size <= minimum_ethereum_transaction_size then
-        return []
+    let* proposal =
+      if is_going_to_upgrade then
+        return_some
+          (produce_proposal
+             ~head_info
+             ~transactions:[]
+             ~delayed_transactions:[]
+             ~timestamp)
       else
-        Tx_pool.pop_transactions
-          ~maximum_cumulative_size:remaining_cumulative_size
+        let* delayed_transactions, remaining_cumulative_size =
+          take_delayed_transactions state.maximum_number_of_chunks
+        in
+        let* transactions =
+          (* Low key optimization to avoid even checking the txpool if there is not
+             enough space for the smallest transaction. *)
+          if remaining_cumulative_size <= minimum_ethereum_transaction_size then
+            return []
+          else
+            Tx_pool.pop_transactions
+              ~maximum_cumulative_size:remaining_cumulative_size
+        in
+        let n = List.length transactions + List.length delayed_transactions in
+        if should_submit_proposal state timestamp || n > 0 then
+          return_some
+            (produce_proposal
+               ~head_info
+               ~transactions
+               ~delayed_transactions
+               ~timestamp)
+        else return_none
     in
-    let n = List.length transactions + List.length delayed_transactions in
-    if should_submit_proposal state timestamp || n > 0 then (
-      let*! head_info = Evm_context.head_info () in
-      let transactions =
-        List.map
-          (fun (transaction, _hash) ->
-            Threshold_encryption_types.Transaction.of_string transaction)
-          transactions
-      in
-      let proposal : Threshold_encryption_types.proposal =
-        Threshold_encryption_types.
-          {
-            transactions;
-            delayed_transaction_hashes = delayed_transactions;
-            previous_block_hash = head_info.current_block_hash;
-            current_blueprint_number = head_info.next_blueprint_number;
-            timestamp;
-          }
-      in
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/7189
-         Handle reconnections, timeouts and stream closed on server side. *)
-      let* () =
-        Threshold_encryption_services.submit_proposal
-          ~keep_alive:state.keep_alive
-          ~sidecar_endpoint:state.sidecar_endpoint
-          proposal
-      in
-      state.Types.locked <- true ;
-      state.Types.last_proposed_timestamp <- Some timestamp ;
-      return Threshold_encryption_types.Proposal_submitted)
-    else return Threshold_encryption_types.Proposal_is_early
+    match proposal with
+    | Some proposal ->
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/7189
+           Handle reconnections, timeouts and stream closed on server side. *)
+        let* () =
+          Threshold_encryption_services.submit_proposal
+            ~keep_alive:state.keep_alive
+            ~sidecar_endpoint:state.sidecar_endpoint
+            proposal
+        in
+        state.Types.locked <- true ;
+        state.Types.last_proposed_timestamp <- Some timestamp ;
+        return Threshold_encryption_types.Proposal_submitted
+    | None -> return Threshold_encryption_types.Proposal_is_early
 
 let unlock_next_proposal state = state.Types.locked <- false
 
