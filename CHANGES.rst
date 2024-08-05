@@ -207,6 +207,22 @@ Data Availability Layer (DAL)
 DAL node
 ~~~~~~~~
 
+Reduce the number of inodes used by a bootstrap node. This fixes an issue
+where the number of inodes used was too high with respect to the disk size. (MR :gl:`!12900`)
+
+The DAL node's store has been updated, and it is not compatible with
+V20. However, a V20 store is upgraded at startup. (MR :gl:`!13820`)
+
+The format of the configuration file (and in particular that of profiles) has
+been updated. However, the node is able to read V20 configuration files. (MR
+:gl:`!12968`, MR :gl:`!13787`)
+
+The profile names have changed, in particular '(slot) producers' are now called
+'operators'. Accordingly, the node has a new argument ``--operator`` that should
+be used instead of ``--producer-profiles``, which is deprecated and will be
+removed at the next release, but still supported. (MR :gl:`!14261`, MR
+:gl:`!14277`)
+
 The following RPCs have been removed:
 
 - ``POST /commitments`` (MR :gl:`!12949`), use ``POST /slots`` instead,
