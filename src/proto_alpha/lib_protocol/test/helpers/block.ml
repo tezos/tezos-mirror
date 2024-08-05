@@ -643,7 +643,11 @@ let prepare_initial_context_params ?consensus_committee_size
       ~default:constants.consensus_rights_delay
       consensus_rights_delay
   in
-
+  let cache_sampler_state_cycles =
+    consensus_rights_delay + Constants_repr.max_slashing_period + 1
+  and cache_stake_distribution_cycles =
+    consensus_rights_delay + Constants_repr.max_slashing_period + 1
+  in
   let constants =
     {
       constants with
@@ -668,6 +672,8 @@ let prepare_initial_context_params ?consensus_committee_size
       hard_gas_limit_per_block;
       nonce_revelation_threshold;
       consensus_rights_delay;
+      cache_sampler_state_cycles;
+      cache_stake_distribution_cycles;
     }
   in
   let* () = check_constants_consistency constants in
