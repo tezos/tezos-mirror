@@ -1155,11 +1155,11 @@ let v_3_2_upgrade chain_dir =
                 let*! has_32_bit_offsets =
                   is_using_32_bit_offsets fd nb_blocks
                 in
-                if not has_32_bit_offsets then (
-                  Format.printf
-                    "File %s does not have 32-bit offsets, skipping upgrade@."
-                    file_path ;
-                  return_unit)
+                if not has_32_bit_offsets then
+                  let*! () =
+                    Store_events.(emit upgrade_cemented_file_skip file_path)
+                  in
+                  return_unit
                 else
                   (* Upgraded cemented blocks file *)
                   let upgraded_file_path = file_path ^ "_upgraded" in
