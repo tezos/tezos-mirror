@@ -82,6 +82,7 @@ let register () =
     ~tags:[Dashboard.Test.gas_tps]
     ~timeout:(Long_test.Minutes 60)
     ~executors:Long_test.[x86_executor1]
+    ~uses:[Tezt_wrapper.Uses.octez_baker_alpha]
     (fun () ->
       let average_block_path =
         Cli.get ~default:None (fun s -> Some (Some s)) "average-block"

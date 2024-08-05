@@ -70,6 +70,9 @@ module Uses : sig
   (** ["./octez-admin-client"], with tag ["admin_client"]. *)
   val octez_admin_client : t
 
+  (** ["./octez-baker-alpha"], with tag ["baker_alpha"]. *)
+  val octez_baker_alpha : t
+
   (** Register a test that generates:
       {[
         tezt/lib_wrapper/expected/tezt_wrapper.ml/runtime-dependency-tags.out
