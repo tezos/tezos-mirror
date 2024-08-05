@@ -6,13 +6,11 @@
  (public_name octez-version.value)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.base
   octez-libs.version
   octez-libs.version.parser)
  (flags
   (:standard)
-  -opaque
-  -open Tezos_base.TzPervasives))
+  -opaque))
 
 (rule
  (targets generated_git_info.ml)

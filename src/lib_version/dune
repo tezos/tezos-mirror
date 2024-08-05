@@ -6,8 +6,10 @@
  (public_name octez-libs.version)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.base
+  octez-libs.data-encoding
+  octez-libs.error-monad
   octez-libs.version.parser)
  (flags
   (:standard)
-  -open Tezos_base.TzPervasives))
+  -open Tezos_error_monad
+  -open Tezos_error_monad.TzLwtreslib))

@@ -316,6 +316,45 @@ let check_expected_peer_id (point_info : 'a P2p_point_state.Info.t option)
             in
             return_unit)
 
+let may_select_version ~compare accepted_versions remote_version motive =
+  let open Error_monad.Result_syntax in
+  let greatest = function
+    | [] -> raise (Invalid_argument "Network_version.greatest")
+    | h :: t -> List.fold_left max h t
+  in
+  let best_local_version = greatest accepted_versions in
+  if compare best_local_version remote_version <= 0 then
+    return best_local_version
+  else if
+    List.mem
+      ~equal:(fun a b -> compare a b = 0)
+      remote_version
+      accepted_versions
+  then return remote_version
+  else P2p_rejection.rejecting motive
+
+let select ~chain_name ~distributed_db_versions ~p2p_versions remote =
+  let open Error_monad.Result_syntax in
+  assert (distributed_db_versions <> []) ;
+  assert (p2p_versions <> []) ;
+  if chain_name <> remote.Network_version.chain_name then
+    P2p_rejection.rejecting Unknown_chain_name
+  else
+    let+ distributed_db_version =
+      may_select_version
+        ~compare:Distributed_db_version.compare
+        distributed_db_versions
+        remote.distributed_db_version
+        Deprecated_distributed_db_version
+    and+ p2p_version =
+      may_select_version
+        ~compare:P2p_version.compare
+        p2p_versions
+        remote.p2p_version
+        Deprecated_p2p_version
+    in
+    {Network_version.chain_name; distributed_db_version; p2p_version}
+
 let raw_authenticate t ?point_info canceler scheduled_conn point =
   let open Lwt_result_syntax in
   let incoming = point_info = None in
@@ -392,7 +431,7 @@ let raw_authenticate t ?point_info canceler scheduled_conn point =
   let acceptable =
     let open Result_syntax in
     let* version =
-      Network_version.select
+      select
         ~chain_name:t.message_config.chain_name
         ~distributed_db_versions:t.message_config.distributed_db_versions
         ~p2p_versions:t.custom_p2p_versions

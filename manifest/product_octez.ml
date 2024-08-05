@@ -1689,6 +1689,63 @@ let _octez_micheline_tests =
     ~modules:["test_diff"]
     ~deps:[octez_micheline |> open_]
 
+let octez_version_parser =
+  octez_lib
+    "version.parser"
+    ~internal_name:"tezos_version_parser"
+    ~path:"src/lib_version/parser"
+    ~dune:Dune.[ocamllex "tezos_version_parser"]
+    ~preprocess:[pps ppx_deriving_show]
+
+let octez_version =
+  octez_lib
+    "version"
+    ~internal_name:"tezos_version"
+    ~path:"src/lib_version"
+    ~synopsis:"Version information generated from Git"
+    ~deps:
+      [
+        data_encoding;
+        octez_error_monad |> open_ |> open_ ~m:"TzLwtreslib";
+        octez_version_parser;
+      ]
+
+let octez_version_value =
+  public_lib
+    "octez-version.value"
+    ~internal_name:"tezos_version_value"
+    ~path:"src/lib_version/value/"
+    ~synopsis:"Tezos: version value generated from Git"
+    ~deps:[octez_version; octez_version_parser]
+      (* We want generated_git_info.cmi to be compiled with -opaque so
+         that a change in the implementation doesn't force rebuilding all
+         the reverse dependencies. *)
+    ~flags:(Flags.standard ~opaque:true ())
+    ~dune:
+      Dune.
+        [
+          (* Ensures the hash updates whenever a source file is modified. *)
+          targets_rule
+            ["generated_git_info.ml"]
+            ~deps:[[S "universe"]]
+            ~action:[S "run"; S "../exe/get_git_info.exe"];
+        ]
+
+let _octez_version_get_git_info =
+  private_exe
+    "get_git_info"
+    ~path:"src/lib_version/exe"
+    ~opam:"octez-version"
+    ~deps:[dune_configurator; octez_version_parser]
+    ~modules:["get_git_info"]
+    ~bisect_ppx:No
+
+let octez_print_version =
+  public_lib
+    "octez-version.print"
+    ~path:"src/lib_version/print"
+    ~deps:[octez_version |> open_; octez_version_value |> open_]
+
 let octez_base =
   octez_lib
     "base"
@@ -1697,6 +1754,7 @@ let octez_base =
     ~synopsis:"Meta-package and pervasive type definitions for Tezos"
     ~deps:
       [
+        octez_version;
         octez_stdlib |> open_;
         octez_crypto;
         data_encoding |> open_;
@@ -1741,6 +1799,22 @@ let octez_base_unix =
         lwt_exit;
       ]
     ~inline_tests:ppx_expect
+
+let _octez_print_version_exe =
+  public_exe
+    "octez-version"
+    ~internal_name:"octez_print_version"
+    ~path:"src/lib_version/exe"
+    ~opam:"octez-version"
+    ~deps:
+      [
+        octez_version_value |> open_;
+        octez_version |> open_;
+        octez_base_unix;
+        octez_print_version |> open_;
+      ]
+    ~modules:["octez_print_version"]
+    ~bisect_ppx:No
 
 let octez_base_p2p_identity_file =
   octez_lib
@@ -2067,79 +2141,6 @@ let _octez_webassembly_test =
     ~opam:"octez-l2-libs"
     ~dune:Dune.[[S "include_subdirs"; S "no"]]
     ~deps:[octez_webassembly_interpreter |> open_; alcotezt]
-
-let octez_version_parser =
-  octez_lib
-    "version.parser"
-    ~internal_name:"tezos_version_parser"
-    ~path:"src/lib_version/parser"
-    ~dune:Dune.[ocamllex "tezos_version_parser"]
-    ~preprocess:[pps ppx_deriving_show]
-
-let octez_version =
-  octez_lib
-    "version"
-    ~internal_name:"tezos_version"
-    ~path:"src/lib_version"
-    ~synopsis:"Version information generated from Git"
-    ~deps:[octez_base |> open_ ~m:"TzPervasives"; octez_version_parser]
-
-let octez_version_value =
-  public_lib
-    "octez-version.value"
-    ~internal_name:"tezos_version_value"
-    ~path:"src/lib_version/value/"
-    ~synopsis:"Tezos: version value generated from Git"
-    ~deps:
-      [
-        octez_base |> open_ ~m:"TzPervasives";
-        octez_version;
-        octez_version_parser;
-      ]
-      (* We want generated_git_info.cmi to be compiled with -opaque so
-         that a change in the implementation doesn't force rebuilding all
-         the reverse dependencies. *)
-    ~flags:(Flags.standard ~opaque:true ())
-    ~dune:
-      Dune.
-        [
-          (* Ensures the hash updates whenever a source file is modified. *)
-          targets_rule
-            ["generated_git_info.ml"]
-            ~deps:[[S "universe"]]
-            ~action:[S "run"; S "../exe/get_git_info.exe"];
-        ]
-
-let _octez_version_get_git_info =
-  private_exe
-    "get_git_info"
-    ~path:"src/lib_version/exe"
-    ~opam:"octez-version"
-    ~deps:[dune_configurator; octez_version_parser]
-    ~modules:["get_git_info"]
-    ~bisect_ppx:No
-
-let octez_print_version =
-  public_lib
-    "octez-version.print"
-    ~path:"src/lib_version/print"
-    ~deps:[octez_version |> open_; octez_version_value |> open_]
-
-let _octez_print_version_exe =
-  public_exe
-    "octez-version"
-    ~internal_name:"octez_print_version"
-    ~path:"src/lib_version/exe"
-    ~opam:"octez-version"
-    ~deps:
-      [
-        octez_version_value |> open_;
-        octez_version |> open_;
-        octez_base_unix;
-        octez_print_version |> open_;
-      ]
-    ~modules:["octez_print_version"]
-    ~bisect_ppx:No
 
 let _etherlink_print_version_exe =
   public_exe
@@ -7320,7 +7321,7 @@ let _testnet_experiment_tools =
         tezt_tezos;
         octez_client_base_unix |> open_;
         octez_node_config;
-        octez_base;
+        octez_base |> open_ |> open_ ~m:"TzPervasives";
         octez_base_unix;
         octez_stdlib_unix |> open_;
         Protocol.(client_exn alpha);
