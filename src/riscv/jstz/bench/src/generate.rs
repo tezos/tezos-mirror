@@ -31,6 +31,24 @@ type Result<T> = std::result::Result<T, Box<dyn Error>>;
 /// have `num_accounts` minted of 'token 0'. It will then transfer all of them to 'account 1',
 /// which will transfer `num_accounts - 1` to the next account, etc.
 pub fn handle_generate(rollup_addr: &str, inbox_file: &Path, transfers: usize) -> Result<()> {
+    let inbox = generate_inbox(rollup_addr, transfers)?;
+    inbox.save(inbox_file)?;
+    Ok(())
+}
+
+/// Like [`handle_generate`] but writes the inbox as a shell script.
+pub fn handle_generate_script(
+    rollup_addr: &str,
+    script_file: &Path,
+    transfers: usize,
+) -> Result<()> {
+    let inbox = generate_inbox(rollup_addr, transfers)?;
+    inbox.save_script(script_file)?;
+    Ok(())
+}
+
+/// Generate the inbox for the given rollup address and number of transfers.
+fn generate_inbox(rollup_addr: &str, transfers: usize) -> Result<InboxFile> {
     let rollup_addr = SmartRollupAddress::from_b58check(rollup_addr)?;
 
     let accounts = accounts_for_transfers(transfers);
@@ -80,8 +98,7 @@ pub fn handle_generate(rollup_addr: &str, inbox_file: &Path, transfers: usize) -
 
     // Output inbox file
     let inbox = InboxFile(vec![level1, transfers, balances]);
-    inbox.save(inbox_file)?;
-    Ok(())
+    Ok(inbox)
 }
 
 #[derive(Debug, Serialize)]
