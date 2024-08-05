@@ -18,8 +18,7 @@
   octez-libs.context.sigs
   octez-libs.tezos-context-brassaia.helpers
   octez-libs.tezos-context-brassaia.encoding
-  octez-libs.tezos-context-brassaia.memory
-  octez-libs.tezos-context-brassaia.dump)
+  octez-libs.tezos-context-brassaia.memory)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives

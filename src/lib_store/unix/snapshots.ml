@@ -956,10 +956,6 @@ module Onthefly : sig
       the files matching the given [pattern]. *)
   val find_files_with_common_path : i -> pattern:string -> file list Lwt.t
 
-  (* [read_raw tar file] returns a file descriptor on the [tar] file
-     which is pointing toward the data of the given [file] *)
-  val read_raw : i -> file -> Lwt_unix.file_descr Lwt.t
-
   (* [load_file tar file] loads the [file] from the [tar] and returns
      it as bytes.
      Warning, this function loads the whole data in
@@ -1375,11 +1371,6 @@ end = struct
       (List.filter
          (fun {header; _} -> Re.execp pattern header.Tar.Header.file_name)
          files)
-
-  let read_raw t {data_ofs; _} =
-    let open Lwt_syntax in
-    let* _ = Lwt_unix.LargeFile.lseek t.fd data_ofs SEEK_SET in
-    Lwt.return t.fd
 
   let load_file t file = get_raw t file
 
@@ -2942,14 +2933,6 @@ module type IMPORTER = sig
 
   val restore_context : t -> dst_context_dir:string -> unit tzresult Lwt.t
 
-  val legacy_restore_context :
-    t ->
-    Context.index ->
-    expected_context_hash:Context_hash.t ->
-    nb_context_elements:int ->
-    progress_display_mode:Animation.progress_display_mode ->
-    unit tzresult Lwt.t
-
   val load_protocol_table :
     t -> Protocol_levels.protocol_info Protocol_levels.t tzresult Lwt.t
 
@@ -3044,49 +3027,6 @@ module Raw_importer : IMPORTER = struct
     in
     let*! () = Lwt_utils_unix.copy_dir context_file_path dst_context_dir in
     return_unit
-
-  let legacy_restore_context t context_index ~expected_context_hash
-      ~nb_context_elements ~progress_display_mode =
-    let open Lwt_result_syntax in
-    let context_file_path =
-      Naming.(snapshot_context_file t.snapshot_dir |> file_path)
-    in
-    let* fd =
-      Lwt.catch
-        (fun () ->
-          let*! fd =
-            Lwt_unix.openfile
-              context_file_path
-              Lwt_unix.[O_RDONLY]
-              snapshot_ro_file_perm
-          in
-          return fd)
-        (function
-          | Unix.Unix_error (e, _, _) ->
-              tzfail (Context.Cannot_open_file (Unix.error_message e))
-          | exc ->
-              let msg =
-                Printf.sprintf "unknown error: %s" (Printexc.to_string exc)
-              in
-              tzfail (Context.Cannot_open_file msg))
-    in
-    Lwt.finalize
-      (fun () ->
-        let* () =
-          Context.restore_context
-            context_index
-            ~expected_context_hash
-            ~fd
-            ~nb_context_elements
-            ~in_memory:false
-            ~progress_display_mode
-        in
-        let*! current = Lwt_unix.lseek fd 0 Lwt_unix.SEEK_CUR in
-        let*! stats = Lwt_unix.fstat fd in
-        let total = stats.Lwt_unix.st_size in
-        if current = total then return_unit
-        else tzfail (Context.Suspicious_file (total - current)))
-      (fun () -> Lwt_unix.close fd)
 
   let load_protocol_table t =
     let open Lwt_result_syntax in
@@ -3369,25 +3309,6 @@ module Tar_importer : IMPORTER = struct
         context_files
     in
     return_unit
-
-  let legacy_restore_context t context_index ~expected_context_hash
-      ~nb_context_elements ~progress_display_mode =
-    let open Lwt_result_syntax in
-    let filename = Naming.(snapshot_context_file t.snapshot_tar |> file_path) in
-    let* header =
-      let*! o = Onthefly.get_file t.tar ~filename in
-      match o with
-      | Some header -> return header
-      | None -> tzfail (Cannot_read {kind = `Context; path = filename})
-    in
-    let*! fd = Onthefly.read_raw t.tar header in
-    Context.restore_context
-      context_index
-      ~expected_context_hash
-      ~nb_context_elements
-      ~fd
-      ~in_memory:false
-      ~progress_display_mode
 
   let load_protocol_table t =
     let open Lwt_result_syntax in
