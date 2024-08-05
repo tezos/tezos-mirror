@@ -371,20 +371,30 @@ let fetch_preimage_from_remote endpoint hash_hex =
       in
       raise Not_found
 
-let reveal_preimage_builtin config retries hash =
+let reveal_preimage_builtin ?preimages_endpoint ~preimages retries hash =
   let open Tezos_protocol_alpha.Protocol.Sc_rollup_reveal_hash in
   if hash = well_known_reveal_hash then Lwt.return well_known_reveal_preimage
   else
     let hex = to_hex hash in
     let fetch_from_remote =
-      Option.map fetch_preimage_from_remote config.Config.preimage_endpoint
+      Option.map fetch_preimage_from_remote preimages_endpoint
     in
     read_data
       ~kind:"Preimage"
-      ~directory:config.Config.preimage_directory
+      ~directory:preimages
       ~filename:hex
       ?fetch_from_remote
       retries
+
+let reveal_preimage ?preimages_endpoint ~preimages retries (`Hex hex_hash) =
+  let hash =
+    Tezos_protocol_alpha.Protocol.Sc_rollup_reveal_hash.of_hex hex_hash
+  in
+  match hash with
+  | Some hash ->
+      reveal_preimage_builtin ?preimages_endpoint ~preimages retries hash
+  | None ->
+      Stdlib.failwith (Format.asprintf "invalid preimages hash %s" hex_hash)
 
 let request_dal_page config retries published_level slot_index page_index =
   let open Tezos_protocol_alpha.Protocol in
@@ -408,7 +418,12 @@ let reveals config request =
   let open Tezos_protocol_alpha.Protocol.Alpha_context.Sc_rollup in
   let num_retries = 3 in
   match Wasm_2_0_0PVM.decode_reveal request with
-  | Reveal_raw_data hash -> reveal_preimage_builtin config num_retries hash
+  | Reveal_raw_data hash ->
+      reveal_preimage_builtin
+        ?preimages_endpoint:config.Config.preimage_endpoint
+        ~preimages:config.Config.preimage_directory
+        num_retries
+        hash
   | Reveal_metadata -> Lwt.return (build_metadata config)
   | Reveal_dal_parameters ->
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/6547
@@ -973,7 +988,13 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
         | Reveal_raw_data hash, None ->
             Lwt.catch
               (fun () ->
-                let* preimage = reveal_preimage_builtin config 1 hash in
+                let* preimage =
+                  reveal_preimage_builtin
+                    ?preimages_endpoint:config.Config.preimage_endpoint
+                    ~preimages:config.Config.preimage_directory
+                    1
+                    hash
+                in
                 Wasm.reveal_step (String.to_bytes preimage) tree)
               (fun _ -> return tree)
         | _ ->

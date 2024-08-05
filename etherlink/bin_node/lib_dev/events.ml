@@ -170,6 +170,14 @@ let preload_kernel =
     ~msg:"Kernel {version} successfully preloaded"
     ("version", Data_encoding.string)
 
+let predownload_kernel =
+  Internal_event.Simple.declare_1
+    ~level:Notice
+    ~section
+    ~name:"predownload_kernel"
+    ~msg:"Kernel {version} successfully predownloaded"
+    ("version", Data_encoding.string)
+
 let sandbox_started =
   Internal_event.Simple.declare_1
     ~level:Notice
@@ -246,6 +254,8 @@ let retrying_connect ~endpoint ~delay =
 let preload_kernel commit = emit preload_kernel commit
 
 let patched_state key level = emit patched_state (key, level)
+
+let predownload_kernel root_hash = emit predownload_kernel (Hex.show root_hash)
 
 let sandbox_started level = emit sandbox_started level
 

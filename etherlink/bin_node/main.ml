@@ -2421,6 +2421,45 @@ let patch_state_command =
            As a reminder, patching the state is an advanced and unsafe \
            procedure.")
 
+let preemptive_kernel_download_command =
+  let open Tezos_clic in
+  command
+    ~desc:"Transforms the JSON list of instructions to a RLP list"
+    (args3 data_dir_arg preimages_arg preimages_endpoint_arg)
+    (prefixes ["download"; "kernel"; "with"; "root"; "hash"]
+    @@ param
+         ~name:"root hash"
+         ~desc:"root hash of the kernel to download"
+         (Tezos_clic.parameter (fun _ str ->
+              Lwt_result_syntax.return @@ `Hex str))
+    @@ stop)
+    (fun (data_dir, preimages, preimages_endpoint) root_hash () ->
+      let open Lwt_result_syntax in
+      let* configuration =
+        Cli.create_or_read_config
+          ~data_dir
+          ~keep_alive:false
+          ~verbose:false
+          ?preimages
+          ?preimages_endpoint
+          ()
+      in
+      let kernel_execution_config = configuration.kernel_execution in
+      let*? preimages_endpoint =
+        Option.either
+          preimages_endpoint
+          kernel_execution_config.preimages_endpoint
+        |> Option.value_e ~error:[error_of_fmt "missing preimages endpoint."]
+      in
+      let preimages =
+        Option.value preimages ~default:kernel_execution_config.preimages
+      in
+      let*! () = Lwt_utils_unix.create_dir preimages in
+      Evm_node_lib_dev.Kernel_download.download
+        ~preimages
+        ~preimages_endpoint
+        ~root_hash)
+
 (* List of program commands *)
 let commands =
   [
@@ -2446,6 +2485,7 @@ let commands =
     export_snapshot_auto_name_command;
     export_snapshot_named_command;
     patch_state_command;
+    preemptive_kernel_download_command;
   ]
 
 let global_options = Tezos_clic.no_options
