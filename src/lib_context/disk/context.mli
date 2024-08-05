@@ -27,12 +27,6 @@
 (*****************************************************************************)
 
 module type TEZOS_CONTEXT_UNIX = sig
-  type error +=
-    | Cannot_create_file of string
-    | Cannot_open_file of string
-    | Cannot_find_protocol
-    | Suspicious_file of int
-
   include
     Tezos_context_sigs.Context.TEZOS_CONTEXT
       with type memory_context_tree := Tezos_context_memory.Context.tree
@@ -46,18 +40,6 @@ module type TEZOS_CONTEXT_UNIX = sig
       the overlay temporarily. Calling [flush] performs these writes on
       disk and returns a context with an empty overlay. *)
   val flush : t -> t Lwt.t
-
-  (** {2 Context dumping} *)
-
-  (** Rebuild a context from a given snapshot. *)
-  val restore_context :
-    index ->
-    expected_context_hash:Context_hash.t ->
-    nb_context_elements:int ->
-    fd:Lwt_unix.file_descr ->
-    in_memory:bool ->
-    progress_display_mode:Animation.progress_display_mode ->
-    unit tzresult Lwt.t
 
   (** Offline integrity checking and statistics for contexts. *)
   module Checks : sig

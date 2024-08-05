@@ -681,9 +681,6 @@ struct
       test "fold" test_fold;
       test "trees" test_trees;
       test "raw" test_raw;
-      (* NOTE: importing the context from a snapshot requires using an [`Always]
-         indexing strategy. See the docs for [Context.restore_context] for more
-         details. *)
       test "encoding" test_encoding;
       test "get_hash_version" test_get_version_hash;
       test "set_hash_version_tzresult" test_set_version_hash_tzresult;

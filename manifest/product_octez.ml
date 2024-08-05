@@ -2603,21 +2603,6 @@ let octez_scoru_wasm_fast =
         octez_wasmer;
       ]
 
-let octez_context_dump =
-  octez_lib
-    "tezos-context.dump"
-    ~path:"src/lib_context/dump"
-    ~deps:
-      [octez_base |> open_ ~m:"TzPervasives"; octez_stdlib_unix |> open_; fmt]
-
-let octez_context_brassaia_dump =
-  octez_lib
-    "tezos-context-brassaia.dump"
-    ~path:"src/lib_context_brassaia/dump"
-    ~deps:
-      [octez_base |> open_ ~m:"TzPervasives"; octez_stdlib_unix |> open_; fmt]
-(* Should not be used directly in most cases, use context_ops abstraction instead *)
-
 let octez_context_disk =
   octez_lib
     "tezos-context.disk"
@@ -2637,7 +2622,6 @@ let octez_context_disk =
         octez_context_helpers;
         octez_context_encoding;
         octez_context_memory;
-        octez_context_dump;
       ]
     ~conflicts:[Conflicts.checkseum]
 
@@ -2661,7 +2645,6 @@ let octez_context_brassaia_disk =
         octez_context_brassaia_helpers;
         octez_context_brassaia_encoding;
         octez_context_brassaia_memory |> open_;
-        octez_context_brassaia_dump;
       ]
     ~conflicts:[Conflicts.checkseum]
 
