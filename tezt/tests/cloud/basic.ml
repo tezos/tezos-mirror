@@ -14,7 +14,7 @@ let simple () =
   @@ fun t ->
   let agents = Cloud.agents t in
   let agent0 = List.nth agents 0 in
-  let agent1 = List.nth agents 1 in
+  let agent1 = List.nth agents (1 mod List.length agents) in
   let* output =
     Process.spawn
       ~name:"agent0"
