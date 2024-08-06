@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use super::{Elem, Manager, ManagerBase};
+use super::{Elem, Manager, ManagerBase, ManagerRead, ManagerReadWrite, ManagerWrite};
 
 /// Single element of type `E`
 #[repr(transparent)]
@@ -142,48 +142,67 @@ impl<E: Elem, const LEN: usize, M: ManagerBase> Cells<E, LEN, M> {
     pub fn bind(region: M::Region<E, LEN>) -> Self {
         Self { region }
     }
-}
 
-impl<E: Elem, const LEN: usize, M: Manager> Cells<E, LEN, M> {
     /// Read an element in the region.
     #[inline]
-    pub fn read(&self, index: usize) -> E {
+    pub fn read(&self, index: usize) -> E
+    where
+        M: ManagerRead,
+    {
         M::region_read(&self.region, index)
     }
 
     /// Read all elements in the region.
     #[inline]
-    pub fn read_all(&self) -> Vec<E> {
+    pub fn read_all(&self) -> Vec<E>
+    where
+        M: ManagerRead,
+    {
         M::region_read_all(&self.region)
     }
 
     /// Read `buffer.len()` elements from the region, starting at `offset`.
     #[inline]
-    pub fn read_some(&self, offset: usize, buffer: &mut [E]) {
+    pub fn read_some(&self, offset: usize, buffer: &mut [E])
+    where
+        M: ManagerRead,
+    {
         M::region_read_some(&self.region, offset, buffer)
     }
 
     /// Update an element in the region.
     #[inline]
-    pub fn write(&mut self, index: usize, value: E) {
+    pub fn write(&mut self, index: usize, value: E)
+    where
+        M: ManagerWrite,
+    {
         M::region_write(&mut self.region, index, value)
     }
 
     /// Update all elements in the region.
     #[inline]
-    pub fn write_all(&mut self, value: &[E]) {
+    pub fn write_all(&mut self, value: &[E])
+    where
+        M: ManagerWrite,
+    {
         M::region_write_all(&mut self.region, value)
     }
 
     /// Update a subset of elements in the region starting at `index`.
     #[inline]
-    pub fn write_some(&mut self, index: usize, buffer: &[E]) {
+    pub fn write_some(&mut self, index: usize, buffer: &[E])
+    where
+        M: ManagerWrite,
+    {
         M::region_write_some(&mut self.region, index, buffer)
     }
 
     /// Update the element in the region and return the previous value.
     #[inline]
-    pub fn replace(&mut self, index: usize, value: E) -> E {
+    pub fn replace(&mut self, index: usize, value: E) -> E
+    where
+        M: ManagerReadWrite,
+    {
         M::region_replace(&mut self.region, index, value)
     }
 }
