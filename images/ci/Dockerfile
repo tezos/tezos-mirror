@@ -126,7 +126,6 @@ RUN apk update \
     linux-headers \
     m4 \
     ncurses-dev \
-    opam \
     openssh-client \
     openssl-dev \
     patch \
@@ -148,6 +147,9 @@ RUN apk update \
     protobuf-dev \
     sqlite-static \
     sqlite-dev \
+ # Opam from Edge is Opam 2.2
+ && apk add --no-cache \
+    opam --repository=https://dl-cdn.alpinelinux.org/alpine/edge/community \
 # Cleanup
  && rm -rf /tmp/*
 
