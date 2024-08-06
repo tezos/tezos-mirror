@@ -24,7 +24,7 @@ gitlab_release=$(echo "${CI_COMMIT_TAG}" | grep -oE '^octez-v([0-9]+)\.([0-9]+)$
 
 # Strips the leading 'octez-v'
 # X.Y, X.Y-rcZ or X.Y-betaZ
-gitlab_release_no_v=$(echo "${CI_COMMIT_TAG}" | sed -e 's/^octez-v//g')
+gitlab_release_no_v=$(echo "${gitlab_release}" | sed -e 's/^octez-v//g')
 
 # Replace '.' with '-'
 # X-Y or X-Y-rcZ
@@ -59,13 +59,21 @@ fi
 
 ### Compute GitLab generic package names
 
-gitlab_octez_binaries_package_name="octez-binaries-${gitlab_release_no_v}"
-gitlab_octez_debian_bookworm_package_name="octez-debian-bookworm-${gitlab_release_no_v}"
-gitlab_octez_ubuntu_noble_package_name="octez-ubuntu-noble-${gitlab_release_no_v}"
-gitlab_octez_ubuntu_jammy_package_name="octez-ubuntu-jammy-${gitlab_release_no_v}"
-gitlab_octez_fedora_package_name="octez-fedora-${gitlab_release_no_v}"
-gitlab_octez_rockylinux_package_name="octez-rockylinux-${gitlab_release_no_v}"
-gitlab_octez_source_package_name="octez-source-${gitlab_release_no_v}"
+if [ -n "${gitlab_release_no_v}" ]; then
+  suffix="${gitlab_release_no_v}"
+  gitlab_octez_binaries_package_name="octez-binaries-${suffix}"
+  gitlab_octez_source_package_name="octez-source-${suffix}"
+else
+  suffix=$(date +'%Y%m%d%H%M')+$CI_COMMIT_SHORT_SHA
+  gitlab_octez_binaries_package_name="octez-binaries-${suffix}"
+  gitlab_octez_source_package_name="octez-source-${suffix}"
+fi
+
+gitlab_octez_debian_bookworm_package_name="octez-debian-bookworm"
+gitlab_octez_ubuntu_noble_package_name="octez-ubuntu-noble"
+gitlab_octez_ubuntu_jammy_package_name="octez-ubuntu-jammy"
+gitlab_octez_fedora_package_name="octez-fedora"
+gitlab_octez_rockylinux_package_name="octez-rockylinux"
 
 # X.Y or X.Y-rcZ
-gitlab_package_version="${gitlab_release_no_v}"
+gitlab_package_version="${suffix}"

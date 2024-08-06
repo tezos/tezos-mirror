@@ -18,6 +18,9 @@ export DEBEMAIL="contact@nomadic-labs.com"
 if [ -n "${gitlab_release_no_v:-}" ]; then
   DEBVERSION=$gitlab_release_no_v
   DEBCHANGELOG="New Release $gitlab_release_no_v / $CI_COMMIT_SHORT_SHA"
+elif [ -n "$CI_COMMIT_TAG" ]; then
+  DEBVERSION=$(date +'%Y%m%d%H%M')+$CI_COMMIT_TAG
+  DEBCHANGELOG="Packages for tag $CI_COMMIT_TAG"
 else
   DEBVERSION=$(date +'%Y%m%d%H%M')+$CI_COMMIT_SHORT_SHA
   DEBCHANGELOG="Test package commit $CI_COMMIT_REF_NAME"
