@@ -1208,7 +1208,7 @@ let init_baker cloud (configuration : configuration) ~bootstrap account i agent
     in
     let* () =
       Dal_node.init_config
-        ~expected_pow:0.
+        ~expected_pow:(if Cli.network = Ghostnet then 26. else 0.)
         ~attester_profiles:[account.Account.public_key_hash]
         ~peers:[bootstrap.dal_node_p2p_endpoint] (* no need for peer *)
         dal_node
@@ -1283,7 +1283,7 @@ let init_producer cloud configuration ~bootstrap ~number_of_slots account i
   let () = toplog "Init producer: init DAL node config" in
   let* () =
     Dal_node.init_config
-      ~expected_pow:0.
+      ~expected_pow:(if Cli.network = Ghostnet then 26. else 0.)
       ~observer_profiles:[i mod number_of_slots]
       ~peers:[bootstrap.dal_node_p2p_endpoint]
       dal_node
@@ -1325,7 +1325,7 @@ let init_observer cloud configuration ~bootstrap ~slot_index i agent =
   in
   let* () =
     Dal_node.init_config
-      ~expected_pow:0.
+      ~expected_pow:(if Cli.network = Ghostnet then 26. else 0.)
       ~observer_profiles:[slot_index]
       ~peers:[bootstrap.dal_node_p2p_endpoint]
       dal_node
