@@ -916,6 +916,15 @@ let run ~data_dir ~configuration_override =
   let* cryptobox, shards_proofs_precomputation =
     init_cryptobox config proto_parameters
   in
+  let* amplificator =
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/7452
+       The amplificator also initializes the crypto. This could be avoided.
+       Also, is this the right moment to start the amplificator? *)
+    if Profile_manager.is_prover_profile profile_ctxt then
+      let* amplificator = Amplificator.make () in
+      return_some amplificator
+    else return_none
+  in
   (* Set value size hooks. *)
   Value_size_hooks.set_share_size
     (Cryptobox.Internal_for_tests.encoded_share_size cryptobox) ;
@@ -947,12 +956,6 @@ let run ~data_dir ~configuration_override =
       ~l1_blocks_cache_size:crawler_l1_blocks_cache_size
       ?last_notified_level:last_processed_level
       cctxt
-  in
-  let* amplificator =
-    if Profile_manager.is_prover_profile profile_ctxt then
-      let* amplificator = Amplificator.make () in
-      return_some amplificator
-    else return_none
   in
   let* () =
     match amplificator with
