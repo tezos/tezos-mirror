@@ -86,7 +86,7 @@ type t = {
   operation_metadata_size_limit :
     Shell_limits.operation_metadata_size_limit option;
       (** maximum operation metadata size allowed to be stored on disk *)
-  context_pruning : Storage_maintenance.context_pruning option;
+  disable_context_pruning : bool option;
   storage_maintenance_delay : Storage_maintenance.delay option;
 }
 

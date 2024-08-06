@@ -70,7 +70,7 @@ type t = {
   metrics_addr : string list;
   operation_metadata_size_limit :
     Shell_limits.operation_metadata_size_limit option;
-  context_pruning : Storage_maintenance.context_pruning option;
+  disable_context_pruning : bool option;
   storage_maintenance_delay : Storage_maintenance.delay option;
 }
 
@@ -193,7 +193,7 @@ let wrap data_dir config_file network connections max_download_speed
     log_coloring history_mode synchronisation_threshold latency
     disable_config_validation allow_all_rpc media_type
     max_active_rpc_connections metrics_addr operation_metadata_size_limit
-    context_pruning storage_maintenance_delay =
+    disable_context_pruning storage_maintenance_delay =
   let actual_data_dir =
     Option.value ~default:Config_file.default_data_dir data_dir
   in
@@ -204,6 +204,9 @@ let wrap data_dir config_file network connections max_download_speed
   in
   let rpc_tls =
     Option.map (fun (cert, key) -> {Config_file.cert; key}) rpc_tls
+  in
+  let disable_context_pruning =
+    if disable_context_pruning then Some true else None
   in
   {
     disable_config_validation;
@@ -242,7 +245,7 @@ let wrap data_dir config_file network connections max_download_speed
     max_active_rpc_connections;
     metrics_addr;
     operation_metadata_size_limit;
-    context_pruning;
+    disable_context_pruning;
     storage_maintenance_delay;
   }
 
@@ -752,24 +755,9 @@ module Term = struct
           Config_file.default_max_active_rpc_connections
       & info ~docs ~doc ~docv:"NUM" ["max-active-rpc-connections"])
 
-  let context_pruning =
-    let open Storage_maintenance in
-    let doc =
-      "Configures whether or not the storage maintenance of the context should \
-       be enabled"
-    in
-    let parse str =
-      match str with
-      | "disabled" -> `Ok (Disabled : Storage_maintenance.context_pruning)
-      | "enabled" -> `Ok Enabled
-      | _ ->
-          `Error
-            "context-pruning only supports \"disabled\" and \"enabled\" modes"
-    in
-    Arg.(
-      value
-      & opt (some (parse, pp_context_pruning)) None
-      & info ~docs ~doc ["context-pruning"])
+  let disable_context_pruning =
+    let doc = "Disables the storage maintenance of the context" in
+    Arg.(value & flag & info ~docs ~doc ["disable-context-pruning"])
 
   let storage_maintenance_delay =
     let open Storage_maintenance in
@@ -807,7 +795,7 @@ module Term = struct
     $ log_output $ log_coloring $ history_mode $ synchronisation_threshold
     $ latency $ disable_config_validation $ allow_all_rpc $ media_type
     $ max_active_rpc_connections $ metrics_addr $ operation_metadata_size_limit
-    $ context_pruning $ storage_maintenance_delay
+    $ disable_context_pruning $ storage_maintenance_delay
 end
 
 let read_config_file args =
@@ -955,7 +943,7 @@ let patch_config ?(may_override_network = false) ?(emit = Event.emit)
     max_active_rpc_connections;
     metrics_addr;
     operation_metadata_size_limit;
-    context_pruning;
+    disable_context_pruning;
     storage_maintenance_delay;
   } =
     args
@@ -1114,7 +1102,7 @@ let patch_config ?(may_override_network = false) ?(emit = Event.emit)
     ?synchronisation_threshold
     ?history_mode
     ?latency
-    ?context_pruning
+    ?disable_context_pruning
     ?storage_maintenance_delay
     cfg
 
