@@ -877,8 +877,8 @@ let call_extendable_encoding =
          | from, to_, gas, gasPrice, value, data, None
          | from, to_, gas, gasPrice, value, None, data ->
              Ok {from; to_; gas; gasPrice; value; data}
-         | _, _, _, _, _, Some _, Some _ ->
-             Error "Cannot specify both data and input")
+         | from, to_, gas, gasPrice, value, Some _data, Some input ->
+             Ok {from; to_; gas; gasPrice; value; data = Some input})
        (obj7
           (dft "from" (option address_encoding) None)
           (dft "to" (option address_encoding) None)
