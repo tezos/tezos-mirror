@@ -146,6 +146,31 @@ let rpc_port_arg =
     ~doc:"The EVM node server rpc port."
     Params.int
 
+let rpc_batch_limit_arg =
+  Tezos_clic.arg
+    ~long:"rpc-batch-limit"
+    ~placeholder:"PORT"
+    ~doc:
+      "A limit on the number of requests allowed in a single batch. Can either \
+       be `unlimited` or a positive integer."
+    (Tezos_clic.parameter (fun _ctxt ->
+         let open Lwt_result_syntax in
+         function
+         | "unlimited" -> return Unlimited
+         | r -> (
+             match int_of_string_opt r with
+             | Some max ->
+                 if 0 <= max then return (Limit max)
+                 else
+                   failwith
+                     "Invalid argument for --rpc-batch-limit: %d is negative"
+                     max
+             | None ->
+                 failwith
+                   "Invalid argument for --rpc-batch-limit: %s. Should be \
+                    `unlimited` or an integer"
+                   r)))
+
 let private_rpc_port_arg =
   Tezos_clic.arg
     ~long:"private-rpc-port"
@@ -557,10 +582,11 @@ let dal_slots_arg =
          |> Lwt_result_syntax.return))
 
 let common_config_args =
-  Tezos_clic.args18
+  Tezos_clic.args19
     data_dir_arg
     rpc_addr_arg
     rpc_port_arg
+    rpc_batch_limit_arg
     devmode_arg
     cors_allowed_origins_arg
     cors_allowed_headers_arg
@@ -615,11 +641,11 @@ let assert_rollup_node_endpoint_equal ~arg ~param =
       ]
   else Ok ()
 
-let start_proxy ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?cors_origins
-    ?cors_headers ?log_filter_max_nb_blocks ?log_filter_max_nb_logs
-    ?log_filter_chunk_size ?rollup_node_endpoint ?tx_pool_timeout_limit
-    ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit ?restricted_rpcs ~verbose
-    ~read_only ~finalized_view () =
+let start_proxy ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?rpc_batch_limit
+    ?cors_origins ?cors_headers ?log_filter_max_nb_blocks
+    ?log_filter_max_nb_logs ?log_filter_chunk_size ?rollup_node_endpoint
+    ?tx_pool_timeout_limit ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit
+    ?restricted_rpcs ~verbose ~read_only ~finalized_view () =
   let open Lwt_result_syntax in
   let* config =
     Cli.create_or_read_config
@@ -627,6 +653,7 @@ let start_proxy ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?cors_origins
       ~keep_alive
       ?rpc_addr
       ?rpc_port
+      ?rpc_batch_limit
       ?cors_origins
       ?cors_headers
       ?log_filter_max_nb_blocks
@@ -684,6 +711,7 @@ let proxy_command =
     (fun ( ( data_dir,
              rpc_addr,
              rpc_port,
+             rpc_batch_limit,
              _devmode,
              cors_origins,
              cors_headers,
@@ -718,6 +746,7 @@ let proxy_command =
         ~keep_alive
         ?rpc_addr
         ?rpc_port
+        ?rpc_batch_limit
         ?cors_origins
         ?cors_headers
         ?log_filter_max_nb_blocks
@@ -746,13 +775,14 @@ let register_wallet ?password_filename ~wallet_dir () =
   wallet_ctxt
 
 let start_sequencer ?password_filename ~wallet_dir ~data_dir ?rpc_addr ?rpc_port
-    ?cors_origins ?cors_headers ?tx_pool_timeout_limit ?tx_pool_addr_limit
-    ?tx_pool_tx_per_addr_limit ~keep_alive ?rollup_node_endpoint ~verbose
-    ?preimages ?preimages_endpoint ?time_between_blocks ?max_number_of_chunks
-    ?private_rpc_port ?sequencer_str ?max_blueprints_lag ?max_blueprints_ahead
-    ?max_blueprints_catchup ?catchup_cooldown ?log_filter_max_nb_blocks
-    ?log_filter_max_nb_logs ?log_filter_chunk_size ?genesis_timestamp
-    ?restricted_rpcs ?kernel ?dal_slots ?sandbox_key () =
+    ?rpc_batch_limit ?cors_origins ?cors_headers ?tx_pool_timeout_limit
+    ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit ~keep_alive
+    ?rollup_node_endpoint ~verbose ?preimages ?preimages_endpoint
+    ?time_between_blocks ?max_number_of_chunks ?private_rpc_port ?sequencer_str
+    ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
+    ?catchup_cooldown ?log_filter_max_nb_blocks ?log_filter_max_nb_logs
+    ?log_filter_chunk_size ?genesis_timestamp ?restricted_rpcs ?kernel
+    ?dal_slots ?sandbox_key () =
   let open Lwt_result_syntax in
   let wallet_ctxt = register_wallet ?password_filename ~wallet_dir () in
   let* sequencer_key =
@@ -770,6 +800,7 @@ let start_sequencer ?password_filename ~wallet_dir ~data_dir ?rpc_addr ?rpc_port
       ~data_dir
       ?rpc_addr
       ?rpc_port
+      ?rpc_batch_limit
       ?cors_origins
       ?cors_headers
       ?tx_pool_timeout_limit
@@ -828,7 +859,7 @@ let start_sequencer ?password_filename ~wallet_dir ~data_dir ?rpc_addr ?rpc_port
     ()
 
 let start_threshold_encryption_sequencer ?password_filename ~wallet_dir
-    ~data_dir ?rpc_addr ?rpc_port ?cors_origins ?cors_headers
+    ~data_dir ?rpc_addr ?rpc_port ?rpc_batch_limit ?cors_origins ?cors_headers
     ?tx_pool_timeout_limit ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit
     ~keep_alive ?rollup_node_endpoint ~verbose ?preimages ?preimages_endpoint
     ?time_between_blocks ?max_number_of_chunks ?private_rpc_port ?sequencer_str
@@ -848,6 +879,7 @@ let start_threshold_encryption_sequencer ?password_filename ~wallet_dir
       ~data_dir
       ?rpc_addr
       ?rpc_port
+      ?rpc_batch_limit
       ?cors_origins
       ?cors_headers
       ?tx_pool_timeout_limit
@@ -940,6 +972,7 @@ let sequencer_command =
     (fun ( ( data_dir,
              rpc_addr,
              rpc_port,
+             rpc_batch_limit,
              _devmode,
              cors_origins,
              cors_headers,
@@ -989,6 +1022,7 @@ let sequencer_command =
         ~data_dir
         ?rpc_addr
         ?rpc_port
+        ?rpc_batch_limit
         ?cors_origins
         ?cors_headers
         ?tx_pool_timeout_limit
@@ -1029,6 +1063,7 @@ let rpc_command =
     (fun ( ( data_dir,
              rpc_addr,
              rpc_port,
+             rpc_batch_limit,
              _devmode,
              cors_origins,
              cors_headers,
@@ -1093,6 +1128,7 @@ let rpc_command =
           ~keep_alive
           ?cors_origins
           ?cors_headers
+          ?rpc_batch_limit
           ~verbose
           ?preimages
           ?preimages_endpoint
@@ -1133,8 +1169,8 @@ let rpc_command =
       let*! () = Internal_event.Simple.emit Event.event_starting "rpc" in
       Evm_node_lib_dev.Rpc.main ~data_dir ~evm_node_endpoint ~config)
 
-let start_observer ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?cors_origins
-    ?cors_headers ~verbose ?preimages ?rollup_node_endpoint
+let start_observer ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?rpc_batch_limit
+    ?cors_origins ?cors_headers ~verbose ?preimages ?rollup_node_endpoint
     ~dont_track_rollup_node ?preimages_endpoint ?evm_node_endpoint
     ?threshold_encryption_bundler_endpoint ?tx_pool_timeout_limit
     ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit ?log_filter_chunk_size
@@ -1147,6 +1183,7 @@ let start_observer ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?cors_origins
       ~keep_alive
       ?rpc_addr
       ?rpc_port
+      ?rpc_batch_limit
       ?cors_origins
       ?cors_headers
       ?rollup_node_endpoint
@@ -1217,6 +1254,7 @@ let observer_command =
   @@ fun ( ( data_dir,
              rpc_addr,
              rpc_port,
+             rpc_batch_limit,
              _devmode,
              cors_origins,
              cors_headers,
@@ -1256,6 +1294,7 @@ let observer_command =
     ~keep_alive
     ?rpc_addr
     ?rpc_port
+    ?rpc_batch_limit
     ?cors_origins
     ?cors_headers
     ~verbose
@@ -1686,6 +1725,7 @@ mode.|}
     (fun ( ( data_dir,
              rpc_addr,
              rpc_port,
+             rpc_batch_limit,
              _devmode,
              cors_origins,
              cors_headers,
@@ -1734,6 +1774,7 @@ mode.|}
           ~data_dir
           ?rpc_addr
           ?rpc_port
+          ?rpc_batch_limit
           ?cors_origins
           ?cors_headers
           ?log_filter_max_nb_blocks
@@ -1895,6 +1936,7 @@ let proxy_simple_command =
     (fun ( ( data_dir,
              rpc_addr,
              rpc_port,
+             rpc_batch_limit,
              _devmode,
              cors_origins,
              cors_headers,
@@ -1921,6 +1963,7 @@ let proxy_simple_command =
         ~keep_alive
         ?rpc_addr
         ?rpc_port
+        ?rpc_batch_limit
         ?cors_origins
         ?cors_headers
         ?log_filter_max_nb_blocks
@@ -1975,6 +2018,7 @@ let sequencer_simple_command =
     (fun ( ( data_dir,
              rpc_addr,
              rpc_port,
+             rpc_batch_limit,
              _devmode,
              cors_origins,
              cors_headers,
@@ -2016,6 +2060,7 @@ let sequencer_simple_command =
         ~data_dir
         ?rpc_addr
         ?rpc_port
+        ?rpc_batch_limit
         ?cors_origins
         ?cors_headers
         ?tx_pool_timeout_limit
@@ -2055,6 +2100,7 @@ let sandbox_command =
     (fun ( ( data_dir,
              rpc_addr,
              rpc_port,
+             rpc_batch_limit,
              _devmode,
              cors_origins,
              cors_headers,
@@ -2096,6 +2142,7 @@ let sandbox_command =
         ~data_dir
         ?rpc_addr
         ?rpc_port
+        ?rpc_batch_limit
         ?cors_origins
         ?cors_headers
         ?tx_pool_timeout_limit
@@ -2152,6 +2199,7 @@ let threshold_encryption_sequencer_command =
     (fun ( ( data_dir,
              rpc_addr,
              rpc_port,
+             rpc_batch_limit,
              _devmode,
              cors_origins,
              cors_headers,
@@ -2194,6 +2242,7 @@ let threshold_encryption_sequencer_command =
         ~data_dir
         ?rpc_addr
         ?rpc_port
+        ?rpc_batch_limit
         ?cors_origins
         ?cors_headers
         ?tx_pool_timeout_limit
@@ -2240,6 +2289,7 @@ let observer_simple_command =
     (fun ( ( data_dir,
              rpc_addr,
              rpc_port,
+             rpc_batch_limit,
              _devmode,
              cors_origins,
              cors_headers,
@@ -2271,6 +2321,7 @@ let observer_simple_command =
         ~keep_alive
         ?rpc_addr
         ?rpc_port
+        ?rpc_batch_limit
         ?cors_origins
         ?cors_headers
         ~verbose

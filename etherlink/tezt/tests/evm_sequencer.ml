@@ -5432,6 +5432,58 @@ let test_rpc_mode_while_block_are_produced =
   in
   unit
 
+let test_batch_limit_size_rpc =
+  register_all
+    ~bootstrap_accounts:Eth_account.lots_of_address
+    ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
+    ~title:"Test batch size limit"
+    ~tags:["rpc"; "batch_limit"]
+    ~time_between_blocks:Nothing
+  @@ fun {sequencer; _} _protocol ->
+  (* We restart the sequencer to impose a batch limit on the sequencer. *)
+  let* () = Evm_node.terminate sequencer in
+  let* () =
+    Evm_node.run ~extra_arguments:["--rpc-batch-limit"; "5"] sequencer
+  in
+  let all_txs = read_tx_from_file () in
+  (* Considering the choosen limit (5), we prepare two batches of transactions.
+     The first one with the first three transactions of our tx file, the second
+     one with the 10 ones that comes after.*)
+  let below_limit_txs =
+    List.filteri (fun i _ -> i < 3) all_txs |> List.map fst
+  in
+  let above_limit_txs =
+    List.filteri (fun i _ -> 3 <= i && i < 13) all_txs |> List.map fst
+  in
+
+  (* We first check that we can inject the first batch. *)
+  let* _ = Helpers.batch_n_transactions ~evm_node:sequencer below_limit_txs in
+
+  (* We then demonstrate that we cannot inject the second batch. *)
+  let* has_failed =
+    Lwt.catch
+      (fun () ->
+        let* _ =
+          Helpers.batch_n_transactions ~evm_node:sequencer above_limit_txs
+        in
+        return false)
+      (fun _ -> return true)
+  in
+
+  if not has_failed then
+    Test.fail "Large batch exceeding the limit should have failed." ;
+
+  (* We restart the sequencer, and explicitely lift the limit. *)
+  let* () = Evm_node.terminate sequencer in
+  let* () =
+    Evm_node.run ~extra_arguments:["--rpc-batch-limit"; "unlimited"] sequencer
+  in
+
+  (* We demonstrate it is now possible to inject the batch. *)
+  let* _ = Helpers.batch_n_transactions ~evm_node:sequencer above_limit_txs in
+
+  unit
+
 let test_relay_restricted_rpcs =
   register_all
     ~bootstrap_accounts:Eth_account.lots_of_address
@@ -5527,4 +5579,5 @@ let () =
   test_sequencer_sandbox () ;
   test_rpc_mode_while_block_are_produced protocols ;
   test_trace_transaction_call_trace protocols ;
-  test_relay_restricted_rpcs protocols
+  test_relay_restricted_rpcs protocols ;
+  test_batch_limit_size_rpc protocols

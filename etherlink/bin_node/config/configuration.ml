@@ -69,9 +69,12 @@ type restricted_rpcs =
   | Blacklist of string list
   | Whitelist of string list
 
+type limit = Unlimited | Limit of int
+
 type t = {
   rpc_addr : string;
   rpc_port : int;
+  rpc_batch_limit : limit;
   cors_origins : string list;
   cors_headers : string list;
   log_filter : log_filter_config;
@@ -165,6 +168,24 @@ let default_fee_history = {max_count = None; max_past = None}
 
 let make_pattern_restricted_rpcs raw =
   Pattern {raw; regex = Re.Perl.compile_pat raw}
+
+let limit_encoding =
+  let open Data_encoding in
+  union
+    [
+      case
+        ~title:"unlimited"
+        Json_only
+        (constant "unlimited")
+        (function Unlimited -> Some () | _ -> None)
+        (fun () -> Unlimited);
+      case
+        ~title:"limited"
+        Json_only
+        int31
+        (function Limit i -> Some i | _ -> None)
+        (fun i -> Limit i);
+    ]
 
 let restricted_rpcs_encoding =
   let open Data_encoding in
@@ -560,6 +581,7 @@ let encoding data_dir : t Data_encoding.t =
     (fun {
            rpc_addr;
            rpc_port;
+           rpc_batch_limit;
            cors_origins;
            cors_headers;
            log_filter;
@@ -600,7 +622,7 @@ let encoding data_dir : t Data_encoding.t =
             proxy,
             fee_history,
             restricted_rpcs ),
-          kernel_execution ) ))
+          (kernel_execution, rpc_batch_limit) ) ))
     (fun ( ( rpc_addr,
              rpc_port,
              _devmode,
@@ -621,10 +643,11 @@ let encoding data_dir : t Data_encoding.t =
                proxy,
                fee_history,
                restricted_rpcs ),
-             kernel_execution ) ) ->
+             (kernel_execution, rpc_batch_limit) ) ) ->
       {
         rpc_addr;
         rpc_port;
+        rpc_batch_limit;
         cors_origins;
         cors_headers;
         log_filter;
@@ -699,11 +722,12 @@ let encoding data_dir : t Data_encoding.t =
              (dft "proxy" proxy_encoding (default_proxy ()))
              (dft "fee_history" fee_history_encoding default_fee_history)
              (opt "restricted_rpcs" restricted_rpcs_encoding))
-          (obj1
+          (obj2
              (dft
                 "kernel_execution"
                 (kernel_execution_encoding data_dir)
-                (kernel_execution_config_dft ~data_dir ())))))
+                (kernel_execution_config_dft ~data_dir ()))
+             (dft "rpc-batch-limit" limit_encoding Unlimited))))
 
 let save ~force ~data_dir config =
   let open Lwt_result_syntax in
@@ -739,16 +763,16 @@ let observer_config_exn {observer; _} =
   Option.to_result ~none:(error_missing_config ~name:"observer") observer
 
 module Cli = struct
-  let create ~data_dir ?rpc_addr ?rpc_port ?cors_origins ?cors_headers
-      ?tx_pool_timeout_limit ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit
-      ~keep_alive ?rollup_node_endpoint ?dont_track_rollup_node ~verbose
-      ?preimages ?preimages_endpoint ?time_between_blocks ?max_number_of_chunks
-      ?private_rpc_port ?sequencer_key ?evm_node_endpoint
-      ?threshold_encryption_bundler_endpoint ?log_filter_max_nb_blocks
-      ?log_filter_max_nb_logs ?log_filter_chunk_size ?max_blueprints_lag
-      ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
-      ?sequencer_sidecar_endpoint ?restricted_rpcs ?proxy_finalized_view
-      ?dal_slots () =
+  let create ~data_dir ?rpc_addr ?rpc_port ?rpc_batch_limit ?cors_origins
+      ?cors_headers ?tx_pool_timeout_limit ?tx_pool_addr_limit
+      ?tx_pool_tx_per_addr_limit ~keep_alive ?rollup_node_endpoint
+      ?dont_track_rollup_node ~verbose ?preimages ?preimages_endpoint
+      ?time_between_blocks ?max_number_of_chunks ?private_rpc_port
+      ?sequencer_key ?evm_node_endpoint ?threshold_encryption_bundler_endpoint
+      ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
+      ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
+      ?catchup_cooldown ?sequencer_sidecar_endpoint ?restricted_rpcs
+      ?proxy_finalized_view ?dal_slots () =
     let sequencer =
       Option.map
         (fun sequencer ->
@@ -810,6 +834,7 @@ module Cli = struct
     {
       rpc_addr = Option.value ~default:default_rpc_addr rpc_addr;
       rpc_port = Option.value ~default:default_rpc_port rpc_port;
+      rpc_batch_limit = Option.value ~default:Unlimited rpc_batch_limit;
       cors_origins = Option.value ~default:default_cors_origins cors_origins;
       cors_headers = Option.value ~default:default_cors_headers cors_headers;
       log_filter;
@@ -847,8 +872,8 @@ module Cli = struct
     in
     {preimages; preimages_endpoint}
 
-  let patch_configuration_from_args ?rpc_addr ?rpc_port ?cors_origins
-      ?cors_headers ?tx_pool_timeout_limit ?tx_pool_addr_limit
+  let patch_configuration_from_args ?rpc_addr ?rpc_port ?rpc_batch_limit
+      ?cors_origins ?cors_headers ?tx_pool_timeout_limit ?tx_pool_addr_limit
       ?tx_pool_tx_per_addr_limit ~keep_alive ?rollup_node_endpoint
       ?dont_track_rollup_node ~verbose ?preimages ?preimages_endpoint
       ?time_between_blocks ?max_number_of_chunks ?private_rpc_port
@@ -1061,6 +1086,8 @@ module Cli = struct
     {
       rpc_addr = Option.value ~default:configuration.rpc_addr rpc_addr;
       rpc_port = Option.value ~default:configuration.rpc_port rpc_port;
+      rpc_batch_limit =
+        Option.value ~default:configuration.rpc_batch_limit rpc_batch_limit;
       cors_origins =
         Option.value ~default:configuration.cors_origins cors_origins;
       cors_headers =
@@ -1092,8 +1119,8 @@ module Cli = struct
       restricted_rpcs;
     }
 
-  let create_or_read_config ~data_dir ?rpc_addr ?rpc_port ?cors_origins
-      ?cors_headers ?tx_pool_timeout_limit ?tx_pool_addr_limit
+  let create_or_read_config ~data_dir ?rpc_addr ?rpc_port ?rpc_batch_limit
+      ?cors_origins ?cors_headers ?tx_pool_timeout_limit ?tx_pool_addr_limit
       ?tx_pool_tx_per_addr_limit ~keep_alive ?rollup_node_endpoint
       ?dont_track_rollup_node ~verbose ?preimages ?preimages_endpoint
       ?time_between_blocks ?max_number_of_chunks ?private_rpc_port
@@ -1126,6 +1153,7 @@ module Cli = struct
         patch_configuration_from_args
           ?rpc_addr
           ?rpc_port
+          ?rpc_batch_limit
           ?cors_origins
           ?cors_headers
           ~keep_alive
@@ -1163,6 +1191,7 @@ module Cli = struct
           ~data_dir
           ?rpc_addr
           ?rpc_port
+          ?rpc_batch_limit
           ?cors_origins
           ?cors_headers
           ~keep_alive
