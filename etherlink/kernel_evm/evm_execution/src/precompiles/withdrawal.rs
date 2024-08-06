@@ -13,9 +13,9 @@ use crate::handler::RouterInterface;
 use crate::handler::Withdrawal;
 use crate::precompiles::tick_model;
 use crate::precompiles::PrecompileOutcome;
-use crate::precompiles::WITHDRAWAL_ADDRESS;
+use crate::precompiles::{SYSTEM_ACCOUNT_ADDRESS, WITHDRAWAL_ADDRESS};
 use crate::read_ticketer;
-use crate::storage::withdraw_nonce;
+use crate::withdrawal_counter::WithdrawalCounter;
 use crate::{abi, fail_if_too_much, EthereumError};
 use evm::{Context, ExitReason, ExitRevert, ExitSucceed, Transfer};
 use host::runtime::Runtime;
@@ -188,10 +188,9 @@ pub fn withdrawal_precompile<Host: Runtime>(
                 return Ok(revert_withdrawal());
             };
 
-            let withdrawal_id = withdraw_nonce::get_and_increment(handler.borrow_host())
-                .map_err(|e| {
-                    EthereumError::WrappedError(Cow::from(format!("{:?}", e)))
-                })?;
+            let mut system = handler.get_or_create_account(SYSTEM_ACCOUNT_ADDRESS)?;
+            let withdrawal_id =
+                system.withdrawal_counter_get_and_increment(handler.borrow_host())?;
 
             // We use the original amount in order not to lose additional information
             let withdrawal_event =

@@ -23,15 +23,16 @@ use tezos_smart_rollup_mock::MockHost;
 use crate::{
     account_storage::{account_path, read_u256, EthereumAccountStorage},
     handler::{EvmHandler, ExecutionOutcome},
-    precompiles::{self, precompile_set},
+    precompiles::{self, precompile_set, SYSTEM_ACCOUNT_ADDRESS},
     run_transaction,
     utilities::keccak256_hash,
+    withdrawal_counter::WITHDRAWAL_COUNTER_PATH,
 };
 
 use super::{
     deposit::{ticket_hash, FaDeposit},
     execute_fa_deposit, execute_fa_withdrawal,
-    ticket_table::{ticket_balance_path, TicketTable, TICKET_TABLE_ACCOUNT},
+    ticket_table::{ticket_balance_path, TicketTable},
     withdrawal::FaWithdrawal,
 };
 
@@ -178,7 +179,7 @@ pub fn ticket_balance_add(
     balance: U256,
 ) -> bool {
     let mut system = evm_account_storage
-        .get_or_create(host, &account_path(&TICKET_TABLE_ACCOUNT).unwrap())
+        .get_or_create(host, &account_path(&SYSTEM_ACCOUNT_ADDRESS).unwrap())
         .unwrap();
     system
         .ticket_balance_add(host, ticket_hash, address, balance)
@@ -193,7 +194,7 @@ pub fn ticket_balance_get(
     address: &H160,
 ) -> U256 {
     let system = evm_account_storage
-        .get(host, &account_path(&TICKET_TABLE_ACCOUNT).unwrap())
+        .get(host, &account_path(&SYSTEM_ACCOUNT_ADDRESS).unwrap())
         .unwrap()
         .unwrap();
 
@@ -201,6 +202,22 @@ pub fn ticket_balance_get(
         .custom_path(&ticket_balance_path(ticket_hash, address).unwrap())
         .unwrap();
     read_u256(host, &path, U256::zero()).unwrap()
+}
+
+/// Get next withdrawal counter value
+pub fn withdrawal_counter_next(
+    host: &impl Runtime,
+    evm_account_storage: &EthereumAccountStorage,
+) -> Option<U256> {
+    let system = evm_account_storage
+        .get_or_create(host, &account_path(&SYSTEM_ACCOUNT_ADDRESS).unwrap())
+        .unwrap();
+
+    let path = system.custom_path(&WITHDRAWAL_COUNTER_PATH).unwrap();
+    match host.store_read_all(&path) {
+        Ok(bytes) => Some(U256::from_little_endian(&bytes)),
+        _ => None,
+    }
 }
 
 /// Provision TEZ balance for a specified account

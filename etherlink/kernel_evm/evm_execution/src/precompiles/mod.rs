@@ -42,6 +42,9 @@ pub const FA_BRIDGE_PRECOMPILE_ADDRESS: H160 = H160([
     0xff, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
 ]);
 
+// System (zero) account address, owns ticket table and withdrawal counter
+pub const SYSTEM_ACCOUNT_ADDRESS: H160 = H160::zero();
+
 /// Outcome of executing a precompiled contract. Covers both successful
 /// return, stop and revert and additionally, it covers contract execution
 /// failures (malformed input etc.). This is encoded using the `ExitReason`

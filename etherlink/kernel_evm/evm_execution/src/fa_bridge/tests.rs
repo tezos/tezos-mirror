@@ -14,10 +14,9 @@ use crate::{
         convert_h160, convert_log, convert_u256, deploy_mock_wrapper, dummy_fa_deposit,
         dummy_fa_withdrawal, dummy_ticket, fa_bridge_precompile_call_withdraw,
         get_storage_flag, kernel_wrapper, run_fa_deposit, ticket_balance_add,
-        ticket_balance_get, token_wrapper,
+        ticket_balance_get, token_wrapper, withdrawal_counter_next,
     },
     handler::ExtendedExitReason,
-    storage::withdraw_nonce,
 };
 
 #[test]
@@ -363,10 +362,10 @@ fn fa_withdrawal_executed_via_l2_proxy_contract() {
     assert_eq!(burn_event.sender, convert_h160(&withdrawal.sender));
     assert_eq!(burn_event.amount, convert_u256(&withdrawal.amount));
 
-    // Ensure withdrawal counter is updated
+    // Ensure withdrawal counter is incremented
     assert_eq!(
-        U256::one(),
-        withdraw_nonce::get_and_increment(&mut mock_runtime).unwrap()
+        Some(U256::one()),
+        withdrawal_counter_next(&mock_runtime, &evm_account_storage)
     );
 }
 
@@ -413,10 +412,10 @@ fn fa_withdrawal_fails_due_to_faulty_l2_proxy() {
         U256::MAX,
     ));
 
-    // Ensure withdrawal counter is updated
+    // Ensure withdrawal counter is reverted
     assert_eq!(
-        U256::one(),
-        withdraw_nonce::get_and_increment(&mut mock_runtime).unwrap()
+        None,
+        withdrawal_counter_next(&mock_runtime, &evm_account_storage)
     );
     assert!(
         matches!(res.reason, ExtendedExitReason::Exit(ExitReason::Error(ExitError::Other(err))) if err.contains("Proxy contract does not exist"))
@@ -447,8 +446,8 @@ fn fa_withdrawal_fails_due_to_insufficient_balance() {
 
     // Ensure withdrawal counter is not updated (returned before incrementing the nonce)
     assert_eq!(
-        U256::zero(),
-        withdraw_nonce::get_and_increment(&mut mock_runtime).unwrap()
+        None,
+        withdrawal_counter_next(&mock_runtime, &evm_account_storage)
     );
     assert!(
         matches!(res.reason, ExtendedExitReason::Exit(ExitReason::Error(ExitError::Other(err))) if err.contains("Insufficient ticket balance"))
