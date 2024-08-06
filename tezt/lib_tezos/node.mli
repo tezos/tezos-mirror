@@ -100,7 +100,7 @@ type argument =
   | RPC_additional_addr_external of string  (** [--external-rpc-addr] *)
   | Max_active_rpc_connections of int  (** [--max-active-rpc-connections] *)
   | Enable_http_cache_headers  (** [--enable-http-cache-headers] *)
-  | Context_pruning of string  (** [--context-pruning] *)
+  | Disable_context_pruning  (** [--disable_context-pruning] *)
   | Storage_maintenance_delay of string  (** [--storage-maintenance-delay]*)
 
 (** A TLS configuration for the node: paths to a [.crt] and a [.key] file.

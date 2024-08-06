@@ -41,7 +41,7 @@ let test_context_pruning_call =
   let* node1, client =
     Client.init_with_protocol
       ~node_name:"no_gc"
-      ~nodes_args:Node.[Synchronisation_threshold 0; Context_pruning "disabled"]
+      ~nodes_args:Node.[Synchronisation_threshold 0; Disable_context_pruning]
       `Client
       ~protocol
       ()

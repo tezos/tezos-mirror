@@ -42,7 +42,7 @@ type argument =
   | RPC_additional_addr_external of string
   | Max_active_rpc_connections of int
   | Enable_http_cache_headers
-  | Context_pruning of string
+  | Disable_context_pruning
   | Storage_maintenance_delay of string
 
 let make_argument = function
@@ -78,7 +78,7 @@ let make_argument = function
   | Max_active_rpc_connections n ->
       ["--max-active-rpc-connections"; string_of_int n]
   | Enable_http_cache_headers -> ["--enable-http-cache-headers"]
-  | Context_pruning x -> ["--context-pruning"; x]
+  | Disable_context_pruning -> ["--disable-context-pruning"]
   | Storage_maintenance_delay x -> ["--storage-maintenance-delay"; x]
 
 let make_arguments arguments = List.flatten (List.map make_argument arguments)
@@ -104,7 +104,7 @@ let is_redundant = function
   | Version, Version
   | Max_active_rpc_connections _, Max_active_rpc_connections _
   | Enable_http_cache_headers, Enable_http_cache_headers
-  | Context_pruning _, Context_pruning _
+  | Disable_context_pruning, Disable_context_pruning
   | Storage_maintenance_delay _, Storage_maintenance_delay _ ->
       true
   | Metrics_addr addr1, Metrics_addr addr2 -> addr1 = addr2
@@ -132,7 +132,7 @@ let is_redundant = function
   | Version, _
   | Max_active_rpc_connections _, _
   | Enable_http_cache_headers, _
-  | Context_pruning _, _
+  | Disable_context_pruning, _
   | Storage_maintenance_delay _, _ ->
       false
 
