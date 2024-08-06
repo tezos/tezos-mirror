@@ -84,6 +84,7 @@ type threshold_encryption_sequencer =
 type observer = {
   evm_node_endpoint : Uri.t;
   threshold_encryption_bundler_endpoint : Uri.t option;
+  rollup_node_tracking : bool;
 }
 
 type proxy = {
@@ -187,6 +188,7 @@ val threshold_encryption_sequencer_config_dft :
 val observer_config_dft :
   evm_node_endpoint:Uri.t ->
   ?threshold_encryption_bundler_endpoint:Uri.t ->
+  ?rollup_node_tracking:bool ->
   unit ->
   observer
 
@@ -203,7 +205,8 @@ module Cli : sig
     ?tx_pool_addr_limit:int64 ->
     ?tx_pool_tx_per_addr_limit:int64 ->
     keep_alive:bool ->
-    rollup_node_endpoint:Uri.t ->
+    ?rollup_node_endpoint:Uri.t ->
+    ?dont_track_rollup_node:bool ->
     verbose:bool ->
     ?preimages:string ->
     ?preimages_endpoint:Uri.t ->
@@ -237,6 +240,7 @@ module Cli : sig
     ?tx_pool_tx_per_addr_limit:int64 ->
     keep_alive:bool ->
     ?rollup_node_endpoint:Uri.t ->
+    ?dont_track_rollup_node:bool ->
     verbose:bool ->
     ?preimages:string ->
     ?preimages_endpoint:Uri.t ->
@@ -271,6 +275,7 @@ module Cli : sig
     ?tx_pool_tx_per_addr_limit:int64 ->
     keep_alive:bool ->
     ?rollup_node_endpoint:Uri.t ->
+    ?dont_track_rollup_node:bool ->
     verbose:bool ->
     ?preimages:string ->
     ?preimages_endpoint:Uri.t ->

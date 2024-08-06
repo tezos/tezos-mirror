@@ -38,6 +38,8 @@
   the kernel state used by an EVM node. The main use case for this command
   is to modify the state to debug, it is not mean to be used under normal
   circumstances.  (!14383)
+- Support running an observer node without a companion rollup node with
+  `--dont-track-rollup-node`. (!14428)
 
 ### Bug fixes
 

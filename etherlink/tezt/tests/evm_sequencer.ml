@@ -2108,7 +2108,31 @@ let test_observer_applies_blueprint =
     Evm_node.run sequencer_node
   in
 
-  let levels_to_wait = 2 * levels_to_wait in
+  let*@ current_head = Rpc.block_number sequencer_node in
+  let levels_to_wait = Int32.to_int current_head + levels_to_wait in
+
+  let* _ =
+    Evm_node.wait_for_blueprint_applied ~timeout observer_node levels_to_wait
+  and* _ =
+    Evm_node.wait_for_blueprint_applied ~timeout sequencer_node levels_to_wait
+  in
+
+  let* () =
+    check_block_consistency
+      ~left:sequencer_node
+      ~right:observer_node
+      ~block:(`Level (Int32.of_int levels_to_wait))
+      ()
+  in
+
+  (* We stop and start the observer, to disable rollup node tracking. *)
+  let* () = Evm_node.terminate observer_node in
+  let* () =
+    Evm_node.run ~extra_arguments:["--dont-track-rollup-node"] observer_node
+  in
+
+  let*@ current_head = Rpc.block_number sequencer_node in
+  let levels_to_wait = Int32.to_int current_head + levels_to_wait in
 
   let* _ =
     Evm_node.wait_for_blueprint_applied ~timeout observer_node levels_to_wait
