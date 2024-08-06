@@ -1698,6 +1698,70 @@ let test_delayed_fa_deposit_is_ignored_if_feature_disabled =
       "The deposit should have been refused by sequencer, but balance is %R" ;
   unit
 
+let test_delayed_transaction_peeked =
+  register_all
+    ~da_fee:arb_da_fee_for_delayed_inbox
+    ~tags:["evm"; "sequencer"; "delayed_inbox"; "failure"]
+    ~title:"Delayed deposit is removed only when it is applied"
+    ~enable_fa_bridge:false
+    ~kernels:[Kernel.Latest]
+    ~time_between_blocks:Nothing
+  @@ fun {
+           client;
+           l1_contracts;
+           sc_rollup_address;
+           sc_rollup_node;
+           sequencer;
+           proxy;
+           kernel;
+           _;
+         }
+             _protocol ->
+  (* This test act as an non-regression test.
+
+     The unwanted behavior was :
+       - A blueprint containing a deposit triggers an upgrade
+       - The kernel reboots and upgrade
+       - The blueprint is popped again and fails to find the deposit
+
+     To mitigate this problem until the kernel is patched we don't put
+     transactions in a block that triggers an upgrade. In this test we
+     are going to play with this property to force an upgrade with a
+     blueprint that contains a deposit.
+  *)
+  let* () =
+    send_deposit_to_delayed_inbox
+      ~amount:Tez.one
+      ~l1_contracts
+      ~depositor:Constant.bootstrap5
+      ~receiver:"0x1074Fd1EC02cbeaa5A90450505cF3B48D834f3EB"
+      ~sc_rollup_node
+      ~sc_rollup_address
+      client
+  in
+  (* We bake enough blocks for the sequencer to realize there's a deposit. *)
+  let* () =
+    repeat 2 (fun () ->
+        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+        unit)
+  in
+  (* Send an upgrade to the rollup node, but don't finalize the block, so the
+     sequencer doesn't see the upgrade. *)
+  let* () =
+    upgrade
+      ~sc_rollup_node
+      ~sc_rollup_address
+      ~admin:Constant.bootstrap2.public_key_hash
+      ~admin_contract:l1_contracts.admin
+      ~client
+      ~upgrade_to:kernel
+      ~activation_timestamp:"0"
+  in
+  (* Produce a block. The sequencer will include the deposit, but won't upgrade.
+     The rollup node will upgrade as soon as it receives the block. *)
+  let*@ _ = produce_block sequencer in
+  bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy ()
+
 let call_fa_withdraw ?expect_failure ~sender ~endpoint ~evm_node ~ticket_owner
     ~routing_info ~amount ~ticketer ~content () =
   let* () =
@@ -5528,6 +5592,7 @@ let () =
   test_delayed_deposit_is_included protocols ;
   test_delayed_fa_deposit_is_included protocols ;
   test_delayed_fa_deposit_is_ignored_if_feature_disabled protocols ;
+  test_delayed_transaction_peeked protocols ;
   test_fa_withdrawal_is_included protocols ;
   test_largest_delayed_transfer_is_included protocols ;
   test_delayed_deposit_from_init_rollup_node protocols ;
