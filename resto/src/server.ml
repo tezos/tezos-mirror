@@ -364,6 +364,29 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
     server.streams <- ConnectionMap.add con shutdown server.streams ;
     stream
 
+  (* When writing a message to the log, Linux only guarantees atomicity up to
+     4095 bytes. Therefore, we truncate the request body, as otherwise the
+     logged message could get mingled with messages of other events, leading to
+     unparsable logs. *)
+  let truncate body =
+    let max_size =
+      (* We leave a security margin because there are also prefixes added to the
+         body to build the logged message. This value is just a guess. *)
+      3600
+    in
+    let body_length = String.length body in
+    if body_length > max_size then
+      let truncate_to =
+        (* If we truncate it, then truncate it to a short string. *) 200
+      in
+      (* We show the beginning and the end of the body, in the form
+         "<prefix>[...]<suffix>", with <prefix> is 175 characters long, and
+         <suffix> is 10 characters long. *)
+      String.sub body 0 (truncate_to - 15)
+      ^ "[...]"
+      ^ String.sub body (body_length - 10) 10
+    else body
+
   let resto_callback server ((_io, con) : Cohttp_lwt_unix.Server.conn) req body
       =
     let con_string = Connection.to_string con in
@@ -381,7 +404,7 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
       (Header.to_string req_headers)
     >>= fun () ->
     Cohttp_lwt.Body.to_string body >>= fun body ->
-    Log.lwt_log_debug "server (%s) request body: %s" con_string body
+    Log.lwt_log_debug "server (%s) request body: %s" con_string (truncate body)
     >>= fun () ->
     let path = Uri.path uri in
     let path = Resto.Utils.decode_split_path path in
