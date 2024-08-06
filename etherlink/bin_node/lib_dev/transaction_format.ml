@@ -5,29 +5,18 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* The hard limit is 4096 but it needs to add the external message tag. *)
-let max_input_size = 4095
-
-let smart_rollup_address_size = 20
-
-let transaction_tag_size = 1
-
-let framing_protocol_tag_size = 1
-
 (** max size of a chunk *)
 let size_per_chunk =
-  max_input_size - framing_protocol_tag_size - smart_rollup_address_size
-  - transaction_tag_size - 2 (* Index as u16 *)
+  Message_format.usable_size_in_message - 2 (* Index as u16 *)
   - (Ethereum_types.transaction_hash_size * 2)
 
 (** Maximum size describes the maximum size of [tx_raw] to fit
    in a simple transaction. *)
 let maximum_size =
-  max_input_size - framing_protocol_tag_size - smart_rollup_address_size
-  - transaction_tag_size - Ethereum_types.transaction_hash_size
+  Message_format.usable_size_in_message - Ethereum_types.transaction_hash_size
 
 let encode_transaction ~smart_rollup_address (kind, data) =
-  Message_frame.frame_message smart_rollup_address kind data
+  Message_format.frame_message smart_rollup_address kind data
 
 let chunk_transaction ~tx_hash_raw ~tx_raw =
   let open Result_syntax in

@@ -17,8 +17,6 @@ let nb_chunks_size = 2
 (* U16 *)
 let chunk_index_size = 2
 
-let blueprint_tag_size = 1
-
 (* ED25519  *)
 let signature_size = 64
 
@@ -35,10 +33,7 @@ let signature_size = 64
 let rlp_tags_size = 16
 
 let max_chunk_size =
-  let open Transaction_format in
-  (* max_input_size already considers the external tag *)
-  max_input_size - framing_protocol_tag_size - smart_rollup_address_size
-  - blueprint_tag_size - blueprint_number_size - nb_chunks_size
+  Message_format.usable_size_in_message - blueprint_number_size - nb_chunks_size
   - chunk_index_size - rlp_tags_size - signature_size
 
 let maximum_usable_space_in_blueprint chunks_count =

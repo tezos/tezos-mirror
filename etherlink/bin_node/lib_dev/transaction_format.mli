@@ -5,14 +5,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** The hard limit is 4096 but it needs to add the external message
-    tag. *)
-val max_input_size : int
-
-val framing_protocol_tag_size : int
-
-val smart_rollup_address_size : int
-
 (** [make_encoded_messages ~smart_rollup_address raw_tx] returns the
     hash of the transaction, and a list of transactions to include in
     the inbox.
