@@ -558,9 +558,7 @@ pub mod test_helpers {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::state_backend::{
-        AllocatedOf, Array, Atom, Backend, Cell, CellRead, CellWrite, Cells, Manager,
-    };
+    use crate::state_backend::{AllocatedOf, Array, Atom, Backend, Cell, Cells, Manager};
 
     #[test]
     fn test_ro() {

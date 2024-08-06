@@ -17,6 +17,33 @@ impl<E: Elem, M: ManagerBase> Cell<E, M> {
             region: Cells::bind(region),
         }
     }
+
+    /// Read the value managed by the cell.
+    #[inline(always)]
+    pub fn read(&self) -> E
+    where
+        M: ManagerRead,
+    {
+        self.region.read(0)
+    }
+
+    /// Write the value managed by the cell.
+    #[inline(always)]
+    pub fn write(&mut self, value: E)
+    where
+        M: ManagerWrite,
+    {
+        self.region.write(0, value)
+    }
+
+    /// Replace the value managed by the cell, returning the old value.
+    #[inline(always)]
+    pub fn replace(&mut self, value: E) -> E
+    where
+        M: ManagerReadWrite,
+    {
+        self.region.replace(0, value)
+    }
 }
 
 /// A cell that support reading only.
@@ -43,20 +70,22 @@ pub trait CellRead: CellBase {
     fn read(&self) -> Self::Value;
 }
 
-impl<E: Elem, M: Manager> CellRead for Cell<E, M> {
+impl<E: Elem, M: ManagerRead> CellRead for Cell<E, M> {
     #[inline(always)]
     fn read(&self) -> E {
-        self.region.read(0)
+        Cell::read(self)
     }
 }
 
 impl<E: CellRead> CellRead for &E {
+    #[inline(always)]
     fn read(&self) -> Self::Value {
         E::read(self)
     }
 }
 
 impl<E: CellRead> CellRead for &mut E {
+    #[inline(always)]
     fn read(&self) -> Self::Value {
         E::read(self)
     }
@@ -68,10 +97,10 @@ pub trait CellWrite: CellBase {
     fn write(&mut self, value: Self::Value);
 }
 
-impl<E: Elem, M: Manager> CellWrite for Cell<E, M> {
+impl<E: Elem, M: ManagerWrite> CellWrite for Cell<E, M> {
     #[inline(always)]
     fn write(&mut self, value: E) {
-        self.region.write(0, value)
+        Cell::write(self, value)
     }
 }
 
@@ -88,10 +117,10 @@ pub trait CellReadWrite: CellRead + CellWrite {
     fn replace(&mut self, value: Self::Value) -> Self::Value;
 }
 
-impl<E: Elem, M: Manager> CellReadWrite for Cell<E, M> {
+impl<E: Elem, M: ManagerReadWrite> CellReadWrite for Cell<E, M> {
     #[inline(always)]
     fn replace(&mut self, value: E) -> E {
-        self.region.replace(0, value)
+        Cell::replace(self, value)
     }
 }
 
@@ -203,8 +232,7 @@ pub(crate) mod tests {
         backend_test, create_backend,
         state_backend::{
             layout::{Atom, Layout},
-            Array, Backend, CellRead, CellWrite, Choreographer, DynCells, Elem, Location,
-            ManagerAlloc, ManagerBase,
+            Array, Backend, Choreographer, DynCells, Elem, Location, ManagerAlloc, ManagerBase,
         },
     };
 

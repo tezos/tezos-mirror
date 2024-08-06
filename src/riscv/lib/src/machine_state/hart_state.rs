@@ -15,7 +15,7 @@ use crate::{
         registers,
         reservation_set::{self, ReservationSet},
     },
-    state_backend::{self as backend, Atom, Cell, CellWrite},
+    state_backend::{self as backend, Atom, Cell},
     traps::{Interrupt, TrapContext},
 };
 use interrupts_cache::InterruptsCacheResult;

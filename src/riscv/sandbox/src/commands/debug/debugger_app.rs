@@ -17,7 +17,6 @@ use octez_riscv::{
     },
     program::Program,
     pvm::PvmHooks,
-    state_backend::CellRead,
     stepper::{pvm::PvmStepper, test::TestStepper, Stepper},
 };
 use ratatui::{prelude::*, style::palette::tailwind, widgets::*};

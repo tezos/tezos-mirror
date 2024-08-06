@@ -15,7 +15,7 @@ use crate::{
         MachineState,
     },
     parser::instruction::FenceSet,
-    state_backend::{self as backend, CellRead},
+    state_backend::{self as backend},
     traps::Exception,
 };
 
@@ -386,7 +386,6 @@ mod tests {
             MachineState, MachineStateLayout,
         },
         parser::instruction::FenceSet,
-        state_backend::{CellRead, CellWrite},
         traps::Exception,
     };
     use proptest::{
