@@ -774,6 +774,7 @@ module Term = struct
       let parse_storage_maintenance_delay_arg str =
         match str with
         | "disabled" -> `Ok Disabled
+        | "auto" -> `Ok Auto
         | _ -> (
             match Int32.of_string_opt str with
             | Some delay -> `Ok (Custom delay)
