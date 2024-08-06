@@ -393,7 +393,10 @@ let sequencer_sidecar_endpoint_arg =
 let time_between_blocks_arg =
   Tezos_clic.arg
     ~long:"time-between-blocks"
-    ~doc:"Interval at which the sequencer creates an empty block by default."
+    ~doc:
+      "Interval (in seconds) at which the sequencer creates an empty block by \
+       default. If set to `none`, blocks are produced on demand only (see \
+       private method produceBlock)."
     ~placeholder:"10."
     Params.time_between_blocks
 
