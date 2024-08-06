@@ -258,11 +258,8 @@ let dispatch_request (config : Configuration.t)
     ({method_; parameters; id} : JSONRPC.request) : JSONRPC.response Lwt.t =
   let open Lwt_result_syntax in
   let open Ethereum_types in
-  let restrict =
-    Option.map (fun {Configuration.regex; _} -> regex) config.restricted_rpcs
-  in
   let*! value =
-    match map_method_name ?restrict method_ with
+    match map_method_name ?restrict:config.restricted_rpcs method_ with
     | Unknown ->
         Prometheus.Counter.inc_one (Metrics.Rpc.method_ "unknown") ;
         Lwt.return_error (Rpc_errors.method_not_found method_)
@@ -625,7 +622,7 @@ let dispatch_private_request (_config : Configuration.t)
   let* value =
     (* Private RPCs can only be accessed locally, they're not accessible to the
        end user. *)
-    match map_method_name ~restrict:Re.(compile empty) method_ with
+    match map_method_name method_ with
     | Unknown ->
         return
           (Error

@@ -311,4 +311,5 @@ type map_result =
   | Unknown
   | Disabled
 
-val map_method_name : ?restrict:Re.re -> string -> map_result
+val map_method_name :
+  ?restrict:Configuration.restricted_rpcs -> string -> map_result

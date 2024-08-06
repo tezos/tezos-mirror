@@ -495,10 +495,46 @@ let finalized_view_arg =
 
 let restricted_rpcs_arg =
   Tezos_clic.arg
-    ~doc:"Restrict methods that matches the given Perl regular expression."
+    ~doc:
+      "Disable methods that matches the given Perl-like regular expression. \
+       Cannot be used with --whitelisted-rpcs or --blacklisted-rpcs."
     ~long:"restricted-rpcs"
-    ~placeholder:"debug_trace*"
-    Params.string
+    ~placeholder:"regexp"
+    (Tezos_clic.parameter (fun _ctxt raw ->
+         Lwt_result_syntax.return
+           (Configuration.make_pattern_restricted_rpcs raw)))
+
+let whitelisted_rpcs_arg =
+  Tezos_clic.arg
+    ~doc:
+      "Disable the RPC methods which are not part of the provided list. Cannot \
+       be used with --restricted-rpcs or --blacklisted-rpcs."
+    ~long:"whitelisted-rpcs"
+    ~placeholder:"whitelist"
+    (Tezos_clic.parameter (fun _ctxt raw ->
+         Lwt_result_syntax.return
+           (Configuration.Whitelist (String.split ',' raw))))
+
+let blacklisted_rpcs_arg =
+  Tezos_clic.arg
+    ~doc:
+      "Disable the RPC methods which are part of the provided list. Cannot be \
+       used with --restricted-rpcs or --blacklisted-rpcs."
+    ~long:"blacklisted-rpcs"
+    ~placeholder:"blacklist"
+    (Tezos_clic.parameter (fun _ctxt raw ->
+         Lwt_result_syntax.return
+           (Configuration.Blacklist (String.split ',' raw))))
+
+let pick_restricted_rpcs r w b =
+  match (r, w, b) with
+  | None, None, None -> Lwt_result_syntax.return_none
+  | Some r, None, None | None, Some r, None | None, None, Some r ->
+      Lwt_result_syntax.return_some r
+  | _ ->
+      failwith
+        "Can only use one CLI argument among --restricted-rpcs, \
+         --blacklisted-rpcs and --whitelisted-rpcs"
 
 let dal_slots_arg =
   Tezos_clic.arg
@@ -512,7 +548,7 @@ let dal_slots_arg =
          |> Lwt_result_syntax.return))
 
 let common_config_args =
-  Tezos_clic.args16
+  Tezos_clic.args18
     data_dir_arg
     rpc_addr_arg
     rpc_port_arg
@@ -529,6 +565,8 @@ let common_config_args =
     tx_pool_tx_per_addr_limit_arg
     verbose_arg
     restricted_rpcs_arg
+    blacklisted_rpcs_arg
+    whitelisted_rpcs_arg
 
 let compress_on_the_fly_arg : (bool, unit) Tezos_clic.arg =
   Tezos_clic.switch
@@ -649,10 +687,15 @@ let proxy_command =
              tx_pool_addr_limit,
              tx_pool_tx_per_addr_limit,
              verbose,
-             restricted_rpcs ),
+             restricted_rpcs,
+             whitelisted_rpcs,
+             blacklisted_rpcs ),
            read_only )
          rollup_node_endpoint
          () ->
+      let* restricted_rpcs =
+        pick_restricted_rpcs restricted_rpcs whitelisted_rpcs blacklisted_rpcs
+      in
       let*? () =
         Option.iter_e
           (fun rollup_node_endpoint_from_arg ->
@@ -900,7 +943,9 @@ let sequencer_command =
              tx_pool_addr_limit,
              tx_pool_tx_per_addr_limit,
              verbose,
-             restricted_rpcs ),
+             restricted_rpcs,
+             blacklisted_rpcs,
+             whitelisted_rpcs ),
            ( kernel,
              private_rpc_port,
              preimages,
@@ -918,6 +963,9 @@ let sequencer_command =
          rollup_node_endpoint
          sequencer_str
          () ->
+      let* restricted_rpcs =
+        pick_restricted_rpcs restricted_rpcs whitelisted_rpcs blacklisted_rpcs
+      in
       let*? () =
         Option.iter_e
           (fun rollup_node_endpoint_from_arg ->
@@ -984,9 +1032,14 @@ let rpc_command =
              tx_pool_addr_limit,
              tx_pool_tx_per_addr_limit,
              verbose,
-             restricted_rpcs ),
+             restricted_rpcs,
+             blacklisted_rpcs,
+             whitelisted_rpcs ),
            (evm_node_endpoint, preimages, preimages_endpoint) )
          () ->
+      let* restricted_rpcs =
+        pick_restricted_rpcs restricted_rpcs whitelisted_rpcs blacklisted_rpcs
+      in
       let* rpc_port =
         match rpc_port with
         | Some rpc_port -> return rpc_port
@@ -1164,7 +1217,9 @@ let observer_command =
              tx_pool_addr_limit,
              tx_pool_tx_per_addr_limit,
              verbose,
-             restricted_rpcs ),
+             restricted_rpcs,
+             blacklisted_rpcs,
+             whitelisted_rpcs ),
            ( kernel,
              preimages,
              preimages_endpoint,
@@ -1172,6 +1227,9 @@ let observer_command =
              evm_node_endpoint
              rollup_node_endpoint
              () ->
+  let* restricted_rpcs =
+    pick_restricted_rpcs restricted_rpcs whitelisted_rpcs blacklisted_rpcs
+  in
   let*? () =
     Option.iter_e
       (fun rollup_node_endpoint_from_arg ->
@@ -1625,7 +1683,9 @@ mode.|}
              tx_pool_addr_limit,
              tx_pool_tx_per_addr_limit,
              verbose,
-             restricted_rpcs ),
+             restricted_rpcs,
+             blacklisted_rpcs,
+             whitelisted_rpcs ),
            ( preimages,
              preimages_endpoint,
              time_between_blocks,
@@ -1643,6 +1703,9 @@ mode.|}
              force,
              dal_slots ) )
          () ->
+      let* restricted_rpcs =
+        pick_restricted_rpcs restricted_rpcs whitelisted_rpcs blacklisted_rpcs
+      in
       let* sequencer_key =
         Option.map_es
           (fun str ->
@@ -1827,9 +1890,15 @@ let proxy_simple_command =
              tx_pool_addr_limit,
              tx_pool_tx_per_addr_limit,
              verbose,
-             restricted_rpcs ),
+             restricted_rpcs,
+             blacklisted_rpcs,
+             whitelisted_rpcs ),
            (read_only, finalized_view) )
          () ->
+      let open Lwt_result_syntax in
+      let* restricted_rpcs =
+        pick_restricted_rpcs restricted_rpcs whitelisted_rpcs blacklisted_rpcs
+      in
       start_proxy
         ~data_dir
         ~keep_alive
@@ -1901,7 +1970,9 @@ let sequencer_simple_command =
              tx_pool_addr_limit,
              tx_pool_tx_per_addr_limit,
              verbose,
-             restricted_rpcs ),
+             restricted_rpcs,
+             blacklisted_rpcs,
+             whitelisted_rpcs ),
            ( preimages,
              preimages_endpoint,
              time_between_blocks,
@@ -1918,6 +1989,10 @@ let sequencer_simple_command =
              password_filename,
              dal_slots ) )
          () ->
+      let open Lwt_result_syntax in
+      let* restricted_rpcs =
+        pick_restricted_rpcs restricted_rpcs whitelisted_rpcs blacklisted_rpcs
+      in
       start_sequencer
         ?password_filename
         ~wallet_dir
@@ -1975,7 +2050,9 @@ let sandbox_command =
              tx_pool_addr_limit,
              tx_pool_tx_per_addr_limit,
              verbose,
-             restricted_rpcs ),
+             restricted_rpcs,
+             blacklisted_rpcs,
+             whitelisted_rpcs ),
            ( preimages,
              preimages_endpoint,
              time_between_blocks,
@@ -1986,6 +2063,10 @@ let sandbox_command =
              wallet_dir,
              password_filename ) )
          () ->
+      let open Lwt_result_syntax in
+      let* restricted_rpcs =
+        pick_restricted_rpcs restricted_rpcs whitelisted_rpcs blacklisted_rpcs
+      in
       let _pkh, pk, sk =
         Tezos_crypto.Signature.(generate_key ~algo:Ed25519) ()
       in
@@ -2066,7 +2147,9 @@ let threshold_encryption_sequencer_command =
              tx_pool_addr_limit,
              tx_pool_tx_per_addr_limit,
              verbose,
-             restricted_rpcs ),
+             restricted_rpcs,
+             blacklisted_rpcs,
+             whitelisted_rpcs ),
            ( preimages,
              preimages_endpoint,
              time_between_blocks,
@@ -2084,6 +2167,10 @@ let threshold_encryption_sequencer_command =
              password_filename,
              dal_slots ) )
          () ->
+      let open Lwt_result_syntax in
+      let* restricted_rpcs =
+        pick_restricted_rpcs restricted_rpcs whitelisted_rpcs blacklisted_rpcs
+      in
       start_threshold_encryption_sequencer
         ?password_filename
         ~wallet_dir
@@ -2147,13 +2234,19 @@ let observer_simple_command =
              tx_pool_addr_limit,
              tx_pool_tx_per_addr_limit,
              verbose,
-             restricted_rpcs ),
+             restricted_rpcs,
+             blacklisted_rpcs,
+             whitelisted_rpcs ),
            ( evm_node_endpoint,
              threshold_encryption_bundler_endpoint,
              preimages,
              preimages_endpoint,
              kernel ) )
          () ->
+      let open Lwt_result_syntax in
+      let* restricted_rpcs =
+        pick_restricted_rpcs restricted_rpcs whitelisted_rpcs blacklisted_rpcs
+      in
       start_observer
         ~data_dir
         ~keep_alive
