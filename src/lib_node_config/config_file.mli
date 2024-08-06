@@ -143,7 +143,7 @@ val update :
   ?network:blockchain_network ->
   ?latency:int ->
   ?enable_http_cache_headers:bool ->
-  ?context_pruning:Storage_maintenance.context_pruning ->
+  ?disable_context_pruning:bool ->
   ?storage_maintenance_delay:Storage_maintenance.delay ->
   t ->
   t tzresult Lwt.t

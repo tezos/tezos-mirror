@@ -1370,10 +1370,10 @@ let create_merging_thread block_store ~history_mode ~old_ro_store ~old_rw_store
   in
   return (new_ro_store, new_savepoint, new_caboose)
 
-let may_trigger_gc ~context_pruning block_store history_mode ~previous_savepoint
-    ~new_savepoint =
+let may_trigger_gc ~disable_context_pruning block_store history_mode
+    ~previous_savepoint ~new_savepoint =
   let open Lwt_result_syntax in
-  if context_pruning = Storage_maintenance.Enabled then
+  if not disable_context_pruning then
     let savepoint_hash = fst new_savepoint in
     if
       History_mode.(equal history_mode Archive)
@@ -1397,7 +1397,8 @@ let split_context block_store new_head_lpbl =
 
 let merge_stores ?(cycle_size_limit = default_cycle_size_limit) block_store
     ~(on_error : tztrace -> unit tzresult Lwt.t) ~finalizer ~history_mode
-    ~new_head ~new_head_metadata ~cementing_highwatermark ~context_pruning =
+    ~new_head ~new_head_metadata ~cementing_highwatermark
+    ~disable_context_pruning =
   let open Lwt_result_syntax in
   let* () = fail_when block_store.readonly Cannot_write_in_readonly in
   (* Do not allow multiple merges: force waiting for a potential
@@ -1517,7 +1518,7 @@ let merge_stores ?(cycle_size_limit = default_cycle_size_limit) block_store
                            its end. *)
                         let* () =
                           may_trigger_gc
-                            ~context_pruning
+                            ~disable_context_pruning
                             block_store
                             history_mode
                             ~previous_savepoint
