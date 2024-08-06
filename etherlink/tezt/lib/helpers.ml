@@ -267,12 +267,13 @@ let wait_for_transaction_receipt ?(count = 3) ~evm_node ~transaction_hash () =
   in
   loop count
 
-let wait_for_application ~evm_node ~sc_rollup_node ~client apply =
+let wait_for_application ~produce_block apply =
+  let open Rpc.Syntax in
   let max_iteration = 10 in
   let application_result = apply () in
   let rec loop current_iteration =
     let* () = Lwt_unix.sleep 5. in
-    let* () = next_evm_level ~evm_node ~sc_rollup_node ~client in
+    let*@ _ = produce_block () in
     if max_iteration < current_iteration then
       Test.fail
         "Baked more than %d blocks and the operation's application is still \
@@ -301,16 +302,14 @@ let batch_n_transactions ~evm_node txs =
   return (requests, hashes)
 
 (* sending more than ~300 tx could fail, because or curl *)
-let send_n_transactions ~sc_rollup_node ~client ~evm_node ?wait_for_blocks txs =
+let send_n_transactions ~produce_block ~evm_node ?wait_for_blocks txs =
   let* requests, hashes = batch_n_transactions ~evm_node txs in
   let first_hash = List.hd hashes in
   (* Let's wait until one of the transactions is injected into a block, and
       test this block contains the `n` transactions as expected. *)
   let* receipt =
     wait_for_application
-      ~evm_node
-      ~sc_rollup_node
-      ~client
+      ~produce_block
       (wait_for_transaction_receipt
          ?count:wait_for_blocks
          ~evm_node

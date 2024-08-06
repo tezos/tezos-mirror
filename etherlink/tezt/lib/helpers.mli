@@ -167,14 +167,12 @@ val wait_for_transaction_receipt :
   unit ->
   Transaction.transaction_receipt Lwt.t
 
-(** [wait_for_application ~evm_node ~sc_rollup_node ~client apply] returns only
-    when the `apply` yields, or fails when 10 blocks have passed. *)
+(** [wait_for_application ~produce_block apply] returns only when the `apply`
+    yields, or fails when 10 blocks (produced with [produce_block] have passed. *)
 val wait_for_application :
-  evm_node:Evm_node.t ->
-  sc_rollup_node:Sc_rollup_node.t ->
-  client:Client.t ->
-  (unit -> 'a Lwt.t) ->
-  'a Lwt.t
+  produce_block:(unit -> ('a, Rpc.error) result Lwt.t) ->
+  (unit -> 'b Lwt.t) ->
+  'b Lwt.t
 
 (** [batch_n_transactions ~evm_node raw_transactions] batches [raw_transactions]
     to the [evm_node] and returns the requests and transaction hashes. *)
@@ -188,8 +186,7 @@ val batch_n_transactions :
     until the first one is applied in a block and returns, or fails if it isn't
     applied after [wait_for_blocks] blocks. *)
 val send_n_transactions :
-  sc_rollup_node:Sc_rollup_node.t ->
-  client:Client.t ->
+  produce_block:(unit -> ('a, Rpc.error) result Lwt.t) ->
   evm_node:Evm_node.t ->
   ?wait_for_blocks:int ->
   string list ->
