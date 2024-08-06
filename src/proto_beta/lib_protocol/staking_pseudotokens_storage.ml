@@ -358,8 +358,8 @@ let burn_pseudotokens ctxt (delegator_balances_before : delegator_balances)
       tez_amount <> 0 /\
       delegate_balances.frozen_deposits_pseudotokens <> 0 /\
       delegate_balances.frozen_deposits_staked_tez <> 0.
-    Postcondition:
-      result <> 0.
+
+    When [rounding] is [`Up]: Postcondition: result <> 0.
 *)
 let pseudotokens_of ~rounding (delegate_balances : delegate_balances) tez_amount
     =
@@ -454,41 +454,53 @@ let request_unstake ctxt ~delegator ~delegate requested_amount =
       assert (
         Staking_pseudotoken_repr.(
           delegate_balances.frozen_deposits_pseudotokens <> zero)) ;
-
       let*? max_to_request =
         tez_of
           ~rounding:`Down
           delegate_balances
           delegator_balances.pseudotoken_balance
       in
-      let requested_amount = Tez_repr.min max_to_request requested_amount in
-      let*? requested_pseudotokens =
-        pseudotokens_of ~rounding:`Up delegate_balances requested_amount
-      in
-      let pseudotokens_to_unstake =
-        Staking_pseudotoken_repr.min
-          requested_pseudotokens
-          delegator_balances.pseudotoken_balance
-      in
-      let*? tez_to_unstake =
-        tez_of ~rounding:`Down delegate_balances pseudotokens_to_unstake
-      in
       let*? pseudotokens_to_unstake, tez_to_unstake =
         let open Result_syntax in
-        if Tez_repr.(tez_to_unstake > requested_amount) then (
-          (* this may happen because of the rounding up of pseudotokens, in
-             this case we resort to unstaking a bit less *)
+        if Tez_repr.(requested_amount >= max_to_request) then
+          (* Unstake everything. It's essential to make sure that the
+             delegator doesn't have any pseudotoken left in this case,
+             because the unstake request may have been triggered by a
+             change of delegates; it would break invariant 3 if
+             delegator's delegate was modified while delegator still has
+             non-zero pseudotokens. *)
+          return (delegator_balances.pseudotoken_balance, max_to_request)
+        else
+          let* requested_pseudotokens =
+            pseudotokens_of ~rounding:`Up delegate_balances requested_amount
+          in
           let pseudotokens_to_unstake =
-            match Staking_pseudotoken_repr.pred pseudotokens_to_unstake with
-            | None -> assert false (* by postcondition of pseudotokens_of *)
-            | Some pt -> pt
+            Staking_pseudotoken_repr.min
+              requested_pseudotokens
+              delegator_balances.pseudotoken_balance
           in
           let* tez_to_unstake =
             tez_of ~rounding:`Down delegate_balances pseudotokens_to_unstake
           in
-          assert (Tez_repr.(tez_to_unstake <= requested_amount)) ;
-          return (pseudotokens_to_unstake, tez_to_unstake))
-        else return (pseudotokens_to_unstake, tez_to_unstake)
+          if Tez_repr.(tez_to_unstake > requested_amount) then (
+            (* this may happen because of the rounding up of pseudotokens, in
+               this case we resort to unstaking a bit less *)
+            let pseudotokens_to_unstake =
+              match Staking_pseudotoken_repr.pred pseudotokens_to_unstake with
+              | None ->
+                  assert false
+                  (* because:
+                     - [requested_pseudotokens <> zero]
+                         by postcondition of [pseudotokens_of ~rounding:`Up]
+                     - [delegator_balances.pseudotoken_balance <> zero] *)
+              | Some pt -> pt
+            in
+            let* tez_to_unstake =
+              tez_of ~rounding:`Down delegate_balances pseudotokens_to_unstake
+            in
+            assert (Tez_repr.(tez_to_unstake <= requested_amount)) ;
+            return (pseudotokens_to_unstake, tez_to_unstake))
+          else return (pseudotokens_to_unstake, tez_to_unstake)
       in
       let+ ctxt, balance_updates =
         burn_pseudotokens ctxt delegator_balances pseudotokens_to_unstake
