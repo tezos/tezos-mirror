@@ -30,50 +30,54 @@ type t = {
   p2p_version : P2p_version.t;
 }
 
-val pp : Format.formatter -> t -> unit
+let pp ppf {chain_name; distributed_db_version; p2p_version} =
+  Format.fprintf
+    ppf
+    "%a.%a (p2p: %a)"
+    Distributed_db_version.Name.pp
+    chain_name
+    Distributed_db_version.pp
+    distributed_db_version
+    P2p_version.pp
+    p2p_version
 
-val encoding : t Data_encoding.t
+let encoding =
+  let open Data_encoding in
+  def
+    "network_version"
+    ~description:
+      "A version number for the network protocol (includes distributed DB \
+       version and p2p version)"
+  @@ conv
+       (fun {chain_name; distributed_db_version; p2p_version} ->
+         (chain_name, distributed_db_version, p2p_version))
+       (fun (chain_name, distributed_db_version, p2p_version) ->
+         {chain_name; distributed_db_version; p2p_version})
+       (obj3
+          (req "chain_name" Distributed_db_version.Name.encoding)
+          (req "distributed_db_version" Distributed_db_version.encoding)
+          (req "p2p_version" P2p_version.encoding))
 
-(** Get the network protocol version to announce on peer connection.
+let greatest = function
+  | [] -> raise (Invalid_argument "Network_version.greatest")
+  | h :: t -> List.fold_left max h t
 
-    Use the highest [distributed_db_versions] and the highest [p2p_versions].
-    The version also contains the [chain_name] since it is used to prevent
-    peers from different networks to communicate.
+let announced ~chain_name ~distributed_db_versions ~p2p_versions =
+  assert (distributed_db_versions <> []) ;
+  assert (p2p_versions <> []) ;
+  {
+    chain_name;
+    distributed_db_version = greatest distributed_db_versions;
+    p2p_version = greatest p2p_versions;
+  }
 
-    Neither [distributed_db_versions] nor [p2p_versions] can be empty. *)
-val announced :
-  chain_name:Distributed_db_version.Name.t ->
-  distributed_db_versions:Distributed_db_version.t list ->
-  p2p_versions:P2p_version.t list ->
-  t
+let () = Data_encoding.Registration.register ~pp encoding
 
-(** Try to find a version which is supported both by us and a peer.
-
-    Usage: [select ~chain_name ~distributed_db_versions ~p2p_versions remote_version]
-
-    If the chain name of [remote_version] is not equal to [chain_name],
-    there is no compatible version.
-
-    [distributed_db_versions] is the list of distributed database versions
-    supported by the node.
-    If the highest supported version is lesser or equal to the remote version,
-    use this highest supported version.
-    Otherwise, there is no compatible version.
-
-    Similarly, [p2p_versions] is the list of peer-to-peer versions
-    supported by the node. The rules to find a compatible version are the same
-    as the ones for [distributed_db_versions].
-
-    If there is no compatible version, return a [P2p_rejection.Rejecting] error. *)
-val select :
-  chain_name:Distributed_db_version.Name.t ->
-  distributed_db_versions:Distributed_db_version.t list ->
-  p2p_versions:P2p_version.t list ->
-  t ->
-  t Error_monad.tzresult
-
-(**/**)
-
-module Internal_for_tests : sig
-  val mock : unit -> t
+module Internal_for_tests = struct
+  let mock () =
+    {
+      chain_name = Distributed_db_version.Name.of_string "";
+      distributed_db_version = Distributed_db_version.zero;
+      p2p_version = P2p_version.zero;
+    }
 end

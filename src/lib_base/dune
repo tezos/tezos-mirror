@@ -6,6 +6,7 @@
  (public_name octez-libs.base)
  (instrumentation (backend bisect_ppx))
  (libraries
+  octez-libs.version
   octez-libs.stdlib
   octez-libs.crypto
   octez-libs.data-encoding

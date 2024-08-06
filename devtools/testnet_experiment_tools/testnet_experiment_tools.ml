@@ -241,10 +241,10 @@ module Local = struct
     let* block, time = genesis () in
     let genesis = Tezos_base.Genesis.{block; time; protocol} in
     let chain_name =
-      Tezos_base.Distributed_db_version.Name.of_string network_name
+      Tezos_version.Distributed_db_version.Name.of_string network_name
     in
     let sandboxed_chain_name =
-      Tezos_base.Distributed_db_version.Name.of_string @@ network_name
+      Tezos_version.Distributed_db_version.Name.of_string @@ network_name
       ^ "_SANDBOXED"
     in
     let client = Client.create ~base_dir:output_dir () in
