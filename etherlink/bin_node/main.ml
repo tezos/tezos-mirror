@@ -42,6 +42,12 @@ end
 module Params = struct
   let string = Tezos_clic.parameter (fun _ s -> Lwt.return_ok s)
 
+  let hex_string =
+    Tezos_clic.parameter (fun _ s ->
+        match `Hex s |> Hex.to_string with
+        | Some bytes -> Lwt.return_ok bytes
+        | None -> failwith "Invalid hex string")
+
   let int = Tezos_clic.parameter (fun _ s -> Lwt.return_ok (int_of_string s))
 
   let int64 =
@@ -2208,6 +2214,46 @@ let export_snapshot_named_command =
         (data_dir, None, compress_on_the_fly, uncompressed)
         (Some filename))
 
+let patch_state_command =
+  let open Tezos_clic in
+  let open Lwt_result_syntax in
+  command
+    ~desc:
+      "Patches the state with an arbitrary value. This is an unsafe command, \
+       it should be used for debugging only. Patched state is persisted and \
+       you need to use the command `reset` to revert the changes."
+    (args2 data_dir_arg (force_arg ~doc:"Force patching the state"))
+    (prefixes ["patch"; "state"; "at"]
+    @@ param ~name:"path" ~desc:"Durable storage path" Params.string
+    @@ prefixes ["with"]
+    @@ param ~name:"value" ~desc:"Patched value" Params.hex_string
+    @@ stop)
+    (fun (data_dir, force) key value () ->
+      let open Evm_node_lib_dev in
+      let*! () =
+        let open Tezos_base_unix.Internal_event_unix in
+        let config = make_with_defaults ~verbosity:Warning () in
+        init ~config ()
+      in
+      if force then
+        let* _status =
+          Evm_context.start
+            ~data_dir
+            ~preimages:Filename.Infix.(data_dir // "wasm_2_0_0")
+            ~store_perm:`Read_write
+              (* Since we won’t execute anything, we don’t care about the following
+                 argument. *)
+            ~preimages_endpoint:None
+            ~fail_on_missing_blueprint:true
+            ()
+        in
+        Evm_context.patch_state ~key ~value
+      else
+        failwith
+          "You must add --force to your command-line to execute this command. \
+           As a reminder, patching the state is an advanced and unsafe \
+           procedure.")
+
 (* List of program commands *)
 let commands =
   [
@@ -2232,6 +2278,7 @@ let commands =
     make_kernel_config_command;
     export_snapshot_auto_name_command;
     export_snapshot_named_command;
+    patch_state_command;
   ]
 
 let global_options = Tezos_clic.no_options

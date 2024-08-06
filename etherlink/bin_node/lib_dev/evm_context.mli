@@ -165,6 +165,9 @@ val patch_kernel : string -> unit tzresult Lwt.t
     modify the current head.  *)
 val patch_sequencer_key : Signature.public_key -> unit tzresult Lwt.t
 
+(** [patch_state ~key ~value] writes [value] at [key]. *)
+val patch_state : key:string -> value:string -> unit tzresult Lwt.t
+
 val block_param_to_block_number :
   Ethereum_types.Block_parameter.extended ->
   Ethereum_types.quantity tzresult Lwt.t

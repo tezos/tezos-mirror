@@ -727,6 +727,25 @@ let test_remove_sequencer =
 
   unit
 
+let test_patch_state =
+  register_test (* It's a node specific test. *)
+    ~kernel:Kernel.Latest
+    ~enable_dal:false
+    ~tags:["evm"; "patch"; "state"]
+    ~title:"Patch state via command"
+    ~time_between_blocks:Nothing
+  @@ fun {sequencer; _} _protocol ->
+  let path = Durable_storage_path.sequencer in
+  let*@! before_patch = Rpc.state_value sequencer path in
+  let* () = Evm_node.terminate sequencer in
+  let* () = Evm_node.patch_state sequencer ~key:path ~value:"00" in
+  let* () = Evm_node.run sequencer in
+  let*@! after_patch = Rpc.state_value sequencer path in
+  Check.((before_patch <> after_patch) string)
+    ~error_msg:"value should have changed" ;
+  Check.((after_patch = "00") string) ~error_msg:"value be 00" ;
+  unit
+
 let test_persistent_state =
   register_all
     ~tags:["evm"; "sequencer"]
@@ -5394,6 +5413,7 @@ let protocols = Protocol.all
 let () =
   test_remove_sequencer protocols ;
   test_persistent_state protocols ;
+  test_patch_state [Protocol.Alpha] ;
   test_publish_blueprints protocols ;
   test_publish_blueprints_on_dal protocols ;
   test_sequencer_too_ahead protocols ;

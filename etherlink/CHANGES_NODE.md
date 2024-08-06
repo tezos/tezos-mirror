@@ -32,6 +32,10 @@
   running in observer and RPC modes. (!14327)
 - Adds support for `callTracer` in `debug_traceTransaction` and 
   `debug_traceCall`. (!14273)
+- Add an **unsafe** command `patch state at [path] with [value]` to patch
+  the kernel state used by an EVM node. The main use case for this command
+  is to modify the state to debug, it is not mean to be used under normal
+  circumstances.  (!14383)
 
 ### Bug fixes
 

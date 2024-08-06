@@ -1100,6 +1100,26 @@ let patch_kernel evm_node path =
       let process = Process.spawn (Uses.path Constant.octez_evm_node) @@ args in
       Process.check process
 
+let patch_state evm_node ~key ~value =
+  match evm_node.status with
+  | Running _ -> Test.fail "Cannot patch the state of a running node"
+  | Not_running ->
+      let args =
+        [
+          "patch";
+          "state";
+          "at";
+          key;
+          "with";
+          value;
+          "--data-dir";
+          data_dir evm_node;
+          "--force";
+        ]
+      in
+      let process = Process.spawn (Uses.path Constant.octez_evm_node) @@ args in
+      Process.check process
+
 let wait_termination (evm_node : t) =
   match evm_node.status with
   | Not_running -> unit

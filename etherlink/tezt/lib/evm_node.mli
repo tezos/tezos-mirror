@@ -399,6 +399,10 @@ val chunk_data :
     running. *)
 val patch_kernel : t -> string -> unit Lwt.t
 
+(** [patch_kernel evm_node ~key ~value] modifies the state of the [evm_node]
+    by writing [value] at [key]. *)
+val patch_state : t -> key:string -> value:string -> unit Lwt.t
+
 val wait_termination : t -> unit Lwt.t
 
 (** [make_kernel_installer_config ~output ()] create the config needed for the
