@@ -1014,13 +1014,21 @@ let run ~data_dir ~configuration_override =
   in
   let* store = Store.init config in
   let*! metrics_server = Metrics.launch config.metrics_addr in
+  let* first_seen_level = Store.First_seen_level.load store.first_seen_level in
   let* last_processed_level =
     Store.Last_processed_level.load store.last_processed_level
   in
   (* First wait for the L1 node to be bootstrapped. *)
   let* () = wait_for_l1_bootstrapped cctxt in
   (* Check the DAL node's and L1 node's history mode. *)
-  let* ((_, _, proto_parameters) as plugin_info) = get_head_plugin cctxt in
+  let* ((head_level, _, proto_parameters) as plugin_info) =
+    get_head_plugin cctxt
+  in
+  let* () =
+    match first_seen_level with
+    | None -> Store.First_seen_level.save store.first_seen_level head_level
+    | Some _ -> return_unit
+  in
   let* profile_ctxt = build_profile_context config in
   let*? () =
     Profile_manager.validate_slot_indexes

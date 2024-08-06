@@ -129,6 +129,8 @@ end
 
 module Last_processed_level : Single_value_store.S with type value = int32
 
+module First_seen_level : Single_value_store.S with type value = int32
+
 type t = private {
   slot_header_statuses : Statuses.t;  (** Statuses store *)
   shards : Shards.t;  (** Shards store *)
@@ -144,6 +146,7 @@ type t = private {
           than [number_of_slots] commitments can be stored per level. *)
   last_processed_level : Last_processed_level.t;
       (** Last processed level store *)
+  first_seen_level : First_seen_level.t;  (** First seen level store *)
 }
 
 (** [cache_entry store commitment entry] adds or replace an entry to
