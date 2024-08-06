@@ -1682,6 +1682,42 @@ module Chain = struct
           else return_unit
     else return_unit
 
+  let custom_delayed_maintenance chain_store new_head delay =
+    let open Lwt_result_syntax in
+    let*! scheduled_maintenance =
+      Stored_data.get chain_store.storage_maintenance.scheduled_maintenance
+    in
+    match scheduled_maintenance with
+    | Some target ->
+        (* A delayed merge is pending. *)
+        let level_to_merge_reached = target <= Block.level new_head in
+        let* () =
+          if level_to_merge_reached then
+            Stored_data.write
+              chain_store.storage_maintenance.scheduled_maintenance
+              None
+          else
+            let*! () =
+              Store_events.(
+                emit
+                  delayed_store_merging_countdown
+                  Int32.(sub target (Block.level new_head)))
+            in
+            return_unit
+        in
+        return level_to_merge_reached
+    | None ->
+        (* A merge is ready to be executed, setting the
+           target for the delayed execution. *)
+        let new_target = Int32.add (Block.level new_head) delay in
+        let* () =
+          Stored_data.write
+            chain_store.storage_maintenance.scheduled_maintenance
+            (Some new_target)
+        in
+        let*! () = Store_events.(emit delay_store_merging new_target) in
+        return_false
+
   let set_head chain_store new_head =
     let open Lwt_result_syntax in
     Shared.update_with chain_store.chain_state (fun chain_state ->
@@ -1820,46 +1856,8 @@ module Chain = struct
                       None
                   in
                   return_true
-              | Custom delay -> (
-                  let*! scheduled_maintenance =
-                    Stored_data.get
-                      chain_store.storage_maintenance.scheduled_maintenance
-                  in
-                  match scheduled_maintenance with
-                  | Some target ->
-                      (* A delayed merge is pending. *)
-                      let level_to_merge_reached =
-                        target <= Block.level new_head
-                      in
-                      let* () =
-                        if level_to_merge_reached then
-                          Stored_data.write
-                            chain_store.storage_maintenance
-                              .scheduled_maintenance
-                            None
-                        else
-                          let*! () =
-                            Store_events.(
-                              emit
-                                delayed_store_merging_countdown
-                                Int32.(sub target (Block.level new_head)))
-                          in
-                          return_unit
-                      in
-                      return level_to_merge_reached
-                  | None ->
-                      (* A merge is ready to be executed, setting the
-                         target for the delayed execution. *)
-                      let new_target = Int32.add (Block.level new_head) delay in
-                      let* () =
-                        Stored_data.write
-                          chain_store.storage_maintenance.scheduled_maintenance
-                          (Some new_target)
-                      in
-                      let*! () =
-                        Store_events.(emit delay_store_merging new_target)
-                      in
-                      return_false)
+              | Custom delay ->
+                  custom_delayed_maintenance chain_store new_head delay
             in
             (* We effectively trigger the merge only if the delayed
                maintenance is disabled or if the targeted delay is
