@@ -10,7 +10,7 @@ use crate::{
         AccessType, MachineState,
     },
     parser::instruction::Instr,
-    state_backend::{CellRead, CellWrite, Manager},
+    state_backend::{CellRead, CellReadWrite, CellWrite, Manager},
     traps::EnvironException,
 };
 use ed25519_dalek::{Signature, Signer, SigningKey, VerifyingKey};
@@ -77,7 +77,7 @@ where
 /// machine wasn't expecting any input, otherwise returns `true`.
 pub fn provide_no_input<S, ML, M>(status: &mut S, machine: &mut MachineState<ML, M>) -> bool
 where
-    S: CellWrite<Value = PvmStatus>,
+    S: CellReadWrite<Value = PvmStatus>,
     ML: MainMemoryLayout,
     M: Manager,
 {
@@ -105,7 +105,7 @@ pub fn provide_input<S, ML, M>(
     payload: &[u8],
 ) -> bool
 where
-    S: CellWrite<Value = PvmStatus>,
+    S: CellReadWrite<Value = PvmStatus>,
     ML: MainMemoryLayout,
     M: Manager,
 {
@@ -162,7 +162,7 @@ pub fn provide_metadata<S, ML, M>(
     origination_level: u32,
 ) -> bool
 where
-    S: CellWrite<Value = PvmStatus>,
+    S: CellReadWrite<Value = PvmStatus>,
     ML: MainMemoryLayout,
     M: Manager,
 {
@@ -370,7 +370,7 @@ pub fn handle_call<S, ML, M>(
     env_exception: EnvironException,
 ) -> bool
 where
-    S: CellWrite<Value = PvmStatus>,
+    S: CellReadWrite<Value = PvmStatus>,
     ML: MainMemoryLayout,
     M: Manager,
 {

@@ -3,7 +3,8 @@
 // SPDX-License-Identifier: MIT
 
 use super::{
-    AllocatedOf, Atom, Cell, CellRead, CellReadWrite, CellWrite, Elem, Manager, ManagerBase,
+    AllocatedOf, Atom, Cell, CellBase, CellRead, CellReadWrite, CellWrite, Elem, Manager,
+    ManagerBase,
 };
 use std::marker::PhantomData;
 
@@ -51,14 +52,20 @@ where
     }
 }
 
+impl<T, R, M> CellBase for EnumCell<T, R, M>
+where
+    R: Elem,
+    M: Manager,
+{
+    type Value = T;
+}
+
 impl<T, R, M> CellRead for EnumCell<T, R, M>
 where
     T: From<R> + Default,
     R: From<T> + Elem,
     M: Manager,
 {
-    type Value = T;
-
     fn read(&self) -> Self::Value {
         EnumCell::read(self)
     }
