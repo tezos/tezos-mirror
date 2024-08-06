@@ -349,7 +349,7 @@ let init_node ?sandbox ?target ~identity ~singleprocess ~internal_events
   Node.create
     ~sandboxed:(sandbox <> None)
     ?sandbox_parameters:(Option.map snd sandbox_param)
-    ?context_pruning:config.shell.context_pruning
+    ?disable_context_pruning:config.shell.disable_context_pruning
     ~singleprocess
     ~version
     ~commit_info

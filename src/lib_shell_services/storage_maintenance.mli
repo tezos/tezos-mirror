@@ -12,14 +12,6 @@
 
  *)
 
-(** The type [context_pruning] specifies whether or not a storage maintenance
-    should be triggered (if [Enabled]) or not (if [Disabled]). *)
-type context_pruning = Enabled | Disabled
-
-val context_pruning_encoding : context_pruning Data_encoding.t
-
-val pp_context_pruning : Format.formatter -> context_pruning -> unit
-
 (** The type [delay] specifies whether or not a storage maintenance
     should be delayed or not.
     Setting it to [Disabled] will trigger the storage maintenance as
