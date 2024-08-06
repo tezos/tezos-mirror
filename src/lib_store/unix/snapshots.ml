@@ -3259,9 +3259,7 @@ module Raw_importer : IMPORTER = struct
           let x = int_of_string x_str in
           let y = int_of_string y_str in
           return (y - x + 1)
-      | _ ->
-          (* Invalid cemented blocks file *)
-          failwith "Wrong filename format: %s" file
+      | _ -> tzfail (Invalid_cemented_file file)
     in
     Lwt.finalize
       (fun () ->
@@ -3640,9 +3638,7 @@ module Tar_importer : IMPORTER = struct
             let x = int_of_string x_str in
             let y = int_of_string y_str in
             return (y - x + 1)
-        | _ ->
-            (* Invalid cemented blocks file *)
-            failwith "Wrong filename format: %s" file
+        | _ -> tzfail (Invalid_cemented_file file)
       in
       let*! () =
         Onthefly.copy_and_upgrade_legacy_file
