@@ -127,6 +127,8 @@ module Commitment_indexed_cache : sig
   val find_opt : 'a t -> commitment -> 'a option
 end
 
+module Last_processed_level : Single_value_store.S with type value = int32
+
 type t = private {
   slot_header_statuses : Statuses.t;  (** Statuses store *)
   shards : Shards.t;  (** Shards store *)

@@ -404,6 +404,14 @@ module Commitment_indexed_cache =
         let hash = Hashtbl.hash
       end)
 
+module Last_processed_level = Single_value_store.Make (struct
+  type t = int32
+
+  let name = "last_processed_level"
+
+  let encoding = Data_encoding.int32
+end)
+
 (** Store context *)
 type t = {
   slot_header_statuses : Statuses.t;

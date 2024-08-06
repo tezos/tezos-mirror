@@ -502,9 +502,7 @@ module Handler = struct
       Event.(emit layer1_node_final_block (block_level, block_round))
     in
     (* This should be done at the end of the function. *)
-    Last_processed_level.save_last_processed_level
-      store.last_processed_level
-      ~level:block_level
+    Store.Last_processed_level.save store.last_processed_level block_level
 
   let rec try_process_block ~retries ctxt cctxt proto_parameters
       finalized_shell_header =
@@ -888,9 +886,7 @@ let clean_up_store ctxt cctxt ~last_processed_level
           else return_unit
         in
         let* () =
-          Last_processed_level.save_last_processed_level
-            store.last_processed_level
-            ~level
+          Store.Last_processed_level.save store.last_processed_level level
         in
         clean_up_from_level (Int32.succ level)
     in
@@ -1019,7 +1015,7 @@ let run ~data_dir ~configuration_override =
   let* store = Store.init config in
   let*! metrics_server = Metrics.launch config.metrics_addr in
   let* last_processed_level =
-    Last_processed_level.load_last_processed_level store.last_processed_level
+    Store.Last_processed_level.load store.last_processed_level
   in
   (* First wait for the L1 node to be bootstrapped. *)
   let* () = wait_for_l1_bootstrapped cctxt in
@@ -1080,7 +1076,7 @@ let run ~data_dir ~configuration_override =
     (* We reload the last processed level because [clean_up_store] has likely
        modified it. *)
     let* last_notified_level =
-      Last_processed_level.load_last_processed_level store.last_processed_level
+      Store.Last_processed_level.load store.last_processed_level
     in
     let open Constants in
     let*! crawler =
