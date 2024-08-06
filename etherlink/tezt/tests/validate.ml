@@ -40,6 +40,16 @@ let test_validate_compressed_sig () =
           "0xb80e5dd2ba9281e482589973600609bb0f10f6a075e6c733e4472d4dd2df238a";
       }
   in
+  (* Gives funds to the new account. *)
+  let* _ =
+    send_transaction_to_sequencer
+      (Eth_cli.transaction_send
+         ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+         ~to_public_key:account.address
+         ~value:(Wei.of_eth_int 10)
+         ~endpoint:(Evm_node.endpoint sequencer))
+      sequencer
+  in
   let* base_fee_per_gas = Rpc.get_gas_price sequencer in
   let base_fee_per_gas = Int32.to_int base_fee_per_gas in
   (* We have noticed that this transaction produces a compressed signature.
@@ -225,9 +235,86 @@ let test_validate_max_fee_per_gas () =
 
   unit
 
+let test_validate_pay_for_fees () =
+  register ~title:"Validate pay for fees" ~tags:["pay_for_fees"]
+  @@ fun sequencer ->
+  let empty_account =
+    Eth_account.
+      {
+        address = "0xA257edC8ad1D8f8f463aC0D947cc381000b3c863";
+        private_key =
+          "0xb80e5dd2ba9281e482589973600609bb0f10f6a075e6c733e4472d4dd2df238a";
+      }
+  in
+
+  let* base_fee_per_gas = Rpc.get_gas_price sequencer in
+  let base_fee_per_gas = Int32.to_int base_fee_per_gas in
+
+  (* The account has no funds, any transaction will be rejected. *)
+  let* insufficient_funds =
+    Cast.craft_tx
+      ~source_private_key:empty_account.private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas_price:base_fee_per_gas
+      ~gas:100_000
+      ~address:"0xd77420f73b4612a7a99dba8c2afd30a1886b0344"
+      ~value:Wei.zero
+      ()
+  in
+  let*@? err = Rpc.send_raw_transaction ~raw_tx:insufficient_funds sequencer in
+  Check.((err.message = "Cannot prepay transaction.") string)
+    ~error_msg:"the account has no funds, it should fail" ;
+
+  (* We transfer enough funds to pay for `100_000 (gas unit) * gas price`. *)
+  let* _ =
+    send_transaction_to_sequencer
+      (Eth_cli.transaction_send
+         ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+         ~to_public_key:empty_account.address
+         ~value:(Wei.of_string (string_of_int (100_000 * base_fee_per_gas)))
+         ~endpoint:(Evm_node.endpoint sequencer))
+      sequencer
+  in
+
+  (* Now the account can pay for at least the base_fee_per_gas. *)
+  let* enough_funds =
+    Cast.craft_tx
+      ~source_private_key:empty_account.private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas_price:base_fee_per_gas
+      ~gas:100_000
+      ~address:empty_account.address
+      ~value:Wei.zero
+      ()
+  in
+  let*@ _ok = Rpc.send_raw_transaction ~raw_tx:enough_funds sequencer in
+
+  (* But it's the gas price provided by the user that's necessary, not
+     the base fee per gas. If the user sets an higher gas price, it needs
+     to be able to pay for it. *)
+  let* insufficient_funds =
+    Cast.craft_tx
+      ~source_private_key:empty_account.private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas_price:(base_fee_per_gas + 1)
+      ~gas:100_000
+      ~address:"0xd77420f73b4612a7a99dba8c2afd30a1886b0344"
+      ~value:Wei.zero
+      ()
+  in
+  let*@? err = Rpc.send_raw_transaction ~raw_tx:insufficient_funds sequencer in
+  Check.((err.message = "Cannot prepay transaction.") string)
+    ~error_msg:"the account has no enough funds, it should fail" ;
+
+  unit
+
 let () =
   test_validate_compressed_sig () ;
   test_validate_recover_caller () ;
   test_validate_chain_id () ;
   test_validate_nonce () ;
-  test_validate_max_fee_per_gas ()
+  test_validate_max_fee_per_gas () ;
+  test_validate_pay_for_fees ()
