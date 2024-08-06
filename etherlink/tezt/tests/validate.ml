@@ -16,7 +16,7 @@ let tag = function
   | Eip1559 -> "Eip1559"
   | Eip2930 -> "Eip2930"
 
-let register ?da_fee_per_byte ~title ~tags f tx_types =
+let register ?set_account_code ?da_fee_per_byte ~title ~tags f tx_types =
   List.iter
     (fun tx_type ->
       let tag_tx = tag tx_type in
@@ -41,7 +41,11 @@ let register ?da_fee_per_byte ~title ~tags f tx_types =
           ()
       in
       let* sequencer =
-        Helpers.init_sequencer_sandbox ?da_fee_per_byte ~patch_config ()
+        Helpers.init_sequencer_sandbox
+          ?set_account_code
+          ?da_fee_per_byte
+          ~patch_config
+          ()
       in
       f sequencer tx_type)
     tx_types
@@ -433,6 +437,50 @@ let test_validate_gas_limit =
        should fail" ;
   unit
 
+let test_sender_is_not_contract =
+  let source = Eth_account.bootstrap_accounts.(0) in
+  register
+    ~set_account_code:[(source.address, "6080")]
+    ~title:"Sender must not be a contract"
+    ~tags:["sender_contract"]
+  @@ fun sequencer tx_type ->
+  let make_raw_tx ~legacy =
+    Cast.craft_tx
+      ~source_private_key:source.private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas_price:1_000_000_000
+      ~legacy
+      ~gas:30_000
+      ~address:"0xd77420f73b4612a7a99dba8c2afd30a1886b0344"
+      ~value:Wei.zero
+      ()
+  in
+  let* sender_is_a_contract =
+    match tx_type with
+    | Legacy -> make_raw_tx ~legacy:true
+    | Eip2930 ->
+        return
+          "01f86f82053980843b9aca00825b0494b53dc01974176e5dff2298c5a94343c2585e3c54880de0b6b3a764000080c080a04cda4f1de731980d8f9bb4653f5bdf82cbacb342af15f512e925cb5e7bf44b9ba020874590087c9c2e481f5beb3abb96a9e2ce2712e064f9443760921d7e90d9eb"
+    | Eip1559 -> make_raw_tx ~legacy:false
+  in
+  (* Just testing that the check to know if sender has code works.
+     The good case where sender is not a contract is already tested
+     by all the other tests *)
+  let*@? err =
+    Rpc.send_raw_transaction ~raw_tx:sender_is_a_contract sequencer
+  in
+  let error_msg =
+    Format.sprintf
+      "The error of this transaction should be that the sender is a contract, \
+       but it's %s"
+      err.message
+  in
+  Check.((err.message = "Sender is a contract which is not possible") string)
+    ~error_msg ;
+
+  unit
+
 let () =
   let all_types = [Legacy; Eip1559; Eip2930] in
   test_validate_compressed_sig [Legacy] ;
@@ -441,4 +489,5 @@ let () =
   test_validate_nonce all_types ;
   test_validate_max_fee_per_gas all_types ;
   test_validate_pay_for_fees [Legacy; Eip1559] ;
-  test_validate_gas_limit all_types
+  test_validate_gas_limit all_types ;
+  test_sender_is_not_contract all_types

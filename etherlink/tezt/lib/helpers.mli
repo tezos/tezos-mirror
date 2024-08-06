@@ -217,6 +217,7 @@ val find_and_execute_withdrawal :
 (** Runs a sequencer in mode sandbox, with no connection needed to a
     rollup node. *)
 val init_sequencer_sandbox :
+  ?set_account_code:(string * string) list ->
   ?da_fee_per_byte:Wei.t ->
   ?patch_config:(JSON.t -> JSON.t) ->
   ?kernel:Uses.t ->
