@@ -4008,6 +4008,12 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
         (Snapshot_file_not_found snapshot_path)
     in
     let snapshot_version = Importer.snapshot_version snapshot_importer in
+    let* is_legacy_format = Version.is_legacy_format snapshot_version in
+    let*! () =
+      if is_legacy_format then
+        Store_events.(emit import_legacy_snapshot_version snapshot_version)
+      else Lwt.return_unit
+    in
     let snapshot_metadata = Importer.snapshot_metadata snapshot_importer in
     let* () =
       fail_unless
