@@ -180,10 +180,21 @@ module type METRICS = sig
     unit Lwt.t
 end
 
-(** Emtpy metrics module. All metrics are -1. *)
+(** Empty metrics module. All metrics are -1. *)
 module Undefined_metrics_plugin (P : sig
   val hash : Protocol_hash.t
 end) : METRICS
+
+(** Protocol specific plugin to expose some helpers function that are
+    helpful in scope of the Shell. *)
+module type SHELL_HELPERS = sig
+  val hash : Protocol_hash.t
+
+  (** [get_blocks_per_cycle ctxt] returns the blocks_per_cycle
+      protocol constant. *)
+  val get_blocks_per_cycle :
+    Tezos_protocol_environment.Context.t -> int32 option Lwt.t
+end
 
 (** Register a validation plugin for a specific protocol
     (according to its [Proto.hash]). *)
@@ -194,6 +205,9 @@ val register_rpc : (module RPC) -> unit
 
 (** Register a metrics plugin module *)
 val register_metrics : (module METRICS) -> unit
+
+(** Register a Shell_helpers plugin module *)
+val register_shell_helpers : (module SHELL_HELPERS) -> unit
 
 (** Retrieves the registered protocol with the provided hash and wraps it
     together with its validation plugin.
@@ -218,3 +232,6 @@ val find_metrics : Protocol_hash.t -> (module METRICS) option
 
 (** Same as [find_metrics] but returns [Undefined_metrics_plugin] if not found *)
 val safe_find_metrics : Protocol_hash.t -> (module METRICS) Lwt.t
+
+(** Looks for a shell helpers plugin module for a specific protocol *)
+val find_shell_helpers : Protocol_hash.t -> (module SHELL_HELPERS) option
