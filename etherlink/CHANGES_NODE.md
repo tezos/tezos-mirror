@@ -30,6 +30,8 @@
 - Introduce `GET /evm/time_between_blocks` to retrieve the maximum time (in
   seconds) between two blocks created by the sequencer. It is used by the nodes
   running in observer and RPC modes. (!14327)
+- Adds support for `callTracer` in `debug_traceTransaction` and 
+  `debug_traceCall`. (!14273)
 
 ### Bug fixes
 

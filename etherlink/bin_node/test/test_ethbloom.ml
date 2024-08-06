@@ -12,6 +12,9 @@
     Subject:      Tests for implementation of Ethereum bloom filters
 *)
 
+(* TODO: #7449
+   These tests need to be refactored in tezt, Alcote*t has been deprecated *)
+
 open Evm_node_lib_dev_encoding
 open Evm_node_lib_dev.Ethbloom
 open Ethereum_types

@@ -162,7 +162,7 @@ let evm_node_lib_dev =
 
 let _octez_evm_node_tests =
   tezt
-    ["test_rlp"; "test_ethbloom"]
+    ["test_rlp"; "test_ethbloom"; "test_call_tracer_algo"]
     ~path:"etherlink/bin_node/test"
     ~opam:"octez-evm-node-tests"
     ~synopsis:"Tests for the EVM Node"
@@ -176,6 +176,9 @@ let _octez_evm_node_tests =
         qcheck_alcotest;
         alcotezt;
         evm_node_lib_dev;
+        tezt_wrapper |> open_ |> open_ ~m:"Base";
+        tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
+        Protocol.(main alpha);
       ]
 
 let _tezt_etherlink =
