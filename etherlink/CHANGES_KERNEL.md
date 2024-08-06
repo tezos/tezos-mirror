@@ -21,6 +21,10 @@
 
 - Simulation with parameter `from` no longer return `OutOfFunds` if the
   value is greater than zero. (!14150)
+- Removes transactions from the delayed inbox only if they are applied
+  in a block. They were previously optimistically removed from the delayed
+  inbox, which could be an issue if an upgrade happen in the same block.
+  (!14351)
 
 ## Internal
 
