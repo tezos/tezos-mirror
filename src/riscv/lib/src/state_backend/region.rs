@@ -57,9 +57,6 @@ impl<E: CellRead> CellRead for &mut E {
 pub trait CellWrite: CellRead {
     /// Write the value managed by the cell.
     fn write(&mut self, value: Self::Value);
-
-    /// Replace the value managed by the cell, returning the old value.
-    fn replace(&mut self, value: Self::Value) -> Self::Value;
 }
 
 impl<E: Elem, M: Manager> CellWrite for Cell<E, M> {
@@ -67,18 +64,29 @@ impl<E: Elem, M: Manager> CellWrite for Cell<E, M> {
     fn write(&mut self, value: E) {
         self.region.write(0, value)
     }
+}
 
+impl<E: CellWrite> CellWrite for &mut E {
+    #[inline(always)]
+    fn write(&mut self, value: Self::Value) {
+        E::write(self, value)
+    }
+}
+
+/// A cell that support reading and writing.
+pub trait CellReadWrite: CellRead + CellWrite {
+    /// Replace the value managed by the cell, returning the old value.
+    fn replace(&mut self, value: Self::Value) -> Self::Value;
+}
+
+impl<E: Elem, M: Manager> CellReadWrite for Cell<E, M> {
     #[inline(always)]
     fn replace(&mut self, value: E) -> E {
         self.region.replace(0, value)
     }
 }
 
-impl<E: CellWrite> CellWrite for &mut E {
-    fn write(&mut self, value: Self::Value) {
-        E::write(self, value)
-    }
-
+impl<E: CellReadWrite> CellReadWrite for &mut E {
     #[inline(always)]
     fn replace(&mut self, value: Self::Value) -> Self::Value {
         E::replace(self, value)

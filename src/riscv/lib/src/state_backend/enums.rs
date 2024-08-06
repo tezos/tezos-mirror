@@ -2,7 +2,9 @@
 //
 // SPDX-License-Identifier: MIT
 
-use super::{AllocatedOf, Atom, Cell, CellRead, CellWrite, Elem, Manager, ManagerBase};
+use super::{
+    AllocatedOf, Atom, Cell, CellRead, CellReadWrite, CellWrite, Elem, Manager, ManagerBase,
+};
 use std::marker::PhantomData;
 
 /// Cell representing an enumeration type
@@ -71,7 +73,14 @@ where
     fn write(&mut self, value: Self::Value) {
         EnumCell::write(self, value)
     }
+}
 
+impl<T, R, M> CellReadWrite for EnumCell<T, R, M>
+where
+    T: From<R> + Default,
+    R: From<T> + Elem,
+    M: Manager,
+{
     #[inline(always)]
     fn replace(&mut self, value: Self::Value) -> Self::Value {
         EnumCell::replace(self, value)
