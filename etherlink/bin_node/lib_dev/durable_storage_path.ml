@@ -48,6 +48,8 @@ let sequencer_pool_address = EVM.make "/sequencer_pool_address"
 
 let sequencer_key = EVM.make "/sequencer"
 
+let maximum_gas_per_transaction = EVM.make "/maximum_gas_per_transaction"
+
 module Accounts = struct
   let accounts = World_state.make "/eth_accounts"
 

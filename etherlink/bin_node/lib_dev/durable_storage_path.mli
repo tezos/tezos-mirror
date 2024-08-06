@@ -36,6 +36,8 @@ val sequencer_pool_address : path
 
 val sequencer_key : path
 
+val maximum_gas_per_transaction : path
+
 (** Paths related to accounts. *)
 module Accounts : sig
   (** Path to the account's balance. *)
