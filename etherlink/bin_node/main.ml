@@ -1575,12 +1575,25 @@ let bootstrap_account_arg =
   @@ Tezos_clic.parameter (fun _ address ->
          Lwt.return_ok @@ Evm_node_lib_dev.Misc.normalize_addr address)
 
+let set_account_code =
+  let long = "set-code" in
+  let doc = Format.sprintf "add code to an account in the installer config." in
+  Tezos_clic.multiple_arg ~long ~doc ~placeholder:"0x...,0x...."
+  @@ Tezos_clic.parameter (fun _ address_code ->
+         match String.split ',' address_code with
+         | [address; code] ->
+             let address =
+               String.trim @@ Evm_node_lib_dev.Misc.normalize_addr address
+             in
+             Lwt.return_ok (address, code)
+         | _ -> failwith "Parsing error for set-code")
+
 let make_kernel_config_command =
   let open Tezos_clic in
   let open Lwt_result_syntax in
   command
     ~desc:"Transforms the JSON list of instructions to a RLP list"
-    (args24
+    (args25
        mainnet_compat_arg
        (config_key_arg ~name:"kernel_root_hash" ~placeholder:"root hash")
        (config_key_arg ~name:"chain_id" ~placeholder:"chain id")
@@ -1611,6 +1624,7 @@ let make_kernel_config_command =
           ~placeholder:"9999000000000000000000"
        @@ Tezos_clic.parameter (fun _ s -> return @@ Z.of_string s))
        bootstrap_account_arg
+       set_account_code
        (config_key_flag ~name:"enable_fa_bridge")
        (config_key_flag ~name:"enable_dal")
        (config_key_arg ~name:"dal_slots" ~placeholder:"0,1,4,6,..."))
@@ -1641,6 +1655,7 @@ let make_kernel_config_command =
            remove_whitelist,
            boostrap_balance,
            bootstrap_accounts,
+           set_account_code,
            enable_fa_bridge,
            enable_dal,
            dal_slots )
@@ -1671,6 +1686,7 @@ let make_kernel_config_command =
         ?enable_fa_bridge
         ?enable_dal
         ?dal_slots
+        ?set_account_code
         ~output
         ())
 

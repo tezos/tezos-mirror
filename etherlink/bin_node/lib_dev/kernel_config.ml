@@ -14,6 +14,10 @@ let make_instr ?(path_prefix = "/evm/") ?(convert = Fun.id) arg_opt =
 let padded_32_le_int_bytes z =
   String.of_bytes @@ Ethereum_types.encode_u256_le (Qty z)
 
+let encode_hexa hexa =
+  let hexa = Ethereum_types.hex_of_string hexa in
+  Ethereum_types.hex_to_bytes hexa
+
 let parse_z_to_padded_32_le_int_bytes s =
   let z = Z.of_string s in
   padded_32_le_int_bytes z
@@ -24,7 +28,7 @@ let make ~mainnet_compat ~boostrap_balance ?bootstrap_accounts ?kernel_root_hash
     ?da_fee_per_byte ?delayed_inbox_timeout ?delayed_inbox_min_levels
     ?sequencer_pool_address ?maximum_allowed_ticks ?maximum_gas_per_transaction
     ?max_blueprint_lookahead_in_seconds ?remove_whitelist ?enable_fa_bridge
-    ?enable_dal ?dal_slots ~output () =
+    ?enable_dal ?dal_slots ?set_account_code ~output () =
   let bootstrap_accounts =
     match bootstrap_accounts with
     | None -> []
@@ -36,6 +40,19 @@ let make ~mainnet_compat ~boostrap_balance ?bootstrap_accounts ?kernel_root_hash
               ~path_prefix:"/evm/world_state/eth_accounts/"
               (Some (address ^ "/balance", balance)))
           bootstrap_accounts
+        |> List.flatten
+  in
+  let set_account_code =
+    match set_account_code with
+    | None -> []
+    | Some set_account_codes ->
+        List.map
+          (fun (address, code) ->
+            make_instr
+              ~convert:encode_hexa
+              ~path_prefix:"/evm/world_state/eth_accounts/"
+              (Some (address ^ "/code", code)))
+          set_account_codes
         |> List.flatten
   in
   let le_int64_bytes i =
@@ -81,7 +98,7 @@ let make ~mainnet_compat ~boostrap_balance ?bootstrap_accounts ?kernel_root_hash
     @ make_instr ~convert:le_int64_bytes maximum_allowed_ticks
     @ make_instr ~convert:le_int64_bytes maximum_gas_per_transaction
     @ make_instr ~convert:le_int64_bytes max_blueprint_lookahead_in_seconds
-    @ bootstrap_accounts
+    @ bootstrap_accounts @ set_account_code
     @ make_instr remove_whitelist
     @ make_instr ~path_prefix:"/evm/feature_flags/" enable_fa_bridge
     @ make_instr ~path_prefix:"/evm/feature_flags/" enable_dal

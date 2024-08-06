@@ -1163,7 +1163,15 @@ let make_kernel_installer_config ?(mainnet_compat = false)
     ?delayed_inbox_timeout ?delayed_inbox_min_levels ?sequencer_pool_address
     ?maximum_allowed_ticks ?maximum_gas_per_transaction
     ?(max_blueprint_lookahead_in_seconds = 157_680_000L)
-    ?(enable_fa_bridge = false) ?(enable_dal = false) ?dal_slots ~output () =
+    ?(set_account_code = []) ?(enable_fa_bridge = false) ?(enable_dal = false)
+    ?dal_slots ~output () =
+  let set_account_code =
+    List.flatten
+    @@ List.map
+         (fun (address, code) ->
+           ["--set-code"; Format.sprintf "%s,%s" address code])
+         set_account_code
+  in
   let cmd =
     ["make"; "kernel"; "installer"; "config"; output]
     @ Cli_arg.optional_switch "mainnet-compat" mainnet_compat
@@ -1201,6 +1209,7 @@ let make_kernel_installer_config ?(mainnet_compat = false)
         "maximum-allowed-ticks"
         Int64.to_string
         maximum_allowed_ticks
+    @ set_account_code
     @ Cli_arg.optional_arg
         "maximum-gas-per-transaction"
         Int64.to_string
