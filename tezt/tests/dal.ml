@@ -141,6 +141,47 @@ let get_peer_score dal_node peer_id =
   in
   return peer_score.score
 
+let wait_for_stored_slot ?shard_index dal_node ~published_level ~slot_index =
+  let check_slot_id e =
+    JSON.(e |-> "published_level" |> as_int) = published_level
+    && JSON.(e |-> "slot_index" |> as_int) = slot_index
+  in
+  let check_shard_index e =
+    match shard_index with
+    | None -> true
+    | Some shard_index -> JSON.(e |-> "shard_index" |> as_int) = shard_index
+  in
+  Dal_node.wait_for dal_node "stored_slot_shard.v0" (fun e ->
+      if check_slot_id e && check_shard_index e then Some () else None)
+
+(* Wait until the given [dal_node] receives all the shards whose
+   indices are [shards] for the given published level and slot index. *)
+let wait_for_shards_promises ~dal_node ~shards ~published_level ~slot_index =
+  let nshards = List.length shards in
+  let count = ref 0 in
+  let promises =
+    List.map
+      (fun shard_index ->
+        let* () =
+          wait_for_stored_slot
+            ~shard_index
+            ~published_level
+            ~slot_index
+            dal_node
+        in
+        let () = incr count in
+        let () =
+          Log.info
+            "Dal node %s has received %d/%d shards"
+            (Dal_node.name dal_node)
+            !count
+            nshards
+        in
+        unit)
+      shards
+  in
+  Lwt.join promises
+
 (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3173
    The functions below are duplicated from sc_rollup.ml.
    They should be moved to a common submodule. *)
@@ -653,19 +694,6 @@ let update_known_peers dal_node known_peers =
   Dal_node.Config_file.update
     dal_node
     (JSON.put ("peers", JSON.annotate ~origin:"dal_node_config" peers))
-
-let wait_for_stored_slot ?shard_index dal_node ~published_level ~slot_index =
-  let check_slot_id e =
-    JSON.(e |-> "published_level" |> as_int) = published_level
-    && JSON.(e |-> "slot_index" |> as_int) = slot_index
-  in
-  let check_shard_index e =
-    match shard_index with
-    | None -> true
-    | Some shard_index -> JSON.(e |-> "shard_index" |> as_int) = shard_index
-  in
-  Dal_node.wait_for dal_node "stored_slot_shard.v0" (fun e ->
-      if check_slot_id e && check_shard_index e then Some () else None)
 
 (* Return the baker at round 0 at the given level. *)
 let baker_for_round_zero node ~level =
@@ -5291,32 +5319,9 @@ module Amplification = struct
       assigned_shard_indices_non_banned
       non_banned_attesters ;
 
-    (* Wait until the given [dal_node] receives all the shards whose
-       indices are [shards] for the given published level and slot index. *)
     let wait_for_shards ~dal_node ~shards ~published_level ~slot_index =
-      let nshards = List.length shards in
-      let count = ref 0 in
       let* () =
-        Lwt.join
-        @@ List.map
-             (fun shard_index ->
-               let* () =
-                 wait_for_stored_slot
-                   ~shard_index
-                   ~published_level
-                   ~slot_index
-                   dal_node
-               in
-               let () = incr count in
-               let () =
-                 Log.info
-                   "Dal node %s has received %d/%d shards"
-                   (Dal_node.name dal_node)
-                   !count
-                   nshards
-               in
-               unit)
-             shards
+        wait_for_shards_promises ~dal_node ~shards ~published_level ~slot_index
       in
       let () =
         Log.info "Dal node %s has received its shards" (Dal_node.name dal_node)
@@ -7465,7 +7470,9 @@ let slot_producer ~slot_index ~slot_size ~from ~into dal_node l1_node l1_client
    attests. *)
 let test_new_attester_attests _protocol dal_parameters _cryptobox node client
     dal_bootstrap =
+  let peer_id dal_node = Dal_node.read_identity dal_node in
   let slot_size = dal_parameters.Dal.Parameters.cryptobox.slot_size in
+  let num_slots = dal_parameters.Dal.Parameters.number_of_slots in
   let slot_index = 0 in
   let* () = check_profiles ~__LOC__ dal_bootstrap ~expected:Dal_RPC.Bootstrap in
   Log.info "Bootstrap DAL node is running" ;
@@ -7512,46 +7519,131 @@ let test_new_attester_attests _protocol dal_parameters _cryptobox node client
   let* () = Client.register_key new_account.alias client in
   let* () = bake_for client in
 
-  let attester_node = Dal_node.create ~name:"attester" ~node () in
+  let attester = Dal_node.create ~name:"attester" ~node () in
   let* () =
     Dal_node.init_config
       ~attester_profiles:[new_account.public_key_hash]
       ~peers
-      attester_node
+      attester
   in
-  let* () = Dal_node.run ~wait_ready:true attester_node in
-  let client = Client.with_dal_node client ~dal_node:attester_node in
+  let* () = Dal_node.run attester in
+  let client = Client.with_dal_node client ~dal_node:attester in
 
   let num_cycles = 1 + consensus_rights_delay in
   let* level = Client.level client in
 
-  (* We need to publish at the level [n-lag], where [n] is the first level where
-     we should see the attestation of the new attester. But for simplicity we
-     keep publish till level [n-1]. *)
-  let last_publish_level = (num_cycles * blocks_per_cycle) - 1 in
-  let first_publish_level =
-    last_publish_level - dal_parameters.attestation_lag
+  let lag = dal_parameters.attestation_lag in
+  (* We need to publish at the level [n - lag], where [n] is the first level
+     where we should see the attestation of the new attester. Level [n] is
+     [first_level_in_committee + 1] (because the attestation is included in the
+     following block). *)
+  let first_level_in_committee =
+    (* plus 1 because the first cycle starts at level 1 *)
+    (num_cycles * blocks_per_cycle) + 1
   in
+  let published_level = first_level_in_committee + 1 - lag in
   Log.info
-    "Bake blocks fast (without publishing) up to level %d"
-    (first_publish_level - 1) ;
-  let* () = bake_for ~count:(first_publish_level - level) client in
-  Log.info
-    "Publish slots for levels %d to %d"
-    first_publish_level
-    last_publish_level ;
+    "first_level_in_committee = %d; published_level = %d"
+    first_level_in_committee
+    published_level ;
+  Log.info "Bake blocks up to level %d" (published_level - 1) ;
+  let* () = bake_for ~count:(published_level - 1 - level) client in
 
-  let* () =
-    slot_producer
-      ~slot_index
-      ~slot_size
-      ~from:first_publish_level
-      ~into:last_publish_level
-      producer
-      node
-      client
-  in
   let* level = Client.level client in
+  Log.info
+    "Current level is %d, publish a slot for level %d"
+    level
+    published_level ;
+  let* _ =
+    Helpers.publish_and_store_slot
+      client
+      producer
+      Constant.bootstrap2
+      ~index:slot_index
+    @@ Helpers.make_slot ~slot_size "SLOTDATA"
+  in
+  let* () = bake_for client in
+  let* manager_ops =
+    Node.RPC.call node
+    @@ RPC.get_chain_block_operations_validation_pass ~validation_pass:3 ()
+  in
+  Check.(
+    (JSON.as_list manager_ops |> List.length <> 0)
+      int
+      ~error_msg:
+        "Expected the commitment to be published, but no manager operation was \
+         included.") ;
+
+  let* id_attester = peer_id attester in
+  let* id_producer = peer_id producer in
+  let already_seen_slots =
+    Array.init num_slots (fun index -> slot_index <> index)
+  in
+  let check_graft_promises =
+    let graft_from_attester =
+      check_events_with_topic
+        ~event_with_topic:(Graft id_attester)
+        producer
+        ~num_slots
+        ~already_seen_slots
+        new_account.public_key_hash
+    in
+    let graft_from_producer =
+      check_events_with_topic
+        ~event_with_topic:(Graft id_producer)
+        attester
+        ~num_slots
+        ~already_seen_slots
+        new_account.public_key_hash
+    in
+    Lwt.pick [graft_from_attester; graft_from_producer]
+  in
+  let* assigned_shard_indexes =
+    Dal_RPC.(
+      call attester
+      @@ get_assigned_shard_indices
+           ~level:first_level_in_committee
+           ~pkh:new_account.public_key_hash)
+  in
+  let wait_for_shards_promises =
+    wait_for_shards_promises
+      ~dal_node:attester
+      ~shards:assigned_shard_indexes
+      ~published_level
+      ~slot_index
+  in
+
+  Log.info
+    "Bake another block, so that the attester node fetches the DAL committee \
+     for level %d and changes topics"
+    first_level_in_committee ;
+  let* () = bake_for client in
+
+  Log.info "Waiting for grafting of the attester - producer connection" ;
+  (* This is important because the attester and the producer should connect and
+     join the relevant mesh, before the producer attempts to send its
+     shards. Normally there the time between two levels to do that, but since
+     we're baking in the past, this time is very short, so without this explicit
+     wait the test would be flaky. *)
+  let* () = check_graft_promises in
+
+  Log.info "Bake another block, so that the producer sends the shards" ;
+  let* () = bake_for client in
+  let () = Log.info "Waiting for the attester to receive its shards" in
+  let* () = wait_for_shards_promises in
+
+  Log.info "Bake blocks up to level %d" (first_level_in_committee - 1) ;
+  let* () = bake_for ~count:(lag - 4) client in
+  let* level = Client.level client in
+  Log.info "Current level is %d" level ;
+  Check.(
+    (level = first_level_in_committee - 1)
+      int
+      ~error_msg:"Expected current level to be %R, got %L") ;
+  Log.info
+    "At level %d the new attester is not yet in the committee, at the next \
+     level it will be"
+    level ;
   let* () =
     check_in_TB_committee
       ~__LOC__
