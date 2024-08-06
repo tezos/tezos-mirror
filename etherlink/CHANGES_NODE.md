@@ -16,6 +16,8 @@
   exists, otherwise returns the zero address. (!todo)
 - Add `--restricted-rpcs` to disable RPCs, following the given regular
   expression. (!13993)
+- Add `--whitelisted-rpcs` to enable a subset of RPCs. (!14441)
+- Add `--blacklisted-rpcs` to disable a subset of RPCs. (!14441)
 - Add an **unsafe** command `patch kernel with [FILE]` to patch the kernel used
   by an EVM node. The main use case for this command can be used to fix bugs in
   RPCs partly implemented in the kernel (*e.g.*, `eth_call` for instance).

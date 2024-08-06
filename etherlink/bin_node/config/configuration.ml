@@ -63,7 +63,10 @@ type fee_history = {max_count : int option; max_past : int option}
 
 (* The regular expression is compiled at the launch of the node, and encoded
    into its raw form. *)
-type restricted_rpcs = {raw : string; regex : Re.re}
+type restricted_rpcs =
+  | Pattern of {raw : string; regex : Re.re}
+  | Blacklist of string list
+  | Whitelist of string list
 
 type t = {
   rpc_addr : string;
@@ -155,7 +158,32 @@ let default_blueprints_publisher_config =
 
 let default_fee_history = {max_count = None; max_past = None}
 
-let make_restricted_rpcs raw = {raw; regex = Re.Perl.compile_pat raw}
+let make_pattern_restricted_rpcs raw =
+  Pattern {raw; regex = Re.Perl.compile_pat raw}
+
+let restricted_rpcs_encoding =
+  let open Data_encoding in
+  union
+    [
+      case
+        ~title:"pattern"
+        Json_only
+        string
+        (function Pattern {raw; _} -> Some raw | _ -> None)
+        make_pattern_restricted_rpcs;
+      case
+        ~title:"whitelist"
+        Json_only
+        (obj1 (req "whitelist" (list string)))
+        (function Whitelist l -> Some l | _ -> None)
+        (fun l -> Whitelist l);
+      case
+        ~title:"blacklist"
+        Json_only
+        (obj1 (req "blacklist" (list string)))
+        (function Blacklist l -> Some l | _ -> None)
+        (fun l -> Blacklist l);
+    ]
 
 let kernel_execution_config_dft ~data_dir ?preimages ?preimages_endpoint () =
   {
@@ -549,7 +577,7 @@ let encoding data_dir : t Data_encoding.t =
             experimental_features,
             proxy,
             fee_history,
-            Option.map (fun {raw; _} -> raw) restricted_rpcs ),
+            restricted_rpcs ),
           kernel_execution ) ))
     (fun ( ( rpc_addr,
              rpc_port,
@@ -591,7 +619,7 @@ let encoding data_dir : t Data_encoding.t =
         verbose;
         experimental_features;
         fee_history;
-        restricted_rpcs = Option.map make_restricted_rpcs restricted_rpcs;
+        restricted_rpcs;
         kernel_execution;
       })
     (merge_objs
@@ -645,7 +673,7 @@ let encoding data_dir : t Data_encoding.t =
                 default_experimental_features)
              (dft "proxy" proxy_encoding (default_proxy ()))
              (dft "fee_history" fee_history_encoding default_fee_history)
-             (opt "restricted_rpcs" string))
+             (opt "restricted_rpcs" restricted_rpcs_encoding))
           (obj1
              (dft
                 "kernel_execution"
@@ -748,7 +776,6 @@ module Cli = struct
     let kernel_execution =
       kernel_execution_config_dft ~data_dir ?preimages ?preimages_endpoint ()
     in
-    let restricted_rpcs = Option.map make_restricted_rpcs restricted_rpcs in
     {
       rpc_addr = Option.value ~default:default_rpc_addr rpc_addr;
       rpc_port = Option.value ~default:default_rpc_port rpc_port;
@@ -987,9 +1014,7 @@ module Cli = struct
         ()
     in
     let restricted_rpcs =
-      Option.either
-        (Option.map make_restricted_rpcs restricted_rpcs)
-        configuration.restricted_rpcs
+      Option.either restricted_rpcs configuration.restricted_rpcs
     in
     {
       rpc_addr = Option.value ~default:configuration.rpc_addr rpc_addr;

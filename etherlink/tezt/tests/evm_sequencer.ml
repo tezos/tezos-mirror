@@ -5408,6 +5408,28 @@ let test_rpc_mode_while_block_are_produced =
   in
   unit
 
+let test_relay_restricted_rpcs =
+  register_all
+    ~bootstrap_accounts:Eth_account.lots_of_address
+    ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
+    ~time_between_blocks:Nothing
+    ~kernels:[Latest]
+    ~tags:["evm"; "rpc"; "relay"]
+    ~title:"Relay restricted RPC only accept eth_sendRawTransaction"
+    ~da_fee:Wei.zero
+  @@ fun {sequencer; _} _protocol ->
+  let* () = Evm_node.terminate sequencer in
+  let* () =
+    Evm_node.run
+      ~extra_arguments:["--whitelisted-rpcs"; "eth_sendRawTransaction"]
+      sequencer
+  in
+  let raw_tx, _ = read_tx_from_file () |> List.hd in
+  let*@ _ = Rpc.send_raw_transaction ~raw_tx sequencer in
+  let*@? _ = Rpc.get_block_by_number ~block:"0x0" sequencer in
+  let*@? _ = Rpc.tez_kernelVersion sequencer in
+  unit
+
 let protocols = Protocol.all
 
 let () =
@@ -5481,4 +5503,4 @@ let () =
   test_sequencer_sandbox () ;
   test_rpc_mode_while_block_are_produced protocols ;
   test_trace_transaction_call_trace protocols ;
-  ()
+  test_relay_restricted_rpcs protocols

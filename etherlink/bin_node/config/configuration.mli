@@ -94,7 +94,10 @@ type proxy = {
 
 type fee_history = {max_count : int option; max_past : int option}
 
-type restricted_rpcs = {raw : string; regex : Re.re}
+type restricted_rpcs =
+  | Pattern of {raw : string; regex : Re.re}
+  | Blacklist of string list
+  | Whitelist of string list
 
 type t = {
   rpc_addr : string;
@@ -187,6 +190,8 @@ val observer_config_dft :
   unit ->
   observer
 
+val make_pattern_restricted_rpcs : string -> restricted_rpcs
+
 module Cli : sig
   val create :
     data_dir:string ->
@@ -216,7 +221,7 @@ module Cli : sig
     ?max_blueprints_catchup:int ->
     ?catchup_cooldown:int ->
     ?sequencer_sidecar_endpoint:Uri.t ->
-    ?restricted_rpcs:string ->
+    ?restricted_rpcs:restricted_rpcs ->
     ?proxy_finalized_view:bool ->
     ?dal_slots:int list ->
     unit ->
@@ -249,7 +254,7 @@ module Cli : sig
     ?max_blueprints_catchup:int ->
     ?catchup_cooldown:int ->
     ?sequencer_sidecar_endpoint:Uri.t ->
-    ?restricted_rpcs:string ->
+    ?restricted_rpcs:restricted_rpcs ->
     ?proxy_finalized_view:bool ->
     dal_slots:int trace option ->
     t ->
@@ -283,7 +288,7 @@ module Cli : sig
     ?log_filter_max_nb_logs:int ->
     ?log_filter_chunk_size:int ->
     ?sequencer_sidecar_endpoint:Uri.t ->
-    ?restricted_rpcs:string ->
+    ?restricted_rpcs:restricted_rpcs ->
     ?proxy_finalized_view:bool ->
     ?dal_slots:int list ->
     unit ->
