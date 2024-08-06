@@ -29,8 +29,6 @@ let create ~cctxt ~sequencer_key ~smart_rollup_address ~slot_index
     |> encode |> Bytes.to_string
   in
   `External
-    ("\000" (* Framed protocol *) ^ smart_rollup_address
-    ^ "\004"
-    ^ (* Sequencer signal *)
-    rlp_sequencer_signal)
+    Message_format.(
+      frame_message smart_rollup_address Sequencer_signal rlp_sequencer_signal)
   |> return

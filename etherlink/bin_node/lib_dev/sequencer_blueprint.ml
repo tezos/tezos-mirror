@@ -116,10 +116,11 @@ let create ~cctxt ~sequencer_key ~timestamp ~smart_rollup_address ~number
       |> encode |> Bytes.to_string
     in
     `External
-      ("\000" (* Framed protocol *) ^ smart_rollup_address
-      ^ "\003"
-      ^ (* Sequencer blueprint *)
-      rlp_sequencer_blueprint)
+      Message_format.(
+        frame_message
+          smart_rollup_address
+          Blueprint_chunk
+          rlp_sequencer_blueprint)
     |> return
   in
   List.mapi_ep (message_from_chunk nb_chunks) chunks
