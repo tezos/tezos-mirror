@@ -140,6 +140,8 @@ type t = private {
       (** Cache of commitments indexed by level and then by slot id. The maximum
           number of levels is given by {!Constants.slot_id_cache_size}. No more
           than [number_of_slots] commitments can be stored per level. *)
+  last_processed_level : Last_processed_level.t;
+      (** Last processed level store *)
 }
 
 (** [cache_entry store commitment entry] adds or replace an entry to

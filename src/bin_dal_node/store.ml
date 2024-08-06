@@ -415,6 +415,7 @@ type t = {
     Commitment_indexed_cache.t;
       (* The length of the array is the number of shards per slot *)
   finalized_commitments : Slot_id_cache.t;
+  last_processed_level : Last_processed_level.t;
 }
 
 let cache_entry node_store commitment slot shares shard_proofs =
@@ -566,6 +567,7 @@ let init config =
   let* shards = Shards.init base_dir Stores_dirs.shard in
   let* slots = Slots.init base_dir Stores_dirs.slot in
   let* skip_list_cells = init_skip_list_cells_store base_dir in
+  let* last_processed_level = Last_processed_level.init ~root_dir:base_dir in
   let*! () = Event.(emit store_is_ready ()) in
   return
     {
@@ -576,6 +578,7 @@ let init config =
       cache = Commitment_indexed_cache.create Constants.cache_size;
       finalized_commitments =
         Slot_id_cache.create ~capacity:Constants.slot_id_cache_size;
+      last_processed_level;
     }
 
 let add_slot_headers ~number_of_slots ~block_level slot_headers t =

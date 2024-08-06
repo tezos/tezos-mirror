@@ -416,6 +416,7 @@ module Handler = struct
 
   let process_block ctxt cctxt proto_parameters finalized_shell_header =
     let open Lwt_result_syntax in
+    let store = Node_context.get_store ctxt in
     let block_level = finalized_shell_header.Block_header.level in
     let block = `Level block_level in
     let pred_level = Int32.pred block_level in
@@ -445,7 +446,7 @@ module Handler = struct
               ~number_of_slots:proto_parameters.Dal_plugin.number_of_slots
               ~block_level
               slot_headers
-              (Node_context.get_store ctxt)
+              store
           else return_unit
         in
         let* () =
@@ -465,7 +466,7 @@ module Handler = struct
                   Slot_manager.publish_slot_data
                     ~level_committee:(Node_context.fetch_committee ctxt)
                     ~slot_size:proto_parameters.cryptobox_parameters.slot_size
-                    (Node_context.get_store ctxt)
+                    store
                     (Node_context.get_gs_worker ctxt)
                     proto_parameters
                     commitment
@@ -480,7 +481,7 @@ module Handler = struct
             ~attestation_lag:proto_parameters.attestation_lag
             ~number_of_slots:proto_parameters.number_of_slots
             (Plugin.is_attested attested_slots)
-            (Node_context.get_store ctxt)
+            store
         in
         let*! () =
           remove_unattested_slots_and_shards
@@ -502,7 +503,7 @@ module Handler = struct
     in
     (* This should be done at the end of the function. *)
     Last_processed_level.save_last_processed_level
-      (Node_context.get_last_processed_level_store ctxt)
+      store.last_processed_level
       ~level:block_level
 
   let rec try_process_block ~retries ctxt cctxt proto_parameters
@@ -848,7 +849,7 @@ let clean_up_store ctxt cctxt ~last_processed_level
       level
       (module Plugin : Dal_plugin.T with type block_info = Plugin.block_info)
   in
-  let lpl_store = Node_context.get_last_processed_level_store ctxt in
+  let store = Node_context.get_store ctxt in
   let supports_refutations = Handler.supports_refutations ctxt in
   (* [target_level] identifies the level wrt to head level at which we want to
      start the P2P and process blocks as usual. *)
@@ -887,7 +888,9 @@ let clean_up_store ctxt cctxt ~last_processed_level
           else return_unit
         in
         let* () =
-          Last_processed_level.save_last_processed_level lpl_store ~level
+          Last_processed_level.save_last_processed_level
+            store.last_processed_level
+            ~level
         in
         clean_up_from_level (Int32.succ level)
     in
@@ -1015,11 +1018,8 @@ let run ~data_dir ~configuration_override =
   in
   let* store = Store.init config in
   let*! metrics_server = Metrics.launch config.metrics_addr in
-  let* last_processed_level_store =
-    Last_processed_level.init ~root_dir:(Configuration_file.store_path config)
-  in
   let* last_processed_level =
-    Last_processed_level.load_last_processed_level last_processed_level_store
+    Last_processed_level.load_last_processed_level store.last_processed_level
   in
   (* First wait for the L1 node to be bootstrapped. *)
   let* () = wait_for_l1_bootstrapped cctxt in
@@ -1069,7 +1069,6 @@ let run ~data_dir ~configuration_override =
       transport_layer
       cctxt
       metrics_server
-      last_processed_level_store
   in
   let* () =
     match last_processed_level with
@@ -1081,7 +1080,7 @@ let run ~data_dir ~configuration_override =
     (* We reload the last processed level because [clean_up_store] has likely
        modified it. *)
     let* last_notified_level =
-      Last_processed_level.load_last_processed_level last_processed_level_store
+      Last_processed_level.load_last_processed_level store.last_processed_level
     in
     let open Constants in
     let*! crawler =
