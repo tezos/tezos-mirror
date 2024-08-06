@@ -103,7 +103,9 @@ module S = struct
   let current_yearly_rate =
     RPC_service.get_service
       ~description:
-        "Returns the current expected maximum yearly issuance rate (in %)"
+        "Returns the current expected maximum yearly issuance rate (in %). The \
+         value only includes participation rewards (and does not include \
+         liquidity baking)"
       ~query:RPC_query.empty
       ~output:(string Plain)
       RPC_path.(path / "current_yearly_rate")
@@ -112,7 +114,8 @@ module S = struct
     RPC_service.get_service
       ~description:
         "Returns the current expected maximum yearly issuance rate (exact \
-         quotient)"
+         quotient) (in %). The value only includes participation rewards (and \
+         does not include liquidity baking)"
       ~query:RPC_query.empty
       ~output:q_encoding
       RPC_path.(path / "current_yearly_rate_exact")
@@ -121,7 +124,8 @@ module S = struct
     RPC_service.get_service
       ~description:
         "Returns the static and dynamic parts of the current expected maximum \
-         yearly issuance rate."
+         yearly issuance rate (in %). The value only includes participation \
+         rewards (and does not include liquidity baking)"
       ~query:RPC_query.empty
       ~output:(obj2 (req "static" q_encoding) (req "dynamic" q_encoding))
       RPC_path.(path / "current_yearly_rate_details")
@@ -129,7 +133,9 @@ module S = struct
   let current_issuance_per_minute =
     RPC_service.get_service
       ~description:
-        "Returns the current expected maximum issuance per minute (in mutez)"
+        "Returns the current expected maximum issuance per minute (in mutez). \
+         The value only includes participation rewards (and does not include \
+         liquidity baking)"
       ~query:RPC_query.empty
       ~output:Tez.encoding
       RPC_path.(path / "issuance_per_minute")
@@ -148,7 +154,7 @@ module S = struct
     RPC_service.get_service
       ~description:
         "Returns the expected issued tez for the provided block and the next \
-         'consensus_rights_delay' cycles"
+         'consensus_rights_delay' cycles (in mutez)"
       ~query:RPC_query.empty
       ~output:(Data_encoding.list expected_rewards_encoding)
       RPC_path.(path / "expected_issuance")
