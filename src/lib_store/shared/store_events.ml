@@ -561,3 +561,11 @@ let upgrade_cemented_file_skip =
     ~msg:"File {path} does not have 32-bit offsets, skipping upgrade"
     ~pp1:Format.pp_print_string
     ("path", Data_encoding.string)
+
+let import_legacy_snapshot_version =
+  declare_1
+    ~section
+    ~level:Notice
+    ~name:"import_legacy_snapshot_version"
+    ~msg:"Importing a legacy snapshot version: {legacy_version}."
+    ("legacy_version", Data_encoding.int31)
