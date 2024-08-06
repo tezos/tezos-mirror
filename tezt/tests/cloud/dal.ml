@@ -1005,7 +1005,7 @@ let init_producer cloud ~bootstrap ~number_of_slots account i agent =
   let* () =
     Dal_node.init_config
       ~expected_pow:0.
-      ~producer_profiles:[i mod number_of_slots]
+      ~observer_profiles:[i mod number_of_slots]
       ~peers:[bootstrap.dal_node_p2p_endpoint]
       dal_node
   in
