@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use super::{Elem, Manager, ManagerBase, ManagerRead, ManagerReadWrite, ManagerWrite};
+use super::{Elem, ManagerBase, ManagerRead, ManagerReadWrite, ManagerWrite};
 
 /// Single element of type `E`
 #[repr(transparent)]
@@ -217,30 +217,40 @@ impl<const LEN: usize, M: ManagerBase> DynCells<LEN, M> {
     pub fn bind(region: M::DynRegion<LEN>) -> Self {
         Self { region }
     }
-}
 
-impl<const LEN: usize, M: Manager> DynCells<LEN, M> {
     /// Read an element in the region. `address` is in bytes.
     #[inline]
-    pub fn read<E: Elem>(&self, address: usize) -> E {
+    pub fn read<E: Elem>(&self, address: usize) -> E
+    where
+        M: ManagerRead,
+    {
         M::dyn_region_read(&self.region, address)
     }
 
     /// Read elements from the region. `address` is in bytes.
     #[inline]
-    pub fn read_all<E: Elem>(&self, address: usize, values: &mut [E]) {
+    pub fn read_all<E: Elem>(&self, address: usize, values: &mut [E])
+    where
+        M: ManagerRead,
+    {
         M::dyn_region_read_all(&self.region, address, values)
     }
 
     /// Update an element in the region. `address` is in bytes.
     #[inline]
-    pub fn write<E: Elem>(&mut self, address: usize, value: E) {
+    pub fn write<E: Elem>(&mut self, address: usize, value: E)
+    where
+        M: ManagerWrite,
+    {
         M::dyn_region_write(&mut self.region, address, value)
     }
 
     /// Update multiple elements in the region. `address` is in bytes.
     #[inline]
-    pub fn write_all<E: Elem>(&mut self, address: usize, values: &[E]) {
+    pub fn write_all<E: Elem>(&mut self, address: usize, values: &[E])
+    where
+        M: ManagerWrite,
+    {
         M::dyn_region_write_all(&mut self.region, address, values)
     }
 }

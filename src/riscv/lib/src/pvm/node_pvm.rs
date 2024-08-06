@@ -10,7 +10,7 @@ use crate::{
     state_backend::{
         self,
         memory_backend::{InMemoryBackend, SliceManager, SliceManagerRO},
-        Backend, CellRead, CellWrite, Layout,
+        Backend, Layout,
     },
     storage::{self, Hash, Repo},
 };
