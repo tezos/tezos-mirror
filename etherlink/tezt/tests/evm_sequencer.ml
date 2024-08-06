@@ -1762,6 +1762,85 @@ let test_delayed_transaction_peeked =
   let*@ _ = produce_block sequencer in
   bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy ()
 
+let test_invalid_delayed_transaction =
+  register_all
+    ~da_fee:arb_da_fee_for_delayed_inbox
+    ~tags:["evm"; "sequencer"; "delayed_inbox"; "invalid"]
+    ~title:"Delayed transaction is removed even when invalid"
+    ~enable_fa_bridge:false
+    ~kernels:[Kernel.Latest]
+    ~time_between_blocks:Nothing
+  @@ fun {
+           client;
+           l1_contracts;
+           sc_rollup_address;
+           sc_rollup_node;
+           sequencer;
+           proxy;
+           _;
+         }
+             _protocol ->
+  (* Produces an invalid transaction by setting an invalid nonce. *)
+  let* invalid_nonce =
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~chain_id:1337
+      ~nonce:16
+      ~gas_price:1_000_000_000
+      ~gas:23_300
+      ~value:(Wei.of_eth_int 1)
+      ~address:Eth_account.bootstrap_accounts.(1).address
+      ()
+  in
+  let* hash =
+    send_raw_transaction_to_delayed_inbox
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sc_rollup_address
+      ~amount:Tez.one
+      invalid_nonce
+  in
+  (* Assert that the expected transaction hash is found in the delayed inbox
+     durable storage path. *)
+  let* delayed_transactions_hashes =
+    Sc_rollup_node.RPC.call sc_rollup_node
+    @@ Sc_rollup_rpc.get_global_block_durable_state_value
+         ~pvm_kind:"wasm_2_0_0"
+         ~operation:Sc_rollup_rpc.Subkeys
+         ~key:"/evm/delayed-inbox"
+         ()
+  in
+  Check.(list_mem string hash delayed_transactions_hashes)
+    ~error_msg:"hash %L should be present in the delayed inbox %R" ;
+  (* We bake enough blocks for the sequencer to see the transaction. *)
+  let* () =
+    repeat 2 (fun () ->
+        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+        unit)
+  in
+  let*@ _ = produce_block sequencer in
+  let* () = bake_until_sync ~sc_rollup_node ~client ~proxy ~sequencer () in
+
+  (* There is no receipt for the transaction because it's invalid. *)
+  let*@ receipt_opt = Rpc.get_transaction_receipt ~tx_hash:hash sequencer in
+  Check.is_true
+    (receipt_opt = None)
+    ~error_msg:"The transaction should not have a receipt" ;
+  (* The transaction has been cleared from the delayed inbox. *)
+  let* delayed_transactions_hashes =
+    Sc_rollup_node.RPC.call sc_rollup_node
+    @@ Sc_rollup_rpc.get_global_block_durable_state_value
+         ~pvm_kind:"wasm_2_0_0"
+         ~operation:Sc_rollup_rpc.Subkeys
+         ~key:"/evm/delayed-inbox"
+         ()
+  in
+  Check.is_true
+    (delayed_transactions_hashes = ["meta"])
+    ~error_msg:"Delayed inbox should have been cleared" ;
+  unit
+
 let call_fa_withdraw ?expect_failure ~sender ~endpoint ~evm_node ~ticket_owner
     ~routing_info ~amount ~ticketer ~content () =
   let* () =
@@ -5593,6 +5672,7 @@ let () =
   test_delayed_fa_deposit_is_included protocols ;
   test_delayed_fa_deposit_is_ignored_if_feature_disabled protocols ;
   test_delayed_transaction_peeked protocols ;
+  test_invalid_delayed_transaction protocols ;
   test_fa_withdrawal_is_included protocols ;
   test_largest_delayed_transfer_is_included protocols ;
   test_delayed_deposit_from_init_rollup_node protocols ;
