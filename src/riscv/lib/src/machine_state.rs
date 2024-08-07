@@ -20,7 +20,7 @@ use crate::{
     bits::u64,
     devicetree,
     machine_state::{
-        bus::{main_memory, Address, Addressable, Bus, OutOfBounds},
+        bus::{main_memory, Address, AddressableRead, AddressableWrite, Bus, OutOfBounds},
         csregisters::CSRegister,
         hart_state::{HartState, HartStateLayout},
     },
@@ -831,7 +831,7 @@ mod tests {
         create_backend, create_state,
         machine_state::{
             address_translation::pte::{PPNField, PageTableEntry},
-            bus::{main_memory::M1M, start_of_main_memory, Addressable},
+            bus::{main_memory::M1M, start_of_main_memory, AddressableWrite},
             csregisters::{
                 satp::{Satp, TranslationAlgorithm},
                 xstatus::{self, MStatus},

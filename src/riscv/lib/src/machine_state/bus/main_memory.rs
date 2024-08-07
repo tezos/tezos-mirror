@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use super::{Address, Addressable};
+use super::{Address, AddressableRead, AddressableWrite};
 use crate::state_backend::{self as backend};
 use std::mem;
 
@@ -157,7 +157,7 @@ impl<L: MainMemoryLayout, M: backend::ManagerBase> MainMemory<L, M> {
     }
 }
 
-impl<E: backend::Elem, L: MainMemoryLayout, M: backend::Manager> Addressable<E>
+impl<E: backend::Elem, L: MainMemoryLayout, M: backend::ManagerRead> AddressableRead<E>
     for MainMemory<L, M>
 {
     #[inline(always)]
@@ -179,7 +179,11 @@ impl<E: backend::Elem, L: MainMemoryLayout, M: backend::Manager> Addressable<E>
 
         Ok(())
     }
+}
 
+impl<E: backend::Elem, L: MainMemoryLayout, M: backend::ManagerWrite> AddressableWrite<E>
+    for MainMemory<L, M>
+{
     fn write(&mut self, addr: super::Address, value: E) -> Result<(), super::OutOfBounds> {
         if addr as usize + mem::size_of::<E>() > L::BYTES {
             return Err(super::OutOfBounds);
@@ -209,7 +213,7 @@ pub mod tests {
         backend_test, create_backend,
         machine_state::{
             backend::{tests::test_determinism, Backend, Layout},
-            bus::Addressable,
+            bus::{AddressableRead, AddressableWrite},
         },
     };
 
@@ -223,7 +227,7 @@ pub mod tests {
 
         macro_rules! check_address {
             ($ty:ty, $addr:expr, $value:expr) => {
-                assert_eq!(Addressable::<$ty>::read(&memory, $addr), Ok($value));
+                assert_eq!(AddressableRead::<$ty>::read(&memory, $addr), Ok($value));
             };
         }
 

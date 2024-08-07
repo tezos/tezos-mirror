@@ -214,7 +214,7 @@ mod tests {
         machine_state::{
             bus::{
                 main_memory::{M1K, M1M},
-                start_of_main_memory, Addressable,
+                start_of_main_memory, AddressableRead,
             },
             registers::{a0, a1, a2, a3, a6, a7},
         },

@@ -5,7 +5,7 @@
 //! We reserve an address space of size [DEVICES_ADDRESS_SPACE_LENGTH] dedicated
 //! to devices.
 
-use super::Addressable;
+use super::{AddressableRead, AddressableWrite};
 use crate::machine_state::backend;
 
 /// Length of the devices address space
@@ -39,7 +39,7 @@ impl<M: backend::ManagerBase> Devices<M> {
     }
 }
 
-impl<E: backend::Elem, M: backend::Manager> Addressable<E> for Devices<M> {
+impl<E: backend::Elem, M: backend::ManagerBase> AddressableRead<E> for Devices<M> {
     fn read(&self, _addr: super::Address) -> Result<E, super::OutOfBounds> {
         Err(super::OutOfBounds)
     }
@@ -47,7 +47,9 @@ impl<E: backend::Elem, M: backend::Manager> Addressable<E> for Devices<M> {
     fn read_all(&self, _addr: super::Address, _values: &mut [E]) -> Result<(), super::OutOfBounds> {
         Err(super::OutOfBounds)
     }
+}
 
+impl<E: backend::Elem, M: backend::ManagerBase> AddressableWrite<E> for Devices<M> {
     fn write(&mut self, _addr: super::Address, _value: E) -> Result<(), super::OutOfBounds> {
         Err(super::OutOfBounds)
     }
