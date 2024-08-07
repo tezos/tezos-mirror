@@ -22,6 +22,7 @@ Beta and Testnet, and allows users to deposit and withdraw FA 2.1 tokens.
 
 - Tick model is updated with regards to FA deposits and withdrawals. (!14016)
 - L1 proxy address is added as a field to the FA withdrawal event. (!14260)
+- Preliminary support of larger delayed transactions. !(14467)
 
 ## Version af7909023768bc4aad3120bec7bea4a64a576047
 
@@ -72,6 +73,8 @@ L1 blocks, without sacrificing decentralization, and with reduced costs.
 
 - Forbids in the code module to overwrite the code storage of an
   account. Execution forbid this. (!14317)
+- Tick model is updated with regards to FA deposits and withdrawals. (!14016)
+- Gas cost of XTZ/FA withdrawals is increased to prevent abuses. (!14016)
 
 ## Version 4f4457e2527cb227a90bb1c56d3a83f39c0f78fd
 
