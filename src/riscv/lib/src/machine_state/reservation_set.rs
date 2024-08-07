@@ -46,34 +46,50 @@ const fn align_address(address: u64, align: u64) -> u64 {
     address
 }
 
-impl<M: backend::Manager> ReservationSet<M> {
-    #[inline(always)]
-    fn write(&mut self, addr: u64) {
-        self.start_addr.write(addr)
-    }
-
-    #[inline(always)]
-    fn read(&self) -> u64 {
-        self.start_addr.read()
-    }
-
+impl<M: backend::ManagerBase> ReservationSet<M> {
     /// Bind the reservation set cell to the given allocated space
     pub fn bind(space: backend::AllocatedOf<ReservationSetLayout, M>) -> Self {
         Self { start_addr: space }
     }
 
     /// Unset any reservation
-    pub fn reset(&mut self) {
+    pub fn reset(&mut self)
+    where
+        M: backend::ManagerWrite,
+    {
         self.write(UNSET_VALUE);
     }
 
+    #[inline(always)]
+    fn write(&mut self, addr: u64)
+    where
+        M: backend::ManagerWrite,
+    {
+        self.start_addr.write(addr)
+    }
+
+    #[inline(always)]
+    fn read(&self) -> u64
+    where
+        M: backend::ManagerRead,
+    {
+        self.start_addr.read()
+    }
+
     /// Set the reservation set as `addr` aligned to the nearest double
-    pub fn set(&mut self, addr: u64) {
+    #[inline]
+    pub fn set(&mut self, addr: u64)
+    where
+        M: backend::ManagerWrite,
+    {
         self.write(align_address(addr, SIZE))
     }
 
     /// Check wether the `addr` is within the reservation set
-    pub fn test_and_unset(&mut self, addr: u64) -> bool {
+    pub fn test_and_unset(&mut self, addr: u64) -> bool
+    where
+        M: backend::ManagerReadWrite,
+    {
         let start_addr = self.read();
         // Regardless of success or failure, executing an SC.x instruction
         // invalidates any reservation held by this hart.
