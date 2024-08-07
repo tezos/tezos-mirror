@@ -24,7 +24,7 @@ use super::{
 use crate::{
     bits::{ones, u64, Bits64},
     machine_state::mode::Mode,
-    state_backend::{self as backend, Manager},
+    state_backend::{self as backend, ManagerRead},
     traps::{Exception, Interrupt, TrapContext, TrapKind},
 };
 use num_enum::TryFromPrimitive;
@@ -1052,7 +1052,7 @@ fn check_fs_access(csr: CSRegister, fs_field: ExtensionValue) -> Result<()> {
 /// Perform general checks on all read or write operations on a CSR.
 ///
 /// Examples of checks: Privilege checks, SATP trapping
-pub fn access_checks(csr: CSRegister, hart_state: &HartState<impl Manager>) -> Result<()> {
+pub fn access_checks(csr: CSRegister, hart_state: &HartState<impl ManagerRead>) -> Result<()> {
     let mode = hart_state.mode.read();
     check_privilege(csr, mode)?;
     let mstatus: MStatus = hart_state.csregisters.read(CSRegister::mstatus);
@@ -1068,13 +1068,16 @@ pub struct CSRegisters<M: backend::ManagerBase> {
     pub(super) interrupt_cache: InterruptsCache,
 }
 
-impl<M: backend::Manager> CSRegisters<M> {
+impl<M: backend::ManagerBase> CSRegisters<M> {
     /// Transform the write operation to account for shadow registers.
     /// (e.g. `sstatus` register)
     ///
     /// Sections 3.1.6 & 4.1.1
     #[inline(always)]
-    fn transform_write(&self, reg: CSRegister, value: CSRRepr) -> CSRRepr {
+    fn transform_write(&self, reg: CSRegister, value: CSRRepr) -> CSRRepr
+    where
+        M: backend::ManagerRead,
+    {
         // the update of a shadow register follows the steps:
         // 1. keep the shadowed fields from [value]
         // 2. all the other, non-shadowed fields are the underlying register
@@ -1125,7 +1128,10 @@ impl<M: backend::Manager> CSRegisters<M> {
     ///
     /// Sections 3.1.6 & 4.1.1
     #[inline(always)]
-    fn transform_read(&self, reg: CSRegister, source_reg_value: Option<CSRRepr>) -> CSRRepr {
+    fn transform_read(&self, reg: CSRegister, source_reg_value: Option<CSRRepr>) -> CSRRepr
+    where
+        M: backend::ManagerRead,
+    {
         let source_reg_value = source_reg_value.unwrap_or_else(|| {
             // If reg is a shadow, obtain the underlying ground truth for that register
             self.registers.general_raw_read(reg.into())
@@ -1145,7 +1151,10 @@ impl<M: backend::Manager> CSRegisters<M> {
 
     /// Write to a CSR.
     #[inline(always)]
-    pub fn write<V: Bits64>(&mut self, reg: CSRegister, value: V) {
+    pub fn write<V: Bits64>(&mut self, reg: CSRegister, value: V)
+    where
+        M: backend::ManagerReadWrite,
+    {
         if let Some(value) = reg.make_value_writable(value.to_bits()) {
             let value = self.transform_write(reg, value);
             let source_reg: RootCSRegister = reg.into();
@@ -1167,7 +1176,10 @@ impl<M: backend::Manager> CSRegisters<M> {
 
     /// Read from a CSR.
     #[inline(always)]
-    pub fn read<V: Bits64>(&self, reg: CSRegister) -> V {
+    pub fn read<V: Bits64>(&self, reg: CSRegister) -> V
+    where
+        M: backend::ManagerRead,
+    {
         // sstatus is just a restricted view of mstatus.
         // to maintain consistency, when reading sstatus
         // just return mstatus with only the sstatus fields, making the other fields 0
@@ -1176,7 +1188,10 @@ impl<M: backend::Manager> CSRegisters<M> {
 
     /// Replace the CSR value, returning the previous value.
     #[inline(always)]
-    pub fn replace<V: Bits64>(&mut self, reg: CSRegister, value: V) -> V {
+    pub fn replace<V: Bits64>(&mut self, reg: CSRegister, value: V) -> V
+    where
+        M: backend::ManagerReadWrite,
+    {
         if let Some(value) = reg.make_value_writable(value.to_bits()) {
             let value = self.transform_write(reg, value);
             let source_reg: RootCSRegister = reg.into();
@@ -1203,7 +1218,10 @@ impl<M: backend::Manager> CSRegisters<M> {
 
     /// Set bits in the CSR.
     #[inline(always)]
-    pub fn set_bits(&mut self, reg: CSRegister, bits: CSRRepr) -> CSRValue {
+    pub fn set_bits(&mut self, reg: CSRegister, bits: CSRRepr) -> CSRValue
+    where
+        M: backend::ManagerReadWrite,
+    {
         let old_value: CSRValue = self.read(reg);
         let new_value = old_value.repr() | bits;
         self.write(reg, new_value);
@@ -1212,7 +1230,10 @@ impl<M: backend::Manager> CSRegisters<M> {
 
     /// Clear bits in the CSR.
     #[inline(always)]
-    pub fn clear_bits(&mut self, reg: CSRegister, bits: CSRRepr) -> CSRValue {
+    pub fn clear_bits(&mut self, reg: CSRegister, bits: CSRRepr) -> CSRValue
+    where
+        M: backend::ManagerReadWrite,
+    {
         let old_value: CSRValue = self.read(reg);
         let new_value = old_value.repr() & !bits;
         self.write(reg, new_value);
@@ -1220,7 +1241,10 @@ impl<M: backend::Manager> CSRegisters<M> {
     }
 
     /// Get a mask of possible interrupts when in `current_mode`.
-    pub fn possible_interrupts(&mut self, current_mode: Mode) -> CSRRepr {
+    pub fn possible_interrupts(&self, current_mode: Mode) -> CSRRepr
+    where
+        M: backend::ManagerRead,
+    {
         // 3.1.6.1 Privilege and Global Interrupt-Enable Stack in mstatus register
         // "When a hart is executing in privilege mode x, interrupts are globally enabled when
         // xIE=1 and globally disabled when xIE=0.
@@ -1252,7 +1276,10 @@ impl<M: backend::Manager> CSRegisters<M> {
     }
 
     /// Determine the mode where this trap would go to.
-    pub fn get_trap_mode<TC: TrapContext>(&self, trap_source: &TC, current_mode: Mode) -> TrapMode {
+    pub fn get_trap_mode<TC: TrapContext>(&self, trap_source: &TC, current_mode: Mode) -> TrapMode
+    where
+        M: backend::ManagerRead,
+    {
         // Section 3.1.8: Machine Trap Delegation Registers (medeleg and mideleg)
         //
         // "By default, all traps at any privilege level are handled in machine mode"
@@ -1310,7 +1337,10 @@ impl<M: backend::Manager> CSRegisters<M> {
         &self,
         trap_source: &TC,
         trap_mode: TrapMode,
-    ) -> Address {
+    ) -> Address
+    where
+        M: backend::ManagerRead,
+    {
         let xtvec = self.read(match trap_mode {
             TrapMode::Supervisor => CSRegister::stvec,
             TrapMode::Machine => CSRegister::mtvec,
@@ -1322,7 +1352,7 @@ impl<M: backend::Manager> CSRegisters<M> {
 /// Layout for [CSRegisters]
 pub type CSRegistersLayout = CSRegisterValuesLayout;
 
-impl<M: backend::Manager> CSRegisters<M> {
+impl<M: backend::ManagerBase> CSRegisters<M> {
     /// Bind the CSR state to the allocated space.
     pub fn bind(space: backend::AllocatedOf<CSRegistersLayout, M>) -> Self {
         Self {
@@ -1332,15 +1362,22 @@ impl<M: backend::Manager> CSRegisters<M> {
     }
 
     /// Reset the control and state registers.
-    pub fn reset(&mut self) {
+    pub fn reset(&mut self)
+    where
+        M: backend::ManagerWrite,
+    {
         // Try to reset known CSRs to known default values.
         for reg in CSRegister::iter() {
-            self.write(reg, reg.default_value());
+            self.registers
+                .general_raw_write(reg.into(), reg.default_value());
         }
     }
 
     /// Check whether floating point extension is disabled.
-    pub fn floating_disabled(&self) -> bool {
+    pub fn floating_disabled(&self) -> bool
+    where
+        M: backend::ManagerRead,
+    {
         let mstatus: MStatus = self.read(CSRegister::mstatus);
         mstatus.fs() == ExtensionValue::Off
     }
