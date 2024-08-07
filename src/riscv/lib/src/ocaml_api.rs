@@ -24,13 +24,9 @@ pub struct State(NodePvm);
 #[ocaml::sig]
 pub struct Id(storage::Hash);
 
-#[ocaml::sig]
-pub struct Hooks(PvmHooks<'static>);
-
 ocaml::custom!(Repo);
 ocaml::custom!(State);
 ocaml::custom!(Id);
-ocaml::custom!(Hooks);
 
 #[derive(ocaml::FromValue, ocaml::ToValue, IntoPrimitive, TryFromPrimitive)]
 #[ocaml::sig("Evaluating | WaitingForInput | WaitingForMetadata")]
@@ -51,12 +47,6 @@ impl From<Status> for PvmStatus {
     fn from(item: Status) -> Self {
         PvmStatus::try_from(item as u8).expect("Invalid conversion")
     }
-}
-
-#[ocaml::func]
-#[ocaml::sig("unit -> hooks")]
-pub fn octez_riscv_default_pvm_hooks() -> Pointer<Hooks> {
-    Hooks(PvmHooks::default()).into()
 }
 
 #[ocaml::func]
@@ -144,25 +134,55 @@ pub fn octez_riscv_string_of_status(status: Status) -> String {
 }
 
 #[ocaml::func]
-#[ocaml::sig("state -> hooks -> state")]
-pub fn octez_riscv_compute_step(
-    state: Pointer<State>,
-    mut hooks: Pointer<Hooks>,
-) -> Pointer<State> {
-    State(state.as_ref().0.compute_step(&mut hooks.as_mut().0)).into()
+#[ocaml::sig("state -> state")]
+pub fn octez_riscv_compute_step(state: Pointer<State>) -> Pointer<State> {
+    let mut default_pvm_hooks = PvmHooks::default();
+    State(state.as_ref().0.compute_step(&mut default_pvm_hooks)).into()
 }
 
 #[ocaml::func]
-#[ocaml::sig("int64 -> state -> hooks -> (state * int64)")]
+#[ocaml::sig("state -> (int -> unit) -> state")]
+pub fn octez_riscv_compute_step_with_debug(
+    state: Pointer<State>,
+    printer: ocaml::Value,
+) -> Pointer<State> {
+    let printer = ocaml::function!(printer, (a: ocaml::Int) -> ());
+    let putchar = move |c: u8| {
+        let c = c as isize;
+        printer(gc, &c).expect("compute_step: putchar error")
+    };
+    let mut hooks = PvmHooks::new(putchar);
+    State(state.as_ref().0.compute_step(&mut hooks)).into()
+}
+
+#[ocaml::func]
+#[ocaml::sig("int64 -> state -> (state * int64)")]
 pub fn octez_riscv_compute_step_many(
     max_steps: usize,
     state: Pointer<State>,
-    mut hooks: Pointer<Hooks>,
 ) -> (Pointer<State>, i64) {
+    let mut default_pvm_hooks = PvmHooks::default();
     let (s, steps) = state
         .as_ref()
         .0
-        .compute_step_many(&mut hooks.as_mut().0, max_steps);
+        .compute_step_many(&mut default_pvm_hooks, max_steps);
+    (State(s).into(), steps)
+}
+
+#[ocaml::func]
+#[ocaml::sig("int64 -> state -> (int -> unit) -> (state * int64)")]
+pub fn octez_riscv_compute_step_many_with_debug(
+    max_steps: usize,
+    state: Pointer<State>,
+    printer: ocaml::Value,
+) -> (Pointer<State>, i64) {
+    let printer = ocaml::function!(printer, (a: ocaml::Int) -> ());
+    let putchar = move |c: u8| {
+        let c = c as isize;
+        printer(gc, &c).expect("compute_step_many: putchar error")
+    };
+    let mut hooks = PvmHooks::new(putchar);
+    let (s, steps) = state.as_ref().0.compute_step_many(&mut hooks, max_steps);
     (State(s).into(), steps)
 }
 
