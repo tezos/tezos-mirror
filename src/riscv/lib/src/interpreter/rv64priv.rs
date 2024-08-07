@@ -2,7 +2,8 @@ use crate::{
     machine_state::{
         bus::{main_memory, Address},
         csregisters::{
-            xstatus::{MPPValue, MStatus, SPPValue},
+            effects::handle_csr_effect,
+            xstatus::{MPPValue, SPPValue},
             CSRegister,
         },
         hart_state::HartState,
@@ -10,7 +11,7 @@ use crate::{
         registers::XRegister,
         AccessType, MachineState,
     },
-    state_backend as backend,
+    state_backend::{self as backend},
     traps::Exception,
 };
 use strum::IntoEnumIterator;
@@ -29,25 +30,21 @@ where
             Mode::Machine => (),
         }
 
-        let mstatus: MStatus = self.csregisters.read(CSRegister::mstatus);
+        let csrs = &mut self.csregisters;
         // get MPP
-        let prev_privilege = mstatus.mpp();
+        let prev_privilege = csrs.mstatus().mpp.read();
         // Set MIE to MPIE
-        let prev_mie = mstatus.mpie();
-        let mstatus = mstatus.with_mie(prev_mie);
+        let prev_mie = csrs.mstatus().mpie.read();
+        let effect = csrs.mstatus_mut().mie_write(prev_mie);
+        handle_csr_effect(csrs, effect);
         // set MPIE to 1
-        let mstatus = mstatus.with_mpie(true);
+        csrs.mstatus_mut().mpie.write(true);
         // Set MPP to least p.with_ivilege-mode supported
-        let mstatus = mstatus.with_mpp(MPPValue::User);
+        csrs.mstatus_mut().mpp.write(MPPValue::User);
         // Set MPRV to 0 when leaving M-mode. (MPP != M-mode)
-        let mstatus = if prev_privilege != MPPValue::Machine {
-            mstatus.with_mprv(false)
-        } else {
-            mstatus
-        };
-
-        // Commit the mstatus
-        self.csregisters.write(CSRegister::mstatus, mstatus);
+        if prev_privilege != MPPValue::Machine {
+            csrs.mstatus_mut().mprv.write(false)
+        }
 
         // Set the mode after handling mret, according to MPP read initially
         self.mode.write(match prev_privilege {
@@ -69,27 +66,25 @@ where
             Mode::User => return Err(Exception::IllegalInstruction),
             Mode::Supervisor | Mode::Machine => (),
         }
+        let csrs = &mut self.csregisters;
         // Section 3.1.6.5
         // SRET raises IllegalInstruction exception when TSR (Trap SRET) bit is on.
-        let mstatus: MStatus = self.csregisters.read(CSRegister::mstatus);
-        if mstatus.tsr() {
+        if csrs.mstatus().tsr.read() {
             return Err(Exception::IllegalInstruction);
         }
         // get SPP
-        let prev_privilege = mstatus.spp();
+        let prev_privilege = csrs.mstatus().spp.read();
         // Set SIE to SPIE
-        let prev_sie = mstatus.spie();
-        let mstatus = mstatus.with_sie(prev_sie);
+        let prev_sie = csrs.mstatus().spie.read();
+        let effect = csrs.mstatus_mut().sie_write(prev_sie);
+        handle_csr_effect(csrs, effect);
         // set SPIE to 1
-        let mstatus = mstatus.with_spie(true);
+        csrs.mstatus_mut().spie.write(true);
         // Set SPP to least privilege-mode supported
-        let mstatus = mstatus.with_spp(SPPValue::User);
+        csrs.mstatus_mut().spp.write(SPPValue::User);
         // Set MPRV to 0 when leaving M-mode. (SPP != M-mode)
         // Since SPP can only hold User / Supervisor, it is always set to 0
-        let mstatus = mstatus.with_mprv(false);
-
-        // Commit the mstatus
-        self.csregisters.write(CSRegister::mstatus, mstatus);
+        csrs.mstatus_mut().mprv.write(false);
 
         // Set the mode after handling sret, according to SPP read initially
         self.mode.write(match prev_privilege {
@@ -128,8 +123,7 @@ where
         self.translation_cache.invalidate(AccessType::iter());
 
         let mode = self.hart.mode.read();
-        let mstatus: MStatus = self.hart.csregisters.read(CSRegister::mstatus);
-        let tvm = mstatus.tvm();
+        let tvm = self.hart.csregisters.mstatus().tvm.read();
 
         if tvm && mode == Mode::Supervisor {
             return Err(Exception::IllegalInstruction);

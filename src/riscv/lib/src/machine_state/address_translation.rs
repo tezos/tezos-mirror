@@ -6,15 +6,16 @@ use super::{
     bus::{main_memory, Address, AddressableRead, Bus, OutOfBounds},
     csregisters::{
         satp::{Satp, SvLength, TranslationAlgorithm},
-        xstatus::MStatus,
         CSRRepr, CSRegister,
     },
     mode::Mode,
     MachineState,
 };
 use crate::{
-    bits::Bits64, machine_state::address_translation::pte::PageTableEntry,
-    state_backend as backend, traps::Exception,
+    bits::Bits64,
+    machine_state::address_translation::pte::PageTableEntry,
+    state_backend::{self as backend},
+    traps::Exception,
 };
 use strum::{EnumCount, EnumIter};
 
@@ -203,9 +204,12 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::ManagerBase> MachineState<ML
     where
         M: backend::ManagerRead,
     {
-        let mstatus: MStatus = self.hart.csregisters.read(CSRegister::mstatus);
+        let mstatus = self.hart.csregisters.mstatus();
+
         match access_type {
-            AccessType::Store | AccessType::Load if mstatus.mprv() => mstatus.mpp().into(),
+            AccessType::Store | AccessType::Load if mstatus.mprv.read() => {
+                mstatus.mpp.read().into()
+            }
             _ => mode,
         }
     }

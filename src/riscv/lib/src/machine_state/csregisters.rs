@@ -1056,10 +1056,9 @@ fn check_fs_access(csr: CSRegister, fs_field: ExtensionValue) -> Result<()> {
 pub fn access_checks(csr: CSRegister, hart_state: &HartState<impl ManagerRead>) -> Result<()> {
     let mode = hart_state.mode.read();
     check_privilege(csr, mode)?;
-    let mstatus: MStatus = hart_state.csregisters.read(CSRegister::mstatus);
-    let tvm = mstatus.tvm();
+    let tvm = hart_state.csregisters.mstatus().tvm.read();
     check_satp_access(csr, tvm)?;
-    let fs = mstatus.fs();
+    let fs = hart_state.csregisters.mstatus().fs.read();
     check_fs_access(csr, fs)
 }
 
@@ -1243,21 +1242,17 @@ impl<M: backend::ManagerBase> CSRegisters<M> {
         match current_mode {
             Mode::User => Interrupt::SUPERVISOR_BIT_MASK | Interrupt::MACHINE_BIT_MASK,
             Mode::Supervisor => {
-                let mstatus: MStatus = self.read(CSRegister::mstatus);
-                let ie_supervisor = match mstatus.sie() {
+                let ie_supervisor = match self.mstatus().sie_read() {
                     true => self.read(CSRegister::sie),
                     false => 0,
                 };
 
                 ie_supervisor | Interrupt::MACHINE_BIT_MASK
             }
-            Mode::Machine => {
-                let mstatus: MStatus = self.read(CSRegister::mstatus);
-                match mstatus.mie() {
-                    true => self.read(CSRegister::mie),
-                    false => 0,
-                }
-            }
+            Mode::Machine => match self.mstatus().mie_read() {
+                true => self.read(CSRegister::mie),
+                false => 0,
+            },
         }
     }
 
@@ -1363,8 +1358,8 @@ impl<M: backend::ManagerBase> CSRegisters<M> {
     where
         M: backend::ManagerRead,
     {
-        let mstatus: MStatus = self.read(CSRegister::mstatus);
-        mstatus.fs() == ExtensionValue::Off
+        let fs = self.mstatus().fs.read();
+        fs == ExtensionValue::Off
     }
 }
 
@@ -1372,14 +1367,17 @@ impl<M: backend::ManagerBase> CSRegisters<M> {
 #[allow(clippy::identity_op)]
 mod tests {
     use crate::{
-        backend_test, create_backend, create_state,
+        backend_test,
+        bits::Bits64,
+        create_backend, create_state,
         machine_state::{
             backend::{
                 tests::{test_determinism, ManagerFor},
                 Backend, Layout,
             },
             csregisters::{
-                values::CSRValue, CSRRepr, CSRegister, CSRegisters, CSRegistersLayout, Exception,
+                values::CSRValue, xstatus::MStatus, CSRRepr, CSRegister, CSRegisters,
+                CSRegistersLayout, Exception,
             },
             mode::Mode,
         },
@@ -1598,9 +1596,9 @@ mod tests {
             1u64 << 37 | 0b01 << 34 | 0b11 << 32 | 0b11 << 15 | 0b11 << 11 | 1 << 8 | 1 << 7,
         );
         // SXL, UXL should be set to MXL (WARL), SD bit should be 1
-        let read_mstatus: CSRValue = csrs.read(CSRegister::mstatus);
+        let read_mstatus: MStatus = csrs.read(CSRegister::mstatus);
         assert_eq!(
-            read_mstatus.repr(),
+            read_mstatus.to_bits(),
             1u64 << 63
                 | 1 << 37
                 | 0b10 << 34
