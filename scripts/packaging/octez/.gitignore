@@ -33,7 +33,6 @@ debian/substvars
 binaries
 manpages/octez-node.1
 manpages/octez-dal-node.1
-manpages/octez-proxy-server.1
 zcash-params
 
 debian/octez-client/

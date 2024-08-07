@@ -5,7 +5,6 @@
 
 override_dh_auto_build:
 	binaries/octez-node --help=groff > manpages/octez-node.1
-	binaries/octez-proxy-server --help=groff > manpages/octez-proxy-server.1
 	binaries/octez-dal-node --help=groff > manpages/octez-dal-node.1
 	dh_auto_build --parallel
 
