@@ -5093,6 +5093,102 @@ let test_trace_transaction_call_trace =
       ~error_msg:"Wrong gas, expected %R but got %L") ;
   unit
 
+let test_trace_transaction_calltracer_all_types =
+  register_all
+    ~kernels:[Latest]
+    ~tags:["evm"; "rpc"; "trace"; "call_trace"; "types"]
+    ~title:
+      "debug_traceTransaction with calltracer can produce all the call types"
+    ~da_fee:Wei.zero
+  @@ fun {sc_rollup_node; sequencer; client; proxy; _} _protocol ->
+  let endpoint = Evm_node.endpoint sequencer in
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let* call_types = Solidity_contracts.call_types () in
+  let* () = Eth_cli.add_abi ~label:call_types.label ~abi:call_types.abi () in
+  let* contract_address, _ =
+    send_transaction_to_sequencer
+      (fun () ->
+        Eth_cli.deploy
+          ~source_private_key:sender.Eth_account.private_key
+          ~endpoint
+          ~abi:call_types.label
+          ~bin:call_types.bin)
+      sequencer
+  in
+  let* () =
+    repeat 2 (fun () ->
+        next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client)
+  in
+  let* () = bake_until_sync ~sequencer ~sc_rollup_node ~proxy ~client () in
+  let* tx_hash =
+    send_transaction_to_sequencer
+      (Eth_cli.contract_send
+         ~source_private_key:sender.private_key
+         ~endpoint
+         ~abi_label:call_types.label
+         ~address:contract_address
+         ~method_call:"testProduceOpcodes()")
+      sequencer
+  in
+  let* () =
+    repeat 2 (fun () ->
+        next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client)
+  in
+  let* () = bake_until_sync ~sequencer ~sc_rollup_node ~proxy ~client () in
+  let*@ trace_result =
+    Rpc.trace_transaction
+      ~tracer:"callTracer"
+      ~transaction_hash:tx_hash
+      ~tracer_config:[("withLog", `Bool false); ("onlyTopCall", `Bool false)]
+      sequencer
+  in
+  let call_list = JSON.(trace_result |-> "calls" |> as_list) in
+  (* Initial call is of type CALL *)
+  Check.(
+    (JSON.(trace_result |-> "type" |> as_string) = "CALL")
+      string
+      ~error_msg:"Wrong type, expected %R but got %L") ;
+  (* The call list should be of size 6, we produce the following opcodes:
+     CREATE / CREATE2 / CALL / DELEGATECALL / STATICCALL / CALLCODE *)
+  Check.(
+    (List.length call_list = 6)
+      int
+      ~error_msg:"Wrong call list size, expected %R but got %L") ;
+  List.iteri
+    (fun position call ->
+      (if position = 0 then
+         Check.(
+           (JSON.(call |-> "type" |> as_string) = "CREATE")
+             string
+             ~error_msg:"Wrong type, expected %R but got %L")) ;
+      (if position = 1 then
+         Check.(
+           (JSON.(call |-> "type" |> as_string) = "CREATE2")
+             string
+             ~error_msg:"Wrong type, expected %R but got %L")) ;
+      (if position = 2 then
+         Check.(
+           (JSON.(call |-> "type" |> as_string) = "CALL")
+             string
+             ~error_msg:"Wrong type, expected %R but got %L")) ;
+      (if position = 3 then
+         Check.(
+           (JSON.(call |-> "type" |> as_string) = "DELEGATECALL")
+             string
+             ~error_msg:"Wrong type, expected %R but got %L")) ;
+      (if position = 4 then
+         Check.(
+           (JSON.(call |-> "type" |> as_string) = "STATICCALL")
+             string
+             ~error_msg:"Wrong type, expected %R but got %L")) ;
+      if position = 5 then
+        Check.(
+          (JSON.(call |-> "type" |> as_string) = "CALLCODE")
+            string
+            ~error_msg:"Wrong type, expected %R but got %L"))
+    call_list ;
+  unit
+
 let test_miner =
   let sequencer_pool_address =
     String.lowercase_ascii "0x8aaD6553Cf769Aa7b89174bE824ED0e53768ed70"
@@ -5749,4 +5845,5 @@ let () =
   test_rpc_mode_while_block_are_produced protocols ;
   test_trace_transaction_call_trace protocols ;
   test_relay_restricted_rpcs protocols ;
-  test_batch_limit_size_rpc protocols
+  test_batch_limit_size_rpc protocols ;
+  test_trace_transaction_calltracer_all_types protocols
