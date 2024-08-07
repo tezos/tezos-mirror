@@ -5189,6 +5189,73 @@ let test_trace_transaction_calltracer_all_types =
     call_list ;
   unit
 
+let test_trace_transaction_call_tracer_with_logs =
+  register_all
+    ~kernels:[Latest]
+    ~tags:["evm"; "rpc"; "trace"; "call_trace"; "with_logs"]
+    ~title:"debug_traceTransaction with calltracer can produce a call with logs"
+    ~da_fee:Wei.zero
+  @@ fun {sc_rollup_node; sequencer; client; proxy; _} _protocol ->
+  let endpoint = Evm_node.endpoint sequencer in
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let* simple_logger = Solidity_contracts.simple_logger () in
+  let* () =
+    Eth_cli.add_abi ~label:simple_logger.label ~abi:simple_logger.abi ()
+  in
+  let* contract_address, _ =
+    send_transaction_to_sequencer
+      (fun () ->
+        Eth_cli.deploy
+          ~source_private_key:sender.Eth_account.private_key
+          ~endpoint
+          ~abi:simple_logger.label
+          ~bin:simple_logger.bin)
+      sequencer
+  in
+  let* () =
+    repeat 2 (fun () ->
+        next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client)
+  in
+  let* () = bake_until_sync ~sequencer ~sc_rollup_node ~proxy ~client () in
+  let value = 251197 in
+  let* tx_hash =
+    send_transaction_to_sequencer
+      (Eth_cli.contract_send
+         ~source_private_key:sender.private_key
+         ~endpoint
+         ~abi_label:simple_logger.label
+         ~address:contract_address
+         ~method_call:(Format.sprintf "logValue(%d)" value))
+      sequencer
+  in
+  let* () =
+    repeat 2 (fun () ->
+        next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client)
+  in
+  let* () = bake_until_sync ~sequencer ~sc_rollup_node ~proxy ~client () in
+  let*@ trace_result =
+    Rpc.trace_transaction
+      ~tracer:"callTracer"
+      ~transaction_hash:tx_hash
+      ~tracer_config:[("withLog", `Bool true)]
+      sequencer
+  in
+  let logs = JSON.(trace_result |-> "logs" |> as_list) in
+  Check.(
+    (List.length @@ logs = 1)
+      int
+      ~error_msg:"Wrong logs size, expected %R but got %L") ;
+  let log = List.hd logs in
+  let topics = JSON.(log |-> "topics" |> as_list) in
+  (* The first topic is the selector of the function which isn't relevant for the test.
+     We will match the second topic which is the value that was emitted, i.e: 251197. *)
+  let topic_value = JSON.(List.nth topics 1 |> as_string) in
+  Check.(
+    (topic_value = add_0x @@ hex_256_of_int value)
+      string
+      ~error_msg:"Wrong topic value, expected %R but got %L") ;
+  unit
+
 let test_miner =
   let sequencer_pool_address =
     String.lowercase_ascii "0x8aaD6553Cf769Aa7b89174bE824ED0e53768ed70"
@@ -5846,4 +5913,5 @@ let () =
   test_trace_transaction_call_trace protocols ;
   test_relay_restricted_rpcs protocols ;
   test_batch_limit_size_rpc protocols ;
-  test_trace_transaction_calltracer_all_types protocols
+  test_trace_transaction_calltracer_all_types protocols ;
+  test_trace_transaction_call_tracer_with_logs protocols
