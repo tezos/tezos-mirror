@@ -5256,6 +5256,89 @@ let test_trace_transaction_call_tracer_with_logs =
       ~error_msg:"Wrong topic value, expected %R but got %L") ;
   unit
 
+let test_trace_transaction_call_trace_certain_depth =
+  register_all
+    ~kernels:[Latest]
+    ~tags:["evm"; "rpc"; "trace"; "call_trace"; "depth"]
+    ~title:"debug_traceTransaction with calltracer to see diffuclt depth"
+    ~da_fee:Wei.zero
+  @@ fun {sc_rollup_node; sequencer; client; proxy; _} _protocol ->
+  let endpoint = Evm_node.endpoint sequencer in
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let* call_tracer_depth = Solidity_contracts.call_tracer_depth () in
+  let* () =
+    Eth_cli.add_abi ~label:call_tracer_depth.label ~abi:call_tracer_depth.abi ()
+  in
+  let* contract_address, _ =
+    send_transaction_to_sequencer
+      (fun () ->
+        Eth_cli.deploy
+          ~source_private_key:sender.Eth_account.private_key
+          ~endpoint
+          ~abi:call_tracer_depth.label
+          ~bin:call_tracer_depth.bin)
+      sequencer
+  in
+  let* () =
+    repeat 2 (fun () ->
+        next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client)
+  in
+  let* () = bake_until_sync ~sequencer ~sc_rollup_node ~proxy ~client () in
+  let* tx_hash =
+    send_transaction_to_sequencer
+      (Eth_cli.contract_send
+         ~source_private_key:sender.private_key
+         ~endpoint
+         ~abi_label:call_tracer_depth.label
+         ~address:contract_address
+         ~method_call:"startDepth()")
+      sequencer
+  in
+  let* () =
+    repeat 2 (fun () ->
+        next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client)
+  in
+  let*@ trace_result =
+    Rpc.trace_transaction
+      ~tracer:"callTracer"
+      ~transaction_hash:tx_hash
+      ~tracer_config:[("withLog", `Bool false); ("onlyTopCall", `Bool false)]
+      sequencer
+  in
+  let check_and_get_subcalls opcode size json_value =
+    Check.(
+      (JSON.(json_value |-> "type" |> as_string) = opcode)
+        string
+        ~error_msg:"Wrong type, expected %R but got %L") ;
+
+    let call_list = JSON.(json_value |-> "calls" |> as_list) in
+    Check.(
+      (List.length call_list = size)
+        int
+        ~error_msg:"Wrong call list size, expected %R but got %L") ;
+    return call_list
+  in
+  (* The call list should be of size 4, 3 create and one call in depth *)
+  let* depth_call_list = check_and_get_subcalls "CALL" 4 trace_result in
+  (* Check that in a CREATE we can make a CALL *)
+  let first_contract = List.nth depth_call_list 1 in
+  let* create_call_list = check_and_get_subcalls "CREATE" 1 first_contract in
+  let call_in_create = List.hd create_call_list in
+  let* _ = check_and_get_subcalls "CALL" 0 call_in_create in
+  (* Now check the last CALL of the first list that makes multiple calls
+     in depth *)
+  let depth_0 = List.nth depth_call_list 3 in
+  let* depth_1 = check_and_get_subcalls "CALL" 1 depth_0 in
+  let* depth_2 = check_and_get_subcalls "CALL" 2 (List.hd depth_1) in
+  let depth_2_1, depth_2_2 = (List.nth depth_2 0, List.nth depth_2 0) in
+  (* first branch *)
+  let* depth_3_1 = check_and_get_subcalls "CALL" 1 depth_2_1 in
+  let* _ = check_and_get_subcalls "CALL" 0 (List.hd depth_3_1) in
+  (* second branch *)
+  let* depth_3_2 = check_and_get_subcalls "CALL" 1 depth_2_2 in
+  let* _ = check_and_get_subcalls "CALL" 0 (List.hd depth_3_2) in
+  unit
+
 let test_miner =
   let sequencer_pool_address =
     String.lowercase_ascii "0x8aaD6553Cf769Aa7b89174bE824ED0e53768ed70"
@@ -5914,4 +5997,5 @@ let () =
   test_relay_restricted_rpcs protocols ;
   test_batch_limit_size_rpc protocols ;
   test_trace_transaction_calltracer_all_types protocols ;
-  test_trace_transaction_call_tracer_with_logs protocols
+  test_trace_transaction_call_tracer_with_logs protocols ;
+  test_trace_transaction_call_trace_certain_depth protocols
