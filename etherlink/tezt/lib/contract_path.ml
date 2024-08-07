@@ -21,7 +21,8 @@ let fa_withdrawal_abi_path () =
 
 let delayed_path () =
   Base.(
-    project_root // "etherlink/tezos_contracts/delayed_transaction_bridge.tz")
+    project_root
+    // "etherlink/tezos_contracts/chunked_delayed_transaction_bridge.tz")
 
 let ticket_router_tester_path () =
   Base.(

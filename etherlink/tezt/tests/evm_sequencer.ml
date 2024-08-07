@@ -1398,6 +1398,7 @@ let test_delayed_transfer_is_included =
 
 let test_largest_delayed_transfer_is_included =
   register_all
+    ~kernels:[Kernel.Latest]
     ~da_fee:arb_da_fee_for_delayed_inbox
     ~tags:["evm"; "sequencer"; "delayed_inbox"; "inclusion"]
     ~title:"Largest possible delayed transaction is included"
@@ -1413,7 +1414,7 @@ let test_largest_delayed_transfer_is_included =
              _protocol ->
   let _endpoint = Evm_node.endpoint sequencer in
   (* This is the largest ethereum transaction we transfer via the bridge contract. *)
-  let max_data = String.make 7818 '0' in
+  let max_data = String.make 64896 '0' in
   let* transfer_that_fits =
     Cast.craft_tx
       ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
