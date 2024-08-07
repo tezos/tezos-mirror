@@ -89,10 +89,8 @@ impl<T: super::Elem, const LEN: usize> Layout for Array<T, LEN> {
 /// Usage: Provide a struct with each field holding a layout.
 ///
 /// ```
-/// use octez_riscv::*;
 /// use octez_riscv::state_backend::*;
 /// use octez_riscv::machine_state::csregisters::CSRRepr;
-/// use octez_riscv::machine_state::mode::Mode;
 /// use octez_riscv::struct_layout;
 ///
 /// struct_layout!(
@@ -115,19 +113,19 @@ macro_rules! struct_layout {
             }
 
             pub struct [<$layout_t Placed>] {
-                $( $field_name: PlacedOf<$cell_repr> ),+
+                $( $field_name: $crate::state_backend::PlacedOf<$cell_repr> ),+
             }
 
             pub struct [<$layout_t Allocated>]<M: $crate::state_backend::ManagerBase> {
                 $( $field_name: AllocatedOf<$cell_repr, M> ),+
             }
 
-            impl Layout for $layout_t {
+            impl $crate::state_backend::Layout for $layout_t {
                 type Placed = [<$layout_t Placed>];
 
                 type Allocated<M: $crate::state_backend::ManagerBase> = [<$layout_t Allocated>]<M>;
 
-                fn place_with(alloc: &mut Choreographer) -> Self::Placed {
+                fn place_with(alloc: &mut $crate::state_backend::Choreographer) -> Self::Placed {
                     [<$layout_t Placed>] {
                         $($field_name: alloc.alloc()),+
                     }
@@ -138,7 +136,7 @@ macro_rules! struct_layout {
                     placed: Self::Placed
                 ) -> Self::Allocated<M> {
                     Self::Allocated {
-                        $($field_name: <$cell_repr as Layout>::allocate(
+                        $($field_name: <$cell_repr as $crate::state_backend::Layout>::allocate(
                             backend, placed.$field_name
                         )),+
                     }

@@ -2,6 +2,8 @@
 //
 // SPDX-License-Identifier: MIT
 
+mod mstatus;
+
 use super::root::RootCSRegister;
 use crate::struct_layout;
 use crate::{
