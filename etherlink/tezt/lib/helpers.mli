@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
-(* Copyright (c) 2023 Functori <contact@functori.com>                        *)
+(* Copyright (c) 2023-2024 Functori <contact@functori.com>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -31,6 +31,9 @@ val evm_type : string
     (little endian).
     NB: Ints greater than 2 bytes are truncated. *)
 val u16_to_bytes : int -> string
+
+(** [add_0x s] will add the hexa prefix `0x` before the given string. *)
+val add_0x : string -> string
 
 (** [mapping_position key map_position] computes the storage position for
     a value in a mapping given its [key] and the position of the map
