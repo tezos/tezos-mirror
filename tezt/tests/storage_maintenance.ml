@@ -39,7 +39,7 @@ let wait_for_context_split node ~expected =
 let test_context_pruning_call =
   Protocol.register_test
     ~__FILE__
-    ~title:(Format.asprintf "storage context pruning call")
+    ~title:"storage context pruning call"
     ~tags:[team; "storage"; "maintenance"; "context"; "pruning"]
   @@ fun protocol ->
   let* node1, client =
@@ -86,7 +86,7 @@ let wait_for_complete_storage_maintenance node target =
 let test_disabled_maintenance_delay =
   Protocol.register_test
     ~__FILE__
-    ~title:(Format.asprintf "storage maintenance disabled delay")
+    ~title:"storage maintenance disabled delay"
     ~tags:[team; "storage"; "maintenance"; "delay"; "disabled"]
   @@ fun protocol ->
   let* node =
@@ -139,7 +139,7 @@ let test_disabled_maintenance_delay =
 let test_custom_maintenance_delay =
   Protocol.register_test
     ~__FILE__
-    ~title:(Format.asprintf "storage maintenance custom delay")
+    ~title:"storage maintenance custom delay"
     ~tags:[team; "storage"; "maintenance"; "delay"; "custom"]
   @@ fun protocol ->
   let custom_delay = 2 in
@@ -264,7 +264,132 @@ let test_custom_maintenance_delay =
   let* () = wait_delayed_storage_maintenance_C in
   unit
 
+(* The exclusion and limit are computed according to the
+   `Lib_shell_services.Storage_maintenance.default_auto_delay`
+   function. *)
+let check_auto_delay_value ~blocks_per_cycle ~target ~level =
+  let exclusion = max 1 (blocks_per_cycle / 20) in
+  let limit = blocks_per_cycle / 2 in
+  let generated_delay = target - level in
+  Check.(
+    (generated_delay >= exclusion)
+      int
+      ~error_msg:"delay is %L but is expected to be above %R") ;
+  Check.(
+    (generated_delay <= limit)
+      int
+      ~error_msg:"delay is %L but is expected to be below %R") ;
+  unit
+
+let wait_for_auto_delayed_maintenance node =
+  let filter json =
+    let mode = JSON.(json |-> "mode" |> as_string) in
+    let target = JSON.(json |-> "level" |> as_int) in
+    if mode = "auto" then Some target else None
+  in
+  Node.wait_for node "start_delayed_maintenance.v0" filter
+
+let get_blocks_per_cycle client =
+  let* constants =
+    Client.RPC.call client @@ RPC.get_chain_block_context_constants ()
+  in
+  let blocks_per_cycle = JSON.(constants |-> "blocks_per_cycle" |> as_int) in
+  return blocks_per_cycle
+
+(* This test aims to check the behaviour of the auto mode of the
+   storage maintenance. As this "auto" parameter introduces
+   randomness, the test will run several steps to, hopefully, have
+   various delayed values.
+   A step consist in:
+   - bake several blocks to trigger a delayed maintenance,
+   - check that the delay respects the constraints,
+   - bake several blocks to actually merge.
+*)
+let test_auto_maintenance_delay =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"storage maintenance auto delay"
+    ~tags:[team; "storage"; "maintenance"; "delay"; "auto"]
+  @@ fun protocol ->
+  let* delayed_node =
+    Node.init
+      ~name:"delayed_node"
+      ~event_sections_levels:[("node.store", `Info)]
+      Node.[Synchronisation_threshold 0; Storage_maintenance_delay "auto"]
+  in
+  let* client = Client.init ~endpoint:(Node delayed_node) () in
+  let* () =
+    Client.activate_protocol_and_wait ~protocol ~node:delayed_node client
+  in
+  let* blocks_per_cycle = get_blocks_per_cycle client in
+  let step cpt ~next_cycle_dist =
+    Log.info "Starting step %d" cpt ;
+    let wait_context_split =
+      wait_for_context_split delayed_node ~expected:true
+    in
+    let wait_delayed_maintenance =
+      wait_for_auto_delayed_maintenance delayed_node
+    in
+    Log.info "Bake %d blocks to trigger a store merge" next_cycle_dist ;
+    let* () = bake_blocks delayed_node client ~blocks_to_bake:next_cycle_dist in
+    Log.info "Wait for the maintenance delay event" ;
+    let* next_target = wait_delayed_maintenance in
+    let merge_target_level = (cpt * blocks_per_cycle) + 1 in
+    let merge_trigger_level = ((cpt + 1) * blocks_per_cycle) + 1 in
+    (* We must ensure that the context split is not delayed. Indeed, for
+       the sake of performance, the context split aims to be called on the
+       block candidate to a future GC. See
+       [Lib_context.Sigs.Context.split] for more details. *)
+    Log.info "Waiting for the context split event" ;
+    let* split_level = wait_context_split in
+    Check.(
+      (merge_target_level = split_level)
+        int
+        ~error_msg:"split level was expected on level %L but found on %R") ;
+    let* () =
+      check_auto_delay_value
+        ~blocks_per_cycle
+        ~target:next_target
+        ~level:merge_trigger_level
+    in
+    let* current_level = Node.get_level delayed_node in
+    let just_before_delayed_trigger_level = next_target - current_level - 1 in
+    Log.info
+      "Bake enough blocks (%d) to be 1 block before the trigger of the delayed \
+       maintenance"
+      just_before_delayed_trigger_level ;
+    let* () =
+      bake_blocks
+        delayed_node
+        client
+        ~blocks_to_bake:just_before_delayed_trigger_level
+    in
+    let wait_merge =
+      wait_for_complete_storage_maintenance delayed_node merge_target_level
+    in
+    Log.info "Bake 1 block to trigger the actual delayed maintenance" ;
+    let* () = bake_blocks delayed_node client ~blocks_to_bake:1 in
+    let* () = wait_merge in
+    let to_next_cycle =
+      blocks_per_cycle - just_before_delayed_trigger_level - 1
+    in
+    Log.info "Step %d finished" cpt ;
+    return to_next_cycle
+  in
+  let run_steps nb =
+    let rec loop cpt acc =
+      if cpt >= nb then unit
+      else
+        let* acc = step cpt ~next_cycle_dist:acc in
+        loop (cpt + 1) acc
+    in
+    loop 0 8
+  in
+  (* Run several steps to get various "auto" (random) delays. *)
+  run_steps 3
+
 let register ~protocols =
   test_context_pruning_call protocols ;
   test_disabled_maintenance_delay protocols ;
-  test_custom_maintenance_delay protocols
+  test_custom_maintenance_delay protocols ;
+  test_auto_maintenance_delay protocols
