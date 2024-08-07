@@ -317,3 +317,10 @@ let call_types () =
     ~label:"call_types"
     ~contract:"TestCallTypes"
     ~evm_version:"shanghai"
+
+let simple_logger () =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/simple_logger.sol")
+    ~label:"simple_logger"
+    ~contract:"SimpleLogger"
+    ~evm_version:"shanghai"
