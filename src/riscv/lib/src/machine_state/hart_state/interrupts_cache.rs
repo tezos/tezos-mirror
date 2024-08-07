@@ -10,7 +10,7 @@ use crate::{
 };
 
 /// Implements the Cache behaviour for HartState
-impl<M: backend::Manager> HartState<M> {
+impl<M: backend::ManagerBase> HartState<M> {
     /// Update the interrupt cache. Updates are to the entire cache (mode, possible, pending), cannot be partial.
     pub(super) fn update_interrupts_cache(
         &mut self,
