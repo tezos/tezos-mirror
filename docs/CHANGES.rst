@@ -2842,9 +2842,6 @@ Proxy server
    up the protocol from the backing node when it starts. Proxy servers
    can be started and destroyed at will, making them easy to deploy.
 
-   Please refer to the :doc:`online documentation <user/proxy-server>`
-   for further details.
-
 Version 9.7
 ===========
 

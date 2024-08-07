@@ -63,15 +63,6 @@ For more details on the node invocation and configuration, see :doc:`../user/nod
 
 .. include:: ../api/octez-node.txt
 
-.. _proxy_server_manual:
-
-Proxy server manual
-===================
-
-The command line of the :doc:`Octez proxy server <../user/proxy-server>` is documented in Unix ``man`` format, as shown below. You can also obtain this manual by running ``octez-proxy-server --help``.
-
-.. include:: ../api/octez-proxy-server.txt
-
 .. _dac_node_manual:
 
 DAC node manual (Experimental)
