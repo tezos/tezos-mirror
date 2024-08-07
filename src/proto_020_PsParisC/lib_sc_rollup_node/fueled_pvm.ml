@@ -122,6 +122,9 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
     in
     let reveal_builtins request =
       match Sc_rollup.Wasm_2_0_0PVM.decode_reveal request with
+      | Reveal_raw_data hash
+        when Sc_rollup_reveal_hash.(equal hash well_known_reveal_hash) ->
+          Lwt.return Sc_rollup_reveal_hash.well_known_reveal_preimage
       | Reveal_raw_data hash -> (
           let*! data =
             get_reveal

@@ -6651,12 +6651,6 @@ module Tx_kernel_e2e = struct
           (Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) pvm_name)
         Constant.WASM.dal_echo_kernel
     in
-    (* The kernel is badly written and may ask pages in negative
-       levels. We ensure it is not possible by baking enough
-       blocks. *)
-    let* () =
-      bake_for ~count:parameters.Dal.Parameters.attestation_lag client
-    in
     let* sc_rollup_address =
       Client.Sc_rollup.originate
         ~burn_cap:Tez.(of_int 9999999)

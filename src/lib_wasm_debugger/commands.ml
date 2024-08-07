@@ -372,16 +372,19 @@ let fetch_preimage_from_remote endpoint hash_hex =
       raise Not_found
 
 let reveal_preimage_builtin config retries hash =
-  let hex = Tezos_protocol_alpha.Protocol.Sc_rollup_reveal_hash.to_hex hash in
-  let fetch_from_remote =
-    Option.map fetch_preimage_from_remote config.Config.preimage_endpoint
-  in
-  read_data
-    ~kind:"Preimage"
-    ~directory:config.Config.preimage_directory
-    ~filename:hex
-    ?fetch_from_remote
-    retries
+  let open Tezos_protocol_alpha.Protocol.Sc_rollup_reveal_hash in
+  if hash = well_known_reveal_hash then Lwt.return well_known_reveal_preimage
+  else
+    let hex = to_hex hash in
+    let fetch_from_remote =
+      Option.map fetch_preimage_from_remote config.Config.preimage_endpoint
+    in
+    read_data
+      ~kind:"Preimage"
+      ~directory:config.Config.preimage_directory
+      ~filename:hex
+      ?fetch_from_remote
+      retries
 
 let request_dal_page config retries published_level slot_index page_index =
   let open Tezos_protocol_alpha.Protocol in
