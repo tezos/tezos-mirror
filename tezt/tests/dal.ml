@@ -60,6 +60,42 @@ module Dal_RPC = struct
   include Dal.RPC.Local
 end
 
+let read_dir dir =
+  let* dir = Lwt_unix.opendir dir in
+  let rec read_files acc =
+    Lwt.catch
+      (fun () ->
+        let* entry = Lwt_unix.readdir dir in
+        match entry with
+        | "." | ".." | ".lock" -> read_files acc
+        | file -> read_files (file :: acc))
+      (function
+        | End_of_file ->
+            let* () = Lwt_unix.closedir dir in
+            return acc
+        | exn -> Lwt.reraise exn)
+  in
+  read_files []
+
+(* This function checks that in the skip list store of the given [dal_node]
+   (1) the list of files in the 'hashes' sub-directory coincides with
+   [expected_levels] (up to ordering) and (2) as many files in the 'cells'
+   sub-directory as the [(List.length expected_levels) * number_of_slots]. *)
+let check_skip_list_store dal_node ~number_of_slots ~expected_levels =
+  let store_dir = sf "%s/store/skip_list_store/" (Dal_node.data_dir dal_node) in
+  let* hashes = read_dir (store_dir ^ "hashes") in
+  Check.(
+    List.sort String.compare hashes = List.sort String.compare expected_levels)
+    ~__LOC__
+    Check.(list string)
+    ~error_msg:"Expected hashes directory content: %R. Got: %L" ;
+  let* cells = read_dir (store_dir ^ "cells") in
+  Check.(List.length cells = number_of_slots * List.length expected_levels)
+    ~__LOC__
+    Check.int
+    ~error_msg:"Expected %R cells, got %L" ;
+  unit
+
 (* Wait for 'new_head' event. Note that the DAL node processes a new head with a
    delay of one level. Also, this event is emitted before block processing. *)
 let wait_for_layer1_head dal_node level =
@@ -4446,6 +4482,12 @@ let test_dal_node_crawler_reconnects_to_l1 _protocol _dal_parameters _cryptobox
      late. *)
   let* () = bake_for ~count:num_blocks client in
 
+  let* head_level = Client.level client in
+  (* before the crawler is started, the bootstrap phase advances the
+     [last_processed_level] (so [last_notified_level] to the following
+     value: *)
+  let last_notified_level = head_level - 2 in
+
   (* Restart the DAL node, the finalized events watcher promise, and wait until
      the node is ready. We wait for the node to be ready after spawning an
      instance of seen_finalized_per_level_events to prevent the test from being
@@ -4458,7 +4500,7 @@ let test_dal_node_crawler_reconnects_to_l1 _protocol _dal_parameters _cryptobox
     monitor_finalized_levels_events
       dal_node
       ~__LOC__
-      ~last_notified_level:last_finalized_level
+      ~last_notified_level
       ~target_level:(last_finalized_level + (2 * num_blocks))
   in
   let* () = Dal_node.wait_for_ready dal_node in
@@ -4474,6 +4516,91 @@ let test_dal_node_crawler_reconnects_to_l1 _protocol _dal_parameters _cryptobox
       int
       ~error_msg:"Expected last processed finalized level %R (got %L)") ;
   unit
+
+(* We run a L1 node and stop the DAL node for a period and then restart it. If
+   the DAL node should participate in refutations we restart it after more than
+   2 cycles, but less than the history's mode length. Otherwise, we restart it
+   less than the L1's history length. In both cases the DAL node should not fail
+   when restarted. To make the distinction between the two cases we use the
+   profile of the initial DAL node. It is expected to be either a bootstrap
+   node, who stores data for [2*attestation_lag] blocks or a producer node who
+   stores much more data. *)
+let test_restart_dal_node protocol dal_parameters _cryptobox node client
+    dal_node =
+  let all_pkhs =
+    Account.Bootstrap.keys |> Array.to_list
+    |> List.map (fun account -> account.Account.public_key_hash)
+  in
+  let* history_mode = Node.RPC.call node @@ RPC.get_config_history_mode in
+  let* proto_params =
+    Node.RPC.call node @@ RPC.get_chain_block_context_constants ()
+  in
+  let blocks_per_cycle = JSON.(proto_params |-> "blocks_per_cycle" |> as_int) in
+  let blocks_preservation_cycles =
+    JSON.(history_mode |-> "blocks_preservation_cycles" |> as_int)
+  in
+  let additional_cycles =
+    JSON.(
+      history_mode |-> "history_mode" |-> "rolling" |-> "additional_cycles"
+      |> as_int)
+  in
+  let l1_history_length =
+    (blocks_preservation_cycles + additional_cycles) * blocks_per_cycle
+  in
+  let* profile = Dal_RPC.(call dal_node @@ get_profiles ()) in
+  let offline_period =
+    if profile = Dal_RPC.Bootstrap then l1_history_length + blocks_per_cycle
+    else (* this is just a not too small value *)
+      3 * blocks_per_cycle
+  in
+  let* baker =
+    Baker.init
+      ~protocol
+      ~delegates:all_pkhs
+      ~liquidity_baking_toggle_vote:(Some On)
+      ~state_recorder:true
+      ~force_apply:true
+      ~dal_node
+      node
+      client
+  in
+  let stop_level = 10 in
+  let restart_level = stop_level + offline_period in
+  Log.info
+    "We let the DAL node run for a few levels (till level %d), then we stop \
+     it, then we restart it at level %d"
+    stop_level
+    restart_level ;
+  let* _ = Node.wait_for_level node stop_level in
+  let* () = Dal_node.terminate dal_node in
+  let* _ = Node.wait_for_level node restart_level in
+  let* () = Dal_node.run dal_node in
+
+  let last_finalized_level =
+    restart_level + dal_parameters.Dal.Parameters.attestation_lag
+  in
+  let wait_for_dal_node =
+    wait_for_layer1_final_block dal_node last_finalized_level
+  in
+  let* _ = Node.wait_for_level node (last_finalized_level + 2) in
+  let* () = Baker.terminate baker in
+  let* () = wait_for_dal_node in
+  if profile <> Dal_RPC.Bootstrap then
+    let expected_levels =
+      let offset = dal_parameters.attestation_lag + 1 in
+      List.init
+        (last_finalized_level - offset + 1)
+        (fun i -> string_of_int (offset + i))
+    in
+    check_skip_list_store
+      dal_node
+      ~number_of_slots:dal_parameters.number_of_slots
+      ~expected_levels
+  else
+    check_skip_list_store
+      dal_node
+      ~number_of_slots:dal_parameters.number_of_slots
+      ~expected_levels:[]
 
 let test_attestation_through_p2p _protocol dal_parameters _cryptobox node client
     dal_bootstrap =
@@ -6179,44 +6306,6 @@ module Garbage_collection = struct
     in
 
     Log.info "End of test" ;
-    unit
-
-  let read_dir dir =
-    let* dir = Lwt_unix.opendir dir in
-    let rec read_files acc =
-      Lwt.catch
-        (fun () ->
-          let* entry = Lwt_unix.readdir dir in
-          match entry with
-          | "." | ".." | ".lock" -> read_files acc
-          | file -> read_files (file :: acc))
-        (function
-          | End_of_file ->
-              let* () = Lwt_unix.closedir dir in
-              return acc
-          | exn -> Lwt.reraise exn)
-    in
-    read_files []
-
-  (* This function checks that in the skip list store of the given [dal_node]
-     there are the list of files in the 'hashes' sub-directory coincides with
-     [expected_levels] (up to ordering) and as many files in the 'cells'
-     sub-directory as the [(List.length expected_levels) * number_of_slots]. *)
-  let check_skip_list_store dal_node ~number_of_slots ~expected_levels =
-    let store_dir =
-      sf "%s/store/skip_list_store/" (Dal_node.data_dir dal_node)
-    in
-    let* hashes = read_dir (store_dir ^ "hashes") in
-    Check.(
-      List.sort String.compare hashes = List.sort String.compare expected_levels)
-      ~__LOC__
-      Check.(list string)
-      ~error_msg:"Expected hashes directory content: %R. Got: %L" ;
-    let* cells = read_dir (store_dir ^ "cells") in
-    Check.(List.length cells = number_of_slots * List.length expected_levels)
-      ~__LOC__
-      Check.int
-      ~error_msg:"Expected %R cells, got %L" ;
     unit
 
   let test_gc_skip_list_cells ~protocols =
@@ -7969,6 +8058,22 @@ let register ~protocols =
     ~number_of_slots:1
     "new attester attests"
     test_new_attester_attests
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~uses:(fun protocol -> [Protocol.baker protocol])
+    ~tags:["restart"]
+    ~activation_timestamp:Now
+    ~producer_profiles:[0]
+    "restart DAL node (producer)"
+    test_restart_dal_node
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~uses:(fun protocol -> [Protocol.baker protocol])
+    ~tags:["restart"]
+    ~activation_timestamp:Now
+    ~bootstrap_profile:true
+    "restart DAL node (bootstrap)"
+    test_restart_dal_node
     protocols ;
 
   (* Tests with all nodes *)
