@@ -53,10 +53,11 @@ val progress_display_mode_encoding : progress_display_mode Data_encoding.t
 (** The number of steps that the animation cycles through. *)
 val number_of_frames : int
 
-(** [display_progress ?every ?out ~progress_display_mode ~pp_print_step f] calls
-    [pp_print_step] when the first argument of [f] is called and
-    increments the number of steps which will be given to
-    [pp_print_step].
+(** [display_progress ?every ?out ~progress_display_mode ~pp_print_step f]
+    [pp_print_step] is called once with [0] before the first trace of
+    [f] and then each time the argument passed to [f] is called to notify that
+    a step has finished, incrementing the number which will be given to
+    [pp_print_step] between each call.
 
     If [every] is passed, it is instead displayed whenever [nb_step
     mod every = 0] (defaults to 1). Each time [pp_print_step] is
