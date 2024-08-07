@@ -28,9 +28,13 @@ let wait_for_context_gc node ~expected =
   else Test.fail "Unexpected start_context_gc event caught"
 
 let wait_for_context_split node ~expected =
-  Node.wait_for node "start_context_split.v0" @@ fun _json ->
-  if expected then Some ()
-  else Test.fail "Unexpected start_context_split event caught"
+  let filter json =
+    let level = JSON.(json |> as_int) in
+    if expected then Some level
+    else Test.fail "Unexpected start_context_split event caught"
+  in
+
+  Node.wait_for node "start_context_split.v0" filter
 
 let test_context_pruning_call =
   Protocol.register_test
@@ -56,17 +60,17 @@ let test_context_pruning_call =
   let (_wait_no_context_gc : unit Lwt.t) =
     wait_for_context_gc node1 ~expected:false
   in
-  let (_wait_no_context_split : unit Lwt.t) =
+  let (_wait_no_context_split : int Lwt.t) =
     wait_for_context_split node1 ~expected:false
   in
   let (wait_context_gc : unit Lwt.t) =
     wait_for_context_gc node2 ~expected:true
   in
-  let (wait_context_split : unit Lwt.t) =
+  let (wait_context_split : int Lwt.t) =
     wait_for_context_split node2 ~expected:true
   in
   let* () = bake_blocks node1 client ~blocks_to_bake in
-  let* () = wait_context_gc and* () = wait_context_split in
+  let* () = wait_context_gc and* (_ : int) = wait_context_split in
   unit
 
 let wait_for_complete_storage_maintenance node target =
@@ -163,6 +167,9 @@ let test_custom_maintenance_delay =
      maintenance. We expect the regular node to merge immediately and
      the delayed node to merge after the given delay. *)
   let merge_level_A = 1 in
+  let wait_context_split_A =
+    wait_for_context_split delayed_node ~expected:true
+  in
   let wait_delayed_storage_maintenance_A =
     wait_for_complete_storage_maintenance delayed_node merge_level_A
   in
@@ -176,6 +183,16 @@ let test_custom_maintenance_delay =
   in
   Log.info "Waiting for the regular storage maintenance" ;
   let* () = wait_regular_storage_maintenance_A in
+  (* We must ensure that the context split is not delayed. Indeed, for
+     the sake of performance, the context split aims to be called on the
+     block candidate to a future GC. See
+     [Lib_context.Sigs.Context.split] for more details. *)
+  Log.info "Waiting for the context split event" ;
+  let* split_level_A = wait_context_split_A in
+  Check.(
+    (merge_level_A = split_level_A)
+      int
+      ~error_msg:"split level was expected on level %L but found on %R") ;
   let* () =
     let nb = custom_delay in
     Log.info "Baking %d blocks to trigger the delayed storage maintenance" nb ;
@@ -186,6 +203,9 @@ let test_custom_maintenance_delay =
   (* Step B: We bake enough blocks to trigger the delayed maintenance
      but restart the node to check that the delay is maintained. *)
   let merge_level_B = merge_level_A + blocks_per_cycle in
+  let wait_context_split_B =
+    wait_for_context_split delayed_node ~expected:true
+  in
   let wait_regular_storage_maintenance_B =
     wait_for_complete_storage_maintenance regular_node merge_level_B
   in
@@ -194,6 +214,12 @@ let test_custom_maintenance_delay =
     Log.info "Baking %d blocks to trigger the regular storage maintenance" nb ;
     bake_blocks delayed_node client ~blocks_to_bake:nb
   in
+  Log.info "Waiting for the context split event" ;
+  let* split_level_B = wait_context_split_B in
+  Check.(
+    (merge_level_B = split_level_B)
+      int
+      ~error_msg:"split level was expected on level %L but found on %R") ;
   let* () = wait_regular_storage_maintenance_B in
   Log.info "Restarting delayed storage maintenance node" ;
   let* () = Node.terminate delayed_node in
