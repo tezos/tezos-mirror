@@ -22,7 +22,7 @@ pub struct Devices<M: backend::ManagerBase> {
     _placeholder: backend::Cells<u8, 1, M>,
 }
 
-impl<M: backend::Manager> Devices<M> {
+impl<M: backend::ManagerBase> Devices<M> {
     /// Bind the devices state.
     pub fn bind(space: backend::AllocatedOf<DevicesLayout, M>) -> Self {
         Self {
@@ -31,7 +31,10 @@ impl<M: backend::Manager> Devices<M> {
     }
 
     /// Reset the devices state.
-    pub fn reset(&mut self) {
+    pub fn reset(&mut self)
+    where
+        M: backend::ManagerWrite,
+    {
         self._placeholder.write(0, 0);
     }
 }
