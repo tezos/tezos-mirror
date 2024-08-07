@@ -5045,8 +5045,7 @@ let test_trace_transaction_call_trace =
     Rpc.trace_transaction
       ~tracer:"callTracer"
       ~transaction_hash
-      ~tracer_config:
-        [("withLogs", `Bool true); ("onlyTopLevelCall", `Bool true)]
+      ~tracer_config:[("withLog", `Bool true); ("onlyTopCall", `Bool true)]
       sequencer
   in
   let*@! {Transaction.input; gas; _} =
