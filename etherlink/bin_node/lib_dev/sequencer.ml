@@ -66,19 +66,12 @@ module Make (Ctxt : sig
 end) =
   Services_backend_sig.Make (MakeBackend (Ctxt))
 
-let install_finalizer_seq server private_server =
+let install_finalizer_seq server_public_finalizer server_private_finalizer =
   let open Lwt_syntax in
   Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
   let* () = Events.shutdown_node ~exit_status in
-  let* () = Tezos_rpc_http_server.RPC_server.shutdown server in
-  let* () = Events.shutdown_rpc_server ~private_:false in
-  let* () =
-    Option.iter_s
-      (fun private_server ->
-        let* () = Tezos_rpc_http_server.RPC_server.shutdown private_server in
-        Events.shutdown_rpc_server ~private_:true)
-      private_server
-  in
+  let* () = server_public_finalizer () in
+  let* () = server_private_finalizer () in
   Misc.unwrap_error_monad @@ fun () ->
   let open Lwt_result_syntax in
   let* () = Tx_pool.shutdown () in
@@ -86,104 +79,6 @@ let install_finalizer_seq server private_server =
   let* () = Blueprints_publisher.shutdown () in
   let* () = Signals_publisher.shutdown () in
   return_unit
-
-let callback server dir =
-  let open Cohttp in
-  let open Lwt_syntax in
-  let callback_log conn req body =
-    let path = Request.uri req |> Uri.path in
-    if path = "/metrics" then
-      let* response = Metrics.Metrics_server.callback conn req body in
-      Lwt.return (`Response response)
-    else
-      let uri = req |> Request.uri |> Uri.to_string in
-      let meth = req |> Request.meth |> Code.string_of_method in
-      let* body_str = body |> Cohttp_lwt.Body.to_string in
-      let* () = Events.callback_log ~uri ~meth ~body:body_str in
-      Tezos_rpc_http_server.RPC_server.resto_callback
-        server
-        conn
-        req
-        (Cohttp_lwt.Body.of_string body_str)
-  in
-  let update_metrics uri meth =
-    Prometheus.Summary.(time (labels Metrics.Rpc.metrics [uri; meth]) Sys.time)
-  in
-  Tezos_rpc_http_server.RPC_middleware.rpc_metrics_transform_callback
-    ~update_metrics
-    dir
-    callback_log
-
-let start_server
-    Configuration.
-      {
-        rpc_addr;
-        rpc_port;
-        cors_origins;
-        cors_headers;
-        max_active_connections;
-        _;
-      } ~directory ~private_info =
-  let open Lwt_result_syntax in
-  let open Tezos_rpc_http_server in
-  let p2p_addr = P2p_addr.of_string_exn rpc_addr in
-  let host = Ipaddr.V6.to_string p2p_addr in
-  let node = `TCP (`Port rpc_port) in
-  let acl = RPC_server.Acl.allow_all in
-  let cors =
-    Resto_cohttp.Cors.
-      {allowed_headers = cors_headers; allowed_origins = cors_origins}
-  in
-  let server =
-    RPC_server.init_server
-      ~acl
-      ~cors
-      ~media_types:Supported_media_types.all
-      directory
-  in
-  let private_info =
-    Option.map
-      (fun (private_directory, private_rpc_port) ->
-        let private_server =
-          RPC_server.init_server
-            ~acl
-            ~cors
-            ~media_types:Media_type.all_media_types
-            private_directory
-        in
-        (private_server, private_rpc_port))
-      private_info
-  in
-  let private_server = Option.map fst private_info in
-  Lwt.catch
-    (fun () ->
-      let*! () =
-        RPC_server.launch
-          ~max_active_connections
-          ~host
-          server
-          ~callback:(callback server directory)
-          node
-      in
-      let*! () =
-        Option.iter_s
-          (fun (private_server, private_rpc_port) ->
-            let host = Ipaddr.V4.(to_string localhost) in
-            let*! () =
-              RPC_server.launch
-                ~max_active_connections
-                ~host
-                private_server
-                (`TCP (`Port private_rpc_port))
-            in
-            Events.private_server_is_ready
-              ~rpc_addr:host
-              ~rpc_port:private_rpc_port)
-          private_info
-      in
-      let*! () = Events.is_ready ~rpc_addr ~rpc_port in
-      return (server, private_server))
-    (fun _ -> return (server, private_server))
 
 let loop_sequencer (sequencer_config : Configuration.sequencer) =
   let open Lwt_result_syntax in
@@ -339,34 +234,26 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
       in
       return_unit
   in
-  let directory =
-    Services.directory configuration ((module Rollup_rpc), smart_rollup_address)
+  let* finalizer_public_server =
+    Rpc_server.start_public_server
+      ~evm_services:
+        {
+          next_blueprint_number = Evm_context.next_blueprint_number;
+          find_blueprint = Evm_context.blueprint;
+          smart_rollup_address = smart_rollup_address_typed;
+          time_between_blocks = sequencer_config.time_between_blocks;
+        }
+      configuration
+      ((module Rollup_rpc), smart_rollup_address_typed)
   in
-  let directory =
-    directory
-    |> Evm_services.register
-         Evm_context.next_blueprint_number
-         Evm_context.blueprint
-         smart_rollup_address_typed
-         sequencer_config.time_between_blocks
-  in
-  let private_info =
-    Option.map
-      (fun private_rpc_port ->
-        let private_directory =
-          Services.private_directory
-            ~threshold_encryption:false
-            configuration
-            ((module Rollup_rpc), smart_rollup_address)
-        in
-        (private_directory, private_rpc_port))
-      sequencer_config.private_rpc_port
-  in
-  let* server, private_server =
-    start_server configuration ~directory ~private_info
+  let* finalizer_private_server =
+    Rpc_server.start_private_server
+      ~block_production:`Single_node
+      configuration
+      ((module Rollup_rpc), smart_rollup_address_typed)
   in
   let (_ : Lwt_exit.clean_up_callback_id) =
-    install_finalizer_seq server private_server
+    install_finalizer_seq finalizer_public_server finalizer_private_server
   in
   let* () = loop_sequencer sequencer_config in
   return_unit
