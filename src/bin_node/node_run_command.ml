@@ -181,16 +181,6 @@ module Event = struct
       ~pp2:History_mode.pp
       ("stored_history_mode", History_mode.encoding)
 
-  let warn_external_rpc_process_usage =
-    declare_0
-      ~section
-      ~name:"warn_external_rpc_process_usage"
-      ~msg:
-        "the external RPC process is enabled. This is an unstable feature that \
-         should be use with care. Please report encountered issues if any."
-      ~level:Warning
-      ()
-
   let enable_http_cache_headers_for_local =
     declare_0
       ~section
@@ -707,8 +697,6 @@ let init_rpc (config : Config_file.t) (node : Node.t) internal_events =
   let* rpc_server =
     if config.rpc.external_listen_addrs = [] then return No_server
     else
-      (* Warn that the feature is experimental.*)
-      let*! () = Event.(emit warn_external_rpc_process_usage) () in
       (* Starts the node's local RPC server that aims to handle the
          RPCs forwarded by the rpc_process, if they cannot be
          processed by the rpc_process itself. *)
