@@ -303,9 +303,11 @@ val wait_for_rollup_node_ahead : t -> int Lwt.t
     hash. *)
 val wait_for_tx_pool_add_transaction : ?timeout:float -> t -> string Lwt.t
 
-(** Waits until a node terminates and return its status. If the node is
-    not running, make the test fail. *)
-val wait_for_shutdown_event : t -> int Lwt.t
+(** [wait_for_shutdown ?can_terminate evm_node] waits until a node terminates
+    and return its status. If the node is not running, make the test fail. If
+    [can_terminate] is `true` and the node was already terminated, returns
+    `None`. *)
+val wait_for_shutdown_event : ?can_terminate:bool -> t -> int option Lwt.t
 
 (** [rpc_endpoint ?local ?private_ evm_node] returns the endpoint to communicate with the
     [evm_node]. If [private_] is true, the endpoint for the private

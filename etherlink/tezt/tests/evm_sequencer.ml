@@ -718,7 +718,8 @@ let test_remove_sequencer =
         let* _ = next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
-  Check.((exit_code = 100) int) ~error_msg:"Expected exit code %R, got %L" ;
+  Check.((exit_code = Some 100) (option int))
+    ~error_msg:"Expected exit code %R, got %L" ;
   (* Sequencer is at genesis, proxy is at [advance]. *)
   Check.((missing_block_nb = 1) int)
     ~error_msg:"Sequencer should be missing block %L" ;
@@ -4035,11 +4036,14 @@ let test_sequencer_diverge =
   let* () =
     Evm_node.init_from_rollup_node_data_dir sequencer_bis sc_rollup_node
   in
+  (* When run in the CI the shutdown event are sometimes handled after the
+     sequencer and/or the observer have already been terminated, leading to
+     errors while they actually shutdown as expected. *)
   let diverged_and_shutdown sequencer observer =
     let* _ = Evm_node.wait_for_diverged sequencer
-    and* _ = Evm_node.wait_for_shutdown_event sequencer
+    and* _ = Evm_node.wait_for_shutdown_event ~can_terminate:true sequencer
     and* _ = Evm_node.wait_for_diverged observer
-    and* _ = Evm_node.wait_for_shutdown_event observer in
+    and* _ = Evm_node.wait_for_shutdown_event ~can_terminate:true observer in
     unit
   in
   let* () = Evm_node.run sequencer_bis in
