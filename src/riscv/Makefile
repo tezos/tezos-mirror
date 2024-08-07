@@ -37,12 +37,17 @@ riscv-dummy.elf::
 
 # Update checked-in binaries
 .PHONY: update-assets
-update-assets: assets/riscv-dummy.elf
+update-assets: assets/riscv-dummy.elf assets/jstz
 
 # Update the compiled dummy kernel used in CI tests
 assets/riscv-dummy.elf assets/riscv-dummy.elf.checksum::
 	@make -C dummy_kernel build
 	@cp dummy_kernel/target/riscv64gc-unknown-hermit/release/riscv-dummy $@
+	@sha256sum $@ > $@.checksum
+
+assets/jstz assets/jstz.checksum::
+	@make -C jstz build
+	@cp jstz/target/riscv64gc-unknown-hermit/release/jstz $@
 	@sha256sum $@ > $@.checksum
 
 .PHONY: build-deps

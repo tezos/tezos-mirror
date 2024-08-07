@@ -221,7 +221,8 @@ let test_full_scenario ?supports ?regression ?hooks ~kind ?mode ?boot_sector
   then
     Sc_rollup_node.on_event rollup_node (fun Sc_rollup_node.{name; value; _} ->
         if name = "kernel_debug.v0" then
-          Regression.capture (JSON.as_string value)) ;
+          Regression.capture
+            (Tezos_regression.replace_variables (JSON.as_string value))) ;
   scenario protocol rollup_node sc_rollup tezos_node tezos_client
 
 (*
@@ -1362,6 +1363,49 @@ let test_rollup_node_boots_into_initial_state ?supports ~kind =
     Check.string
     ~error_msg:"Unexpected PVM status (%L = %R)" ;
   unit
+
+(* Originate a rollup with the given boot sector, then send 1 message per level
+ * and record the output of the kernel debug log. *)
+let test_advances_state_with_kernel ~title ~boot_sector ~kind ~messages =
+  test_full_scenario
+    ~regression:true
+    ~kernel_debug_log:true
+    ~hooks
+    {variant = None; tags = ["pvm"]; description = title}
+    ~boot_sector
+    ~kind
+  @@ fun _protocol sc_rollup_node sc_rollup _tezos_node client ->
+  let* () = Sc_rollup_node.run sc_rollup_node sc_rollup [] in
+  let* _ = Sc_rollup_node.wait_sync ~timeout:30. sc_rollup_node in
+
+  let test_message message =
+    let* prev_state_hash =
+      Sc_rollup_node.RPC.call ~rpc_hooks sc_rollup_node
+      @@ Sc_rollup_rpc.get_global_block_state_hash ()
+    in
+    let* () = send_message ~hooks client (sf "hex:[ \"%s\" ]" message) in
+    let* _ = Sc_rollup_node.wait_sync ~timeout:30. sc_rollup_node in
+    let* state_hash =
+      Sc_rollup_node.RPC.call ~rpc_hooks sc_rollup_node
+      @@ Sc_rollup_rpc.get_global_block_state_hash ()
+    in
+    Check.(state_hash <> prev_state_hash)
+      Check.string
+      ~error_msg:"State hash has not changed (%L <> %R)" ;
+    unit
+  in
+  Lwt_list.iter_s test_message messages
+
+(* `inbox_file` is expected to be in the format produced by the `inbox_bench` tool
+ * in `src/riscv/jstz` *)
+let test_advances_state_with_inbox ~title ~boot_sector ~kind ~inbox_file =
+  let inbox =
+    JSON.(parse_file inbox_file |> as_list |> List.map as_list |> List.concat)
+  in
+  let messages =
+    List.map (fun m -> JSON.(m |-> "external" |> as_string)) inbox
+  in
+  test_advances_state_with_kernel ~title ~boot_sector ~kind ~messages
 
 let test_rollup_node_advances_pvm_state ?regression ?kernel_debug_log ~title
     ?boot_sector ~internal ~kind =
@@ -6011,6 +6055,18 @@ let register_riscv ~protocols =
     ~internal:false
     ~kernel_debug_log:true
 
+let register_riscv_jstz ~protocols =
+  let kind = "riscv" in
+  let boot_sector =
+    read_riscv_kernel "src/riscv/assets/jstz" "src/riscv/assets/jstz.checksum"
+  in
+  test_advances_state_with_inbox
+    protocols
+    ~kind
+    ~title:"node advances PVM state with jstz kernel"
+    ~boot_sector
+    ~inbox_file:"tezt/tests/riscv-tests/jstz-inbox.json"
+
 let register ~kind ~protocols =
   test_origination ~kind protocols ;
   test_rollup_get_genesis_info ~kind protocols ;
@@ -6149,6 +6205,7 @@ let register ~protocols =
 
   (* Specific riscv PVM tezt *)
   register_riscv ~protocols:[Protocol.Alpha] ;
+  register_riscv_jstz ~protocols:[Protocol.Alpha] ;
   (* Shared tezts - will be executed for each PVMs. *)
   register ~kind:"wasm_2_0_0" ~protocols ;
   register ~kind:"arith" ~protocols ;

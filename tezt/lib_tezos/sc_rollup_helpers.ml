@@ -331,7 +331,9 @@ let setup_rollup ~kind ?hooks ?alias ?(mode = Sc_rollup_node.Operator)
     ?allow_degraded tezos_node tezos_client =
   let* sc_rollup =
     match sc_rollup with
-    | Some sc_rollup -> return sc_rollup
+    | Some sc_rollup ->
+        let* () = Client.bake_for_and_wait tezos_client in
+        return sc_rollup
     | None ->
         originate_sc_rollup
           ?hooks
