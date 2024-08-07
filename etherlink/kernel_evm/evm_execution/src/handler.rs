@@ -2322,76 +2322,73 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
                         );
                         let gas_after = self.gas_used();
 
-                        // TRACING
-                        if let Some(CallTracer(CallTracerInput {
-                            transaction_hash,
-                            config:
-                                CallTracerConfig {
-                                    with_logs,
-                                    only_top_call: false,
-                                },
-                        })) = self.tracer
-                        {
-                            let mut call_trace = CallTrace::new_minimal_trace(
-                                if let CreateScheme::Create2 { .. } = scheme {
-                                    "CREATE2"
-                                } else {
-                                    "CREATE"
-                                }
-                                .into(),
-                                caller,
-                                value,
-                                gas_after - gas_before,
-                                init_code,
-                                // We need to make the distinction between the initial call (depth 0)
-                                // and the other subcalls
-                                (self.stack_depth() + 1).try_into().unwrap_or_default(),
-                            );
+                        match self.end_inter_transaction(result) {
+                            Capture::Exit((reason, address, output)) => {
+                                // TRACING
+                                if let Some(CallTracer(CallTracerInput {
+                                    transaction_hash,
+                                    config:
+                                        CallTracerConfig {
+                                            with_logs,
+                                            only_top_call: false,
+                                        },
+                                })) = self.tracer
+                                {
+                                    let mut call_trace = CallTrace::new_minimal_trace(
+                                        if let CreateScheme::Create2 { .. } = scheme {
+                                            "CREATE2"
+                                        } else {
+                                            "CREATE"
+                                        }
+                                        .into(),
+                                        caller,
+                                        value,
+                                        gas_after - gas_before,
+                                        init_code,
+                                        // We need to make the distinction between the initial call (depth 0)
+                                        // and the other subcalls
+                                        (self.stack_depth() + 1)
+                                            .try_into()
+                                            .unwrap_or_default(),
+                                    );
 
-                            call_trace.add_gas(target_gas);
+                                    call_trace.add_output(Some(output.to_owned()));
+                                    call_trace.add_gas(target_gas);
 
-                            // TODO: https://gitlab.com/tezos/tezos/-/issues/7437
-                            // For errors and revert reasons, find the appropriate values
-                            // to return for tracing. The following values are kind of placeholders.
-                            match &result {
-                                Ok((ExitReason::Succeed(_), _, output)) => {
-                                    call_trace.add_output(Some(output.to_owned()))
-                                }
-                                Ok((ExitReason::Error(e), _, output)) => {
-                                    call_trace.add_output(Some(output.to_owned()));
-                                    call_trace.add_error(Some(format!("{:?}", e).into()))
-                                }
-                                Ok((ExitReason::Revert(r), _, output)) => {
-                                    call_trace.add_output(Some(output.to_owned()));
-                                    call_trace.add_revert_reason(Some(
-                                        format!("{:?}", r).into(),
-                                    ));
-                                }
-                                Ok((ExitReason::Fatal(f), _, output)) => {
-                                    call_trace.add_output(Some(output.to_owned()));
-                                    call_trace.add_error(Some(format!("{:?}", f).into()))
-                                }
-                                Err(e) => {
-                                    call_trace.add_error(Some(format!("{:?}", e).into()))
-                                }
-                            };
+                                    // TODO: https://gitlab.com/tezos/tezos/-/issues/7437
+                                    // For errors and revert reasons, find the appropriate values
+                                    // to return for tracing. The following values are kind of placeholders.
+                                    match &reason {
+                                        ExitReason::Error(e) => call_trace
+                                            .add_error(Some(format!("{:?}", e).into())),
+                                        ExitReason::Revert(r) => call_trace
+                                            .add_revert_reason(Some(
+                                                format!("{:?}", r).into(),
+                                            )),
+                                        ExitReason::Fatal(f) => call_trace
+                                            .add_error(Some(format!("{:?}", f).into())),
+                                        ExitReason::Succeed(_) => (),
+                                    };
 
-                            if with_logs {
-                                call_trace.add_logs(
-                                    self.transaction_data
-                                        .last()
-                                        .map(|tx_layer| tx_layer.logs.clone()),
-                                )
+                                    if with_logs {
+                                        call_trace.add_logs(
+                                            self.transaction_data
+                                                .last()
+                                                .map(|tx_layer| tx_layer.logs.clone()),
+                                        )
+                                    }
+
+                                    let _ = tracer::store_call_trace(
+                                        self.host,
+                                        call_trace,
+                                        &transaction_hash,
+                                    );
+                                }
+
+                                Capture::Exit((reason, address, output))
                             }
-
-                            let _ = tracer::store_call_trace(
-                                self.host,
-                                call_trace,
-                                &transaction_hash,
-                            );
+                            Capture::Trap(x) => Capture::Trap(x),
                         }
-
-                        self.end_inter_transaction(result)
                     }
                     Err(err) => {
                         log!(
