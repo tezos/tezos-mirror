@@ -21,7 +21,6 @@ dsn_node: octez-dsn-node
 evm_node: octez-evm-node
 node: octez-node
 protocol_compiler: octez-protocol-compiler
-proxy_server: octez-proxy-server
 signer: octez-signer
 smart_rollup_node: octez-smart-rollup-node
 wasm_debugger: octez-smart-rollup-wasm-debugger
