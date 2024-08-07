@@ -331,3 +331,10 @@ let call_tracer_depth () =
     ~label:"call_tracer_depth"
     ~contract:"TestDepthCall"
     ~evm_version:"shanghai"
+
+let call_tracer_revert () =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/call_tracer_revert.sol")
+    ~label:"call_tracer_revert"
+    ~contract:"ErrorContract"
+    ~evm_version:"shanghai"
