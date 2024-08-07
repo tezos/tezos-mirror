@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: MIT
 
 use super::{
-    AllocatedOf, Atom, Cell, CellBase, CellRead, CellReadWrite, CellWrite, Elem, Manager,
-    ManagerBase,
+    AllocatedOf, Atom, Cell, CellBase, CellRead, CellReadWrite, CellWrite, Elem, ManagerBase,
+    ManagerRead, ManagerReadWrite, ManagerWrite,
 };
 use std::marker::PhantomData;
 
@@ -21,7 +21,7 @@ impl<T, R, M> EnumCell<T, R, M>
 where
     T: From<R> + Default,
     R: From<T> + Elem,
-    M: Manager,
+    M: ManagerBase,
 {
     /// Bind the enum cell to the allocated space.
     pub fn bind(space: AllocatedOf<EnumCellLayout<R>, M>) -> Self {
@@ -32,22 +32,34 @@ where
     }
 
     /// Reset the enum cell by writing the default value of `T`.
-    pub fn reset(&mut self) {
+    pub fn reset(&mut self)
+    where
+        M: ManagerWrite,
+    {
         self.write(T::default());
     }
 
     /// Write a value to the enum cell.
-    pub fn write(&mut self, value: T) {
+    pub fn write(&mut self, value: T)
+    where
+        M: ManagerWrite,
+    {
         self.cell.write(value.into());
     }
 
     /// Replace a value in the enum cell, returning the old value.
-    pub fn replace(&mut self, value: T) -> T {
+    pub fn replace(&mut self, value: T) -> T
+    where
+        M: ManagerReadWrite,
+    {
         T::from(self.cell.replace(value.into()))
     }
 
     /// Read the value from the enum cell.
-    pub fn read(&self) -> T {
+    pub fn read(&self) -> T
+    where
+        M: ManagerRead,
+    {
         T::from(self.cell.read())
     }
 }
@@ -55,7 +67,7 @@ where
 impl<T, R, M> CellBase for EnumCell<T, R, M>
 where
     R: Elem,
-    M: Manager,
+    M: ManagerBase,
 {
     type Value = T;
 }
@@ -64,7 +76,7 @@ impl<T, R, M> CellRead for EnumCell<T, R, M>
 where
     T: From<R> + Default,
     R: From<T> + Elem,
-    M: Manager,
+    M: ManagerRead,
 {
     fn read(&self) -> Self::Value {
         EnumCell::read(self)
@@ -75,7 +87,7 @@ impl<T, R, M> CellWrite for EnumCell<T, R, M>
 where
     T: From<R> + Default,
     R: From<T> + Elem,
-    M: Manager,
+    M: ManagerWrite,
 {
     fn write(&mut self, value: Self::Value) {
         EnumCell::write(self, value)
@@ -86,7 +98,7 @@ impl<T, R, M> CellReadWrite for EnumCell<T, R, M>
 where
     T: From<R> + Default,
     R: From<T> + Elem,
-    M: Manager,
+    M: ManagerReadWrite,
 {
     #[inline(always)]
     fn replace(&mut self, value: Self::Value) -> Self::Value {
