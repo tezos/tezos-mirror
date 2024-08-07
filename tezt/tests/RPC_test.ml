@@ -49,10 +49,6 @@ let hooks = Tezos_regression.hooks
    - what ~uses to add to the test. *)
 let metadata_of_test_mode = function
   | `Client -> (`Client, "client", [])
-  | `Client_data_dir_proxy_server ->
-      (`Client, "proxy_server_data_dir", [Constant.octez_proxy_server])
-  | `Client_rpc_proxy_server ->
-      (`Client, "proxy_server_rpc", [Constant.octez_proxy_server])
   | `Light -> (`Light, "light", [])
   | `Proxy -> (`Proxy, "proxy", [])
 
@@ -66,24 +62,8 @@ let patch_protocol_parameters protocol = function
       in
       Lwt.return_some file
 
-let initialize_chain_for_test client = function
-  | `Client_data_dir_proxy_server | `Client_rpc_proxy_server ->
-      (* Because the proxy server doesn't support genesis. *)
-      Client.bake_for_and_wait client
-  | `Client | `Light | `Proxy -> unit
-
 let endpoint_of_test_mode_tag node = function
   | `Client | `Light | `Proxy -> Lwt.return_some Client.(Node node)
-  | (`Client_rpc_proxy_server | `Client_data_dir_proxy_server) as
-    proxy_server_mode ->
-      let args =
-        Some
-          (match proxy_server_mode with
-          | `Client_rpc_proxy_server -> [Proxy_server.Data_dir]
-          | `Client_data_dir_proxy_server -> [])
-      in
-      let* proxy_server = Proxy_server.init ?args node in
-      Lwt.return_some Client.(Proxy_server proxy_server)
 
 (* A helper to register a RPC test environment with a node and a client for the
    given protocol version.
@@ -121,7 +101,6 @@ let check_rpc_regression ~test_mode_tag ~test_function ?supports
       client_mode_tag
       ()
   in
-  let* () = initialize_chain_for_test client test_mode_tag in
   let* endpoint = endpoint_of_test_mode_tag node test_mode_tag in
   let* _ = test_function test_mode_tag protocol ?endpoint client in
   unit
@@ -148,7 +127,6 @@ let check_rpc ~test_mode_tag ~test_function ?parameter_overrides ?nodes_args
       client_mode_tag
       ()
   in
-  let* () = initialize_chain_for_test client test_mode_tag in
   let* endpoint = endpoint_of_test_mode_tag node test_mode_tag in
   let* _ = test_function test_mode_tag protocol ?endpoint client in
   unit
@@ -1218,9 +1196,6 @@ let test_network test_mode_tag _protocol ?endpoint client =
     unit
   in
   match test_mode_tag with
-  | `Client_data_dir_proxy_server | `Client_rpc_proxy_server ->
-      Log.info "Skipping network RPCs" ;
-      unit
   | `Light ->
       (* In light mode, the node is already connected to another node: use that as peer *)
       let* peers = Client.RPC.call ?endpoint client @@ RPC.get_network_peers in
@@ -1676,7 +1651,7 @@ let register protocols =
       ~test_function:test_misc_protocol
       ~parameter_overrides:consensus_threshold ;
     (match test_mode_tag with
-    | `Client_data_dir_proxy_server | `Client_rpc_proxy_server | `Light -> ()
+    | `Light -> ()
     | _ ->
         check_rpc_regression
           "mempool"
@@ -1692,7 +1667,6 @@ let register protocols =
       ~nodes_args:[Connections 1] ;
     (match test_mode_tag with
     (* No worker RPCs in these modes *)
-    | `Client_data_dir_proxy_server | `Client_rpc_proxy_server -> ()
     | _ ->
         check_rpc
           "workers"
@@ -1700,7 +1674,6 @@ let register protocols =
           ~parameter_overrides:consensus_threshold) ;
     (match test_mode_tag with
     (* No misc shell RPCs in these modes *)
-    | `Client_data_dir_proxy_server | `Client_rpc_proxy_server -> ()
     | _ ->
         check_rpc
           "misc_shell"
@@ -1708,7 +1681,6 @@ let register protocols =
           ~parameter_overrides:consensus_threshold) ;
     (match test_mode_tag with
     (* No chain RPCs in these modes *)
-    | `Client_data_dir_proxy_server | `Client_rpc_proxy_server -> ()
     | _ ->
         check_rpc
           "chain"
@@ -1716,15 +1688,7 @@ let register protocols =
           ~parameter_overrides:consensus_threshold) ;
     check_rpc "deprecated" ~test_function:test_deprecated
   in
-  List.iter
-    (register protocols)
-    [
-      `Client;
-      `Light;
-      `Proxy;
-      `Client_data_dir_proxy_server;
-      `Client_rpc_proxy_server;
-    ] ;
+  List.iter (register protocols) [`Client; `Light; `Proxy] ;
 
   let addresses = ["localhost"; "127.0.0.1"] in
   let mk_title list_type address =

@@ -179,7 +179,6 @@ let register_protocol_tests_that_use_supports_correctly () =
   Prevalidator.register ~protocols ;
   Protocol_limits.register ~protocols ;
   Proxy.register ~protocols ;
-  Proxy_server_test.register ~protocols ;
   Rpc_process.register ~protocols ;
   RPC_test.register protocols ;
   Rpc_versioning_attestation.register ~protocols ;

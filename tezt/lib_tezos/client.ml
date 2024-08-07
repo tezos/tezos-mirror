@@ -27,16 +27,12 @@
 open Runnable.Syntax
 open Cli_arg
 
-type endpoint =
-  | Node of Node.t
-  | Proxy_server of Proxy_server.t
-  | Foreign_endpoint of Endpoint.t
+type endpoint = Node of Node.t | Foreign_endpoint of Endpoint.t
 
 type media_type = Json | Binary | Any
 
 let rpc_port = function
   | Node n -> Node.rpc_port n
-  | Proxy_server ps -> Proxy_server.rpc_port ps
   | Foreign_endpoint fe -> Endpoint.rpc_port fe
 
 type mode =
@@ -98,7 +94,6 @@ let with_dal_node ?dal_node t = {t with dal_node}
 let endpoint_wait_for ?where endpoint event filter =
   match endpoint with
   | Node node -> Node.wait_for ?where node event filter
-  | Proxy_server ps -> Proxy_server.wait_for ?where ps event filter
   | Foreign_endpoint _ -> Test.fail "Cannot wait_for with a Foreign_endpoint"
 
 let next_name = ref 1
@@ -113,12 +108,10 @@ let () = Test.declare_reset_function @@ fun () -> next_name := 1
 let runner endpoint =
   match endpoint with
   | Node node -> Node.runner node
-  | Proxy_server ps -> Proxy_server.runner ps
   | Foreign_endpoint _ -> None
 
 let scheme = function
   | Node n -> Node.rpc_scheme n
-  | Proxy_server _ -> Proxy_server.rpc_scheme
   | Foreign_endpoint fe -> Endpoint.rpc_scheme fe
 
 let address ?(hostname = false) ?from peer =
@@ -737,9 +730,7 @@ let activate_protocol ?endpoint ?block ?protocol ?protocol_hash ?fitness ?key
     client
   |> Process.check
 
-let node_of_endpoint = function
-  | Node n -> Some n
-  | Proxy_server _ | Foreign_endpoint _ -> None
+let node_of_endpoint = function Node n -> Some n | Foreign_endpoint _ -> None
 
 let node_of_client_mode = function
   | Client (Some endpoint, _) -> node_of_endpoint endpoint
@@ -4289,13 +4280,6 @@ let publish_dal_commitment ?hooks ?(wait = "none") ?burn_cap ~src ~commitment
 let as_foreign_endpoint = function
   | Node node -> Node.as_rpc_endpoint node
   | Foreign_endpoint fe -> fe
-  | Proxy_server ps ->
-      Endpoint.
-        {
-          scheme = Proxy_server.rpc_scheme;
-          host = Proxy_server.rpc_host;
-          port = Proxy_server.rpc_port ps;
-        }
 
 let get_receipt_for ~operation ?(check_previous = 10) client =
   spawn_command client
