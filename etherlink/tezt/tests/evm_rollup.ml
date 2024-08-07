@@ -890,6 +890,7 @@ let test_rpc_getBlockByHash =
 
 let test_rpc_getBlockReceipts =
   register_both
+    ~time_between_blocks:Nothing
     ~bootstrap_accounts:Eth_account.lots_of_address
     ~tags:["evm"; "rpc"; "get_block_receipts"]
     ~title:"RPC method eth_getBlockReceipts"
