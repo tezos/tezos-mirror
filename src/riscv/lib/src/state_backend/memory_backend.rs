@@ -508,72 +508,6 @@ impl<'backend> backend::ManagerRead for SliceManagerRO<'backend> {
     }
 }
 
-// TODO: RV-157: Remove this macro, it should not be needed any more
-macro_rules! read_only_write {
-    () => {
-        panic!("cannot write to an immutable reference to a region")
-    };
-}
-
-// TODO: RV-157: Remove this implementation
-impl<'backend> backend::ManagerWrite for SliceManagerRO<'backend> {
-    #[inline]
-    fn region_write<E: backend::Elem, const LEN: usize>(
-        _region: &mut Self::Region<E, LEN>,
-        _index: usize,
-        _value: E,
-    ) {
-        read_only_write!()
-    }
-
-    #[inline]
-    fn region_write_all<E: backend::Elem, const LEN: usize>(
-        _region: &mut Self::Region<E, LEN>,
-        _value: &[E],
-    ) {
-        read_only_write!()
-    }
-
-    #[inline]
-    fn region_write_some<E: backend::Elem, const LEN: usize>(
-        _region: &mut Self::Region<E, LEN>,
-        _index: usize,
-        _buffer: &[E],
-    ) {
-        read_only_write!()
-    }
-
-    #[inline]
-    fn dyn_region_write<E: backend::Elem, const LEN: usize>(
-        _region: &mut Self::DynRegion<LEN>,
-        _address: usize,
-        _value: E,
-    ) {
-        read_only_write!()
-    }
-
-    #[inline]
-    fn dyn_region_write_all<E: backend::Elem, const LEN: usize>(
-        _region: &mut Self::DynRegion<LEN>,
-        _address: usize,
-        _values: &[E],
-    ) {
-        read_only_write!()
-    }
-}
-
-// TODO: RV-157: Remove this implementation
-impl ManagerReadWrite for SliceManagerRO<'_> {
-    #[inline]
-    fn region_replace<E: backend::Elem, const LEN: usize>(
-        _region: &mut Self::Region<E, LEN>,
-        _index: usize,
-        _value: E,
-    ) -> E {
-        read_only_write!()
-    }
-}
-
 pub mod test_helpers {
     use super::InMemoryBackend;
     use crate::state_backend::{test_helpers::TestBackendFactory, Layout};
@@ -593,35 +527,6 @@ pub mod test_helpers {
 pub mod tests {
     use super::*;
     use crate::state_backend::{AllocatedOf, Array, Atom, Backend, Cell, Cells, ManagerBase};
-
-    #[test]
-    fn test_ro() {
-        type L = (Atom<u64>, Array<u32, 4>);
-
-        struct T<M: ManagerBase> {
-            first: Cell<u64, M>,
-            second: Cells<u32, 4, M>,
-        }
-
-        impl<M: ManagerBase> T<M> {
-            fn bind(space: AllocatedOf<L, M>) -> Self {
-                T {
-                    first: space.0,
-                    second: space.1,
-                }
-            }
-        }
-
-        let (backend, placed) = InMemoryBackend::<L>::new();
-
-        let mut t = T::bind(backend.allocate_ro(placed));
-        let r = t.second.read(0);
-
-        assert_eq!(r, 0);
-
-        let result = std::panic::catch_unwind(move || t.first.write(1373));
-        assert!(result.is_err());
-    }
 
     #[test]
     fn test_backend_reuse() {
