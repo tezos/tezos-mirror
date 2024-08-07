@@ -310,3 +310,10 @@ let gas_left () =
     ~label:"gas_left"
     ~contract:"GasLeft"
     ~evm_version:"shanghai"
+
+let call_types () =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/call_types.sol")
+    ~label:"call_types"
+    ~contract:"TestCallTypes"
+    ~evm_version:"shanghai"
