@@ -38,7 +38,9 @@ use crate::{
     bits::ones,
     cache_utils::FenceCounter,
     machine_state::{bus::Address, csregisters::CSRRepr, mode::Mode},
-    state_backend::{AllocatedOf, Atom, Cell, Manager, ManagerBase, Many},
+    state_backend::{
+        AllocatedOf, Atom, Cell, ManagerBase, ManagerRead, ManagerReadWrite, ManagerWrite, Many,
+    },
 };
 use strum::EnumCount;
 
@@ -81,7 +83,7 @@ struct Cached<M: ManagerBase> {
     fence_counter: Cell<FenceCounter, M>,
 }
 
-impl<M: Manager> Cached<M> {
+impl<M: ManagerBase> Cached<M> {
     /// Bind the allocated cells.
     fn bind(space: AllocatedOf<CachedLayout, M>) -> Self {
         Self {
@@ -94,7 +96,10 @@ impl<M: Manager> Cached<M> {
     }
 
     /// Reset the underlying storage.
-    pub fn reset(&mut self) {
+    pub fn reset(&mut self)
+    where
+        M: ManagerWrite,
+    {
         self.fence_counter.write(FenceCounter::INITIAL);
         self.mode.write(!0);
         self.satp.write(!0);
@@ -104,7 +109,10 @@ impl<M: Manager> Cached<M> {
 
     /// Invalidate the cache entry.
     #[inline]
-    fn invalidate(&mut self) {
+    fn invalidate(&mut self)
+    where
+        M: ManagerWrite,
+    {
         self.virt_page.write(!0);
     }
 
@@ -116,7 +124,9 @@ impl<M: Manager> Cached<M> {
         virt_page: Address,
         phys_page: Address,
         fence_counter: FenceCounter,
-    ) {
+    ) where
+        M: ManagerWrite,
+    {
         self.satp.write(satp);
         self.mode.write(mode as u8);
         self.virt_page.write(virt_page);
@@ -132,7 +142,10 @@ impl<M: Manager> Cached<M> {
         virt_page: Address,
         virt_offset: Address,
         fence_counter: FenceCounter,
-    ) -> Option<u64> {
+    ) -> Option<u64>
+    where
+        M: ManagerRead,
+    {
         if self.virt_page.read() == virt_page
             && self.satp.read() == satp
             && self.mode.read() == mode as u8
@@ -160,7 +173,7 @@ struct AccessCache<M: ManagerBase> {
     entries: Box<[Cached<M>; PAGES]>,
 }
 
-impl<M: Manager> AccessCache<M> {
+impl<M: ManagerBase> AccessCache<M> {
     /// Bind the address translation cache to the allocated items.
     fn bind(space: AllocatedOf<AccessCacheLayout, M>) -> Self {
         Self {
@@ -178,14 +191,20 @@ impl<M: Manager> AccessCache<M> {
     }
 
     /// Reset the underlying storage.
-    fn reset(&mut self) {
+    fn reset(&mut self)
+    where
+        M: ManagerWrite,
+    {
         self.fence_counter.write(FenceCounter::INITIAL);
         self.entries.iter_mut().for_each(Cached::reset);
     }
 
     /// Invalidate the entire cache.
     #[inline]
-    fn invalidate(&mut self) {
+    fn invalidate(&mut self)
+    where
+        M: ManagerReadWrite,
+    {
         let fence_counter = self.fence_counter.read();
         self.fence_counter.write(fence_counter.next());
 
@@ -206,7 +225,10 @@ impl<M: Manager> AccessCache<M> {
 
     /// Attempt to translate a virtual address.
     #[inline]
-    fn try_translate(&self, satp: CSRRepr, mode: Mode, virt_addr: Address) -> Option<Address> {
+    fn try_translate(&self, satp: CSRRepr, mode: Mode, virt_addr: Address) -> Option<Address>
+    where
+        M: ManagerRead,
+    {
         let virt_page = virt_addr & PAGE_MASK;
         let virt_page_index = virtual_page_index(virt_page);
 
@@ -227,7 +249,9 @@ impl<M: Manager> AccessCache<M> {
         mode: Mode,
         virt_addr: Address,
         phys_addr: Address,
-    ) {
+    ) where
+        M: ManagerReadWrite,
+    {
         let virt_page = virt_addr & PAGE_MASK;
         let virt_page_index = virtual_page_index(virt_page);
 
@@ -263,7 +287,7 @@ pub struct TranslationCache<M: ManagerBase> {
     entries: [AccessCache<M>; NUM_ACCESS_TYPES],
 }
 
-impl<M: Manager> TranslationCache<M> {
+impl<M: ManagerBase> TranslationCache<M> {
     /// Bind the allocated cells.
     pub fn bind(space: AllocatedOf<TranslationCacheLayout, M>) -> Self {
         Self {
@@ -272,13 +296,19 @@ impl<M: Manager> TranslationCache<M> {
     }
 
     /// Reset the underlying state.
-    pub fn reset(&mut self) {
+    pub fn reset(&mut self)
+    where
+        M: ManagerWrite,
+    {
         self.entries.iter_mut().for_each(AccessCache::reset);
     }
 
     /// Invalidate the cache.
     #[inline]
-    pub fn invalidate(&mut self, access_types: impl IntoIterator<Item = AccessType>) {
+    pub fn invalidate(&mut self, access_types: impl IntoIterator<Item = AccessType>)
+    where
+        M: ManagerReadWrite,
+    {
         for access_type in access_types {
             let access_type_index = access_type_index(access_type);
             self.entries[access_type_index].invalidate();
@@ -293,7 +323,10 @@ impl<M: Manager> TranslationCache<M> {
         satp: CSRRepr,
         access_type: AccessType,
         virt_addr: Address,
-    ) -> Option<Address> {
+    ) -> Option<Address>
+    where
+        M: ManagerRead,
+    {
         let access_type_index = access_type_index(access_type);
         self.entries[access_type_index].try_translate(satp, mode, virt_addr)
     }
@@ -307,7 +340,9 @@ impl<M: Manager> TranslationCache<M> {
         access_type: AccessType,
         virt_addr: Address,
         phys_addr: Address,
-    ) {
+    ) where
+        M: ManagerReadWrite,
+    {
         let access_type_index = access_type_index(access_type);
         self.entries[access_type_index].cache_translation(satp, mode, virt_addr, phys_addr);
     }
