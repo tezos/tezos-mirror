@@ -6,16 +6,16 @@ Overview
 
 The Octez node provides a JSON/RPC interface. Note that it is an RPC
 interface, and it is JSON based, but it does not follow the “JSON-RPC”
-protocol. 
+protocol.
 
 Some RPC calls are computationally intensive. They can slow down the node
 and even temporarily block synchronization with its peers and get the
-node out of sync. 
+node out of sync.
 
 The JSON/RPC interface is not active by default mainly for security reasons.
 The operator should be explicit about exposing endpoints and possibly
 add a whitelist if necessary.
-See :ref:`default_acl` for limiting access to certain RPCs. 
+See :ref:`default_acl` for limiting access to certain RPCs.
 Another reason is the potential performance impact.
 See :ref:`activating_rpc` section.
 
@@ -24,10 +24,11 @@ activated in two different modes.
 
 - Local RPC server: this server operates in the same process as the
   Tezos node and serves data directly from the node.
-- External RPC server (experimental feature): this server operates in a separate process and
-  forwards requests to the Local RPC server. However, some RPC requests
-  are handled directly by the External RPC server, which we refer to as
-  being handled locally. This mode prevents the node from blocking.
+- External RPC server: this server operates in a separate process and
+  forwards requests to the Local RPC server. However, some RPC
+  requests are handled directly by the External RPC server, which we
+  refer to as being handled locally. This mode prevents the node from
+  blocking.
 
 .. figure:: images/rpc_intro.png
    :alt: Local and External RPC servers
@@ -73,8 +74,9 @@ just want to explore the RPC interface on your own, you would run::
 
     ./octez-node run --rpc-addr localhost
 
-To run an External RPC server (experimental feature), use instead ``--external-rpc-addr``
-in the command line. Then an External RPC server is started at port ``18731``.
+To run an External RPC server, use instead ``--external-rpc-addr`` in
+the command line. Then an External RPC server is started at port
+``18731``.
 
 ::
 
@@ -121,7 +123,7 @@ format. For example, the previous RPC call, that does not require an
 input, would display on the standard output::
 
     { "balance": "4000000000000" }
-    
+
 When calling an RPC that requires an input through command line, you will
 be prompted to provide the JSON input
 in your default configured text editor. Alternatively, you can provide
@@ -130,11 +132,11 @@ the JSON input using command
 ::
 
     octez-admin-client rpc post <url> with <JSON>
-    
+
 Don't forget to quote the JSON according to your shell rules.
 
-External RPC server (experimental feature)
-------------------------------------------
+External RPC server
+-------------------
 
 Thanks to this feature, the node won't experience slowdowns on computationally
 intensive RPC calls. This significantly reduces the load on the Tezos node and
@@ -148,10 +150,6 @@ A benchmark framework, implemented in the
 allows to run performance evaluations easily. Along with
 this benchmark framework, former results are stored in the dedicated
 :src:`devtools/benchmarks-tools/bench_RPS/results.json` file.
-
-.. warning::
-   It is not recommended to use External RPC server yet, as
-   it is still an experimental feature.
 
 RPC versions
 ------------
@@ -178,7 +176,7 @@ Resto is responsible for the following:
 - Providing primitives to describe services.
 - Assembling the services into directories which are essentially maps of paths
   and methods to services.
-- Spinning up a Cohttp server that serves the chosen directory. 
+- Spinning up a Cohttp server that serves the chosen directory.
 - Making requests to services as a client. The client automatically builds
   paths based on parameters to the service, assembles other HTTP details,
   and parses the response.
@@ -206,5 +204,4 @@ calls with their input/output.
 A useful tool to manipulate JSON is `jq <https://stedolan.github.io/jq/>`_.
 
 To enable the logs for RPC-related components, prepend Tezos scripts
-with ``TEZOS_LOG="*->debug"`` and ``COHTTP_DEBUG=true``. 
-
+with ``TEZOS_LOG="*->debug"`` and ``COHTTP_DEBUG=true``.
