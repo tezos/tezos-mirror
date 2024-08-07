@@ -45,7 +45,9 @@ extern crate tezos_smart_rollup_debug as debug;
 extern crate tezos_smart_rollup_host as host;
 
 use precompiles::PrecompileSet;
-use trace::{CallTrace, CallTracerInput, StructLoggerInput, TracerInput};
+use trace::{
+    CallTrace, CallTracerConfig, CallTracerInput, StructLoggerInput, TracerInput,
+};
 
 use crate::{handler::ExtendedExitReason, storage::tracer};
 
@@ -271,7 +273,7 @@ where
                         )?
                     } else if let Some(CallTracer(CallTracerInput {
                         transaction_hash,
-                        ..
+                        config: CallTracerConfig { with_logs, .. },
                     })) = tracer
                     {
                         let mut call_trace = CallTrace::new_minimal_trace(
@@ -287,6 +289,10 @@ where
                         call_trace.add_gas(gas_limit);
                         call_trace
                             .add_output(result.result.as_ref().map(|res| res.to_vec()));
+
+                        if with_logs {
+                            call_trace.add_logs(Some(result.logs.clone()))
+                        }
 
                         tracer::store_call_trace(
                             handler.host,
