@@ -37,6 +37,13 @@ type forwarder_events = {
           (without any forwarding). *)
 }
 
+type forwarder_resources
+
+val init_forwarder : unit -> forwarder_resources
+
+val forwarding_conn_closed :
+  forwarder_resources -> 'a * Cohttp.Connection.t -> unit
+
 (** A Resto middleware that transforms any callback to an other that rewrites
     queries that the proxy server cannot handle and forwards them to the full
     node at the given [Uri.t]. If [acl] parameter is provided, the forwarding
@@ -45,6 +52,7 @@ val proxy_server_query_forwarder :
   ?acl:RPC_server.Acl.t ->
   ?ctx:Cohttp_lwt_unix.Net.ctx ->
   ?forwarder_events:forwarder_events ->
+  forwarder_resources ->
   Uri.t ->
   RPC_server.callback ->
   RPC_server.callback

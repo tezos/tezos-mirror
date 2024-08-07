@@ -113,19 +113,26 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) : sig
   val resto_callback : server -> callback
 
   (** [launch server ?conn_closed ?callback listening_protocol] starts
-     the given resto [server] initiating the listening loop using the
+     the given Resto [server], initiating the listening loop using the
      [listening_protocol].
 
-      @param [callback] overwrites (if given) the default handler of
-     resto each http query will be treated by.
+     @param [callback] overwrites (if given) the default handler of
+     Resto each HTTP query will be treated by.
 
-      @param [conn_closed] is an optional function that is called when
-     a connection is closed. *)
+     @param [conn_closed] is an optional function that is called when
+     a connection is closed.
+
+     @param [sleep_fn] is an optional function used to actively wait
+     for EOF on the established connection. If not provided, EOF will not be
+     awaited while [callback] is executed. This can lead to inefficient
+     resource usage while serving an abandoned request or can lead to a
+     resource leak if the [callback] promise is never resolved for some reason. *)
   val launch :
     ?host:string ->
     server ->
     ?conn_closed:(Cohttp_lwt_unix.Server.conn -> unit) ->
     ?callback:callback ->
+    ?sleep_fn:(unit -> unit Lwt.t) ->
     Conduit_lwt_unix.server ->
     unit Lwt.t
 
