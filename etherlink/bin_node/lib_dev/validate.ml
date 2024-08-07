@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2024 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -62,20 +63,31 @@ let validate backend_rpc transaction ~caller =
   let** () = validate_pay_for_fees backend_rpc transaction caller in
   return (Ok ())
 
+let valid_transaction_object ~backend_rpc ~decode ~hash tx_raw =
+  let open Lwt_result_syntax in
+  let tx_raw = Bytes.unsafe_of_string tx_raw in
+  let**? transaction = decode tx_raw in
+  let**? transaction_object =
+    Transaction.to_transaction_object ~hash transaction
+  in
+  let** () = validate backend_rpc transaction ~caller:transaction_object.from in
+  return (Ok (Either.Left transaction_object))
+
 let is_tx_valid ((module Backend_rpc : Services_backend_sig.S) as backend_rpc)
     tx_raw =
-  let open Lwt_result_syntax in
-  let hash = hash_raw_tx tx_raw in
+  let hash = Ethereum_types.hash_raw_tx tx_raw in
   match String.get_uint8 tx_raw 0 with
   | 1 -> Backend_rpc.is_tx_valid tx_raw
-  | 2 -> Backend_rpc.is_tx_valid tx_raw
+  | 2 ->
+      let tx_raw = String.sub tx_raw 1 (String.length tx_raw - 1) in
+      valid_transaction_object
+        ~backend_rpc
+        ~decode:Transaction.decode_eip1559
+        ~hash
+        tx_raw
   | _ ->
-      let tx_raw = Bytes.unsafe_of_string tx_raw in
-      let**? transaction = Transaction.decode_legacy tx_raw in
-      let**? transaction_object =
-        Transaction.to_transaction_object ~hash transaction
-      in
-      let** () =
-        validate backend_rpc transaction ~caller:transaction_object.from
-      in
-      return (Ok (Either.Left transaction_object))
+      valid_transaction_object
+        ~backend_rpc
+        ~decode:Transaction.decode_legacy
+        ~hash
+        tx_raw

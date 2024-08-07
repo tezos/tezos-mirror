@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2024 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -25,6 +26,47 @@ type transaction = {
   s : bytes;
 }
 
+let decode_transaction ?chain_id ~tx_type ~nonce ~max_priority_fee_per_gas
+    ~max_fee_per_gas ~gas_limit ~to_ ~value ~data ?(access_list = []) (v, r, s)
+    =
+  let open Result_syntax in
+  let (Qty nonce) = decode_number_be nonce in
+  let (Qty gas_limit) = decode_number_be gas_limit in
+  let (Qty max_priority_fee_per_gas) =
+    decode_number_be max_priority_fee_per_gas
+  in
+  let (Qty max_fee_per_gas) = decode_number_be max_fee_per_gas in
+  let to_ = if to_ = Bytes.empty then None else Some to_ in
+  let (Qty value) = decode_number_be value in
+  let (Qty v) = decode_number_be v in
+  let* chain_id =
+    match chain_id with
+    | None ->
+        let open Z in
+        if v > of_int 36 then return (Some (div (v - of_int 35) (of_int 2)))
+        else if v = of_int 27 || v = of_int 28 then return None
+        else fail "Chain ID cannot be decoded"
+    | Some chain_id ->
+        let (Qty chain_id) = decode_number_be chain_id in
+        return (Some chain_id)
+  in
+  return
+    {
+      transaction_type = tx_type;
+      chain_id;
+      nonce;
+      max_priority_fee_per_gas;
+      max_fee_per_gas;
+      gas_limit;
+      to_;
+      value;
+      data;
+      access_list;
+      v;
+      r;
+      s;
+    }
+
 let decode_legacy : bytes -> (transaction, string) result =
  fun bytes ->
   let open Result_syntax in
@@ -43,34 +85,16 @@ let decode_legacy : bytes -> (transaction, string) result =
           Value r;
           Value s;
         ]) ->
-      let (Qty nonce) = decode_number_be nonce in
-      let (Qty gas_limit) = decode_number_be gas_limit in
-      let (Qty gas_price) = decode_number_be gas_price in
-      let to_ = if to_ = Bytes.empty then None else Some to_ in
-      let (Qty value) = decode_number_be value in
-      let (Qty v) = decode_number_be v in
-      let* chain_id =
-        let open Z in
-        if v > of_int 36 then return (Some (div (v - of_int 35) (of_int 2)))
-        else if v = of_int 27 || v = of_int 28 then return None
-        else fail "Chain ID cannot be decoded"
-      in
-      return
-        {
-          transaction_type = Legacy;
-          chain_id;
-          nonce;
-          max_priority_fee_per_gas = gas_price;
-          max_fee_per_gas = gas_price;
-          gas_limit;
-          to_;
-          value;
-          data;
-          access_list = [];
-          v;
-          r;
-          s;
-        }
+      decode_transaction
+        ~tx_type:Legacy
+        ~nonce
+        ~max_priority_fee_per_gas:gas_price
+        ~max_fee_per_gas:gas_price
+        ~gas_limit
+        ~to_
+        ~value
+        ~data
+        (v, r, s)
   | _ -> fail "Legacy transaction is not 9 rlp items"
 
 let encode_legacy_transaction : transaction -> bytes = function
@@ -122,6 +146,82 @@ let encode_legacy_transaction : transaction -> bytes = function
       encode rlp
   | _ -> invalid_arg "Transaction is not legacy"
 
+let decode_eip1559 : bytes -> (transaction, string) result =
+ fun bytes ->
+  let open Result_syntax in
+  let open Rlp in
+  match decode bytes with
+  | Ok
+      (List
+        [
+          Value chain_id;
+          Value nonce;
+          Value max_priority_fee_per_gas;
+          Value max_fee_per_gas;
+          Value gas_limit;
+          Value to_;
+          Value value;
+          Value data;
+          List _access_list;
+          Value v;
+          Value r;
+          Value s;
+        ]) ->
+      decode_transaction
+        ~tx_type:Eip1559
+        ~chain_id
+        ~nonce
+        ~max_priority_fee_per_gas
+        ~max_fee_per_gas
+        ~gas_limit
+        ~to_
+        ~value
+        ~data
+        (v, r, s)
+  | _ -> fail "Eip1559 transaction is not 12 rlp items"
+
+let encode_eip1559_transaction : transaction -> bytes = function
+  | {
+      transaction_type = Eip1559;
+      chain_id = Some chain_id;
+      nonce;
+      max_priority_fee_per_gas;
+      max_fee_per_gas;
+      gas_limit;
+      to_;
+      value;
+      data;
+      access_list = [];
+      v = _;
+      r = _;
+      s = _;
+    } ->
+      let open Rlp in
+      let rlp =
+        let chain_id = encode_z chain_id in
+        let nonce = encode_z nonce in
+        let max_priority_fee_per_gas = encode_z max_priority_fee_per_gas in
+        let max_fee_per_gas = encode_z max_fee_per_gas in
+        let gas_limit = encode_z gas_limit in
+        let to_ = Option.value ~default:Bytes.empty to_ in
+        let value = encode_z value in
+        List
+          [
+            Value chain_id;
+            Value nonce;
+            Value max_priority_fee_per_gas;
+            Value max_fee_per_gas;
+            Value gas_limit;
+            Value to_;
+            Value value;
+            Value data;
+            List [];
+          ]
+      in
+      let prefix = Bytes.make 1 (Char.chr 2) in
+      Bytes.cat prefix (encode rlp)
+  | _ -> invalid_arg "Transaction is not eip 1559"
+
 (** [message transaction] returns the "message" of the transaction, the
     binary blob that is signed and then to be used in signature recovery. *)
 let message : transaction -> bytes =
@@ -130,7 +230,7 @@ let message : transaction -> bytes =
     match transaction.transaction_type with
     | Legacy -> encode_legacy_transaction transaction
     | Eip2930 -> invalid_arg "Eip2930 is not yet supported"
-    | Eip1559 -> invalid_arg "Eip1559 is not yet supported"
+    | Eip1559 -> encode_eip1559_transaction transaction
   in
   Tezos_crypto.Hacl.Hash.Keccak_256.digest encoded_transaction
 
@@ -149,7 +249,7 @@ let recovery_id : transaction -> (bytes, string) result =
     | Legacy ->
         legacy_recovery_id ~chain_id:transaction.chain_id ~v:transaction.v
     | Eip2930 -> invalid_arg "Eip2930 is not yet supported"
-    | Eip1559 -> invalid_arg "Eip1559 is not yet supported"
+    | Eip1559 -> Z.to_int transaction.v
   in
   if ri == 0 || ri == 1 then (
     let buffer = Bytes.create 1 in

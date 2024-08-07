@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2024 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -35,6 +36,9 @@ type transaction = {
 
 (** [decode_legacy bytes] tries to decode [bytes] into a {!transaction}. *)
 val decode_legacy : bytes -> (transaction, string) result
+
+(** [decode_eip1559 bytes] tries to decode [bytes] into a {!transaction}. *)
+val decode_eip1559 : bytes -> (transaction, string) result
 
 (** [to_transaction_object ~hash transaction] transforms a [transaction] and
     its [hash] to a {!Ethereum_types.transaction_object}. *)
