@@ -695,9 +695,49 @@ let check_history_mode config profile_ctxt proto_parameters =
       else return_unit
   | Rolling {blocks = `Auto} | Full -> return_unit
 
+(* We need more levels because [store_skip_list_cells level] needs the plugin
+   for [attestation_lag + 1] levels in the past wrt to the target [level]. Note
+   {!get_storage_period} refers to published levels (not attested levels). The
+   plus one comes from the technical details of {!store_skip_list_cells}. *)
+let skip_list_offset proto_parameters =
+  proto_parameters.Dal_plugin.attestation_lag + 1
+
+(* This function determines the storage period taking into account the node's
+   [first_seen_level]. Indeed, if the node started for the first time, we do not
+   expect it to store skip list cells (even if it supports refutations) for the
+   entire required period of 3 months, because it will anyway not have the slot
+   pages for this period. Note that this could be further refined by taking into
+   account when the corresponding rollup was originated. *)
+let get_storage_period profile_ctxt proto_parameters head_level first_seen_level
+    =
+  let supports_refutations =
+    Profile_manager.supports_refutations profile_ctxt
+  in
+  let default_storage_period =
+    Profile_manager.get_attested_data_default_store_period
+      profile_ctxt
+      proto_parameters
+  in
+  if supports_refutations then
+    (* This deliberately does not take into account the [last_processed_level]. *)
+    let online_period =
+      match first_seen_level with
+      | None -> 0
+      | Some first_seen_level ->
+          Int32.sub head_level first_seen_level |> Int32.to_int
+    in
+    (* Even if the node was not online previously, or it was online only for a
+       few levels, we still need to store data for the minimal period, defined
+       in [get_attested_data_default_store_period]. TODO: refactor to expose
+       this value. *)
+    let max_period = max (2 * proto_parameters.attestation_lag) online_period in
+    min max_period default_storage_period
+  else default_storage_period
+
 (* This function checks the L1 node stores enough block data for the DAL node to
    function correctly. *)
-let check_l1_history_mode profile_ctxt cctxt proto_parameters =
+let check_l1_history_mode profile_ctxt cctxt proto_parameters head_level
+    first_level =
   let open Lwt_result_syntax in
   let* l1_history_mode =
     let* l1_mode, blocks_preservation_cycles_opt =
@@ -737,21 +777,15 @@ let check_l1_history_mode profile_ctxt cctxt proto_parameters =
   in
   match l1_history_mode with
   | `L1_archive -> return_unit
-  | `L1_rolling c ->
-      let b =
-        Profile_manager.get_attested_data_default_store_period
-          profile_ctxt
-          proto_parameters
-      in
-      let b =
+  | `L1_rolling l1_cycles ->
+      let dal_blocks =
+        get_storage_period profile_ctxt proto_parameters head_level first_level
+        +
         if Profile_manager.supports_refutations profile_ctxt then
-          (* We need more levels because [store_skip_list_cells level] needs the
-             plugin for [attestation_lag + 1] levels in the past wrt to the
-             target [level]. *)
-          b + proto_parameters.attestation_lag + 1
-        else b
+          skip_list_offset proto_parameters
+        else 0
       in
-      check ~dal_blocks:b ~l1_cycles:c
+      check ~dal_blocks ~l1_cycles
 
 let build_profile_context config =
   let open Lwt_result_syntax in
@@ -760,7 +794,7 @@ let build_profile_context config =
   match res with
   | Ok loaded_profile ->
       (* The profiles from the loaded context are prioritized over the
-           profiles provided in the config file. *)
+         profiles provided in the config file. *)
       Profile_manager.merge_profiles
         ~lower_prio:config.Configuration_file.profile
         ~higher_prio:loaded_profile
@@ -785,7 +819,7 @@ let update_and_register_profiles ctxt =
 (* This function fetches the protocol plugins for levels for which it is needed
    to add skip list cells. It starts by computing the oldest level at which it
    will be needed to add skip list cells. *)
-let get_proto_plugins cctxt profile_ctxt last_processed_level
+let get_proto_plugins cctxt profile_ctxt ~last_processed_level ~first_seen_level
     (head_level, (module Plugin : Dal_plugin.T), proto_parameters) =
   (* We resolve the plugins for all levels starting with [(max
      last_processed_level (head_level - storage_period)], or (max
@@ -797,9 +831,7 @@ let get_proto_plugins cctxt profile_ctxt last_processed_level
      parameters and the relevant encodings do not change for now, so the head
      plugin could be used). *)
   let storage_period =
-    Profile_manager.get_attested_data_default_store_period
-      profile_ctxt
-      proto_parameters
+    get_storage_period profile_ctxt proto_parameters head_level first_seen_level
   in
   let first_level =
     Int32.max
@@ -808,8 +840,7 @@ let get_proto_plugins cctxt profile_ctxt last_processed_level
   in
   let first_level =
     if Profile_manager.supports_refutations profile_ctxt then
-      (* See usage of the plugin in [store_skip_list_cells] *)
-      Int32.(sub first_level (of_int (1 + proto_parameters.attestation_lag)))
+      Int32.sub first_level (Int32.of_int (skip_list_offset proto_parameters))
     else first_level
   in
   let first_level = Int32.(max 1l first_level) in
@@ -828,7 +859,7 @@ let get_proto_plugins cctxt profile_ctxt last_processed_level
    and we don't detect it if this code starts running just before the migration
    level, and the head changes meanwhile to be above the migration level.
 *)
-let clean_up_store ctxt cctxt ~last_processed_level
+let clean_up_store ctxt cctxt ~last_processed_level ~first_seen_level
     (head_level, (module Plugin : Dal_plugin.T), proto_parameters) =
   let open Lwt_result_syntax in
   let store_skip_list_cells ~level =
@@ -852,29 +883,27 @@ let clean_up_store ctxt cctxt ~last_processed_level
   (* [target_level] identifies the level wrt to head level at which we want to
      start the P2P and process blocks as usual. *)
   let target_level head_level = Int32.(sub head_level 2l) in
-  let first_level_for_skip_list_storage period head_level =
-    (* We consider that [period] refers to published levels (not attested
-       levels). The plus one comes from the technical details of
-       {store_skip_list_cells}. Note that behind this first level we do not have
+  let first_level_for_skip_list_storage period level =
+    (* Note that behind this first level we do not have
        the plugin. *)
-    Int32.(
-      sub
-        head_level
-        (of_int (period - (proto_parameters.Dal_plugin.attestation_lag + 1))))
+    Int32.(sub level (of_int period))
   in
   let should_store_skip_list_cells ~head_level ~level =
     let profile_ctxt = Node_context.get_profile_ctxt ctxt in
     let period =
-      Profile_manager.get_attested_data_default_store_period
+      get_storage_period
         profile_ctxt
         proto_parameters
+        head_level
+        first_seen_level
+      + skip_list_offset proto_parameters
     in
     supports_refutations
     && level >= first_level_for_skip_list_storage period head_level
   in
   let rec do_clean_up last_processed_level head_level =
     let last_level = target_level head_level in
-    let rec clean_up_from_level level =
+    let rec clean_up_at_level level =
       if level > last_level then return_unit
       else
         let*! () =
@@ -888,10 +917,10 @@ let clean_up_store ctxt cctxt ~last_processed_level
         let* () =
           Store.Last_processed_level.save store.last_processed_level level
         in
-        clean_up_from_level (Int32.succ level)
+        clean_up_at_level (Int32.succ level)
     in
     (* Clean up from [last_processed_level] to [last_level]. *)
-    let* () = clean_up_from_level (Int32.succ last_processed_level) in
+    let* () = clean_up_at_level (Int32.succ last_processed_level) in
     (* As this iteration may be slow, the head level might have advanced in the
        meanwhile. *)
     let* header =
@@ -1036,7 +1065,14 @@ let run ~data_dir ~configuration_override =
       ~number_of_slots:proto_parameters.number_of_slots
   in
   let* () = check_history_mode config profile_ctxt proto_parameters in
-  let* () = check_l1_history_mode profile_ctxt cctxt proto_parameters in
+  let* () =
+    check_l1_history_mode
+      profile_ctxt
+      cctxt
+      proto_parameters
+      head_level
+      first_seen_level
+  in
   (* Initialize the crypto process *)
   (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5743
      Instead of recomputing these parameters, they could be stored
@@ -1058,7 +1094,12 @@ let run ~data_dir ~configuration_override =
     (Cryptobox.Internal_for_tests.encoded_share_size cryptobox) ;
   Value_size_hooks.set_number_of_slots proto_parameters.number_of_slots ;
   let* proto_plugins =
-    get_proto_plugins cctxt profile_ctxt last_processed_level plugin_info
+    get_proto_plugins
+      cctxt
+      profile_ctxt
+      ~last_processed_level
+      ~first_seen_level
+      plugin_info
   in
   let ctxt =
     Node_context.init
@@ -1078,7 +1119,12 @@ let run ~data_dir ~configuration_override =
     match last_processed_level with
     | None -> (* there's nothing to clean up *) return_unit
     | Some last_processed_level ->
-        clean_up_store ctxt cctxt ~last_processed_level plugin_info
+        clean_up_store
+          ctxt
+          cctxt
+          ~last_processed_level
+          ~first_seen_level
+          plugin_info
   in
   let* crawler =
     (* We reload the last processed level because [clean_up_store] has likely
