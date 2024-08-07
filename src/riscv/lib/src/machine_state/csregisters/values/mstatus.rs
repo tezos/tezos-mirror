@@ -107,21 +107,21 @@ impl<M: ManagerBase> MStatusValue<M> {
     }
 
     #[inline(always)]
-    pub fn mie_write(&mut self, value: bool) -> CSREffect
+    pub fn mie_write(&mut self, value: bool) -> Option<CSREffect>
     where
         M: ManagerWrite,
     {
         self.mie.write(value);
-        CSREffect::InvalidateTranslationCacheXIE
+        Some(CSREffect::InvalidateTranslationCacheXIE)
     }
 
     #[inline(always)]
-    pub fn mie_replace(&mut self, value: bool) -> (bool, CSREffect)
+    pub fn mie_replace(&mut self, value: bool) -> (bool, Option<CSREffect>)
     where
         M: ManagerReadWrite,
     {
         let old_value = self.mie.replace(value);
-        (old_value, CSREffect::InvalidateTranslationCacheXIE)
+        (old_value, Some(CSREffect::InvalidateTranslationCacheXIE))
     }
 
     #[inline(always)]
@@ -133,21 +133,21 @@ impl<M: ManagerBase> MStatusValue<M> {
     }
 
     #[inline(always)]
-    pub fn sie_write(&mut self, value: bool) -> CSREffect
+    pub fn sie_write(&mut self, value: bool) -> Option<CSREffect>
     where
         M: ManagerWrite,
     {
         self.sie.write(value);
-        CSREffect::InvalidateTranslationCacheXIE
+        Some(CSREffect::InvalidateTranslationCacheXIE)
     }
 
     #[inline(always)]
-    pub fn sie_replace(&mut self, value: bool) -> (bool, CSREffect)
+    pub fn sie_replace(&mut self, value: bool) -> (bool, Option<CSREffect>)
     where
         M: ManagerReadWrite,
     {
         let old_value = self.sie.replace(value);
-        (old_value, CSREffect::InvalidateTranslationCacheXIE)
+        (old_value, Some(CSREffect::InvalidateTranslationCacheXIE))
     }
 }
 
@@ -218,7 +218,7 @@ impl<M: ManagerBase> MStatusValue<M> {
 
     /// Write to mstatus the `value` given in 64 bit representation
     #[inline]
-    pub fn write(&mut self, value: CSRRepr) -> CSREffect
+    pub fn write(&mut self, value: CSRRepr) -> Option<CSREffect>
     where
         M: ManagerWrite,
     {
@@ -227,8 +227,8 @@ impl<M: ManagerBase> MStatusValue<M> {
 
         let effect_sie = mstatus.sie_write(value.sie());
         let effect_mie = mstatus.mie_write(value.mie());
-        debug_assert_eq!(effect_sie, CSREffect::InvalidateTranslationCacheXIE);
-        debug_assert_eq!(effect_mie, CSREffect::InvalidateTranslationCacheXIE);
+        debug_assert_eq!(effect_sie, Some(CSREffect::InvalidateTranslationCacheXIE));
+        debug_assert_eq!(effect_mie, Some(CSREffect::InvalidateTranslationCacheXIE));
 
         mstatus.spie.write(value.spie());
         mstatus.ube.write(value.ube());
@@ -248,12 +248,12 @@ impl<M: ManagerBase> MStatusValue<M> {
         mstatus.sbe.write(value.sbe());
         mstatus.mbe.write(value.mbe());
 
-        CSREffect::InvalidateTranslationCacheXIE
+        Some(CSREffect::InvalidateTranslationCacheXIE)
     }
 
     /// Replace mstatus with `value` given in 64 bit representation
     #[inline]
-    pub fn replace(&mut self, value: CSRRepr) -> (CSRRepr, CSREffect)
+    pub fn replace(&mut self, value: CSRRepr) -> (CSRRepr, Option<CSREffect>)
     where
         M: ManagerReadWrite,
     {
@@ -262,8 +262,8 @@ impl<M: ManagerBase> MStatusValue<M> {
 
         let (sie, effect_sie) = mstatus.sie_replace(value.sie());
         let (mie, effect_mie) = mstatus.mie_replace(value.mie());
-        debug_assert_eq!(effect_sie, CSREffect::InvalidateTranslationCacheXIE);
-        debug_assert_eq!(effect_mie, CSREffect::InvalidateTranslationCacheXIE);
+        debug_assert_eq!(effect_sie, Some(CSREffect::InvalidateTranslationCacheXIE));
+        debug_assert_eq!(effect_mie, Some(CSREffect::InvalidateTranslationCacheXIE));
 
         let spie = mstatus.spie.replace(value.spie());
         let ube = mstatus.ube.replace(value.ube());
@@ -314,6 +314,6 @@ impl<M: ManagerBase> MStatusValue<M> {
         )
         .to_bits();
 
-        (old_value, CSREffect::InvalidateTranslationCacheXIE)
+        (old_value, Some(CSREffect::InvalidateTranslationCacheXIE))
     }
 }

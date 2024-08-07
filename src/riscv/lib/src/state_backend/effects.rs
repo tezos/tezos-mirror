@@ -14,7 +14,7 @@ pub trait EffectGetter {
     type Effect;
 
     /// Effect on write/replace operations.
-    const EFFECT: Self::Effect;
+    const EFFECT: Option<Self::Effect>;
 }
 
 pub type EffectCellLayout<T> = Atom<T>;
@@ -39,7 +39,7 @@ impl<T: Elem, EG: EffectGetter, M: ManagerBase> EffectCell<T, EG, M> {
         self.inner.read()
     }
 
-    pub fn write(&mut self, value: T) -> EG::Effect
+    pub fn write(&mut self, value: T) -> Option<EG::Effect>
     where
         M: ManagerWrite,
     {
@@ -47,7 +47,7 @@ impl<T: Elem, EG: EffectGetter, M: ManagerBase> EffectCell<T, EG, M> {
         EG::EFFECT
     }
 
-    pub fn replace(&mut self, value: T) -> (T, EG::Effect)
+    pub fn replace(&mut self, value: T) -> (T, Option<EG::Effect>)
     where
         M: ManagerReadWrite,
     {

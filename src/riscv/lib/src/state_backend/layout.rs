@@ -127,7 +127,7 @@ macro_rules! struct_layout {
 
                 fn place_with(alloc: &mut $crate::state_backend::Choreographer) -> Self::Placed {
                     [<$layout_t Placed>] {
-                        $($field_name: alloc.alloc()),+
+                        $($field_name: <$cell_repr>::place_with(alloc)),+
                     }
                 }
 
