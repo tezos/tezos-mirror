@@ -215,7 +215,7 @@ fn fetch_delayed_txs<Host: Runtime>(
     let mut delayed_txs = vec![];
     let mut total_size = current_blueprint_size;
     for tx_hash in blueprint_with_hashes.delayed_hashes {
-        let tx = delayed_inbox.find_and_remove_transaction(host, tx_hash)?;
+        let tx = delayed_inbox.find_transaction(host, tx_hash)?;
         // This is overestimated, as the transactions cannot be chunked in the
         // delayed bridge.
         total_size += MAXIMUM_SIZE_OF_DELAYED_TRANSACTION;

@@ -9,7 +9,9 @@ use crate::apply::{
     apply_transaction, ExecutionInfo, ExecutionResult, WITHDRAWAL_OUTBOX_QUEUE,
 };
 use crate::blueprint_storage::{drop_blueprint, read_next_blueprint};
+use crate::configuration::ConfigurationMode;
 use crate::configuration::Limits;
+use crate::delayed_inbox::DelayedInbox;
 use crate::error::Error;
 use crate::event::Event;
 use crate::internal_storage::InternalRuntime;
@@ -28,6 +30,7 @@ use evm_execution::precompiles::PrecompileBTreeMap;
 use evm_execution::trace::TracerInput;
 use primitive_types::{H160, H256, U256};
 use tezos_ethereum::block::BlockFees;
+use tezos_ethereum::transaction::TransactionHash;
 use tezos_evm_logging::{log, Level::*};
 use tezos_indexable_storage::IndexableStorage;
 use tezos_smart_rollup::outbox::OutboxQueue;
@@ -59,6 +62,14 @@ impl TickCounter {
 }
 
 #[derive(PartialEq, Debug)]
+pub enum BlockComputationResult {
+    RebootNeeded,
+    Finished {
+        included_delayed_transactions: Vec<TransactionHash>,
+    },
+}
+
+#[derive(PartialEq, Debug)]
 pub enum ComputationResult {
     RebootNeeded,
     Finished,
@@ -77,7 +88,7 @@ fn compute<Host: Runtime>(
     sequencer_pool_address: Option<H160>,
     limits: &Limits,
     tracer_input: Option<TracerInput>,
-) -> Result<ComputationResult, anyhow::Error> {
+) -> Result<BlockComputationResult, anyhow::Error> {
     log!(
         host,
         Debug,
@@ -116,7 +127,7 @@ fn compute<Host: Runtime>(
                     be allocated enough ticks even alone in a kernel run."
                 );
             }
-            return Ok(ComputationResult::RebootNeeded);
+            return Ok(BlockComputationResult::RebootNeeded);
         }
 
         // If `apply_transaction` returns `None`, the transaction should be
@@ -141,6 +152,10 @@ fn compute<Host: Runtime>(
                 object_info,
                 estimated_ticks_used,
             }) => {
+                if transaction.is_delayed() {
+                    block_in_progress.register_delayed_transaction(transaction.tx_hash);
+                }
+
                 block_in_progress.register_valid_transaction(
                     &transaction,
                     object_info,
@@ -167,9 +182,13 @@ fn compute<Host: Runtime>(
                          current reboot but will be retried."
                 );
                 block_in_progress.repush_tx(transaction);
-                return Ok(ComputationResult::RebootNeeded);
+                return Ok(BlockComputationResult::RebootNeeded);
             }
             ExecutionResult::Invalid => {
+                if transaction.is_delayed() {
+                    block_in_progress.register_delayed_transaction(transaction.tx_hash);
+                }
+
                 block_in_progress.account_for_invalid_transaction(data_size);
                 log!(
                     host,
@@ -181,7 +200,9 @@ fn compute<Host: Runtime>(
         };
         is_first_transaction = false;
     }
-    Ok(ComputationResult::Finished)
+    Ok(BlockComputationResult::Finished {
+        included_delayed_transactions: block_in_progress.delayed_txs.clone(),
+    })
 }
 
 enum BlueprintParsing {
@@ -250,7 +271,7 @@ fn compute_bip<Host: KernelRuntime>(
     chain_id: U256,
     block_fees: &BlockFees,
     coinbase: H160,
-) -> anyhow::Result<ComputationResult> {
+) -> anyhow::Result<BlockComputationResult> {
     let constants: BlockConstants =
         block_in_progress.constants(chain_id, block_fees, GAS_LIMIT, coinbase);
     let result = compute(
@@ -266,8 +287,8 @@ fn compute_bip<Host: KernelRuntime>(
         limits,
         tracer_input,
     )?;
-    match result {
-        ComputationResult::RebootNeeded => {
+    match &result {
+        BlockComputationResult::RebootNeeded => {
             log!(host, Info, "Ask for reboot.");
             log!(
                 host,
@@ -277,7 +298,9 @@ fn compute_bip<Host: KernelRuntime>(
             );
             storage::store_block_in_progress(host, &block_in_progress)?;
         }
-        ComputationResult::Finished => {
+        BlockComputationResult::Finished {
+            included_delayed_transactions: _,
+        } => {
             crate::gas_price::register_block(host, &block_in_progress)?;
             *tick_counter =
                 TickCounter::finalize(block_in_progress.estimated_ticks_in_run);
@@ -312,11 +335,24 @@ fn revert_block<Host: Runtime>(
     Ok(())
 }
 
+fn clean_delayed_transactions(
+    host: &mut impl Runtime,
+    delayed_inbox: &mut DelayedInbox,
+    delayed_txs: Vec<TransactionHash>,
+) -> anyhow::Result<()> {
+    for hash in delayed_txs {
+        delayed_inbox.delete(host, hash.into())?;
+    }
+    Ok(())
+}
+
 fn promote_block<Host: Runtime>(
     safe_host: &mut SafeStorage<&mut Host, &mut impl InternalRuntime>,
     outbox_queue: &OutboxQueue<'_, impl Path>,
     block_in_progress: bool,
     number: U256,
+    config: &mut Configuration,
+    delayed_txs: Vec<TransactionHash>,
 ) -> anyhow::Result<()> {
     if block_in_progress {
         storage::delete_block_in_progress(safe_host)?;
@@ -339,6 +375,10 @@ fn promote_block<Host: Runtime>(
         "Flushed outbox queue messages ({} flushed)",
         written
     );
+
+    if let ConfigurationMode::Sequencer { delayed_inbox, .. } = &mut config.mode {
+        clean_delayed_transactions(safe_host.host, delayed_inbox, delayed_txs)?;
+    }
 
     Ok(())
 }
@@ -407,18 +447,22 @@ pub fn produce<Host: Runtime>(
                 &block_fees,
                 coinbase,
             ) {
-                Ok(ComputationResult::Finished) => {
+                Ok(BlockComputationResult::Finished {
+                    included_delayed_transactions,
+                }) => {
                     promote_block(
                         &mut safe_host,
                         &outbox_queue,
                         true,
                         processed_blueprint,
+                        config,
+                        included_delayed_transactions,
                     )?;
                     if at_most_one_block {
                         return Ok(ComputationResult::Finished);
                     }
                 }
-                Ok(ComputationResult::RebootNeeded) => {
+                Ok(BlockComputationResult::RebootNeeded) => {
                     // The computation still needs to reboot, we do nothing.
                     return Ok(ComputationResult::RebootNeeded);
                 }
@@ -487,13 +531,22 @@ pub fn produce<Host: Runtime>(
             &block_fees,
             coinbase,
         ) {
-            Ok(ComputationResult::Finished) => {
-                promote_block(&mut safe_host, &outbox_queue, false, processed_blueprint)?;
+            Ok(BlockComputationResult::Finished {
+                included_delayed_transactions,
+            }) => {
+                promote_block(
+                    &mut safe_host,
+                    &outbox_queue,
+                    false,
+                    processed_blueprint,
+                    config,
+                    included_delayed_transactions,
+                )?;
                 if at_most_one_block {
                     return Ok(ComputationResult::Finished);
                 }
             }
-            Ok(ComputationResult::RebootNeeded) => {
+            Ok(BlockComputationResult::RebootNeeded) => {
                 // The computation will resume at next reboot, we leave the
                 // storage untouched.
                 log!(
@@ -1371,7 +1424,7 @@ mod tests {
 
         assert_eq!(
             result,
-            ComputationResult::RebootNeeded,
+            BlockComputationResult::RebootNeeded,
             "Should have asked for a reboot"
         );
         // block in progress should not have registered any gas or ticks

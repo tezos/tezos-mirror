@@ -13,7 +13,9 @@ use anyhow::Result;
 use evm_execution::fa_bridge::deposit::FaDeposit;
 use rlp::{Decodable, DecoderError, Encodable};
 use tezos_ethereum::{
-    rlp_helpers, transaction::TRANSACTION_HASH_SIZE, tx_common::EthereumTransactionCommon,
+    rlp_helpers,
+    transaction::{TransactionHash, TRANSACTION_HASH_SIZE},
+    tx_common::EthereumTransactionCommon,
 };
 use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
@@ -41,6 +43,12 @@ pub const DELAYED_FA_DEPOSIT_TAG: u8 = 0x03;
 /// It represents the key of the transaction in the delayed inbox.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Hash(pub [u8; TRANSACTION_HASH_SIZE]);
+
+impl From<TransactionHash> for Hash {
+    fn from(v: TransactionHash) -> Self {
+        Self(v)
+    }
+}
 
 impl Encodable for Hash {
     fn rlp_append(&self, s: &mut rlp::RlpStream) {
@@ -226,18 +234,12 @@ impl DelayedInbox {
         }
     }
 
-    pub fn find_and_remove_transaction<Host: Runtime>(
+    pub fn find_transaction<Host: Runtime>(
         &mut self,
         host: &mut Host,
         tx_hash: Hash,
     ) -> Result<Option<(Transaction, Timestamp)>> {
-        log!(
-            host,
-            Info,
-            "Removing transaction {} from the delayed inbox",
-            hex::encode(tx_hash)
-        );
-        let tx = self.0.remove(host, &tx_hash)?.map(
+        let tx = self.0.find(host, &tx_hash)?.map(
             |DelayedInboxItem {
                  transaction,
                  timestamp,
@@ -351,8 +353,23 @@ impl DelayedInbox {
         })
     }
 
-    pub fn delete<Host: Runtime>(&mut self, host: &mut Host) -> Result<()> {
-        self.0.delete(host)
+    /// Deletes a transaction from the delayed inbox. It does not check if
+    /// a transaction is removed or not. The only property ensured by the
+    /// function is that the transaction is not part of the delayed inbox
+    /// after the call.
+    pub fn delete<Host: Runtime>(
+        &mut self,
+        host: &mut Host,
+        tx_hash: Hash,
+    ) -> Result<()> {
+        log!(
+            host,
+            Info,
+            "Removing transaction {} from the delayed inbox",
+            hex::encode(tx_hash)
+        );
+        let _found = self.0.remove(host, &tx_hash)?;
+        Ok(())
     }
 }
 
@@ -417,7 +434,7 @@ mod tests {
             DelayedInbox::new(&mut host).expect("Delayed inbox should exist");
 
         let read = delayed_inbox
-            .find_and_remove_transaction(&mut host, Hash(tx.tx_hash))
+            .find_transaction(&mut host, Hash(tx.tx_hash))
             .expect("Reading from the delayed inbox should work")
             .expect("Transaction should be in the delayed inbox");
         assert_eq!((tx, timestamp), read)
