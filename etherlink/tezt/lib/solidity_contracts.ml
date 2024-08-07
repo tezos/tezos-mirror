@@ -324,3 +324,10 @@ let simple_logger () =
     ~label:"simple_logger"
     ~contract:"SimpleLogger"
     ~evm_version:"shanghai"
+
+let call_tracer_depth () =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/call_tracer_depth.sol")
+    ~label:"call_tracer_depth"
+    ~contract:"TestDepthCall"
+    ~evm_version:"shanghai"
