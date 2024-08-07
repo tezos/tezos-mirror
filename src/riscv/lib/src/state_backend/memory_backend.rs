@@ -592,18 +592,18 @@ pub mod test_helpers {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::state_backend::{AllocatedOf, Array, Atom, Backend, Cell, Cells, Manager};
+    use crate::state_backend::{AllocatedOf, Array, Atom, Backend, Cell, Cells, ManagerBase};
 
     #[test]
     fn test_ro() {
         type L = (Atom<u64>, Array<u32, 4>);
 
-        struct T<M: Manager> {
+        struct T<M: ManagerBase> {
             first: Cell<u64, M>,
             second: Cells<u32, 4, M>,
         }
 
-        impl<M: Manager> T<M> {
+        impl<M: ManagerBase> T<M> {
             fn bind(space: AllocatedOf<L, M>) -> Self {
                 T {
                     first: space.0,
@@ -627,12 +627,12 @@ pub mod tests {
     fn test_backend_reuse() {
         type L = (Atom<u64>, Array<u32, 4>);
 
-        struct T<M: Manager> {
+        struct T<M: ManagerBase> {
             first: Cell<u64, M>,
             second: Cells<u32, 4, M>,
         }
 
-        impl<M: Manager> T<M> {
+        impl<M: ManagerBase> T<M> {
             fn bind(space: AllocatedOf<L, M>) -> Self {
                 T {
                     first: space.0,

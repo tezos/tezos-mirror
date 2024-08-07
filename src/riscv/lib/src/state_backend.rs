@@ -172,20 +172,13 @@ pub trait ManagerReadWrite: ManagerRead + ManagerWrite {
     ) -> E;
 }
 
-/// Manager with allocation, read, write and replace capabilities
-// TODO: RV-157: Remove this trait and use the individual traits instead. Also rename ManagerBase
-// back to Manager.
-pub trait Manager: ManagerAlloc + ManagerWrite + ManagerRead + ManagerReadWrite {}
-
-impl<All: ManagerAlloc + ManagerWrite + ManagerRead + ManagerReadWrite> Manager for All {}
-
 /// State backend with manager
 pub trait BackendManagement {
     /// Backend manager
-    type Manager<'backend>: Manager;
+    type Manager<'backend>: ManagerReadWrite;
 
     /// Backend manager for readonly operations
-    type ManagerRO<'backend>: Manager;
+    type ManagerRO<'backend>: ManagerRead;
 }
 
 /// State backend storage
@@ -364,14 +357,14 @@ pub mod tests {
     }
 
     backend_test!(test_example, F, {
-        struct Example<M: Manager> {
+        struct Example<M: ManagerBase> {
             first: Cell<u64, M>,
             second: Cells<u32, 4, M>,
         }
 
         type ExampleLayout = (Atom<u64>, Array<u32, 4>);
 
-        impl<M: Manager> Example<M> {
+        impl<M: ManagerBase> Example<M> {
             fn bind(space: AllocatedOf<ExampleLayout, M>) -> Self {
                 Example {
                     first: space.0,
