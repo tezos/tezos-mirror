@@ -17,7 +17,7 @@ pub const SC_FAILURE: u64 = 1;
 impl<ML, M> MachineState<ML, M>
 where
     ML: MainMemoryLayout,
-    M: backend::Manager,
+    M: backend::ManagerReadWrite,
 {
     /// Loads a word or a double from the address in `rs1`, places the
     /// sign-extended value in `rd`, and registers a reservation set for

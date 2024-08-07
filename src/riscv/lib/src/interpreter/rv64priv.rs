@@ -17,7 +17,7 @@ use strum::IntoEnumIterator;
 
 impl<M> HartState<M>
 where
-    M: backend::Manager,
+    M: backend::ManagerReadWrite,
 {
     /// `MRET` instruction
     ///
@@ -105,7 +105,7 @@ where
 impl<ML, M> MachineState<ML, M>
 where
     ML: main_memory::MainMemoryLayout,
-    M: backend::Manager,
+    M: backend::ManagerReadWrite,
 {
     /// `WFI` instruction
     ///

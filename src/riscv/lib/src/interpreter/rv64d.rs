@@ -46,7 +46,7 @@ impl FloatExt for Double {
 
 impl<M> HartState<M>
 where
-    M: backend::Manager,
+    M: backend::ManagerReadWrite,
 {
     /// `FCLASS.D` D-type instruction.
     ///
@@ -517,7 +517,7 @@ where
 impl<ML, M> MachineState<ML, M>
 where
     ML: MainMemoryLayout,
-    M: backend::Manager,
+    M: backend::ManagerReadWrite,
 {
     /// `FLD` I-type instruction.
     ///

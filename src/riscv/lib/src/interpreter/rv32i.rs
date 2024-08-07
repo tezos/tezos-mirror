@@ -21,7 +21,7 @@ use crate::{
 
 impl<M> XRegisters<M>
 where
-    M: backend::Manager,
+    M: backend::ManagerReadWrite,
 {
     /// `ADDI` I-type instruction
     ///
@@ -160,7 +160,7 @@ where
 
 impl<M> HartState<M>
 where
-    M: backend::Manager,
+    M: backend::ManagerReadWrite,
 {
     /// `AUIPC` U-type instruction
     pub fn run_auipc(&mut self, imm: i64, rd: XRegister) {
@@ -356,7 +356,7 @@ where
 impl<ML, M> MachineState<ML, M>
 where
     ML: MainMemoryLayout,
-    M: backend::Manager,
+    M: backend::ManagerBase,
 {
     /// `FENCE` I-Type instruction
     ///
