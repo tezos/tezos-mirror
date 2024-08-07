@@ -12,6 +12,7 @@ type t = {
   store : Evm_store.t;
   smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
   index : Irmin_context.ro_index;
+  mutable current_block_number : Ethereum_types.quantity;
 }
 
 let load ~data_dir ~preimages ?preimages_endpoint () =
@@ -22,8 +23,17 @@ let load ~data_dir ~preimages ?preimages_endpoint () =
       load ~cache_size:100_000 Read_only (Evm_state.irmin_store_path ~data_dir))
   in
   Evm_store.use store @@ fun conn ->
+  let* current_block_number, _ = Evm_store.Context_hashes.get_latest conn in
   let+ smart_rollup_address = Evm_store.Metadata.get conn in
-  {store; index; data_dir; preimages; preimages_endpoint; smart_rollup_address}
+  {
+    store;
+    index;
+    data_dir;
+    preimages;
+    preimages_endpoint;
+    smart_rollup_address;
+    current_block_number;
+  }
 
 let with_evm_state ctxt hash k =
   let open Lwt_result_syntax in
@@ -269,7 +279,11 @@ module Make (Base : sig
 
   val keep_alive : bool
 end) =
-  Services_backend_sig.Make (MakeBackend (Base)) (Base.Executor)
+struct
+  include Services_backend_sig.Make (MakeBackend (Base)) (Base.Executor)
+
+  let current_block_number () = Lwt_result.return Base.ctxt.current_block_number
+end
 
 let callback server dir =
   let open Cohttp in
@@ -338,17 +352,10 @@ let install_finalizer_rpc server =
   let* () = Events.shutdown_rpc_server ~private_:false in
   Misc.unwrap_error_monad @@ fun () -> Tx_pool.shutdown ()
 
-let next_blueprint_number, next_blueprint_number_waker = Lwt.task ()
-
-let set_next_blueprint_number v =
+let next_blueprint_number ctxt () =
   let open Lwt_syntax in
-  let+ next_blueprint_number in
-  next_blueprint_number := v
-
-let next_blueprint_number () =
-  let open Lwt_syntax in
-  let+ next_blueprint_number in
-  !next_blueprint_number
+  let (Qty current) = ctxt.current_block_number in
+  return (Ethereum_types.Qty Z.(succ current))
 
 let preload_kernel_from_level ctxt level =
   let open Lwt_result_syntax in
@@ -444,20 +451,6 @@ let main ~data_dir ~evm_node_endpoint ~(config : Configuration.t) =
     end) : Services_backend_sig.S)
   in
 
-  let* latest_candidate =
-    Evm_store.use ctxt.store Evm_store.Context_hashes.find_latest
-  in
-
-  let* (Qty current_number) =
-    match latest_candidate with
-    | None -> failwith "Missing latest number"
-    | Some (current, _) -> return current
-  in
-
-  Lwt.wakeup
-    next_blueprint_number_waker
-    (ref (Ethereum_types.Qty Z.(succ current_number))) ;
-
   let* () =
     Tx_pool.start
       {
@@ -480,7 +473,7 @@ let main ~data_dir ~evm_node_endpoint ~(config : Configuration.t) =
   let directory =
     directory
     |> Evm_services.register
-         next_blueprint_number
+         (next_blueprint_number ctxt)
          (fun level ->
            Evm_store.use ctxt.store (fun conn ->
                Evm_store.Blueprints.find_with_events conn level))
@@ -494,12 +487,12 @@ let main ~data_dir ~evm_node_endpoint ~(config : Configuration.t) =
   Blueprints_follower.start
     ~time_between_blocks
     ~evm_node_endpoint
-    ~get_next_blueprint_number:next_blueprint_number
-  @@ fun (Qty number as level) blueprint ->
+    ~get_next_blueprint_number:(next_blueprint_number ctxt)
+  @@ fun number blueprint ->
   let* () =
     when_ (Option.is_some blueprint.kernel_upgrade) @@ fun () ->
-    preload_kernel_from_level ctxt level
+    preload_kernel_from_level ctxt number
   in
   Blueprints_watcher.notify blueprint ;
-  let*! () = set_next_blueprint_number (Qty Z.(succ number)) in
+  ctxt.current_block_number <- number ;
   return_unit
