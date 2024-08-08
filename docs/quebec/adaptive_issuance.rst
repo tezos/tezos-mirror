@@ -3,7 +3,7 @@
 :math:`\newcommand\exp[1]{\F{exp}{#1}}`
 
 
-.. _adaptive_issuance_beta:
+.. _adaptive_issuance_quebec:
 
 =================
 Adaptive Issuance
@@ -34,7 +34,7 @@ ratio of staked tez to the total supply. This lets issuance roughly
 match the *actual* security budget the chain requires, the amount needed
 to encourage participants to stake and produce blocks, but *no more*.
 
-At the end of each blockchain :ref:`cycle <def_cycle_beta>`, the
+At the end of each blockchain :ref:`cycle <def_cycle_quebec>`, the
 regular issuance is adjusted, to nudge the staked ratio towards a
 protocol-defined target (set at 50% starting in the Paris
 protocol). Participation rewards are recomputed to match that
@@ -43,19 +43,19 @@ emission rates increase, incentivizing participants to stake funds to
 re-approach the target. Conversely, incentives decrease as the ratio
 increases beyond the target.
 
-.. _adaptive_issuance_rate_beta:
+.. _adaptive_issuance_rate_quebec:
 
 Adaptive issuance rate
 ----------------------
 
 The adaptive issuance rate determines, at the end
 of cycle :math:`\IL{c}`, the issuance for cycle :math:`\IL{c + 3}`. The
-adaptive issuance rate is the sum of a :ref:`static rate <static_rate_beta>`
-and a :ref:`dynamic rate <dynamic_rate_beta>`. This value is kept within
+adaptive issuance rate is the sum of a :ref:`static rate <static_rate_quebec>`
+and a :ref:`dynamic rate <dynamic_rate_quebec>`. This value is kept within
 a minimal and a maximal value, to ensure nominal emissions remain within
 reasonable bounds.
 
-.. _staked_ratio_beta:
+.. _staked_ratio_quebec:
 
 Staked ratio
 ............
@@ -73,7 +73,7 @@ Where:
 - ``total_supply(cycle)`` returns the total supply of tez at the end of the given ``cycle``.
 - ``total_frozen_stake(cycle)`` returns the total frozen stake at the given ``cycle``.
 
-.. _static_rate_beta:
+.. _static_rate_quebec:
 
 Static rate
 ...........
@@ -91,7 +91,7 @@ The static rate is defined as follows:
 
 The choice of a scaling factor ensures that the curve takes reasonable values for plausible staked ratios. Moreover, since Adaptive Issuance is activated with a dynamic rate of 0, and at current staked ratio (that is, ~7.5% of the total supply), this factor allows for a smooth transition from the issuance rate (~4.6%) from the Oxford protocol (before the activation of Adaptive Issuance).
 
-.. _dynamic_rate_beta:
+.. _dynamic_rate_quebec:
 
 Dynamic rate
 ............
@@ -120,9 +120,9 @@ Where:
 - ``days_per_cycle`` denotes the minimal duration in days of a Tezos cycle, assuming all blocks in the cycle are produced at the minimal allowed time – that is, every 10 seconds in Paris.
 - ``growth_rate`` controls the speed at which the dynamic rate adjusts. The value is set so that a one percentage point deviation of the staked ratio changes the dynamic rate by 0.01 percentage points per day.
 
-In a nutshell, ``dynamic_rate(c)`` increases and decreases by an amount proportional to the distance between the target rate and the interval ``[48%; 52%]``. Note that to ensure that the issuance rate is kept within :ref:`the minimum and maximum bounds <minimum_and_maximum_rates_beta>`, the dynamic rate might be adjusted accordingly. More precisely, if :ref:`the issuance rate <issuance_rate_beta>` would surpass the maximum issuance allowed for a given cycle, then ``dynamic_rate(c)`` would be reduced to keep the issuance rate within the bounds (this part of the formula has been omitted from the above pseudocode for brevity).
+In a nutshell, ``dynamic_rate(c)`` increases and decreases by an amount proportional to the distance between the target rate and the interval ``[48%; 52%]``. Note that to ensure that the issuance rate is kept within :ref:`the minimum and maximum bounds <minimum_and_maximum_rates_quebec>`, the dynamic rate might be adjusted accordingly. More precisely, if :ref:`the issuance rate <issuance_rate_quebec>` would surpass the maximum issuance allowed for a given cycle, then ``dynamic_rate(c)`` would be reduced to keep the issuance rate within the bounds (this part of the formula has been omitted from the above pseudocode for brevity).
 
-.. _minimum_and_maximum_rates_beta:
+.. _minimum_and_maximum_rates_quebec:
 
 Minimum and maximum rates
 ..........................
@@ -205,7 +205,7 @@ Where:
   below this bound for the initial period.
 - ``issuance_global_max`` (10%) is the final value for the upper bound, reached at the end of the transition period.
 
-.. _dynmax_rate_beta:
+.. _dynmax_rate_quebec:
 
 Dynamic Maximum
 ......................
@@ -243,12 +243,12 @@ this maximum value to theoretically be smaller than  the minimum bound. In this 
 takes priority, and the max is set to the min. In other words, the bounds in the previous section are always
 applied, regardless of the value of dynmax.
 
-.. _issuance_rate_beta:
+.. _issuance_rate_quebec:
 
 Issuance rate
 ......................
 
-Finally, as mentioned before, the nominal adaptive issuance rate [1]_ for a cycle ``c + consensus_rights_delay + 1`` is defined as the sum of the static rate and the dynamic rate computed for the cycle ``c``, bounded within the :ref:`minimum and maximum rates <minimum_and_maximum_rates_beta>`, along with the :ref:`dynamic maximum <dynmax_rate_beta>`, computed for the cycle ``c + 1``.
+Finally, as mentioned before, the nominal adaptive issuance rate [1]_ for a cycle ``c + consensus_rights_delay + 1`` is defined as the sum of the static rate and the dynamic rate computed for the cycle ``c``, bounded within the :ref:`minimum and maximum rates <minimum_and_maximum_rates_quebec>`, along with the :ref:`dynamic maximum <dynmax_rate_quebec>`, computed for the cycle ``c + 1``.
 
 .. code-block:: python
 
@@ -262,7 +262,7 @@ Finally, as mentioned before, the nominal adaptive issuance rate [1]_ for a cycl
     return max( min(total_rate, maximum_rate), minimum_rate )
 
 
-.. _adaptive_rewards_beta:
+.. _adaptive_rewards_quebec:
 
 Adaptive rewards
 ----------------
@@ -273,9 +273,9 @@ constants. With the new mechanism, the adaptive issuance rate provides
 instead a budget for the whole cycle, which gets allocated equally to
 each block of the cycle and distributed between the various rewards,
 in proportion to their relative :ref:`weights
-<rewards_weights_beta>`.
+<rewards_weights_quebec>`.
 
-.. _rewards_weights_beta:
+.. _rewards_weights_quebec:
 
 Reward weights
 ..............
@@ -366,7 +366,7 @@ Where:
 
 
 **Nonce and VDF revelation tips.** The rewards allocated to delegates
-for contributing to :ref:`random seed generation <randomness_generation_beta>`
+for contributing to :ref:`random seed generation <randomness_generation_quebec>`
 (that is, for revealing nonce seeds and posting VDF proofs) are not paid
 each block, but rather every 192 blocks.
 

@@ -17,7 +17,7 @@ addresses:
 Finally, addresses prefixed with ``sr1`` identify :doc:`Smart Rollups
 <./smart_rollups>`.
 
-.. _user_accounts_beta:
+.. _user_accounts_quebec:
 
 User accounts
 ~~~~~~~~~~~~~
@@ -87,4 +87,4 @@ Smart contracts
 ~~~~~~~~~~~~~~~
 
 A transaction to a smart contract
-address can provide data and optionally some tokens, and triggers the execution of the code, which may read and update the storage. The transaction can succeed or fail, according to the :ref:`transaction semantics <transaction_semantics_beta>`.
+address can provide data and optionally some tokens, and triggers the execution of the code, which may read and update the storage. The transaction can succeed or fail, according to the :ref:`transaction semantics <transaction_semantics_quebec>`.

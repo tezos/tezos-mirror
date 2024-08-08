@@ -23,15 +23,15 @@ incurs moderate penalties, while a high fraction of misconduct is
 deemed to be critical and faces more serious repercussions.
 
 This document presents the definition of the :ref:`adaptive slashing
-function<adaptive_slashing_fn_beta>` implementing this idea, as well as the
-:ref:`new forbidden period<new_forbidden_period_beta>`.
+function<adaptive_slashing_fn_quebec>` implementing this idea, as well as the
+:ref:`new forbidden period<new_forbidden_period_quebec>`.
 
-.. _adaptive_slashing_fn_beta:
+.. _adaptive_slashing_fn_quebec:
 
 Adaptive Slashing Function
 ==========================
 
-.. _adaptive_slashing_informal_beta:
+.. _adaptive_slashing_informal_quebec:
 
 Informal presentation
 ---------------------
@@ -85,15 +85,15 @@ takes more than 2 cycles to complete the unstaking process. This
 ensures that the baker can't decrease their at-stake funds after being
 denunciated and before facing penalties.
 
-.. _formal_adaptive_slashing_beta:
+.. _formal_adaptive_slashing_quebec:
 
 A formal definition of slashing function for double-attestations
 ----------------------------------------------------------------
 
 * :math:`\mathcal{W}` denotes the maximal possible *weight* of
   attestations in a block, that is, the fixed number of available
-  :ref:`slots<rights_beta>` in any block. It is also known as
-  :ref:`CONSENSUS_COMMITTEE_SIZE<tb_validator_beta>`.
+  :ref:`slots<rights_quebec>` in any block. It is also known as
+  :ref:`CONSENSUS_COMMITTEE_SIZE<tb_validator_quebec>`.
 
 * :math:`f(B)` is the *fraction of double attestations* for block
   :math:`B`, that is, the ratio of the total weight of double
@@ -103,7 +103,7 @@ A formal definition of slashing function for double-attestations
   to be considered critical. A typical value for :math:`T` is
   :math:`{1 \over 3} \mathcal{W}`, which is the difference between
   :math:`\mathcal{W}` and the
-  :ref:`CONSENSUS_THRESHOLD<tb_validator_beta>` which is set to
+  :ref:`CONSENSUS_THRESHOLD<tb_validator_quebec>` which is set to
   :math:`{2 \over 3} \mathcal{W}`.
 
 We define :math:`S(B)` the percentage of slashed funds for all
@@ -124,7 +124,7 @@ where :math:`(b, B) \in C` means that:
 * :math:`C` is the last cycle of the denunciation period for
   :math:`B`.
 
-.. _new_forbidden_period_beta:
+.. _new_forbidden_period_quebec:
 
 New definition for the forbidden period
 =======================================
@@ -147,9 +147,9 @@ met:
 * all pending slashings for the delegate have occurred, and
 
 * the current total frozen stake for the delegate (sum of the
-  :ref:`staking balances<active_stake_beta>` of the delegate itself
+  :ref:`staking balances<active_stake_quebec>` of the delegate itself
   and its stakers) is at least as high as the :ref:`active
-  stake<active_stake_beta>` that was used ``CONSENSUS_RIGHTS_DELAY``
+  stake<active_stake_quebec>` that was used ``CONSENSUS_RIGHTS_DELAY``
   cycles ago to compute the consensus rights for the next cycle.
 
 The second condition may be fulfilled when the delegate and/or stakers

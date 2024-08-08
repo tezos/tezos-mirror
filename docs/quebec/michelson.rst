@@ -29,7 +29,7 @@ the specification. The document also starts with a less formal
 explanation of the context: how Michelson code interacts with the
 blockchain.
 
-.. _transaction_semantics_beta:
+.. _transaction_semantics_quebec:
 
 Semantics of smart contracts and transactions
 ---------------------------------------------
@@ -111,7 +111,7 @@ Internal operations are not included in any block, and are not signed.
 
 Internal operations are run in an atomic sequence with the external operation who generated them, right after it, in depth-first order.
 
-Note that :ref:`manager operations batches <manager_operations_batches_beta>` contain a sequence of external operations signed as a whole by a source user account, which are executed atomically.
+Note that :ref:`manager operations batches <manager_operations_batches_quebec>` contain a sequence of external operations signed as a whole by a source user account, which are executed atomically.
 For example, in case of a batch of two external operations, execution proceeds as follows:
 
 ::
@@ -298,7 +298,7 @@ constructors is fixed by this specification. Michelson does not let the
 programmer introduce its own types.
 
 Be aware that the syntax used in the specification may differ from
-the :ref:`concrete syntax <ConcreteSyntax_beta>`. In particular
+the :ref:`concrete syntax <ConcreteSyntax_quebec>`. In particular
 some instructions are annotated with types that are not present in the
 concrete language because they are synthesized by the typechecker.
 
@@ -324,7 +324,7 @@ The concrete language also has some syntax sugar to group some common
 sequences of operations as one. This is described in this specification
 using a simple regular expression style recursive instruction rewriting.
 
-.. _michelson_type_system_beta:
+.. _michelson_type_system_quebec:
 
 Introduction to the type system and notations
 ---------------------------------------------
@@ -454,7 +454,7 @@ the program on an abstract stack representing the input type provided by
 the programmer, and checking that the resulting symbolic stack is
 consistent with the expected result, also provided by the programmer.
 
-.. _type_normalization_beta:
+.. _type_normalization_quebec:
 
 Type normalization
 ~~~~~~~~~~~~~~~~~~
@@ -467,7 +467,7 @@ See `type pair <https://tezos.gitlab.io/michelson-reference/#type-pair>`__ for d
 
 The node RPC ``/helpers/script/normalize_type`` is available to normalize a given Michelson type (see :doc:`../api/openapi`, within the protocol-dependent RPCs).
 This RPC is intended for tool developers wanting to support the type shorthands in their tools without reimplementing their normalization.
-However, one side effect of this RPC is the stripping of :ref:`annotations <annotations_beta>`.
+However, one side effect of this RPC is the stripping of :ref:`annotations <annotations_quebec>`.
 As a consequence, a tool needing to preserve annotations on shorthand data types should implement its own type normalization instead of relying on this RPC.
 
 Side note
@@ -761,7 +761,7 @@ A typing rule can be inferred:
 
 Concrete syntax
 ---------------
-.. _ConcreteSyntax_beta:
+.. _ConcreteSyntax_quebec:
 
 The concrete language is very close to the formal notation of the
 specification. Its structure is extremely simple: an expression in the
@@ -829,7 +829,7 @@ parameters require sequences in the concrete syntax.
     IF { instr1_true ; instr2_true ; ... }
        { instr1_false ; instr2_false ; ... }
 
-.. _syntax_of_scripts_beta:
+.. _syntax_of_scripts_quebec:
 
 Main program structure
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -840,7 +840,7 @@ of three primitive applications (in no particular order) that provide its
 
 See the next section for a concrete example.
 
-.. _annotations_beta:
+.. _annotations_quebec:
 
 Annotations
 -----------
@@ -865,7 +865,7 @@ We distinguish three kinds of annotations:
 - variable annotations, written ``@var_annot``,
 - and field or constructors annotations, written ``%field_annot``.
 
-Note that all annotations are stripped during :ref:`type normalization <type_normalization_beta>`.
+Note that all annotations are stripped during :ref:`type normalization <type_normalization_quebec>`.
 
 Type annotations
 ~~~~~~~~~~~~~~~~
@@ -1166,7 +1166,7 @@ Primitive applications can receive one or many annotations.
 An annotation is a sequence of characters that matches the regular
 expression ``@%|@%%|%@|[@:%][_0-9a-zA-Z][_0-9a-zA-Z\.%@]*``.
 Note however that ``@%``, ``@%%`` and ``%@`` are
-:ref:`special annotations <SpecialAnnotations_beta>` and are not allowed everywhere.
+:ref:`special annotations <SpecialAnnotations_quebec>` and are not allowed everywhere.
 
 Annotations come after the primitive name and before its potential arguments.
 
@@ -1320,7 +1320,7 @@ type (which can be changed). For instance the annotated typing rule for
 
 Special annotations
 ~~~~~~~~~~~~~~~~~~~
-.. _SpecialAnnotations_beta:
+.. _SpecialAnnotations_quebec:
 
 The special variable annotations ``@%`` and ``@%%`` can be used on instructions
 ``CAR``, ``CDR``, and ``UNPAIR``. It means to use the accessed field name (if any) as
@@ -1663,7 +1663,7 @@ data include not only a description of the action to perform but also
 the address of the multisig contract and a counter that gets
 incremented at each successful call to the contract.
 
-The multisig commands of :ref:`Octez command line client <client_manual_beta>`
+The multisig commands of :ref:`Octez command line client <client_manual_quebec>`
 use this
 smart contract. Moreover, `functional correctness of this contract has
 been verified
@@ -2020,7 +2020,7 @@ The language is implemented in OCaml as follows:
    ``Prim ("If", ...)`` into an ``If``, a ``Prim ("Dup", ...)`` into a
    ``Dup``, etc.
 
-.. michelson_tzt_beta:
+.. michelson_tzt_quebec:
 
 TZT, a Syntax extension for writing unit tests
 ----------------------------------------------
@@ -2044,7 +2044,7 @@ is :doc:`../shell/micheline`.
 TZT unit test files usually have the extension ``.tzt``. A unit test
 file describes a single unit test. It consists of a Micheline sequence
 of primitive applications (see :doc:`../shell/micheline`), in no particular order. This is
-:ref:`similar to Michelson scripts <syntax_of_scripts_beta>` but
+:ref:`similar to Michelson scripts <syntax_of_scripts_quebec>` but
 the set of primitives allowed at the toplevel differ; in Michelson
 scripts, the allowed toplevel primitives are ``parameter``
 (mandatory), ``storage`` (mandatory), ``code`` (mandatory), and
@@ -2072,7 +2072,7 @@ Each of the mandatory primitives ``input``, ``code``, and ``output``
 must occur exactly once in a unit test file in no particular order.
 
 The ``input`` primitive is used to declare the input stack (see the
-:ref:`syntax of concrete stacks <syntax_of_concrete_stacks_beta>`).
+:ref:`syntax of concrete stacks <syntax_of_concrete_stacks_quebec>`).
 
 The ``code`` primitive is used to declare the instruction or sequence
 of instructions to execute.
@@ -2081,9 +2081,9 @@ The ``output`` primitive is used to declare if the execution is
 expected to succeed or fail and what result is expected from the
 execution. For executions expected to succeed, the argument of the
 ``output`` primitive is simply the expected output stack (see the
-:ref:`syntax of errors <syntax_of_errors_beta>`). For executions
+:ref:`syntax of errors <syntax_of_errors_quebec>`). For executions
 expected to fail, the argument is the expected error. In both cases,
-the :ref:`wildcard pattern <omitting_parts_of_the_output_beta>` can
+the :ref:`wildcard pattern <omitting_parts_of_the_output_quebec>` can
 be used to omit part of the expected output.
 
 The simplest test which can be written asserts that executing no
@@ -2191,12 +2191,12 @@ particular order.
 - ``other_contracts`` (optional, defaults to ``{}``): mapping between
   the contract addresses that are assumed to exist and their
   parameter types (see the :ref:`syntax of other contracts
-  specifications <syntax_of_other_contracts_beta>`)
+  specifications <syntax_of_other_contracts_quebec>`)
 
 - ``big_maps`` (optional, defaults to ``{}``): mapping between
   integers representing ``big_map`` indices and descriptions of big
   maps (see the :ref:`syntax of extra big maps specifications
-  <syntax_of_extra_big_maps_beta>`)
+  <syntax_of_extra_big_maps_quebec>`)
 
 The following test example asserts that the default value for the `NOW
 <https://tezos.gitlab.io/michelson-reference/#instr-NOW>`__
@@ -2220,7 +2220,7 @@ instruction return a chosen timestamp:
    code NOW;
    output { Stack_elt timestamp "2020-01-08T07:13:51Z" }
 
-.. _syntax_of_concrete_stacks_beta:
+.. _syntax_of_concrete_stacks_quebec:
 
 Syntax of concrete stacks
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2232,7 +2232,7 @@ Stack_elt nat 42 }`` is a concrete stack of length 2 whose top element
 is the boolean ``True`` and the bottom element is the natural number
 ``42``.
 
-.. _omitting_parts_of_the_output_beta:
+.. _omitting_parts_of_the_output_quebec:
 
 Omitting parts of the output
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2298,11 +2298,11 @@ The wildcard pattern is typically used to omit unspecified aspects of
 the Michelson language when writing portable tests; in particular the
 cryptographic nonces in values of type ``operation`` (see the
 :ref:`syntax of concrete operations
-<syntax_of_concrete_operations_beta>`) or implementation-specific
+<syntax_of_concrete_operations_quebec>`) or implementation-specific
 parts of error outputs (see the :ref:`syntax of errors
-<syntax_of_errors_beta>`).
+<syntax_of_errors_quebec>`).
 
-.. _output_normalization_beta:
+.. _output_normalization_quebec:
 
 Output normalization
 ~~~~~~~~~~~~~~~~~~~~
@@ -2330,7 +2330,7 @@ test; for example these two tests pass:
    output {Stack_elt address 0x0000e7670f32038107a59a2b9cfefae36ea21f5aa63c}
 
 This normalization feature is however incompatible with using the
-:ref:`wildcard pattern <omitting_parts_of_the_output_beta>` in the
+:ref:`wildcard pattern <omitting_parts_of_the_output_quebec>` in the
 output; when using wildcards the output must be formatted using the
 readable format so the following test does not pass:
 
@@ -2348,7 +2348,7 @@ but the following test does pass:
    code {};
    output {Stack_elt _ "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN"}
 
-.. _syntax_of_errors_beta:
+.. _syntax_of_errors_quebec:
 
 Syntax of errors
 ~~~~~~~~~~~~~~~~
@@ -2361,7 +2361,7 @@ raise:
 - ``(StaticError <error description>)``: an error occurred before the
   instruction was executed; the error description format is
   unspecified so consider using a :ref:`wildcard
-  <omitting_parts_of_the_output_beta>` such as ``(StaticError _)``
+  <omitting_parts_of_the_output_quebec>` such as ``(StaticError _)``
   to write portable tests;
 
 - ``(Failed <value>)``: the execution reached a ``FAILWITH``
@@ -2412,7 +2412,7 @@ instruction.
    code { DUP "foo" };
    output (StaticError _)
 
-.. _syntax_of_concrete_operations_beta:
+.. _syntax_of_concrete_operations_quebec:
 
 Syntax of concrete operations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2444,7 +2444,7 @@ and ``SET_DELEGATE`` have respectively the following shapes:
 The computation of the cryptographic nonce is not specified. To write
 portable tests, the nonces appearing in output stack expectations
 should be replaced by :ref:`a wildcard pattern
-<omitting_parts_of_the_output_beta>`.
+<omitting_parts_of_the_output_quebec>`.
 
 Here is an example unit test for the ``SET_DELEGATE`` instruction used
 to set the delegate of the current contract to the account at address
@@ -2456,7 +2456,7 @@ to set the delegate of the current contract to the account at address
   code SET_DELEGATE ;
   output { Stack_elt operation (Set_delegate (Some "tz1NwQ6hkenkn6aYYio8VnJvjtb4K1pfeU1Z") _) }
 
-.. _syntax_of_other_contracts_beta:
+.. _syntax_of_other_contracts_quebec:
 
 Syntax of other contracts specifications
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2475,7 +2475,7 @@ Micheline sequence whose elements have the form ``Contract "KT1..."
 ``<ty>`` is the type of its parameter. Each address should appear at
 most once and the order is irrelevant.
 
-.. _syntax_of_extra_big_maps_beta:
+.. _syntax_of_extra_big_maps_quebec:
 
 Syntax of extra big maps specifications
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

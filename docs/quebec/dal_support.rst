@@ -57,7 +57,7 @@ Therefore, for data committed (published) at level ``L``, the slot's availabilit
 Smart rollups integration
 =========================
 
-The DAL is integrated with :doc:`smart rollups <../active/smart_rollups>` so that kernels can request pages from the DAL via the :ref:`reveal data channel <reveal_data_channel_smart_rollups_beta>`. A smart rollup can fetch any page from the DAL node if the commitment respects some conditions:
+The DAL is integrated with :doc:`smart rollups <../active/smart_rollups>` so that kernels can request pages from the DAL via the :ref:`reveal data channel <reveal_data_channel_smart_rollups_quebec>`. A smart rollup can fetch any page from the DAL node if the commitment respects some conditions:
 
 - The commitment should have been published after the rollup origination (this constraint will be leveraged so that the kernel can request any commitment in the past)
 - The commitment should not have been published in a level in the future after the level of the next commitment of the state (at most 30 levels in the future).
@@ -67,12 +67,12 @@ If the kernel requests a page that does not satisfy the mentioned conditions, th
 
 Moreover, the rollup kernel has access to the protocol constants so that the same kernel code can be used on different test networks.
 
-.. _dal_constants_beta:
+.. _dal_constants_quebec:
 
 DAL-related protocol constants
 ==============================
 
-This section describes the protocol constants specific to the DAL as well as their default values on mainnet (see :ref:`protocol_constants_beta` on how to find the values for tests networks):
+This section describes the protocol constants specific to the DAL as well as their default values on mainnet (see :ref:`protocol_constants_quebec` on how to find the values for tests networks):
 
 - ``feature_enable`` (true): Whether the DAL is available
 - ``incentives_enable`` (false): Whether baker incentives are available
