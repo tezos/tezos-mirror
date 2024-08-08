@@ -116,7 +116,7 @@ let initial_context (ctx : Tezos_proxy.Proxy_getter.rpc_context_args)
     Tezos_protocol_environment.Proxy_context.empty
     @@ Some (module ProxyDelegation)
   in
-  let version_value = "beta" in
+  let version_value = "quebec_021" in
   let*! ctxt =
     Tezos_protocol_environment.Context.add
       empty
