@@ -15,13 +15,14 @@ use tezos_smart_rollup_host::runtime::Runtime;
 fn import_dal_slot<Host: Runtime>(
     host: &mut Host,
     params: &RollupDalParameters,
-    published_level: i32,
+    published_level: u32,
     slot_index: u8,
 ) -> Option<Vec<u8>> {
-    // Without this the rollup node hangs.
-    if published_level < 0 {
+    // From the protocol perspective the levels are encoded in [0; 2^31[, as
+    // such any levels above would be invalid and the rollup node would hang.
+    if published_level > i32::MAX as u32 {
         return None;
-    };
+    }
     let page_size = params.page_size as usize;
     let slot_size = params.slot_size as usize;
     let mut slot: Vec<u8> = vec![0u8; slot_size];
@@ -30,7 +31,7 @@ fn import_dal_slot<Host: Runtime>(
     for page_index in 0..number_of_pages {
         let imported_page_len = host
             .reveal_dal_page(
-                published_level,
+                published_level as i32,
                 slot_index,
                 page_index,
                 &mut slot[page_start..page_start + page_size],
@@ -63,9 +64,9 @@ pub fn fetch_and_parse_sequencer_blueprints_from_dal<Host: Runtime>(
 ) -> anyhow::Result<()> {
     if let Some(dal_config) = parsing_context.dal_configuration.clone() {
         let params = host.reveal_dal_parameters();
-        let attestation_lag = params.attestation_lag as i32;
-        let level = read_l1_level(host).unwrap_or_default() as i32;
-        let published_level = level - attestation_lag - 1;
+        let attestation_lag = params.attestation_lag as u32;
+        let level = read_l1_level(host).unwrap_or_default();
+        let Some(published_level) = level.checked_sub(attestation_lag + 1) else { return Ok(()) };
         for slot_index in &dal_config.slot_indices {
             if let Some(slot) =
                 import_dal_slot(host, &params, published_level, *slot_index)
