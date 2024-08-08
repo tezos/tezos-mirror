@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Python documentation & scripts for Tezos"
 
 readme = "README.md"
+package-mode = false
 
 authors = [
   "Tezos community <tezos@tezos.com>"
