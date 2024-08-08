@@ -119,7 +119,10 @@ impl<const BYTES: usize> backend::Layout for Sizes<BYTES> {
 
     type Allocated<M: backend::ManagerBase> = MainMemory<Self, M>;
 
-    fn allocate<M: backend::Manager>(backend: &mut M, placed: Self::Placed) -> Self::Allocated<M> {
+    fn allocate<M: backend::ManagerAlloc>(
+        backend: &mut M,
+        placed: Self::Placed,
+    ) -> Self::Allocated<M> {
         let data = backend.allocate_dyn_region(placed);
         let data = backend::DynCells::bind(data);
         MainMemory { data }

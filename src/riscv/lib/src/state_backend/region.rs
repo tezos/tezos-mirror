@@ -10,7 +10,7 @@ pub struct Cell<E: Elem, M: ManagerBase + ?Sized> {
     region: Cells<E, 1, M>,
 }
 
-impl<E: Elem, M: Manager> Cell<E, M> {
+impl<E: Elem, M: ManagerBase> Cell<E, M> {
     /// Bind this state to the single element region.
     pub fn bind(region: M::Region<E, 1>) -> Self {
         Self {
@@ -91,12 +91,14 @@ pub struct Cells<E: Elem, const LEN: usize, M: ManagerBase + ?Sized> {
     region: M::Region<E, LEN>,
 }
 
-impl<E: Elem, const LEN: usize, M: Manager> Cells<E, LEN, M> {
+impl<E: Elem, const LEN: usize, M: ManagerBase> Cells<E, LEN, M> {
     /// Bind this state to the given region.
     pub fn bind(region: M::Region<E, LEN>) -> Self {
         Self { region }
     }
+}
 
+impl<E: Elem, const LEN: usize, M: Manager> Cells<E, LEN, M> {
     /// Read an element in the region.
     #[inline]
     pub fn read(&self, index: usize) -> E {
@@ -145,12 +147,14 @@ pub struct DynCells<const LEN: usize, M: ManagerBase + ?Sized> {
     region: M::DynRegion<LEN>,
 }
 
-impl<const LEN: usize, M: Manager> DynCells<LEN, M> {
+impl<const LEN: usize, M: ManagerBase> DynCells<LEN, M> {
     /// Bind this state to the given dynamic region.
     pub fn bind(region: M::DynRegion<LEN>) -> Self {
         Self { region }
     }
+}
 
+impl<const LEN: usize, M: Manager> DynCells<LEN, M> {
     /// Read an element in the region. `address` is in bytes.
     #[inline]
     pub fn read<E: Elem>(&self, address: usize) -> E {
@@ -183,7 +187,7 @@ pub(crate) mod tests {
         state_backend::{
             layout::{Atom, Layout},
             Array, Backend, CellRead, CellWrite, Choreographer, DynCells, Elem, Location,
-            ManagerBase,
+            ManagerAlloc, ManagerBase,
         },
     };
 
@@ -308,10 +312,10 @@ pub(crate) mod tests {
 
                 type Allocated<M: ManagerBase> = DynCells<LEN, M>;
 
-                fn allocate<B: super::Manager>(
-                    backend: &mut B,
+                fn allocate<M: ManagerAlloc>(
+                    backend: &mut M,
                     placed: Self::Placed,
-                ) -> Self::Allocated<B> {
+                ) -> Self::Allocated<M> {
                     DynCells::bind(backend.allocate_dyn_region(placed))
                 }
             }
@@ -337,7 +341,7 @@ pub(crate) mod tests {
 
             type Allocated<B: ManagerBase> = DynCells<1024, B>;
 
-            fn allocate<B: super::Manager>(
+            fn allocate<B: ManagerAlloc>(
                 backend: &mut B,
                 placed: Self::Placed,
             ) -> Self::Allocated<B> {
