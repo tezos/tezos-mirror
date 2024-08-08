@@ -40,6 +40,8 @@ val default_config : config
 
 val config_encoding : config Data_encoding.t
 
+val config_to_string : config -> string
+
 type input = Ethereum_types.hash * config
 
 type call_input =

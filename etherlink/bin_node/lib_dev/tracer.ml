@@ -213,6 +213,7 @@ module CallTracerRead = struct
         state
         (Durable_storage_path.Trace.call_trace ~transaction_hash i)
     in
+    let*! () = Tracer_event.read_line (Z.of_int i) in
     Lwt.return @@ Tracer_types.CallTracer.decode_call bytes
 
   (** [call_trace_length evm_state hash] is used to findout how many lines 
@@ -258,6 +259,7 @@ let read_output config state root_indexed_hash =
 let trace_transaction (module Exe : Evm_execution.S) ~block_number
     ~transaction_hash ~config =
   let open Lwt_result_syntax in
+  let*! () = Tracer_event.tracer_input (Tracer_types.config_to_string config) in
   let input = Tracer_types.input_rlp_encoder ~hash:transaction_hash config in
   let set_input state =
     let*! state =

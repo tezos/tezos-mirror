@@ -178,6 +178,10 @@ let config_encoding =
 
 type input = Ethereum_types.hash * config
 
+let config_to_string config =
+  Data_encoding.Json.to_string
+    (Data_encoding.Json.construct config_encoding config)
+
 type call_input =
   (Ethereum_types.call * Ethereum_types.Block_parameter.extended) * config
 
