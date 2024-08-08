@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::state_backend::{self as backend, Layout};
+use crate::state_backend::{self as backend, Layout, ManagerReadWrite};
 use std::{alloc, marker::PhantomData, mem, ptr, slice};
 
 /// In-memory state backend
@@ -124,9 +124,13 @@ impl<'backend> SliceManager<'backend> {
     }
 }
 
-impl<'backend> backend::Manager for SliceManager<'backend> {
+impl<'backend> backend::ManagerBase for SliceManager<'backend> {
     type Region<E: backend::Elem, const LEN: usize> = &'backend mut [E; LEN];
 
+    type DynRegion<const LEN: usize> = &'backend mut [u8; LEN];
+}
+
+impl<'backend> backend::ManagerAlloc for SliceManager<'backend> {
     fn allocate_region<E: backend::Elem, const LEN: usize>(
         &mut self,
         loc: backend::Location<[E; LEN]>,
@@ -137,15 +141,15 @@ impl<'backend> backend::Manager for SliceManager<'backend> {
         }
     }
 
-    type DynRegion<const LEN: usize> = &'backend mut [u8; LEN];
-
     fn allocate_dyn_region<const LEN: usize>(
         &mut self,
         loc: backend::Location<[u8; LEN]>,
     ) -> Self::DynRegion<LEN> {
         self.allocate_region::<u8, LEN>(loc)
     }
+}
 
+impl<'backend> backend::ManagerRead for SliceManager<'backend> {
     #[inline]
     fn region_read<E: backend::Elem, const LEN: usize>(
         region: &Self::Region<E, LEN>,
@@ -193,6 +197,52 @@ impl<'backend> backend::Manager for SliceManager<'backend> {
         }
     }
 
+    #[inline]
+    fn dyn_region_read<E: backend::Elem, const LEN: usize>(
+        region: &Self::DynRegion<LEN>,
+        address: usize,
+    ) -> E {
+        // NOTE: This implementation must match that of SliceManagerRO.
+        assert!(address + mem::size_of::<E>() <= LEN);
+
+        let mut result = unsafe {
+            region
+                .as_ptr()
+                .cast::<u8>() // Calculate the offset in bytes
+                .add(address)
+                .cast::<E>()
+                .read_unaligned()
+        };
+        result.from_stored_in_place();
+
+        result
+    }
+
+    #[inline]
+    fn dyn_region_read_all<E: backend::Elem, const LEN: usize>(
+        region: &Self::DynRegion<LEN>,
+        address: usize,
+        values: &mut [E],
+    ) {
+        // NOTE: This implementation must match that of SliceManagerRO.
+        assert!(address + mem::size_of_val(values) <= LEN);
+
+        unsafe {
+            region
+                .as_ptr()
+                .cast::<u8>() // Calculate the offset in bytes
+                .add(address)
+                .cast::<E>()
+                .copy_to(values.as_mut_ptr(), values.len())
+        };
+
+        for v in values.iter_mut() {
+            v.from_stored_in_place();
+        }
+    }
+}
+
+impl<'backend> backend::ManagerWrite for SliceManager<'backend> {
     #[inline]
     fn region_write<E: backend::Elem, const LEN: usize>(
         region: &mut Self::Region<E, LEN>,
@@ -239,62 +289,6 @@ impl<'backend> backend::Manager for SliceManager<'backend> {
     }
 
     #[inline]
-    fn region_replace<E: backend::Elem, const LEN: usize>(
-        region: &mut Self::Region<E, LEN>,
-        index: usize,
-        mut value: E,
-    ) -> E {
-        value.to_stored_in_place();
-        let mut value = mem::replace(&mut region[index], value);
-        value.from_stored_in_place();
-        value
-    }
-
-    #[inline]
-    fn dyn_region_read<E: backend::Elem, const LEN: usize>(
-        region: &Self::DynRegion<LEN>,
-        address: usize,
-    ) -> E {
-        // NOTE: This implementation must match that of SliceManagerRO.
-        assert!(address + mem::size_of::<E>() <= LEN);
-
-        let mut result = unsafe {
-            region
-                .as_ptr()
-                .cast::<u8>() // Calculate the offset in bytes
-                .add(address)
-                .cast::<E>()
-                .read_unaligned()
-        };
-        result.from_stored_in_place();
-
-        result
-    }
-
-    #[inline]
-    fn dyn_region_read_all<E: backend::Elem, const LEN: usize>(
-        region: &Self::DynRegion<LEN>,
-        address: usize,
-        values: &mut [E],
-    ) {
-        // NOTE: This implementation must match that of SliceManagerRO.
-        assert!(address + mem::size_of_val(values) <= LEN);
-
-        unsafe {
-            region
-                .as_ptr()
-                .cast::<u8>() // Calculate the offset in bytes
-                .add(address)
-                .cast::<E>()
-                .copy_to(values.as_mut_ptr(), values.len())
-        };
-
-        for v in values.iter_mut() {
-            v.from_stored_in_place();
-        }
-    }
-
-    #[inline]
     fn dyn_region_write<E: backend::Elem, const LEN: usize>(
         region: &mut Self::DynRegion<LEN>,
         address: usize,
@@ -337,6 +331,20 @@ impl<'backend> backend::Manager for SliceManager<'backend> {
     }
 }
 
+impl ManagerReadWrite for SliceManager<'_> {
+    #[inline]
+    fn region_replace<E: backend::Elem, const LEN: usize>(
+        region: &mut Self::Region<E, LEN>,
+        index: usize,
+        mut value: E,
+    ) -> E {
+        value.to_stored_in_place();
+        let mut value = mem::replace(&mut region[index], value);
+        value.from_stored_in_place();
+        value
+    }
+}
+
 /// Read-only manager for in-memory backing storage
 pub struct SliceManagerRO<'backend> {
     backing_storage: usize,
@@ -353,15 +361,13 @@ impl<'backend> SliceManagerRO<'backend> {
     }
 }
 
-macro_rules! read_only_write {
-    () => {
-        panic!("cannot write to an immutable reference to a region")
-    };
-}
-
-impl<'backend> backend::Manager for SliceManagerRO<'backend> {
+impl<'backend> backend::ManagerBase for SliceManagerRO<'backend> {
     type Region<E: backend::Elem, const LEN: usize> = &'backend [E; LEN];
 
+    type DynRegion<const LEN: usize> = &'backend [u8; LEN];
+}
+
+impl<'backend> backend::ManagerAlloc for SliceManagerRO<'backend> {
     fn allocate_region<E: backend::Elem, const LEN: usize>(
         &mut self,
         loc: backend::Location<[E; LEN]>,
@@ -372,15 +378,15 @@ impl<'backend> backend::Manager for SliceManagerRO<'backend> {
         }
     }
 
-    type DynRegion<const LEN: usize> = &'backend [u8; LEN];
-
     fn allocate_dyn_region<const LEN: usize>(
         &mut self,
         loc: backend::Location<[u8; LEN]>,
     ) -> Self::DynRegion<LEN> {
         self.allocate_region::<u8, LEN>(loc)
     }
+}
 
+impl<'backend> backend::ManagerRead for SliceManagerRO<'backend> {
     #[inline]
     fn region_read<E: backend::Elem, const LEN: usize>(
         region: &Self::Region<E, LEN>,
@@ -424,41 +430,6 @@ impl<'backend> backend::Manager for SliceManagerRO<'backend> {
     }
 
     #[inline]
-    fn region_write<E: backend::Elem, const LEN: usize>(
-        _region: &mut Self::Region<E, LEN>,
-        _index: usize,
-        _value: E,
-    ) {
-        read_only_write!()
-    }
-
-    #[inline]
-    fn region_write_all<E: backend::Elem, const LEN: usize>(
-        _region: &mut Self::Region<E, LEN>,
-        _value: &[E],
-    ) {
-        read_only_write!()
-    }
-
-    #[inline]
-    fn region_write_some<E: backend::Elem, const LEN: usize>(
-        _region: &mut Self::Region<E, LEN>,
-        _index: usize,
-        _buffer: &[E],
-    ) {
-        read_only_write!()
-    }
-
-    #[inline]
-    fn region_replace<E: backend::Elem, const LEN: usize>(
-        _region: &mut Self::Region<E, LEN>,
-        _index: usize,
-        _value: E,
-    ) -> E {
-        read_only_write!()
-    }
-
-    #[inline]
     fn dyn_region_read<E: backend::Elem, const LEN: usize>(
         region: &Self::DynRegion<LEN>,
         address: usize,
@@ -501,6 +472,42 @@ impl<'backend> backend::Manager for SliceManagerRO<'backend> {
             v.from_stored_in_place();
         }
     }
+}
+
+// TODO: RV-157: Remove this macro, it should not be needed any more
+macro_rules! read_only_write {
+    () => {
+        panic!("cannot write to an immutable reference to a region")
+    };
+}
+
+// TODO: RV-157: Remove this implementation
+impl<'backend> backend::ManagerWrite for SliceManagerRO<'backend> {
+    #[inline]
+    fn region_write<E: backend::Elem, const LEN: usize>(
+        _region: &mut Self::Region<E, LEN>,
+        _index: usize,
+        _value: E,
+    ) {
+        read_only_write!()
+    }
+
+    #[inline]
+    fn region_write_all<E: backend::Elem, const LEN: usize>(
+        _region: &mut Self::Region<E, LEN>,
+        _value: &[E],
+    ) {
+        read_only_write!()
+    }
+
+    #[inline]
+    fn region_write_some<E: backend::Elem, const LEN: usize>(
+        _region: &mut Self::Region<E, LEN>,
+        _index: usize,
+        _buffer: &[E],
+    ) {
+        read_only_write!()
+    }
 
     #[inline]
     fn dyn_region_write<E: backend::Elem, const LEN: usize>(
@@ -517,6 +524,18 @@ impl<'backend> backend::Manager for SliceManagerRO<'backend> {
         _address: usize,
         _values: &[E],
     ) {
+        read_only_write!()
+    }
+}
+
+// TODO: RV-157: Remove this implementation
+impl ManagerReadWrite for SliceManagerRO<'_> {
+    #[inline]
+    fn region_replace<E: backend::Elem, const LEN: usize>(
+        _region: &mut Self::Region<E, LEN>,
+        _index: usize,
+        _value: E,
+    ) -> E {
         read_only_write!()
     }
 }
