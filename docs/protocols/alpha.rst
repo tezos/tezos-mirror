@@ -2,7 +2,7 @@ Protocol Alpha
 ==============
 
 This page documents the changes brought by protocol Alpha with respect
-to Beta (see :ref:`naming_convention`).
+to Quebec (see :ref:`naming_convention`).
 
 For changes brought by Paris with respect to Oxford, see :doc:`../protocols/019_paris`.
 
@@ -58,5 +58,3 @@ Minor Changes
 
 Internal
 --------
-
-
