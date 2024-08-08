@@ -75,6 +75,10 @@ val preload_kernel : string -> unit Lwt.t
 
 val patched_state : string -> Ethereum_types.quantity -> unit Lwt.t
 
+(** [predownload_kernel root_hash] advertizes the EVM node has
+    downloaded all preimages under [root_hash]. *)
+val predownload_kernel : Hex.t -> unit Lwt.t
+
 (** [sandbox_started level] advertizes that sandbox mode started on top of
     level [level]. *)
 val sandbox_started : Z.t -> unit Lwt.t
