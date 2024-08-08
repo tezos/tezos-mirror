@@ -233,7 +233,7 @@ let call_tracer_input_rlp_encoder ?hash config =
   let only_top_call =
     Ethereum_types.bool_to_rlp_bytes config.tracer_config.only_top_call
   in
-  List [hash; with_logs; only_top_call]
+  List [hash; only_top_call; with_logs]
   |> encode
   |> Bytes.cat (Bytes.make 1 tracer_input_prefix_calltracer)
   |> Bytes.to_string
