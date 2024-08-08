@@ -37,7 +37,7 @@ let default_tracer_config =
     disable_stack = false;
     disable_storage = false;
     with_logs = true;
-    only_top_call = true;
+    only_top_call = false;
   }
 
 let tracer_config_encoding =
