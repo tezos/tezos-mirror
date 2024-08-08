@@ -15,7 +15,10 @@ type transaction_type = Legacy | Eip2930 | Eip1559
     as this type is not returned in any RPC and we do not need to make sure
     they are hexadecimal values. On the contrary, we prefer to keep binary bytes
     to facilitate signature verification.
-*)
+ *)
+
+type access_list_item = bytes * bytes list
+
 type transaction = {
   transaction_type : transaction_type;
   chain_id : Z.t option;
@@ -26,7 +29,7 @@ type transaction = {
   to_ : bytes option;
   value : Z.t;
   data : bytes;
-  access_list : unit list;
+  access_list : access_list_item list;
       (** Access list are not yet supported. Even if the kernel does not
           support them, we need to decode them to verify the signature. *)
   v : Z.t;
