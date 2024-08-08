@@ -22,7 +22,7 @@ pub trait Layout {
     }
 
     /// Representation of the allocated regions in the state backend
-    type Allocated<B: super::Manager>;
+    type Allocated<M: super::ManagerBase>;
 
     /// Allocate regions in the given state backend.
     fn allocate<B: super::Manager>(backend: &mut B, placed: Self::Placed) -> Self::Allocated<B>;
@@ -47,7 +47,7 @@ impl<T: super::Elem> Layout for Atom<T> {
         alloc.alloc()
     }
 
-    type Allocated<B: super::Manager> = super::Cell<T, B>;
+    type Allocated<M: super::ManagerBase> = super::Cell<T, M>;
 
     fn allocate<B: super::Manager>(backend: &mut B, placed: Self::Placed) -> Self::Allocated<B> {
         let loc = placed.as_array();
@@ -69,7 +69,7 @@ impl<T: super::Elem, const LEN: usize> Layout for Array<T, LEN> {
         alloc.alloc()
     }
 
-    type Allocated<B: super::Manager> = Cells<T, LEN, B>;
+    type Allocated<M: super::ManagerBase> = Cells<T, LEN, M>;
 
     fn allocate<B: super::Manager>(backend: &mut B, placed: Self::Placed) -> Self::Allocated<B> {
         let region = backend.allocate_region(placed);
@@ -101,7 +101,6 @@ macro_rules! struct_layout {
         $( , )?
     }) => {
         paste::paste! {
-
             $vis struct $layout_t {
                 $( [<_$field_name>]: $cell_repr ),+
             }
@@ -110,14 +109,14 @@ macro_rules! struct_layout {
                 $( $field_name: PlacedOf<$cell_repr> ),+
             }
 
-            pub struct [<$layout_t Allocated>]<M: Manager>
-            {
+            pub struct [<$layout_t Allocated>]<M: $crate::state_backend::ManagerBase> {
                 $( $field_name: AllocatedOf<$cell_repr, M> ),+
             }
 
             impl Layout for $layout_t {
                 type Placed = [<$layout_t Placed>];
-                type Allocated<Back: Manager> = [<$layout_t Allocated>]<Back>;
+
+                type Allocated<M: $crate::state_backend::ManagerBase> = [<$layout_t Allocated>]<M>;
 
                 fn place_with(alloc: &mut Choreographer) -> Self::Placed {
                     [<$layout_t Placed>] {
@@ -151,7 +150,7 @@ where
         (A::place_with(alloc), B::place_with(alloc))
     }
 
-    type Allocated<Back: super::Manager> = (A::Allocated<Back>, B::Allocated<Back>);
+    type Allocated<M: super::ManagerBase> = (A::Allocated<M>, B::Allocated<M>);
 
     fn allocate<Back: super::Manager>(
         backend: &mut Back,
@@ -180,8 +179,7 @@ where
         )
     }
 
-    type Allocated<Back: super::Manager> =
-        (A::Allocated<Back>, B::Allocated<Back>, C::Allocated<Back>);
+    type Allocated<M: super::ManagerBase> = (A::Allocated<M>, B::Allocated<M>, C::Allocated<M>);
 
     fn allocate<Back: super::Manager>(
         backend: &mut Back,
@@ -213,11 +211,11 @@ where
         )
     }
 
-    type Allocated<Back: super::Manager> = (
-        A::Allocated<Back>,
-        B::Allocated<Back>,
-        C::Allocated<Back>,
-        D::Allocated<Back>,
+    type Allocated<M: super::ManagerBase> = (
+        A::Allocated<M>,
+        B::Allocated<M>,
+        C::Allocated<M>,
+        D::Allocated<M>,
     );
 
     fn allocate<Back: super::Manager>(
@@ -253,12 +251,12 @@ where
         )
     }
 
-    type Allocated<Back: super::Manager> = (
-        A::Allocated<Back>,
-        B::Allocated<Back>,
-        C::Allocated<Back>,
-        D::Allocated<Back>,
-        E::Allocated<Back>,
+    type Allocated<M: super::ManagerBase> = (
+        A::Allocated<M>,
+        B::Allocated<M>,
+        C::Allocated<M>,
+        D::Allocated<M>,
+        E::Allocated<M>,
     );
 
     fn allocate<Back: super::Manager>(
@@ -304,13 +302,13 @@ where
         )
     }
 
-    type Allocated<Back: super::Manager> = (
-        A::Allocated<Back>,
-        B::Allocated<Back>,
-        C::Allocated<Back>,
-        D::Allocated<Back>,
-        E::Allocated<Back>,
-        F::Allocated<Back>,
+    type Allocated<M: super::ManagerBase> = (
+        A::Allocated<M>,
+        B::Allocated<M>,
+        C::Allocated<M>,
+        D::Allocated<M>,
+        E::Allocated<M>,
+        F::Allocated<M>,
     );
 
     fn allocate<Back: super::Manager>(
@@ -338,7 +336,7 @@ where
         array::from_fn(|_| T::place_with(alloc))
     }
 
-    type Allocated<B: super::Manager> = [T::Allocated<B>; LEN];
+    type Allocated<M: super::ManagerBase> = [T::Allocated<M>; LEN];
 
     fn allocate<B: super::Manager>(backend: &mut B, placed: Self::Placed) -> Self::Allocated<B> {
         placed.map(|placed| T::allocate(backend, placed))
@@ -362,7 +360,7 @@ where
         Self { positions }
     }
 
-    type Allocated<M: super::Manager> = Vec<T::Allocated<M>>;
+    type Allocated<M: super::ManagerBase> = Vec<T::Allocated<M>>;
 
     fn allocate<M: super::Manager>(backend: &mut M, placed: Self::Placed) -> Self::Allocated<M> {
         placed

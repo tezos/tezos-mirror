@@ -152,7 +152,7 @@ impl XRegister {
 pub type XValue = u64;
 
 /// Integer registers
-pub struct XRegisters<M: backend::Manager> {
+pub struct XRegisters<M: backend::ManagerBase> {
     registers: backend::Cells<XValue, 31, M>,
 }
 
@@ -346,7 +346,7 @@ impl backend::Elem for FValue {
 }
 
 /// Floating-point number registers
-pub struct FRegisters<M: backend::Manager> {
+pub struct FRegisters<M: backend::ManagerBase> {
     registers: backend::Cells<FValue, 32, M>,
 }
 

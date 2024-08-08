@@ -20,7 +20,7 @@ use crate::{
 };
 
 /// RISC-V hart state
-pub struct HartState<M: backend::Manager> {
+pub struct HartState<M: backend::ManagerBase> {
     /// Integer registers
     pub xregisters: registers::XRegisters<M>,
 

@@ -56,7 +56,7 @@ macro_rules! csregisters_boilerplate {
             $( , )?
         }
     ) => { paste::paste! {
-        $struct_v struct $struct_t<M: Manager> {
+        $struct_v struct $struct_t<M: $crate::state_backend::ManagerBase> {
             $($name: Cell<$cell_repr, M>,)+
         }
 

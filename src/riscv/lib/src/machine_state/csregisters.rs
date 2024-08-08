@@ -1063,7 +1063,7 @@ pub fn access_checks(csr: CSRegister, hart_state: &HartState<impl Manager>) -> R
 }
 
 /// CSRs
-pub struct CSRegisters<M: backend::Manager> {
+pub struct CSRegisters<M: backend::ManagerBase> {
     registers: CSRegisterValues<M>,
     pub(super) interrupt_cache: PossibleInterruptsCache,
 }

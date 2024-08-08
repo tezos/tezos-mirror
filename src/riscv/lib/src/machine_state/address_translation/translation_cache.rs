@@ -37,7 +37,9 @@ use super::{AccessType, PAGE_OFFSET_WIDTH};
 use crate::{
     bits::ones,
     machine_state::{bus::Address, csregisters::CSRRepr, mode::Mode},
-    state_backend::{AllocatedOf, Atom, Cell, CellRead, CellWrite, Elem, Manager, Many},
+    state_backend::{
+        AllocatedOf, Atom, Cell, CellRead, CellWrite, Elem, Manager, ManagerBase, Many,
+    },
 };
 use strum::EnumCount;
 
@@ -104,7 +106,7 @@ type CachedLayout = (
 );
 
 /// Cached address translation
-struct Cached<M: Manager> {
+struct Cached<M: ManagerBase> {
     /// Privilege mode
     mode: Cell<u8, M>,
 
@@ -195,7 +197,7 @@ const PAGES_MASK: usize = PAGES - 1;
 type AccessCacheLayout = (Atom<FenceCounter>, Many<CachedLayout, PAGES>);
 
 /// Address translation cache for a single access type
-struct AccessCache<M: Manager> {
+struct AccessCache<M: ManagerBase> {
     fence_counter: Cell<FenceCounter, M>,
     entries: Box<[Cached<M>; PAGES]>,
 }
@@ -298,7 +300,7 @@ const fn access_type_index(access_type: AccessType) -> usize {
 pub type TranslationCacheLayout = [AccessCacheLayout; NUM_ACCESS_TYPES];
 
 /// Address translation cache
-pub struct TranslationCache<M: Manager> {
+pub struct TranslationCache<M: ManagerBase> {
     /// Cache entries
     entries: [AccessCache<M>; NUM_ACCESS_TYPES],
 }

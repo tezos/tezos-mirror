@@ -37,11 +37,11 @@ gen_memory_layout!(M4G = 4 GiB);
 // inherent associated types are unstable. Hence we must go through a dummy
 // trait.
 pub trait MainMemoryLayout: backend::Layout {
-    type Data<M: backend::Manager>;
+    type Data<M: backend::ManagerBase>;
 
     const BYTES: usize;
 
-    fn refl<M: backend::Manager>(space: backend::AllocatedOf<Self, M>) -> MainMemory<Self, M>;
+    fn refl<M: backend::ManagerBase>(space: backend::AllocatedOf<Self, M>) -> MainMemory<Self, M>;
 
     /// Read an element in the region. `address` is in bytes.
     fn data_read<E: backend::Elem, M: backend::Manager>(data: &Self::Data<M>, address: usize) -> E;
@@ -69,11 +69,11 @@ pub trait MainMemoryLayout: backend::Layout {
 }
 
 impl<const BYTES: usize> MainMemoryLayout for Sizes<BYTES> {
-    type Data<M: backend::Manager> = backend::DynCells<BYTES, M>;
+    type Data<M: backend::ManagerBase> = backend::DynCells<BYTES, M>;
 
     const BYTES: usize = BYTES;
 
-    fn refl<M: backend::Manager>(space: backend::AllocatedOf<Self, M>) -> MainMemory<Self, M> {
+    fn refl<M: backend::ManagerBase>(space: backend::AllocatedOf<Self, M>) -> MainMemory<Self, M> {
         space
     }
 
@@ -117,7 +117,7 @@ impl<const BYTES: usize> backend::Layout for Sizes<BYTES> {
         alloc.alloc_min_align(4096)
     }
 
-    type Allocated<M: backend::Manager> = MainMemory<Self, M>;
+    type Allocated<M: backend::ManagerBase> = MainMemory<Self, M>;
 
     fn allocate<M: backend::Manager>(backend: &mut M, placed: Self::Placed) -> Self::Allocated<M> {
         let data = backend.allocate_dyn_region(placed);
@@ -127,7 +127,7 @@ impl<const BYTES: usize> backend::Layout for Sizes<BYTES> {
 }
 
 /// Main memory state for the given layout
-pub struct MainMemory<L: MainMemoryLayout + ?Sized, M: backend::Manager> {
+pub struct MainMemory<L: MainMemoryLayout + ?Sized, M: backend::ManagerBase> {
     pub data: L::Data<M>,
 }
 

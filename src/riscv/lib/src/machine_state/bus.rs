@@ -85,7 +85,7 @@ impl AddressSpace {
 pub type BusLayout<ML> = (devices::DevicesLayout, ML);
 
 /// Bus connects to the main memory and other devices.
-pub struct Bus<ML: main_memory::MainMemoryLayout, M: backend::Manager> {
+pub struct Bus<ML: main_memory::MainMemoryLayout, M: backend::ManagerBase> {
     devices: devices::Devices<M>,
     memory: main_memory::MainMemory<ML, M>,
 }

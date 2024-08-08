@@ -2,11 +2,11 @@
 //
 // SPDX-License-Identifier: MIT
 
-use super::{AllocatedOf, Atom, Cell, CellRead, CellWrite, Elem, Manager};
+use super::{AllocatedOf, Atom, Cell, CellRead, CellWrite, Elem, Manager, ManagerBase};
 use std::marker::PhantomData;
 
 /// Cell representing an enumeration type
-pub struct EnumCell<T, R: Elem, M: Manager> {
+pub struct EnumCell<T, R: Elem, M: ManagerBase> {
     cell: Cell<R, M>,
     _pd: PhantomData<T>,
 }
