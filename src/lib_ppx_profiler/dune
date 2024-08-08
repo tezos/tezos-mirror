@@ -1,0 +1,13 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name ppx_profiler)
+ (public_name octez-libs.ppx_profiler)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  ppxlib)
+ (kind ppx_rewriter)
+ (ppx_runtime_libraries
+  logs)
+ (preprocess (pps ppxlib.metaquot)))
