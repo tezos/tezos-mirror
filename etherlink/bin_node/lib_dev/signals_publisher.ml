@@ -180,8 +180,20 @@ module Worker = struct
              <= Int32.to_int finalized_level
            in
            match status with
-           | Committed {finalized; l1_level = published_level; _}
-           | Included {finalized; l1_level = published_level; _}
+           | Committed
+               {
+                 finalized;
+                 l1_level = published_level;
+                 op = Publish_dal_commitment {slot_index; _};
+                 _;
+               }
+           | Included
+               {
+                 finalized;
+                 l1_level = published_level;
+                 op = Publish_dal_commitment {slot_index; _};
+                 _;
+               }
              when finalized && is_after_attestation_period ~published_level ->
                let*! () =
                  Signals_publisher_events.commited_or_included_injection_id
@@ -195,11 +207,29 @@ module Worker = struct
                  Signals_publisher_events.untracking
                    ~injector_op_hash:injection_id
                in
+               let* payload =
+                 Sequencer_signal.create
+                   ~cctxt:state.cctxt
+                   ~sequencer_key:state.sequencer_key
+                   ~smart_rollup_address:state.smart_rollup_address
+                   ~slot_index
+                   ~published_level
+               in
+               let*! () =
+                 Signals_publisher_events.signal_signed
+                   ~injector_op_hash:injection_id
+                   ~published_level
+                   ~slot_index
+                   ~smart_rollup_address:state.smart_rollup_address
+               in
+               Rollup_services.publish
+                 ~keep_alive:false
+                 ~rollup_node_endpoint:state.rollup_node_endpoint
+                 [payload]
                (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7385
 
                   Implement included DAL slots anouncement to the kernel.
                *)
-               return_unit
            | Unknown | Pending_batch | Pending_injection _ | Injected _
            | Included _ | Committed _ ->
                return_unit)

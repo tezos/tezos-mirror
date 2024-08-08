@@ -84,6 +84,7 @@ let install_finalizer_seq server private_server =
   let* () = Tx_pool.shutdown () in
   let* () = Evm_events_follower.shutdown () in
   let* () = Blueprints_publisher.shutdown () in
+  let* () = Signals_publisher.shutdown () in
   return_unit
 
 let callback_log server conn req body =
@@ -196,6 +197,21 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
       ()
   in
   let*! (Qty next_blueprint_number) = Evm_context.next_blueprint_number () in
+  let* () =
+    Option.iter_es
+      (fun _ ->
+        Signals_publisher.start
+          ~cctxt
+          ~smart_rollup_address
+          ~sequencer_key:threshold_encryption_sequencer_config.sequencer
+          ~rollup_node_endpoint
+          ~max_blueprints_lag:
+            threshold_encryption_sequencer_config.blueprints_publisher_config
+              .max_blueprints_lag
+          ())
+      threshold_encryption_sequencer_config.blueprints_publisher_config
+        .dal_slots
+  in
   let* () =
     Blueprints_publisher.start
       ~rollup_node_endpoint
