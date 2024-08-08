@@ -94,6 +94,7 @@ type t = {
   state_recorder : state_recorder_config;
   extra_operations : Operations_source.t option;
   dal_node_endpoint : Uri.t option;
+  dal_node_timeout_percentage : int;
   pre_emptive_forge_time : Time.System.Span.t;
 }
 
@@ -134,6 +135,8 @@ let default_extra_operations = None
 
 let default_pre_emptive_forge_time = Time.System.Span.of_seconds_exn 0.
 
+let default_dal_node_timeout_percentage = 10
+
 let default_config =
   {
     fees = default_fees_config;
@@ -147,6 +150,7 @@ let default_config =
     state_recorder = default_state_recorder_config;
     extra_operations = default_extra_operations;
     dal_node_endpoint = None;
+    dal_node_timeout_percentage = default_dal_node_timeout_percentage;
     pre_emptive_forge_time = default_pre_emptive_forge_time;
   }
 
@@ -160,6 +164,7 @@ let make ?(minimal_fees = default_fees_config.minimal_fees)
     ?(votes = default_votes_config) ?(force_apply = default_force_apply)
     ?(force = default_force) ?(state_recorder = default_state_recorder_config)
     ?extra_operations ?dal_node_endpoint
+    ?(dal_node_timeout_percentage = default_dal_node_timeout_percentage)
     ?(pre_emptive_forge_time = default_pre_emptive_forge_time) () =
   let fees =
     {minimal_fees; minimal_nanotez_per_gas_unit; minimal_nanotez_per_byte}
@@ -181,6 +186,7 @@ let make ?(minimal_fees = default_fees_config.minimal_fees)
     state_recorder;
     extra_operations;
     dal_node_endpoint;
+    dal_node_timeout_percentage;
     pre_emptive_forge_time;
   }
 
@@ -306,6 +312,7 @@ let encoding : t Data_encoding.t =
               state_recorder;
               extra_operations;
               dal_node_endpoint;
+              dal_node_timeout_percentage;
               pre_emptive_forge_time;
             } ->
          ( ( fees,
@@ -318,7 +325,7 @@ let encoding : t Data_encoding.t =
              force,
              state_recorder,
              pre_emptive_forge_time ),
-           (extra_operations, dal_node_endpoint) ))
+           (extra_operations, dal_node_endpoint, dal_node_timeout_percentage) ))
        (fun ( ( fees,
                 validation,
                 nonce,
@@ -329,7 +336,8 @@ let encoding : t Data_encoding.t =
                 force,
                 state_recorder,
                 pre_emptive_forge_time ),
-              (extra_operations, dal_node_endpoint) ) ->
+              (extra_operations, dal_node_endpoint, dal_node_timeout_percentage)
+            ) ->
          {
            fees;
            validation;
@@ -342,6 +350,7 @@ let encoding : t Data_encoding.t =
            state_recorder;
            extra_operations;
            dal_node_endpoint;
+           dal_node_timeout_percentage;
            pre_emptive_forge_time;
          })
        (merge_objs
@@ -358,9 +367,10 @@ let encoding : t Data_encoding.t =
              (req "force" force_config_encoding)
              (req "state_recorder" state_recorder_config_encoding)
              (req "pre_emptive_forge_time" Time.System.Span.encoding))
-          (obj2
+          (obj3
              (opt "extra_operations" Operations_source.encoding)
-             (opt "dal_node_endpoint" Tezos_rpc.Encoding.uri_encoding)))
+             (opt "dal_node_endpoint" Tezos_rpc.Encoding.uri_encoding)
+             (req "dal_node_timeout_percentage" int16)))
 
 let pp fmt t =
   let json = Data_encoding.Json.construct encoding t in
