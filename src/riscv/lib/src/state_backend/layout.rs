@@ -99,7 +99,7 @@ impl<T: super::Elem, const LEN: usize> Layout for Array<T, LEN> {
 ///     pub struct ExampleLayout {
 ///         satp_ppn: Atom<CSRRepr>,
 ///         mode: EnumCellLayout<u8>,
-///         cached: BoolCellLayout,
+///         cached: Atom<bool>,
 ///     }
 /// );
 /// ```
