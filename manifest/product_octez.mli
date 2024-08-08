@@ -31,6 +31,8 @@ val octez_context_sigs : Manifest.target
 
 val octez_crypto : Manifest.target
 
+val octez_dal_node_services : Manifest.target
+
 val octez_event_logging : Manifest.target
 
 val octez_layer2_store : Manifest.target
