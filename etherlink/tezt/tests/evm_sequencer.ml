@@ -4200,6 +4200,181 @@ let test_sequencer_dont_read_level_twice =
 
   unit
 
+(** Test that the kernel can handle more than 100 withdrawals per level,
+    which is currently the limit of outbox messages in the L1. *)
+let test_outbox_size_limit_resilience ~slow =
+  let commitment_period = 5 and challenge_window = 5 in
+  let slow_str = if slow then "slow" else "fast" in
+  register_all
+    ~sequencer:Constant.bootstrap1
+    ~time_between_blocks:Nothing
+    ~tags:
+      (["evm"; "withdraw"; "outbox"; "spam"] @ if slow then [Tag.slow] else [])
+    ~title:(sf "Outbox size limit resilience (%s)" slow_str)
+    ~commitment_period
+    ~challenge_window
+  @@ fun {
+           client;
+           l1_contracts;
+           sc_rollup_address;
+           sc_rollup_node;
+           sequencer;
+           proxy;
+           _;
+         }
+             _protocol ->
+  let endpoint = Evm_node.endpoint sequencer in
+
+  (* Make a tez deposit *)
+  let amount = Tez.of_int 1000 in
+  let depositor = Constant.bootstrap5 in
+  let receiver =
+    Eth_account.
+      {
+        address = "0x1074Fd1EC02cbeaa5A90450505cF3B48D834f3EB";
+        private_key =
+          "0xb7c548b5442f5b28236f0dcd619f65aaaafd952240908adcf9642d8e616587ee";
+      }
+  in
+  let* receiver_balance_prev =
+    Eth_cli.balance ~account:receiver.address ~endpoint
+  in
+  let* () =
+    send_deposit_to_delayed_inbox
+      ~amount
+      ~l1_contracts
+      ~depositor
+      ~receiver:receiver.address
+      ~sc_rollup_node
+      ~sc_rollup_address
+      client
+  in
+  let* () =
+    wait_for_delayed_inbox_add_tx_and_injected
+      ~sequencer
+      ~sc_rollup_node
+      ~client
+  in
+  let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
+  let* () = check_delayed_inbox_is_empty ~sc_rollup_node in
+  let* receiver_balance_next =
+    Eth_cli.balance ~account:receiver.address ~endpoint
+  in
+  Check.((receiver_balance_next > receiver_balance_prev) Wei.typ)
+    ~error_msg:"Expected a bigger balance" ;
+
+  (* Deploy and top up batch withdrawal contract *)
+  let* spammer_resolved = Solidity_contracts.spam_withdrawal () in
+  let* () =
+    Eth_cli.add_abi ~label:spammer_resolved.label ~abi:spammer_resolved.abi ()
+  in
+  let* spammer_contract, _tx_hash =
+    send_transaction_to_sequencer
+      (fun () ->
+        Eth_cli.deploy
+          ~source_private_key:receiver.private_key
+          ~endpoint:(Evm_node.endpoint sequencer)
+          ~abi:spammer_resolved.abi
+          ~bin:spammer_resolved.bin)
+      sequencer
+  in
+  let* _ =
+    send_transaction_to_sequencer
+      (Eth_cli.contract_send
+         ~source_private_key:receiver.private_key
+         ~endpoint
+         ~abi_label:spammer_resolved.label
+         ~address:spammer_contract
+         ~method_call:"giveFunds()"
+         ~value:(Wei.of_eth_int 990))
+      sequencer
+  in
+
+  (* Create and topup 30 accounts (to overcome single account per block limitation) *)
+  let* wallets = Cast.gen_wallets ~number:30 () in
+  let addresses =
+    List.map (fun (w : Cast.wallet) -> sf "\"%s\"" w.address) wallets
+  in
+  let* _ =
+    send_transaction_to_sequencer
+      (Eth_cli.contract_send
+         ~source_private_key:receiver.private_key
+         ~endpoint
+         ~abi_label:spammer_resolved.label
+         ~address:spammer_contract
+         ~method_call:(sf "batchTopUp([%s])" (String.concat "," addresses))
+         ~value:(Wei.of_eth_int 0))
+      sequencer
+  in
+
+  (* Create 150 withdrawals *)
+  let* withdrawal_level = Client.level client in
+  let withdraw_tx ~(wallet : Cast.wallet) =
+    Cast.craft_tx
+      ~source_private_key:wallet.private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas_price:1_000_000_000
+      ~gas:30_000_000
+      ~value:(Wei.of_eth_int 0)
+      ~address:spammer_contract
+      ~signature:"doWithdrawals(uint256)"
+      ~arguments:["5"]
+  in
+  let* withdraw_txs =
+    List.map (fun w -> withdraw_tx ~wallet:w ()) wallets |> Lwt.all
+  in
+  let* _ = batch_n_transactions ~evm_node:sequencer withdraw_txs in
+  let* _ = produce_block sequencer in
+
+  (* At this point the outbox queue must contain 150 messages *)
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
+
+  (* 100 messages flushed at this point *)
+  let* _ = produce_block sequencer in
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
+
+  (* +50 messages flushed at this point *)
+  if slow then (
+    (* Execute the first 100 withdrawals *)
+    let* actual_withdrawal_level =
+      find_and_execute_withdrawal
+        ~withdrawal_level
+        ~commitment_period
+        ~challenge_window
+        ~evm_node:proxy
+        ~sc_rollup_node
+        ~sc_rollup_address
+        ~client
+    in
+    let* balance =
+      Client.get_balance_for
+        ~account:"tz1WrbkDrzKVqcGXkjw4Qk4fXkjXpAJuNP1j"
+        client
+    in
+    Check.((balance = Tez.of_int 100) Tez.typ)
+      ~error_msg:"Expected balance of %R, got %L" ;
+    (* Execute the next 50 withdrawals *)
+    let* _ =
+      find_and_execute_withdrawal
+        ~withdrawal_level:(actual_withdrawal_level + 1)
+        ~commitment_period
+        ~challenge_window
+        ~evm_node:proxy
+        ~sc_rollup_node
+        ~sc_rollup_address
+        ~client
+    in
+    let* balance =
+      Client.get_balance_for
+        ~account:"tz1WrbkDrzKVqcGXkjw4Qk4fXkjXpAJuNP1j"
+        client
+    in
+    Check.((balance = Tez.of_int 150) Tez.typ)
+      ~error_msg:"Expected balance of %R, got %L" ;
+    unit)
+  else unit
+
 let test_stage_one_reboot =
   register_all
     ~sequencer:Constant.bootstrap1
@@ -6202,4 +6377,6 @@ let () =
   test_trace_transaction_call_trace_certain_depth protocols ;
   test_trace_transaction_call_trace_revert protocols ;
   test_trace_transaction_calltracer_multiple_txs protocols ;
-  test_debug_print_store_schemas ()
+  test_debug_print_store_schemas () ;
+  test_outbox_size_limit_resilience ~slow:true protocols ;
+  test_outbox_size_limit_resilience ~slow:false protocols

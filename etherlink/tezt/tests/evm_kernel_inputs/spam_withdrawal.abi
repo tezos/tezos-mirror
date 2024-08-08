@@ -1,22 +1,35 @@
 [
 	{
+		"type": "function",
+		"name": "batchTopUp",
 		"inputs": [
 			{
-				"internalType": "uint256",
-				"name": "n",
-				"type": "uint256"
+				"name": "accounts",
+				"type": "address[]",
+				"internalType": "address[]"
 			}
 		],
-		"name": "doWithdrawals",
 		"outputs": [],
-		"stateMutability": "payable",
-		"type": "function"
+		"stateMutability": "nonpayable"
 	},
 	{
-		"inputs": [],
-		"name": "giveFunds",
+		"type": "function",
+		"name": "doWithdrawals",
+		"inputs": [
+			{
+				"name": "n",
+				"type": "uint256",
+				"internalType": "uint256"
+			}
+		],
 		"outputs": [],
-		"stateMutability": "payable",
-		"type": "function"
+		"stateMutability": "payable"
+	},
+	{
+		"type": "function",
+		"name": "giveFunds",
+		"inputs": [],
+		"outputs": [],
+		"stateMutability": "payable"
 	}
 ]

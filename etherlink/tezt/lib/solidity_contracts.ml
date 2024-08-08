@@ -245,7 +245,7 @@ let error () =
     ~contract:"Error"
     ~evm_version:"london"
 
-(** The info for the "block_hash_gen.sol" contract. *)
+(** The info for the "spam_withdrawal.sol" contract. *)
 let spam_withdrawal () =
   compile_contract
     ~source:(solidity_contracts_path ^ "/spam_withdrawal.sol")
