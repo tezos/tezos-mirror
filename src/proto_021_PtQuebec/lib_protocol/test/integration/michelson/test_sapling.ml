@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (Sapling)
-    Invocation: dune exec src/proto_beta/lib_protocol/test/integration/michelson/main.exe \
+    Invocation: dune exec src/proto_021_PtQuebec/lib_protocol/test/integration/michelson/main.exe \
                   -- --file test_sapling.ml
     Subject:    On the privacy-preserving library Sapling
 *)

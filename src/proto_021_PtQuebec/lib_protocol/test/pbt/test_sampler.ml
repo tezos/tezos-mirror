@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Protocol Library
-    Invocation:   dune exec src/proto_beta/lib_protocol/test/pbt/main.exe \
+    Invocation:   dune exec src/proto_021_PtQuebec/lib_protocol/test/pbt/main.exe \
                   -- --file test_sampler.ml
     Subject:      Operations in Saturation_repr
 *)

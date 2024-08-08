@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (saturated arithmetic)
-    Invocation: dune exec src/proto_beta/lib_protocol/test/unit/main.exe \
+    Invocation: dune exec src/proto_021_PtQuebec/lib_protocol/test/unit/main.exe \
                   -- --file test_sc_rollup_arith.ml
     Subject:    Basic testing of the arithmetic rollup example
 *)

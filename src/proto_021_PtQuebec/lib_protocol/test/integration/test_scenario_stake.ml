@@ -8,7 +8,7 @@
 (** Testing
     -------
     Component:    Adaptive Issuance, Staking
-    Invocation:   dune exec src/proto_beta/lib_protocol/test/integration/main.exe \
+    Invocation:   dune exec src/proto_021_PtQuebec/lib_protocol/test/integration/main.exe \
                    -- --file test_scenario_stake.ml
     Subject:      Test staking operations in the protocol.
 *)
