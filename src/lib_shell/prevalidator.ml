@@ -1023,6 +1023,9 @@ module Make
             List.mem ~equal:Signature.Public_key_hash.equal source sources)
           op_sources
 
+  let filter_operation_hashes ophs oph =
+    if ophs = [] then true else List.mem ~equal:Operation_hash.equal oph ophs
+
   let build_rpc_directory w =
     lazy
       (let open Lwt_result_syntax in
@@ -1106,9 +1109,12 @@ module Make
              let sources =
                List.map_e Signature.Public_key_hash.of_b58check params#sources
              in
-             match sources with
-             | Error errs -> Tezos_rpc.Answer.fail errs
-             | Ok sources ->
+             let ophs =
+               List.map_e Operation_hash.of_b58check params#operation_hash
+             in
+             match (sources, ophs) with
+             | Error errs, _ | _, Error errs -> Tezos_rpc.Answer.fail errs
+             | Ok sources, Ok ophs ->
                  let* ctxt =
                    if sources = [] then Lwt.return_none
                    else
@@ -1148,6 +1154,7 @@ module Make
                      && filter_validation_passes
                           params#validation_passes
                           protocol
+                     && filter_operation_hashes ophs oph
                    then return @@ Some (oph, res)
                    else return_none
                  in
@@ -1213,6 +1220,7 @@ module Make
                          && filter_validation_passes
                               params#validation_passes
                               protocol
+                         && filter_operation_hashes ophs oph
                        then return @@ Map.add oph protocol acc
                        else return acc)
                      (Pending_ops.operations pv.shell.pending)

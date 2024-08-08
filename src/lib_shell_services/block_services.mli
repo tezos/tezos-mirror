@@ -414,7 +414,8 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
     - Default [refused] is [true].
     - Default [outdated] is [true].
     - Default [validation_passes] is [[]]
-    - Default [sources] is [[]] *)
+    - Default [sources] is [[]]
+    - Default [operation_hash] is [[]]*)
     val pending_operations :
       #simple ->
       ?chain:chain ->
@@ -426,6 +427,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
       ?outdated:bool ->
       ?validation_passes:int list ->
       ?sources:string list ->
+      ?operation_hash:string list ->
       unit ->
       t tzresult Lwt.t
 
@@ -746,7 +748,8 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
           ; refused : bool
           ; outdated : bool
           ; validation_passes : int list
-          ; sources : string list >,
+          ; sources : string list
+          ; operation_hash : string list >,
           unit,
           version * Mempool.t )
         Tezos_rpc.Service.t

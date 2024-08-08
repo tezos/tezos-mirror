@@ -2469,6 +2469,114 @@ module Revamped = struct
     Log.info "The [source] filter has filtered the sources correctly." ;
     unit
 
+  (** This test injects consensus and manager operations and checks that
+      the [operation_hash] filter of the [pending_operations] RPC correctly
+      filters operations by hash. *)
+  let test_filter_mempool_operations_by_hash =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Filter mempool operations by hash"
+      ~tags:[team; "mempool"; "rpc"; "pending_operations"; "operation_hash"]
+    @@ fun protocol ->
+    log_step 1 "Initialize a node and a client." ;
+    let* node, client =
+      Client.init_with_protocol
+        ~nodes_args:[Synchronisation_threshold 0]
+        ~protocol
+        `Client
+        ()
+    in
+
+    log_step 2 "Inject a transfer." ;
+    let* (`OpHash oph1) =
+      Operation.Manager.(inject [make (transfer ())]) client
+    in
+
+    log_step
+      3
+      "Check that operation %s is correctly returned when filtered on."
+      oph1 ;
+    let* mempool = Mempool.get_mempool client ~operation_hash:[oph1] in
+    Mempool.check_mempool ~validated:[oph1] mempool ;
+
+    log_step
+      4
+      "Bake a block to remove %s from the mempool and to be able to attest on \
+       it."
+      oph1 ;
+    let* level =
+      bake_for ~empty:false ~protocol ~wait_for_flush:true node client
+    in
+    let* block_payload_hash =
+      Operation.Consensus.get_block_payload_hash client
+    in
+    let* slots_json = Operation.Consensus.get_slots ~level client in
+    let inject_attestation (account : Account.key) =
+      Operation.Consensus.inject
+        (Operation.Consensus.attestation
+           ~slot:(Operation.Consensus.first_slot ~slots_json account)
+           ~level
+           ~round:0
+           ~block_payload_hash
+           ())
+        ~signer:account
+        client
+    in
+
+    log_step
+      5
+      "Check that the empty mempool is correctly returned even when filtered \
+       with [operation_hash]." ;
+    let* mempool = Mempool.get_mempool client ~operation_hash:[oph1] in
+    Mempool.check_mempool ~validated:[] mempool ;
+
+    log_step 6 "Attest with %s." Constant.bootstrap1.alias ;
+    let* (`OpHash oph2) = inject_attestation Constant.bootstrap1 in
+
+    log_step 7 "Attest with %s." Constant.bootstrap2.alias ;
+    let* (`OpHash oph3) = inject_attestation Constant.bootstrap2 in
+
+    log_step 8 "Inject a delegation with %s." Constant.bootstrap3.alias ;
+    let* (`OpHash oph4) =
+      let source = Constant.bootstrap3 in
+      Operation.Manager.(inject [make ~source @@ delegation ()] client)
+    in
+
+    log_step
+      9
+      "Check that only operation %s is recovered when using the \
+       [operation_hash] filter on it"
+      oph2 ;
+    let* mempool = Mempool.get_mempool client ~operation_hash:[oph2] in
+    Mempool.check_mempool ~validated:[oph2] mempool ;
+
+    log_step
+      10
+      "Check that only operation %s is recovered when using the \
+       [operation_hash] filter on it"
+      oph4 ;
+    let* mempool = Mempool.get_mempool client ~operation_hash:[oph4] in
+    Mempool.check_mempool ~validated:[oph4] mempool ;
+
+    log_step
+      11
+      "Check that only %s and %s operations are recovered when using the \
+       [operation_hash] filter on them"
+      oph3
+      oph4 ;
+    let* mempool = Mempool.get_mempool client ~operation_hash:[oph3; oph4] in
+    Mempool.check_mempool ~validated:[oph3; oph4] mempool ;
+
+    log_step
+      12
+      "Check that no operation is recovered when using the [operation_hash] \
+       filter on %s"
+      oph1 ;
+    let* mempool = Mempool.get_mempool client ~operation_hash:[oph1] in
+    Mempool.check_mempool ~validated:[] mempool ;
+
+    unit
+
   (** This test injects consensus operations and management operations from
       several sources and checks that the [source] filter on mempool correctly
       filters operations by consensus_key. *)
@@ -4090,6 +4198,7 @@ let register ~protocols =
   Revamped.mempool_disabled protocols ;
   Revamped.propagation_future_attestation protocols ;
   Revamped.test_mempool_config_operation_filtering protocols ;
+  Revamped.test_filter_mempool_operations_by_hash protocols ;
   forge_pre_filtered_operation protocols ;
   refetch_failed_operation protocols ;
   ban_operation_and_check_validated protocols ;
