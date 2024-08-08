@@ -415,9 +415,17 @@ let wait_for_evm_event ?timeout event ?(check = parse_evm_event_kind event)
          let expected_event_kind = string_of_evm_event_kind event in
          if expected_event_kind = found_event_kind then check json else None)
 
-let wait_for_shutdown_event evm_node =
-  wait_for evm_node "shutting_down.v0" @@ fun json ->
-  JSON.(json |> as_int |> Option.some)
+let wait_for_shutdown_event ?(can_terminate = false) evm_node =
+  let shutdown_event = "shutting_down.v0" in
+  Lwt.catch
+    (fun () ->
+      wait_for evm_node shutdown_event @@ fun json ->
+      JSON.(json |> as_int |> Option.some |> Option.some))
+    (function
+      | Terminated_before_event {event; _}
+        when event = shutdown_event && can_terminate ->
+          Lwt.return_none
+      | exn -> Lwt.reraise exn)
 
 let wait_for_diverged evm_node =
   wait_for evm_node "evm_events_follower_diverged.v0" @@ fun json ->
