@@ -10,6 +10,8 @@ pub mod tracer {
     };
 
     use primitive_types::H256;
+    use tezos_evm_logging::log;
+    use tezos_evm_logging::Level::Debug;
     use tezos_indexable_storage::{IndexableStorage, IndexableStorageError};
     use tezos_smart_rollup_host::path::*;
     use thiserror::Error;
@@ -67,6 +69,7 @@ pub mod tracer {
     ) -> Result<(), Error> {
         let path = trace_tx_path(hash, &FAILED)?;
         host.store_write_all(&path, &[u8::from(!is_success)])?;
+        log!(host, Debug, "Store trace info: is_success {}", is_success);
         Ok(())
     }
 
@@ -77,6 +80,7 @@ pub mod tracer {
     ) -> Result<(), Error> {
         let path = trace_tx_path(hash, &RETURN_VALUE)?;
         host.store_write_all(&path, value)?;
+        log!(host, Debug, "Store trace info: value {:?}", value);
         Ok(())
     }
 
@@ -91,6 +95,7 @@ pub mod tracer {
         let struct_logs_storage = IndexableStorage::new_owned_path(path);
 
         struct_logs_storage.push_value(host, &logs)?;
+        log!(host, Debug, "Store trace info: logs {:?}", logs);
 
         Ok(())
     }
@@ -102,12 +107,13 @@ pub mod tracer {
         call_trace: CallTrace,
         hash: &Option<H256>,
     ) -> Result<(), Error> {
-        let call_trace = rlp::encode(&call_trace);
+        let encoded_call_trace = rlp::encode(&call_trace);
 
         let path = trace_tx_path(hash, &CALL_TRACE)?;
         let call_trace_storage = IndexableStorage::new_owned_path(path);
 
-        call_trace_storage.push_value(host, &call_trace)?;
+        call_trace_storage.push_value(host, &encoded_call_trace)?;
+        log!(host, Debug, "Store call trace: {:?}", call_trace);
 
         Ok(())
     }
