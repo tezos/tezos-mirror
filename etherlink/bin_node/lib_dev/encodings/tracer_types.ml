@@ -891,10 +891,10 @@ module CallTracer = struct
                  revert_reason;
                  logs;
                } ->
-            ( (calls, type_, from, to_, value, gas),
-              (gas_used, input, output, error, revert_reason, logs) ))
-          (fun ( (calls, type_, from, to_, value, gas),
-                 (gas_used, input, output, error, revert_reason, logs) ) ->
+            ( (type_, from, to_, value, gas, gas_used),
+              (input, output, error, revert_reason, logs, calls) ))
+          (fun ( (type_, from, to_, value, gas, gas_used),
+                 (input, output, error, revert_reason, logs, calls) ) ->
             {
               calls;
               type_;
@@ -911,19 +911,19 @@ module CallTracer = struct
             })
           (merge_objs
              (obj6
-                (req "calls" (list enc))
                 (req "type" string)
                 (req "from" Ethereum_types.address_encoding)
                 (opt "to" Ethereum_types.address_encoding)
                 (req "value" uint_as_hex_encoding)
-                (opt "gas" uint_as_hex_encoding))
+                (opt "gas" uint_as_hex_encoding)
+                (req "gas_used" uint_as_hex_encoding))
              (obj6
-                (req "gas_used" uint_as_hex_encoding)
                 (req "input" Ethereum_types.hex_encoding)
                 (opt "output" Ethereum_types.hex_encoding)
                 (opt "error" Ethereum_types.hex_encoding)
                 (opt "revert_reason" Ethereum_types.hex_encoding)
-                (opt "logs" (list logs_encoding)))))
+                (opt "logs" (list logs_encoding))
+                (req "calls" (list enc)))))
 
   let decode_logs item =
     let open Result_syntax in
