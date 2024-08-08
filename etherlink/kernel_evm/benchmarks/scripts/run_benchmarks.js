@@ -6,10 +6,10 @@
 
 // Before running this script, run the following commands to build the debugger and the benchmark kernel
 // $ make
-// $ make -C etherlink/kernel_evm/
+// $ make -f etherlink.mk evm_benchmark_kernel.wasm
 
 // Then run this script using the following command
-// $ node etherlink/kernel_evm/kernel_benchmark/scripts/run_benchmarks.js
+// $ node etherlink/kernel_evm/benchmarks/scripts/run_benchmarks.js
 
 // Each row of the output file represents the processing of one message in the kernel
 // Each value represents a cost. "gas_cost" is the cost in gas in the EVM, and the other values are costs in ticks in the PVM
@@ -219,7 +219,7 @@ function run_profiler(path, logs) {
             push_match(output, results.block_in_progress_read, /\[Benchmarking\] Reading Block In Progress of size\s*(\d+)/g)
             push_match(output, results.receipt_size, /\[Benchmarking\] Storing receipt of size \s*(\d+)/g)
             push_match(output, results.bloom_size, /\[Benchmarking\] bloom size:\s*(\d+)/g)
-            push_match(output, results.tx_type, /\[Benchmarking\] Transaction type: ([A-Z]+)\b/g)
+            push_match(output, results.tx_type, /\[Benchmarking\] Transaction type: ([A-Z_]+)\b/g)
             push_match(output, results.reason, /\[Benchmarking\] reason: ([A-Za-z()_]+)\b/g)
             push_match(output, results.chunks_in_bip, /\[Benchmarking\] Number of chunks in blueprint: (\d+)\b/g)
             push_match(output, results.bip_size, /\[Benchmarking\] Size of blueprint: (\d+)\b/g)
@@ -306,17 +306,23 @@ async function analyze_profiler_output(path) {
     results.block_in_progress_read_ticks = await get_ticks(path, "read_block_in_progress");
     results.next_bip_ticks = await get_ticks(path, "next_bip_from_blueprint");
 
+    // FA deposit ticks
+    results.execute_fa_deposit_ticks = await get_ticks(path, "execute_fa_deposit");
+    results.parse_fa_deposit_ticks = await get_ticks(path, "FaDeposit.*try_parse");
+    results.hash_fa_deposit_ticks = await get_ticks(path, "handle_fa_deposit");
+
     let nb_reboots = results.block_in_progress_store_ticks;
     let nb_runs = results.kernel_run_ticks?.length;
     let nb_transactions = results.run_transaction_ticks?.length;
+    let nb_deposits = results.execute_fa_deposit_ticks?.length;
     let nb_blocks = results.block_finalize?.length;
     check(nb_runs, results.interpreter_init_ticks?.length, "Error in nb of interpreter init ticks $?")
     check(nb_runs, results.interpreter_decode_ticks?.length, "Error in nb of interpreter decode ticks $?")
-    check(nb_transactions, results.signature_verification_ticks?.length, "Error in nb of signatures ticks $?")
+    check(nb_transactions, results.signature_verification_ticks?.length, "Error in nb of (signature) validation ticks $?")
     check(nb_transactions, results.hashing_ticks?.length, "Error in nb of hash ticks $?")
-    check(nb_transactions - nb_reboots, results.store_transaction_object_ticks?.length, "Error in nb of stored tx ticks $?")
-    check(nb_transactions - nb_reboots, results.store_receipt_ticks?.length, "Error in nb of receipts ticks $?")
-    check(nb_transactions - nb_reboots, results.logs_to_bloom?.length, "Error in nb of bloom ticks $?")
+    check(nb_transactions + nb_deposits - nb_reboots, results.store_transaction_object_ticks?.length, "Error in nb of stored tx ticks $?")
+    check(nb_transactions + nb_deposits - nb_reboots, results.store_receipt_ticks?.length, "Error in nb of receipts ticks $?")
+    check(nb_transactions + nb_deposits - nb_reboots, results.logs_to_bloom?.length, "Error in nb of bloom ticks $?")
     // last bp reading should be empty and lead to no block
     check(nb_blocks + 1, results.next_bip_ticks?.length, "Error in nb of bp reading ticks $?")
     check(results.block_in_progress_store?.length, results.block_in_progress_read?.length, "not as many bip read as store $?")
@@ -379,7 +385,9 @@ function log_benchmark_result({ benchmark_name, options, expect_false }, data) {
             options,
             expected: expect_false.includes(j) ? "OK_false" : "",
             signature_verification_ticks: data.signature_verification_ticks?.[j],
+            parse_fa_deposit_ticks: data.parse_fa_deposit_ticks?.[j],
             hashing_ticks: data.hashing_ticks?.[j],
+            hash_fa_deposit_ticks: data.hash_fa_deposit_ticks?.[j],
             status,
             estimated_ticks: data.estimated_ticks_per_tx[j],
             tx_type: data.tx_type[j],
@@ -391,9 +399,9 @@ function log_benchmark_result({ benchmark_name, options, expect_false }, data) {
                 {
                     gas_cost: 21000,
                     run_transaction_ticks: data.run_transaction_ticks?.[j],
+                    execute_fa_deposit_ticks: data.execute_fa_deposit_ticks?.[j],
                     sputnik_runtime_ticks: 0,
                     store_transaction_object_ticks: data.store_transaction_object_ticks?.[j],
-
                 });
 
         }
@@ -404,6 +412,7 @@ function log_benchmark_result({ benchmark_name, options, expect_false }, data) {
                     gas_cost: data.gas_costs[gas_cost_index],
                     reason: data.reason?.[j],
                     run_transaction_ticks: data.run_transaction_ticks?.[j],
+                    execute_fa_deposit_ticks: data.execute_fa_deposit_ticks?.[j],
                     sputnik_runtime_ticks: data.sputnik_runtime_ticks?.[j],
                     store_transaction_object_ticks: data.store_transaction_object_ticks?.[j],
                     store_receipt_ticks: data.store_receipt_ticks?.[j],

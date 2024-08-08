@@ -449,6 +449,13 @@ fn apply_fa_deposit<Host: Runtime>(
     )
     .map_err(Error::InvalidRunTransaction)?;
 
+    log!(
+        host,
+        Benchmarking,
+        "Transaction status: OK_{}.",
+        outcome.is_success()
+    );
+
     Ok(ExecutionResult::Valid(TransactionResult {
         caller,
         gas_used: outcome.gas_used.into(),

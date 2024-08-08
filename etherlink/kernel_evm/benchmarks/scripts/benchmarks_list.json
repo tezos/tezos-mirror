@@ -78,6 +78,8 @@
     "benchmarks/bench_loop_progressive.js",
     "benchmarks/bench_loop_expensive.js",
     "benchmarks/bench_deposit.js",
+    "benchmarks/bench_fa_deposit.js",
+    "benchmarks/bench_fa_withdrawal.js",
     "benchmarks/scenarios/audit/bench_create.js",
     "benchmarks/scenarios/audit/bench_linear_big_contract.js --count 1",
     "benchmarks/scenarios/audit/bench_linear_big_contract_shortened.js --count 1",

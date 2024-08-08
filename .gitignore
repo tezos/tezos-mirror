@@ -172,3 +172,6 @@ terraform.rc
 /script-inputs/custom_dune_flags
 
 etherlink/scripts/docker-compose/mainnet-docker-compose/.etherlink-mainnet-data/
+
+# Etherlink benchmarks
+node_modules/
