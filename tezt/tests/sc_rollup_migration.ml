@@ -17,7 +17,7 @@ open Sc_rollup_helpers
 
 let block_time_to_trigger_constant_update_on_migration = function
   | Protocol.Alpha -> Some 5
-  | Protocol.Beta -> Some 5
+  | Protocol.Quebec -> Some 5
   | ParisC -> Some 8
 
 let test_l1_migration_scenario ?parameters_ty ?(src = Constant.bootstrap1.alias)
