@@ -66,9 +66,9 @@
   (select void_for_linking-octez-protocol-020-PsParisC-libs-client from
    (octez-protocol-020-PsParisC-libs.client -> void_for_linking-octez-protocol-020-PsParisC-libs-client.empty)
    (-> void_for_linking-octez-protocol-020-PsParisC-libs-client.empty))
-  (select void_for_linking-octez-protocol-beta-libs-client from
-   (octez-protocol-beta-libs.client -> void_for_linking-octez-protocol-beta-libs-client.empty)
-   (-> void_for_linking-octez-protocol-beta-libs-client.empty))
+  (select void_for_linking-octez-protocol-021-PtQuebec-libs-client from
+   (octez-protocol-021-PtQuebec-libs.client -> void_for_linking-octez-protocol-021-PtQuebec-libs-client.empty)
+   (-> void_for_linking-octez-protocol-021-PtQuebec-libs-client.empty))
   (select void_for_linking-octez-protocol-alpha-libs-client from
    (octez-protocol-alpha-libs.client -> void_for_linking-octez-protocol-alpha-libs-client.empty)
    (-> void_for_linking-octez-protocol-alpha-libs-client.empty)))
@@ -105,5 +105,5 @@
    (write-file void_for_linking-octez-protocol-018-Proxford-libs-client.empty "")
    (write-file void_for_linking-octez-protocol-019-PtParisB-libs-client.empty "")
    (write-file void_for_linking-octez-protocol-020-PsParisC-libs-client.empty "")
-   (write-file void_for_linking-octez-protocol-beta-libs-client.empty "")
+   (write-file void_for_linking-octez-protocol-021-PtQuebec-libs-client.empty "")
    (write-file void_for_linking-octez-protocol-alpha-libs-client.empty ""))))

@@ -10,5 +10,7 @@ octez-codec
 octez-client
 octez-admin-client
 octez-node
+octez-accuser-PtQuebec
+octez-baker-PtQuebec
 octez-accuser-PsParisC
 octez-baker-PsParisC
