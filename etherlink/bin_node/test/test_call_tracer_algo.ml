@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2024 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -212,7 +213,7 @@ let test_decoding_rlp =
       let bytes =
         Hex.to_bytes
           (`Hex
-            "f8dd8443414c4c941919191919191919191919191919191919191919d5941919191919191919191919191919191919191919a03dd5030000000000000000000000000000000000000000000000000000000000c988881300000000000088881300000000000083000102c483000102c483000102c483000102f861f85ff85d941919191919191919191919191919191919191919f842a01919191919191919191919191919191919191919191919191919191919191919a00d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d83000102820200")
+            "f8d88443414c4c941919191919191919191919191919191919191919d5941919191919191919191919191919191919191919a03dd5030000000000000000000000000000000000000000000000000000000000c988881300000000000088881300000000000083000102c483000102c483000102f861f85ff85d941919191919191919191919191919191919191919f842a01919191919191919191919191919191919191919191919191919191919191919a00d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d83000102820200")
       in
       (*
         Comes from the following rust:
@@ -232,7 +233,7 @@ let test_decoding_rlp =
             input: vec![0x00, 0x01, 0x02],
             output: Some(vec![0x00, 0x01, 0x02]),
             error: Some(vec![0x00, 0x01, 0x02]),
-            revert_reason: Some(vec![0x00, 0x01, 0x02]),
+            revert_reason: None,
             logs: Some(vec![logs]),
         };*)
       let logs =
@@ -258,8 +259,8 @@ let test_decoding_rlp =
             gas_used = Z.of_int 5000;
             input = Hex "000102";
             output = Some (Hex "000102");
-            error = Some (Hex "000102");
-            revert_reason = Some (Hex "000102");
+            error = Some "\000\001\002";
+            revert_reason = None;
             logs;
           }
       in
@@ -326,8 +327,8 @@ let test_decoding_rlp_min =
             gas_used = Z.of_int 5000;
             input = Hex "000102";
             output = Some (Hex "000102");
-            error = Some (Hex "000102");
-            revert_reason = Some (Hex "000102");
+            error = Some "\000\001\002";
+            revert_reason = None;
             logs = None;
           }
       in
