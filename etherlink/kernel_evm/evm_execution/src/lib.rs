@@ -285,7 +285,12 @@ where
                             0, // Initial call, we start at depth 0.
                         );
 
-                        call_trace.add_to(address);
+                        if base_call_type != "CREATE" {
+                            call_trace.add_to(address);
+                        } else {
+                            call_trace.add_to(result.new_address);
+                        }
+
                         call_trace.add_gas(gas_limit);
                         call_trace
                             .add_output(result.result.as_ref().map(|res| res.to_vec()));
