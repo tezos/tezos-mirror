@@ -36,6 +36,16 @@ val hex_of_string : string -> hex
 (** [hex_to_bytes hex] transforms the [hex] to binary format. *)
 val hex_to_bytes : hex -> string
 
+(** [hex_to_real_bytes hex] transforms the [hex] to bytes. *)
+val hex_to_real_bytes : hex -> bytes
+
+(** [hex_of_utf8] encodes a string to its utf8 representation in
+    hexadecimal. *)
+val hex_of_utf8 : string -> hex
+
+(** [hex_of_bytes] transforms the [bytes] to hexadecimal. *)
+val hex_of_bytes : bytes -> hex
+
 (** Ethereum block hash (32 bytes) *)
 type block_hash = Block_hash of hex [@@unboxed]
 
