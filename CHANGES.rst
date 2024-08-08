@@ -85,6 +85,10 @@ Node
 
 - Removed ParisB mempool plugin. (MR :gl:`!14031`)
 
+- Introduced the external RPC process to reduce the load of the node
+  when answering heavy RPCs. This can be enabled using
+  ``--external-rpc-addr`` (MR :gl:`!9490`)
+
 Client
 ------
 
