@@ -419,21 +419,28 @@ let may_get_dal_content state consensus_vote =
   in
   let compute_dal_rpc_timeout state =
     (* We set the timeout to a certain percent of the remaining time till the
-       end of the round. *)
-    let default = 0.2 in
+       end of the round. In the corner case (for instance, not having an end of
+       round time), we pick some small default value. *)
+    let corner_case_default = 0.2 in
     match compute_next_round_time state with
-    | None -> (* corner case; we pick some small default value *) default
+    | None -> corner_case_default
     | Some (timestamp, _next_round) -> (
         let ts = Time.System.of_protocol_opt timestamp in
         match ts with
-        | None -> default
+        | None -> corner_case_default
         | Some ts ->
             let now = Time.System.now () in
             let diff = Ptime.diff ts now |> Ptime.Span.to_float_s in
             if diff < 0. then
               (* We could output a warning, as this should not happen. *)
-              default
-            else diff *. 0.1)
+              corner_case_default
+            else
+              let factor =
+                float_of_int
+                  state.global_state.config.dal_node_timeout_percentage
+                /. 100.
+              in
+              diff *. factor)
   in
   only_if_dal_feature_enabled
     state
