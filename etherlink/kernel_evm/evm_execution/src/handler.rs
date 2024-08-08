@@ -2363,9 +2363,7 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
                                         ExitReason::Error(e) => call_trace
                                             .add_error(Some(format!("{:?}", e).into())),
                                         ExitReason::Revert(r) => call_trace
-                                            .add_revert_reason(Some(
-                                                format!("{:?}", r).into(),
-                                            )),
+                                            .add_error(Some(format!("{:?}", r).into())),
                                         ExitReason::Fatal(f) => call_trace
                                             .add_error(Some(format!("{:?}", f).into())),
                                         ExitReason::Succeed(_) => (),
@@ -2518,8 +2516,9 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
                                 ExitReason::Error(e) => {
                                     call_trace.add_error(Some(format!("{:?}", e).into()))
                                 }
-                                ExitReason::Revert(r) => call_trace
-                                    .add_revert_reason(Some(format!("{:?}", r).into())),
+                                ExitReason::Revert(r) => {
+                                    call_trace.add_error(Some(format!("{:?}", r).into()))
+                                }
                                 ExitReason::Fatal(f) => {
                                     call_trace.add_error(Some(format!("{:?}", f).into()))
                                 }
