@@ -975,7 +975,8 @@ module Onthefly : sig
   (* [copy_and_upgrade_legacy_file tar filename ~dst ~nb_blocks] loads
      the file [filename] from the given [tar], upgrades the [~nb_blocks] offset
      bytes from a 32 to a 64-bit format (in case the snapshot uses a legacy
-     format) and then it copies the rest of the file in the [~dst] file. *)
+     format) and then it copies the rest of the file in the [~dst] file.
+     TODO: this function should be removed when the upgrade is finished. *)
   val copy_and_upgrade_legacy_file :
     i -> file -> dst:string -> nb_blocks:int -> unit Lwt.t
 end = struct
