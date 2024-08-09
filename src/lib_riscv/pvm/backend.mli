@@ -45,3 +45,5 @@ val state_hash : state -> bytes
 val set_input : state -> int32 -> int64 -> string -> state Lwt.t
 
 val set_metadata : state -> bytes -> int32 -> state Lwt.t
+
+val reveal_raw_data : state -> string -> state Lwt.t
