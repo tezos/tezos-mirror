@@ -18,14 +18,13 @@ depends: [
   "octez-l2-libs" { = version }
   "octez-crawler" { = version }
   "octez-protocol-020-PsParisC-libs" { = version }
+  "octez-protocol-021-PtQuebec-libs" { = version }
 ]
 depopts: [
-  "octez-protocol-beta-libs"
   "octez-protocol-alpha-libs"
 ]
 conflicts: [
   "checkseum" { = "0.5.0" }
-  "octez-protocol-beta-libs" { != version }
   "octez-protocol-alpha-libs" { != version }
 ]
 build: [

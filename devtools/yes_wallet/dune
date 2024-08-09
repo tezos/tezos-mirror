@@ -11,7 +11,7 @@
   octez-node-config
   octez-shell-libs.store
   tezos-protocol-020-PsParisC.protocol
-  tezos-protocol-beta.protocol
+  tezos-protocol-021-PtQuebec.protocol
   tezos-protocol-alpha.protocol)
  (library_flags (:standard -linkall))
  (flags

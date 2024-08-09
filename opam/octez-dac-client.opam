@@ -15,13 +15,12 @@ depends: [
   "tezos-dac-lib" { = version }
   "tezos-dac-client-lib" { = version }
   "octez-protocol-020-PsParisC-libs" { = version }
+  "octez-protocol-021-PtQuebec-libs" { = version }
 ]
 depopts: [
-  "octez-protocol-beta-libs"
   "octez-protocol-alpha-libs"
 ]
 conflicts: [
-  "octez-protocol-beta-libs" { != version }
   "octez-protocol-alpha-libs" { != version }
 ]
 build: [
