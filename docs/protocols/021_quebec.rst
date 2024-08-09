@@ -55,7 +55,7 @@ Adaptive Issuance
 Gas improvements
 ----------------
 
-.. _breaking_changes_beta:
+.. _breaking_changes_quebec:
 
 Breaking Changes
 ----------------
@@ -80,7 +80,7 @@ RPC Changes
 - In the following paths, ``../`` is short for
   ``/chains/<chain_id>/blocks/<block_id>/context/delegates/<baker_pkh>/``.
   The documentation for the RPCs can be found on
-  https://tezos.gitlab.io/beta/rpc.html.
+  https://tezos.gitlab.io/quebec/rpc.html.
 
   * Renamed RPC ``GET ../current_frozen_deposits`` to ``GET
     ../total_staked``.  The old path is now **deprecated**. (MR
@@ -150,7 +150,7 @@ RPC Changes
 
 - Reworked RPC ``GET
   /chains/<chain_id>/blocks/<block_id>/context/delegates/<baker_pkh>``;
-  see :ref:`breaking_changes_beta`.
+  see :ref:`breaking_changes_quebec`.
 
 Operation receipts
 ------------------
