@@ -2,6 +2,16 @@
 
 set -e
 
+# Checks if running in dry-mode
+for arg in "$@"; do
+  case $arg in
+  "--dry-run")
+    dry_run="--dry-run"
+    echo "Running in dry-run mode. The opam packages won't be actually released."
+    ;;
+  esac
+done
+
 ci_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
 script_dir="$(dirname "$ci_dir")"
 
@@ -28,23 +38,29 @@ log "Done setting up credentials."
 echo "$script_dir/opam-release.sh" \
   "$opam_release_tag" \
   "https://gitlab.com/tezos/tezos/-/archive/$CI_COMMIT_TAG/$gitlab_octez_source_package_name.tar.gz" \
-  "$opam_dir"
+  "$opam_dir" \
+  "$dry_run"
 
 "$script_dir/opam-release.sh" \
   "$opam_release_tag" \
   "https://gitlab.com/tezos/tezos/-/archive/$CI_COMMIT_TAG/$gitlab_octez_source_package_name.tar.gz" \
-  "$opam_dir"
+  "$opam_dir" \
+  "$dry_run"
 
 # Matches the corresponding variable in /scripts/opam-release.sh.
 branch_name="octez-$(echo "$opam_release_tag" | tr '~' -)"
 
-log "While we're here, update master on the fork..."
-cd "$opam_dir"
-git remote add github "$opam_repository_fork"
-git push github master:master
+if [ -z "$dry_run" ]; then
 
-log "Pushing $branch_name to $opam_repository_fork..."
-git push --force-with-lease github "${branch_name}:${branch_name}"
+  log "While we're here, update master on the fork..."
+  cd "$opam_dir"
+  git remote add github "$opam_repository_fork"
+  git push github master:master
 
-log "Create the pull request at:"
-log "https://github.com/ocaml/opam-repository/compare/master...tezos:opam-repository:${branch_name}"
+  log "Pushing $branch_name to $opam_repository_fork..."
+  git push --force-with-lease github "${branch_name}:${branch_name}"
+
+  log "Create the pull request at:"
+  log "https://github.com/ocaml/opam-repository/compare/master...tezos:opam-repository:${branch_name}"
+
+fi

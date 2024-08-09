@@ -20,6 +20,8 @@ version="${1:-}"
 tarball="${2:-}"
 opam_dir="${3:-opam-repository}"
 
+eval "$(opam env)"
+
 if [ -z "$version" ]; then
   echo "$usage"
   exit 1

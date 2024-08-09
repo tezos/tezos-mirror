@@ -113,14 +113,14 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
     | Non_release_tag -> job_gitlab_publish ~dependencies
     | _ -> job_gitlab_release ~dependencies
   in
-  let job_opam_release : Tezos_ci.tezos_job =
+  let job_opam_release ?(dry_run = false) () : Tezos_ci.tezos_job =
     job
       ~__POS__
-      ~image:Images.CI.test
+      ~image:Images.CI.prebuild
       ~stage:Stages.publish_release
       ~interruptible:false
       ~name:"opam:release"
-      ["./scripts/ci/opam-release.sh"]
+      [("./scripts/ci/opam-release.sh" ^ if dry_run then " --dry-run" else "")]
   in
   let job_promote_to_latest_test =
     Common.job_docker_promote_to_latest
@@ -142,7 +142,7 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
   match (test, release_tag_pipeline_type) with
   (* for the moment the apt repository are not official, so we do not add to the release
      pipeline . *)
-  | false, Release_tag -> [job_opam_release]
+  | false, Release_tag -> [job_opam_release ()]
   | true, Release_tag ->
       [
         (* This job normally runs in the {!Octez_latest_release} pipeline
@@ -151,6 +151,7 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
            release testers are not required to trigger two separate pipelines
            (indeed, the second `latest_release_test` pipeline is rarely tested). *)
         job_promote_to_latest_test;
+        job_opam_release ~dry_run:true ();
       ]
   | _ -> []
 

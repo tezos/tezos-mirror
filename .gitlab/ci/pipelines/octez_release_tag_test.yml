@@ -580,3 +580,14 @@ docker:promote_to_latest:
   variables:
     DOCKER_VERSION: 24.0.7
     CI_DOCKER_HUB: "false"
+
+opam:release:
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
+  stage: publish_release
+  tags:
+  - gcp
+  dependencies:
+  - oc.docker:ci:amd64
+  interruptible: false
+  script:
+  - ./scripts/ci/opam-release.sh --dry-run
