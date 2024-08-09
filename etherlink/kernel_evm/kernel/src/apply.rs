@@ -310,7 +310,7 @@ pub struct TransactionResult {
 /// Technically incorrect: it is possible to do a call without sending any data,
 /// however it's done for benchmarking only, and benchmarking doesn't include
 /// such a scenario
-fn log_transaction_type<Host: Runtime>(host: &Host, to: Option<H160>, data: &Vec<u8>) {
+fn log_transaction_type<Host: Runtime>(host: &Host, to: Option<H160>, data: &[u8]) {
     if to.is_none() {
         log!(host, Benchmarking, "Transaction type: CREATE");
     } else if data.is_empty() {

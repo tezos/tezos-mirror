@@ -213,8 +213,8 @@ fn execute_transaction(
     let address = env.tx.transact_to.map(|addr| addr.to_fixed_bytes().into());
     let caller = env.tx.caller.to_fixed_bytes().into();
     let call_data = env.tx.data.to_vec();
-    let gas_limit = Some(env.tx.gas_limit);
-    let transaction_value = Some(env.tx.value);
+    let gas_limit = env.tx.gas_limit;
+    let transaction_value = env.tx.value;
     let pay_for_gas = true; // always, for now
 
     write_host!(
@@ -224,7 +224,7 @@ fn execute_transaction(
                     \t- gas: {} gas\n\
                     \t- value: {} wei",
         string_of_hexa(&env.tx.data),
-        gas_limit.unwrap(),
+        gas_limit,
         env.tx.value
     );
     run_transaction(
@@ -236,9 +236,9 @@ fn execute_transaction(
         address,
         caller,
         call_data,
-        gas_limit,
+        Some(gas_limit),
         env.tx.gas_price,
-        transaction_value,
+        Some(transaction_value),
         pay_for_gas,
         u64::MAX, // don't account for ticks during the test
         false,

@@ -83,7 +83,7 @@ fn append_queue(stream: &mut rlp::RlpStream, queue: &VecDeque<Transaction>) {
     }
 }
 
-fn append_txs(stream: &mut rlp::RlpStream, valid_txs: &Vec<[u8; TRANSACTION_HASH_SIZE]>) {
+fn append_txs(stream: &mut rlp::RlpStream, valid_txs: &[[u8; TRANSACTION_HASH_SIZE]]) {
     stream.begin_list(valid_txs.len());
     valid_txs.iter().for_each(|tx| {
         stream.append_iter(*tx);

@@ -756,7 +756,7 @@ mod tests {
             .enumerate()
             .map(|(i, bytes)| {
                 let data = bytes.to_vec();
-                let chunk_hash = Keccak256::digest(&data).try_into().unwrap();
+                let chunk_hash = Keccak256::digest(&data).into();
                 chunk_hashes.push(chunk_hash);
                 Input::ModeSpecific(ProxyInput::TransactionChunk {
                     tx_hash,
