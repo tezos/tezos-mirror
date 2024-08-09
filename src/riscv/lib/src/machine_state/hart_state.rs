@@ -18,6 +18,7 @@ use crate::{
     state_backend::{self as backend, Atom, Cell, CellWrite},
     traps::{Interrupt, TrapContext},
 };
+use interrupts_cache::InterruptsCacheResult;
 
 /// RISC-V hart state
 pub struct HartState<M: backend::ManagerBase> {
@@ -157,69 +158,64 @@ impl<M: backend::Manager> HartState<M> {
     /// Return the current [`Interrupt`] with highest priority to be handled
     /// or [`None`] if there isn't any available
     pub fn get_pending_interrupt(&mut self, current_mode: Mode) -> Option<Interrupt> {
-        let possible = if let Some(cache_hit) = self.get_possible_interrupts_cache(current_mode) {
-            cache_hit
+        let possible = match self.get_interrupts_cache(current_mode) {
+            InterruptsCacheResult::PendingInterrupt(result) => return result,
+            InterruptsCacheResult::PossibleInterrupts(possible_interrupts) => possible_interrupts,
+            InterruptsCacheResult::Miss => self.csregisters.possible_interrupts(current_mode),
+        };
+        let interrupt = if possible == 0 {
+            None
         } else {
-            let possible = self.csregisters.possible_interrupts(current_mode);
-            self.update_possible_interrupts_cache(current_mode, possible);
-            possible
+            // Normally, interrupts from devices / external sources are signaled to the CPU
+            // by updating the MEIP,MTIP,MSIP,SEIP,STIP,SSIP interrupt bits in the MIP register.
+            // In the hardware world, these CSRs updates would be done by PLIC / CLINT
+            // based on memory written by devices on the bus
+
+            // Section 3.1.9 MIP & MIE registers
+            // Multiple simultaneous interrupts destined for M-mode are handled in the
+            // following decreasing priority order: MEI, MSI, MTI, SEI, SSI, STI
+
+            // sip is a shadow of mip and sie is a shadow of mie
+            // hence we only need to look at mie to find out the interrupt bits
+            let mip: CSRRepr = self.csregisters.read(CSRegister::mip);
+            let active_interrupts = mip & possible;
+
+            if u64::bit(
+                active_interrupts,
+                Interrupt::MACHINE_EXTERNAL_EXCEPTION_CODE as usize,
+            ) {
+                Some(Interrupt::MachineExternal)
+            } else if u64::bit(
+                active_interrupts,
+                Interrupt::MACHINE_SOFTWARE_EXCEPTION_CODE as usize,
+            ) {
+                Some(Interrupt::MachineSoftware)
+            } else if u64::bit(
+                active_interrupts,
+                Interrupt::MACHINE_TIMER_EXCEPTION_CODE as usize,
+            ) {
+                Some(Interrupt::MachineTimer)
+            } else if u64::bit(
+                active_interrupts,
+                Interrupt::SUPERVISOR_EXTERNAL_EXCEPTION_CODE as usize,
+            ) {
+                Some(Interrupt::SupervisorExternal)
+            } else if u64::bit(
+                active_interrupts,
+                Interrupt::SUPERVISOR_SOFTWARE_EXCEPTION_CODE as usize,
+            ) {
+                Some(Interrupt::SupervisorSoftware)
+            } else if u64::bit(
+                active_interrupts,
+                Interrupt::SUPERVISOR_TIMER_EXCEPTION_CODE as usize,
+            ) {
+                Some(Interrupt::SupervisorTimer)
+            } else {
+                None
+            }
         };
-        if possible == 0 {
-            return None;
-        };
-
-        // Normally, interrupts from devices / external sources are signaled to the CPU
-        // by updating the MEIP,MTIP,MSIP,SEIP,STIP,SSIP interrupt bits in the MIP register.
-        // In the hardware world, these CSRs updates would be done by PLIC / CLINT
-        // based on memory written by devices on the bus
-
-        // Section 3.1.9 MIP & MIE registers
-        // Multiple simultaneous interrupts destined for M-mode are handled in the
-        // following decreasing priority order: MEI, MSI, MTI, SEI, SSI, STI
-
-        // sip is a shadow of mip and sie is a shadow of mie
-        // hence we only need to look at mie to find out the interrupt bits
-        let mip: CSRRepr = self.csregisters.read(CSRegister::mip);
-        let active_interrupts = mip & possible;
-
-        if u64::bit(
-            active_interrupts,
-            Interrupt::MACHINE_EXTERNAL_EXCEPTION_CODE as usize,
-        ) {
-            return Some(Interrupt::MachineExternal);
-        }
-        if u64::bit(
-            active_interrupts,
-            Interrupt::MACHINE_SOFTWARE_EXCEPTION_CODE as usize,
-        ) {
-            return Some(Interrupt::MachineSoftware);
-        }
-        if u64::bit(
-            active_interrupts,
-            Interrupt::MACHINE_TIMER_EXCEPTION_CODE as usize,
-        ) {
-            return Some(Interrupt::MachineTimer);
-        }
-        if u64::bit(
-            active_interrupts,
-            Interrupt::SUPERVISOR_EXTERNAL_EXCEPTION_CODE as usize,
-        ) {
-            return Some(Interrupt::SupervisorExternal);
-        }
-        if u64::bit(
-            active_interrupts,
-            Interrupt::SUPERVISOR_SOFTWARE_EXCEPTION_CODE as usize,
-        ) {
-            return Some(Interrupt::SupervisorSoftware);
-        }
-        if u64::bit(
-            active_interrupts,
-            Interrupt::SUPERVISOR_TIMER_EXCEPTION_CODE as usize,
-        ) {
-            return Some(Interrupt::SupervisorTimer);
-        }
-
-        None
+        self.update_interrupts_cache(current_mode, possible, interrupt);
+        interrupt
     }
 }
 

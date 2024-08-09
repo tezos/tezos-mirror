@@ -121,7 +121,7 @@ impl From<Exception> for SbiError {
 }
 
 /// RISC-V Interrupts (also known as asynchronous exceptions)
-#[derive(PartialEq, Eq, thiserror::Error, strum::Display, Debug)]
+#[derive(PartialEq, Eq, thiserror::Error, strum::Display, Debug, Copy, Clone)]
 pub enum Interrupt {
     SupervisorSoftware,
     MachineSoftware,
