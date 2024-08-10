@@ -13,8 +13,7 @@ use alloc::borrow::Cow;
 use alloc::collections::TryReserveError;
 use crypto::hash::{ContractKt1Hash, HashTrait};
 use evm::executor::stack::PrecompileFailure;
-use evm::ExitReason;
-use handler::EvmHandler;
+use handler::{EvmHandler, ExecutionResult};
 use host::{path::RefPath, runtime::Runtime};
 use primitive_types::{H160, H256, U256};
 use tezos_ethereum::block::BlockConstants;
@@ -49,7 +48,7 @@ use trace::{
     CallTrace, CallTracerConfig, CallTracerInput, StructLoggerInput, TracerInput,
 };
 
-use crate::{handler::ExtendedExitReason, storage::tracer};
+use crate::storage::tracer;
 
 #[derive(Error, Clone, Copy, Debug, Eq, PartialEq)]
 pub enum DurableStorageError {
@@ -136,7 +135,7 @@ pub enum EthereumError {
 fn trace_outcome<Host: Runtime>(
     handler: EvmHandler<Host>,
     is_success: bool,
-    output: &Option<Vec<u8>>,
+    output: Option<&[u8]>,
     gas_used: u64,
     transaction_hash: Option<H256>,
 ) -> Result<(), EthereumError> {
@@ -185,9 +184,8 @@ where
     Host: Runtime,
 {
     fn do_refund(outcome: &handler::ExecutionOutcome, pay_for_gas: bool) -> bool {
-        match outcome.reason {
-            ExtendedExitReason::Exit(ExitReason::Revert(_))
-            | ExtendedExitReason::OutOfTicks => pay_for_gas,
+        match outcome.result {
+            ExecutionResult::CallReverted(_) | ExecutionResult::OutOfTicks => pay_for_gas,
             _ => pay_for_gas && outcome.is_success(),
         }
     }
@@ -232,7 +230,7 @@ where
 
         match result {
             Ok(result) => {
-                if result.reason == ExtendedExitReason::OutOfTicks && retriable {
+                if result.result == ExecutionResult::OutOfTicks && retriable {
                     // The nonce must be incremented before the execution. Details here: https://gitlab.com/tezos/tezos/-/merge_requests/11998.
                     // In the EVM logic, the nonce is never decremented
                     // But with the ticks model, if the execution raises an 'out of ticks' error and if the transaction is 'retriable', the nonce must not be incremented
@@ -244,7 +242,7 @@ where
                     // In case of `OutOfTicks` and the transaction can be
                     // retried, the gas is entirely refunded as it will be
                     // repaid in the next attempt
-                    if result.reason == ExtendedExitReason::OutOfTicks && retriable {
+                    if result.result == ExecutionResult::OutOfTicks && retriable {
                         log!(
                             handler.borrow_host(),
                             Debug,
@@ -267,7 +265,7 @@ where
                         trace_outcome(
                             handler,
                             result.is_success(),
-                            &result.result,
+                            result.output(),
                             result.gas_used,
                             transaction_hash,
                         )?
@@ -288,12 +286,12 @@ where
                         if base_call_type != "CREATE" {
                             call_trace.add_to(address);
                         } else {
-                            call_trace.add_to(result.new_address);
+                            call_trace.add_to(result.new_address());
                         }
 
                         call_trace.add_gas(gas_limit);
                         call_trace
-                            .add_output(result.result.as_ref().map(|res| res.to_vec()));
+                            .add_output(result.output().as_ref().map(|res| res.to_vec()));
 
                         if with_logs {
                             call_trace.add_logs(Some(result.logs.clone()))
@@ -316,7 +314,7 @@ where
                         ..
                     })) = tracer
                     {
-                        trace_outcome(handler, false, &None, 0, transaction_hash)?
+                        trace_outcome(handler, false, None, 0, transaction_hash)?
                     } else if let Some(CallTracer(CallTracerInput {
                         transaction_hash,
                         ..

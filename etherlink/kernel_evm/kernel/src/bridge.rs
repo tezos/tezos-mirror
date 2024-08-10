@@ -7,11 +7,11 @@
 use std::borrow::Cow;
 
 use ethereum::Log;
-use evm::{Config, ExitError, ExitReason, ExitSucceed};
+use evm::{Config, ExitError};
 use evm_execution::{
     abi::{ABI_H160_LEFT_PADDING, ABI_U32_LEFT_PADDING},
     account_storage::{account_path, AccountStorageError, EthereumAccountStorage},
-    handler::ExecutionOutcome,
+    handler::{ExecutionOutcome, ExecutionResult},
     EthereumError,
 };
 use primitive_types::{H160, H256, U256};
@@ -190,15 +190,15 @@ pub fn execute_deposit<Host: Runtime>(
         account_path(&deposit.receiver).map_err(AccountStorageError::from)?;
     let mut to_account = evm_account_storage.get_or_create(host, &to_account_path)?;
 
-    let exit_reason = match to_account.balance_add(host, deposit.amount) {
-        Ok(()) => ExitReason::Succeed(ExitSucceed::Returned),
+    let result = match to_account.balance_add(host, deposit.amount) {
+        Ok(()) => ExecutionResult::TransferSucceeded,
         Err(err) => {
             log!(host, Info, "Deposit failed with {:?}", err);
-            ExitReason::Error(ExitError::Other(Cow::from("Deposit failed")))
+            ExecutionResult::Error(ExitError::Other(Cow::from("Deposit failed")))
         }
     };
 
-    let logs = if exit_reason.is_succeed() {
+    let logs = if result.is_success() {
         vec![deposit.event_log()]
     } else {
         vec![]
@@ -210,10 +210,8 @@ pub fn execute_deposit<Host: Runtime>(
 
     let execution_outcome = ExecutionOutcome {
         gas_used,
-        reason: exit_reason.into(),
-        new_address: None,
         logs,
-        result: None,
+        result,
         withdrawals: vec![],
         estimated_ticks_used,
     };

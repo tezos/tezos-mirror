@@ -20,11 +20,13 @@ use crate::{
     tick_model, CONFIG,
 };
 
-use evm::ExitReason;
 use evm_execution::account_storage::account_path;
-use evm_execution::handler::ExtendedExitReason;
 use evm_execution::trace::TracerInput;
-use evm_execution::{account_storage, handler::ExecutionOutcome, precompiles};
+use evm_execution::{
+    account_storage,
+    handler::{ExecutionOutcome, ExecutionResult as ExecutionOutcomeResult},
+    precompiles,
+};
 use evm_execution::{run_transaction, EthereumError};
 use primitive_types::{H160, U256};
 use rlp::{Decodable, DecoderError, Encodable, Rlp};
@@ -214,25 +216,27 @@ impl From<Result<Option<ExecutionOutcome>, EthereumError>>
     fn from(result: Result<Option<ExecutionOutcome>, EthereumError>) -> Self {
         match result {
             Ok(Some(ExecutionOutcome {
-                gas_used,
-                reason: ExtendedExitReason::Exit(ExitReason::Succeed(_)),
-                result,
-                ..
-            })) => Self::Ok(SimulationResult::Ok(ExecutionResult {
-                value: result,
-                gas_used: Some(gas_used),
-            })),
+                gas_used, result, ..
+            })) if result.is_success() => {
+                Self::Ok(SimulationResult::Ok(ExecutionResult {
+                    value: result.output().map(|x| x.to_vec()),
+                    gas_used: Some(gas_used),
+                }))
+            }
+            Ok(Some(
+                outcome @ ExecutionOutcome {
+                    result: ExecutionOutcomeResult::CallReverted(_),
+                    ..
+                },
+            )) => Self::Ok(SimulationResult::Err(
+                outcome.output().unwrap_or_default().to_vec(),
+            )),
             Ok(Some(ExecutionOutcome {
-                reason: ExtendedExitReason::Exit(ExitReason::Revert(_)),
-                result,
-                ..
-            })) => Self::Ok(SimulationResult::Err(result.unwrap_or_default())),
-            Ok(Some(ExecutionOutcome {
-                reason: ExtendedExitReason::OutOfTicks,
+                result: ExecutionOutcomeResult::OutOfTicks,
                 ..
             })) => Self::Err(String::from(OUT_OF_TICKS_MSG)),
-            Ok(Some(ExecutionOutcome { reason, .. })) => {
-                let msg = format!("The transaction failed: {:?}.", reason);
+            Ok(Some(ExecutionOutcome { result, .. })) => {
+                let msg = format!("The transaction failed: {:?}.", result);
                 Self::Err(msg)
             }
             Ok(None) => Self::Err(String::from(
@@ -578,7 +582,7 @@ impl TxValidation {
             None,
         ) {
             Ok(Some(ExecutionOutcome {
-                reason: ExtendedExitReason::OutOfTicks,
+                result: ExecutionOutcomeResult::OutOfTicks,
                 ..
             })) => Self::to_error(OUT_OF_TICKS_MSG),
             Ok(None) => Self::to_error(CANNOT_PREPAY),
