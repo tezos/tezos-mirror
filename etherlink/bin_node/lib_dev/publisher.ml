@@ -9,7 +9,7 @@ open Ethereum_types
 
 module type TxEncoder = sig
   (* Transactions to be encoded *)
-  type transactions = string list
+  type transactions = (string * Ethereum_types.transaction_object) list
 
   (* Encoded messages to be injected *)
   type messages
@@ -34,7 +34,7 @@ module Make
     (TxEncoder : TxEncoder)
     (Publisher : Publisher with type messages = TxEncoder.messages) =
 struct
-  let inject_raw_transactions ~timestamp ~smart_rollup_address ~transactions =
+  let inject_transactions ~timestamp ~smart_rollup_address ~transactions =
     let open Lwt_result_syntax in
     let*? tx_hashes, to_publish =
       TxEncoder.encode_transactions ~smart_rollup_address ~transactions

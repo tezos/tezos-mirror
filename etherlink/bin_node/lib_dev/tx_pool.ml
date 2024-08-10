@@ -232,7 +232,9 @@ module Request = struct
     | Add_transaction :
         Ethereum_types.transaction_object * string
         -> ((Ethereum_types.hash, string) result, tztrace) t
-    | Pop_transactions : int -> ((string * Ethereum_types.hash) list, tztrace) t
+    | Pop_transactions :
+        int
+        -> ((string * Ethereum_types.transaction_object) list, tztrace) t
     | Pop_and_inject_transactions : (unit, tztrace) t
     | Lock_transactions : (unit, tztrace) t
     | Unlock_transactions : (unit, tztrace) t
@@ -562,7 +564,7 @@ let pop_transactions state ~maximum_cumulative_size =
       |> List.sort (fun Pool.{index = index_a; _} {index = index_b; _} ->
              Int64.compare index_a index_b)
       |> List.map (fun Pool.{raw_tx; transaction_object; _} ->
-             (raw_tx, transaction_object.hash))
+             (raw_tx, transaction_object))
     in
     (* update the pool *)
     state.pool <- pool ;
@@ -589,9 +591,8 @@ let pop_and_inject_transactions state =
   let* txs = pop_transactions state ~maximum_cumulative_size in
   if not (List.is_empty txs) then
     let (module Rollup_node : Services_backend_sig.S) = state.rollup_node in
-    let txs = List.map fst txs in
     let*! hashes =
-      Rollup_node.inject_raw_transactions
+      Rollup_node.inject_transactions
       (* The timestamp is ignored in observer and proxy mode, it's just for
          compatibility with sequencer mode. *)
         ~timestamp:(Misc.now ())

@@ -48,7 +48,7 @@ val nonce : Ethereum_types.Address.t -> Ethereum_types.quantity tzresult Lwt.t
     `maximum_cumulative_size`. Returns no transactions if the pool is locked. *)
 val pop_transactions :
   maximum_cumulative_size:int ->
-  (string * Ethereum_types.hash) list tzresult Lwt.t
+  (string * Ethereum_types.transaction_object) list tzresult Lwt.t
 
 (** [pop_and_inject_transactions ()] pops the valid transactions from
     the pool using {!pop_transactions} and injects them using
