@@ -178,6 +178,13 @@ let private_rpc_port_arg =
     ~doc:"The EVM node private server rpc port."
     Params.int
 
+let block_number_arg ~doc =
+  let open Evm_node_lib_dev_encoding in
+  Tezos_clic.map_arg ~f:(fun _ctxt i ->
+      Lwt_result_syntax.return
+        (Option.map (fun i -> Ethereum_types.Qty Z.(of_int i)) i))
+  @@ Tezos_clic.arg ~long:"block-number" ~placeholder:"N" ~doc Params.int
+
 let maximum_blueprints_lag_arg =
   Tezos_clic.arg
     ~long:"maximum-blueprints-lag"
@@ -1393,11 +1400,19 @@ let patch_kernel_command =
        unsafe command, which can lead to the EVM node diverging from the \
        Etherlink main branch if the new kernel is not compatible with the one \
        deployed on the network."
-    (args2 data_dir_arg (force_arg ~doc:"Force patching the kernel"))
+    (args3
+       data_dir_arg
+       (block_number_arg
+          ~doc:
+            "If provided, the state resulting in the application of the \
+             requested block will be used instead of the latest state. In that \
+             case, the patch will only impact replays of the successor block \
+             only.")
+       (force_arg ~doc:"Force patching the kernel"))
     (prefixes ["patch"; "kernel"; "with"]
     @@ Tezos_clic.string ~name:"kernel_path" ~desc:"Path to the kernel"
     @@ stop)
-    (fun (data_dir, force) kernel_path () ->
+    (fun (data_dir, block_number, force) kernel_path () ->
       let open Lwt_result_syntax in
       let open Evm_node_lib_dev in
       let*! () =
@@ -1417,7 +1432,7 @@ let patch_kernel_command =
             ~fail_on_missing_blueprint:true
             ()
         in
-        Evm_context.patch_kernel kernel_path
+        Evm_context.patch_kernel ?block_number kernel_path
       else
         failwith
           "You must add --force to your command-line to execute this command. \
@@ -2215,13 +2230,19 @@ let patch_state_command =
       "Patches the state with an arbitrary value. This is an unsafe command, \
        it should be used for debugging only. Patched state is persisted and \
        you need to use the command `reset` to revert the changes."
-    (args2 data_dir_arg (force_arg ~doc:"Force patching the state"))
+    (args3
+       data_dir_arg
+       (block_number_arg
+          ~doc:
+            "If provided, the state resulting in the application of the \
+             requested block will be used instead of the latest state.")
+       (force_arg ~doc:"Force patching the state"))
     (prefixes ["patch"; "state"; "at"]
     @@ param ~name:"path" ~desc:"Durable storage path" Params.string
     @@ prefixes ["with"]
     @@ param ~name:"value" ~desc:"Patched value" Params.hex_string
     @@ stop)
-    (fun (data_dir, force) key value () ->
+    (fun (data_dir, block_number, force) key value () ->
       let open Evm_node_lib_dev in
       let*! () =
         let open Tezos_base_unix.Internal_event_unix in
@@ -2240,7 +2261,7 @@ let patch_state_command =
             ~fail_on_missing_blueprint:true
             ()
         in
-        Evm_context.patch_state ~key ~value
+        Evm_context.patch_state ?block_number ~key ~value ()
       else
         failwith
           "You must add --force to your command-line to execute this command. \
