@@ -4,7 +4,7 @@
 
 use alloy_primitives::FixedBytes;
 use alloy_sol_types::SolEvent;
-use evm::{ExitError, ExitReason};
+use evm::ExitError;
 use primitive_types::{H160, U256};
 use tezos_smart_rollup_mock::MockHost;
 
@@ -16,7 +16,7 @@ use crate::{
         get_storage_flag, kernel_wrapper, run_fa_deposit, ticket_balance_add,
         ticket_balance_get, token_wrapper, withdrawal_counter_next,
     },
-    handler::ExtendedExitReason,
+    handler::ExecutionResult,
 };
 
 #[test]
@@ -34,7 +34,7 @@ fn fa_deposit_reached_wrapper_contract() {
         &caller,
         0,
     )
-    .new_address
+    .new_address()
     .unwrap();
 
     let deposit = dummy_fa_deposit(ticket, Some(proxy));
@@ -235,7 +235,7 @@ fn fa_deposit_proxy_state_reverted_if_ticket_balance_overflows() {
         &caller,
         100500,
     )
-    .new_address
+    .new_address()
     .unwrap();
 
     let deposit = dummy_fa_deposit(ticket, Some(proxy));
@@ -297,7 +297,7 @@ fn fa_withdrawal_executed_via_l2_proxy_contract() {
         &caller,
         0,
     )
-    .new_address
+    .new_address()
     .unwrap();
 
     let withdrawal = dummy_fa_withdrawal(ticket, sender, proxy);
@@ -418,7 +418,7 @@ fn fa_withdrawal_fails_due_to_faulty_l2_proxy() {
         withdrawal_counter_next(&mock_runtime, &evm_account_storage)
     );
     assert!(
-        matches!(res.reason, ExtendedExitReason::Exit(ExitReason::Error(ExitError::Other(err))) if err.contains("Proxy contract does not exist"))
+        matches!(res.result, ExecutionResult::Error(ExitError::Other(err)) if err.contains("Proxy contract does not exist"))
     );
 }
 
@@ -450,6 +450,6 @@ fn fa_withdrawal_fails_due_to_insufficient_balance() {
         withdrawal_counter_next(&mock_runtime, &evm_account_storage)
     );
     assert!(
-        matches!(res.reason, ExtendedExitReason::Exit(ExitReason::Error(ExitError::Other(err))) if err.contains("Insufficient ticket balance"))
+        matches!(res.result, ExecutionResult::Error(ExitError::Other(err)) if err.contains("Insufficient ticket balance"))
     );
 }

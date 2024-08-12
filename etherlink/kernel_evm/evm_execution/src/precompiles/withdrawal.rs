@@ -305,7 +305,7 @@ fn event_log(
 #[cfg(test)]
 mod tests {
     use crate::{
-        handler::{ExecutionOutcome, Withdrawal},
+        handler::{ExecutionOutcome, ExecutionResult, Withdrawal},
         precompiles::{
             test_helpers::{execute_precompiled, DUMMY_TICKETER},
             withdrawal::WITHDRAWAL_EVENT_TOPIC,
@@ -313,7 +313,7 @@ mod tests {
         },
     };
     use alloy_sol_types::SolEvent;
-    use evm::{ExitReason, ExitRevert, ExitSucceed, Transfer};
+    use evm::{ExitSucceed, Transfer};
     use pretty_assertions::assert_eq;
     use primitive_types::{H160, H256, U256};
     use sha3::{Digest, Keccak256};
@@ -476,10 +476,11 @@ mod tests {
 
         let expected = ExecutionOutcome {
             gas_used: expected_gas,
-            reason: ExitReason::Succeed(ExitSucceed::Returned).into(),
-            new_address: None,
             logs: vec![expected_log],
-            result: Some(expected_output),
+            result: ExecutionResult::CallSucceeded(
+                ExitSucceed::Returned,
+                expected_output,
+            ),
             withdrawals: vec![message],
             estimated_ticks_used: 880_000,
         };
@@ -553,10 +554,11 @@ mod tests {
 
         let expected = ExecutionOutcome {
             gas_used: expected_gas,
-            reason: ExitReason::Succeed(ExitSucceed::Returned).into(),
-            new_address: None,
             logs: vec![expected_log],
-            result: Some(expected_output),
+            result: ExecutionResult::CallSucceeded(
+                ExitSucceed::Returned,
+                expected_output,
+            ),
             withdrawals: vec![message],
             // TODO (#6426): estimate the ticks consumption of precompiled contracts
             estimated_ticks_used: 880_000,
@@ -591,10 +593,8 @@ mod tests {
 
         let expected = ExecutionOutcome {
             gas_used: expected_gas,
-            reason: ExitReason::Revert(ExitRevert::Reverted).into(),
-            new_address: None,
             logs: vec![],
-            result: Some(vec![]),
+            result: ExecutionResult::CallReverted(vec![]),
             withdrawals: vec![],
             estimated_ticks_used: 880_000,
         };
@@ -613,10 +613,8 @@ mod tests {
 
         let expected = ExecutionOutcome {
             gas_used: expected_gas,
-            reason: ExitReason::Revert(ExitRevert::Reverted).into(),
-            new_address: None,
             logs: vec![],
-            result: Some(vec![]),
+            result: ExecutionResult::CallReverted(vec![]),
             withdrawals: vec![],
             estimated_ticks_used: 880_000,
         };
@@ -638,10 +636,8 @@ mod tests {
 
         let expected = ExecutionOutcome {
             gas_used: expected_gas,
-            reason: ExitReason::Revert(ExitRevert::Reverted).into(),
-            new_address: None,
             logs: vec![],
-            result: Some(vec![]),
+            result: ExecutionResult::CallReverted(vec![]),
             withdrawals: vec![],
             estimated_ticks_used: 880_000,
         };

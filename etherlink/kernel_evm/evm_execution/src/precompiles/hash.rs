@@ -92,11 +92,12 @@ pub fn ripemd160_precompile<Host: Runtime>(
 
 #[cfg(test)]
 mod tests {
-    use evm::{ExitReason, ExitSucceed};
+    use evm::ExitSucceed;
     use primitive_types::H160;
 
     use crate::{
-        handler::ExecutionOutcome, precompiles::test_helpers::execute_precompiled,
+        handler::{ExecutionOutcome, ExecutionResult},
+        precompiles::test_helpers::execute_precompiled,
     };
 
     #[test]
@@ -118,10 +119,8 @@ mod tests {
 
         let expected = ExecutionOutcome {
             gas_used: expected_gas,
-            reason: ExitReason::Succeed(ExitSucceed::Returned).into(),
-            new_address: None,
             logs: vec![],
-            result: Some(expected_hash),
+            result: ExecutionResult::CallSucceeded(ExitSucceed::Returned, expected_hash),
             withdrawals: vec![],
             estimated_ticks_used: 75_000,
         };
@@ -148,10 +147,8 @@ mod tests {
 
         let expected = ExecutionOutcome {
             gas_used: expected_gas,
-            reason: ExitReason::Succeed(ExitSucceed::Returned).into(),
-            new_address: None,
             logs: vec![],
-            result: Some(expected_hash),
+            result: ExecutionResult::CallSucceeded(ExitSucceed::Returned, expected_hash),
             withdrawals: vec![],
             estimated_ticks_used: 70_000,
         };

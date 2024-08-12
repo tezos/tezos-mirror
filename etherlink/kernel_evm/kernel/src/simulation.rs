@@ -947,7 +947,7 @@ mod tests {
             outcome.is_some(),
             "execution should have produced some outcome"
         );
-        outcome.unwrap().new_address.unwrap()
+        outcome.unwrap().new_address().unwrap()
     }
 
     #[test]

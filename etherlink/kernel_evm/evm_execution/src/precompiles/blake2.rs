@@ -319,7 +319,7 @@ mod tests {
 
             let expected = hex::decode(test.expected).unwrap();
 
-            assert_eq!(Some(expected), outcome.result);
+            assert_eq!(Some(expected.as_slice()), outcome.output());
         }
     }
 }

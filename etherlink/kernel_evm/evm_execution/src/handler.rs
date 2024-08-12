@@ -4011,12 +4011,12 @@ mod test {
             .create_contract(caller, Some(U256::one()), code, None)
             .unwrap();
 
-        let suicided_contract = result.new_address.unwrap();
+        let suicided_contract = result.new_address().unwrap();
 
-        assert_eq!(
-            result.reason,
-            ExitReason::Succeed(ExitSucceed::Suicided).into()
-        );
+        assert!(matches!(
+            result.result,
+            ExecutionResult::ContractDeployed(_, _)
+        ));
         assert_eq!(get_balance(&mut handler, &withdrawal_contract), U256::one());
         assert_eq!(get_balance(&mut handler, &caller), U256::from(999999999));
         assert!(!handler.exists(suicided_contract));
@@ -4478,12 +4478,8 @@ mod test {
         assert_eq!(
             Ok(ExecutionOutcome {
                 gas_used: 53839, // costs 53841 on ethereum
-                reason: ExtendedExitReason::Exit(ExitReason::Succeed(
-                    ExitSucceed::Stopped
-                )),
-                new_address: None,
                 logs: vec![],
-                result: Some(vec![]),
+                result: ExecutionResult::CallSucceeded(ExitSucceed::Stopped, vec![]),
                 withdrawals: vec![],
                 estimated_ticks_used: 40549308
             }),
@@ -4645,8 +4641,8 @@ mod test {
         assert_eq!(result.gas_used, 27836);
 
         assert_eq!(
-            result.reason,
-            ExtendedExitReason::Exit(ExitReason::Succeed(ExitSucceed::Returned))
+            result.result,
+            ExecutionResult::CallSucceeded(ExitSucceed::Returned, vec![0])
         );
     }
 
@@ -4713,8 +4709,8 @@ mod test {
             assert_eq!(result.gas_used, expected_gas);
 
             assert_eq!(
-                result.reason,
-                ExtendedExitReason::Exit(ExitReason::Succeed(ExitSucceed::Suicided))
+                result.result,
+                ExecutionResult::CallSucceeded(ExitSucceed::Suicided, vec![])
             );
 
             // At the end of the transaction, any account touched by the execution of that transaction
@@ -4802,8 +4798,8 @@ mod test {
             assert_eq!(result.gas_used, expected_gas);
 
             assert_eq!(
-                result.reason,
-                ExtendedExitReason::Exit(ExitReason::Succeed(ExitSucceed::Stopped))
+                result.result,
+                ExecutionResult::CallSucceeded(ExitSucceed::Stopped, vec![])
             );
         }
     }

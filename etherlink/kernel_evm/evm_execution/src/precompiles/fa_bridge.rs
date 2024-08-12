@@ -158,7 +158,7 @@ mod tests {
     use std::str::FromStr;
 
     use alloy_sol_types::SolCall;
-    use evm::{Config, ExitError, ExitReason};
+    use evm::{Config, ExitError};
     use primitive_types::{H160, U256};
     use tezos_smart_rollup_mock::MockHost;
 
@@ -171,7 +171,7 @@ mod tests {
                 kernel_wrapper, set_balance, ticket_balance_add, ticket_id,
             },
         },
-        handler::{EvmHandler, ExecutionOutcome, ExtendedExitReason},
+        handler::{EvmHandler, ExecutionOutcome, ExecutionResult},
         precompiles::{self, FA_BRIDGE_PRECOMPILE_ADDRESS},
         transaction::TransactionContext,
         utilities::{bigint_to_u256, keccak256_hash},
@@ -226,7 +226,7 @@ mod tests {
         );
         assert!(!outcome.is_success());
         assert!(
-            matches!(outcome.reason, ExtendedExitReason::Exit(ExitReason::Error(ExitError::Other(err))) if err.contains("unexpected selector"))
+            matches!(outcome.result, ExecutionResult::Error(ExitError::Other(err)) if err.contains("unexpected selector"))
         );
     }
 
@@ -247,7 +247,7 @@ mod tests {
         );
         assert!(!outcome.is_success());
         assert!(
-            matches!(outcome.reason, ExtendedExitReason::Exit(ExitReason::Error(ExitError::Other(err))) if err.contains("gas limit too low"))
+            matches!(outcome.result, ExecutionResult::Error(ExitError::Other(err)) if err.contains("gas limit too low"))
         );
     }
 
@@ -275,7 +275,7 @@ mod tests {
         );
         assert!(!outcome.is_success());
         assert!(
-            matches!(outcome.reason, ExtendedExitReason::Exit(ExitReason::Error(ExitError::Other(err))) if err.contains("unexpected value transfer"))
+            matches!(outcome.result, ExecutionResult::Error(ExitError::Other(err)) if err.contains("unexpected value transfer"))
         );
     }
 
@@ -296,7 +296,7 @@ mod tests {
         );
         assert!(!outcome.is_success());
         assert!(
-            matches!(outcome.reason, ExtendedExitReason::Exit(ExitReason::Error(ExitError::Other(err))) if err.contains("static call not allowed"))
+            matches!(outcome.result, ExecutionResult::Error(ExitError::Other(err)) if err.contains("static call not allowed"))
         );
     }
 
@@ -338,7 +338,7 @@ mod tests {
 
         assert!(!outcome.is_success());
         assert!(
-            matches!(outcome.reason, ExtendedExitReason::Exit(ExitReason::Error(ExitError::Other(err))) if err.contains("delegate call not allowed"))
+            matches!(outcome.result, ExecutionResult::Error(ExitError::Other(err)) if err.contains("delegate call not allowed"))
         );
     }
 
@@ -358,7 +358,7 @@ mod tests {
         );
         assert!(!outcome.is_success());
         assert!(
-            matches!(outcome.reason, ExtendedExitReason::Exit(ExitReason::Error(ExitError::Other(err))) if err.contains("parsing failed"))
+            matches!(outcome.result, ExecutionResult::Error(ExitError::Other(err)) if err.contains("parsing failed"))
         );
     }
 
