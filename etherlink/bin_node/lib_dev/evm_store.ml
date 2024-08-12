@@ -227,7 +227,7 @@ module Q = struct
         - Run [etherlink/scripts/check_evm_store_migrations.sh promote]
         - Increment [version]
     *)
-    let version = 8
+    let version = 9
 
     let all : Evm_node_migrations.migration list =
       Evm_node_migrations.migrations version
