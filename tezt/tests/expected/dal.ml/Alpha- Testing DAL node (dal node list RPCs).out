@@ -29,15 +29,25 @@ Available services:
       - GET /p2p/gossipsub/message_cache
           Get the number of message ids in the message cache, grouped by
           heartbeat tick and topic. 
+      - GET /p2p/gossipsub/pkhs/peers
+          Get an association list between each topic subscribed to by the
+          connected peers and the remote peers subscribed to that topic. If
+          the 'subscribed' flag is given, then restrict the output to the
+          topics this peer is subscribed to. 
       - GET /p2p/gossipsub/scores
           Get the scores of the peers with a known score. 
+      - GET /p2p/gossipsub/slot_indexes/peers
+          Get an association list between each public key hash part of a
+          topic subscribed to by the connected peers and the remote peers
+          subscribed to such topics. If the 'subscribed' flag is given, then
+          restrict the output to the topics this peer is subscribed to. 
       - GET /p2p/gossipsub/topics
           Get the topics this node is currently subscribed to. 
       - GET /p2p/gossipsub/topics/peers
           Get an association list between each topic subscribed to by the
           connected peers and the remote peers subscribed to that topic. If
           the 'subscribed' flag is given, then restrict the output to the
-          topics this node is subscribed to. 
+          topics this peer is subscribed to. 
     + peers/
       - GET /p2p/peers/by-id/<peer_id>
           Get info of the requested peer 
