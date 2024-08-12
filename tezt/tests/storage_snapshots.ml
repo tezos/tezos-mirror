@@ -30,7 +30,12 @@
    Subject: Tests both the snapshot mechanism and the store's behaviour
 *)
 
-let node_arguments = Node.[Synchronisation_threshold 0]
+let team = Tag.layer1
+
+let node_arguments =
+  (* Disable the storage maintenance delay to have a deterministic
+     behavior. *)
+  Node.[Synchronisation_threshold 0; Storage_maintenance_delay "disabled"]
 
 let pp_snapshot_export_format fmt v =
   Format.fprintf fmt "%s" (match v with Node.Tar -> "tar" | Raw -> "raw")

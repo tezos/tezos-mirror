@@ -177,8 +177,18 @@ let check_bootstrap_with_history_modes hmode1 hmode2 =
       ]
   @@ fun protocol ->
   (* Initialize nodes and client. *)
-  let* node_1 =
-    Node.init [Synchronisation_threshold 0; Connections 1; History_mode hmode1]
+  let node_1_args =
+    (* Disable the storage maintenance delay to have a deterministic
+       behavior. *)
+    Node.
+      [
+        Synchronisation_threshold 0;
+        Connections 1;
+        History_mode hmode1;
+        Storage_maintenance_delay "disabled";
+      ]
+  in
+  let* node_1 = Node.init node_1_args
   and* node_2 = Node.init [Connections 1; History_mode hmode2] in
   let endpoint_1 = Client.(Node node_1) in
   let* node2_identity = Node.wait_for_identity node_2 in
