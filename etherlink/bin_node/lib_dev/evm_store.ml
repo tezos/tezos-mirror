@@ -301,6 +301,7 @@ module Q = struct
       (unit ->* level)
       @@ {|SELECT applied_before
            FROM kernel_upgrades
+           WHERE applied_before IS NOT NULL
            ORDER BY applied_before DESC
     |}
 
