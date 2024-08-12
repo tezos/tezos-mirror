@@ -189,7 +189,15 @@ let check_bootstrap_with_history_modes hmode1 hmode2 =
   in
   (* Initialize nodes and client. *)
   let node_1_args =
-    Node.[Synchronisation_threshold 0; Connections 1; History_mode hmode1]
+    (* Disable the storage maintenance delay to have a deterministic
+       behavior. *)
+    Node.
+      [
+        Synchronisation_threshold 0;
+        Connections 1;
+        History_mode hmode1;
+        Storage_maintenance_delay "disabled";
+      ]
   in
   let* node_1 = Node.init node_1_args
   and* node_2 = Node.init [Connections 1; History_mode hmode2] in
