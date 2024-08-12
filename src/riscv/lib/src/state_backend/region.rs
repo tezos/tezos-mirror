@@ -20,17 +20,30 @@ impl<E: Elem, M: ManagerBase> Cell<E, M> {
 }
 
 /// A cell that support reading only.
-pub trait CellRead {
+pub trait CellBase {
     /// Element type managed by the cell.
     type Value;
+}
 
+impl<E: Elem, M: ManagerBase> CellBase for Cell<E, M> {
+    type Value = E;
+}
+
+impl<E: CellBase> CellBase for &E {
+    type Value = E::Value;
+}
+
+impl<E: CellBase> CellBase for &mut E {
+    type Value = E::Value;
+}
+
+/// A cell that support reading only.
+pub trait CellRead: CellBase {
     /// Read the value managed by the cell.
     fn read(&self) -> Self::Value;
 }
 
 impl<E: Elem, M: Manager> CellRead for Cell<E, M> {
-    type Value = E;
-
     #[inline(always)]
     fn read(&self) -> E {
         self.region.read(0)
@@ -38,28 +51,21 @@ impl<E: Elem, M: Manager> CellRead for Cell<E, M> {
 }
 
 impl<E: CellRead> CellRead for &E {
-    type Value = E::Value;
-
     fn read(&self) -> Self::Value {
         E::read(self)
     }
 }
 
 impl<E: CellRead> CellRead for &mut E {
-    type Value = E::Value;
-
     fn read(&self) -> Self::Value {
         E::read(self)
     }
 }
 
 /// A cell that support writing.
-pub trait CellWrite: CellRead {
+pub trait CellWrite: CellBase {
     /// Write the value managed by the cell.
     fn write(&mut self, value: Self::Value);
-
-    /// Replace the value managed by the cell, returning the old value.
-    fn replace(&mut self, value: Self::Value) -> Self::Value;
 }
 
 impl<E: Elem, M: Manager> CellWrite for Cell<E, M> {
@@ -67,18 +73,29 @@ impl<E: Elem, M: Manager> CellWrite for Cell<E, M> {
     fn write(&mut self, value: E) {
         self.region.write(0, value)
     }
+}
 
+impl<E: CellWrite> CellWrite for &mut E {
+    #[inline(always)]
+    fn write(&mut self, value: Self::Value) {
+        E::write(self, value)
+    }
+}
+
+/// A cell that support reading and writing.
+pub trait CellReadWrite: CellRead + CellWrite {
+    /// Replace the value managed by the cell, returning the old value.
+    fn replace(&mut self, value: Self::Value) -> Self::Value;
+}
+
+impl<E: Elem, M: Manager> CellReadWrite for Cell<E, M> {
     #[inline(always)]
     fn replace(&mut self, value: E) -> E {
         self.region.replace(0, value)
     }
 }
 
-impl<E: CellWrite> CellWrite for &mut E {
-    fn write(&mut self, value: Self::Value) {
-        E::write(self, value)
-    }
-
+impl<E: CellReadWrite> CellReadWrite for &mut E {
     #[inline(always)]
     fn replace(&mut self, value: Self::Value) -> Self::Value {
         E::replace(self, value)

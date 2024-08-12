@@ -7,7 +7,8 @@ use crate::struct_layout;
 use crate::{
     bits::Bits64,
     state_backend::{
-        AllocatedOf, Atom, Cell, CellRead, CellWrite, Choreographer, Layout, Manager, PlacedOf,
+        AllocatedOf, Atom, Cell, CellRead, CellReadWrite, CellWrite, Choreographer, Layout,
+        Manager, PlacedOf,
     },
 };
 
