@@ -5,7 +5,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type delay = Disabled | Custom of Int32.t
+type delay = Disabled | Custom of Int32.t | Auto
 
 let delay_encoding =
   let open Data_encoding in
@@ -34,8 +34,24 @@ let delay_encoding =
            (obj1 (req "custom" int32))
            (function Custom delay -> Some delay | _ -> None)
            (fun delay -> Custom delay);
+         case
+           ~title:"auto"
+           ~description:
+             "When \"auto\" is set, storage maintenance is triggered after a \
+              delay that is determined automatically."
+           (Tag 2)
+           (constant "auto")
+           (function Auto -> Some () | _ -> None)
+           (fun () -> Auto);
        ])
+
+let default_auto_delay ~blocks_per_cycle =
+  let exclusion = Int32.(max 1l (div blocks_per_cycle 20l)) in
+  let limit = Int32.div blocks_per_cycle 2l in
+  let delay = Int32.add (Random.int32 (Int32.sub limit exclusion)) exclusion in
+  delay
 
 let pp_delay fmt = function
   | Disabled -> Format.fprintf fmt "disabled"
   | Custom delay -> Format.fprintf fmt "custom %ld" delay
+  | Auto -> Format.fprintf fmt "auto"
