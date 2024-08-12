@@ -12,7 +12,8 @@
   tezos-protocol-alpha.protocol
   tezos-protocol-alpha.parameters
   octez-protocol-alpha-libs.test-helpers
-  octez-libs.base-test-helpers)
+  octez-libs.base-test-helpers
+  octez-protocol-alpha-libs.plugin)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -23,7 +24,8 @@
   -open Tezos_protocol_alpha
   -open Tezos_protocol_alpha_parameters
   -open Tezos_alpha_test_helpers
-  -open Tezos_base_test_helpers)
+  -open Tezos_base_test_helpers
+  -open Tezos_protocol_plugin_alpha)
  (modules
   test_constants
   test_frozen_bonds
