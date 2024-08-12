@@ -374,7 +374,8 @@ module type Sigs = sig
       and metadata implementations. The contents and node values are addressed
       directly by their hash. *)
   module Make
-      (Hash : Hash.S) (Path : sig
+      (Hash : Hash.S)
+      (Path : sig
         type step [@@deriving brassaia]
 
         val step_encoding : step Data_encoding.t

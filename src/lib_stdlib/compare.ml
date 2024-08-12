@@ -175,7 +175,8 @@ module Int32 = Make (Int32)
 module Int64 = Make (Int64)
 
 module MakeUnsigned
-    (Int : S) (Z : sig
+    (Int : S)
+    (Z : sig
       val zero : Int.t
     end) =
 struct

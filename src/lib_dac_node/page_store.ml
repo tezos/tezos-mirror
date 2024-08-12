@@ -248,13 +248,17 @@ module Filesystem_with_integrity_check :
   S with type configuration = string and type t = Filesystem.t =
   With_data_integrity_check (Filesystem)
 
-module With_remote_fetch (R : sig
-  type remote_context
+module With_remote_fetch
+    (R : sig
+      type remote_context
 
-  val fetch :
-    Dac_plugin.t -> remote_context -> Dac_plugin.hash -> bytes tzresult Lwt.t
-end)
-(P : S) :
+      val fetch :
+        Dac_plugin.t ->
+        remote_context ->
+        Dac_plugin.hash ->
+        bytes tzresult Lwt.t
+    end)
+    (P : S) :
   S
     with type configuration = R.remote_context * P.t
      and type t = R.remote_context * P.t = struct
@@ -370,13 +374,17 @@ module Internal_for_tests = struct
     S with type configuration = P.configuration and type t = P.t =
     With_data_integrity_check (P)
 
-  module With_remote_fetch (R : sig
-    type remote_context
+  module With_remote_fetch
+      (R : sig
+        type remote_context
 
-    val fetch :
-      Dac_plugin.t -> remote_context -> Dac_plugin.hash -> bytes tzresult Lwt.t
-  end)
-  (P : S) :
+        val fetch :
+          Dac_plugin.t ->
+          remote_context ->
+          Dac_plugin.hash ->
+          bytes tzresult Lwt.t
+      end)
+      (P : S) :
     S
       with type configuration = R.remote_context * P.t
        and type t = R.remote_context * P.t =

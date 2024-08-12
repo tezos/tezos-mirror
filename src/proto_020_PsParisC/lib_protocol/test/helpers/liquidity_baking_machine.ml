@@ -652,7 +652,7 @@ module MachineBuilder = struct
      fun ?(invariant = fun _ _ -> pure true)
          ?(subsidy = default_subsidy)
          ({cpmm_min_xtz_balance; accounts_balances; cpmm_min_tzbtc_balance} as
-         specs) ->
+          specs) ->
       let accounts_balances_with_extra =
         predict_initial_balances accounts_balances subsidy
       in

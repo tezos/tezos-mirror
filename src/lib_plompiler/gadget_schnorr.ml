@@ -24,7 +24,8 @@
 (*****************************************************************************)
 
 module Make
-    (Curve : Mec.CurveSig.AffineEdwardsT) (H : sig
+    (Curve : Mec.CurveSig.AffineEdwardsT)
+    (H : sig
       module P : Hash_sig.P_HASH
 
       module V : Hash_sig.HASH

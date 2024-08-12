@@ -83,21 +83,21 @@ let binary_pretty_printer (Record {encoding; pp; _}) fmt bytes =
       Format.fprintf fmt "%a" Json.pp json
 
 let rec lookup_id_descr : 'a. 'a Encoding.t -> _ =
-  fun (type a) ({encoding; _} : a Encoding.t) ->
-   match encoding with
-   | Splitted {encoding; _}
-   | Dynamic_size {encoding; _}
-   | Check_size {encoding; _} ->
-       lookup_id_descr encoding
-   | Describe {id; description; _} -> Some (id, description)
-   | Null | Empty | Ignore | Constant _ | Bool | Int8 | Uint8 | Int16 _
-   | Uint16 _ | Int31 _ | Int32 _ | Int64 _ | N | Z | RangedInt _
-   | RangedFloat _ | Float | Bytes _ | String _ | Bigstring _
-   | Padded (_, _)
-   | String_enum (_, _)
-   | Array _ | List _ | Obj _ | Objs _ | Tup _ | Tups _ | Union _ | Mu _
-   | Conv _ | Delayed _ ->
-       None
+ fun (type a) ({encoding; _} : a Encoding.t) ->
+  match encoding with
+  | Splitted {encoding; _}
+  | Dynamic_size {encoding; _}
+  | Check_size {encoding; _} ->
+      lookup_id_descr encoding
+  | Describe {id; description; _} -> Some (id, description)
+  | Null | Empty | Ignore | Constant _ | Bool | Int8 | Uint8 | Int16 _
+  | Uint16 _ | Int31 _ | Int32 _ | Int64 _ | N | Z | RangedInt _ | RangedFloat _
+  | Float | Bytes _ | String _ | Bigstring _
+  | Padded (_, _)
+  | String_enum (_, _)
+  | Array _ | List _ | Obj _ | Objs _ | Tup _ | Tups _ | Union _ | Mu _ | Conv _
+  | Delayed _ ->
+      None
 
 let register ?pp encoding =
   match lookup_id_descr encoding with

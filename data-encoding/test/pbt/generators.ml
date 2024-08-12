@@ -458,8 +458,9 @@ let any_compactty_gen =
                 AnyCTy (CmpctTup3 (cty_a, cty_b, cty_c)));
             map
               [g; g; g; g]
-              (fun (AnyCTy cty_a) (AnyCTy cty_b) (AnyCTy cty_c) (AnyCTy cty_d)
-              -> AnyCTy (CmpctTup4 (cty_a, cty_b, cty_c, cty_d)));
+              (fun
+                (AnyCTy cty_a) (AnyCTy cty_b) (AnyCTy cty_c) (AnyCTy cty_d) ->
+                AnyCTy (CmpctTup4 (cty_a, cty_b, cty_c, cty_d)));
             map
               [g; g; g; g; g; g; g]
               (fun
@@ -480,8 +481,9 @@ let any_compactty_gen =
                 AnyCTy (CmpctUnion2 (cty_both, cty_both)));
             map
               [g; g; g; g]
-              (fun (AnyCTy cty_a) (AnyCTy cty_b) (AnyCTy cty_c) (AnyCTy cty_d)
-              -> AnyCTy (CmpctUnion4 (cty_a, cty_b, cty_c, cty_d)));
+              (fun
+                (AnyCTy cty_a) (AnyCTy cty_b) (AnyCTy cty_c) (AnyCTy cty_d) ->
+                AnyCTy (CmpctUnion4 (cty_a, cty_b, cty_c, cty_d)));
             map [g; g] (fun (AnyCTy cty_a) (AnyCTy cty_b) ->
                 AnyCTy (CmpctUnion4Spill (cty_a, cty_b)));
             map [shallow_ty] (fun (AnyTy ty) -> AnyCTy (CmpctOrInt32 ty));

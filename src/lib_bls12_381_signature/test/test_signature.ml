@@ -132,22 +132,23 @@ let test_keygen_raise_invalid_argument_if_ikm_too_small () =
 (* Both can be used i.e. MinPk or MinSig. They must share the same interface. *)
 module type SIGNATURE_INSTANTIATION = module type of Bls12_381_signature.MinPk
 
-module MakeTestsForInstantiation (MISC : sig
-  val sig_basic_filenames : string list
+module MakeTestsForInstantiation
+    (MISC : sig
+      val sig_basic_filenames : string list
 
-  val sig_aug_filenames : string list
+      val sig_aug_filenames : string list
 
-  val sig_pop_filenames : string list
+      val sig_pop_filenames : string list
 
-  val pop_filenames : string list
+      val pop_filenames : string list
 
-  val pk_not_in_subgroup : string list
+      val pk_not_in_subgroup : string list
 
-  val signature_not_in_subgroup : string list
-end)
-(PkGroup : Bls12_381.CURVE)
-(SigGroup : Bls12_381.CURVE)
-(SignatureM : SIGNATURE_INSTANTIATION) =
+      val signature_not_in_subgroup : string list
+    end)
+    (PkGroup : Bls12_381.CURVE)
+    (SigGroup : Bls12_381.CURVE)
+    (SignatureM : SIGNATURE_INSTANTIATION) =
 struct
   let test_pk_size_in_bytes () =
     let ikm = generate_random_bytes 32 in

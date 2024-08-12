@@ -354,11 +354,11 @@ let collect_stats : 'a workload_data -> workloads_stats =
 module Time = struct
   external get_time_ns : unit -> (int64[@unboxed])
     = "caml_clock_gettime_byte" "caml_clock_gettime"
-    [@@noalloc]
+  [@@noalloc]
 
   external clock_getres : unit -> (int64[@unboxed])
     = "caml_clock_getres_byte" "caml_clock_getres"
-    [@@noalloc]
+  [@@noalloc]
 
   let measure f =
     let bef = get_time_ns () in
@@ -366,7 +366,7 @@ module Time = struct
     let aft = get_time_ns () in
     let dt = Int64.(to_float (sub aft bef)) in
     dt
-    [@@inline always]
+  [@@inline always]
 
   let measure_lwt f =
     let open Lwt.Syntax in
@@ -375,7 +375,7 @@ module Time = struct
     let aft = get_time_ns () in
     let dt = Int64.(to_float (sub aft bef)) in
     (dt, res)
-    [@@inline always]
+  [@@inline always]
 
   let measure_and_return f =
     let bef = get_time_ns () in
@@ -383,7 +383,7 @@ module Time = struct
     let aft = get_time_ns () in
     let dt = Int64.(to_float (sub aft bef)) in
     (dt, x)
-    [@@inline always]
+  [@@inline always]
 
   let check_timer_resolution () =
     let ns = clock_getres () in
@@ -413,7 +413,7 @@ let compute_empirical_timing_distribution :
   done ;
   let shape = Linalg.Tensor.Int.rank_one nsamples in
   Linalg.Vec.Float.make shape (fun i -> buffer.{i + start})
- [@@ocaml.inline]
+[@@ocaml.inline]
 
 let seed_init_from_options (options : options) =
   Random.State.make [|options.seed|]

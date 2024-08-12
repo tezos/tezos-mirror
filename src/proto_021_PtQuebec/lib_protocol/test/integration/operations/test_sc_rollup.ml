@@ -669,10 +669,8 @@ let execute_outbox_message_without_proof_validation block rollup
   let*@ res, alpha_ctxt =
     Sc_rollup_operations.Internal_for_tests.execute_outbox_message
       (Incremental.alpha_ctxt incr)
-      ~validate_and_decode_output_proof:(fun ctxt
-                                             ~cemented_commitment:_
-                                             _rollup
-                                             ~output_proof:_ ->
+      ~validate_and_decode_output_proof:(fun
+          ctxt ~cemented_commitment:_ _rollup ~output_proof:_ ->
         return (outbox_message, ctxt))
       rollup
       ~cemented_commitment

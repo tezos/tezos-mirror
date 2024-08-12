@@ -42,12 +42,12 @@ let return_unit = return ()
 
 (* Inlined [Option.bind] for performance. *)
 let ( >>?? ) m f = match m with None -> None | Some x -> f x
-  [@@ocaml.inline always]
+[@@ocaml.inline always]
 
 let bind m f gas =
   m gas >>?? fun (res, gas) ->
   match res with Ok y -> f y gas | Error _ as err -> of_result err gas
-  [@@ocaml.inline always]
+[@@ocaml.inline always]
 
 let map f m gas =
   let open Result_syntax in
@@ -56,12 +56,12 @@ let map f m gas =
     (let+ x in
      f x)
     gas
-  [@@ocaml.inline always]
+[@@ocaml.inline always]
 
 let bind_result m f = bind (of_result m) f [@@ocaml.inline always]
 
 let bind_recover m f gas = m gas >>?? fun (x, gas) -> f x gas
-  [@@ocaml.inline always]
+[@@ocaml.inline always]
 
 let consume_gas cost gas =
   match Local_gas_counter.consume_opt gas cost with

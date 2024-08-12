@@ -435,8 +435,8 @@ let lowest_cemented_metadata cemented_dir =
       let*! m =
         Seq_s.of_seq (Array.to_seq metadata_files)
         |> Seq_s.S.find_map
-             (fun {Cemented_block_store.metadata_file; start_level; end_level}
-             ->
+             (fun
+               {Cemented_block_store.metadata_file; start_level; end_level} ->
                let*! lowest_metadata_entry =
                  Option.catch_s (fun () -> lowest_metadata_entry metadata_file)
                in

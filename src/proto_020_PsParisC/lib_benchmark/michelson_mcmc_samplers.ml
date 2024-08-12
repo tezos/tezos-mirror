@@ -211,7 +211,8 @@ end
 
 module Make_code_sampler
     (Michelson_base : Michelson_samplers_base.S)
-    (Crypto_samplers : Crypto_samplers.Finite_key_pool_S) (X : sig
+    (Crypto_samplers : Crypto_samplers.Finite_key_pool_S)
+    (X : sig
       val rng_state : Random.State.t
 
       val target_size : int
@@ -270,7 +271,8 @@ end
 
 module Make_data_sampler
     (Michelson_base : Michelson_samplers_base.S)
-    (Crypto_samplers : Crypto_samplers.Finite_key_pool_S) (X : sig
+    (Crypto_samplers : Crypto_samplers.Finite_key_pool_S)
+    (X : sig
       val rng_state : Random.State.t
 
       val target_size : int

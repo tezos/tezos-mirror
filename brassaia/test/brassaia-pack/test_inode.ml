@@ -29,7 +29,8 @@ let wrong_depth = 100
 
 module Inode_modules
     (Conf : Brassaia_pack.Conf.S)
-    (Schema : Brassaia.Schema.S) (Contents : sig
+    (Schema : Brassaia.Schema.S)
+    (Contents : sig
       val foo : Schema.Contents.t
       val bar : Schema.Contents.t
     end) =

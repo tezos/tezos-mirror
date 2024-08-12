@@ -745,8 +745,8 @@ module Lib = struct
       ~msg:"attempting to {action} proposal {proposal}"
       ("action", Baking_state.consensus_vote_kind_encoding)
       ~pp1:(fun fmt -> function
-             | Baking_state.Preattestation -> Format.fprintf fmt "preattest"
-             | Attestation -> Format.fprintf fmt "attest")
+        | Baking_state.Preattestation -> Format.fprintf fmt "preattest"
+        | Attestation -> Format.fprintf fmt "attest")
       ("proposal", Baking_state.proposal_encoding)
       ~pp2:Baking_state.pp_proposal
 

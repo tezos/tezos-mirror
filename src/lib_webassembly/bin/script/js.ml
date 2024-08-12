@@ -649,7 +649,7 @@ let of_wrapper mods x_opt name wrap_action wrap_assertion at =
 
 let of_action mods act =
   match act.it with
-  | Invoke (x_opt, name, vs) -> (
+  | Invoke (x_opt, name, vs) ->
       ( "call(" ^ of_var_opt mods x_opt ^ ", " ^ of_name name ^ ", " ^ "["
         ^ String.concat ", " (List.map of_value vs)
         ^ "])",
@@ -657,14 +657,14 @@ let of_action mods act =
         | ExternFuncType ft when not (is_js_func_type ft) ->
             let (FuncType (_, out)) = ft in
             Some (of_wrapper mods x_opt name (invoke ft vs), out)
-        | _ -> None ))
-  | Get (x_opt, name) -> (
+        | _ -> None )
+  | Get (x_opt, name) ->
       ( "get(" ^ of_var_opt mods x_opt ^ ", " ^ of_name name ^ ")",
         match lookup mods x_opt name act.at with
         | ExternGlobalType gt when not (is_js_global_type gt) ->
             let (GlobalType (t, _)) = gt in
             Some (of_wrapper mods x_opt name (get gt), Vector.singleton t)
-        | _ -> None ))
+        | _ -> None )
 
 let of_assertion' mods act name args wrapper_opt =
   let open Lwt.Syntax in

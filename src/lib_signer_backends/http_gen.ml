@@ -30,7 +30,8 @@ struct
   let scheme = N.scheme
 
   module Make
-      (RPC_client : RPC_client.S) (P : sig
+      (RPC_client : RPC_client.S)
+      (P : sig
         val authenticate :
           Tezos_crypto.Signature.Public_key_hash.t list ->
           Bytes.t ->

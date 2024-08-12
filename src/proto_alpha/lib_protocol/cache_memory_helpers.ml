@@ -145,7 +145,7 @@ let option_size_vec some x =
   Option.fold ~none:zero ~some x
 
 let list_cell_size elt_size = header_size +! word_size +! word_size +! elt_size
-  [@@ocaml.inline always]
+[@@ocaml.inline always]
 
 let list_fold_size elt_size list =
   List.fold_left
@@ -154,7 +154,7 @@ let list_fold_size elt_size list =
     list
 
 let boxed_tup2 x y = header_size +! word_size +! word_size +! x +! y
-  [@@ocaml.inline always]
+[@@ocaml.inline always]
 
 let node_size =
   let open Micheline in

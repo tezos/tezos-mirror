@@ -852,54 +852,54 @@ end = struct
       GP_subcommand.t list ->
       string list ->
       GP_data.t list * GP_subcommand.t list * string list =
-    fun (type dim)
-        (axes : dim axes)
-        (specs : dim spec list)
-        data_acc
-        cmd_acc
-        name_acc ->
-     match specs with
-     | [] -> (List.rev data_acc, List.rev cmd_acc, List.rev name_acc)
-     | Scatter {data; error_bars} :: tl ->
-         let `Data data_block, `Command command_chunk, data_name =
-           scatter axes data error_bars
-         in
-         spec_list
-           axes
-           tl
-           (data_block :: data_acc)
-           (command_chunk :: cmd_acc)
-           (data_name :: name_acc)
-     | Histogram {data; options; legend} :: tl ->
-         let `Data data_block, `Command command_chunk, data_name =
-           histogram data options legend
-         in
-         spec_list
-           axes
-           tl
-           (data_block :: data_acc)
-           (command_chunk :: cmd_acc)
-           (data_name :: name_acc)
-     | Line {data; with_points; error_bars} :: tl ->
-         let `Data data_block, `Command command_chunk, data_name =
-           line axes data with_points error_bars
-         in
-         spec_list
-           axes
-           tl
-           (data_block :: data_acc)
-           (command_chunk :: cmd_acc)
-           (data_name :: name_acc)
-     | Boxes {data; box_width; fill} :: tl ->
-         let `Data data_block, `Command command_chunk, data_name =
-           boxes data box_width fill
-         in
-         spec_list
-           axes
-           tl
-           (data_block :: data_acc)
-           (command_chunk :: cmd_acc)
-           (data_name :: name_acc)
+   fun (type dim)
+       (axes : dim axes)
+       (specs : dim spec list)
+       data_acc
+       cmd_acc
+       name_acc ->
+    match specs with
+    | [] -> (List.rev data_acc, List.rev cmd_acc, List.rev name_acc)
+    | Scatter {data; error_bars} :: tl ->
+        let `Data data_block, `Command command_chunk, data_name =
+          scatter axes data error_bars
+        in
+        spec_list
+          axes
+          tl
+          (data_block :: data_acc)
+          (command_chunk :: cmd_acc)
+          (data_name :: name_acc)
+    | Histogram {data; options; legend} :: tl ->
+        let `Data data_block, `Command command_chunk, data_name =
+          histogram data options legend
+        in
+        spec_list
+          axes
+          tl
+          (data_block :: data_acc)
+          (command_chunk :: cmd_acc)
+          (data_name :: name_acc)
+    | Line {data; with_points; error_bars} :: tl ->
+        let `Data data_block, `Command command_chunk, data_name =
+          line axes data with_points error_bars
+        in
+        spec_list
+          axes
+          tl
+          (data_block :: data_acc)
+          (command_chunk :: cmd_acc)
+          (data_name :: name_acc)
+    | Boxes {data; box_width; fill} :: tl ->
+        let `Data data_block, `Command command_chunk, data_name =
+          boxes data box_width fill
+        in
+        spec_list
+          axes
+          tl
+          (data_block :: data_acc)
+          (command_chunk :: cmd_acc)
+          (data_name :: name_acc)
 
   let render ?save (Plot {axes; plots; title}) =
     let title_cmd =

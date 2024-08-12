@@ -227,7 +227,7 @@ let float_incr table key dx =
   match Vertex_table.find_opt table key with
   | None -> Vertex_table.add table key (ref 0.0)
   | Some x -> x := !x +. dx
-  [@@ocaml.inline]
+[@@ocaml.inline]
 
 let uniform_spanning_trees ~graph ~source ~subgraph_predicate =
   if not (subgraph_predicate source) then
@@ -262,7 +262,7 @@ let estimate_bandwidth ~state ~subgraph_predicate ~counters ~spanning_trees
     float_incr incoming dst db ;
     float_incr outgoing src db ;
     Edge_table.add routing e ()
-    [@@ocaml.inline]
+      [@@ocaml.inline]
   in
   (* Invariant: all spanning trees have the same support, corresponding to the subgraph predicate.
      Hence, we optimize as follows:

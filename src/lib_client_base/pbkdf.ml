@@ -18,7 +18,7 @@ let cdiv x y =
   if y < 1 then raise Division_by_zero
   else if x > 0 then 1 + ((x - 1) / y)
   else 0
-  [@@inline]
+[@@inline]
 
 module type S = sig
   val pbkdf2 :

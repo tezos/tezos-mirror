@@ -335,7 +335,7 @@ let process_operations (cctxt : #Protocol_client_context.full) state
       match protocol_data with
       | Operation_data
           ({contents = Single (Preattestation {round; slot; level; _}); _} as
-          protocol_data) ->
+           protocol_data) ->
           let new_preattestation : Kind.preattestation Alpha_context.operation =
             {shell; protocol_data}
           in

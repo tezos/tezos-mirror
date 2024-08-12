@@ -25,44 +25,48 @@
 (*****************************************************************************)
 
 class unix_wallet :
-  base_dir:string -> password_filename:string option -> Client_context.wallet
+  base_dir:string ->
+  password_filename:string option ->
+  Client_context.wallet
 
 class unix_prompter : Client_context.prompter
 
 class unix_logger : base_dir:string -> Client_context.printer
 
 class unix_io_wallet :
-  base_dir:string -> password_filename:string option -> Client_context.io_wallet
+  base_dir:string ->
+  password_filename:string option ->
+  Client_context.io_wallet
 
 class unix_ui : Client_context.ui
 
 class unix_full :
-  base_dir:string
-  -> chain:Shell_services.chain
-  -> block:Shell_services.block
-  -> confirmations:int option
-  -> password_filename:string option
-  -> rpc_config:Tezos_rpc_http_client_unix.RPC_client_unix.config
-  -> verbose_rpc_error_diagnostics:bool
-  -> Client_context.full
+  base_dir:string ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  confirmations:int option ->
+  password_filename:string option ->
+  rpc_config:Tezos_rpc_http_client_unix.RPC_client_unix.config ->
+  verbose_rpc_error_diagnostics:bool ->
+  Client_context.full
 
 class unix_mockup :
-  base_dir:string
-  -> mem_only:bool
-  -> mockup_env:Tezos_mockup_registration.Registration.mockup_environment
-  -> chain_id:Chain_id.t
-  -> rpc_context:Tezos_protocol_environment.rpc_context
-  -> protocol_data:bytes
-  -> Client_context.full
+  base_dir:string ->
+  mem_only:bool ->
+  mockup_env:Tezos_mockup_registration.Registration.mockup_environment ->
+  chain_id:Chain_id.t ->
+  rpc_context:Tezos_protocol_environment.rpc_context ->
+  protocol_data:bytes ->
+  Client_context.full
 
 class unix_proxy :
-  base_dir:string
-  -> ?protocol:Protocol_hash.t
-  -> chain:Shell_services.chain
-  -> block:Shell_services.block
-  -> confirmations:int option
-  -> password_filename:string option
-  -> rpc_config:Tezos_rpc_http_client_unix.RPC_client_unix.config
-  -> mode:Tezos_proxy.Proxy_services.mode
-  -> unit
-  -> Client_context.full
+  base_dir:string ->
+  ?protocol:Protocol_hash.t ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  confirmations:int option ->
+  password_filename:string option ->
+  rpc_config:Tezos_rpc_http_client_unix.RPC_client_unix.config ->
+  mode:Tezos_proxy.Proxy_services.mode ->
+  unit ->
+  Client_context.full

@@ -330,7 +330,8 @@ module type Proof = sig
 
   module Make
       (C : Type.S)
-      (H : Hash.S) (P : sig
+      (H : Hash.S)
+      (P : sig
         type step [@@deriving brassaia]
       end)
       (M : Type.S) : sig

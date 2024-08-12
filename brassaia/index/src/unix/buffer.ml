@@ -18,7 +18,7 @@ type t = { mutable buffer : bytes; mutable position : int }
 
 external unsafe_blit_string : string -> int -> bytes -> int -> int -> unit
   = "caml_blit_string"
-  [@@noalloc]
+[@@noalloc]
 (** Bytes.unsafe_blit_string not available in OCaml 4.08. *)
 
 let create n = { buffer = Bytes.create n; position = 0 }

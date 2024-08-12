@@ -114,8 +114,8 @@ module Simple = struct
       ("error", Data_encoding.option Error_monad.trace_encoding)
       ~pp1:L1_operation.pp
       ~pp3:(fun ppf -> function
-             | None -> Format.pp_print_string ppf "none"
-             | Some e -> Error_monad.pp_print_trace ppf e)
+        | None -> Format.pp_print_string ppf "none"
+        | Some e -> Error_monad.pp_print_trace ppf e)
 
   let migration =
     declare_5

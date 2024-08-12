@@ -207,11 +207,11 @@ module Elt_g1 = struct
   let eq a b = G.eq (G.jacobian_of_affine a) (G.jacobian_of_affine b)
 
   external uncompress : t -> bytes -> int = "caml_blst_p1_uncompress_stubs"
-    [@@noalloc]
+  [@@noalloc]
 
   external pippenger : G.t -> Bigstringaf.t -> Polynomial.t -> int -> int -> int
     = "caml_bls12_381_polynomial_srs_g1_pippenger_stubs"
-    [@@noalloc]
+  [@@noalloc]
 end
 
 module Elt_g2 = struct
@@ -229,11 +229,11 @@ module Elt_g2 = struct
 
   external uncompress : G.affine -> bytes -> int
     = "caml_blst_p2_uncompress_stubs"
-    [@@noalloc]
+  [@@noalloc]
 
   external pippenger : G.t -> Bigstringaf.t -> Polynomial.t -> int -> int -> int
     = "caml_bls12_381_polynomial_srs_g2_pippenger_stubs"
-    [@@noalloc]
+  [@@noalloc]
 end
 
 module Srs_g1 :

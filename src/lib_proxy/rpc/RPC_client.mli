@@ -30,8 +30,8 @@
     - the protocol-dependent implementation of the proxy (the proxy mode
       obtains data from endpoints with protocol-dependent RPCs). *)
 class http_local_ctxt :
-  Tezos_client_base.Client_context.printer
-  -> Tezos_rpc.Context.generic
-  -> Tezos_proxy.Proxy_services.mode
-  -> Protocol_hash.t option
-  -> Tezos_rpc.Context.generic
+  Tezos_client_base.Client_context.printer ->
+  Tezos_rpc.Context.generic ->
+  Tezos_proxy.Proxy_services.mode ->
+  Protocol_hash.t option ->
+  Tezos_rpc.Context.generic

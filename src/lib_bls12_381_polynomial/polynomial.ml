@@ -41,7 +41,7 @@ module Stubs = struct
   - [size p = n] *)
   external of_sparse : fr_array -> (fr * int) array -> int -> unit
     = "caml_bls12_381_polynomial_polynomial_of_sparse_stubs"
-    [@@noalloc]
+  [@@noalloc]
 
   (** [add res a b size_a size_b] writes the result of polynomial addition of [a] and [b]
   in [res]
@@ -53,7 +53,7 @@ module Stubs = struct
   - [res], [a] and [b] are either pairwise disjoint or equal *)
   external add : fr_array -> fr_array -> fr_array -> int -> int -> unit
     = "caml_bls12_381_polynomial_polynomial_add_stubs"
-    [@@noalloc]
+  [@@noalloc]
 
   (** [sub res a b size_a size_b] writes the result of polynomial subtraction of [b] from [a]
   in [res]
@@ -65,7 +65,7 @@ module Stubs = struct
   - [res], [a] and [b] are either pairwise disjoint or equal *)
   external sub : fr_array -> fr_array -> fr_array -> int -> int -> unit
     = "caml_bls12_381_polynomial_polynomial_sub_stubs"
-    [@@noalloc]
+  [@@noalloc]
 
   (** [mul res a b size_a size_b] writes the result of polynomial multiplication of [a] by [b]
   in [res]
@@ -77,7 +77,7 @@ module Stubs = struct
   - [size res = size_a + size_b - 1] *)
   external mul : fr_array -> fr_array -> fr_array -> int -> int -> unit
     = "caml_bls12_381_polynomial_polynomial_mul_stubs"
-    [@@noalloc]
+  [@@noalloc]
 
   (** [mul_by_scalar res b a size_a] writes the result of multiplying a polynomial [a]
   by a blst_fr element [b] in [res]
@@ -88,7 +88,7 @@ module Stubs = struct
   - [res] and [a] either disjoint or equal *)
   external mul_by_scalar : fr_array -> fr -> fr_array -> int -> unit
     = "caml_bls12_381_polynomial_polynomial_mul_by_scalar_stubs"
-    [@@noalloc]
+  [@@noalloc]
 
   (** [linear res poly_polylen_coeff nb_polys] writes the result of
       computing [λ₁·p₁(x) + λ₂·p₂(x) + … + λₖ·pₖ(x)] in [res], where
@@ -102,7 +102,7 @@ module Stubs = struct
    - [size p_i = size_p_i] *)
   external linear : fr_array -> (fr_array * int * fr) array -> int -> unit
     = "caml_bls12_381_polynomial_polynomial_linear_stubs"
-    [@@noalloc]
+  [@@noalloc]
 
   (** [linear_with_powers res c poly_polylen nb_polys] writes the result of
       computing [c⁰·p₀(x) + c¹·p₁(x) + … + cᵏ·pₖ(x)] in [res], where
@@ -117,7 +117,7 @@ module Stubs = struct
   external linear_with_powers :
     fr_array -> fr -> (fr_array * int) array -> int -> unit
     = "caml_bls12_381_polynomial_polynomial_linear_with_powers_stubs"
-    [@@noalloc]
+  [@@noalloc]
 
   (** [negate res p n] writes the result of negating a polynomial [p] in [res]
 
@@ -127,7 +127,7 @@ module Stubs = struct
   - [res] and [p] either disjoint or equal *)
   external negate : fr_array -> fr_array -> int -> unit
     = "caml_bls12_381_polynomial_polynomial_negate_stubs"
-    [@@noalloc]
+  [@@noalloc]
 
   (** [evaluate res p n x] writes the result of evaluating a polynomial [p] at [x]
   in [res]
@@ -135,7 +135,7 @@ module Stubs = struct
   - requires: [size p = n] and [n > 0] *)
   external evaluate : fr -> fr_array -> int -> fr -> unit
     = "caml_bls12_381_polynomial_polynomial_evaluate_stubs"
-    [@@noalloc]
+  [@@noalloc]
 
   (** [division_xn res_q res_r p size_p (n, c)] writes the quotient and remainder of
       the division of a polynomial [p] by [(X^n + c)] in [res]
@@ -147,7 +147,7 @@ module Stubs = struct
   external division_xn :
     fr_array -> fr_array -> fr_array -> int -> int * fr -> unit
     = "caml_bls12_381_polynomial_polynomial_division_xn_stubs"
-    [@@noalloc]
+  [@@noalloc]
 
   (** [mul_xn res p size_p n c] writes the result of multiplying a polynomial [p]
       by [(X^n + c)] in [res]
@@ -158,11 +158,11 @@ module Stubs = struct
   - [size res = size_p + n] *)
   external mul_xn : fr_array -> fr_array -> int -> int -> fr -> unit
     = "caml_bls12_381_polynomial_polynomial_mul_xn_stubs"
-    [@@noalloc]
+  [@@noalloc]
 
   external derivative : fr_array -> fr_array -> int -> unit
     = "caml_bls12_381_polynomial_polynomial_derivative_stubs"
-    [@@noalloc]
+  [@@noalloc]
 end
 
 module Polynomial_impl = struct

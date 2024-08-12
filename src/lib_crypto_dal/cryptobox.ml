@@ -50,7 +50,7 @@ let () =
     (function
       | Failed_to_load_trusted_setup parameter -> Some parameter | _ -> None)
     (fun parameter -> Failed_to_load_trusted_setup parameter)
-  [@@coverage off]
+[@@coverage off]
 
 type initialisation_parameters =
   | Verifier of {is_fake : bool}
@@ -94,7 +94,7 @@ module Inner = struct
         ~to_raw:to_string
         ~of_raw:of_string_opt
         ~wrap:(fun x -> Data x)
-      [@@coverage off]
+    [@@coverage off]
 
     let raw_encoding = encoding [@@coverage off]
 
@@ -118,12 +118,12 @@ module Inner = struct
            function exposed. We only need the Base58 encoding and the
            rpc_arg. *)
         assert false
-        [@@coverage off]
+      [@@coverage off]
 
       let seeded_hash _ _ =
         (* Same argument. *)
         assert false
-        [@@coverage off]
+      [@@coverage off]
     end)
 
     let of_b58check = of_b58check
@@ -170,7 +170,7 @@ module Inner = struct
         (fun {index; share} -> (index, share))
         (fun (index, share) -> {index; share})
         (tup2 int31 share_encoding)
-      [@@coverage off]
+    [@@coverage off]
 
     let shards_proofs_precomputation_encoding =
       Kate_amortized.preprocess_encoding
@@ -204,7 +204,7 @@ module Inner = struct
          Data_encoding.string)
       (function Invalid_precomputation_hash err -> Some err | _ -> None)
       (function err -> Invalid_precomputation_hash err)
-    [@@coverage off]
+  [@@coverage off]
 
   (* Builds group of nth roots of unity, a valid domain for the FFT. *)
   let make_domain n = Domain.build n
@@ -305,7 +305,7 @@ module Inner = struct
           return x
     in
     fun ({redundancy_factor; slot_size; page_size; number_of_shards} as
-        parameters) ->
+         parameters) ->
       (* The cryptobox is deterministically computed from the DAL parameters and
          this computation takes time (on the order of 10ms) so we cache it. *)
       with_cache (parameters, !initialisation_parameters) @@ fun () ->
@@ -377,7 +377,7 @@ module Inner = struct
   let parameters
       ({redundancy_factor; slot_size; page_size; number_of_shards; _} : t) =
     {redundancy_factor; slot_size; page_size; number_of_shards}
-    [@@coverage off]
+  [@@coverage off]
 
   let polynomial_degree = Poly.degree
 

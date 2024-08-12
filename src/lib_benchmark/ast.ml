@@ -791,9 +791,12 @@ module To_ast (Ast : S) :
   let if_ cond ift iff = If (cond, ift, iff)
 end
 
-module Transform (F : functor (Ast : S) -> sig
-  val transform : 'a Ast.t -> 'a Ast.t
-end) : Costlang.Transform =
+module Transform
+    (F : functor
+      (Ast : S)
+      -> sig
+      val transform : 'a Ast.t -> 'a Ast.t
+    end) : Costlang.Transform =
 functor
   (X : Costlang.S)
   ->

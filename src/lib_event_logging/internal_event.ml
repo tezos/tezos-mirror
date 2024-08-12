@@ -297,10 +297,10 @@ module All_sinks = struct
       ~title
       ~description
       ~pp:(fun ppf -> function
-            | Missing_uri_scheme uri ->
-                Format.fprintf ppf "%s: Missing URI scheme %S" title uri
-            | Uri_scheme_not_registered uri ->
-                Format.fprintf ppf "%s: URI scheme not registered %S" title uri)
+        | Missing_uri_scheme uri ->
+            Format.fprintf ppf "%s: Missing URI scheme %S" title uri
+        | Uri_scheme_not_registered uri ->
+            Format.fprintf ppf "%s: URI scheme not registered %S" title uri)
       Data_encoding.(
         union
           [
@@ -615,90 +615,89 @@ module Simple = struct
      If [never_empty] is [true], always print something.
      This is useful for inline parameters. *)
   let rec pp_human_readable :
-            'a. never_empty:bool -> 'a Data_encoding.t -> _ -> 'a -> _ =
-    fun (type a) ~never_empty (encoding : a Data_encoding.t) fmt (value : a) ->
-     match encoding.encoding with
-     | Null -> if never_empty then Format.pp_print_string fmt "N/A"
-     | Empty -> if never_empty then Format.pp_print_string fmt "N/A"
-     | Ignore -> if never_empty then Format.pp_print_string fmt "N/A"
-     | Constant name -> pp_print_shortened_string fmt name
-     | Bool -> Format.pp_print_bool fmt value
-     | Int8 -> Format.pp_print_int fmt value
-     | Uint8 -> Format.pp_print_int fmt value
-     | Int16 _ -> Format.pp_print_int fmt value
-     | Uint16 _ -> Format.pp_print_int fmt value
-     | Int31 _ -> Format.pp_print_int fmt value
-     | Int32 _ -> Format.fprintf fmt "%ld" value
-     | Int64 _ -> Format.fprintf fmt "%Ld" value
-     | N -> Format.pp_print_string fmt (Z.to_string value)
-     | Z -> Format.pp_print_string fmt (Z.to_string value)
-     | RangedInt _ -> Format.pp_print_int fmt value
-     | RangedFloat _ -> pp_print_compact_float fmt value
-     | Float -> pp_print_compact_float fmt value
-     | Bytes _ -> pp_print_shortened_string fmt (Bytes.to_string value)
-     | String _ -> pp_print_shortened_string fmt value
-     | Bigstring _ -> Format.pp_print_string fmt "<bigstring>"
-     | Padded (encoding, _) -> pp_human_readable ~never_empty encoding fmt value
-     | String_enum (table, _) -> (
-         match Stdlib.Hashtbl.find_opt table value with
-         | None -> if never_empty then Format.pp_print_string fmt "N/A"
-         | Some (name, _) -> pp_print_shortened_string fmt name)
-     | Array _ -> if never_empty then Format.pp_print_string fmt "<array>"
-     | List _ -> if never_empty then Format.pp_print_string fmt "<list>"
-     | Obj (Req {encoding; _} | Dft {encoding; _}) ->
-         pp_human_readable ~never_empty encoding fmt value
-     | Obj (Opt {encoding; _}) ->
-         Option.iter (pp_human_readable ~never_empty encoding fmt) value
-     | Objs _ -> if never_empty then Format.pp_print_string fmt "<obj>"
-     | Tup encoding -> pp_human_readable ~never_empty encoding fmt value
-     | Tups _ -> if never_empty then Format.pp_print_string fmt "<tuple>"
-     | Union
-         {
-           cases =
-             [
-               Case {encoding; proj; _};
-               Case {encoding = {encoding = Null; _}; _};
-             ];
-           _;
-         } -> (
-         (* Probably an [option] type or similar.
-            We only print the value if it is not null,
-            unless [never_empty] is [true]. *)
-         match proj value with
-         | None -> if never_empty then Format.pp_print_string fmt "null"
-         | Some value -> pp_human_readable ~never_empty encoding fmt value)
-     | Union _ -> if never_empty then Format.pp_print_string fmt "<union>"
-     | Mu _ -> if never_empty then Format.pp_print_string fmt "<recursive>"
-     | Conv {proj; encoding; _} ->
-         (* TODO: it may be worth it to take a look at [encoding]
-            before calling [proj], to try and predict whether the value
-            will actually be printed. *)
-         pp_human_readable ~never_empty encoding fmt (proj value)
-     | Describe {encoding; _} ->
-         pp_human_readable ~never_empty encoding fmt value
-     | Splitted {json_encoding; _} -> (
-         (* Generally, [Splitted] nodes imply that the JSON encoding
-            is more human-friendly, as JSON is a human-friendly
-            format. A typical example is Blake2B hashes.
-            So for log outputs we use the JSON encoding.
-            Unfortunately, [Json_encoding.t] is abstract so we have
-            to [construct] the JSON value and continue from here. *)
-         (* TODO: it may be worth it to take a look at [encoding]
-            before constructing the JSON value, to try and predict
-            whether the value will actually be printed (same as [Conv]). *)
-         match Json_encoding.construct json_encoding value with
-         | `Null -> if never_empty then Format.pp_print_string fmt "N/A"
-         | `Bool value -> Format.pp_print_bool fmt value
-         | `Float value -> pp_print_compact_float fmt value
-         | `String value -> pp_print_shortened_string fmt value
-         | `A _ -> if never_empty then Format.pp_print_string fmt "<list>"
-         | `O _ -> if never_empty then Format.pp_print_string fmt "<obj>")
-     | Dynamic_size {encoding; _} ->
-         pp_human_readable ~never_empty encoding fmt value
-     | Check_size {encoding; _} ->
-         pp_human_readable ~never_empty encoding fmt value
-     | Delayed make_encoding ->
-         pp_human_readable ~never_empty (make_encoding ()) fmt value
+        'a. never_empty:bool -> 'a Data_encoding.t -> _ -> 'a -> _ =
+   fun (type a) ~never_empty (encoding : a Data_encoding.t) fmt (value : a) ->
+    match encoding.encoding with
+    | Null -> if never_empty then Format.pp_print_string fmt "N/A"
+    | Empty -> if never_empty then Format.pp_print_string fmt "N/A"
+    | Ignore -> if never_empty then Format.pp_print_string fmt "N/A"
+    | Constant name -> pp_print_shortened_string fmt name
+    | Bool -> Format.pp_print_bool fmt value
+    | Int8 -> Format.pp_print_int fmt value
+    | Uint8 -> Format.pp_print_int fmt value
+    | Int16 _ -> Format.pp_print_int fmt value
+    | Uint16 _ -> Format.pp_print_int fmt value
+    | Int31 _ -> Format.pp_print_int fmt value
+    | Int32 _ -> Format.fprintf fmt "%ld" value
+    | Int64 _ -> Format.fprintf fmt "%Ld" value
+    | N -> Format.pp_print_string fmt (Z.to_string value)
+    | Z -> Format.pp_print_string fmt (Z.to_string value)
+    | RangedInt _ -> Format.pp_print_int fmt value
+    | RangedFloat _ -> pp_print_compact_float fmt value
+    | Float -> pp_print_compact_float fmt value
+    | Bytes _ -> pp_print_shortened_string fmt (Bytes.to_string value)
+    | String _ -> pp_print_shortened_string fmt value
+    | Bigstring _ -> Format.pp_print_string fmt "<bigstring>"
+    | Padded (encoding, _) -> pp_human_readable ~never_empty encoding fmt value
+    | String_enum (table, _) -> (
+        match Stdlib.Hashtbl.find_opt table value with
+        | None -> if never_empty then Format.pp_print_string fmt "N/A"
+        | Some (name, _) -> pp_print_shortened_string fmt name)
+    | Array _ -> if never_empty then Format.pp_print_string fmt "<array>"
+    | List _ -> if never_empty then Format.pp_print_string fmt "<list>"
+    | Obj (Req {encoding; _} | Dft {encoding; _}) ->
+        pp_human_readable ~never_empty encoding fmt value
+    | Obj (Opt {encoding; _}) ->
+        Option.iter (pp_human_readable ~never_empty encoding fmt) value
+    | Objs _ -> if never_empty then Format.pp_print_string fmt "<obj>"
+    | Tup encoding -> pp_human_readable ~never_empty encoding fmt value
+    | Tups _ -> if never_empty then Format.pp_print_string fmt "<tuple>"
+    | Union
+        {
+          cases =
+            [
+              Case {encoding; proj; _}; Case {encoding = {encoding = Null; _}; _};
+            ];
+          _;
+        } -> (
+        (* Probably an [option] type or similar.
+           We only print the value if it is not null,
+           unless [never_empty] is [true]. *)
+        match proj value with
+        | None -> if never_empty then Format.pp_print_string fmt "null"
+        | Some value -> pp_human_readable ~never_empty encoding fmt value)
+    | Union _ -> if never_empty then Format.pp_print_string fmt "<union>"
+    | Mu _ -> if never_empty then Format.pp_print_string fmt "<recursive>"
+    | Conv {proj; encoding; _} ->
+        (* TODO: it may be worth it to take a look at [encoding]
+           before calling [proj], to try and predict whether the value
+           will actually be printed. *)
+        pp_human_readable ~never_empty encoding fmt (proj value)
+    | Describe {encoding; _} ->
+        pp_human_readable ~never_empty encoding fmt value
+    | Splitted {json_encoding; _} -> (
+        (* Generally, [Splitted] nodes imply that the JSON encoding
+           is more human-friendly, as JSON is a human-friendly
+           format. A typical example is Blake2B hashes.
+           So for log outputs we use the JSON encoding.
+           Unfortunately, [Json_encoding.t] is abstract so we have
+           to [construct] the JSON value and continue from here. *)
+        (* TODO: it may be worth it to take a look at [encoding]
+           before constructing the JSON value, to try and predict
+           whether the value will actually be printed (same as [Conv]). *)
+        match Json_encoding.construct json_encoding value with
+        | `Null -> if never_empty then Format.pp_print_string fmt "N/A"
+        | `Bool value -> Format.pp_print_bool fmt value
+        | `Float value -> pp_print_compact_float fmt value
+        | `String value -> pp_print_shortened_string fmt value
+        | `A _ -> if never_empty then Format.pp_print_string fmt "<list>"
+        | `O _ -> if never_empty then Format.pp_print_string fmt "<obj>")
+    | Dynamic_size {encoding; _} ->
+        pp_human_readable ~never_empty encoding fmt value
+    | Check_size {encoding; _} ->
+        pp_human_readable ~never_empty encoding fmt value
+    | Delayed make_encoding ->
+        pp_human_readable ~never_empty (make_encoding ()) fmt value
 
   type parameter =
     | Parameter :

@@ -332,8 +332,7 @@ module RPC = struct
         conv
           (fun (storage, operations, lazy_storage_diff) ->
             (storage, operations, lazy_storage_diff, lazy_storage_diff))
-          (fun (storage, operations, legacy_lazy_storage_diff, lazy_storage_diff)
-               ->
+          (fun (storage, operations, legacy_lazy_storage_diff, lazy_storage_diff) ->
             let lazy_storage_diff =
               Option.either lazy_storage_diff legacy_lazy_storage_diff
             in

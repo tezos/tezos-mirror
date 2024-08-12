@@ -1741,7 +1741,8 @@ module Sc_rollup = struct
          (Make_index (Sc_rollup_repr.Index))
 
   module Make_versioned
-      (Versioned_value : Sc_rollup_data_version_sig.S) (Data_storage : sig
+      (Versioned_value : Sc_rollup_data_version_sig.S)
+      (Data_storage : sig
         type context
 
         type key

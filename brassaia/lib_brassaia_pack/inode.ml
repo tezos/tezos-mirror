@@ -37,7 +37,8 @@ end
 
 module Make_internal
     (Conf : Conf.S)
-    (H : Brassaia.Hash.S) (Key : sig
+    (H : Brassaia.Hash.S)
+    (Key : sig
       include Brassaia.Key.S with type hash = H.t
 
       val unfindable_of_hash : hash -> t

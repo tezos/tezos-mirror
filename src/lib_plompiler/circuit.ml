@@ -1329,7 +1329,8 @@ module Mod_arith = struct
         ~ts_bounds
     in
     with_label ~label:"Mod_arith.is_zero"
-    @@ (* b is the output of [is_zero]: b = 1 if x = 0 and b = 0 otherwise *)
+    @@
+    (* b is the output of [is_zero]: b = 1 if x = 0 and b = 0 otherwise *)
     let* b = fresh Dummy.bool in
     let* rs = fresh @@ Dummy.list nb_limbs Dummy.scalar in
     let (Bool out) = b in

@@ -143,11 +143,11 @@ module SM = struct
    fun m f rng_state s ->
     let x, s = m rng_state s in
     f x rng_state s
-   [@@inline]
+  [@@inline]
 
   let sample : 'a sampler -> 'a Inference.M.t sampler =
    fun x rng_state st -> (x rng_state, st)
-   [@@inline]
+  [@@inline]
 
   let deterministic : 'a Inference.M.t -> 'a t = fun x _rng_state -> x
 

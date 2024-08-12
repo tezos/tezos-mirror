@@ -25,10 +25,9 @@
 
 open Tezos_dal_node_services
 
-class type cctxt =
-  object
-    inherit Tezos_rpc.Context.generic
-  end
+class type cctxt = object
+  inherit Tezos_rpc.Context.generic
+end
 
 class unix_cctxt ~rpc_config : cctxt =
   object

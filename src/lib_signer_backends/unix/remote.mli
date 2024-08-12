@@ -24,7 +24,8 @@
 (*****************************************************************************)
 
 module Make
-    (RPC_client : RPC_client.S) (S : sig
+    (RPC_client : RPC_client.S)
+    (S : sig
       val default : Uri.t
 
       val authenticate :

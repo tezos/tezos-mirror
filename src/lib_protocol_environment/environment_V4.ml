@@ -112,20 +112,21 @@ module type T = sig
        and type application_state = P.validation_state
 
   class ['chain, 'block] proto_rpc_context :
-    Tezos_rpc.Context.t
-    -> (unit, (unit * 'chain) * 'block) RPC_path.t
-    -> ['chain * 'block] RPC_context.simple
+    Tezos_rpc.Context.t ->
+    (unit, (unit * 'chain) * 'block) RPC_path.t ->
+    ['chain * 'block] RPC_context.simple
 
   class ['block] proto_rpc_context_of_directory :
-    ('block -> RPC_context.t)
-    -> RPC_context.t RPC_directory.t
-    -> ['block] RPC_context.simple
+    ('block -> RPC_context.t) ->
+    RPC_context.t RPC_directory.t ->
+    ['block] RPC_context.simple
 end
 
-module Make (Param : sig
-  val name : string
-end)
-() =
+module Make
+    (Param : sig
+      val name : string
+    end)
+    () =
 struct
   (* The protocol V4 only supports 64-bits architectures. We ensure this the
      hard way with a dynamic check. *)
@@ -883,58 +884,57 @@ struct
   module RPC_context = struct
     type t = rpc_context
 
-    class type ['pr] simple =
-      object
-        method call_proto_service0 :
-          'm 'q 'i 'o.
-          (([< RPC_service.meth] as 'm), t, t, 'q, 'i, 'o) RPC_service.t ->
-          'pr ->
-          'q ->
-          'i ->
-          'o Error_monad.shell_tzresult Lwt.t
+    class type ['pr] simple = object
+      method call_proto_service0 :
+        'm 'q 'i 'o.
+        (([< RPC_service.meth] as 'm), t, t, 'q, 'i, 'o) RPC_service.t ->
+        'pr ->
+        'q ->
+        'i ->
+        'o Error_monad.shell_tzresult Lwt.t
 
-        method call_proto_service1 :
-          'm 'a 'q 'i 'o.
-          (([< RPC_service.meth] as 'm), t, t * 'a, 'q, 'i, 'o) RPC_service.t ->
-          'pr ->
-          'a ->
-          'q ->
-          'i ->
-          'o Error_monad.shell_tzresult Lwt.t
+      method call_proto_service1 :
+        'm 'a 'q 'i 'o.
+        (([< RPC_service.meth] as 'm), t, t * 'a, 'q, 'i, 'o) RPC_service.t ->
+        'pr ->
+        'a ->
+        'q ->
+        'i ->
+        'o Error_monad.shell_tzresult Lwt.t
 
-        method call_proto_service2 :
-          'm 'a 'b 'q 'i 'o.
-          ( ([< RPC_service.meth] as 'm),
-            t,
-            (t * 'a) * 'b,
-            'q,
-            'i,
-            'o )
-          RPC_service.t ->
-          'pr ->
-          'a ->
-          'b ->
-          'q ->
-          'i ->
-          'o Error_monad.shell_tzresult Lwt.t
+      method call_proto_service2 :
+        'm 'a 'b 'q 'i 'o.
+        ( ([< RPC_service.meth] as 'm),
+          t,
+          (t * 'a) * 'b,
+          'q,
+          'i,
+          'o )
+        RPC_service.t ->
+        'pr ->
+        'a ->
+        'b ->
+        'q ->
+        'i ->
+        'o Error_monad.shell_tzresult Lwt.t
 
-        method call_proto_service3 :
-          'm 'a 'b 'c 'q 'i 'o.
-          ( ([< RPC_service.meth] as 'm),
-            t,
-            ((t * 'a) * 'b) * 'c,
-            'q,
-            'i,
-            'o )
-          RPC_service.t ->
-          'pr ->
-          'a ->
-          'b ->
-          'c ->
-          'q ->
-          'i ->
-          'o Error_monad.shell_tzresult Lwt.t
-      end
+      method call_proto_service3 :
+        'm 'a 'b 'c 'q 'i 'o.
+        ( ([< RPC_service.meth] as 'm),
+          t,
+          ((t * 'a) * 'b) * 'c,
+          'q,
+          'i,
+          'o )
+        RPC_service.t ->
+        'pr ->
+        'a ->
+        'b ->
+        'c ->
+        'q ->
+        'i ->
+        'o Error_monad.shell_tzresult Lwt.t
+    end
 
     let make_call0 s (ctxt : _ simple) = ctxt#call_proto_service0 s
 

@@ -60,8 +60,7 @@ module Pool = struct
       else Ethereum_types.AddressMap.add address nonce_map acc_address_map
     in
     Pkey_map.fold_e
-      (fun address nonce_tx_map (acc_address_map_pending, acc_address_map_queued)
-           ->
+      (fun address nonce_tx_map (acc_address_map_pending, acc_address_map_queued) ->
         let address_balance, address_nonce = find_balance_and_nonce address in
         let+ pending, queued =
           Nonce_map.fold_e

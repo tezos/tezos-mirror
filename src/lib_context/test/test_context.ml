@@ -92,14 +92,16 @@ let chain_id = Chain_id.of_block_hash genesis_block
 (** Test functors *)
 
 (* Context-generic tests *)
-module Make_generic (Tag : sig
-  val tag : string
-end) (Type_parameters : sig
-  type memory_context_tree
-end)
-(Context : Tezos_context_sigs.Context.TEZOS_CONTEXT
-             with type memory_context_tree :=
-               Type_parameters.memory_context_tree) =
+module Make_generic
+    (Tag : sig
+      val tag : string
+    end)
+    (Type_parameters : sig
+      type memory_context_tree
+    end)
+    (Context : Tezos_context_sigs.Context.TEZOS_CONTEXT
+                 with type memory_context_tree :=
+                   Type_parameters.memory_context_tree) =
 struct
   open Context
 

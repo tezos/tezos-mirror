@@ -26,7 +26,8 @@
 class mockup_ctxt (base_dir : string) (mem_only : bool)
   (mockup_env : Tezos_mockup_registration.Registration.mockup_environment)
   (chain_id : Chain_id.t) (rpc_context : Tezos_protocol_environment.rpc_context)
-  protocol_data : Tezos_rpc.Context.generic =
+  protocol_data :
+  Tezos_rpc.Context.generic =
   let local_ctxt =
     Tezos_mockup_proxy.RPC_client.local_ctxt
       (Local_services.build_directory

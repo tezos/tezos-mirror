@@ -66,12 +66,14 @@ let () =
     ~id:"Baking_commands.node_version_incompatible"
     ~title:"Node version is incompatible"
     ~description:"The node version is incompatible with this baker"
-    ~pp:(fun fmt
-             ((node_version, node_commit_info, baker_version, baker_commit_info) :
-               Tezos_version_parser.t
-               * Tezos_version.Octez_node_version.commit_info option
-               * Tezos_version_parser.t
-               * Tezos_version.Octez_node_version.commit_info option) ->
+    ~pp:(fun
+        fmt
+        ((node_version, node_commit_info, baker_version, baker_commit_info) :
+          Tezos_version_parser.t
+          * Tezos_version.Octez_node_version.commit_info option
+          * Tezos_version_parser.t
+          * Tezos_version.Octez_node_version.commit_info option)
+      ->
       Format.fprintf
         fmt
         "@[Node version is %a (%a) but it is expected to be more recent than \

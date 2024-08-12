@@ -1918,7 +1918,7 @@ let commitment_of_slot cryptobox slot =
   | Ok cm -> cm
   | Error
       ((`Invalid_degree_strictly_less_than_expected _ | `Prover_SRS_not_loaded)
-      as commit_error) ->
+       as commit_error) ->
       Test.fail "%s" (Cryptobox.string_of_commit_error commit_error)
 
 let test_dal_node_test_post_slot _protocol parameters cryptobox _node client

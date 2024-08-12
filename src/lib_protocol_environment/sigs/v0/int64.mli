@@ -125,12 +125,12 @@ external to_int : int64 -> int = "%int64_to_int"
     the number is outside the range \[{!Int64.min_int}, {!Int64.max_int}\]. *)
 external of_float : float -> int64
   = "caml_int64_of_float" "caml_int64_of_float_unboxed"
-  [@@unboxed] [@@noalloc]
+[@@unboxed] [@@noalloc]
 
 (** Convert the given 64-bit integer to a floating-point number. *)
 external to_float : int64 -> float
   = "caml_int64_to_float" "caml_int64_to_float_unboxed"
-  [@@unboxed] [@@noalloc]
+[@@unboxed] [@@noalloc]
 
 (** Convert the given 32-bit integer (type [int32])
     to a 64-bit integer (type [int64]). *)
@@ -183,14 +183,14 @@ val to_string : int64 -> string
     represent the mantissa. *)
 external bits_of_float : float -> int64
   = "caml_int64_bits_of_float" "caml_int64_bits_of_float_unboxed"
-  [@@unboxed] [@@noalloc]
+[@@unboxed] [@@noalloc]
 
 (** Return the floating-point number whose internal representation,
     according to the IEEE 754 floating-point 'double format' bit layout,
     is the given [int64]. *)
 external float_of_bits : int64 -> float
   = "caml_int64_float_of_bits" "caml_int64_float_of_bits_unboxed"
-  [@@unboxed] [@@noalloc]
+[@@unboxed] [@@noalloc]
 
 (** An alias for the type of 64-bit integers. *)
 type t = int64

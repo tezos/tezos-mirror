@@ -45,13 +45,14 @@ end
 
 module Make_minimal (Name : Name) : S.MINIMAL_HASH
 
-module Make (Register : sig
-  val register_encoding :
-    prefix:string ->
-    length:int ->
-    to_raw:('a -> string) ->
-    of_raw:(string -> 'a option) ->
-    wrap:('a -> Base58.data) ->
-    'a Base58.encoding
-end)
-(Name : PrefixedName) : S.HASH
+module Make
+    (Register : sig
+      val register_encoding :
+        prefix:string ->
+        length:int ->
+        to_raw:('a -> string) ->
+        of_raw:(string -> 'a option) ->
+        wrap:('a -> Base58.data) ->
+        'a Base58.encoding
+    end)
+    (Name : PrefixedName) : S.HASH
