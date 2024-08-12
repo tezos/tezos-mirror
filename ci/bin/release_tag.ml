@@ -44,13 +44,23 @@ type release_tag_pipeline_type =
 
     If [test] is true (default is [false]), then the Docker images are
     built of the [Test] type and are published to the GitLab registry
-    instead of Docker hub. *)
+    instead of Docker hub.
+
+    On release pipelines these jobs can start immediately *)
 let octez_jobs ?(test = false) release_tag_pipeline_type =
   let job_docker_amd64 =
-    job_docker_build ~__POS__ ~arch:Amd64 (if test then Test else Release)
+    job_docker_build
+      ~dependencies:(Dependent [])
+      ~__POS__
+      ~arch:Amd64
+      (if test then Test else Release)
   in
   let job_docker_arm64 =
-    job_docker_build ~__POS__ ~arch:Arm64 (if test then Test else Release)
+    job_docker_build
+      ~dependencies:(Dependent [])
+      ~__POS__
+      ~arch:Arm64
+      (if test then Test else Release)
   in
   let job_docker_merge =
     job_docker_merge_manifests
@@ -59,11 +69,23 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
       ~job_docker_amd64
       ~job_docker_arm64
   in
+  (* on release pipelines the static binaries do not have any dependencies
+     on previous stages and can start immediately *)
   let job_static_arm64_release =
-    job_build_static_binaries ~__POS__ ~arch:Arm64 ~release:true ()
+    job_build_static_binaries
+      ~dependencies:(Dependent [])
+      ~__POS__
+      ~arch:Arm64
+      ~release:true
+      ()
   in
   let job_static_x86_64_release =
-    job_build_static_binaries ~__POS__ ~arch:Amd64 ~release:true ()
+    job_build_static_binaries
+      ~dependencies:(Dependent [])
+      ~__POS__
+      ~arch:Amd64
+      ~release:true
+      ()
   in
   let job_gitlab_release ~dependencies : Tezos_ci.tezos_job =
     job

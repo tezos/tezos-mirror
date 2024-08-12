@@ -58,6 +58,8 @@ oc.build:static-x86_64-linux-binaries:
   stage: build
   tags:
   - gcp
+  needs:
+  - oc.docker:ci:amd64
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -93,6 +95,8 @@ oc.build:static-arm64-linux-binaries:
   stage: build
   tags:
   - gcp_arm64
+  needs:
+  - oc.docker:ci:arm64
   dependencies:
   - oc.docker:ci:arm64
   timeout: 60 minutes
@@ -128,6 +132,8 @@ oc.docker:amd64:
   stage: build
   tags:
   - gcp
+  needs:
+  - oc.docker:ci:amd64
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -149,6 +155,8 @@ oc.docker:arm64:
   stage: build
   tags:
   - gcp_arm64
+  needs:
+  - oc.docker:ci:arm64
   dependencies:
   - oc.docker:ci:arm64
   timeout: 60 minutes
