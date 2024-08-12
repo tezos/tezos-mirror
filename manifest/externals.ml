@@ -164,7 +164,7 @@ let ocaml_migrate_parsetree = external_lib "ocaml-migrate-parsetree" V.True
 let ocaml_protoc_compiler =
   external_lib "ocaml-protoc-plugin" V.(at_least "4.5.0")
 
-let ocamlformat = opam_only "ocamlformat" V.(exactly "0.25.1")
+let ocamlformat = opam_only "ocamlformat" V.(exactly "0.26.2")
 
 let ocamlgraph = external_lib "ocamlgraph" V.True
 

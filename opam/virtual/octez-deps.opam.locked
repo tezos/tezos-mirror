@@ -1,6 +1,6 @@
 opam-version: "2.0"
 name: "octez-deps"
-version: "~dev"
+version: "dev"
 synopsis:
   "Virtual package depending on Octez dependencies (profile: octez-deps)"
 description:
@@ -138,8 +138,8 @@ depends: [
   "ocaml-version" {= "3.6.7"}
   "ocamlbuild" {= "0.14.3"}
   "ocamlfind" {= "1.9.6"}
-  "ocamlformat" {= "0.25.1"}
-  "ocamlformat-lib" {= "0.25.1"}
+  "ocamlformat" {= "0.26.2"}
+  "ocamlformat-lib" {= "0.26.2"}
   "ocamlgraph" {= "2.1.0"}
   "ocp-indent" {= "1.8.1"}
   "ocp-ocamlres" {= "0.4"}

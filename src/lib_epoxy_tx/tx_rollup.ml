@@ -58,8 +58,10 @@ module P = struct
       (List.tl values)
 
   let scalar_of_account (acc : account) =
-    (* We can use just the u coordinate of pk as Edwards curves are symmetric and as such there are only two possible v coordinates and the same sk is used to generate both.
-       We could set a convention to only use pk with v coordination of a given parity, for instance v odd. *)
+    (* We can use just the u coordinate of pk as Edwards curves are symmetric
+       and as such there are only two possible v coordinates and the same sk is
+       used to generate both. We could set a convention to only use pk with v
+       coordination of a given parity, for instance v odd. *)
     (* TODO move this in schnorr and make the pk directly a single coordinate *)
     let u = Curve.get_u_coordinate acc.pk |> of_bls_scalar in
     let compressed = compress Bounded.[f acc.tez_balance; f acc.cnt] in

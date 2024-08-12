@@ -67,7 +67,7 @@ depends: [
   "mtime" { >= "2.0.0" }
   "num"
   "ocaml-migrate-parsetree"
-  "ocamlformat" { = "0.25.1" }
+  "ocamlformat" { = "0.26.2" }
   "ocamlgraph"
   "ocp-ocamlres" { >= "0.4" }
   "ocplib-endian"
