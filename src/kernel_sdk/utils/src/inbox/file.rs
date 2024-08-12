@@ -6,7 +6,7 @@
 //! by both *wasm debugger* and *riscv sandbox*.
 
 use serde::{Deserialize, Serialize};
-use std::{fs, path::Path};
+use std::{fs, io::Write, path::Path};
 
 /// Single Inbox message
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -41,6 +41,27 @@ impl InboxFile {
     pub fn save(&self, path: &Path) -> Result<(), Box<dyn std::error::Error>> {
         let mut file = fs::File::create(path)?;
         serde_json::ser::to_writer_pretty(&mut file, self)?;
+        Ok(())
+    }
+
+    /// Save the Inbox file as a shell script.
+    pub fn save_script(&self, path: &Path) -> Result<(), Box<dyn std::error::Error>> {
+        let mut file = fs::File::create(path)?;
+        writeln!(file, "#!/bin/sh")?;
+
+        for level in self.0.iter() {
+            for msg in level {
+                let hex = match msg {
+                    Message::Raw(bytes) => bytes.as_slice(),
+                    Message::External { external } => external.as_slice(),
+                };
+                let hex = hex::encode(hex);
+
+                writeln!(file, "octez-client --wait none send smart rollup message 'hex:[\"{hex}\"]' from bootstrap2")?;
+                writeln!(file, "octez-client bake for --minimal-timestamp")?;
+            }
+        }
+
         Ok(())
     }
 }
