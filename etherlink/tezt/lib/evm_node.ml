@@ -1065,6 +1065,12 @@ let sequencer_upgrade_payload ?client ~public_key ~pool_address
   let* payload = Process.check_and_read_stdout process in
   return (String.trim payload)
 
+let debug_print_store_schemas ?(path = Uses.path Constant.octez_evm_node) ?hooks
+    () =
+  let args = ["debug"; "print"; "store"; "schemas"] in
+  let process = Process.spawn ?hooks path @@ args in
+  Process.check process
+
 let chunk_data ~rollup_address ?sequencer_key ?timestamp ?parent_hash ?number
     ?client data =
   let args = "chunk" :: "data" :: data in

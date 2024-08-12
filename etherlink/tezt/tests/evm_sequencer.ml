@@ -5997,6 +5997,19 @@ let test_batch_limit_size_rpc =
 
   unit
 
+let test_debug_print_store_schemas () =
+  Regression.register
+    ~__FILE__
+    ~title:"EVM Node: debug print store schemas"
+    ~tags:["evm"; "store"; "schemas"]
+    ~uses:[Constant.octez_evm_node]
+    ~uses_node:false
+    ~uses_client:false
+    ~uses_admin_client:false
+  @@ fun () ->
+  let hooks = Tezos_regression.hooks in
+  Evm_node.debug_print_store_schemas ~hooks ()
+
 let test_relay_restricted_rpcs =
   register_all
     ~bootstrap_accounts:Eth_account.lots_of_address
@@ -6099,4 +6112,5 @@ let () =
   test_trace_transaction_calltracer_all_types protocols ;
   test_trace_transaction_call_tracer_with_logs protocols ;
   test_trace_transaction_call_trace_certain_depth protocols ;
-  test_trace_transaction_call_trace_revert protocols
+  test_trace_transaction_call_trace_revert protocols ;
+  test_debug_print_store_schemas ()

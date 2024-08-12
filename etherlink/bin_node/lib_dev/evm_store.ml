@@ -200,6 +200,13 @@ module Q = struct
 
   let vacuum_request = (string ->. unit) @@ {|VACUUM main INTO ?|}
 
+  module Schemas = struct
+    let get_all =
+      (unit ->* string)
+      @@ {|SELECT sql FROM sqlite_schema WHERE name
+           NOT LIKE 'sqlite_%' AND name != 'migrations'|}
+  end
+
   module Migrations = struct
     let create_table =
       (unit ->. unit)
@@ -225,7 +232,14 @@ module Q = struct
           (with leading 0s) followed by the name of the migration (e.g.
           [005_create_blueprints_table.sql])
         - Run [etherlink/scripts/check_evm_store_migrations.sh promote]
+        - Regenerate the schemas, using [[
+              dune exec -- etherlink/tezt/tests/main.exe --file evm_sequencer.ml \
+                evm store schemas regression --reset-regressions
+          ]]
         - Increment [version]
+
+      You can review the result at
+      [etherlink/tezt/tests/expected/evm_sequencer.ml/EVM Node- debug print store schemas.out].
     *)
     let version = 9
 
@@ -406,6 +420,12 @@ module Journal_mode = struct
     when_ (current_mode <> Wal) @@ fun () ->
     let* _wal = Db.find conn Q.Journal_mode.set_wal () in
     return_unit
+end
+
+module Schemas = struct
+  let get_all store =
+    with_connection store @@ fun conn ->
+    Db.collect_list conn Q.Schemas.get_all ()
 end
 
 module Migrations = struct

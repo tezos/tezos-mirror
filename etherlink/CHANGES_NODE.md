@@ -81,6 +81,8 @@
   estimation of DA fees no longer require to run the kernel. (!14165)
 - Add a private RPC method to by-pass node validation when injecting a
   transaction to the TX pool. (!13856).
+- Add a debug command to print the SQLite schemas currently is use by the node.
+  (!14509)
 
 ## Version for ec7c3b349624896b269e179384d0a45cf39e1145
 
