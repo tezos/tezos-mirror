@@ -355,34 +355,75 @@ let bake ?baker : t -> t tzresult Lwt.t =
   in
   return (block, state)
 
+let rec repeat n f acc =
+  let open Lwt_result_syntax in
+  if n <= 0 then return acc
+  else
+    let* acc = f acc in
+    repeat (n - 1) f acc
+
+(* adopted from tezt/lib_tezos/client.ml *)
+let bake_until_level ~target_level : t -> t tzresult Lwt.t =
+ fun (init_block, init_state) ->
+  let open Lwt_result_syntax in
+  Log.info "Bake until level %d." target_level ;
+  let current_level = Int32.to_int @@ Block.current_level init_block in
+  if target_level < current_level then
+    Test.fail
+      "bake_until_level(%d): already at level %d"
+      target_level
+      current_level ;
+  let* final_block, final_state =
+    repeat (target_level - current_level) bake (init_block, init_state)
+  in
+  let final_level = Int32.to_int @@ Block.current_level final_block in
+  Check.((final_level = target_level) ~__LOC__ int)
+    ~error_msg:"Expected level=%R, got %L" ;
+  return (final_block, final_state)
+
+let bake_until ~target_cycle condition : t -> t tzresult Lwt.t =
+ fun (init_block, init_state) ->
+  let blocks_per_cycle = Int32.to_int init_block.constants.blocks_per_cycle in
+  let target_level, str =
+    match condition with
+    | `New_cycle -> (target_cycle * blocks_per_cycle, "first block")
+    | `Cycle_end -> (((target_cycle + 1) * blocks_per_cycle) - 1, "last block")
+    | `Cycle_end_but_one ->
+        (((target_cycle + 1) * blocks_per_cycle) - 2, "last but one block")
+  in
+  Log.info "Bake until cycle %d (level %d); %s" target_cycle target_level str ;
+  bake_until_level ~target_level (init_block, init_state)
+
 (** Bake until a cycle is reached, using [bake] instead of [Block.bake] *)
 let bake_until_next_cycle : t -> t tzresult Lwt.t =
  fun (init_block, init_state) ->
-  let open Lwt_result_syntax in
-  let current_cycle = Block.current_cycle init_block in
-  let rec step (old_block, old_state) =
-    let step_cycle = Block.current_cycle old_block in
-    if Protocol.Alpha_context.Cycle.(step_cycle > current_cycle) then
-      return (old_block, old_state)
-    else
-      let* new_block, new_state = bake (old_block, old_state) in
-      step (new_block, new_state)
+  let next_cycle =
+    Int32.to_int @@ Cycle.to_int32 @@ Cycle.succ
+    @@ Block.current_cycle init_block
   in
-  step (init_block, init_state)
+  bake_until `New_cycle ~target_cycle:next_cycle (init_block, init_state)
 
 (** Bake all the remaining blocks of the current cycle *)
 let bake_until_dawn_of_next_cycle : t -> t tzresult Lwt.t =
  fun (init_block, init_state) ->
-  let open Lwt_result_syntax in
-  let current_cycle = Block.current_cycle init_block in
-  let rec step (old_block, old_state) =
-    let* new_block, new_state = bake (old_block, old_state) in
-    let step_cycle = Block.current_cycle new_block in
-    if Protocol.Alpha_context.Cycle.(step_cycle > current_cycle) then
-      return (old_block, old_state)
-    else step (new_block, new_state)
+  let current_cycle =
+    Int32.to_int @@ Cycle.to_int32 @@ Block.current_cycle init_block
   in
-  step (init_block, init_state)
+  bake_until `Cycle_end ~target_cycle:current_cycle (init_block, init_state)
+
+let bake_until_next_cycle_end_but_one : t -> t tzresult Lwt.t =
+ fun (init_block, init_state) ->
+  let current_cycle =
+    Int32.to_int @@ Cycle.to_int32 @@ Block.current_cycle init_block
+  in
+  let next_cycle =
+    Int32.to_int @@ Cycle.to_int32 @@ Cycle.succ
+    @@ Block.current_cycle init_block
+  in
+  let target_cycle =
+    if Block.last_block_of_cycle init_block then next_cycle else current_cycle
+  in
+  bake_until `Cycle_end_but_one ~target_cycle (init_block, init_state)
 
 (* ======== Operations ======== *)
 
