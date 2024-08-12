@@ -69,9 +69,6 @@ pub use region::*;
 mod enums;
 pub use enums::*;
 
-mod bools;
-pub use bools::*;
-
 mod elems;
 pub use elems::*;
 

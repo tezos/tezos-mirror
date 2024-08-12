@@ -19,7 +19,7 @@ use thiserror::Error;
 
 pub type StateLayout = (
     PvmLayout<M100M>,
-    state_backend::BoolCellLayout,
+    state_backend::Atom<bool>,
     state_backend::Atom<u32>,
     state_backend::Atom<u64>,
     state_backend::Atom<u64>,
@@ -27,7 +27,7 @@ pub type StateLayout = (
 
 pub struct State<M: state_backend::Manager> {
     pvm: Pvm<M100M, M>,
-    level_is_set: state_backend::BoolCell<M>,
+    level_is_set: state_backend::Cell<bool, M>,
     level: state_backend::Cell<u32, M>,
     message_counter: state_backend::Cell<u64, M>,
     tick: state_backend::Cell<u64, M>,
@@ -37,7 +37,7 @@ impl<M: state_backend::Manager> State<M> {
     pub fn bind(space: state_backend::AllocatedOf<StateLayout, M>) -> Self {
         Self {
             pvm: Pvm::<M100M, M>::bind(space.0),
-            level_is_set: state_backend::BoolCell::bind(space.1),
+            level_is_set: space.1,
             level: space.2,
             message_counter: space.3,
             tick: space.4,

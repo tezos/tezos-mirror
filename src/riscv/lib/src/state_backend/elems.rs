@@ -56,6 +56,24 @@ impl_elem_prim!(i64);
 impl_elem_prim!(u128);
 impl_elem_prim!(i128);
 
+impl Elem for bool {
+    #[inline(always)]
+    fn store(&mut self, source: &Self) {
+        *self = *source;
+    }
+
+    #[inline(always)]
+    fn to_stored_in_place(&mut self) {}
+
+    #[inline(always)]
+    fn from_stored_in_place(&mut self) {}
+
+    #[inline(always)]
+    fn from_stored(source: &Self) -> Self {
+        *source
+    }
+}
+
 impl<E: Elem, const LEN: usize> Elem for [E; LEN] {
     #[inline(always)]
     fn store(&mut self, source: &Self) {
@@ -93,5 +111,17 @@ impl<E: Elem, const LEN: usize> Elem for [E; LEN] {
         }
 
         new
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_bool_repr() {
+        proptest::proptest!(|(val: u8)| {
+            let bool_val: bool = unsafe {std::mem::transmute_copy(&val)};
+            let truthy = val & 1 == 1;
+            assert_eq!(bool_val, truthy);
+        });
     }
 }
