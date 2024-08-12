@@ -24,7 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type version = V0 | V1 | V2 | V3 | V4 | V5
+type version = V0 | V1 | V2 | V3 | V4 | V5 | V6
 
 let versions =
   [
@@ -34,6 +34,7 @@ let versions =
     ("2.0.0-r3", V3);
     ("2.0.0-r4", V4);
     ("2.0.0-r5", V5);
+    ("2.0.0-r6", V6);
   ]
 
 let versions_flip = List.map (fun (x, y) -> (y, x)) versions

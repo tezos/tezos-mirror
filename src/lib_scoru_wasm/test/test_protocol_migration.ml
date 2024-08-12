@@ -75,7 +75,7 @@ let tests =
          If you end up here because of this, please add a protocol migration
          test for you new version. *)
       (match from_version with
-      | Tezos_scoru_wasm.Wasm_pvm_state.V0 | V1 | V2 | V3 | V4 | V5 -> ()) ;
+      | Tezos_scoru_wasm.Wasm_pvm_state.V0 | V1 | V2 | V3 | V4 | V5 | V6 -> ()) ;
       tztest
         (sf
            "protocol migration message handling by the WASM PVM (%s)"

@@ -203,6 +203,8 @@ Smart Rollup node
   produced by the PVM for ``block_id`` if the query parameter ``outbox`` is
   present. (MR :gl:`!14140`)
 
+- Introduce the 6th version of the WASM PVM. (MR :gl:`!14493`)
+
 Smart Rollup WASM Debugger
 --------------------------
 
