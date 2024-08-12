@@ -414,6 +414,31 @@ module Dal_RPC = struct
     make ~query_string GET ["p2p"; "gossipsub"; "topics"; "peers"] (fun json ->
         JSON.(json |> as_list |> List.map as_topic_and_peers))
 
+  let get_slot_indexes_peers ~subscribed =
+    let open JSON in
+    let query_string = if subscribed then [("subscribed", "true")] else [] in
+    let as_slot_indexes_and_peers json =
+      let topic = get "slot_index" json |> as_int in
+      let peers = get "peers" json |> as_list |> List.map as_string in
+      (topic, peers)
+    in
+    make
+      ~query_string
+      GET
+      ["p2p"; "gossipsub"; "slot_indexes"; "peers"]
+      (fun json -> JSON.(json |> as_list |> List.map as_slot_indexes_and_peers))
+
+  let get_pkhs_peers ~subscribed =
+    let open JSON in
+    let query_string = if subscribed then [("subscribed", "true")] else [] in
+    let as_pkhs_and_peers json =
+      let topic = get "pkh" json |> as_string in
+      let peers = get "peers" json |> as_list |> List.map as_string in
+      (topic, peers)
+    in
+    make ~query_string GET ["p2p"; "gossipsub"; "pkhs"; "peers"] (fun json ->
+        JSON.(json |> as_list |> List.map as_pkhs_and_peers))
+
   let get_gossipsub_connections () =
     make ~query_string:[] GET ["p2p"; "gossipsub"; "connections"] (fun x -> x)
 
