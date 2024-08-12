@@ -572,24 +572,32 @@ let worker =
     | Lwt.Fail exn -> fail (Error_monad.error_of_exn exn)
     | Lwt.Sleep -> Error Rollup_node_errors.No_publisher)
 
-let worker_add_request ~request =
+let worker_add_request condition ~request =
   let open Lwt_result_syntax in
   match Lazy.force worker with
   | Ok w ->
       let node_ctxt = Worker.state w in
       (* Bailout does not publish any commitment it only cement them. *)
-      unless (Node_context.is_bailout node_ctxt && request = Request.Publish)
+      unless
+        ((not (condition node_ctxt))
+        || (Node_context.is_bailout node_ctxt && request = Request.Publish))
       @@ fun () ->
       let*! (_pushed : bool) = Worker.Queue.push_request w request in
       return_unit
   | Error Rollup_node_errors.No_publisher -> return_unit
   | Error e -> tzfail e
 
-let publish_commitments () = worker_add_request ~request:Request.Publish
+let publish_commitments () =
+  worker_add_request ~request:Request.Publish (fun node_ctxt ->
+      Configuration.can_inject node_ctxt.config.mode Publish)
 
-let cement_commitments () = worker_add_request ~request:Request.Cement
+let cement_commitments () =
+  worker_add_request ~request:Request.Cement (fun node_ctxt ->
+      Configuration.can_inject node_ctxt.config.mode Cement)
 
-let execute_outbox () = worker_add_request ~request:Request.Execute_outbox
+let execute_outbox () =
+  worker_add_request ~request:Request.Execute_outbox (fun node_ctxt ->
+      Configuration.can_inject node_ctxt.config.mode Execute_outbox_message)
 
 let shutdown () =
   match Lazy.force worker with
