@@ -116,15 +116,17 @@ let shutdown ?exn t =
 (* This function is used to ensure we can connect to the docker image on the VM. *)
 let wait_ssh_server_running agent =
   let runner = Agent.runner agent in
-  let is_ready _output = true in
-  let run () =
-    let cmd, args =
-      Runner.wrap_with_ssh runner (Runner.Shell.cmd [] "echo" ["-n"; "check"])
+  if (Agent.configuration agent).os = "debian" then Lwt.return_unit
+  else
+    let is_ready _output = true in
+    let run () =
+      let cmd, args =
+        Runner.wrap_with_ssh runner (Runner.Shell.cmd [] "echo" ["-n"; "check"])
+      in
+      Process.spawn cmd (["-o"; "StrictHostKeyChecking=no"] @ args)
     in
-    Process.spawn cmd (["-o"; "StrictHostKeyChecking=no"] @ args)
-  in
-  let* _ = Env.wait_process ~is_ready ~run () in
-  Lwt.return_unit
+    let* _ = Env.wait_process ~is_ready ~run () in
+    Lwt.return_unit
 
 let orchestrator deployement f =
   let agents = Deployement.agents deployement in

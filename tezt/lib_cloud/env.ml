@@ -68,6 +68,8 @@ let dns_domain = Cli.dns_domain
 
 let dns = Cli.dns
 
+let os = Cli.os
+
 let docker_image =
   (* In localhost mode, we don't want to interact with GCP. The image is taken
      locally. *)

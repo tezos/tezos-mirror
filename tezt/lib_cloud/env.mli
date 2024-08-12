@@ -77,6 +77,8 @@ val dns_domain : string option
 
 val dns : bool
 
+val os : string
+
 val init : unit -> unit Lwt.t
 
 val project_id : unit -> string Lwt.t

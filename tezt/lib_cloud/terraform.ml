@@ -154,7 +154,7 @@ module VM = struct
     Process.run ~name ~color "terraform" (chdir Path.terraform_vm @ ["init"])
 
   let deploy ~max_run_duration ~machine_type ~base_port ~ports_per_vm
-      ~number_of_vms ~docker_image =
+      ~number_of_vms ~docker_image ~os =
     let* project_id = Gcloud.project_id () in
     let max_run_duration =
       match max_run_duration with
@@ -176,6 +176,8 @@ module VM = struct
           Format.asprintf "machine_type=%s" machine_type;
           "--var";
           Format.asprintf "docker_image=%s" docker_image;
+          "--var";
+          Format.asprintf "os=%s" os;
         ]
     in
     Process.run
