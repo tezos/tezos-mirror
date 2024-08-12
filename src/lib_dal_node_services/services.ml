@@ -484,7 +484,7 @@ module P2P = struct
           "Get an association list between each topic subscribed to by the \
            connected peers and the remote peers subscribed to that topic. If \
            the 'subscribed' flag is given, then restrict the output to the \
-           topics this node is subscribed to."
+           topics this peer is subscribed to."
         ~query:subscribed_query
         ~output:
           Data_encoding.(
@@ -493,6 +493,52 @@ module P2P = struct
                  (req "topic" Types.Topic.encoding)
                  (req "peers" (list Types.Peer.encoding))))
         (open_root / "topics" / "peers")
+
+    let get_slot_indexes_peers :
+        < meth : [`GET]
+        ; input : unit
+        ; output : (Types.slot_index * Types.Peer.t list) list
+        ; prefix : unit
+        ; params : unit
+        ; query : < subscribed : bool > >
+        service =
+      Tezos_rpc.Service.get_service
+        ~description:
+          "Get an association list between each public key hash part of a \
+           topic subscribed to by the connected peers and the remote peers \
+           subscribed to such topics. If the 'subscribed' flag is given, then \
+           restrict the output to the topics this peer is subscribed to."
+        ~query:subscribed_query
+        ~output:
+          Data_encoding.(
+            list
+              (obj2
+                 (req "slot_index" uint8)
+                 (req "peers" (list Types.Peer.encoding))))
+        (open_root / "slot_indexes" / "peers")
+
+    let get_pkhs_peers :
+        < meth : [`GET]
+        ; input : unit
+        ; output : (Signature.public_key_hash * Types.Peer.t list) list
+        ; prefix : unit
+        ; params : unit
+        ; query : < subscribed : bool > >
+        service =
+      Tezos_rpc.Service.get_service
+        ~description:
+          "Get an association list between each topic subscribed to by the \
+           connected peers and the remote peers subscribed to that topic. If \
+           the 'subscribed' flag is given, then restrict the output to the \
+           topics this peer is subscribed to."
+        ~query:subscribed_query
+        ~output:
+          Data_encoding.(
+            list
+              (obj2
+                 (req "pkh" Signature.Public_key_hash.encoding)
+                 (req "peers" (list Types.Peer.encoding))))
+        (open_root / "pkhs" / "peers")
 
     let get_connections :
         < meth : [`GET]
