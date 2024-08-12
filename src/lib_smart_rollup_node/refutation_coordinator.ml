@@ -199,7 +199,7 @@ let start_in_mode mode =
   match mode with
   | Accuser | Bailout | Operator | Maintenance -> true
   | Observer | Batcher -> false
-  | Custom ops -> purpose_matches_mode (Custom ops) Operating
+  | Custom ops -> purposes_matches_mode (Custom ops) [Operating]
 
 let init (node_ctxt : _ Node_context.t) =
   let open Lwt_result_syntax in

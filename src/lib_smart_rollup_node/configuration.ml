@@ -773,8 +773,11 @@ let can_inject mode (op_kind : Operation_kind.t) =
   let allowed_operations = operation_kinds_of_mode mode in
   List.mem ~equal:Stdlib.( = ) op_kind allowed_operations
 
-let purpose_matches_mode (type k) mode (purpose : k Purpose.t) =
-  List.mem ~equal:Stdlib.( = ) (Purpose.Purpose purpose) (purposes_of_mode mode)
+let purposes_matches_mode (type k) mode (purposes : k Purpose.t list) =
+  List.exists
+    (fun p ->
+      List.mem ~equal:Stdlib.( = ) (Purpose.Purpose p) (purposes_of_mode mode))
+    purposes
 
 let refutation_player_buffer_levels = 5
 

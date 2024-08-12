@@ -331,7 +331,7 @@ let start_in_mode mode =
   match mode with
   | Batcher | Operator -> true
   | Observer | Accuser | Bailout | Maintenance -> false
-  | Custom ops -> purpose_matches_mode (Custom ops) Batching
+  | Custom ops -> purposes_matches_mode (Custom ops) [Batching]
 
 let init plugin (node_ctxt : _ Node_context.t) =
   let open Lwt_result_syntax in
