@@ -1275,6 +1275,21 @@ let current_cycle b =
   let current_level = b.header.shell.level in
   current_cycle_of_level ~blocks_per_cycle ~current_level
 
+let first_level_of_cycle (constants : Constants.Parametric.t) ~level =
+  let blocks_per_cycle = constants.blocks_per_cycle in
+  Int32.(equal (rem level blocks_per_cycle) zero)
+
+let first_block_of_cycle b =
+  first_level_of_cycle b.constants ~level:b.header.shell.level
+
+let last_but_one_level_of_cycle (constants : Constants.Parametric.t) ~level =
+  let blocks_per_cycle = constants.blocks_per_cycle in
+  let mod_plus_two = Int32.(rem (succ (succ level)) blocks_per_cycle) in
+  Int32.(equal mod_plus_two zero)
+
+let last_but_one_block_of_cycle b =
+  last_but_one_level_of_cycle b.constants ~level:b.header.shell.level
+
 let last_level_of_cycle (constants : Constants.Parametric.t) ~level =
   let blocks_per_cycle = constants.blocks_per_cycle in
   let mod_plus_one = Int32.(rem (succ level) blocks_per_cycle) in
