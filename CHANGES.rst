@@ -90,6 +90,11 @@ Node
 - Reduced the maximum allowed timestamp drift to 1 seconds. It is recommended to
   use NTP to sync the clock of the node. (MR :gl:`!13198`)
 
+- Introduced ``--storage-maintenance-delay`` to allow delaying the
+  storage maintenance. It is set to ``auto`` by default, to
+  automatically trigger the maintenance whenever it is the most
+  suitable. (MR :gl:`!14503`)
+
 Client
 ------
 
