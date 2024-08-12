@@ -20,6 +20,27 @@ open Scenario
 
 let fs = Format.asprintf
 
+let fail_to_stake_refuse_external_staking ~loc staker ~amount =
+  assert_failure
+    ~expected_error:(fun _ errs ->
+      Error_helpers.check_error_constructor_name
+        ~loc
+        ~expected:
+          Protocol.Apply.Staking_to_delegate_that_refuses_external_staking
+        errs)
+    (stake staker amount)
+
+let fail_to_stake_with_unfinalizable_unstake_requests ~loc staker ~amount =
+  assert_failure
+    ~expected_error:(fun _ errs ->
+      Error_helpers.check_error_constructor_name
+        ~loc
+        ~expected:
+          Protocol.Staking
+          .Cannot_stake_with_unfinalizable_unstake_requests_to_another_delegate
+        errs)
+    (stake staker amount)
+
 (** Initializes of scenarios with 2 cases:
      - staker = delegate
      - staker != delegate
@@ -358,27 +379,17 @@ let change_delegate_to_self =
      having unstake requests to a previous delegate that cannot be
      finalized yet. Try again in a later cycle (no more than
      consensus_rights_delay + max_slashing_period)." *)
-  --> assert_failure
-        ~expected_error:(fun _ errs ->
-          Error_helpers.check_error_constructor_name
-            ~loc:__LOC__
-            ~expected:
-              Protocol.Staking
-              .Cannot_stake_with_unfinalizable_unstake_requests_to_another_delegate
-            errs)
-        (stake "staker" Half)
+  --> fail_to_stake_with_unfinalizable_unstake_requests
+        ~loc:__LOC__
+        "staker"
+        ~amount:Half
   --> unstake "staker" Max_tez
   --> wait_n_cycles_f (unstake_wait -- 1) (* Still can't stake. *)
   --> check_balance_field "staker" `Unstaked_finalizable Tez.zero
-  --> assert_failure
-        ~expected_error:(fun _ errs ->
-          Error_helpers.check_error_constructor_name
-            ~loc:__LOC__
-            ~expected:
-              Protocol.Staking
-              .Cannot_stake_with_unfinalizable_unstake_requests_to_another_delegate
-            errs)
-        (stake "staker" Half)
+  --> fail_to_stake_with_unfinalizable_unstake_requests
+        ~loc:__LOC__
+        "staker"
+        ~amount:Half
   --> next_cycle
   (* The unstake request from changing delegates is now finalizable. *)
   --> assert_failure_in_check_balance_field
@@ -427,27 +438,17 @@ let change_delegate =
      having unstake requests to a previous delegate that cannot be
      finalized yet. Try again in a later cycle (no more than
      consensus_rights_delay + max_slashing_period)." *)
-  --> assert_failure
-        ~expected_error:(fun _ errs ->
-          Error_helpers.check_error_constructor_name
-            ~loc:__LOC__
-            ~expected:
-              Protocol.Staking
-              .Cannot_stake_with_unfinalizable_unstake_requests_to_another_delegate
-            errs)
-        (stake "staker" Half)
+  --> fail_to_stake_with_unfinalizable_unstake_requests
+        ~loc:__LOC__
+        "staker"
+        ~amount:Half
   --> unstake "staker" Max_tez
   --> wait_n_cycles_f (unstake_wait -- 1) (* Still can't stake. *)
   --> check_balance_field "staker" `Unstaked_finalizable Tez.zero
-  --> assert_failure
-        ~expected_error:(fun _ errs ->
-          Error_helpers.check_error_constructor_name
-            ~loc:__LOC__
-            ~expected:
-              Protocol.Staking
-              .Cannot_stake_with_unfinalizable_unstake_requests_to_another_delegate
-            errs)
-        (stake "staker" Half)
+  --> fail_to_stake_with_unfinalizable_unstake_requests
+        ~loc:__LOC__
+        "staker"
+        ~amount:Half
   --> next_cycle
   (* The unstake request from changing delegates is now finalizable. *)
   --> assert_failure_in_check_balance_field
@@ -547,14 +548,7 @@ let forbid_costaking =
   --> stake "staker" amount
   --> next_cycle
   (* External staking is now forbidden *)
-  --> assert_failure
-        ~expected_error:(fun _ errs ->
-          Error_helpers.check_error_constructor_name
-            ~loc:__LOC__
-            ~expected:
-              Protocol.Apply.Staking_to_delegate_that_refuses_external_staking
-            errs)
-        (stake "staker" amount)
+  --> fail_to_stake_refuse_external_staking ~loc:__LOC__ "staker" ~amount
   (* Can still self-stake *)
   --> stake "delegate" amount
   (* Can still unstake *)
@@ -565,14 +559,7 @@ let forbid_costaking =
   --> set_delegate_params "delegate" init_params
   --> wait_cycle_until `right_before_delegate_parameters_activation
   (* Not yet... *)
-  --> assert_failure
-        ~expected_error:(fun _ errs ->
-          Error_helpers.check_error_constructor_name
-            ~loc:__LOC__
-            ~expected:
-              Protocol.Apply.Staking_to_delegate_that_refuses_external_staking
-            errs)
-        (stake "staker" amount)
+  --> fail_to_stake_refuse_external_staking ~loc:__LOC__ "staker" ~amount
   --> next_cycle
   (* Now possible *)
   --> stake "staker" amount
