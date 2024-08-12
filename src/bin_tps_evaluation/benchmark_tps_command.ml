@@ -297,6 +297,7 @@ let register () =
     ~tags:[Dashboard.Test.benchmark_tps]
     ~timeout:(Long_test.Minutes 60)
     ~executors:Long_test.[x86_executor1]
+    ~uses:[Tezt_wrapper.Uses.octez_baker_alpha]
     (fun () ->
       let lift_protocol_limits =
         Cli.get_bool ~default:false "lift-protocol-limits"
