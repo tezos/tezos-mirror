@@ -30,6 +30,7 @@ type metrics = {
   alternate_heads_count : Prometheus.Gauge.t;
   last_written_block_size : Prometheus.Gauge.t;
   last_store_merge_time : Prometheus.Gauge.t;
+  maintenance_target : Prometheus.Gauge.t;
 }
 
 let namespace = Tezos_version.Octez_node_version.namespace
@@ -67,6 +68,13 @@ let metrics =
     let help = "Time, in seconds, for the completion of the last store merge" in
     Prometheus.Gauge.v ~help ~namespace ~subsystem "last_merge_time"
   in
+  let maintenance_target =
+    let help =
+      "The level at which the storage maintenance is expected to be triggered. \
+       Set to -1 if no target is set"
+    in
+    Prometheus.Gauge.v ~help ~namespace ~subsystem "maintenance_target"
+  in
   let invalid_blocks_info =
     Prometheus.MetricInfo.
       {
@@ -94,4 +102,5 @@ let metrics =
     alternate_heads_count;
     last_written_block_size;
     last_store_merge_time;
+    maintenance_target;
   }
