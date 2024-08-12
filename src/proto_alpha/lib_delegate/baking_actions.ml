@@ -450,6 +450,8 @@ let may_get_dal_content state consensus_vote =
       let lag = state.global_state.constants.parametric.dal.attestation_lag in
       if Int32.sub attested_level (Int32.of_int lag) < 1l then return_none
       else
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/7459
+           Rather then getting this now, do it at the start of the level. *)
         let timeout = compute_dal_rpc_timeout state in
         let*! result =
           Lwt.pick
