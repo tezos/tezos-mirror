@@ -1179,27 +1179,34 @@ module Handlers = struct
     let open Lwt_result_syntax in
     match request with
     | Apply_evm_events {finalized_level; events} ->
+        protect @@ fun () ->
         let ctxt = Worker.state self in
         State.apply_evm_events ?finalized_level ctxt events
     | Apply_blueprint {timestamp; payload; delayed_transactions} ->
+        protect @@ fun () ->
         let ctxt = Worker.state self in
         State.apply_blueprint ctxt timestamp payload delayed_transactions
     | Last_produce_blueprint ->
+        protect @@ fun () ->
         let ctxt = Worker.state self in
         State.last_produced_blueprint ctxt
     | Blueprint {level} ->
+        protect @@ fun () ->
         let ctxt = Worker.state self in
         State.blueprint_with_events ctxt level
     | Blueprints_range {from; to_} ->
+        protect @@ fun () ->
         let ctxt = Worker.state self in
         Evm_store.use ctxt.store @@ fun conn ->
         Evm_store.Blueprints.find_range conn ~from ~to_
     | Last_known_L1_level -> (
+        protect @@ fun () ->
         let ctxt = Worker.state self in
         Evm_store.use ctxt.store @@ fun conn ->
         let+ level = Evm_store.L1_l2_levels_relationships.find conn in
         match level with Some {l1_level; _} -> Some l1_level | None -> None)
     | New_last_known_L1_level l1_level ->
+        protect @@ fun () ->
         let ctxt = Worker.state self in
         Evm_store.use ctxt.store @@ fun conn ->
         let l2_level = State.current_blueprint_number ctxt in
@@ -1209,10 +1216,12 @@ module Handlers = struct
           ~l1_level
           ~finalized_l2_level:ctxt.session.finalized_number
     | Delayed_inbox_hashes ->
+        protect @@ fun () ->
         let ctxt = Worker.state self in
         let*! hashes = State.delayed_inbox_hashes ctxt.session.evm_state in
         return hashes
     | Evm_state_after block_request -> (
+        protect @@ fun () ->
         let ctxt = Worker.state self in
         let* number =
           match block_request with
@@ -1236,6 +1245,7 @@ module Handlers = struct
             return_some evm_state
         | None -> return_none)
     | Finalized_state -> (
+        protect @@ fun () ->
         let ctxt = Worker.state self in
         Evm_store.use ctxt.store @@ fun conn ->
         let* checkpoint =
@@ -1248,6 +1258,7 @@ module Handlers = struct
             return_some evm_state
         | None -> return_none)
     | Earliest_state -> (
+        protect @@ fun () ->
         let ctxt = Worker.state self in
         Evm_store.use ctxt.store @@ fun conn ->
         let* checkpoint = Evm_store.Context_hashes.find_earliest conn in
@@ -1258,6 +1269,7 @@ module Handlers = struct
             return_some evm_state
         | None -> return_none)
     | Earliest_number -> (
+        protect @@ fun () ->
         let ctxt = Worker.state self in
         Evm_store.use ctxt.store @@ fun conn ->
         let* checkpoint = Evm_store.Context_hashes.find_earliest conn in
@@ -1273,6 +1285,7 @@ module Handlers = struct
           levels_to_hashes;
           l2_blocks;
         } ->
+        protect @@ fun () ->
         let ctxt = Worker.state self in
         State.reconstruct_history
           ctxt
@@ -1283,9 +1296,11 @@ module Handlers = struct
           ~levels_to_hashes
           ~l2_blocks
     | Patch_state {commit; key; value} ->
+        protect @@ fun () ->
         let ctxt = Worker.state self in
         State.patch_state ctxt ~commit ~key ~value
     | Wasm_pvm_version ->
+        protect @@ fun () ->
         let ctxt = Worker.state self in
         State.wasm_pvm_version ctxt
 
