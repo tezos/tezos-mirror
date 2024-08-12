@@ -19,3 +19,5 @@ type summary =
   | Transaction_batch of transaction_summary list
 
 val summary_encoding : summary Data_encoding.t
+
+val pp_summary : Format.formatter -> summary -> unit

@@ -178,6 +178,41 @@ let publish_execute_whitelist_update_message (node_ctxt : _ Node_context.t) =
         cemented_commitment_and_proof
   | None -> return_unit
 
+let outbox_message_destination_match_filter
+    (dest_filter : Configuration.outbox_destination_filter) dest =
+  match dest_filter with
+  | Any_destination -> true
+  | Destination_among allowed_dests ->
+      List.mem ~equal:String.equal dest allowed_dests
+
+let outbox_message_entrypoint_match_filter
+    (entrypoint_filter : Configuration.outbox_entrypoint_filter) entrypoint =
+  match entrypoint_filter with
+  | Any_entrypoint -> true
+  | Entrypoint_among allowed_entrypoints ->
+      List.mem ~equal:String.equal entrypoint allowed_entrypoints
+
+let outbox_message_transaction_match_filter destination_filter entrypoint_filter
+    (transaction : Outbox_message.transaction_summary) =
+  outbox_message_destination_match_filter
+    destination_filter
+    transaction.destination
+  && outbox_message_entrypoint_match_filter
+       entrypoint_filter
+       transaction.entrypoint
+
+let outbox_message_match_filter (message : Outbox_message.summary)
+    (filter : Configuration.outbox_message_filter) =
+  match (filter, message) with
+  | ( Transaction {destination = Any_destination; entrypoint = Any_entrypoint},
+      Transaction_batch _ ) ->
+      true
+  | Transaction {destination; entrypoint}, Transaction_batch txs ->
+      List.for_all
+        (outbox_message_transaction_match_filter destination entrypoint)
+        txs
+  | _ -> false
+
 let publish_executable_messages (node_ctxt : _ Node_context.t) =
   let open Lwt_result_syntax in
   let operator = Node_context.get_operator node_ctxt Executing_outbox in
@@ -201,31 +236,53 @@ let publish_executable_messages (node_ctxt : _ Node_context.t) =
         let open Lwt_syntax in
         List.iter_s
           (fun (outbox_level, message_indexes) ->
+            let* outbox =
+              Plugin.Pvm.get_outbox_messages node_ctxt state ~outbox_level
+            in
             List.iter_s
               (fun message_index ->
-                let* res =
-                  let open Lwt_result_syntax in
-                  let* output_proof =
-                    Plugin.Pvm.produce_serialized_output_proof
-                      node_ctxt
-                      state
-                      ~outbox_level
-                      ~message_index
-                  in
-                  let outbox_message =
-                    L1_operation.Execute_outbox_message
-                      {
-                        rollup = node_ctxt.config.sc_rollup_address;
-                        cemented_commitment = lcc.commitment;
-                        output_proof;
-                      }
-                  in
-                  let* _hash = Injector.add_pending_operation outbox_message in
-                  return_unit
+                let message =
+                  List.assoc ~equal:Int.equal message_index outbox
                 in
-                match res with
-                | Error _trace -> return_unit
-                | Ok () -> return_unit)
+                match message with
+                | None -> assert false
+                | Some (Whitelist_update _) ->
+                    (* Don't execute whitelist updates as this is done by
+                       {!publish_execute_whitelist_update_message}. *)
+                    return_unit
+                | Some message
+                  when not
+                         (List.exists
+                            (outbox_message_match_filter message)
+                            node_ctxt.config.execute_outbox_messages_filter) ->
+                    (* Message does not match filter of config: ignore. *)
+                    return_unit
+                | Some _message -> (
+                    let* res =
+                      let open Lwt_result_syntax in
+                      let* output_proof =
+                        Plugin.Pvm.produce_serialized_output_proof
+                          node_ctxt
+                          state
+                          ~outbox_level
+                          ~message_index
+                      in
+                      let outbox_message =
+                        L1_operation.Execute_outbox_message
+                          {
+                            rollup = node_ctxt.config.sc_rollup_address;
+                            cemented_commitment = lcc.commitment;
+                            output_proof;
+                          }
+                      in
+                      let* _hash =
+                        Injector.add_pending_operation outbox_message
+                      in
+                      return_unit
+                    in
+                    match res with
+                    | Error _trace -> return_unit
+                    | Ok () -> return_unit))
               message_indexes)
           executable_messages
       in
