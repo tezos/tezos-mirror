@@ -36,11 +36,10 @@ Smart Rollups
   commitment periods when computing what should be the level of a commitment
   successor. (MR :gl:`!13841`)
 
-Zero Knowledge Rollups (ongoing)
---------------------------------
-
 Data Availability Layer
 -----------------------
+
+No changes.
 
 Adaptive Issuance
 -----------------
@@ -163,9 +162,6 @@ Errors
   counters. The error messages have been updated accordingly, but the
   error IDs remain unchanged. (MR :gl:`!13138`)
 
-Protocol parameters
--------------------
-
 8s Blocks Time (MR :gl:`!12716`)
 ---------------------------------
 
@@ -211,12 +207,6 @@ following quantities are kept the same:
    * - ``hard_gas_limit_per_block`` (gas unit)
      - ``1733333``
      - ``1386666``
-
-Bug Fixes
----------
-
-Minor Changes
--------------
 
 Internal
 --------
