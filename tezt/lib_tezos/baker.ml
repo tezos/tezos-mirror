@@ -45,6 +45,7 @@ module Parameters = struct
     node_data_dir : string;
     node_rpc_endpoint : Endpoint.t;
     dal_node_rpc_endpoint : Endpoint.t option;
+    dal_node_timeout_percentage : int option;
     mutable pending_ready : unit option Lwt.u list;
     votefile : string option;
     liquidity_baking_toggle_vote : liquidity_baking_vote option;
@@ -100,9 +101,10 @@ let create_from_uris ?runner ~protocol
     ?(path = Uses.path (Protocol.baker protocol)) ?name ?color ?event_pipe
     ?(delegates = []) ?votefile ?(liquidity_baking_toggle_vote = Some Pass)
     ?(force_apply = false) ?(remote_mode = false) ?operations_pool
-    ?dal_node_rpc_endpoint ?minimal_nanotez_per_gas_unit
-    ?(state_recorder = false) ?(node_version_check_bypass = false)
-    ?node_version_allowed ~base_dir ~node_data_dir ~node_rpc_endpoint () =
+    ?dal_node_rpc_endpoint ?dal_node_timeout_percentage
+    ?minimal_nanotez_per_gas_unit ?(state_recorder = false)
+    ?(node_version_check_bypass = false) ?node_version_allowed ~base_dir
+    ~node_data_dir ~node_rpc_endpoint () =
   let baker =
     create
       ~path
@@ -124,6 +126,7 @@ let create_from_uris ?runner ~protocol
         force_apply;
         operations_pool;
         dal_node_rpc_endpoint;
+        dal_node_timeout_percentage;
         minimal_nanotez_per_gas_unit;
         state_recorder;
         node_version_check_bypass;
@@ -136,8 +139,9 @@ let create_from_uris ?runner ~protocol
 let create ?runner ~protocol ?path ?name ?color ?event_pipe ?(delegates = [])
     ?votefile ?(liquidity_baking_toggle_vote = Some Pass) ?(force_apply = false)
     ?(remote_mode = false) ?operations_pool ?dal_node
-    ?minimal_nanotez_per_gas_unit ?(state_recorder = false)
-    ?(node_version_check_bypass = false) ?node_version_allowed node client =
+    ?dal_node_timeout_percentage ?minimal_nanotez_per_gas_unit
+    ?(state_recorder = false) ?(node_version_check_bypass = false)
+    ?node_version_allowed node client =
   let dal_node_rpc_endpoint = Option.map Dal_node.as_rpc_endpoint dal_node in
   create_from_uris
     ?runner
@@ -154,6 +158,7 @@ let create ?runner ~protocol ?path ?name ?color ?event_pipe ?(delegates = [])
     ?operations_pool
     ?minimal_nanotez_per_gas_unit
     ?dal_node_rpc_endpoint
+    ?dal_node_timeout_percentage
     ~state_recorder
     ~node_version_check_bypass
     ?node_version_allowed
@@ -195,6 +200,12 @@ let run ?event_level ?event_sections_levels (baker : t) =
       Endpoint.as_string
       baker.persistent_state.dal_node_rpc_endpoint
   in
+  let dal_node_timeout_percentage =
+    Cli_arg.optional_arg
+      "dal-node-timeout-percentage"
+      string_of_int
+      baker.persistent_state.dal_node_timeout_percentage
+  in
   let minimal_nanotez_per_gas_unit =
     Cli_arg.optional_arg
       "minimal-nanotez-per-gas-unit"
@@ -222,9 +233,9 @@ let run ?event_level ?event_sections_levels (baker : t) =
   let arguments =
     ["--endpoint"; node_addr; "--base-dir"; base_dir; "run"]
     @ run_args @ liquidity_baking_toggle_vote @ votefile @ force_apply
-    @ operations_pool @ dal_node_endpoint @ delegates
-    @ minimal_nanotez_per_gas_unit @ state_recorder @ node_version_check_bypass
-    @ node_version_allowed
+    @ operations_pool @ dal_node_endpoint @ dal_node_timeout_percentage
+    @ delegates @ minimal_nanotez_per_gas_unit @ state_recorder
+    @ node_version_check_bypass @ node_version_allowed
   in
 
   let on_terminate _ =
@@ -260,8 +271,9 @@ let wait_for_ready baker =
 let init ?runner ~protocol ?(path = Uses.path (Protocol.baker protocol)) ?name
     ?color ?event_level ?event_pipe ?event_sections_levels ?(delegates = [])
     ?votefile ?liquidity_baking_toggle_vote ?force_apply ?remote_mode
-    ?operations_pool ?dal_node ?minimal_nanotez_per_gas_unit ?state_recorder
-    ?node_version_check_bypass ?node_version_allowed node client =
+    ?operations_pool ?dal_node ?dal_node_timeout_percentage
+    ?minimal_nanotez_per_gas_unit ?state_recorder ?node_version_check_bypass
+    ?node_version_allowed node client =
   let* () = Node.wait_for_ready node in
   let baker =
     create
@@ -277,6 +289,7 @@ let init ?runner ~protocol ?(path = Uses.path (Protocol.baker protocol)) ?name
       ?remote_mode
       ?operations_pool
       ?dal_node
+      ?dal_node_timeout_percentage
       ?minimal_nanotez_per_gas_unit
       ?state_recorder
       ?node_version_check_bypass

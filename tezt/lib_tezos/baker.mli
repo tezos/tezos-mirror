@@ -95,7 +95,7 @@ val liquidity_baking_votefile : ?path:string -> liquidity_baking_vote -> string
 
     This function just creates a value of type [t], it does not call {!val:run}.
 
-    [path] provides the path to the baker binary, the default being the one 
+    [path] provides the path to the baker binary, the default being the one
     derived from the [protocol].
 
     The standard output and standard error output of the baker will
@@ -155,6 +155,7 @@ val create :
   ?remote_mode:bool ->
   ?operations_pool:string ->
   ?dal_node:Dal_node.t ->
+  ?dal_node_timeout_percentage:int ->
   ?minimal_nanotez_per_gas_unit:int ->
   ?state_recorder:bool ->
   ?node_version_check_bypass:bool ->
@@ -195,6 +196,7 @@ val create_from_uris :
   ?remote_mode:bool ->
   ?operations_pool:string ->
   ?dal_node_rpc_endpoint:Endpoint.t ->
+  ?dal_node_timeout_percentage:int ->
   ?minimal_nanotez_per_gas_unit:int ->
   ?state_recorder:bool ->
   ?node_version_check_bypass:bool ->
@@ -263,6 +265,7 @@ val init :
   ?remote_mode:bool ->
   ?operations_pool:string ->
   ?dal_node:Dal_node.t ->
+  ?dal_node_timeout_percentage:int ->
   ?minimal_nanotez_per_gas_unit:int ->
   ?state_recorder:bool ->
   ?node_version_check_bypass:bool ->
