@@ -209,5 +209,74 @@ let repair_commitments_command =
     (fun data_dir protocol cctxt ->
       command_fix_commitments_for_protocol cctxt ~data_dir protocol)
 
+let recompute_outbox_messages node_ctxt first_level =
+  let open Lwt_result_syntax in
+  let* l2_head = Node_context.last_processed_head_opt node_ctxt in
+  let l2_head = WithExceptions.Option.get ~loc:__LOC__ l2_head in
+  let* () =
+    when_ (first_level > l2_head.header.level) @@ fun () ->
+    failwith
+      "First level to recompute outbox messages is %ld but head is at %ld"
+      first_level
+      l2_head.header.level
+  in
+  let levels =
+    Stdlib.List.init
+      (Int32.to_int (Int32.sub l2_head.header.level first_level) + 1)
+      (fun x -> Int32.add (Int32.of_int x) first_level)
+  in
+  let lcc = Reference.get node_ctxt.lcc in
+  List.iter_es
+    (fun level ->
+      let* plugin = Protocol_plugins.proto_plugin_for_level node_ctxt level in
+      let (module Plugin) = plugin in
+      let ctxt_level = if level <= lcc.level then lcc.level else level in
+      let* ctxt_block =
+        Node_context.get_l2_block_by_level node_ctxt ctxt_level
+      in
+      let* ctxt =
+        Node_context.checkout_context node_ctxt ctxt_block.header.block_hash
+      in
+      let*! outbox_messages =
+        let*! pvm_state = Context.PVMState.find ctxt in
+        match pvm_state with
+        | None -> Lwt.return_nil
+        | Some pvm_state ->
+            Plugin.Pvm.get_outbox_messages
+              node_ctxt
+              pvm_state
+              ~outbox_level:level
+      in
+      match outbox_messages with
+      | [] -> return_unit
+      | _ ->
+          Format.eprintf
+            "%ld : %d outbox messages@."
+            level
+            (List.length outbox_messages) ;
+          let indexes = List.map fst outbox_messages in
+          Node_context.register_missing_outbox_messages
+            node_ctxt
+            ~outbox_level:level
+            ~indexes)
+    levels
+
+let command_recompute_outbox_messages cctxt ~data_dir level =
+  Snapshots.with_modify_data_dir cctxt ~data_dir ~apply_unsafe_patches:false
+  @@ fun node_ctxt ~head:_ -> recompute_outbox_messages node_ctxt level
+
+let recompute_outbox_messages_command =
+  let open Tezos_clic in
+  command
+    ~group
+    ~desc:
+      "Recompute outbox messages from a given level up to the current head. It \
+       does not overwrite already stored outbox messages."
+    (args1 Cli.data_dir_arg)
+    (prefixes ["recompute"; "outbox"; "messages"; "from"]
+    @@ Cli.level_param @@ stop)
+    (fun data_dir level cctxt ->
+      command_recompute_outbox_messages cctxt ~data_dir level)
+
 (** Commands exported by the [Repair] module. *)
-let commands = [repair_commitments_command]
+let commands = [repair_commitments_command; recompute_outbox_messages_command]

@@ -735,6 +735,12 @@ let register_new_outbox_messages {store; _} ~outbox_level ~indexes =
     ~outbox_level
     ~indexes
 
+let register_missing_outbox_messages {store; _} ~outbox_level ~indexes =
+  Store.Outbox_messages.register_missing_outbox_messages
+    store.outbox_messages
+    ~outbox_level
+    ~indexes
+
 let get_executable_pending_outbox_messages {store; lcc; current_protocol; _} =
   let max_level = (Reference.get lcc).level in
   let constants = (Reference.get current_protocol).constants.sc_rollup in

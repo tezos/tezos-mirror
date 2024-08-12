@@ -477,6 +477,13 @@ val set_outbox_message_executed :
 val register_new_outbox_messages :
   rw -> outbox_level:int32 -> indexes:int list -> unit tzresult Lwt.t
 
+(** [register_missing_outbox_messages node_ctxt ~outbox_level ~indexes]
+    registers the messages indexes for the [outbox_level]. If messages were
+    already registered for this level, they are not overwritten. This function
+    is meant to be used to recompute missing outbox messages information. *)
+val register_missing_outbox_messages :
+  rw -> outbox_level:int32 -> indexes:int list -> unit tzresult Lwt.t
+
 (** Returns the pending messages (i.e. unexecuted) that can now be executed.
     The returned list contains outbox levels and indexes for each level (in
     order). *)

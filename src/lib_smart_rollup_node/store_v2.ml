@@ -201,6 +201,16 @@ module Outbox_messages = struct
     H.replace h outbox_level {messages; executed_messages = Bitset.empty} ;
     write t h
 
+  let register_missing_outbox_messages (t : _ t) ~outbox_level ~indexes =
+    let open Lwt_result_syntax in
+    let* res = read t in
+    let h = match res with None -> H.create 97 | Some h -> h in
+    let*? messages = Bitset.from_list indexes in
+    if H.mem h outbox_level then return_unit
+    else (
+      H.replace h outbox_level {messages; executed_messages = Bitset.empty} ;
+      write t h)
+
   let set_outbox_message_executed (t : _ t) ~outbox_level ~index =
     let open Lwt_result_syntax in
     let* res = read t in

@@ -556,3 +556,6 @@ let bail_on_disagree_switch : (bool, Client_context.full) Tezos_clic.arg =
       "Make an observer rollup node bail when it sees a commitment it disagree \
        with on L1."
     ()
+
+let level_param next =
+  Tezos_clic.param ~name:"level" ~desc:"Level" positive_int32_parameter next

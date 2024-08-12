@@ -77,6 +77,12 @@ module Outbox_messages : sig
     indexes:int list ->
     unit tzresult Lwt.t
 
+  val register_missing_outbox_messages :
+    [> `Read | `Write] t ->
+    outbox_level:int32 ->
+    indexes:int list ->
+    unit tzresult Lwt.t
+
   val set_outbox_message_executed :
     [> `Read | `Write] t ->
     outbox_level:int32 ->
