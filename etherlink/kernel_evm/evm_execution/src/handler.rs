@@ -910,7 +910,6 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         runtime: evm::Runtime,
         creation_result: Result<ExitReason, EthereumError>,
         address: H160,
-        is_opcode: bool,
     ) -> Result<CreateOutcome, EthereumError> {
         match creation_result {
             Ok(sub_context_result @ ExitReason::Succeed(ExitSucceed::Suicided)) => {
@@ -947,11 +946,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
 
                 self.set_contract_code(address, &code_out)?;
 
-                Ok((
-                    sub_context_result,
-                    Some(address),
-                    if is_opcode { vec![] } else { code_out },
-                ))
+                Ok((sub_context_result, Some(address), code_out))
             }
             Ok(sub_context_result @ ExitReason::Revert(_)) => {
                 // EIP-140: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-140.md
@@ -1035,7 +1030,6 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         value: U256,
         initial_code: Vec<u8>,
         address: H160,
-        is_opcode: bool,
     ) -> Result<CreateOutcome, EthereumError> {
         log!(self.host, Debug, "Executing a contract create");
 
@@ -1109,7 +1103,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             Precondition::EthereumErr(err) => Err(err),
         };
 
-        self.end_create(runtime, creation_result, address, is_opcode)
+        self.end_create(runtime, creation_result, address)
     }
 
     /// Call a contract
@@ -1272,7 +1266,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         }
 
         let result =
-            self.execute_create(caller, value.unwrap_or_default(), input, address, false);
+            self.execute_create(caller, value.unwrap_or_default(), input, address);
 
         self.end_initial_transaction(result)
     }
@@ -1978,6 +1972,13 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             Some(max_gas_limit)
         }
     }
+
+    fn output_for_inter_create(&self, reason: &ExitReason, output: Vec<u8>) -> Vec<u8> {
+        match reason {
+            ExitReason::Error(_) | ExitReason::Revert(_) | ExitReason::Fatal(_) => output,
+            ExitReason::Succeed(_) => vec![],
+        }
+    }
 }
 
 #[allow(unused_variables)]
@@ -2318,80 +2319,76 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
                             value,
                             init_code.clone(),
                             contract_address,
-                            true,
                         );
                         let gas_after = self.gas_used();
 
-                        // TRACING
-                        if let Some(CallTracer(CallTracerInput {
-                            transaction_hash,
-                            config:
-                                CallTracerConfig {
-                                    with_logs,
-                                    only_top_call: false,
-                                },
-                        })) = self.tracer
-                        {
-                            let mut call_trace = CallTrace::new_minimal_trace(
-                                if let CreateScheme::Create2 { .. } = scheme {
-                                    "CREATE2"
-                                } else {
-                                    "CREATE"
-                                }
-                                .into(),
-                                caller,
-                                value,
-                                gas_after - gas_before,
-                                init_code,
-                                // We need to make the distinction between the initial call (depth 0)
-                                // and the other subcalls
-                                (self.stack_depth() + 1).try_into().unwrap_or_default(),
-                            );
+                        match self.end_inter_transaction(result) {
+                            Capture::Exit((reason, address, output)) => {
+                                // TRACING
+                                if let Some(CallTracer(CallTracerInput {
+                                    transaction_hash,
+                                    config:
+                                        CallTracerConfig {
+                                            with_logs,
+                                            only_top_call: false,
+                                        },
+                                })) = self.tracer
+                                {
+                                    let mut call_trace = CallTrace::new_minimal_trace(
+                                        if let CreateScheme::Create2 { .. } = scheme {
+                                            "CREATE2"
+                                        } else {
+                                            "CREATE"
+                                        }
+                                        .into(),
+                                        caller,
+                                        value,
+                                        gas_after - gas_before,
+                                        init_code,
+                                        // We need to make the distinction between the initial call (depth 0)
+                                        // and the other subcalls
+                                        (self.stack_depth() + 1)
+                                            .try_into()
+                                            .unwrap_or_default(),
+                                    );
 
-                            call_trace.add_gas(target_gas);
+                                    call_trace.add_to(address);
+                                    call_trace.add_output(Some(output.to_owned()));
+                                    call_trace.add_gas(target_gas);
 
-                            // TODO: https://gitlab.com/tezos/tezos/-/issues/7437
-                            // For errors and revert reasons, find the appropriate values
-                            // to return for tracing. The following values are kind of placeholders.
-                            match &result {
-                                Ok((ExitReason::Succeed(_), _, output)) => {
-                                    call_trace.add_output(Some(output.to_owned()))
-                                }
-                                Ok((ExitReason::Error(e), _, output)) => {
-                                    call_trace.add_output(Some(output.to_owned()));
-                                    call_trace.add_error(Some(format!("{:?}", e).into()))
-                                }
-                                Ok((ExitReason::Revert(r), _, output)) => {
-                                    call_trace.add_output(Some(output.to_owned()));
-                                    call_trace.add_revert_reason(Some(
-                                        format!("{:?}", r).into(),
-                                    ));
-                                }
-                                Ok((ExitReason::Fatal(f), _, output)) => {
-                                    call_trace.add_output(Some(output.to_owned()));
-                                    call_trace.add_error(Some(format!("{:?}", f).into()))
-                                }
-                                Err(e) => {
-                                    call_trace.add_error(Some(format!("{:?}", e).into()))
-                                }
-                            };
+                                    // TODO: https://gitlab.com/tezos/tezos/-/issues/7437
+                                    // For errors and revert reasons, find the appropriate values
+                                    // to return for tracing. The following values are kind of placeholders.
+                                    match &reason {
+                                        ExitReason::Error(e) => call_trace
+                                            .add_error(Some(format!("{:?}", e).into())),
+                                        ExitReason::Revert(r) => call_trace
+                                            .add_error(Some(format!("{:?}", r).into())),
+                                        ExitReason::Fatal(f) => call_trace
+                                            .add_error(Some(format!("{:?}", f).into())),
+                                        ExitReason::Succeed(_) => (),
+                                    };
 
-                            if with_logs {
-                                call_trace.add_logs(
-                                    self.transaction_data
-                                        .last()
-                                        .map(|tx_layer| tx_layer.logs.clone()),
-                                )
+                                    if with_logs {
+                                        call_trace.add_logs(
+                                            self.transaction_data
+                                                .last()
+                                                .map(|tx_layer| tx_layer.logs.clone()),
+                                        )
+                                    }
+
+                                    let _ = tracer::store_call_trace(
+                                        self.host,
+                                        call_trace,
+                                        &transaction_hash,
+                                    );
+                                }
+                                let output =
+                                    self.output_for_inter_create(&reason, output);
+                                Capture::Exit((reason, address, output))
                             }
-
-                            let _ = tracer::store_call_trace(
-                                self.host,
-                                call_trace,
-                                &transaction_hash,
-                            );
+                            Capture::Trap(x) => Capture::Trap(x),
                         }
-
-                        self.end_inter_transaction(result)
                     }
                     Err(err) => {
                         log!(
@@ -2519,8 +2516,9 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
                                 ExitReason::Error(e) => {
                                     call_trace.add_error(Some(format!("{:?}", e).into()))
                                 }
-                                ExitReason::Revert(r) => call_trace
-                                    .add_revert_reason(Some(format!("{:?}", r).into())),
+                                ExitReason::Revert(r) => {
+                                    call_trace.add_error(Some(format!("{:?}", r).into()))
+                                }
                                 ExitReason::Fatal(f) => {
                                     call_trace.add_error(Some(format!("{:?}", f).into()))
                                 }
@@ -3247,15 +3245,14 @@ mod test {
 
         handler.begin_initial_transaction(false, None).unwrap();
 
-        let result =
-            handler.execute_create(caller, value, init_code, expected_address, true);
+        let result = handler.execute_create(caller, value, init_code, expected_address);
 
         match result {
             Ok(result) => {
                 let expected_result = (
                     ExitReason::Succeed(ExitSucceed::Returned),
                     Some(expected_address),
-                    vec![],
+                    hex::decode("608060405234801561001057600080fd5b50600436106100365760003560e01c80632e64cec11461003b5780636057361d14610059575b600080fd5b610043610075565b60405161005091906100a1565b60405180910390f35b610073600480360381019061006e91906100ed565b61007e565b005b60008054905090565b8060008190555050565b6000819050919050565b61009b81610088565b82525050565b60006020820190506100b66000830184610092565b92915050565b600080fd5b6100ca81610088565b81146100d557600080fd5b50565b6000813590506100e7816100c1565b92915050565b600060208284031215610103576101026100bc565b5b6000610111848285016100d8565b9150509291505056fea26469706673582212204d6c1853cec27824f5dbf8bcd0994714258d22fc0e0dc8a2460d87c70e3e57a564736f6c63430008120033").unwrap(),
                 );
                 assert_eq!(result, expected_result);
                 assert_eq!(
@@ -3318,7 +3315,7 @@ mod test {
         handler.begin_initial_transaction(false, None).unwrap();
 
         let result =
-            handler.execute_create(caller, value, initial_code, contract_address, true);
+            handler.execute_create(caller, value, initial_code, contract_address);
 
         match result {
             Ok(result) => {
@@ -3847,13 +3844,8 @@ mod test {
             .begin_initial_transaction(false, Some(10000))
             .unwrap();
 
-        let result = handler.execute_create(
-            caller,
-            U256::from(100000),
-            code,
-            contract_address,
-            true,
-        );
+        let result =
+            handler.execute_create(caller, U256::from(100000), code, contract_address);
 
         assert_eq!(
             result.unwrap(),
@@ -4513,7 +4505,7 @@ mod test {
             .unwrap();
 
         let result = handler
-            .execute_create(caller, U256::zero(), initial_code.to_vec(), address, true)
+            .execute_create(caller, U256::zero(), initial_code.to_vec(), address)
             .unwrap();
 
         assert_eq!(result.0, ExitReason::Error(ExitError::CreateContractLimit));

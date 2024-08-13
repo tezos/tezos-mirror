@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2024 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -212,7 +213,7 @@ let test_decoding_rlp =
       let bytes =
         Hex.to_bytes
           (`Hex
-            "f8dd8443414c4c941919191919191919191919191919191919191919d5941919191919191919191919191919191919191919a03dd5030000000000000000000000000000000000000000000000000000000000c988881300000000000088881300000000000083000102c483000102c483000102c483000102f861f85ff85d941919191919191919191919191919191919191919f842a01919191919191919191919191919191919191919191919191919191919191919a00d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d83000102820200")
+            "f8d88443414c4c941919191919191919191919191919191919191919d5941919191919191919191919191919191919191919a03dd5030000000000000000000000000000000000000000000000000000000000c988881300000000000088881300000000000083000102c483000102c483000102f861f85ff85d941919191919191919191919191919191919191919f842a01919191919191919191919191919191919191919191919191919191919191919a00d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d83000102820200")
       in
       (*
         Comes from the following rust:
@@ -232,7 +233,7 @@ let test_decoding_rlp =
             input: vec![0x00, 0x01, 0x02],
             output: Some(vec![0x00, 0x01, 0x02]),
             error: Some(vec![0x00, 0x01, 0x02]),
-            revert_reason: Some(vec![0x00, 0x01, 0x02]),
+            revert_reason: None,
             logs: Some(vec![logs]),
         };*)
       let logs =
@@ -258,8 +259,8 @@ let test_decoding_rlp =
             gas_used = Z.of_int 5000;
             input = Hex "000102";
             output = Some (Hex "000102");
-            error = Some (Hex "000102");
-            revert_reason = Some (Hex "000102");
+            error = Some "\000\001\002";
+            revert_reason = None;
             logs;
           }
       in
@@ -326,9 +327,93 @@ let test_decoding_rlp_min =
             gas_used = Z.of_int 5000;
             input = Hex "000102";
             output = Some (Hex "000102");
-            error = Some (Hex "000102");
-            revert_reason = Some (Hex "000102");
+            error = Some "\000\001\002";
+            revert_reason = None;
             logs = None;
+          }
+      in
+      let expected_depth = 2 in
+      match
+        CallTracer.decode_call
+          (Option.value bytes ~default:(Bytes.of_string "\x01"))
+      with
+      | Error e ->
+          Test.fail "Failed to rebuild call %a" (Format.pp_print_list pp) e
+      | Ok (call, depth) ->
+          Check.(
+            (depth = expected_depth)
+              int
+              ~error_msg:"wrong depth, expected %R but got %L") ;
+          Check.is_true
+            (call = expected)
+            ~error_msg:
+              (Format.asprintf
+                 "error decoding call, expected \n%s \n but got \n%s "
+                 (to_string expected)
+                 (CallTracer.to_string call)) ;
+          Lwt.return_unit)
+
+let test_decoding_rlp_revert_reason =
+  register_unit_test
+    ~title:"CallTracer: Test decoding call with a revert reason"
+    ~tags:["call_tracer"; "debug"; "encoding"; "rlp"; "revert_reason"]
+    (fun _protocol ->
+      let open Evm_node_lib_dev_encoding.Tracer_types in
+      let open Evm_node_lib_dev_encoding.Ethereum_types in
+      let bytes =
+        Hex.to_bytes
+          (`Hex
+            "f901258443414c4c941919191919191919191919191919191919191919d5941919191919191919191919191919191919191919a03dd5030000000000000000000000000000000000000000000000000000000000c988881300000000000088881300000000000083000102f84bb84908c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000056572726f72c9885265766572746564f861f85ff85d941919191919191919191919191919191919191919f842a01919191919191919191919191919191919191919191919191919191919191919a00d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d83000102820200")
+      in
+      (*
+        Comes from the following rust:
+
+        let logs = Log {
+            address: H160::from([25; 20]),
+            topics: vec![H256::from([25; 32]), H256::from([13; 32])],
+            data: vec![0x00, 0x01, 0x02],
+        };
+        let call_trace = CallTrace {
+            type_: "CALL".into(),
+            from: H160::from([25; 20]),
+            to: Some(H160::from([25; 20])),
+            value: U256::from(251197),
+            gas: Some(5000),
+            gas_used: 5000,
+            input: vec![0x00, 0x01, 0x02],
+            output: Some("08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000056572726f72"),
+            error: Some("Reverted"),
+            logs: Some(vec![logs]),
+        };*)
+      let logs =
+        Some
+          [
+            CallTracer.
+              {
+                address = Address (Hex (make_string 20 "19"));
+                topics = [make_hex 32 "19"; make_hex 32 "0d"];
+                data = Hex "000102";
+              };
+          ]
+      in
+      let expected =
+        CallTracer.
+          {
+            calls = [];
+            type_ = "CALL";
+            from = Address (Hex (make_string 20 "19"));
+            to_ = Some (Address (Hex (make_string 20 "19")));
+            value = Z.of_int 251197;
+            gas = Some (Z.of_int 5000);
+            gas_used = Z.of_int 5000;
+            input = Hex "000102";
+            output =
+              Some
+                (Hex
+                   "08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000056572726f72");
+            error = Some "execution reverted";
+            revert_reason = Some "error";
+            logs;
           }
       in
       let expected_depth = 2 in
@@ -364,4 +449,5 @@ let () =
   test_fail_wrong_depth protocols ;
   test_fail_wrong_depth_2 protocols ;
   test_decoding_rlp protocols ;
+  test_decoding_rlp_revert_reason protocols ;
   ()

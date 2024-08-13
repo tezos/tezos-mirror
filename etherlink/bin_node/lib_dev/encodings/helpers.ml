@@ -2,8 +2,15 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2024 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (*****************************************************************************)
+
+open Ethereum_types
+
+let keccak256 (Hex s) =
+  let bytes = Hex.to_bytes_exn (`Hex s) in
+  Tezos_crypto.Hacl.Hash.Keccak_256.digest bytes
 
 let encode_u8 i =
   let bytes = Bytes.make 1 '\000' in

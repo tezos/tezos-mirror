@@ -153,9 +153,8 @@ pub struct CallTrace {
     pub gas: Option<u64>, // None if no gas limit was provided
     pub gas_used: u64,
     pub input: Vec<u8>,
-    pub output: Option<Vec<u8>>,
+    pub output: Option<Vec<u8>>, // this output will also be used in revert reason, if there's any
     pub error: Option<Vec<u8>>,
-    pub revert_reason: Option<Vec<u8>>,
     pub logs: Option<Vec<Log>>,
     pub depth: u16, // will be helpful to reconstruct the tree of call on the node's side
 }
@@ -179,7 +178,6 @@ impl CallTrace {
             input,
             output: None,
             error: None,
-            revert_reason: None,
             logs: None,
             depth,
         }
@@ -210,13 +208,6 @@ impl CallTrace {
         };
     }
 
-    pub fn add_revert_reason(&mut self, revert_reason: Option<Vec<u8>>) {
-        *self = Self {
-            revert_reason,
-            ..self.clone()
-        };
-    }
-
     pub fn add_logs(&mut self, logs: Option<Vec<Log>>) {
         *self = Self {
             logs,
@@ -227,7 +218,7 @@ impl CallTrace {
 
 impl Encodable for CallTrace {
     fn rlp_append(&self, stream: &mut RlpStream) {
-        stream.begin_list(12);
+        stream.begin_list(11);
         stream.append(&self.type_);
         stream.append(&self.from);
         stream.append(&self.to);
@@ -237,7 +228,6 @@ impl Encodable for CallTrace {
         stream.append(&self.input);
         stream.append(&self.output);
         stream.append(&self.error);
-        stream.append(&self.revert_reason);
         append_option_canonical(stream, &self.logs, |s, logs| s.append_list(logs));
         append_u16_le(stream, &self.depth);
     }
@@ -249,7 +239,7 @@ impl Decodable for CallTrace {
         if !decoder.is_list() {
             return Err(DecoderError::RlpExpectedToBeList);
         }
-        if Ok(12) != decoder.item_count() {
+        if Ok(11) != decoder.item_count() {
             return Err(DecoderError::RlpIncorrectListLen);
         }
 
@@ -263,7 +253,6 @@ impl Decodable for CallTrace {
         let input = decode_field(&next(&mut it)?, "input")?;
         let output = decode_field(&next(&mut it)?, "output")?;
         let error = decode_field(&next(&mut it)?, "error")?;
-        let revert_reason = decode_field(&next(&mut it)?, "revert_reason")?;
         let logs = decode_option_canonical(&next(&mut it)?, "logs", decode_list)?;
         let depth = decode_field_u16_le(&next(&mut it)?, "depth")?;
 
@@ -277,7 +266,6 @@ impl Decodable for CallTrace {
             input,
             output,
             error,
-            revert_reason,
             logs,
             depth,
         })
@@ -379,7 +367,6 @@ pub mod tests {
             input: vec![0x00, 0x01, 0x02],
             output: Some(vec![0x00, 0x01, 0x02]),
             error: Some(vec![0x00, 0x01, 0x02]),
-            revert_reason: Some(vec![0x00, 0x01, 0x02]),
             logs: Some(vec![logs]),
             depth: 2,
         };
@@ -400,7 +387,6 @@ pub mod tests {
             input: vec![0x00, 0x01, 0x02],
             output: None,
             error: None,
-            revert_reason: None,
             logs: None,
             depth: 2,
         };

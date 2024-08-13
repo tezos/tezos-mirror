@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2024 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -114,8 +115,8 @@ module CallTracer : sig
     gas_used : uint53;
     input : Ethereum_types.hex;
     output : Ethereum_types.hex option;
-    error : Ethereum_types.hex option;
-    revert_reason : Ethereum_types.hex option;
+    error : string option;
+    revert_reason : string option;
     logs : logs list option;
   }
 
@@ -123,11 +124,11 @@ module CallTracer : sig
 
   val output_encoding : output Data_encoding.t
 
-  (** Expects a RLP representation of an output, with an additionnal field 
+  (** Expects a RLP representation of an output, with an additionnal field
       containing the depth of the call.*)
   val decode_call : bytes -> (output * int) tzresult
 
-  (** [to_string output] contains a Json representation of [output]. Based on 
+  (** [to_string output] contains a Json representation of [output]. Based on
       [Data_encoding.Json] so expect exceptions. *)
   val to_string : output -> string
 end

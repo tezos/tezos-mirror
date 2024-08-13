@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2024 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -858,10 +859,15 @@ module CallTracer = struct
     gas_used : uint53;
     input : Ethereum_types.hex;
     output : Ethereum_types.hex option;
-    error : Ethereum_types.hex option;
-    revert_reason : Ethereum_types.hex option;
+    error : string option;
+    revert_reason : string option;
     logs : logs list option;
   }
+
+  let solidity_revert_selector =
+    let error = Ethereum_types.hex_of_utf8 "Error(string)" in
+    let selector = Helpers.keccak256 error in
+    Bytes.sub selector 0 4
 
   let logs_encoding =
     let open Data_encoding in
@@ -872,6 +878,37 @@ module CallTracer = struct
          (req "address" Ethereum_types.address_encoding)
          (req "topics" (list Ethereum_types.hex_encoding))
          (req "data" Ethereum_types.hex_encoding))
+
+  (* See this documentation about how to encode dynamic types (string, bytes, ...):
+     https://docs.soliditylang.org/en/latest/abi-spec.html#use-of-dynamic-types *)
+  let decode_ethereum_string data =
+    let decode_word_to_int word =
+      let (Qty position) = Ethereum_types.decode_number_be word in
+      Z.to_int position
+    in
+    let position = decode_word_to_int (Bytes.sub data 0 32) in
+    let size = decode_word_to_int (Bytes.sub data position 32) in
+    let str = Bytes.sub data (position + 32) size in
+    Bytes.to_string str
+
+  let try_to_string (Ethereum_types.Hex str) =
+    let bytes = Ethereum_types.hex_to_real_bytes (Hex str) in
+    if Bytes.is_valid_utf_8 bytes then Bytes.to_string bytes else str
+
+  let revert_reason_decoding output =
+    let output_b = Ethereum_types.hex_to_real_bytes output in
+    let selector_output = Bytes.sub output_b 0 4 in
+    if solidity_revert_selector = selector_output then
+      (* This is a solidity revert, we can decode the output as
+         a string to put it in revert_reason *)
+      let revert_reason =
+        decode_ethereum_string
+          (Bytes.sub output_b 4 (Bytes.length output_b - 4))
+      in
+      (* When it's a solidity revert, the common error is
+         execution reverted *)
+      (Some "execution reverted", Some revert_reason)
+    else (Some (try_to_string output), None)
 
   let output_encoding =
     let open Data_encoding in
@@ -891,10 +928,10 @@ module CallTracer = struct
                  revert_reason;
                  logs;
                } ->
-            ( (calls, type_, from, to_, value, gas),
-              (gas_used, input, output, error, revert_reason, logs) ))
-          (fun ( (calls, type_, from, to_, value, gas),
-                 (gas_used, input, output, error, revert_reason, logs) ) ->
+            ( (type_, from, to_, value, gas, gas_used),
+              (input, output, error, revert_reason, logs, calls) ))
+          (fun ( (type_, from, to_, value, gas, gas_used),
+                 (input, output, error, revert_reason, logs, calls) ) ->
             {
               calls;
               type_;
@@ -911,19 +948,19 @@ module CallTracer = struct
             })
           (merge_objs
              (obj6
-                (req "calls" (list enc))
                 (req "type" string)
                 (req "from" Ethereum_types.address_encoding)
                 (opt "to" Ethereum_types.address_encoding)
                 (req "value" uint_as_hex_encoding)
-                (opt "gas" uint_as_hex_encoding))
+                (opt "gas" uint_as_hex_encoding)
+                (req "gas_used" uint_as_hex_encoding))
              (obj6
-                (req "gas_used" uint_as_hex_encoding)
                 (req "input" Ethereum_types.hex_encoding)
                 (opt "output" Ethereum_types.hex_encoding)
-                (opt "error" Ethereum_types.hex_encoding)
-                (opt "revert_reason" Ethereum_types.hex_encoding)
-                (opt "logs" (list logs_encoding)))))
+                (opt "error" string)
+                (opt "revert_reason" string)
+                (opt "logs" (list logs_encoding))
+                (req "calls" (list enc)))))
 
   let decode_logs item =
     let open Result_syntax in
@@ -950,7 +987,6 @@ module CallTracer = struct
           input;
           output;
           error;
-          revert_reason;
           logs;
           depth;
         ] ->
@@ -962,8 +998,13 @@ module CallTracer = struct
         let* gas_used = decode_z gas_used in
         let* input = decode_hex input in
         let* output = Rlp.decode_option decode_hex output in
-        let* error = Rlp.decode_option decode_hex error in
-        let* revert_reason = Rlp.decode_option decode_hex revert_reason in
+        let* error = Rlp.decode_option decode_string error in
+        let error, revert_reason =
+          match (output, error) with
+          | Some output, Some err when err = "Reverted" ->
+              revert_reason_decoding output
+          | _ -> (error, None)
+        in
         let* logs = Rlp.decode_option (decode_list decode_logs) logs in
         let* depth = decode_int depth in
         return
@@ -983,17 +1024,19 @@ module CallTracer = struct
             },
             depth )
     | List l ->
+        let (`Hex rlp) = Hex.of_bytes bytes in
         tzfail
           (error_of_fmt
              "Invalid RLP encoding for a call, list with %n items. %s"
              (List.length l)
-             (Bytes.to_string bytes))
+             rlp)
     | Value v ->
+        let (`Hex rlp) = Hex.of_bytes bytes in
         tzfail
           (error_of_fmt
              "Invalid RLP encoding for a call, value \"%s\" %s"
              (Bytes.to_string v)
-             (Bytes.to_string bytes))
+             rlp)
 
   let to_string call =
     Data_encoding.Json.to_string

@@ -45,6 +45,16 @@ let hex_of_string s =
 
 let hex_to_bytes (Hex h) = Hex.to_bytes_exn (`Hex h) |> Bytes.to_string
 
+let hex_to_real_bytes (Hex h) = Hex.to_bytes_exn (`Hex h)
+
+let hex_of_bytes bytes =
+  let (`Hex h) = Hex.of_bytes bytes in
+  Hex h
+
+let hex_of_utf8 str =
+  let (`Hex h) = Bytes.of_string str |> Hex.of_bytes in
+  Hex h
+
 let hex_encoding = Data_encoding.(conv hex_to_string hex_of_string string)
 
 type address = Address of hex [@@ocaml.unboxed]

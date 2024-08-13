@@ -2,14 +2,9 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (*****************************************************************************)
-
-open Ethereum_types
-
-let keccak256 (Hex s) =
-  let bytes = Hex.to_bytes_exn (`Hex s) in
-  Tezos_crypto.Hacl.Hash.Keccak_256.digest bytes
 
 module Bits = struct
   (* Sets to 1 the [position] in [bytes] *)
@@ -27,7 +22,7 @@ module Bits = struct
 end
 
 let positions input =
-  let hash = keccak256 input in
+  let hash = Helpers.keccak256 input in
   let pos_for_idx idx =
     let hash_bytes = Bytes.sub hash idx 2 in
     let bit_to_set = Int.logand (Bytes.get_uint16_be hash_bytes 0) 0x07FF in
