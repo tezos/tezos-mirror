@@ -262,6 +262,8 @@ module P2P = struct
         topic_to_peers_map
         []
 
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/7462
+       We could improve the performance of this function. *)
     let get_slot_indexes_peers ~subscribed ctx =
       let open Gossipsub.Worker in
       let state = state ctx.gs_worker in
@@ -290,6 +292,8 @@ module P2P = struct
         res_map
         []
 
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/7462
+       We could improve the performance of this function. *)
     let get_pkhs_peers ~subscribed ctx =
       let open Gossipsub.Worker in
       let state = state ctx.gs_worker in
