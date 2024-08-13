@@ -27,6 +27,10 @@
 module Message = Distributed_db_message
 module P2p_reader_event = Distributed_db_event.P2p_reader_event
 
+module Profiler = (val Profiler.wrap Shell_profiling.p2p_reader_profiler)
+
+let profiler_init = ref false
+
 type p2p = (Message.t, Peer_metadata.t, Connection_metadata.t) P2p.net
 
 type connection =
@@ -175,22 +179,28 @@ let handle_msg state msg =
   in
   match msg with
   | Get_current_branch chain_id ->
-      Peer_metadata.incr meta @@ Received_request Branch ;
-      may_handle_global state chain_id @@ fun chain_db ->
-      activate state chain_id chain_db ;
-      let seed =
-        {Block_locator.receiver_id = state.gid; sender_id = my_peer_id state}
-      in
-      let* current_head = Store.Chain.current_head chain_db.chain_store in
-      let* locator =
-        Store.Chain.compute_locator chain_db.chain_store current_head seed
-      in
-      Peer_metadata.update_responses meta Branch
-      @@ P2p.try_send state.p2p state.conn
-      @@ Current_branch (chain_id, locator) ;
-      Lwt.return_unit
-  | Current_branch (chain_id, locator) ->
-      may_handle state chain_id @@ fun chain_db ->
+      (Peer_metadata.incr meta @@ Received_request Branch ;
+       may_handle_global state chain_id @@ fun chain_db ->
+       activate state chain_id chain_db ;
+       let seed =
+         {Block_locator.receiver_id = state.gid; sender_id = my_peer_id state}
+       in
+       let* current_head = Store.Chain.current_head chain_db.chain_store in
+       let* locator =
+         (Store.Chain.compute_locator
+            chain_db.chain_store
+            current_head
+            seed
+          [@profiler.span_s
+            ["Get_current_branch"; "compute_current_branch_locator"]])
+       in
+       Peer_metadata.update_responses meta Branch
+       @@ P2p.try_send state.p2p state.conn
+       @@ Current_branch (chain_id, locator) ;
+       Lwt.return_unit)
+      [@profiler.span_s ["Get_current_branch"]]
+  | Current_branch (chain_id, locator) -> (
+      (may_handle state chain_id @@ fun chain_db ->
       let {Block_locator.head_hash; head_header; history} = locator in
       let* known_invalid =
         List.exists_p
@@ -217,14 +227,16 @@ let handle_msg state msg =
         (* TODO discriminate between received advertisements
            and responses? *)
         Peer_metadata.incr meta @@ Received_advertisement Branch ;
-        Lwt.return_unit)
-  | Deactivate chain_id ->
-      may_handle state chain_id @@ fun chain_db ->
+        Lwt.return_unit))
+      [@profiler.span_s ["Current_branch"]])
+  | Deactivate chain_id -> (
+      (may_handle state chain_id @@ fun chain_db ->
       deactivate state.gid chain_db ;
       Chain_id.Table.remove state.peer_active_chains chain_id ;
-      Lwt.return_unit
-  | Get_current_head chain_id ->
-      may_handle state chain_id @@ fun chain_db ->
+      Lwt.return_unit)
+      [@profiler.span_s ["Deactivate"]])
+  | Get_current_head chain_id -> (
+      (may_handle state chain_id @@ fun chain_db ->
       Peer_metadata.incr meta @@ Received_request Head ;
       let {Connection_metadata.disable_mempool; _} =
         P2p.connection_remote_metadata state.p2p state.conn
@@ -239,9 +251,10 @@ let handle_msg state msg =
       Peer_metadata.update_responses meta Head
       @@ P2p.try_send state.p2p state.conn
       @@ Current_head (chain_id, head, mempool) ;
-      Lwt.return_unit
-  | Current_head (chain_id, header, mempool) ->
-      may_handle state chain_id @@ fun chain_db ->
+      Lwt.return_unit)
+      [@profiler.span_s ["Get_current_head"]])
+  | Current_head (chain_id, header, mempool) -> (
+      (may_handle state chain_id @@ fun chain_db ->
       let header_hash = Block_header.hash header in
       let* known_invalid =
         Store.Block.is_known_invalid chain_db.chain_store header_hash
@@ -274,56 +287,71 @@ let handle_msg state msg =
         (* TODO discriminate between received advertisements
            and responses? *)
         Peer_metadata.incr meta @@ Received_advertisement Head ;
-        Lwt.return_unit)
+        Lwt.return_unit))
+      [@profiler.span_s ["Current_head"]])
   | Get_block_headers hashes ->
-      Peer_metadata.incr meta @@ Received_request Block_header ;
-      List.iter_p
-        (fun hash ->
-          let* o = read_block_header state hash in
-          match o with
-          | None ->
-              Peer_metadata.incr meta @@ Unadvertised Block ;
-              Lwt.return_unit
-          | Some (_chain_id, header) ->
-              Peer_metadata.update_responses meta Block_header
-              @@ P2p.try_send state.p2p state.conn
-              @@ Block_header header ;
-              Lwt.return_unit)
-        hashes
+      (Peer_metadata.incr meta @@ Received_request Block_header ;
+       List.iter_p
+         (fun hash ->
+           let* o = read_block_header state hash in
+           match o with
+           | None ->
+               Peer_metadata.incr meta @@ Unadvertised Block ;
+               Lwt.return_unit
+           | Some (_chain_id, header) ->
+               Peer_metadata.update_responses meta Block_header
+               @@ P2p.try_send state.p2p state.conn
+               @@ Block_header header ;
+               Lwt.return_unit)
+         hashes)
+      [@profiler.span_s ["Get_block_headers"]]
   | Block_header block -> (
-      let hash = Block_header.hash block in
-      match find_pending_block_header state hash with
-      | None ->
-          Peer_metadata.incr meta Unexpected_response ;
-          Lwt.return_unit
-      | Some chain_db ->
-          let* () =
-            Distributed_db_requester.Raw_block_header.notify
-              chain_db.block_header_db
-              state.gid
-              hash
-              block
-          in
-          Peer_metadata.incr meta @@ Received_response Block_header ;
-          Lwt.return_unit)
+      (let hash = Block_header.hash block in
+       match find_pending_block_header state hash with
+       | None ->
+           Peer_metadata.incr meta Unexpected_response ;
+           Lwt.return_unit
+       | Some chain_db ->
+           let* () =
+             Distributed_db_requester.Raw_block_header.notify
+               chain_db.block_header_db
+               state.gid
+               hash
+               block
+           in
+           Peer_metadata.incr meta @@ Received_response Block_header ;
+           Lwt.return_unit)
+      [@profiler.span_s ["Block_header"]])
   | Get_operations hashes ->
-      Peer_metadata.incr meta @@ Received_request Operations ;
-      List.iter_p
-        (fun hash ->
-          let* o = read_operation state hash in
-          match o with
-          | None ->
-              Peer_metadata.incr meta @@ Unadvertised Operations ;
-              Lwt.return_unit
-          | Some (_chain_id, op) ->
-              Peer_metadata.update_responses meta Operations
-              @@ P2p.try_send state.p2p state.conn
-              @@ Operation op ;
-              Lwt.return_unit)
-        hashes
+      (Peer_metadata.incr meta @@ Received_request Operations ;
+       List.iter_p
+         (fun hash ->
+           let* o = read_operation state hash in
+           match o with
+           | None ->
+               Peer_metadata.incr meta @@ Unadvertised Operations ;
+               Lwt.return_unit
+           | Some (_chain_id, op) ->
+               Peer_metadata.update_responses meta Operations
+               @@ P2p.try_send state.p2p state.conn
+               @@ Operation op ;
+               Lwt.return_unit)
+         hashes)
+      [@profiler.span_s
+        ["Get_operations"; P2p_peer_id.to_short_b58check state.gid]]
   | Operation operation -> (
       let hash = Operation.hash operation in
-      match find_pending_operation state hash with
+      match[@profiler.span_s
+             [
+               "Operation";
+               (match Char.code (Bytes.get operation.proto 0) with
+               | 0x14 -> "preattestation"
+               | 0x15 -> "attestation"
+               | _ -> "other");
+               P2p_peer_id.to_short_b58check state.gid;
+             ]]
+        find_pending_operation state hash
+      with
       | None ->
           Peer_metadata.incr meta Unexpected_response ;
           Lwt.return_unit
@@ -338,47 +366,52 @@ let handle_msg state msg =
           Peer_metadata.incr meta @@ Received_response Operations ;
           Lwt.return_unit)
   | Get_protocols hashes ->
-      Peer_metadata.incr meta @@ Received_request Protocols ;
-      List.iter_p
-        (fun hash ->
-          let* o = Store.Protocol.read state.disk hash in
-          match o with
-          | None ->
-              Peer_metadata.incr meta @@ Unadvertised Protocol ;
-              Lwt.return_unit
-          | Some p ->
-              Peer_metadata.update_responses meta Protocols
-              @@ P2p.try_send state.p2p state.conn
-              @@ Protocol p ;
-              Lwt.return_unit)
-        hashes
+      (Peer_metadata.incr meta @@ Received_request Protocols ;
+       List.iter_p
+         (fun hash ->
+           let* o = Store.Protocol.read state.disk hash in
+           match o with
+           | None ->
+               Peer_metadata.incr meta @@ Unadvertised Protocol ;
+               Lwt.return_unit
+           | Some p ->
+               Peer_metadata.update_responses meta Protocols
+               @@ P2p.try_send state.p2p state.conn
+               @@ Protocol p ;
+               Lwt.return_unit)
+         hashes)
+      [@profiler.span_s ["Get_protocols"]]
   | Protocol protocol ->
-      let hash = Protocol.hash protocol in
-      let* () =
-        Distributed_db_requester.Raw_protocol.notify
-          state.protocol_db
-          state.gid
-          hash
-          protocol
-      in
-      Peer_metadata.incr meta @@ Received_response Protocols ;
-      Lwt.return_unit
+      (let hash = Protocol.hash protocol in
+       let* () =
+         Distributed_db_requester.Raw_protocol.notify
+           state.protocol_db
+           state.gid
+           hash
+           protocol
+       in
+       Peer_metadata.incr meta @@ Received_response Protocols ;
+       Lwt.return_unit)
+      [@profiler.span_s ["Protocol"]]
   | Get_operations_for_blocks blocks ->
-      Peer_metadata.incr meta @@ Received_request Operations_for_block ;
-      List.iter_p
-        (fun (hash, ofs) ->
-          let* o = read_block state hash in
-          match o with
-          | None -> Lwt.return_unit
-          | Some (_, block) ->
-              let ops, path = Store.Block.operations_path block ofs in
-              Peer_metadata.update_responses meta Operations_for_block
-              @@ P2p.try_send state.p2p state.conn
-              @@ Operations_for_block (hash, ofs, ops, path) ;
-              Lwt.return_unit)
-        blocks
+      (Peer_metadata.incr meta @@ Received_request Operations_for_block ;
+       List.iter_p
+         (fun (hash, ofs) ->
+           let* o = read_block state hash in
+           match o with
+           | None -> Lwt.return_unit
+           | Some (_, block) ->
+               let ops, path = Store.Block.operations_path block ofs in
+               Peer_metadata.update_responses meta Operations_for_block
+               @@ P2p.try_send state.p2p state.conn
+               @@ Operations_for_block (hash, ofs, ops, path) ;
+               Lwt.return_unit)
+         blocks)
+      [@profiler.span_s ["Get_operations_for_blocks"]]
   | Operations_for_block (block, ofs, ops, path) -> (
-      match find_pending_operations state block ofs with
+      match[@profiler.span_s ["Operations_for_block"]]
+        find_pending_operations state block ofs
+      with
       | None ->
           Peer_metadata.incr meta Unexpected_response ;
           Lwt.return_unit
@@ -393,69 +426,75 @@ let handle_msg state msg =
           Peer_metadata.incr meta @@ Received_response Operations_for_block ;
           Lwt.return_unit)
   | Get_checkpoint chain_id -> (
-      Peer_metadata.incr meta @@ Received_request Checkpoint ;
-      may_handle_global state chain_id @@ fun chain_db ->
-      let* checkpoint_hash, _ = Store.Chain.checkpoint chain_db.chain_store in
-      let* o =
-        Store.Block.read_block_opt chain_db.chain_store checkpoint_hash
-      in
-      match o with
-      | None -> Lwt.return_unit
-      | Some checkpoint ->
-          let checkpoint_header = Store.Block.header checkpoint in
-          Peer_metadata.update_responses meta Checkpoint
-          @@ P2p.try_send state.p2p state.conn
-          @@ Checkpoint (chain_id, checkpoint_header) ;
-          Lwt.return_unit)
+      (Peer_metadata.incr meta @@ Received_request Checkpoint ;
+       may_handle_global state chain_id @@ fun chain_db ->
+       let* checkpoint_hash, _ = Store.Chain.checkpoint chain_db.chain_store in
+       let* o =
+         Store.Block.read_block_opt chain_db.chain_store checkpoint_hash
+       in
+       match o with
+       | None -> Lwt.return_unit
+       | Some checkpoint ->
+           let checkpoint_header = Store.Block.header checkpoint in
+           Peer_metadata.update_responses meta Checkpoint
+           @@ P2p.try_send state.p2p state.conn
+           @@ Checkpoint (chain_id, checkpoint_header) ;
+           Lwt.return_unit)
+      [@profiler.span_s ["Get_checkpoint"]])
   | Checkpoint _ ->
       (* This message is currently unused: it will be used for future
          bootstrap heuristics. *)
-      Peer_metadata.incr meta @@ Received_response Checkpoint ;
-      Lwt.return_unit
+      (Peer_metadata.incr meta @@ Received_response Checkpoint ;
+       Lwt.return_unit)
+      [@profiler.span_s ["Checkpoint"]]
   | Get_protocol_branch (chain_id, proto_level) -> (
-      Peer_metadata.incr meta @@ Received_request Protocol_branch ;
-      may_handle_global state chain_id @@ fun chain_db ->
-      activate state chain_id chain_db ;
-      let seed =
-        {Block_locator.receiver_id = state.gid; sender_id = my_peer_id state}
-      in
-      let* o =
-        Store.Chain.compute_protocol_locator
-          chain_db.chain_store
-          ~proto_level
-          seed
-      in
-      match o with
-      | Some locator ->
-          Peer_metadata.update_responses meta Protocol_branch
-          @@ P2p.try_send state.p2p state.conn
-          @@ Protocol_branch (chain_id, proto_level, locator) ;
-          Lwt.return_unit
-      | None -> Lwt.return_unit)
+      (Peer_metadata.incr meta @@ Received_request Protocol_branch ;
+       may_handle_global state chain_id @@ fun chain_db ->
+       activate state chain_id chain_db ;
+       let seed =
+         {Block_locator.receiver_id = state.gid; sender_id = my_peer_id state}
+       in
+       let* o =
+         Store.Chain.compute_protocol_locator
+           chain_db.chain_store
+           ~proto_level
+           seed
+       in
+       match o with
+       | Some locator ->
+           Peer_metadata.update_responses meta Protocol_branch
+           @@ P2p.try_send state.p2p state.conn
+           @@ Protocol_branch (chain_id, proto_level, locator) ;
+           Lwt.return_unit
+       | None -> Lwt.return_unit)
+      [@profiler.span_s ["Get_protocol_branch"]])
   | Protocol_branch (_chain, _proto_level, _locator) ->
       (* This message is currently unused: it will be used for future
          multipass. *)
-      Peer_metadata.incr meta @@ Received_response Protocol_branch ;
-      Lwt.return_unit
+      (Peer_metadata.incr meta @@ Received_response Protocol_branch ;
+       Lwt.return_unit)
+      [@profiler.span_s ["Protocol_branch"]]
   | Get_predecessor_header (block_hash, offset) -> (
-      Peer_metadata.incr meta @@ Received_request Predecessor_header ;
-      let* o = read_predecessor_header state block_hash offset in
-      match o with
-      | None ->
-          (* The peer is not expected to request blocks that are beyond
-             our locator. *)
-          Peer_metadata.incr meta @@ Unadvertised Block ;
-          Lwt.return_unit
-      | Some header ->
-          Peer_metadata.update_responses meta Predecessor_header
-          @@ P2p.try_send state.p2p state.conn
-          @@ Predecessor_header (block_hash, offset, header) ;
-          Lwt.return_unit)
+      (Peer_metadata.incr meta @@ Received_request Predecessor_header ;
+       let* o = read_predecessor_header state block_hash offset in
+       match o with
+       | None ->
+           (* The peer is not expected to request blocks that are beyond
+              our locator. *)
+           Peer_metadata.incr meta @@ Unadvertised Block ;
+           Lwt.return_unit
+       | Some header ->
+           Peer_metadata.update_responses meta Predecessor_header
+           @@ P2p.try_send state.p2p state.conn
+           @@ Predecessor_header (block_hash, offset, header) ;
+           Lwt.return_unit)
+      [@profiler.span_s ["Get_predecessor_header"]])
   | Predecessor_header (_block_hash, _offset, _header) ->
       (* This message is currently unused: it will be used to improve
          bootstrapping. *)
-      Peer_metadata.incr meta @@ Received_response Predecessor_header ;
-      Lwt.return_unit
+      (Peer_metadata.incr meta @@ Received_response Predecessor_header ;
+       Lwt.return_unit)
+      [@profiler.span_s ["Predecessor_header"]]
 
 let rec worker_loop state =
   let open Lwt_syntax in
@@ -474,6 +513,9 @@ let rec worker_loop state =
       Lwt.return_unit
 
 let run ~register ~unregister p2p disk protocol_db active_chains gid conn =
+  if not !profiler_init then (
+    Profiler.record "start" ;
+    profiler_init := true) ;
   let canceler = Lwt_canceler.create () in
   let state =
     {
