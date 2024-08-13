@@ -2460,6 +2460,22 @@ let preemptive_kernel_download_command =
         ~preimages_endpoint
         ~root_hash)
 
+let debug_print_store_schemas_command =
+  let open Tezos_clic in
+  command
+    ~desc:"Print SQL statements describing the tables created in the store"
+    no_options
+    (prefixes ["debug"; "print"; "store"; "schemas"] @@ stop)
+    (fun () () ->
+      let open Lwt_result_syntax in
+      let open Evm_node_lib_dev in
+      Lwt_utils_unix.with_tempdir "store" @@ fun data_dir ->
+      let* store = Evm_store.init ~data_dir ~perm:`Read_write () in
+      let* schemas = Evm_store.(use store Schemas.get_all) in
+      let output = String.concat ";\n\n" schemas in
+      Format.printf "%s\n" output ;
+      return_unit)
+
 (* List of program commands *)
 let commands =
   [
@@ -2486,6 +2502,7 @@ let commands =
     export_snapshot_named_command;
     patch_state_command;
     preemptive_kernel_download_command;
+    debug_print_store_schemas_command;
   ]
 
 let global_options = Tezos_clic.no_options

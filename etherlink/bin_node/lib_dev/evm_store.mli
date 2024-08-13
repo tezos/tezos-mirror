@@ -45,6 +45,12 @@ val with_transaction : conn -> (conn -> 'a tzresult Lwt.t) -> 'a tzresult Lwt.t
     @raise Assert_failure *)
 val assert_in_transaction : conn -> unit
 
+module Schemas : sig
+  (** [get_all conn] returns the list of SQL statements allowing to recreate
+      the tables in the current store. *)
+  val get_all : conn -> string list tzresult Lwt.t
+end
+
 module Blueprints : sig
   val store : conn -> Blueprint_types.t -> unit tzresult Lwt.t
 
