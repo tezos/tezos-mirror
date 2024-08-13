@@ -174,17 +174,28 @@ let jobs pipeline_type =
       ~matrix:(ubuntu_package_release_matrix pipeline_type)
   in
 
-  (* These jobs build the next packages in a matrix using the
-     build dependencies images *)
+  (* data packages. we build them once *)
   let job_build_data_packages : tezos_job =
-    make_job_build_debian_packages
+    job
       ~__POS__
       ~name:"oc.build-data_packages"
-      ~distribution:"debian"
+      ~image:build_debian_packages_image
+      ~stage:Stages.build
+      ~variables:
+        (variables
+           [
+             ("DISTRIBUTION", "debian"); ("RELEASE", "bookworm"); ("TAGS", "gcp");
+           ])
       ~dependencies:(Dependent [Job job_docker_build_debian_dependencies])
-      ~script:"./scripts/ci/build-debian-packages.sh zcash"
-      ~matrix:(debian_package_release_matrix pipeline_type)
+      ~tag:Dynamic
+      ~artifacts:(artifacts ["packages/$DISTRIBUTION/$RELEASE"])
+      [
+        "export CARGO_NET_OFFLINE=false";
+        "./scripts/ci/build-debian-packages.sh zcash";
+      ]
   in
+  (* These jobs build the next packages in a matrix using the
+     build dependencies images *)
   let job_build_debian_package : tezos_job =
     make_job_build_debian_packages
       ~__POS__

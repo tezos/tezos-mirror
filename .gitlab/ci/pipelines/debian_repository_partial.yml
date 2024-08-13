@@ -126,15 +126,11 @@ oc.build-data_packages:
   variables:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: debian
+    RELEASE: bookworm
+    TAGS: gcp
   artifacts:
     paths:
     - packages/$DISTRIBUTION/$RELEASE
-  parallel:
-    matrix:
-    - RELEASE:
-      - bookworm
-      TAGS:
-      - gcp
 
 apt_repo_debian_current:
   image: debian:bookworm

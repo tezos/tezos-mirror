@@ -123,6 +123,15 @@ for architecture in $ARCHITECTURES; do # amd64, arm64 ...
       echo "Adding package $file to $TARGETDIR/${target}/"
     done
 
+    # for ubuntu, we also add the data packages that we built for
+    # bookworm, that are distribution independent. Only for next packages
+    if [ "$DISTRIBUTION" = "ubuntu" ] && [ -n "$PREFIX" ]; then
+      for file in packages/debian/bookworm/*.deb; do
+        cp "$file" "$TARGETDIR/${target}/"
+        echo "Adding data package $file to $TARGETDIR/${target}/"
+      done
+    fi
+
     cd "$TARGETDIR"
     echo "Create the Packages file"
     apt-ftparchive packages "dists/${release}" > "${target}/Packages"
