@@ -55,26 +55,47 @@ let check_preimage (`Hex hash) preimage =
   in
   hash = computed_hash
 
+let delete_preimage preimages (`Hex hash) =
+  Lwt_unix.unlink (Filename.concat preimages hash)
+
+let rec reveal_and_check ~preimages_endpoint ~preimages ~num_download_retries
+    hash =
+  let open Lwt_result_syntax in
+  let*! preimage =
+    Commands.reveal_preimage
+      ~preimages_endpoint
+      ~preimages
+      0
+      (* Retrying makes sense only when the preimage is fed through stdin, this
+         wouldn't make sense in our case. *)
+      hash
+  in
+  if not (check_preimage hash preimage) then
+    if num_download_retries <= 0 then
+      tzfail (Invalid_preimage_for_hash (hash, preimage))
+    else
+      let*! () = delete_preimage preimages hash in
+      reveal_and_check
+        ~preimages_endpoint
+        ~preimages
+        ~num_download_retries:(pred num_download_retries)
+        hash
+  else return preimage
+
 let download ~preimages_endpoint ~preimages ~(root_hash : Hex.t) =
   let open Lwt_result_syntax in
-  (* value found in `commands.ml`, should we make it configurable? *)
-  let num_retries = 3 in
+  let num_download_retries = 1 in
   let rec go retrieved_hashes =
     let open Lwt_result_syntax in
     match retrieved_hashes with
     | [] -> return_unit
     | hash :: hashes -> (
-        let*! preimage =
-          Commands.reveal_preimage
+        let* preimage =
+          reveal_and_check
             ~preimages_endpoint
             ~preimages
-            num_retries
+            ~num_download_retries
             hash
-        in
-        let* () =
-          if not (check_preimage hash preimage) then
-            tzfail (Invalid_preimage_for_hash (hash, preimage))
-          else return_unit
         in
         match
           Data_encoding.Binary.of_string_exn preimages_encoding preimage
