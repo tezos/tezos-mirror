@@ -2079,3 +2079,5 @@ module Unsafe = struct
 end
 
 let v_3_1_upgrade ~store_dir:_ _genesis = Lwt_result_syntax.return_unit
+
+let v_3_2_upgrade ~store_dir:_ _genesis = Lwt_result_syntax.return_unit

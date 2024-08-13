@@ -3481,6 +3481,13 @@ let v_3_1_upgrade ~store_dir genesis =
   in
   Block_store.v_3_1_upgrade chain_dir
 
+let v_3_2_upgrade ~store_dir genesis =
+  let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
+  let chain_dir =
+    Naming.chain_dir (Naming.store_dir ~dir_path:store_dir) chain_id
+  in
+  Cemented_block_store.v_3_2_upgrade chain_dir
+
 (************ For testing and internal purposes only **************)
 module Unsafe = struct
   let repr_of_block b = b
