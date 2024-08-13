@@ -590,7 +590,11 @@ let uint53_encoding =
 
 let uint_as_hex_encoding =
   let open Data_encoding in
-  let int_to_json i = `String (Format.sprintf "0x%02x" (Z.to_int i)) in
+  let int_to_json i =
+    let hex = Z.format "%02x" i in
+    let padded_hex = if String.length hex mod 2 = 1 then "0" ^ hex else hex in
+    `String ("0x" ^ padded_hex)
+  in
   let json_to_int = function
     | `String s -> Z.of_int @@ int_of_string s
     | _ -> Stdlib.failwith "expected hex encoded int"
