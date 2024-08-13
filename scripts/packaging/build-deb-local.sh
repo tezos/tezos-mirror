@@ -1,8 +1,8 @@
 #!/bin/sh
 
-TYPE=${1}
-
 set -eu
+
+DEVEL=0
 
 packages() {
   # Build tezos as usual
@@ -28,7 +28,7 @@ packages() {
 }
 
 zcash() {
-  # Link the zcash dans DAL parametes to be packaged
+  # Link the zcash DAL parameters to be packaged
   if [ ! -e scripts/packaging/octez-data/zcash-params ]; then
     ln -s ../../../_opam/share/zcash-params scripts/packaging/octez-data/
   fi
@@ -44,21 +44,53 @@ zcash() {
 
 }
 
+usage() {
+  echo "Usage: $0 (binaries|zcash) [--dev]"
+  exit 2
+}
+
 # Cleanup old leftover packages
 rm -f scripts/packaging/*.deb
 
-case $TYPE in
+TARGET=all
+
+while [ $# -gt 0 ]; do
+  case ${1} in
+  "binaries")
+    TARGET=binaries
+    shift
+    ;;
+  "zcash")
+    TARGET=zcash
+    shift
+    ;;
+  "--dev")
+    DEVEL=1
+    shift
+    ;;
+  "help")
+    usage
+    ;;
+  *)
+    echo "Unknown command or option: $1"
+    usage
+    ;;
+  esac
+done
+
+case ${TARGET} in
 "binaries")
   echo "Building binary packages only"
   packages
   ;;
 "zcash")
-  echo "Building DATA packages only"
+  echo "Building data packages only"
   zcash
   ;;
-*)
-  zcash
+"all")
+  echo "Building binary and data packages"
   packages
+  zcash
   ;;
 esac
 
@@ -66,6 +98,6 @@ echo "All packages are available in ./scripts/packaging"
 
 # Run lintian only if building packages locally.
 # On the CI we have a specific job for it
-if [ -z "${CI:-}" ]; then
+if [ -z "${CI:-}" ] && [ ${DEVEL} != "1" ]; then
   lintian scripts/packaging/octez-*.deb --tag-display-limit 0 --verbose
 fi
