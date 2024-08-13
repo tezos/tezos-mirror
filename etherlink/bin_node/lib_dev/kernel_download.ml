@@ -5,6 +5,28 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Reveal_hash = Tezos_raw_protocol_alpha.Sc_rollup_reveal_hash
+
+type error += Invalid_preimage_for_hash of Hex.t * string
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"evm_node_dev_invalid_preimage"
+    ~title:"Preimage has not the expected hash"
+    ~description:
+      "The EVM node could not apply a blueprint on top of its local EVM state."
+    ~pp:(fun ppf (hash, _preimage) ->
+      Format.fprintf
+        ppf
+        "The preimage received for %s doesn't return the same hash"
+        hash)
+    Data_encoding.(obj2 (req "expected_hash" string) (req "preimage" string))
+    (function
+      | Invalid_preimage_for_hash (`Hex hash, preimage) -> Some (hash, preimage)
+      | _ -> None)
+    (fun (hash, preimage) -> Invalid_preimage_for_hash (`Hex hash, preimage))
+
 type preimages = Contents of bytes | Hashes of string list
 
 let preimages_encoding =
@@ -21,14 +43,17 @@ let preimages_encoding =
         case
           ~title:"hashes"
           (Tag 1)
-          (list Tezos_raw_protocol_alpha.Sc_rollup_reveal_hash.encoding)
+          (list Reveal_hash.encoding)
           (function Hashes _hashes -> assert false | _ -> None)
-          (fun hashes ->
-            Hashes
-              (List.map
-                 Tezos_raw_protocol_alpha.Sc_rollup_reveal_hash.to_hex
-                 hashes));
+          (fun hashes -> Hashes (List.map Reveal_hash.to_hex hashes));
       ])
+
+let check_preimage (`Hex hash) preimage =
+  let computed_hash =
+    Reveal_hash.hash_string ~scheme:Reveal_hash.Blake2B [preimage]
+    |> Reveal_hash.to_hex
+  in
+  hash = computed_hash
 
 let download ~preimages_endpoint ~preimages ~(root_hash : Hex.t) =
   let open Lwt_result_syntax in
@@ -45,6 +70,11 @@ let download ~preimages_endpoint ~preimages ~(root_hash : Hex.t) =
             ~preimages
             num_retries
             hash
+        in
+        let* () =
+          if not (check_preimage hash preimage) then
+            tzfail (Invalid_preimage_for_hash (hash, preimage))
+          else return_unit
         in
         match
           Data_encoding.Binary.of_string_exn preimages_encoding preimage
