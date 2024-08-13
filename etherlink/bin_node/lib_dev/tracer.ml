@@ -213,7 +213,10 @@ module CallTracerRead = struct
         state
         (Durable_storage_path.Trace.call_trace ~transaction_hash i)
     in
-    let*! () = Tracer_event.read_line (Z.of_int i) in
+    let*! () =
+      Tracer_event.read_line
+        (Z.of_int i, Option.value transaction_hash ~default:"none")
+    in
     Lwt.return @@ Tracer_types.CallTracer.decode_call bytes
 
   (** [call_trace_length evm_state hash] is used to findout how many lines 
