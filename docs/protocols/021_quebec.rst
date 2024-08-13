@@ -36,11 +36,10 @@ Smart Rollups
   commitment periods when computing what should be the level of a commitment
   successor. (MR :gl:`!13841`)
 
-Zero Knowledge Rollups (ongoing)
---------------------------------
-
 Data Availability Layer
 -----------------------
+
+No changes.
 
 Adaptive Issuance
 -----------------
@@ -55,10 +54,17 @@ Adaptive Issuance
 Gas improvements
 ----------------
 
+- Updated a few gas parameters to be more accurate. (MR :gl:`!13171`)
+
 .. _breaking_changes_quebec:
 
 Breaking Changes
 ----------------
+
+- Deprecated legacy encoding of tickets (``Pair (Pair _ _) _``) in favor of
+  the ``Ticket`` constructor introduced in Paris. This new notation will
+  notably be used in operations metadata (MRs :gl:`!11619` :gl:`!11620`
+  :gl:`!12048`).
 
 - Reworked RPC ``GET
   /chains/<chain_id>/blocks/<block_id>/context/delegates/<baker_pkh>``,
@@ -79,8 +85,8 @@ RPC Changes
 
 - In the following paths, ``../`` is short for
   ``/chains/<chain_id>/blocks/<block_id>/context/delegates/<baker_pkh>/``.
-  The documentation for the RPCs can be found on
-  https://tezos.gitlab.io/quebec/rpc.html.
+  See https://tezos.gitlab.io/quebec/baking_power.html for more
+  details on the renamed and new RPCs.
 
   * Renamed RPC ``GET ../current_frozen_deposits`` to ``GET
     ../total_staked``.  The old path is now **deprecated**. (MR
@@ -152,15 +158,6 @@ RPC Changes
   /chains/<chain_id>/blocks/<block_id>/context/delegates/<baker_pkh>``;
   see :ref:`breaking_changes_quebec`.
 
-Operation receipts
-------------------
-
-- To better differentiate Deposits coming from 'rewards from bakers own stakes'
-  from 'the edge bakers may take from their stakers rewards', the balance updates
-  field has been specialized. The field {"staker":{"baker": <delegate_pkh>}} is now
-  split into {"staker":{"baker_own_stake": <delegate_pkh>}} and {"staker":{"baker_edge":
-  <delegate_pkh>}}. (MR :gl:`!12258`)
-
 Errors
 ------
 
@@ -169,9 +166,6 @@ Errors
   expanded with information on the problematic sources and
   counters. The error messages have been updated accordingly, but the
   error IDs remain unchanged. (MR :gl:`!13138`)
-
-Protocol parameters
--------------------
 
 8s Blocks Time (MR :gl:`!12716`)
 ---------------------------------
@@ -218,12 +212,6 @@ following quantities are kept the same:
    * - ``hard_gas_limit_per_block`` (gas unit)
      - ``1733333``
      - ``1386666``
-
-Bug Fixes
----------
-
-Minor Changes
--------------
 
 Internal
 --------
