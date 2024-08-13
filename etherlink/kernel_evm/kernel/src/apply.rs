@@ -12,8 +12,8 @@ use evm_execution::fa_bridge::execute_fa_deposit;
 use evm_execution::handler::{ExecutionOutcome, ExtendedExitReason, RouterInterface};
 use evm_execution::precompiles::PrecompileBTreeMap;
 use evm_execution::run_transaction;
-use evm_execution::trace::TracerInput;
-use primitive_types::{H160, U256};
+use evm_execution::trace::{get_tracer_configuration, TracerInput};
+use primitive_types::{H160, H256, U256};
 use tezos_ethereum::block::BlockConstants;
 use tezos_ethereum::transaction::{TransactionHash, TransactionType};
 use tezos_ethereum::tx_common::EthereumTransactionCommon;
@@ -559,6 +559,7 @@ pub fn apply_transaction<Host: Runtime>(
     limits: &Limits,
     tracer_input: Option<TracerInput>,
 ) -> Result<ExecutionResult<ExecutionInfo>, anyhow::Error> {
+    let tracer_input = get_tracer_configuration(H256(transaction.tx_hash), tracer_input);
     let apply_result = match &transaction.content {
         TransactionContent::Ethereum(tx) => apply_ethereum_transaction_common(
             host,
