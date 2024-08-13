@@ -2355,7 +2355,7 @@ let call_withdraw ?expect_failure ~sender ~endpoint ~value ~produce_block
       ~address:"0xff00000000000000000000000000000000000001"
       ~method_call:(sf {|withdraw_base58("%s")|} receiver)
       ~value
-      ~gas:6_000_000
+      ~gas:16_000_000
   in
   wait_for_application ~produce_block call_withdraw
 
@@ -2551,7 +2551,7 @@ let test_withdraw_via_calls =
       ~abi_label:call_withdrawal.label
       ~address:contract
       ~method_call:"testCall()"
-      ~gas:6_000_000
+      ~gas:16_000_000
       ~value:(Wei.of_eth_int 1)
   in
   let* tx = wait_for_application ~produce_block call in
@@ -2567,7 +2567,7 @@ let test_withdraw_via_calls =
       ~abi_label:call_withdrawal.label
       ~address:contract
       ~method_call:"testDelegatecall()"
-      ~gas:6_000_000
+      ~gas:16_000_000
       ~value:(Wei.of_eth_int 1)
   in
   let* tx = wait_for_application ~produce_block delegate_call in
@@ -2583,7 +2583,7 @@ let test_withdraw_via_calls =
       ~abi_label:call_withdrawal.label
       ~address:contract
       ~method_call:"testStaticcall()"
-      ~gas:6_000_000
+      ~gas:16_000_000
       ~value:(Wei.of_eth_int 1)
   in
   let* tx = wait_for_application ~produce_block static_call in
@@ -2603,7 +2603,7 @@ let test_withdraw_via_calls =
       ~abi_label:callcode_withdrawal.label
       ~address:contract
       ~method_call:"testCallcode()"
-      ~gas:6_000_000
+      ~gas:16_000_000
       ~value:(Wei.of_eth_int 1)
   in
   let* tx = wait_for_application ~produce_block callcode in

@@ -17,6 +17,7 @@ use crate::precompiles::{SYSTEM_ACCOUNT_ADDRESS, WITHDRAWAL_ADDRESS};
 use crate::read_ticketer;
 use crate::withdrawal_counter::WithdrawalCounter;
 use crate::{abi, fail_if_too_much, EthereumError};
+use evm::Handler;
 use evm::{Context, ExitReason, ExitRevert, ExitSucceed, Transfer};
 use host::runtime::Runtime;
 use primitive_types::H160;
@@ -36,13 +37,25 @@ use tezos_smart_rollup_encoding::michelson::{
 };
 use tezos_smart_rollup_encoding::outbox::{OutboxMessage, OutboxMessageTransaction};
 
-/// Cost of doing a withdrawal. A valid call to this precompiled contract
-/// takes almost 880000 ticks, and one gas unit takes 1000 ticks.
-/// The ticks/gas ratio is from benchmarks on `ecrecover`.
+/// Added cost of doing a withdrawal.
 ///
-/// Also includes the implied costs of executing the outbox message on L1
-/// see FA_WITHDRAWAL_PRECOMPILE_GAS_COST constant for more details.
-const WITHDRAWAL_COST: u64 = 880 + 5_000_000;
+/// This is roughly the implied costs of executing the outbox message on L1
+/// as a spam prevention mechanism (outbox queue clogging).
+/// In particular it prevents cases when a big number of withdrawals is batched
+/// together in a single transaction which exploits the system.
+///
+/// An execution of a single outbox message carrying a XTZ withdrawal
+/// costs around 0.0025ꜩ on L1; the equivalent amount of gas units on L2 is:
+///  
+///  0.0025 * 10^18 / GAS_PRICE
+///
+/// Multiplying the numerator by 2 for a safe reserve and this is our cost in Wei.
+const WITHDRAWAL_PRECOMPILE_ADDED_COST: u64 = 5_000_000_000_000_000_000;
+
+/// Hard cap for the added gas cost (0.5 of the maximum gas limit per transaction).
+/// If gas price drops the gas amount rises, but we don't want it to hit the transaction
+/// gas limit.
+const WITHDRAWAL_PRECOMPILE_MAX_ADDED_CAS_COST: u64 = 15_000_000;
 
 /// Keccak256 of Withdrawal(uint256,address,bytes22,uint256)
 /// This is main topic (non-anonymous event): https://docs.soliditylang.org/en/latest/abi-spec.html#events
@@ -50,6 +63,15 @@ pub const WITHDRAWAL_EVENT_TOPIC: [u8; 32] = [
     45, 90, 215, 147, 24, 31, 91, 107, 215, 39, 192, 194, 22, 70, 30, 1, 158, 207, 228,
     102, 53, 63, 221, 233, 204, 248, 19, 244, 91, 132, 250, 130,
 ];
+
+/// Calculate precompile gas cost given the estimated amount of ticks and gas price.
+fn estimate_gas_cost(estimated_ticks: u64, gas_price: U256) -> u64 {
+    // Using 1 gas unit ~= 1000 ticks convert ratio
+    let execution_cost = estimated_ticks / 1000;
+    let added_cost = U256::from(WITHDRAWAL_PRECOMPILE_MAX_ADDED_CAS_COST)
+        .min(U256::from(WITHDRAWAL_PRECOMPILE_ADDED_COST) / gas_price);
+    execution_cost + added_cost.as_u64()
+}
 
 fn prepare_message(
     parameters: RouterInterface,
@@ -87,7 +109,8 @@ pub fn withdrawal_precompile<Host: Runtime>(
         }
     }
 
-    if let Err(err) = handler.record_cost(WITHDRAWAL_COST) {
+    let estimated_gas_cost = estimate_gas_cost(estimated_ticks, handler.gas_price());
+    if let Err(err) = handler.record_cost(estimated_gas_cost) {
         log!(
             handler.borrow_host(),
             Info,
@@ -285,7 +308,7 @@ mod tests {
         handler::{ExecutionOutcome, Withdrawal},
         precompiles::{
             test_helpers::{execute_precompiled, DUMMY_TICKETER},
-            withdrawal::{WITHDRAWAL_COST, WITHDRAWAL_EVENT_TOPIC},
+            withdrawal::WITHDRAWAL_EVENT_TOPIC,
             WITHDRAWAL_ADDRESS,
         },
     };
@@ -415,7 +438,8 @@ mod tests {
             value: eth_from_mutez(value_mutez),
         });
 
-        let result = execute_precompiled(target, input, transfer, Some(6000000), false);
+        let result =
+            execute_precompiled(target, input, transfer, Some(30_000_000), false);
 
         let expected_output = vec![];
         let message = make_message(
@@ -426,7 +450,8 @@ mod tests {
 
         let expected_gas = 21000 // base cost, no additional cost for withdrawal
     + 1032 // transaction data cost (90 zero bytes + 42 non zero bytes)
-    + WITHDRAWAL_COST; // cost of calling withdrawal precompiled contract
+    + 880 // gas for ticks
+    + 15_000_000; // cost of calling withdrawal precompiled contract (hard cap because of low gas price)
 
         let expected_log = Log {
             address: H160::zero(),
@@ -490,7 +515,8 @@ mod tests {
             value: eth_from_mutez(value_mutez),
         });
 
-        let result = execute_precompiled(target, input, transfer, Some(6000000), false);
+        let result =
+            execute_precompiled(target, input, transfer, Some(30_000_000), false);
 
         let expected_output = vec![];
         let message = make_message(
@@ -501,7 +527,8 @@ mod tests {
 
         let expected_gas = 21000 // base cost, no additional cost for withdrawal
     + 1032 // transaction data cost (90 zero bytes + 42 non zero bytes)
-    + WITHDRAWAL_COST; // cost of calling withdrawal precompiled contract
+    + 880 // gas for ticks
+    + 15_000_000; // cost of calling withdrawal precompiled contract (hard cap because of low gas price)
 
         let expected_log = Log {
             address: H160::zero(),
@@ -554,11 +581,13 @@ mod tests {
 
         let transfer: Option<Transfer> = None;
 
-        let result = execute_precompiled(target, input, transfer, Some(6000000), false);
+        let result =
+            execute_precompiled(target, input, transfer, Some(30_000_000), false);
 
         let expected_gas = 21000 // base cost, no additional cost for withdrawal
     + 1032 // transaction data cost (90 zero bytes + 42 non zero bytes)
-    + WITHDRAWAL_COST; // cost of calling the withdrawals precompiled contract.
+    + 880 // gas for ticks
+    + 15_000_000; // cost of calling withdrawal precompiled contract (hard cap because of low gas price)
 
         let expected = ExecutionOutcome {
             gas_used: expected_gas,
@@ -592,7 +621,8 @@ mod tests {
             estimated_ticks_used: 880_000,
         };
 
-        let result = execute_precompiled(target, input, transfer, Some(6000000), false);
+        let result =
+            execute_precompiled(target, input, transfer, Some(30_000_000), false);
 
         assert_eq!(Ok(expected), result);
 
@@ -616,7 +646,7 @@ mod tests {
             estimated_ticks_used: 880_000,
         };
 
-        let result = execute_precompiled(target, input, transfer, Some(6000000), true);
+        let result = execute_precompiled(target, input, transfer, Some(30_000_000), true);
 
         assert_eq!(Ok(expected), result);
     }

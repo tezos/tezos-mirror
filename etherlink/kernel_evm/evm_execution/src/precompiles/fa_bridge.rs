@@ -11,8 +11,8 @@
 //!     * Alters ticket table (changes balance)
 //!     * Increments outbox counter
 
-use evm::{Context, Transfer};
-use primitive_types::H160;
+use evm::{Context, Handler, Transfer};
+use primitive_types::{H160, U256};
 use tezos_smart_rollup_host::runtime::Runtime;
 
 use crate::{
@@ -44,12 +44,26 @@ pub const FA_WITHDRAWAL_PRECOMPILE_TICKS_SLOPE: u64 = 700;
 /// together in a single transaction which exploits the system.
 ///
 /// An execution of a single outbox message carrying a FA withdrawal
-/// costs around 0.0025ꜩ on L1; assuming current price per L2 gas of 1 Gwei
-/// the equivalent amount of gas is 0.0025 * 10^18 / 10^9 = 2_500_000
+/// costs around 0.0025ꜩ on L1; the equivalent amount of gas units on L2 is:
+///  
+///  0.0025 * 10^18 / GAS_PRICE
 ///
-/// Multiplying by 2 to have a safe reserve but at the same time keeping
-/// L2 fees per withdrawal below 1 cent.
-pub const FA_WITHDRAWAL_PRECOMPILE_ADDED_GAS_COST: u64 = 5_000_000;
+/// Multiplying the numerator by 2 for a safe reserve and this is our cost in Wei.
+pub const FA_WITHDRAWAL_PRECOMPILE_ADDED_COST: u64 = 5_000_000_000_000_000;
+
+/// Hard cap for the added gas cost (0.5 of the maximum gas limit per transaction).
+/// If gas price drops the gas amount rises, but we don't want it to hit the transaction
+/// gas limit.
+pub const FA_WITHDRAWAL_PRECOMPILE_MAX_ADDED_CAS_COST: u64 = 15_000_000;
+
+/// Calculate precompile gas cost given the estimated amount of ticks and gas price.
+fn estimate_gas_cost(estimated_ticks: u64, gas_price: U256) -> u64 {
+    // Using 1 gas unit ~= 1000 ticks convert ratio
+    let execution_cost = estimated_ticks / 1000;
+    let added_cost = U256::from(FA_WITHDRAWAL_PRECOMPILE_MAX_ADDED_CAS_COST)
+        .min(U256::from(FA_WITHDRAWAL_PRECOMPILE_ADDED_COST) / gas_price);
+    execution_cost + added_cost.as_u64()
+}
 
 macro_rules! precompile_outcome_error {
     ($($arg:tt)*) => {
@@ -81,8 +95,7 @@ pub fn fa_bridge_precompile<Host: Runtime>(
 
     // We also record gas cost which consists of computation cost (1 gas unit per 1000 ticks)
     // and added FA withdrawal cost (spam prevention measure).
-    let estimated_gas_cost =
-        estimated_ticks / 1000 + FA_WITHDRAWAL_PRECOMPILE_ADDED_GAS_COST;
+    let estimated_gas_cost = estimate_gas_cost(estimated_ticks, handler.gas_price());
     if handler.record_cost(estimated_gas_cost).is_err() {
         return Ok(precompile_outcome_error!(
             "FA withdrawal: gas limit too low"
@@ -393,7 +406,7 @@ mod tests {
             ticket_owner,
             None,
             input,
-            Some(6000000),
+            Some(30_000_000),
             false,
         );
         assert!(outcome.is_success());

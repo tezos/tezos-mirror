@@ -706,7 +706,7 @@ mod tests {
             0,
             gas_price,
             gas_price,
-            10_000_000,
+            30_000_000,
             Some(to),
             U256::from(1000000000000000000u64),
             data,
