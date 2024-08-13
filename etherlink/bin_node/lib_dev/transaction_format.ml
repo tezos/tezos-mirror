@@ -5,37 +5,18 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* The hard limit is 4096 but it needs to add the external message tag. *)
-let max_input_size = 4095
-
-let smart_rollup_address_size = 20
-
-let transaction_tag_size = 1
-
-let framing_protocol_tag_size = 1
-
 (** max size of a chunk *)
 let size_per_chunk =
-  max_input_size - framing_protocol_tag_size - smart_rollup_address_size
-  - transaction_tag_size - 2 (* Index as u16 *)
+  Message_format.usable_size_in_message - 2 (* Index as u16 *)
   - (Ethereum_types.transaction_hash_size * 2)
 
 (** Maximum size describes the maximum size of [tx_raw] to fit
    in a simple transaction. *)
 let maximum_size =
-  max_input_size - framing_protocol_tag_size - smart_rollup_address_size
-  - transaction_tag_size - Ethereum_types.transaction_hash_size
+  Message_format.usable_size_in_message - Ethereum_types.transaction_hash_size
 
-type transaction = Simple of string | NewChunked of string | Chunk of string
-
-let encode_transaction ~smart_rollup_address kind =
-  let data =
-    match kind with
-    | Simple data -> "\000" ^ data
-    | NewChunked data -> "\001" ^ data
-    | Chunk data -> "\002" ^ data
-  in
-  "\000" ^ smart_rollup_address ^ data
+let encode_transaction ~smart_rollup_address (kind, data) =
+  Message_format.frame_message smart_rollup_address kind data
 
 let chunk_transaction ~tx_hash_raw ~tx_raw =
   let open Result_syntax in
@@ -49,8 +30,8 @@ let chunk_transaction ~tx_hash_raw ~tx_raw =
         in
         let all_chunk_hashes = all_chunk_hashes ^ chunk_hash in
         let chunk =
-          Chunk
-            (tx_hash_raw ^ Ethereum_types.u16_to_bytes i ^ chunk_hash ^ chunk)
+          ( Message_format.Transaction_chunk,
+            tx_hash_raw ^ Ethereum_types.u16_to_bytes i ^ chunk_hash ^ chunk )
         in
         (all_chunk_hashes, chunk :: chunks))
       ("", [])
@@ -60,7 +41,8 @@ let chunk_transaction ~tx_hash_raw ~tx_raw =
     let number_of_chunks_bytes =
       Ethereum_types.u16_to_bytes @@ List.length chunks
     in
-    NewChunked (tx_hash_raw ^ number_of_chunks_bytes ^ all_chunk_hashes)
+    ( Message_format.New_chunked_transaction,
+      tx_hash_raw ^ number_of_chunks_bytes ^ all_chunk_hashes )
   in
   return (new_chunk_transaction :: chunks)
 
@@ -69,7 +51,7 @@ let make_evm_inbox_transactions ~tx_hash ~tx_raw =
   let tx_hash_raw = Ethereum_types.hash_to_bytes tx_hash in
   if String.length tx_raw <= maximum_size then
     (* Simple transaction, fits in a single input. *)
-    return [Simple (tx_hash_raw ^ tx_raw)]
+    return [(Message_format.Simple_transaction, tx_hash_raw ^ tx_raw)]
   else chunk_transaction ~tx_hash_raw ~tx_raw
 
 let make_encoded_messages ~smart_rollup_address tx_raw =

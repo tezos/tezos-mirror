@@ -17,8 +17,6 @@ let nb_chunks_size = 2
 (* U16 *)
 let chunk_index_size = 2
 
-let blueprint_tag_size = 1
-
 (* ED25519  *)
 let signature_size = 64
 
@@ -35,10 +33,7 @@ let signature_size = 64
 let rlp_tags_size = 16
 
 let max_chunk_size =
-  let open Transaction_format in
-  (* max_input_size already considers the external tag *)
-  max_input_size - framing_protocol_tag_size - smart_rollup_address_size
-  - blueprint_tag_size - blueprint_number_size - nb_chunks_size
+  Message_format.usable_size_in_message - blueprint_number_size - nb_chunks_size
   - chunk_index_size - rlp_tags_size - signature_size
 
 let maximum_usable_space_in_blueprint chunks_count =
@@ -116,10 +111,11 @@ let create ~cctxt ~sequencer_key ~timestamp ~smart_rollup_address ~number
       |> encode |> Bytes.to_string
     in
     `External
-      ("\000" (* Framed protocol *) ^ smart_rollup_address
-      ^ "\003"
-      ^ (* Sequencer blueprint *)
-      rlp_sequencer_blueprint)
+      Message_format.(
+        frame_message
+          smart_rollup_address
+          Blueprint_chunk
+          rlp_sequencer_blueprint)
     |> return
   in
   List.mapi_ep (message_from_chunk nb_chunks) chunks
