@@ -136,33 +136,13 @@ module Make (SimulationBackend : SimulationBackend) = struct
       The whole point of this function is to avoid an unncessary call
       to the WASM PVM to improve the performances.
   *)
-  let gas_for_fees simulation_state tx_data =
+  let gas_for_fees simulation_state tx_data : (Z.t, tztrace) result Lwt.t =
     let open Lwt_result_syntax in
-    (* Constants defined in the kernel: *)
-    let assumed_tx_encoded_size = 150 in
-    let default_da_fee_per_byte =
-      (* 4 * 10^12, 4 mutez *)
-      Ethereum_types.quantity_of_z (Z.of_string "4_000_000_000_000")
-    in
-
-    (* Computation of da fee based on da fee per byte and variable tx data. *)
-    let da_fee da_fee_per_byte tx_data =
-      let size = Bytes.length tx_data + assumed_tx_encoded_size |> Z.of_int in
-      Z.mul da_fee_per_byte size
-    in
-
     let read_qty path =
       let+ bytes = SimulationBackend.read simulation_state ~path in
       Option.map Ethereum_types.decode_number_le bytes
     in
-
-    let* (Qty da_fee_per_byte) =
-      let+ da_fee_per_byte_opt =
-        read_qty Durable_storage_path.da_fee_per_byte
-      in
-      Option.value ~default:default_da_fee_per_byte da_fee_per_byte_opt
-    in
-
+    let* da_fee_per_byte = read_qty Durable_storage_path.da_fee_per_byte in
     let* (Qty gas_price) =
       let path = Durable_storage_path.base_fee_per_gas in
       let* gas_price_opt = read_qty path in
@@ -173,9 +153,8 @@ module Make (SimulationBackend : SimulationBackend) = struct
           failwith "Internal error: base fee per gas is not found at %s" path
       | Some gas_price -> return gas_price
     in
-
-    let fees = da_fee da_fee_per_byte tx_data in
-    return (Z.div fees gas_price)
+    let da_fee = Fees.gas_for_fees ?da_fee_per_byte ~gas_price tx_data in
+    return da_fee
 
   let check_node_da_fees ~previous_gas ~node_da_fees ~simulation_version
       simulation_state call =
