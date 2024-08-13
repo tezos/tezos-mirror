@@ -1138,6 +1138,7 @@ pub fn read_tracer_input<Host: Runtime>(
                 FromRlpBytes::from_rlp_bytes(&bytes)?;
             TracerInput::StructLogger(struct_logger_input)
         };
+        log!(host, Debug, "Tracer input found: {:?}", tracer);
 
         Ok(Some(tracer))
     } else {

@@ -37,7 +37,7 @@ let default_tracer_config =
     disable_stack = false;
     disable_storage = false;
     with_logs = true;
-    only_top_call = true;
+    only_top_call = false;
   }
 
 let tracer_config_encoding =
@@ -178,6 +178,10 @@ let config_encoding =
 
 type input = Ethereum_types.hash * config
 
+let config_to_string config =
+  Data_encoding.Json.to_string
+    (Data_encoding.Json.construct config_encoding config)
+
 type call_input =
   (Ethereum_types.call * Ethereum_types.Block_parameter.extended) * config
 
@@ -229,7 +233,7 @@ let call_tracer_input_rlp_encoder ?hash config =
   let only_top_call =
     Ethereum_types.bool_to_rlp_bytes config.tracer_config.only_top_call
   in
-  List [hash; with_logs; only_top_call]
+  List [hash; only_top_call; with_logs]
   |> encode
   |> Bytes.cat (Bytes.make 1 tracer_input_prefix_calltracer)
   |> Bytes.to_string
