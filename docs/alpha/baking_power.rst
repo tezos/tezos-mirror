@@ -23,7 +23,7 @@ is computed in a similar but simpler way.
 
 .. note::
 
-  In this page, the prefix ``../`` in all RPC paths is standing for
+  In this page, the prefix ``.../`` in all RPC paths is standing for
   ``/chain/<chain_id>/blocks/<block_id>/context/``
 
   Besides, many RPCs presented here used to be known under different
@@ -46,7 +46,7 @@ power** as the weight for each delegate that meets the
 :ref:`requirements<minimal_baking_power_alpha>`. (``CONSENSUS_RIGHTS_DELAY
 = 2`` is a :ref:`protocol constant<cs_constants_alpha>`.)
 
-The ``../delegates/<delegate_pkh>/baking_power`` RPC can be used to
+The ``.../delegates/<delegate_pkh>/baking_power`` RPC can be used to
 retrieve the current baking power of a delegate, that is, its baking
 power as of the end of the requested block ``<block_id>`` (see the
 note above on RPC paths). Therefore, the baking power used for the
@@ -71,14 +71,14 @@ A **delegate**, a.k.a. **baker**, is a :ref:`user
 account<user_accounts_alpha>` that has registered as a delegate by
 emitting a self-``delegation`` :ref:`manager
 operation<manager_operations_alpha>`. The list of all registered
-delegates is queried with the ``../delegates`` RPC.
+delegates is queried with the ``.../delegates`` RPC.
 
 A **delegator** for a given baker is an :doc:`account<accounts>` that
 has registered this baker as its delegate by emitting a ``delegation``
 operation. This includes the baker itself. A delegator may be a user
 account or a smart contract. The list of delegators for a given
 delegate is queried with the
-``../delegates/<delegate_pkh>/delegators`` RPC.
+``.../delegates/<delegate_pkh>/delegators`` RPC.
 
 A **staker** is a delegator that has :doc:`staked<staking>` tez by
 emitting a :ref:`stake operation<staked_funds_management_alpha>`. This
@@ -86,7 +86,7 @@ includes the delegate itself if it has staked funds. Note that stakers
 are always user accounts, because smart contracts cannot emit
 ``stake`` operations. The list of a delegate's stakers and their
 respective staked balances (see below) are queried with the
-``../delegates/<delegate_pkh>/stakers`` RPC.
+``.../delegates/<delegate_pkh>/stakers`` RPC.
 
 An **external delegator** (resp. **external staker**) is a delegator
 (resp. staker) that is not the delegate itself.
@@ -104,7 +104,7 @@ be :ref:`slashed<slashing_alpha>` if the delegate misbehaves. That's
 why they are also known as **frozen deposits**.
 
 The **staked balance** of an account is its amount of staked tez. It
-can be queried with the ``../contracts/<contract_id>/staked_balance``
+can be queried with the ``.../contracts/<contract_id>/staked_balance``
 RPC (in mutez). Note that if an account does not have a delegate, then
 it cannot have any staked tez so its staked balance is zero.
 
@@ -112,16 +112,16 @@ For a given delegate, we define the following:
 
 - ``own_staked`` is the staked balance of the delegate itself. It can
   be queried with either RPC
-  ``../contracts/<contract_id>/staked_balance`` or
-  ``../delegates/<delegate_pkh>/own_staked`` (in mutez).
+  ``.../contracts/<contract_id>/staked_balance`` or
+  ``.../delegates/<delegate_pkh>/own_staked`` (in mutez).
 
 - ``external_staked`` is the sum of the staked balances of the
   delegate's external stakers. It is queried with the
-  ``../delegates/<delegate_pkh>/external_staked`` RPC (in mutez).
+  ``.../delegates/<delegate_pkh>/external_staked`` RPC (in mutez).
 
 - ``total_staked`` is the sum of the staked balances of all stakers,
   including the delegate itself. It is queried with the
-  ``../delegates/<delegate_pkh>/total_staked`` RPC (in mutez).
+  ``.../delegates/<delegate_pkh>/total_staked`` RPC (in mutez).
 
 All three values are of course related:
 
@@ -147,20 +147,20 @@ tez. It is the sum of the following balances:
 
 - The **spendable balance** is the amount of tez that the account can
   freely access and spend at the current time. It can be queried with
-  RPC ``../contracts/<contract_id>/spendable`` (in mutez).
+  RPC ``.../contracts/<contract_id>/spendable`` (in mutez).
 
 - The **unstaked balance** is the sum of tez contained in **unstake
   requests**. These tez have been removed from the staked balance via
   an ``unstake`` operation, but have not been added back to the
   spendable balance yet; see
   :ref:`staked_funds_management_alpha`. Unstake requests can be
-  queried with RPC ``../contracts/<contract_id>/unstake_requests``
+  queried with RPC ``.../contracts/<contract_id>/unstake_requests``
   (returns a detailed view with unfinalizable/finalizable status,
   delegate-at-creation-time, cycle, and amount in mutez).
 
 - The **frozen bonds** are a deposit for :ref:`rollup
   commitments<commitments_alpha>`. They can be queried with RPC
-  ``../contracts/<contract_id>/frozen_bonds`` (in mutez).
+  ``.../contracts/<contract_id>/frozen_bonds`` (in mutez).
 
 Together, the staked and delegated tez represent all the tez owned by
 an account, called the **full balance**.
@@ -203,7 +203,7 @@ For a given delegate, we define the following:
   account. It corresponds to all non-staked tez owned by the baker
   (except for any unstake requests from former delegates, but it's
   rare for a delegate to still have such requests). It can be queried
-  with RPC ``../delegates/<delegate_pkh>/own_delegated`` (in mutez).
+  with RPC ``.../delegates/<delegate_pkh>/own_delegated`` (in mutez).
 
 - ``external_delegated`` is the sum of tez that count as delegated to
   the baker but are not owned by the baker itself. In other words, it
@@ -211,11 +211,11 @@ For a given delegate, we define the following:
   external delegators, plus the sum of any unstaked requests that
   might still exist from this baker to former external delegators. It
   can be queried with RPC
-  ``../delegates/<delegate_pkh>/external_delegated`` (in mutez).
+  ``.../delegates/<delegate_pkh>/external_delegated`` (in mutez).
 
 - ``total_delegated`` is the total amount that counts as delegated to
   this baker. It can be queried with RPC
-  ``../delegates/<delegate_pkh>/total_delegated`` (in mutez).
+  ``.../delegates/<delegate_pkh>/total_delegated`` (in mutez).
 
 ::
 
