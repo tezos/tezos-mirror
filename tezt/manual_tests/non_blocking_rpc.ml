@@ -84,12 +84,12 @@ let write_identity ~path id =
   | Error e -> Test.fail "Cannot convert to JSON: %s" e
   | Ok json -> write_file (Filename.concat path "identity.json") json
 
-let reference_dir =
+let reference_dir () =
   match Sys.getenv_opt "REF_DIR" with
   | Some v -> v
   | None -> Test.fail "cannot find reference directory"
 
-let bootstrapping_snapshot =
+let bootstrapping_snapshot () =
   match Sys.getenv_opt "BOOT_SNAP" with
   | Some v -> v
   | None -> Test.fail "cannot find bootstrapping snapshot"
@@ -204,7 +204,7 @@ let benchmark_bootstrap_node ~reference_node ~node_name ~rpc_external =
   let* bootstrap_node =
     spawn_bootstrapping_node
       ~node_name
-      ~snapshot_uri:bootstrapping_snapshot
+      ~snapshot_uri:(bootstrapping_snapshot ())
       ~reference_node
       ~rpc_external
   in
@@ -228,7 +228,9 @@ let get_progress_after_bootstrapping () =
     ~title:"Check progress made by node during bootstrapping"
     ~tags:["get"; "node"; "progress"]
   @@ fun () ->
-  let* reference_node = spawn_reference_node ~reference_dir in
+  let* reference_node =
+    spawn_reference_node ~reference_dir:(reference_dir ())
+  in
   let* external_level =
     benchmark_bootstrap_node
       ~reference_node
