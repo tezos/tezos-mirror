@@ -482,19 +482,19 @@ let register :
        (P2P.connect ctxt)
   |> add_service
        Tezos_rpc.Directory.register1
-       Services.P2P.delete_disconnect_point
+       Services.P2P.Points.delete_disconnect_point
        (P2P.disconnect_point ctxt)
   |> add_service
        Tezos_rpc.Directory.register1
-       Services.P2P.delete_disconnect_peer
+       Services.P2P.Peers.delete_disconnect_peer
        (P2P.disconnect_peer ctxt)
   |> add_service
        Tezos_rpc.Directory.register0
-       Services.P2P.get_points
+       Services.P2P.Points.get_points
        (P2P.get_points ctxt)
   |> add_service
        Tezos_rpc.Directory.register0
-       Services.P2P.get_points_info
+       Services.P2P.Points.get_points_info
        (P2P.get_points_info ctxt)
   |> add_service
        Tezos_rpc.Directory.opt_register1
@@ -502,11 +502,11 @@ let register :
        (P2P.get_point_info ctxt)
   |> add_service
        Tezos_rpc.Directory.register0
-       Services.P2P.get_peers
+       Services.P2P.Peers.get_peers
        (P2P.get_peers ctxt)
   |> add_service
        Tezos_rpc.Directory.register0
-       Services.P2P.get_peers_info
+       Services.P2P.Peers.get_peers_info
        (P2P.get_peers_info ctxt)
   |> add_service
        Tezos_rpc.Directory.opt_register1
