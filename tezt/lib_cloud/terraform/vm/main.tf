@@ -267,7 +267,7 @@ data "google_compute_image" "cos" {
 }
 
 data "google_compute_image" "debian" {
-  family  = "debian-11"
+  family  = "debian-12"
   project = "debian-cloud"
 }
 
