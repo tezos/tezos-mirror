@@ -406,7 +406,7 @@ module P2P = struct
            is given, then only get the connected peers."
         ~query:connected_query
         ~output:Data_encoding.(list (obj1 (req "peer" P2p_peer.Id.encoding)))
-        (open_root / "list")
+        open_root
 
     let get_peers_info :
         < meth : [`GET]
