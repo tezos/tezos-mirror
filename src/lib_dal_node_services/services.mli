@@ -302,7 +302,7 @@ module P2P : sig
       ; output : (Types.Topic.t * Types.Peer.t list) list
       ; prefix : unit
       ; params : unit
-      ; query : < subscribed : bool > >
+      ; query : < all : bool > >
       service
 
     val get_slot_indexes_peers :
@@ -311,7 +311,7 @@ module P2P : sig
       ; output : (Types.slot_index * Types.Peer.t list) list
       ; prefix : unit
       ; params : unit
-      ; query : < subscribed : bool > >
+      ; query : < all : bool > >
       service
 
     val get_pkhs_peers :
@@ -320,7 +320,7 @@ module P2P : sig
       ; output : (Signature.public_key_hash * Types.Peer.t list) list
       ; prefix : unit
       ; params : unit
-      ; query : < subscribed : bool > >
+      ; query : < all : bool > >
       service
 
     val get_connections :

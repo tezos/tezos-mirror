@@ -497,15 +497,15 @@ module P2P = struct
         ; output : (Types.Topic.t * Types.Peer.t list) list
         ; prefix : unit
         ; params : unit
-        ; query : < subscribed : bool > >
+        ; query : < all : bool > >
         service =
       Tezos_rpc.Service.get_service
         ~description:
-          "Get an association list between each topic subscribed to by the \
-           connected peers and the remote peers subscribed to that topic. If \
-           the 'subscribed' flag is given, then restrict the output to the \
-           topics this peer is subscribed to."
-        ~query:subscribed_query
+          "When the 'all' flag is given, get an association list between each \
+           topic subscribed to by the connected peers and the remote peers \
+           subscribed to that topic. If the 'all' flag is not given, then \
+           restrict the output to the topics this peer is subscribed to."
+        ~query:all_query
         ~output:
           Data_encoding.(
             list
@@ -520,15 +520,16 @@ module P2P = struct
         ; output : (Types.slot_index * Types.Peer.t list) list
         ; prefix : unit
         ; params : unit
-        ; query : < subscribed : bool > >
+        ; query : < all : bool > >
         service =
       Tezos_rpc.Service.get_service
         ~description:
-          "Get an association list between each public key hash part of a \
-           topic subscribed to by the connected peers and the remote peers \
-           subscribed to such topics. If the 'subscribed' flag is given, then \
-           restrict the output to the topics this peer is subscribed to."
-        ~query:subscribed_query
+          "When the 'all' flag is given, get an association list between each \
+           public key hash part of a topic subscribed to by the connected \
+           peers and the remote peers subscribed to such topics. If the 'all' \
+           flag is not given, then restrict the output to the topics this peer \
+           is subscribed to."
+        ~query:all_query
         ~output:
           Data_encoding.(
             list
@@ -543,15 +544,15 @@ module P2P = struct
         ; output : (Signature.public_key_hash * Types.Peer.t list) list
         ; prefix : unit
         ; params : unit
-        ; query : < subscribed : bool > >
+        ; query : < all : bool > >
         service =
       Tezos_rpc.Service.get_service
         ~description:
-          "Get an association list between each topic subscribed to by the \
-           connected peers and the remote peers subscribed to that topic. If \
-           the 'subscribed' flag is given, then restrict the output to the \
-           topics this peer is subscribed to."
-        ~query:subscribed_query
+          "When the 'all' flag is given, get an association list between each \
+           topic subscribed to by the connected peers and the remote peers \
+           subscribed to that topic. If the 'all' flag is not given, then \
+           restrict the output to the topics this peer is subscribed to."
+        ~query:all_query
         ~output:
           Data_encoding.(
             list
