@@ -79,6 +79,8 @@
 - Store finalized L2 level per L1 level. (!14193)
 - Reduces the number of WASM PVM calls for gas estimation. In particular
   estimation of DA fees no longer require to run the kernel. (!14165)
+- Add a private RPC method to by-pass node validation when injecting a
+  transaction to the TX pool. (!13856).
 
 ## Version for ec7c3b349624896b269e179384d0a45cf39e1145
 

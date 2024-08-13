@@ -672,6 +672,21 @@ module Produce_proposal = struct
   type ('input, 'output) method_ += Method : (input, output) method_
 end
 
+module Inject_transaction = struct
+  type input = Ethereum_types.transaction_object * string
+
+  type output = unit
+
+  let input_encoding =
+    Data_encoding.(tup2 Ethereum_types.transaction_object_encoding string)
+
+  let output_encoding = Data_encoding.unit
+
+  let method_ = "injectTransaction"
+
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
 module Durable_state_value = struct
   type input = Durable_storage_path.path
 
@@ -838,6 +853,7 @@ let supported_methods : (module METHOD) list =
     (module Web3_sha3);
     (module Produce_block);
     (module Produce_proposal);
+    (module Inject_transaction);
     (module Durable_state_value);
     (module Durable_state_subkeys);
     (module Eth_max_priority_fee_per_gas);

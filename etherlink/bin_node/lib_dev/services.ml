@@ -659,6 +659,16 @@ let dispatch_private_request (_config : Configuration.t)
           rpc_ok ()
         in
         build ~f module_ parameters
+    | Method (Inject_transaction.Method, module_) ->
+        let open Lwt_result_syntax in
+        let f (transaction_object, raw_txn) =
+          let* tx_hash = Tx_pool.add transaction_object raw_txn in
+          match tx_hash with
+          | Ok _tx_hash -> rpc_ok ()
+          | Error reason ->
+              rpc_error (Rpc_errors.transaction_rejected reason None)
+        in
+        build_with_input ~f module_ parameters
     | Method (Durable_state_value.Method, module_) ->
         let f path =
           let open Lwt_result_syntax in
