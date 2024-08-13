@@ -1127,7 +1127,7 @@ let rpc_command =
             uri
         | None ->
             let evm_node_addr =
-              match read_write_config.rpc_addr with
+              match read_write_config.public_rpc.addr with
               | "0.0.0.0" (* IPv4 catch-all bind address *)
               | "[::]" (* IPv6 catch-all bind address *) ->
                   "localhost"
@@ -1136,7 +1136,7 @@ let rpc_command =
             Uri.make
               ~scheme:"http"
               ~host:evm_node_addr
-              ~port:read_write_config.rpc_port
+              ~port:read_write_config.public_rpc.port
               ()
       in
       let config =

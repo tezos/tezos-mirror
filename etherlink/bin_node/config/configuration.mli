@@ -98,27 +98,33 @@ type proxy = {
 type fee_history = {max_count : int option; max_past : int option}
 
 type restricted_rpcs =
+  | Unrestricted
   | Pattern of {raw : string; regex : Re.re}
   | Blacklist of string list
   | Whitelist of string list
 
 type limit = Unlimited | Limit of int
 
-type t = {
-  rpc_addr : string;
-  rpc_port : int;
-  private_rpc_port : int option;  (** Port for internal RPC services *)
-  rpc_batch_limit : limit;
+type rpc = {
+  port : int;
+  addr : string;
   cors_origins : string list;
   cors_headers : string list;
+  max_active_connections :
+    Tezos_rpc_http_server.RPC_server.Max_active_rpc_connections.t;
+  batch_limit : limit;
+  restricted_rpcs : restricted_rpcs;
+}
+
+type t = {
+  public_rpc : rpc;
+  private_rpc : rpc option;
   log_filter : log_filter_config;
   kernel_execution : kernel_execution_config;
   sequencer : sequencer option;
   threshold_encryption_sequencer : threshold_encryption_sequencer option;
   observer : observer option;
   proxy : proxy;
-  max_active_connections :
-    Tezos_rpc_http_server.RPC_server.Max_active_rpc_connections.t;
   tx_pool_timeout_limit : int64;
   tx_pool_addr_limit : int64;
   tx_pool_tx_per_addr_limit : int64;
@@ -127,7 +133,6 @@ type t = {
   verbose : Internal_event.level;
   experimental_features : experimental_features;
   fee_history : fee_history;
-  restricted_rpcs : restricted_rpcs option;
 }
 
 (** [default_data_dir] is the default value for [data_dir]. *)

@@ -317,4 +317,4 @@ type map_result =
   | Disabled
 
 val map_method_name :
-  ?restrict:Configuration.restricted_rpcs -> string -> map_result
+  restrict:Configuration.restricted_rpcs -> string -> map_result

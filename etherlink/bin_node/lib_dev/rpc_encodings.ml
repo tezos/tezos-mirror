@@ -910,13 +910,13 @@ let unsupported_methods : string list =
     "engine_newPayloadV4";
   ]
 
-let map_method_name ?restrict method_name =
+let map_method_name ~restrict method_name =
   let disabled =
     match restrict with
-    | Some (Configuration.Pattern {regex; _}) -> Re.execp regex method_name
-    | Some (Whitelist l) -> not (List.mem ~equal:String.equal method_name l)
-    | Some (Blacklist l) -> List.mem ~equal:String.equal method_name l
-    | None -> false
+    | Configuration.Pattern {regex; _} -> Re.execp regex method_name
+    | Whitelist l -> not (List.mem ~equal:String.equal method_name l)
+    | Blacklist l -> List.mem ~equal:String.equal method_name l
+    | Unrestricted -> false
   in
 
   if disabled then Disabled
