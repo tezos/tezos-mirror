@@ -310,3 +310,31 @@ let gas_left () =
     ~label:"gas_left"
     ~contract:"GasLeft"
     ~evm_version:"shanghai"
+
+let call_types () =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/call_types.sol")
+    ~label:"call_types"
+    ~contract:"TestCallTypes"
+    ~evm_version:"shanghai"
+
+let simple_logger () =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/simple_logger.sol")
+    ~label:"simple_logger"
+    ~contract:"SimpleLogger"
+    ~evm_version:"shanghai"
+
+let call_tracer_depth () =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/call_tracer_depth.sol")
+    ~label:"call_tracer_depth"
+    ~contract:"TestDepthCall"
+    ~evm_version:"shanghai"
+
+let call_tracer_revert () =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/call_tracer_revert.sol")
+    ~label:"call_tracer_revert"
+    ~contract:"ErrorContract"
+    ~evm_version:"shanghai"
