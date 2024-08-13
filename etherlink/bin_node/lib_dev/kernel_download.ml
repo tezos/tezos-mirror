@@ -82,9 +82,9 @@ let rec reveal_and_check ~preimages_endpoint ~preimages ~num_download_retries
         hash
   else return preimage
 
-let download ~preimages_endpoint ~preimages ~(root_hash : Hex.t) =
+let download ~preimages_endpoint ~preimages ~(root_hash : Hex.t)
+    ?(num_download_retries = 1) () =
   let open Lwt_result_syntax in
-  let num_download_retries = 1 in
   let rec go retrieved_hashes =
     let open Lwt_result_syntax in
     match retrieved_hashes with

@@ -9,4 +9,6 @@ val download :
   preimages_endpoint:Uri.t ->
   preimages:string ->
   root_hash:Hex.t ->
+  ?num_download_retries:int ->
+  unit ->
   unit tzresult Lwt.t
