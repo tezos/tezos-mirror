@@ -423,7 +423,7 @@ module P2P = struct
           Data_encoding.(
             list
               (obj2
-                 (req "point" P2p_peer.Id.encoding)
+                 (req "peer" P2p_peer.Id.encoding)
                  (req "info" P2P.Peer.Info.encoding)))
         (open_root / "info")
 
