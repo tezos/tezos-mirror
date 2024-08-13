@@ -50,6 +50,8 @@ val commit_info_pp : Format.formatter -> commit_info -> unit
 
 val commit_info_pp_short : Format.formatter -> commit_info -> unit
 
+val commit_info_equivalent : commit_info -> commit_info -> bool
+
 val encoding : t Data_encoding.t
 
 (** [partially_compare v1 c1 v2 c2] is similar to compare like function but
@@ -66,7 +68,8 @@ val encoding : t Data_encoding.t
     If [v1] and [v2] are equal, but [c1] and [c2] are not then they are not
     comparable.
 
-    [c1] and [c2] are used only for equality.
+    [c1] and [c2] are used only for equality. If the hash of [c1] or [c2] is a
+    prefix or equal to the other one, they are considered as equal.
 
     To determine which version is more recent or old:
     - [major] has the priority on [minor]

@@ -53,6 +53,38 @@ let check_node_version_check_bypass_test =
   let* () = check_bypassed_event_promise in
   unit
 
+let check_node_version_allowed_test =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"baker node version allowed test"
+    ~tags:[team; "node"; "baker"]
+    ~supports:Protocol.(From_protocol 022)
+    ~uses:(fun protocol -> [Protocol.baker protocol])
+  @@ fun protocol ->
+  let* node, client = Client.init_with_protocol `Client ~protocol () in
+  let* _baker =
+    Baker.init
+      ~protocol
+      ~node_version_allowed:"octez-v7894.789:1a991a03"
+      node
+      client
+  in
+  unit
+
+let check_node_version_no_commit_allowed_test =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"baker node version no commit allowed test"
+    ~tags:[team; "node"; "baker"]
+    ~supports:Protocol.(From_protocol 022)
+    ~uses:(fun protocol -> [Protocol.baker protocol])
+  @@ fun protocol ->
+  let* node, client = Client.init_with_protocol `Client ~protocol () in
+  let* _baker =
+    Baker.init ~protocol ~node_version_allowed:"octez-v7894.789" node client
+  in
+  unit
+
 let baker_reward_test =
   Protocol.register_regression_test
     ~__FILE__
@@ -261,6 +293,8 @@ let baker_check_consensus_branch =
 
 let register ~protocols =
   check_node_version_check_bypass_test protocols ;
+  check_node_version_allowed_test protocols ;
+  check_node_version_no_commit_allowed_test protocols ;
   baker_simple_test protocols ;
   baker_reward_test protocols ;
   baker_stresstest protocols ;

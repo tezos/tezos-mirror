@@ -111,6 +111,12 @@ val pp : Format.formatter -> t -> unit
     Same as [pp] but does not print the product name. *)
 val pp_simple : Format.formatter -> t -> unit
 
+(** A Version printer compatible with command line argments.
+
+    Same as [pp] but print the product name in lowercase and followed by a dash
+    instead of a space. *)
+val pp_arg : Format.formatter -> t -> unit
+
 (** Parse an Octez version.
 
    Returns None if the version cannot be parsed. *)

@@ -124,8 +124,8 @@ Baker
 
 - By default, the Baker only accepts to communicate with nodes of the same or
   more recent version. To allow the Baker to communicate with nodes of older
-  version or dev version, use the --node-version-check-bypass option. (MR
-  :gl:`!14044`)
+  version or dev version, use the --node-version-check-bypass or
+  --node-version-allowed option. (MRs :gl:`!14044`, :gl:`!14189`)
 
 Accuser
 -------
