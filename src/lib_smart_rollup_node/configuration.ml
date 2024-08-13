@@ -4,6 +4,7 @@
 (* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
+(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -836,17 +837,17 @@ module Cli = struct
       ~index_buffer_size ~irmin_cache_size ~log_kernel_debug ~no_degraded
       ~gc_frequency ~history_mode ~allowed_origins ~allowed_headers
       ~apply_unsafe_patches ~bail_on_disagree =
-    let open Result_syntax in
+    let open Lwt_result_syntax in
     let mode = Option.value ~default:configuration.mode mode in
-    let* () = check_custom_mode mode in
-    let* purposed_operator, default_operator =
+    let*? () = check_custom_mode mode in
+    let*? purposed_operators, default_operator =
       get_purposed_and_default_operators operators
     in
     let* operators =
-      Purpose.replace_operator
+      Purpose.replace_operators
         ?default_operator
         ~needed_purposes:(purposes_of_mode mode)
-        purposed_operator
+        purposed_operators
         configuration.operators
     in
     let rpc_addr = Option.value ~default:configuration.rpc_addr rpc_addr in
@@ -953,7 +954,7 @@ module Cli = struct
       (* Read configuration from file and patch if user wanted to override
          some fields with values provided by arguments. *)
       let* configuration = load ~data_dir in
-      let*? configuration =
+      let* configuration =
         patch_configuration_from_args
           configuration
           ~rpc_addr

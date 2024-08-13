@@ -4,6 +4,8 @@
 (* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
 (* Copyright (c) 2023 Marigold, <contact@marigold.dev>                       *)
+(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
+(*                                                                           *)
 (*****************************************************************************)
 
 type 'a t =
@@ -62,12 +64,29 @@ let encoding =
   Data_encoding.string_enum
   @@ List.map (fun p -> (to_string_ex_purpose p, p)) all
 
-type error +=
-  | Missing_operator of ex_purpose
-  | Too_many_operators of {
-      expected_purposes : ex_purpose list;
-      given_operators : operators;
-    }
+module Set = struct
+  include Set.Make (struct
+    type nonrec t = ex_purpose
+
+    let compare = Stdlib.compare
+  end)
+
+  let pp fmt s =
+    Format.pp_print_seq
+      ~pp_sep:(fun fmt () -> Format.fprintf fmt ",@ ")
+      pp_ex_purpose
+      fmt
+      (to_seq s)
+
+  let encoding =
+    let open Data_encoding in
+    conv
+      (fun s -> to_seq s |> List.of_seq)
+      (fun l -> List.to_seq l |> of_seq)
+      (list encoding)
+end
+
+type error += Missing_operator of ex_purpose | Missing_operators of Set.t
 
 let of_string_ex_purpose = function
   (* For backward compability:
@@ -120,24 +139,6 @@ let operators_encoding =
        ~key_of_string:of_string_exn_ex_purpose
        ~value_encoding:(fun _ -> ex_operator_encoding))
 
-let pp_operators fmt operators =
-  Format.pp_print_list
-    (fun fmt (purpose, operator) ->
-      let keys =
-        match operator with
-        | Operator (Single key) -> [key]
-        | Operator (Multiple keys) -> keys
-      in
-      Format.fprintf
-        fmt
-        "%a: %a"
-        pp_ex_purpose
-        purpose
-        (Format.pp_print_list Signature.Public_key_hash.pp)
-        keys)
-    fmt
-    (Map.bindings operators)
-
 let () =
   register_error_kind
     ~id:"sc_rollup.node.missing_mode_operator"
@@ -155,28 +156,34 @@ let () =
       | Missing_operator missing_purpose -> Some missing_purpose | _ -> None)
     (fun missing_purpose -> Missing_operator missing_purpose) ;
   register_error_kind
-    ~id:"sc_rollup.node.too_many_operators"
-    ~title:"Too many operators for the chosen mode"
-    ~description:"Too many operators for the chosen mode."
-    ~pp:(fun ppf (expected_purposes, given_operators) ->
+    ~id:"sc_rollup.node.missing_operators"
+    ~title:"Missing operators for the chosen mode"
+    ~description:"Missing operators for the chosen mode."
+    ~pp:(fun ppf missing_purposes ->
       Format.fprintf
         ppf
-        "@[<hov>Too many operators, expecting operators for only %a, have %a.@]"
-        (Format.pp_print_list pp_ex_purpose)
-        expected_purposes
-        pp_operators
-        given_operators)
+        "@[<hov>Missing operators for purposes %a.@]"
+        Set.pp
+        missing_purposes)
     `Permanent
-    Data_encoding.(
-      obj2
-        (req "expected_purposes" (list encoding))
-        (req "given_operators" operators_encoding))
-    (function
-      | Too_many_operators {expected_purposes; given_operators} ->
-          Some (expected_purposes, given_operators)
-      | _ -> None)
-    (fun (expected_purposes, given_operators) ->
-      Too_many_operators {expected_purposes; given_operators})
+    Data_encoding.(obj1 (req "missing_purposes" Set.encoding))
+    (function Missing_operators p -> Some p | _ -> None)
+    (fun p -> Missing_operators p)
+
+module Event = struct
+  include Internal_event.Simple
+
+  let section = ["smart_rollup_node"; "configuration"]
+
+  let unused_operators =
+    declare_1
+      ~section
+      ~name:"smart_rollup_node_config_unused_operators"
+      ~msg:"[Warning]: Unused operators for {extra_purposes}."
+      ~level:Warning
+      ("extra_purposes", Set.encoding)
+      ~pp1:Set.pp
+end
 
 (* For each purpose, it returns a list of associated operation kinds *)
 let operation_kind : ex_purpose -> Operation_kind.t list = function
@@ -250,9 +257,9 @@ let make_operator ?default_operator ~needed_purposes purposed_key =
     Map.empty
     needed_purposes
 
-let replace_operator ?default_operator ~needed_purposes
+let replace_operators ?default_operator ~needed_purposes
     (purposed_key : (ex_purpose * Signature.public_key_hash) list) operators =
-  let open Result_syntax in
+  let open Lwt_result_syntax in
   let replacement_map =
     List.fold_left
       (fun map ((Purpose purpose as ex_purpose), key) ->
@@ -276,14 +283,17 @@ let replace_operator ?default_operator ~needed_purposes
       replacement_map
       operators
   in
-  let map_size = Map.cardinal operators in
-  let needed_purpose_len = List.length needed_purposes in
-  let* () =
-    error_when
-      (map_size <> needed_purpose_len)
-      (Too_many_operators
-         {expected_purposes = needed_purposes; given_operators = operators})
+  let needed_purposes = Set.of_list needed_purposes in
+  let given_purposes = Map.bindings operators |> List.map fst |> Set.of_list in
+  let missing = Set.diff needed_purposes given_purposes in
+  let*? () = error_unless (Set.is_empty missing) (Missing_operators missing) in
+  let extra = Set.diff given_purposes needed_purposes in
+  let*! () =
+    if not (Set.is_empty extra) then Event.(emit unused_operators) extra
+    else Lwt.return_unit
   in
+  (* Narrow operators to required purposes. *)
+  let operators = Map.filter (fun p _ -> Set.mem p needed_purposes) operators in
   return operators
 
 let single_operator : ex_operator -> Signature.public_key_hash operator =
