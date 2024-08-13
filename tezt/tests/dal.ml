@@ -2538,7 +2538,7 @@ let check_profiles ~__LOC__ dal_node ~expected =
         ~error_msg:
           (__LOC__ ^ " : Unexpected profiles (Actual: %L <> Expected: %R)"))
 
-let check_topics_peers ~__LOC__ ~subscribed dal_node ~expected =
+let check_topics_peers ~__LOC__ dal_node ~expected =
   let normalize_peers l = List.sort String.compare l in
   let compare_topics {Dal.RPC.topic_slot_index = s1; topic_pkh = p1}
       {Dal.RPC.topic_slot_index = s2; topic_pkh = p2} =
@@ -2550,7 +2550,7 @@ let check_topics_peers ~__LOC__ ~subscribed dal_node ~expected =
     |> List.map (fun (topic, peers) -> (topic, normalize_peers peers))
     |> List.sort (fun (t1, _p1) (t2, _p2) -> compare_topics t1 t2)
   in
-  let* topic_peers = Dal_RPC.(call dal_node @@ get_topics_peers ~subscribed) in
+  let* topic_peers = Dal_RPC.(call dal_node @@ get_topics_peers ()) in
   return
     Check.(
       (normalize_topics_peers topic_peers = normalize_topics_peers expected)
@@ -4760,7 +4760,7 @@ let test_attestation_through_p2p _protocol dal_parameters _cryptobox node client
       |> List.of_seq
     in
     let expected = List.concat (List.map expected all_pkhs) in
-    check_topics_peers ~__LOC__ attester ~subscribed:true ~expected
+    check_topics_peers ~__LOC__ attester ~expected
   in
 
   (* The slot producer should be connected to:
@@ -4773,7 +4773,7 @@ let test_attestation_through_p2p _protocol dal_parameters _cryptobox node client
              ( {Dal_RPC.topic_slot_index = index; topic_pkh},
                [bootstrap_peer_id; attester_peer_id] ))
     in
-    check_topics_peers ~__LOC__ producer ~subscribed:true ~expected
+    check_topics_peers ~__LOC__ producer ~expected
   in
 
   (* Produce and publish a slot *)
