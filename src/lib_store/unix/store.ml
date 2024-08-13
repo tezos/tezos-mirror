@@ -1695,6 +1695,9 @@ module Chain = struct
       Store_events.(emit delay_store_merging)
         (chain_store.storage_maintenance.maintenance_delay, new_target)
     in
+    Prometheus.Gauge.set
+      Store_metrics.metrics.maintenance_target
+      (Int32.to_float new_target) ;
     return_unit
 
   (* Returns whether or not we should proceed to the merge. True upon
@@ -1704,6 +1707,13 @@ module Chain = struct
     let level_to_merge_reached = target <= Block.level new_head in
     let* () =
       if level_to_merge_reached then
+        let () =
+          (* Set the storage maintenance target to -1 to notify that
+             no target is set. *)
+          Prometheus.Gauge.set
+            Store_metrics.metrics.maintenance_target
+            Float.minus_one
+        in
         Stored_data.write
           chain_store.storage_maintenance.scheduled_maintenance
           None
@@ -1920,6 +1930,11 @@ module Chain = struct
                       chain_store.storage_maintenance.scheduled_maintenance
                       None
                   in
+                  (* Set the storage maintenance target to -1 to notify that no
+                     target is set. *)
+                  Prometheus.Gauge.set
+                    Store_metrics.metrics.maintenance_target
+                    Float.minus_one ;
                   return_true
               | Custom delay ->
                   custom_delayed_maintenance chain_store new_head delay
@@ -2366,6 +2381,11 @@ module Chain = struct
         (Naming.scheduled_maintenance chain_dir)
         ~initial_data:None
     in
+    (* Set the storage maintenance target to -1 to notify that no
+       target is set. *)
+    Prometheus.Gauge.set
+      Store_metrics.metrics.maintenance_target
+      Float.minus_one ;
     let chain_store : chain_store =
       {
         global_store;
@@ -2419,6 +2439,15 @@ module Chain = struct
             (Naming.scheduled_maintenance chain_dir)
             ~initial_data:None
         in
+        let*! scheduled_maintenance_value =
+          Stored_data.get scheduled_maintenance
+        in
+        (* Set the storage maintenance target to -1, if no value
+           found, to notify that no target is set. *)
+        Prometheus.Gauge.set
+          Store_metrics.metrics.maintenance_target
+          (Option.value ~default:Int32.minus_one scheduled_maintenance_value
+          |> Int32.to_float) ;
         let chain_store =
           {
             global_store;
