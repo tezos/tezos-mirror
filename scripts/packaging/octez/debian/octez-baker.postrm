@@ -12,7 +12,7 @@ debsystemctl=$(command -v deb-systemd-invoke || echo systemctl)
 
 case "${1}" in
 purge)
-  rm -Rf /var/lib/octez-baker
+  rm -Rf /run/octez-baker
   # Purge debconf data for the package in any case
   # shellcheck disable=SC2119
   db_purge || true
@@ -21,8 +21,7 @@ upgrade)
   for s in baker accuser; do
     for p in next active; do
       # Check if the daemon was running before the upgrade
-      if [ -f "/var/lib/octez-baker/$s-$p-daemon_was_running" ] &&
-        [ "$(cat "/var/lib/octez-baker/$s-$p-daemon_was_running")" = "1" ]; then
+      if [ -f "/run/octez-baker/$s-$p-daemon_was_running" ]; then
         # Start the daemon if it was running
         $debsystemctl "start octez-$s-$p.service"
       fi
@@ -37,6 +36,6 @@ remove | failed-upgrade | abort-install | abort-upgrade | disappear) ;;
 esac
 
 # Clean up the temporary file
-rm -f /var/lib/octez-baker/*daemon_was_running
+rm -f /run/octez-baker/*daemon_was_running
 
 #DEBHELPER#
