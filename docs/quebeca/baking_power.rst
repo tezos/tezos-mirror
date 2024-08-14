@@ -395,11 +395,14 @@ Overstaking
 The **limit_of_staking_over_baking** is a :ref:`configurable delegate
 parameter<staking_policy_configuration_quebeca>` that limits how much
 staked tez the external stakers can contribute to the baking power,
-depending on the baker's own staked tez. It defaults to ``0`` --
-meaning no staked contribution from external stakers at all, and will
-be overridden by the global limit of ``5`` if it is higher than this
--- meaning that external stakers may contribute up to five time as
-much staked tez as the baker itself. If the amount of external staked
+depending on the baker's own staked tez. It defaults to ``0``, meaning
+no staked contribution from external stakers at all. It can be set to
+any non-negative value (with a one millionth precision); however, the
+``GLOBAL_LIMIT_OF_STAKING_OVER_BAKING`` constant, set to ``5``,
+ensures that external stakers may never contribute more than five time
+as much staked tez as the baker itself, regardless of the delegate's
+own limit.
+If the amount of external staked
 tez exceeds this quota, the baker is said to be **overstaked**, and we
 also call **overstaked** the excess of external staked tez over the
 allowed maximum. Any overstaked tez will count toward baking rights as
@@ -408,7 +411,8 @@ overdelegated too), so they will weigh half as much.
 
 .. code-block:: python
 
-  actual_limit_of_staking_over_baking = min(limit_of_staking_over_baking, 5)
+  global_limit_of_staking_over_baking = 5
+  actual_limit_of_staking_over_baking = min(limit_of_staking_over_baking, global_limit_of_staking_over_baking)
   max_allowed_external_staked = own_staked * actual_limit_of_staking_over_baking
   external_staked_after_limits = min(external_staked, max_allowed_external_staked)
 
