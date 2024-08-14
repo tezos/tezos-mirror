@@ -660,18 +660,6 @@ let wait_for_l1_bootstrapped (cctxt : Rpc_context.t) =
   let*! () = Event.(emit l1_node_bootstrapped) () in
   return_unit
 
-let get_head_plugin cctxt =
-  let open Lwt_result_syntax in
-  let* header = Shell_services.Blocks.Header.shell_header cctxt () in
-  let head_level = header.Block_header.level in
-  let* (module Plugin : Dal_plugin.T) =
-    Proto_plugins.resolve_plugin_for_level cctxt ~level:head_level
-  in
-  let* proto_parameters =
-    Plugin.get_constants `Main (`Level head_level) cctxt
-  in
-  return (head_level, (module Plugin : Dal_plugin.T), proto_parameters)
-
 (* This function checks that in case the history mode is Rolling with a custom
    number of blocks, these number of blocks are sufficient. *)
 let check_history_mode config profile_ctxt proto_parameters =
@@ -819,8 +807,8 @@ let update_and_register_profiles ctxt =
 (* This function fetches the protocol plugins for levels for which it is needed
    to add skip list cells. It starts by computing the oldest level at which it
    will be needed to add skip list cells. *)
-let get_proto_plugins cctxt profile_ctxt ~last_processed_level ~first_seen_level
-    (head_level, (module Plugin : Dal_plugin.T), proto_parameters) =
+let get_proto_plugins cctxt profile_ctxt ~last_processed_level ~first_seen_level head_level
+    proto_parameters =
   (* We resolve the plugins for all levels starting with [(max
      last_processed_level (head_level - storage_period)], or (max
      last_processed_level (head_level - storage_period) - (attestation_lag -
@@ -846,21 +834,22 @@ let get_proto_plugins cctxt profile_ctxt ~last_processed_level ~first_seen_level
   let first_level = Int32.(max 1l first_level) in
   Proto_plugins.initial_plugins cctxt ~first_level ~last_level:head_level
 
-(* This function removes old data starting from [last_processed_level -
-   storage_period] to [target_level - storage_period], where [storage_period] is
-   the period for which the DAL node stores data related to attested slots and
-   [target_level] is the level at which we connect the P2P and switch to
-   processing blocks in sync with the L1. [target_level] is set to [head_level -
-   2]. It also inserts skip list cells if needed in the period [head_level -
-   storage_level].
+  (* This function removes old data starting from [last_processed_level -
+     storage_period] to [target_level - storage_period], where [storage_period] is
+     the period for which the DAL node stores data related to attested slots and
+     [target_level] is the level at which we connect the P2P and switch to
+     processing blocks in sync with the L1. [target_level] is set to [head_level -
+     2]. It also inserts skip list cells if needed in the period [head_level -
+     storage_level].
 
-   FIXME: https://gitlab.com/tezos/tezos/-/issues/7429
-   We don't call [may_add_plugin], so there is a chance the plugin changes
-   and we don't detect it if this code starts running just before the migration
-   level, and the head changes meanwhile to be above the migration level.
-*)
+     FIXME: https://gitlab.com/tezos/tezos/-/issues/7429
+     We don't call [may_add_plugin], so there is a chance the plugin changes
+     and we don't detect it if this code starts running just before the migration
+     level, and the head changes meanwhile to be above the migration level.
+  *)
 let clean_up_store ctxt cctxt ~last_processed_level ~first_seen_level
-    (head_level, (module Plugin : Dal_plugin.T), proto_parameters) =
+ head_level proto_parameters
+    =
   let open Lwt_result_syntax in
   let store_skip_list_cells ~level =
     let*? (module Plugin) =
@@ -1049,14 +1038,14 @@ let run ~data_dir ~configuration_override =
   in
   (* First wait for the L1 node to be bootstrapped. *)
   let* () = wait_for_l1_bootstrapped cctxt in
-  (* Check the DAL node's and L1 node's history mode. *)
-  let* ((head_level, _, proto_parameters) as plugin_info) =
-    get_head_plugin cctxt
+  (* Get the current L1 head and its DAL plugin and parameters. *)
+  let* header = Shell_services.Blocks.Header.shell_header cctxt () in
+  let head_level = header.Block_header.level in
+  let* (module Plugin : Dal_plugin.T) =
+    Proto_plugins.resolve_plugin_for_level cctxt ~level:head_level
   in
-  let* () =
-    match first_seen_level with
-    | None -> Store.First_seen_level.save store.first_seen_level head_level
-    | Some _ -> return_unit
+  let* proto_parameters =
+    Plugin.get_constants `Main (`Level head_level) cctxt
   in
   let* profile_ctxt = build_profile_context config in
   let*? () =
@@ -1064,7 +1053,13 @@ let run ~data_dir ~configuration_override =
       profile_ctxt
       ~number_of_slots:proto_parameters.number_of_slots
   in
+  (* Check the DAL node's and L1 node's history mode. *)
   let* () = check_history_mode config profile_ctxt proto_parameters in
+  let* () =
+    match first_seen_level with
+    | None -> Store.First_seen_level.save store.first_seen_level head_level
+    | Some _ -> return_unit
+in
   let* () =
     check_l1_history_mode
       profile_ctxt
@@ -1099,7 +1094,8 @@ let run ~data_dir ~configuration_override =
       profile_ctxt
       ~last_processed_level
       ~first_seen_level
-      plugin_info
+      head_level
+      proto_parameters
   in
   let ctxt =
     Node_context.init
@@ -1124,7 +1120,8 @@ let run ~data_dir ~configuration_override =
           cctxt
           ~last_processed_level
           ~first_seen_level
-          plugin_info
+          head_level
+          proto_parameters
   in
   let* crawler =
     (* We reload the last processed level because [clean_up_store] has likely
