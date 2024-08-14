@@ -81,7 +81,7 @@ val recover_bond : _ Node_context.t -> unit tzresult Lwt.t
 
 (** Initialize worker for publishing and cementing commitments, if the
     rollup node mode supports it. *)
-val init : _ Node_context.t -> unit tzresult Lwt.t
+val init : Node_context.rw -> unit tzresult Lwt.t
 
 (** [publish_commitments] publishes the commitments that were not yet
     published up to the finalized head and which are after the last cemented
@@ -95,6 +95,9 @@ val publish_commitments : unit -> unit tzresult Lwt.t
     were originally published. This is a no-op if the rollup node is not in the
     appropriate mode. *)
 val cement_commitments : unit -> unit tzresult Lwt.t
+
+(** [execute_outbox] execute pending outbox messages on L1. *)
+val execute_outbox : unit -> unit tzresult Lwt.t
 
 (** Stop worker for publishing and cementing commitments. *)
 val shutdown : unit -> unit Lwt.t

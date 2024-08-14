@@ -368,6 +368,7 @@ let on_layer_1_head ({node_ctxt; _} as state) (head : Layer1.header) =
   notify_synchronization node_ctxt head.level ;
   let* () = Publisher.publish_commitments () in
   let* () = Publisher.cement_commitments () in
+  let* () = Publisher.execute_outbox () in
   let*! () = Daemon_event.new_heads_processed reorg.new_chain in
   let* () = Batcher.produce_batches () in
   let* () = Dal_injection_queue.produce_dal_slots () in

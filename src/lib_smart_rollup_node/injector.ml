@@ -147,12 +147,12 @@ module Parameters :
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/4071
            Think about which operations should be retried and when. *)
         match op with
-        | Cement _ | Publish _ ->
-            (* Cement and Publish commitments can be forgotten to free up the
+        | Cement _ | Publish _ | Execute_outbox_message _ ->
+            (* These operations can be forgotten to free up the
                injector as they are requeued by the node automatically. *)
             return Forget
         | Refute _ | Timeout _ | Add_messages _ | Recover_bond _
-        | Execute_outbox_message _ | Publish_dal_commitment _ -> (
+        | Publish_dal_commitment _ -> (
             match classify_trace error with
             | Permanent | Outdated -> return Forget
             | Branch | Temporary -> return Retry))

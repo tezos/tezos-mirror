@@ -159,27 +159,74 @@ let execute_whitelist_update_message_aux (node_ctxt : _ Node_context.t)
 let publish_execute_whitelist_update_message (node_ctxt : _ Node_context.t) =
   let open Lwt_result_syntax in
   let operator = Node_context.get_operator node_ctxt Executing_outbox in
-  match operator with
-  | None ->
-      (* Configured to not execute whitelist update commitments *)
+  unless (operator = None) @@ fun () ->
+  (* Configured to execute whitelist update commitments *)
+  let* cemented_commitment_and_proof =
+    executable_whitelist_update_message node_ctxt
+  in
+  let () =
+    Reference.map
+      (Option.map (fun private_info ->
+           let ({level; _} : Node_context.lcc) = Reference.get node_ctxt.lcc in
+           Node_context.{private_info with last_outbox_level_searched = level}))
+      node_ctxt.private_info
+  in
+  match cemented_commitment_and_proof with
+  | Some cemented_commitment_and_proof ->
+      execute_whitelist_update_message_aux
+        node_ctxt
+        cemented_commitment_and_proof
+  | None -> return_unit
+
+let publish_executable_messages (node_ctxt : _ Node_context.t) =
+  let open Lwt_result_syntax in
+  let operator = Node_context.get_operator node_ctxt Executing_outbox in
+  unless (operator = None) @@ fun () ->
+  (* Configured to execute outbox messages *)
+  let lcc = Reference.get node_ctxt.lcc in
+  let* lcc_block_hash = Node_context.hash_of_level node_ctxt lcc.level in
+  let* ctxt = Node_context.checkout_context node_ctxt lcc_block_hash in
+  let*! state = Context.PVMState.find ctxt in
+  match state with
+  | None -> failwith "No PVM state at LCC to execute outbox messages"
+  | Some state ->
+      let* executable_messages =
+        Node_context.get_executable_pending_outbox_messages node_ctxt
+      in
+      let*? (module Plugin) =
+        Protocol_plugins.proto_plugin_for_protocol
+          (Reference.get node_ctxt.current_protocol).hash
+      in
+      let*! () =
+        let open Lwt_syntax in
+        List.iter_s
+          (fun (outbox_level, message_indexes) ->
+            List.iter_s
+              (fun message_index ->
+                let* res =
+                  let open Lwt_result_syntax in
+                  let* output_proof =
+                    Plugin.Pvm.produce_serialized_output_proof
+                      node_ctxt
+                      state
+                      ~outbox_level
+                      ~message_index
+                  in
+                  let outbox_message =
+                    L1_operation.Execute_outbox_message
+                      {
+                        rollup = node_ctxt.config.sc_rollup_address;
+                        cemented_commitment = lcc.commitment;
+                        output_proof;
+                      }
+                  in
+                  let* _hash = Injector.add_pending_operation outbox_message in
+                  return_unit
+                in
+                match res with
+                | Error _trace -> return_unit
+                | Ok () -> return_unit)
+              message_indexes)
+          executable_messages
+      in
       return_unit
-  | Some _ -> (
-      let* cemented_commitment_and_proof =
-        executable_whitelist_update_message node_ctxt
-      in
-      let () =
-        Reference.map
-          (Option.map (fun private_info ->
-               let ({level; _} : Node_context.lcc) =
-                 Reference.get node_ctxt.lcc
-               in
-               Node_context.
-                 {private_info with last_outbox_level_searched = level}))
-          node_ctxt.private_info
-      in
-      match cemented_commitment_and_proof with
-      | Some cemented_commitment_and_proof ->
-          execute_whitelist_update_message_aux
-            node_ctxt
-            cemented_commitment_and_proof
-      | None -> return_unit)
