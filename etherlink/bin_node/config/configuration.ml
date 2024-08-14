@@ -58,7 +58,7 @@ type observer = {
   rollup_node_tracking : bool;
 }
 
-type proxy = {finalized_view : bool}
+type proxy = {finalized_view : bool; evm_node_endpoint : Uri.t option}
 
 type fee_history = {max_count : int option; max_past : int option}
 
@@ -553,11 +553,17 @@ let experimental_features_encoding =
 let proxy_encoding =
   let open Data_encoding in
   conv
-    (fun {finalized_view} -> finalized_view)
-    (fun finalized_view -> {finalized_view})
-  @@ obj1 (dft "finalized_view" bool false)
+    (fun {finalized_view; evm_node_endpoint} ->
+      (finalized_view, Option.map Uri.to_string evm_node_endpoint))
+    (fun (finalized_view, evm_node_endpoint) ->
+      {
+        finalized_view;
+        evm_node_endpoint = Option.map Uri.of_string evm_node_endpoint;
+      })
+  @@ obj2 (dft "finalized_view" bool false) (opt "evm_node_endpoint" string)
 
-let default_proxy ?(finalized_view = false) () = {finalized_view}
+let default_proxy ?(finalized_view = false) ?evm_node_endpoint () =
+  {finalized_view; evm_node_endpoint}
 
 let fee_history_encoding =
   let open Data_encoding in
@@ -817,7 +823,9 @@ module Cli = struct
             ())
         evm_node_endpoint
     in
-    let proxy = default_proxy ?finalized_view:proxy_finalized_view () in
+    let proxy =
+      default_proxy ?finalized_view:proxy_finalized_view ?evm_node_endpoint ()
+    in
     let log_filter =
       default_filter_config
         ?max_nb_blocks:log_filter_max_nb_blocks
@@ -1051,7 +1059,9 @@ module Cli = struct
                 ())
             evm_node_endpoint
     in
-    let proxy = default_proxy ?finalized_view:proxy_finalized_view () in
+    let proxy =
+      default_proxy ?finalized_view:proxy_finalized_view ?evm_node_endpoint ()
+    in
     let log_filter =
       {
         max_nb_blocks =

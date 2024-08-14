@@ -183,7 +183,13 @@ module Pool = struct
       transactions
 end
 
-type mode = Proxy | Sequencer | Relay
+type mode =
+  | Proxy
+  | Sequencer
+  | Relay
+  | Forward of {
+      injector : string -> (Ethereum_types.hash, string) result tzresult Lwt.t;
+    }
 
 type parameters = {
   rollup_node : (module Services_backend_sig.S);
@@ -653,7 +659,7 @@ module Handlers = struct
           Worker.Queue.push_request w Request.Pop_and_inject_transactions
         in
         return_unit
-    | Sequencer | Proxy -> return_unit
+    | Sequencer | Proxy | Forward _ -> return_unit
 
   let on_request :
       type r request_error.
@@ -665,7 +671,11 @@ module Handlers = struct
     match request with
     | Request.Add_transaction (transaction_object, txn) ->
         protect @@ fun () ->
-        let* res = on_normal_transaction state transaction_object txn in
+        let* res =
+          match state.mode with
+          | Forward {injector} -> injector txn
+          | _ -> on_normal_transaction state transaction_object txn
+        in
         let* () = relay_self_inject_request w in
         return res
     | Request.Pop_transactions maximum_cumulative_size ->
@@ -807,7 +817,7 @@ let pop_and_inject_transactions () =
   let*? worker = Lazy.force worker in
   let state = Worker.state worker in
   match state.mode with
-  | Sequencer ->
+  | Sequencer | Forward _ ->
       (* the sequencer injects blueprint in a rollup node, not
          transaction. *)
       return_unit
@@ -822,7 +832,7 @@ let pop_and_inject_transactions_lazy () =
   bind_worker @@ fun w ->
   let state = Worker.state w in
   match state.mode with
-  | Sequencer ->
+  | Sequencer | Forward _ ->
       (* the sequencer injects blueprint in a rollup node, not
          transaction. *)
       return_unit

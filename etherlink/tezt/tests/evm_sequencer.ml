@@ -3616,6 +3616,50 @@ let test_external_transaction_to_delayed_inbox_fails =
   assert (Option.is_none response) ;
   unit
 
+let test_proxy_node_can_forward_to_evm_endpoint =
+  register_all
+    ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
+    ~time_between_blocks:Nothing
+    ~bootstrap_accounts:Eth_account.lots_of_address
+    ~tags:["proxy"; "evm_node_endpoint"]
+    ~title:"Proxy node can forward transactions to another EVM node"
+  @@ fun {sequencer; proxy; sc_rollup_node; client; _} _protocol ->
+  (* We restart the proxy node with a companion EVM node (the sequencer, in
+     this case). It is expected that, in this configuration, it will forward
+     its transactions to the sequencer, which means said transactions will be
+     included in blocks. *)
+  let* () = Evm_node.terminate proxy in
+  let* () =
+    Evm_node.run
+      ~extra_arguments:["--evm-node-endpoint"; Evm_node.endpoint sequencer]
+      proxy
+  in
+  let raw_tx, _ = read_tx_from_file () |> List.hd in
+
+  (* We send a transaction through the proxy. *)
+  let*@ tx_hash = Rpc.send_raw_transaction ~raw_tx proxy in
+
+  (* We bake a few blocks using the sequencer. *)
+  let* () =
+    repeat 2 @@ fun () ->
+    let*@ _ = produce_block sequencer in
+    unit
+  in
+
+  (* We verify the transaction sent to the proxy is known to the sequencer. *)
+  let*@ response_seq = Rpc.get_transaction_receipt ~tx_hash sequencer in
+  assert (Option.is_some response_seq) ;
+
+  (* We bake enough L1 blocks so that the proxy node becomes aware of all
+     blocks created by the sequencer. *)
+  let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
+
+  (* And now we check that the proxy is also aware that the transaction has
+     been included in a block. *)
+  let*@ response_proxy = Rpc.get_transaction_receipt ~tx_hash sequencer in
+  assert (Option.is_some response_proxy) ;
+  unit
+
 let test_delayed_inbox_flushing =
   (* Setup with a short wall time timeout but a significant lower bound of
      L1 levels needed for timeout.
@@ -6379,4 +6423,5 @@ let () =
   test_trace_transaction_calltracer_multiple_txs protocols ;
   test_debug_print_store_schemas () ;
   test_outbox_size_limit_resilience ~slow:true protocols ;
-  test_outbox_size_limit_resilience ~slow:false protocols
+  test_outbox_size_limit_resilience ~slow:false protocols ;
+  test_proxy_node_can_forward_to_evm_endpoint protocols

@@ -647,8 +647,9 @@ let assert_rollup_node_endpoint_equal ~arg ~param =
 let start_proxy ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?rpc_batch_limit
     ?cors_origins ?cors_headers ?log_filter_max_nb_blocks
     ?log_filter_max_nb_logs ?log_filter_chunk_size ?rollup_node_endpoint
-    ?tx_pool_timeout_limit ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit
-    ?restricted_rpcs ~verbose ~read_only ~finalized_view () =
+    ?evm_node_endpoint ?tx_pool_timeout_limit ?tx_pool_addr_limit
+    ?tx_pool_tx_per_addr_limit ?restricted_rpcs ~verbose ~read_only
+    ~finalized_view () =
   let open Lwt_result_syntax in
   let* config =
     Cli.create_or_read_config
@@ -663,6 +664,7 @@ let start_proxy ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?rpc_batch_limit
       ?log_filter_max_nb_logs
       ?log_filter_chunk_size
       ?rollup_node_endpoint
+      ?evm_node_endpoint
       ?tx_pool_timeout_limit
       ?tx_pool_addr_limit
       ?tx_pool_tx_per_addr_limit
@@ -1934,7 +1936,9 @@ let proxy_simple_command =
   let open Tezos_clic in
   command
     ~desc:"Start the EVM node in proxy mode."
-    (merge_options common_config_args (args2 read_only_arg finalized_view_arg))
+    (merge_options
+       common_config_args
+       (args3 read_only_arg finalized_view_arg evm_node_endpoint_arg))
     (prefixes ["run"; "proxy"] @@ stop)
     (fun ( ( data_dir,
              rpc_addr,
@@ -1955,7 +1959,7 @@ let proxy_simple_command =
              restricted_rpcs,
              blacklisted_rpcs,
              whitelisted_rpcs ),
-           (read_only, finalized_view) )
+           (read_only, finalized_view, evm_node_endpoint) )
          () ->
       let open Lwt_result_syntax in
       let* restricted_rpcs =
@@ -1973,6 +1977,7 @@ let proxy_simple_command =
         ?log_filter_max_nb_logs
         ?log_filter_chunk_size
         ?rollup_node_endpoint
+        ?evm_node_endpoint
         ?tx_pool_timeout_limit
         ?tx_pool_addr_limit
         ?tx_pool_tx_per_addr_limit

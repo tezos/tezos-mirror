@@ -43,6 +43,8 @@
 - Introduce a configuration parameter `rpc-batch-limit` and a CLI argument
   `--rpc-batch-limit` to limit the maximum size of JSON RPC API batches.
   (!14432)
+- Allow a proxy node to forward incoming transactions to a companion EVM node.
+  (!14540)
 
 ### Bug fixes
 
