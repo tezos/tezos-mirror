@@ -114,6 +114,33 @@ module Simple = struct
       ("outbox_level", Data_encoding.int32)
       ("message_index", Data_encoding.int31)
 
+  let execute_outbox_message =
+    declare_3
+      ~section
+      ~name:"smart_rollup_node_execute_outbox_message"
+      ~msg:
+        "Executing outbox message {message_index} of level {outbox_level}: \
+         {message}"
+      ~level:Notice
+      ("outbox_level", Data_encoding.int32)
+      ("message_index", Data_encoding.int31)
+      ("message", Outbox_message.summary_encoding)
+      ~pp3:Outbox_message.pp_summary
+
+  let outbox_message_execution_failed =
+    declare_4
+      ~section
+      ~name:"smart_rollup_node_outbox_message_execution_failed"
+      ~msg:
+        "Execution of outbox message {message_index} of level {outbox_level} \
+         ({message}) failed: {error}"
+      ~level:Warning
+      ("outbox_level", Data_encoding.int32)
+      ("message_index", Data_encoding.int31)
+      ("message", Outbox_message.summary_encoding)
+      ("error", trace_encoding)
+      ~pp3:Outbox_message.pp_summary
+
   module Publisher = struct
     let section = section @ ["publisher"]
 
@@ -166,6 +193,15 @@ let recover_bond staker = Simple.(emit recover_bond staker)
 
 let publish_execute_whitelist_update hash level index =
   Simple.(emit publish_execute_whitelist_update (hash, level, index))
+
+let execute_outbox_message ~outbox_level ~message_index message =
+  Simple.(emit execute_outbox_message (outbox_level, message_index, message))
+
+let outbox_message_execution_failed ~outbox_level ~message_index message trace =
+  Simple.(
+    emit
+      outbox_message_execution_failed
+      (outbox_level, message_index, message, trace))
 
 module Publisher = struct
   let request_failed view worker_status errors =

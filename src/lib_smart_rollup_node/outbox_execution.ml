@@ -257,7 +257,13 @@ let publish_executable_messages (node_ctxt : _ Node_context.t) =
                             node_ctxt.config.execute_outbox_messages_filter) ->
                     (* Message does not match filter of config: ignore. *)
                     return_unit
-                | Some _message -> (
+                | Some message -> (
+                    let*! () =
+                      Commitment_event.execute_outbox_message
+                        ~outbox_level
+                        ~message_index
+                        message
+                    in
                     let* res =
                       let open Lwt_result_syntax in
                       let* output_proof =
@@ -281,7 +287,15 @@ let publish_executable_messages (node_ctxt : _ Node_context.t) =
                       return_unit
                     in
                     match res with
-                    | Error _trace -> return_unit
+                    | Error trace ->
+                        let*! () =
+                          Commitment_event.outbox_message_execution_failed
+                            ~outbox_level
+                            ~message_index
+                            message
+                            trace
+                        in
+                        return_unit
                     | Ok () -> return_unit))
               message_indexes)
           executable_messages
