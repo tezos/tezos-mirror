@@ -70,6 +70,9 @@ val may_add_plugin :
   proto_level:int ->
   unit tzresult Lwt.t
 
+(** Set the protocol plugins to the given value. *)
+val set_proto_plugins : t -> Proto_plugins.t -> unit
+
 (** Reconstruct the given slot id by calling the [reconstruct]
     function unless a reconstruction for the given slot id is alredy
     ongoing in which case the ongoing promise is returned instead. *)

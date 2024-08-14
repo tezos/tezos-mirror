@@ -807,8 +807,8 @@ let update_and_register_profiles ctxt =
 (* This function fetches the protocol plugins for levels for which it is needed
    to add skip list cells. It starts by computing the oldest level at which it
    will be needed to add skip list cells. *)
-let get_proto_plugins cctxt profile_ctxt ~last_processed_level ~first_seen_level head_level
-    proto_parameters =
+let get_proto_plugins cctxt profile_ctxt ~last_processed_level ~first_seen_level
+    head_level proto_parameters =
   (* We resolve the plugins for all levels starting with [(max
      last_processed_level (head_level - storage_period)], or (max
      last_processed_level (head_level - storage_period) - (attestation_lag -
@@ -834,22 +834,21 @@ let get_proto_plugins cctxt profile_ctxt ~last_processed_level ~first_seen_level
   let first_level = Int32.(max 1l first_level) in
   Proto_plugins.initial_plugins cctxt ~first_level ~last_level:head_level
 
-  (* This function removes old data starting from [last_processed_level -
-     storage_period] to [target_level - storage_period], where [storage_period] is
-     the period for which the DAL node stores data related to attested slots and
-     [target_level] is the level at which we connect the P2P and switch to
-     processing blocks in sync with the L1. [target_level] is set to [head_level -
-     2]. It also inserts skip list cells if needed in the period [head_level -
-     storage_level].
+(* This function removes old data starting from [last_processed_level -
+   storage_period] to [target_level - storage_period], where [storage_period] is
+   the period for which the DAL node stores data related to attested slots and
+   [target_level] is the level at which we connect the P2P and switch to
+   processing blocks in sync with the L1. [target_level] is set to [head_level -
+   2]. It also inserts skip list cells if needed in the period [head_level -
+   storage_level].
 
-     FIXME: https://gitlab.com/tezos/tezos/-/issues/7429
-     We don't call [may_add_plugin], so there is a chance the plugin changes
-     and we don't detect it if this code starts running just before the migration
-     level, and the head changes meanwhile to be above the migration level.
-  *)
-let clean_up_store ctxt cctxt ~last_processed_level ~first_seen_level
- head_level proto_parameters
-    =
+   FIXME: https://gitlab.com/tezos/tezos/-/issues/7429
+   We don't call [may_add_plugin], so there is a chance the plugin changes
+   and we don't detect it if this code starts running just before the migration
+   level, and the head changes meanwhile to be above the migration level.
+*)
+let clean_up_store ctxt cctxt ~last_processed_level ~first_seen_level head_level
+    proto_parameters =
   let open Lwt_result_syntax in
   let store_skip_list_cells ~level =
     let*? (module Plugin) =
@@ -1030,19 +1029,24 @@ let run ~data_dir ~configuration_override =
       p2p_limits
       ~network_name
   in
-  let* store = Store.init config in
   let*! metrics_server = Metrics.launch config.metrics_addr in
-  let* first_seen_level = Store.First_seen_level.load store.first_seen_level in
+  (* Initialize store *)
+  let* store = Store.init config in
   let* last_processed_level =
     Store.Last_processed_level.load store.last_processed_level
   in
-  (* First wait for the L1 node to be bootstrapped. *)
-  let* () = wait_for_l1_bootstrapped cctxt in
+  let* first_seen_level = Store.First_seen_level.load store.first_seen_level in
   (* Get the current L1 head and its DAL plugin and parameters. *)
   let* header = Shell_services.Blocks.Header.shell_header cctxt () in
   let head_level = header.Block_header.level in
   let* (module Plugin : Dal_plugin.T) =
     Proto_plugins.resolve_plugin_for_level cctxt ~level:head_level
+  in
+  let proto_plugins =
+    Proto_plugins.singleton
+      ~first_level:head_level
+      ~proto_level:header.proto_level
+      (module Plugin)
   in
   let* proto_parameters =
     Plugin.get_constants `Main (`Level head_level) cctxt
@@ -1059,7 +1063,7 @@ let run ~data_dir ~configuration_override =
     match first_seen_level with
     | None -> Store.First_seen_level.save store.first_seen_level head_level
     | Some _ -> return_unit
-in
+  in
   let* () =
     check_l1_history_mode
       profile_ctxt
@@ -1088,15 +1092,6 @@ in
   Value_size_hooks.set_share_size
     (Cryptobox.Internal_for_tests.encoded_share_size cryptobox) ;
   Value_size_hooks.set_number_of_slots proto_parameters.number_of_slots ;
-  let* proto_plugins =
-    get_proto_plugins
-      cctxt
-      profile_ctxt
-      ~last_processed_level
-      ~first_seen_level
-      head_level
-      proto_parameters
-  in
   let ctxt =
     Node_context.init
       config
@@ -1111,6 +1106,24 @@ in
       cctxt
       metrics_server
   in
+  (* Start RPC server. We do that before the waiting for the L1 node to be
+     bootstrapped so that queries can already be issued. Note that that the node
+     will thus already respond to the baker about shards status if queried. *)
+  let* rpc_server = RPC_server.(start config ctxt) in
+  let _ = RPC_server.install_finalizer rpc_server in
+  let*! () = Event.(emit rpc_server_is_ready rpc_addr) in
+  (* Wait for the L1 node to be bootstrapped. *)
+  let* () = wait_for_l1_bootstrapped cctxt in
+  let* proto_plugins =
+    get_proto_plugins
+      cctxt
+      profile_ctxt
+      ~last_processed_level
+      ~first_seen_level
+      head_level
+      proto_parameters
+  in
+  Node_context.set_proto_plugins ctxt proto_plugins ;
   let* () =
     match last_processed_level with
     | None -> (* there's nothing to clean up *) return_unit
@@ -1146,10 +1159,6 @@ in
     | None -> return_unit
     | Some amplificator -> Amplificator.init amplificator ctxt
   in
-  (* Start RPC server. *)
-  let* rpc_server = RPC_server.(start config ctxt) in
-  let _ = RPC_server.install_finalizer rpc_server in
-  let*! () = Event.(emit rpc_server_is_ready rpc_addr) in
   (* Activate the p2p instance. *)
   connect_gossipsub_with_p2p gs_worker transport_layer store ctxt amplificator ;
   let*! () =

@@ -27,6 +27,8 @@ module Plugins = struct
     |> List.map (fun (_block_level, {proto_level = _; plugin}) -> plugin)
 end
 
+let singleton = Plugins.add Plugins.empty
+
 type error += No_plugin_for_proto of {proto_hash : Protocol_hash.t}
 
 let () =
