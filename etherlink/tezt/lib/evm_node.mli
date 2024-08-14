@@ -443,6 +443,9 @@ val debug_print_store_schemas :
 
 val man : ?path:string -> ?hooks:Process_hooks.t -> unit -> unit Lwt.t
 
+val describe_config :
+  ?path:string -> ?hooks:Process_hooks.t -> unit -> unit Lwt.t
+
 module Agent : sig
   val create :
     ?path:string ->

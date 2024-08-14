@@ -6,6 +6,15 @@
 
 - Remove the deprecated `run <mode> with endpoint` commands, use
   `run <mode>` instead. (!14566)
+- Remove the `time_between_blocks` field of the observer configuration
+  (!14327).
+- Remove the `preimages` and `preimages_endpoint` fields specific to each
+  mode, in favor of a new `kernel_execution` top-level configuration.
+  (!14332)
+- Deprecate the field related to the RPC servers configuration (`rpc-port`,
+  `rpc-addr`, `max_active_connections`, `sequencer.private_rpc_port`,
+  etc.) in favor of `publc_rpc` and `private_rpc`. (!14460 !14527)
+- Use `_` consistently instead of `-` in every fields. (!14527)
 
 ### Features
 
@@ -54,6 +63,7 @@
   set in the configuration file. (!14460)
 - Support ignoring the block parameter in RPCs in proxy node, always defaulting
   to the latest block instead. (!14557)
+- Add a debug command to print JSON schema of the configuration file. (!14531)
 
 ### Bug fixes
 
@@ -65,15 +75,6 @@
 - Improves the error message in case of unknown block in RPCs. (!14150)
 - Produces an empty block in case the produced one will trigger a
   kernel upgrade. (!14207)
-
-### Deprecation
-
-- Deprecate the `time_between_blocks` field of the observer configuration.
-  (!14327)
-- Deprecate the `preimages` and `preimages_endpoint` fields specific to each
-  mode, in favor of a new `kernel_execution` top-level configuration. (!14332)
-- Deprecate the `sequencer.private_rpc_port` field in favor of the new
-  `private_rpc_port` top-level field of the configuration. (!14460)
 
 ### Experimental
 

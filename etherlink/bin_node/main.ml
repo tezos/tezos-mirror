@@ -1410,6 +1410,18 @@ let patch_kernel_command =
            As a reminder, patching the kernel is an advanced and unsafe \
            procedure.")
 
+let describe_config_command =
+  let open Tezos_clic in
+  let open Lwt_result_syntax in
+  command
+    ~desc:
+      {|Prints the JSON schema of the configuration file to the standard output.|}
+    no_options
+    (prefixes ["describe"; "config"] @@ stop)
+    (fun () () ->
+      Configuration.describe () ;
+      return_unit)
+
 let init_config_command =
   let open Tezos_clic in
   let open Lwt_result_syntax in
@@ -2226,6 +2238,7 @@ let commands =
     replay_command;
     patch_kernel_command;
     init_config_command;
+    describe_config_command;
     make_kernel_config_command;
     export_snapshot_auto_name_command;
     export_snapshot_named_command;
