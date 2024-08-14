@@ -15,6 +15,12 @@ EOT
   exit 1
 }
 
+images_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
+script_dir="$(dirname "$images_dir")/scripts"
+
+#shellcheck source=scripts/version.sh
+. "$script_dir"/version.sh
+
 if [ "${1:-}" = "--help" ]; then
   usage
 fi
@@ -27,7 +33,7 @@ if [ $# -gt 0 ]; then
   image_tag="$1"
   shift
 fi
-image_base=${image_base:-us-central1-docker.pkg.dev/nl-gitlab-runner/protected-registry/tezos/tezos/rust-toolchain}
+image_base=${image_base:-${GCP_REGISTRY}/tezos/tezos/rust-toolchain}
 image_tag=${image_tag:-master}
 image_name="${image_base}:${image_tag}"
 

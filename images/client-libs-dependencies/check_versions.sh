@@ -10,18 +10,8 @@ images_dir="$(dirname "${current_dir}")"
 # shellcheck source=./images/scripts/check_version.inc.sh
 . "${images_dir}/scripts/check_version.inc.sh"
 
-if [ $# -gt 0 ]; then
-  image_base="$1"
-  shift
-else
-  image_base="registry.gitlab.com/tezos/tezos/client-lib-dependencies"
-fi
-if [ $# -gt 0 ]; then
-  image_tag="$1"
-  shift
-else
-  image_tag="latest"
-fi
+image_base="$1"
+image_tag="${2:-latest}"
 image_name="${image_base}:${image_tag}"
 
 run="docker run --rm ${image_name}"

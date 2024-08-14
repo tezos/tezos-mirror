@@ -3,8 +3,8 @@ set -eu
 
 current_dir=$(cd "$(dirname "${0}")" && pwd)
 
-# Setup Docker registry authentication for either Docker Hub (release) or GitLab registry (dev).
-# Also setup Docker names such that they are valid for the target (Docker Hub or GitLab).
+# Setup Docker registry authentication for either Docker Hub (release) or GCP Artefact registry (dev).
+# Also setup Docker names such that they are valid for the target registry.
 # Docker constraints on tags:
 # https://docs.docker.com/engine/reference/commandline/tag/
 
@@ -13,10 +13,7 @@ current_dir=$(cd "$(dirname "${0}")" && pwd)
 #  name may not start with a period or a dash and may contain a maximum
 #  of 128 characters.
 
-# GitLab constraints on images:
-# https://docs.gitlab.com/ee/user/packages/container_registry/#image-naming-convention
-
-# /!\ CI_REGISTRY is overriden to use AWS ECR in `nomadic-labs` and `tezos` GitLab namespaces
+logged_in=false
 
 # Create directory for Docker JSON configuration (if does not exist)
 mkdir -pv ~/.docker
@@ -38,29 +35,7 @@ if [ "${CI_DOCKER_HUB:-}" = 'true' ] && [ "${CI_PROJECT_NAMESPACE}" = "tezos" ] 
   echo "### Logging into Docker Hub for pushing images"
   docker_image_name="docker.io/${CI_PROJECT_PATH}-"
   echo "{\"auths\":{\"https://index.docker.io/v1/\":{\"auth\":\"${CI_DOCKER_AUTH}\"}}}" > ~/.docker/config.json
-else
-  # GitLab container registry
-  echo "### Logging into Gitlab Container Registry for pushing images"
-  docker login -u "${CI_REGISTRY_USER}" -p "${CI_REGISTRY_PASSWORD}" registry.gitlab.com
-  docker_image_name="registry.gitlab.com/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/"
-fi
-
-# Allow to pull from private AWS ECR if used as CI_REGISTRY
-# CI_REGISTRY is defined by the Gitlab Runner
-# shellcheck disable=SC2153
-if echo "${CI_REGISTRY}" | grep -q '\.dkr\.ecr\.'; then
-  echo "### Logging into Amazon ECR for pulling images"
-  if [ ! -f "/secrets/.aws_ecr/CI_AWS_ECR_TOKEN" ]; then
-    echo "Use Amazon ECR Docker Credential Helper"
-    # Make sure Amazon ECR Docker Credential Helper is installed
-    docker-credential-ecr-login version > /dev/null
-    # Merge with existing Docker client configuration
-    jq ". + {\"credHelpers\": { \"${CI_REGISTRY}\": \"ecr-login\"}}" ~/.docker/config.json | sponge ~/.docker/config.json
-  else
-    echo "Use the stored ECR token"
-    docker login --username AWS --password-stdin "${CI_REGISTRY}" < /secrets/.aws_ecr/CI_AWS_ECR_TOKEN
-  fi
-  echo "### Amazon ECR Docker Credential Helper enabled for ${CI_REGISTRY}"
+  logged_in=true
 fi
 
 # Allow to push to private GCP Artifact Registry if the CI/CD variable is defined
@@ -81,6 +56,12 @@ if [ -n "${GCP_REGISTRY:-}" ]; then
     GCP_ARTIFACT_REGISTRY_TOKEN=$(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token | cut -d'"' -f4)
     echo "${GCP_ARTIFACT_REGISTRY_TOKEN}" | docker login us-central1-docker.pkg.dev -u oauth2accesstoken --password-stdin
   fi
+  docker_image_name="${GCP_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/"
+  logged_in=true
+fi
+
+if [ "$logged_in" = false ]; then
+  echo "WARNING: No login to a docker registry was done during the call of this script."
 fi
 
 # shellcheck source=scripts/ci/docker_registry.inc.sh
