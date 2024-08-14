@@ -17,7 +17,6 @@ use octez_riscv::{
         },
         registers,
     },
-    state_backend::CellRead,
     stepper::{StepResult, Stepper, StepperStatus},
 };
 use ratatui::{

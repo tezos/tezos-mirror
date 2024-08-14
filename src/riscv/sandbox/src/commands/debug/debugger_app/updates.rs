@@ -12,7 +12,6 @@ use octez_riscv::{
         AccessType,
     },
     parser::{instruction::Instr, parse},
-    state_backend::CellRead,
     stepper::Stepper,
 };
 use std::{collections::HashMap, ops::Range};

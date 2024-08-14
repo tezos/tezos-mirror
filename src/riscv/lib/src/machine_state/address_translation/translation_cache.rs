@@ -37,9 +37,7 @@ use super::{AccessType, PAGE_OFFSET_WIDTH};
 use crate::{
     bits::ones,
     machine_state::{bus::Address, csregisters::CSRRepr, mode::Mode},
-    state_backend::{
-        AllocatedOf, Atom, Cell, CellRead, CellWrite, Elem, Manager, ManagerBase, Many,
-    },
+    state_backend::{AllocatedOf, Atom, Cell, Elem, Manager, ManagerBase, Many},
 };
 use strum::EnumCount;
 

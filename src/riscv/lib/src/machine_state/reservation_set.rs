@@ -17,10 +17,7 @@
 /// that a hart can only hold one reservation at a time, and that an SC can only
 /// pair with the most recent LR, and LR with the next following SC, in program
 /// order."
-use crate::{
-    machine_state::backend::{self, Cell},
-    state_backend::{CellRead, CellWrite},
-};
+use crate::machine_state::backend::{self, Cell};
 
 pub struct ReservationSet<M: backend::ManagerBase> {
     start_addr: Cell<u64, M>,

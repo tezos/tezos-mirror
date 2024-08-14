@@ -9,7 +9,7 @@ use crate::{
         registers::{a0, a7},
         MachineState,
     },
-    state_backend::{AllocatedOf, Atom, Cell, CellRead, CellWrite, Manager},
+    state_backend::{AllocatedOf, Atom, Cell, Manager},
     traps::EnvironException,
 };
 

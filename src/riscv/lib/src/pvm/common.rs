@@ -5,7 +5,7 @@
 use crate::{
     machine_state::{self, bus::main_memory},
     pvm::sbi,
-    state_backend::{self, CellRead, CellWrite, EnumCell, EnumCellLayout},
+    state_backend::{self, EnumCell, EnumCellLayout},
     traps::EnvironException,
 };
 use std::{

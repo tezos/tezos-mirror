@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use super::{Elem, Manager, ManagerBase};
+use super::{Elem, ManagerBase, ManagerRead, ManagerReadWrite, ManagerWrite};
 
 /// Single element of type `E`
 #[repr(transparent)]
@@ -16,6 +16,33 @@ impl<E: Elem, M: ManagerBase> Cell<E, M> {
         Self {
             region: Cells::bind(region),
         }
+    }
+
+    /// Read the value managed by the cell.
+    #[inline(always)]
+    pub fn read(&self) -> E
+    where
+        M: ManagerRead,
+    {
+        self.region.read(0)
+    }
+
+    /// Write the value managed by the cell.
+    #[inline(always)]
+    pub fn write(&mut self, value: E)
+    where
+        M: ManagerWrite,
+    {
+        self.region.write(0, value)
+    }
+
+    /// Replace the value managed by the cell, returning the old value.
+    #[inline(always)]
+    pub fn replace(&mut self, value: E) -> E
+    where
+        M: ManagerReadWrite,
+    {
+        self.region.replace(0, value)
     }
 }
 
@@ -43,20 +70,22 @@ pub trait CellRead: CellBase {
     fn read(&self) -> Self::Value;
 }
 
-impl<E: Elem, M: Manager> CellRead for Cell<E, M> {
+impl<E: Elem, M: ManagerRead> CellRead for Cell<E, M> {
     #[inline(always)]
     fn read(&self) -> E {
-        self.region.read(0)
+        Cell::read(self)
     }
 }
 
 impl<E: CellRead> CellRead for &E {
+    #[inline(always)]
     fn read(&self) -> Self::Value {
         E::read(self)
     }
 }
 
 impl<E: CellRead> CellRead for &mut E {
+    #[inline(always)]
     fn read(&self) -> Self::Value {
         E::read(self)
     }
@@ -68,10 +97,10 @@ pub trait CellWrite: CellBase {
     fn write(&mut self, value: Self::Value);
 }
 
-impl<E: Elem, M: Manager> CellWrite for Cell<E, M> {
+impl<E: Elem, M: ManagerWrite> CellWrite for Cell<E, M> {
     #[inline(always)]
     fn write(&mut self, value: E) {
-        self.region.write(0, value)
+        Cell::write(self, value)
     }
 }
 
@@ -88,10 +117,10 @@ pub trait CellReadWrite: CellRead + CellWrite {
     fn replace(&mut self, value: Self::Value) -> Self::Value;
 }
 
-impl<E: Elem, M: Manager> CellReadWrite for Cell<E, M> {
+impl<E: Elem, M: ManagerReadWrite> CellReadWrite for Cell<E, M> {
     #[inline(always)]
     fn replace(&mut self, value: E) -> E {
-        self.region.replace(0, value)
+        Cell::replace(self, value)
     }
 }
 
@@ -113,48 +142,67 @@ impl<E: Elem, const LEN: usize, M: ManagerBase> Cells<E, LEN, M> {
     pub fn bind(region: M::Region<E, LEN>) -> Self {
         Self { region }
     }
-}
 
-impl<E: Elem, const LEN: usize, M: Manager> Cells<E, LEN, M> {
     /// Read an element in the region.
     #[inline]
-    pub fn read(&self, index: usize) -> E {
+    pub fn read(&self, index: usize) -> E
+    where
+        M: ManagerRead,
+    {
         M::region_read(&self.region, index)
     }
 
     /// Read all elements in the region.
     #[inline]
-    pub fn read_all(&self) -> Vec<E> {
+    pub fn read_all(&self) -> Vec<E>
+    where
+        M: ManagerRead,
+    {
         M::region_read_all(&self.region)
     }
 
     /// Read `buffer.len()` elements from the region, starting at `offset`.
     #[inline]
-    pub fn read_some(&self, offset: usize, buffer: &mut [E]) {
+    pub fn read_some(&self, offset: usize, buffer: &mut [E])
+    where
+        M: ManagerRead,
+    {
         M::region_read_some(&self.region, offset, buffer)
     }
 
     /// Update an element in the region.
     #[inline]
-    pub fn write(&mut self, index: usize, value: E) {
+    pub fn write(&mut self, index: usize, value: E)
+    where
+        M: ManagerWrite,
+    {
         M::region_write(&mut self.region, index, value)
     }
 
     /// Update all elements in the region.
     #[inline]
-    pub fn write_all(&mut self, value: &[E]) {
+    pub fn write_all(&mut self, value: &[E])
+    where
+        M: ManagerWrite,
+    {
         M::region_write_all(&mut self.region, value)
     }
 
     /// Update a subset of elements in the region starting at `index`.
     #[inline]
-    pub fn write_some(&mut self, index: usize, buffer: &[E]) {
+    pub fn write_some(&mut self, index: usize, buffer: &[E])
+    where
+        M: ManagerWrite,
+    {
         M::region_write_some(&mut self.region, index, buffer)
     }
 
     /// Update the element in the region and return the previous value.
     #[inline]
-    pub fn replace(&mut self, index: usize, value: E) -> E {
+    pub fn replace(&mut self, index: usize, value: E) -> E
+    where
+        M: ManagerReadWrite,
+    {
         M::region_replace(&mut self.region, index, value)
     }
 }
@@ -169,30 +217,40 @@ impl<const LEN: usize, M: ManagerBase> DynCells<LEN, M> {
     pub fn bind(region: M::DynRegion<LEN>) -> Self {
         Self { region }
     }
-}
 
-impl<const LEN: usize, M: Manager> DynCells<LEN, M> {
     /// Read an element in the region. `address` is in bytes.
     #[inline]
-    pub fn read<E: Elem>(&self, address: usize) -> E {
+    pub fn read<E: Elem>(&self, address: usize) -> E
+    where
+        M: ManagerRead,
+    {
         M::dyn_region_read(&self.region, address)
     }
 
     /// Read elements from the region. `address` is in bytes.
     #[inline]
-    pub fn read_all<E: Elem>(&self, address: usize, values: &mut [E]) {
+    pub fn read_all<E: Elem>(&self, address: usize, values: &mut [E])
+    where
+        M: ManagerRead,
+    {
         M::dyn_region_read_all(&self.region, address, values)
     }
 
     /// Update an element in the region. `address` is in bytes.
     #[inline]
-    pub fn write<E: Elem>(&mut self, address: usize, value: E) {
+    pub fn write<E: Elem>(&mut self, address: usize, value: E)
+    where
+        M: ManagerWrite,
+    {
         M::dyn_region_write(&mut self.region, address, value)
     }
 
     /// Update multiple elements in the region. `address` is in bytes.
     #[inline]
-    pub fn write_all<E: Elem>(&mut self, address: usize, values: &[E]) {
+    pub fn write_all<E: Elem>(&mut self, address: usize, values: &[E])
+    where
+        M: ManagerWrite,
+    {
         M::dyn_region_write_all(&mut self.region, address, values)
     }
 }
@@ -203,8 +261,7 @@ pub(crate) mod tests {
         backend_test, create_backend,
         state_backend::{
             layout::{Atom, Layout},
-            Array, Backend, CellRead, CellWrite, Choreographer, DynCells, Elem, Location,
-            ManagerAlloc, ManagerBase,
+            Array, Backend, Choreographer, DynCells, Elem, Location, ManagerAlloc, ManagerBase,
         },
     };
 

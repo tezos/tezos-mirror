@@ -6,10 +6,7 @@ use super::root::RootCSRegister;
 use crate::struct_layout;
 use crate::{
     bits::Bits64,
-    state_backend::{
-        AllocatedOf, Atom, Cell, CellRead, CellReadWrite, CellWrite, Choreographer, Layout,
-        Manager, PlacedOf,
-    },
+    state_backend::{AllocatedOf, Atom, Cell, Choreographer, Layout, Manager, PlacedOf},
 };
 
 /// Representation of a value in a CSR

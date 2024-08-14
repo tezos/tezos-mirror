@@ -27,7 +27,7 @@ use crate::{
     parser::{instruction::Instr, parse},
     program::Program,
     range_utils::{range_bounds_saturating_sub, range_max, range_min},
-    state_backend::{self as backend, CellRead, CellWrite},
+    state_backend::{self as backend},
     traps::{EnvironException, Exception, Interrupt, TrapContext},
 };
 pub use address_translation::AccessType;
@@ -856,7 +856,7 @@ mod tests {
             instruction::{CIBTypeArgs, ITypeArgs, Instr, SBTypeArgs},
             parse_block,
         },
-        state_backend::{tests::read_backend, CellRead, CellWrite},
+        state_backend::tests::read_backend,
         traps::{EnvironException, Exception, Interrupt, TrapContext},
     };
     use crate::{bits::u64, machine_state::bus::main_memory::M1K};
