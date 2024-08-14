@@ -68,9 +68,6 @@ Available services:
           Disconnect from a peer. 
       - GET /p2p/peers/info
           Get list of known peers and their corresponding info. 
-      - GET /p2p/peers/list
-          By default, get the list of known peers. When the 'connected' flag
-          is given, then only get the connected peers. 
     + points/
       - GET /p2p/points/by-id/<point>
           Get info of the requested point 
