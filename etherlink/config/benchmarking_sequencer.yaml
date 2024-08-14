@@ -11,3 +11,12 @@ instructions:
       # `Boostrap.bootstrap1.public_key` in `tezt/lib_tezos/account.ml`
       value: 6564706b75426b6e5732386e5737324b4736526f48745957377031325436474b63376e4162775958356d385764397344564339796176
       to: /evm/sequencer
+  - set:
+      value: 01
+      to: /evm/feature_flags/enable_fa_bridge
+  - set:
+      value: FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF7F
+      to: /evm/world_state/eth_accounts/0000000000000000000000000000000000000000/ticket_table/8cddc35907a9062880f22f5c815bb5f808ddfc4839363eb2762a4f0300917cbe/f0affc80a5f69f4a9a3ee01a640873b6ba53e539
+  - set:
+      value: FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF7F
+      to: /evm/world_state/eth_accounts/0000000000000000000000000000000000000000/ticket_table/fc2a0f0107d0e2d1b32bd9d99dd3da5bbda4edf016e64d5eec8d64310d3eeb88/f0affc80a5f69f4a9a3ee01a640873b6ba53e539
