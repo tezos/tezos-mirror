@@ -275,6 +275,7 @@ The following RPCs have been removed:
 - ``GET /levels/<int32>/headers`` (MR :gl:`!13044`).
 
 The paths or method of the following RPCs have been updated:
+
 - ``GET /commitments/<c>/slot`` is now ``GET /levels/<l>/slots/<i>/content``  (MR :gl:`!13075`),
 - ``GET /levels/<l>/slot_indices/<i>/commitment`` is now ``GET /levels/<l>/slots/<i>/commitment``  (MR :gl:`!13046`),
 - ``POST /pages/<p>/proof`` is now ``GET /levels/<l>/slots/<i>/pages/<p>/proof``  (MR :gl:`!13083`),
@@ -283,6 +284,15 @@ The paths or method of the following RPCs have been updated:
 - ``GET /slot/pages/<c>`` is now ``GET /levels/<l>/slots/<i>/pages`` (MR :gl:`!12880`),
 - ``GET /commitments/<c>/headers`` is now ``GET /levels/<l>/slots/<i>/status`` (MR :gl:`!13055`),
 - ``GET /p2p/peers/list`` is now ``GET /p2p/peers`` (MR :gl:`!14521`).
+
+Two new RPCs have been added:
+
+- ``GET /p2p/gossipsub/slot_indexes/peers``
+- ``GET /p2p/gossipsub/pkhs/peers``
+
+These two new RPCs are similar to ``GET /p2p/gossipsub/topics/`` but instead of
+grouping peers by topic they group them by slot indices or attester's public key
+hashes (``pkhs``) appearing in the relevant topics. (MR :gl:`!14504`)
 
 In the output of ``GET /p2p/peers/info``, the field ``"point"`` has been renamed
 to ``"peer"``. (MR :gl:`!14521`)
