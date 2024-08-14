@@ -4390,7 +4390,7 @@ let test_rpcs ~kind
     ~boot_sector
     ~whitelist_enable:true
     {
-      tags = ["rpc"; "api"];
+      tags = ["rpc"; "api"; Tag.memory_4k];
       variant = None;
       description = "RPC API should work and be stable";
     }
