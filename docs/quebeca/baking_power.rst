@@ -433,16 +433,16 @@ baker's own funds.
 
 .. note::
 
-  If the baker's ``limit_of_staking_over_baking`` is ``0``, external
-  delegators are prevented from using ``stake`` operations at all. If
-  the limit is positive, external delegators can stake as much tez as
-  they wish, even if this causes the baker to become overstaked or if
-  the baker is already overstaked. The only effect of a non-zero limit
-  is to make overstaked tez count as delegated for the baking
-  power. If the limit is set to a positive value then back to ``0``,
-  external delegators are again prevented from staking new funds, but
-  any previously staked tez remain as such (although they are now all
-  considered overstaked, so they all count as delegated).
+  The ``limit_of_staking_over_baking`` has an additional effect: when
+  set to ``0``, it prevents external delegators from using ``stake``
+  operations at all. This effect is completely removed when the limit
+  is positive: external delegators can stake as much tez as they wish,
+  even if this causes the baker to become overstaked or if the baker
+  is already overstaked. If the limit is set to a positive value then
+  back to ``0``, then external delegators are again prevented from
+  staking new funds, but any previously staked tez remain as such
+  (although they are now all considered overstaked, so they all count
+  as delegated).
 
 
 Overdelegation
