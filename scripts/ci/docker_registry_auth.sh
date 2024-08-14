@@ -3,8 +3,8 @@ set -eu
 
 current_dir=$(cd "$(dirname "${0}")" && pwd)
 
-# Setup Docker registry authentication for either Docker Hub (release) or GitLab registry (dev).
-# Also setup Docker names such that they are valid for the target (Docker Hub or GitLab).
+# Setup Docker registry authentication for either Docker Hub (release) or GCP Artefact registry (dev).
+# Also setup Docker names such that they are valid for the target registry.
 # Docker constraints on tags:
 # https://docs.docker.com/engine/reference/commandline/tag/
 
@@ -12,11 +12,6 @@ current_dir=$(cd "$(dirname "${0}")" && pwd)
 #  uppercase letters, digits, underscores, periods and dashes. A tag
 #  name may not start with a period or a dash and may contain a maximum
 #  of 128 characters.
-
-# GitLab constraints on images:
-# https://docs.gitlab.com/ee/user/packages/container_registry/#image-naming-convention
-
-# /!\ CI_REGISTRY is overriden to use GCP Artefact registry in `nomadic-labs` and `tezos` GitLab namespaces
 
 logged_in=false
 
