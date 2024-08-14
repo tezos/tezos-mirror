@@ -639,7 +639,7 @@ let sign_consensus_votes (global_state : global_state)
   let* signed_consensus_votes =
     List.filter_map_es
       (fun ({delegate; vote_kind; vote_consensus_content; _} as
-           unsigned_consensus_vote) ->
+            unsigned_consensus_vote) ->
         let*! () = Events.(emit signing_consensus_vote (vote_kind, delegate)) in
         let*! signed_consensus_vote_r =
           forge_and_sign_consensus_vote

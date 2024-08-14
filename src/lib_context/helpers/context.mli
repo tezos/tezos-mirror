@@ -70,7 +70,9 @@ end
 
 module Proof_encoding = Tezos_context_merkle_proof_encoding
 
-module Make_proof (DB : DB) (Store_conf : Tezos_context_encoding.Context.Conf) : sig
+module Make_proof
+    (DB : DB)
+    (Store_conf : Tezos_context_encoding.Context.Conf) : sig
   module Proof : Tezos_context_sigs.Context.PROOF
 
   type kinded_key := [`Value of DB.contents_key | `Node of DB.node_key]

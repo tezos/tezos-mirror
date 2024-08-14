@@ -3532,7 +3532,7 @@ and parse_instr :
       Item_t
         ( vk,
           (Item_t (Option_t (vv, _, _), Item_t (Big_map_t (k, v, _), _)) as
-          stack) ) ) ->
+           stack) ) ) ->
       let*? Eq, ctxt = check_item_ty ctxt vk k loc I_GET_AND_UPDATE 1 3 in
       let*? Eq, ctxt = check_item_ty ctxt vv v loc I_GET_AND_UPDATE 2 3 in
       let*? () = check_var_annot loc annot in

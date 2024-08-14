@@ -348,10 +348,11 @@ end
 
    It is assumed that the term is _closed_, i.e. contains no free variables.
 *)
-module Convert_mult (P : sig
-  val options : options
-end)
-(X : Costlang.S) : sig
+module Convert_mult
+    (P : sig
+      val options : options
+    end)
+    (X : Costlang.S) : sig
   include Costlang.S with type size = X.size
 
   val prj : 'a repr -> 'a X.repr

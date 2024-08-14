@@ -119,18 +119,20 @@ module Make_table (H : H) : sig
 end
 
 (** Create an on-disk persistent version of the {!Hash_queue} data structure. *)
-module Make_queue (N : sig
-  (** Name used to derive a path (relative to [data_dir] in [load_from_disk]) of where
+module Make_queue
+    (N : sig
+      (** Name used to derive a path (relative to [data_dir] in [load_from_disk]) of where
       to store the persistent information for this queue. *)
-  val name : string
-end)
-(K : Tezos_crypto.Intfs.HASH) (V : sig
-  type t
+      val name : string
+    end)
+    (K : Tezos_crypto.Intfs.HASH)
+    (V : sig
+      type t
 
-  val persist : t -> bool
+      val persist : t -> bool
 
-  val encoding : t Data_encoding.t
-end) : sig
+      val encoding : t Data_encoding.t
+    end) : sig
   type t
 
   (** [remove q k] removes the binding from [k] in [q]. If [k] is not bound in

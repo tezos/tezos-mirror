@@ -23,10 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-class type cctxt =
-  object
-    inherit Tezos_rpc.Context.generic
-  end
+class type cctxt = object
+  inherit Tezos_rpc.Context.generic
+end
 
 class unix_cctxt ~rpc_config : cctxt =
   object

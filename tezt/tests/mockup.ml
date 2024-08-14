@@ -477,7 +477,8 @@ let test_migration_transfer ?migration_spec () =
       in
       let* () = Client.transfer ~amount ~giver ~receiver client in
       return (giver_balance_before, receiver_balance_before))
-    ~post_migration:(fun client (giver_balance_before, receiver_balance_before) ->
+    ~post_migration:(fun
+        client (giver_balance_before, receiver_balance_before) ->
       let* giver_balance_after = Client.get_balance_for ~account:giver client in
       let* receiver_balance_after =
         Client.get_balance_for ~account:receiver client

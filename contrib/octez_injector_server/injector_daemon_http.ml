@@ -129,7 +129,7 @@ let run ~data_dir (cctxt : Client_context.full) =
     }
   in
   let* (Configuration.{rpc_address; rpc_port; data_dir = _; block_delay; signer}
-       as config) =
+        as config) =
     Configuration.load ~data_dir
   in
   let*? signers = make_signers_for_transactions signer block_delay in

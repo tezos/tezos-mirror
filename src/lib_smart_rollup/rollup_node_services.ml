@@ -279,8 +279,7 @@ module Encodings = struct
                     finalized,
                     cemented )
             | _ -> None)
-          (fun ((), op, (oph, op_index, l1_block, l1_level), finalized, cemented)
-               ->
+          (fun ((), op, (oph, op_index, l1_block, l1_level), finalized, cemented) ->
             Included
               {op; oph; op_index; l1_block; l1_level; finalized; cemented});
         case

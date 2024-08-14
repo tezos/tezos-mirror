@@ -186,7 +186,8 @@ end) : PRIME_WITH_ROOT_OF_UNITY = struct
 end
 
 module MakeFp2
-    (Fp : BASE) (Intf : sig
+    (Fp : BASE)
+    (Intf : sig
       (* Non square residue. Arithmetic is over Fp[X] / X^2 - r *)
       val nsr : Fp.t
     end) : sig

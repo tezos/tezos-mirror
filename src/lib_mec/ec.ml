@@ -45,7 +45,8 @@ open Bls12_381
 
 module MakeJacobianWeierstrass
     (Fq : Ff_sig.PRIME)
-    (Fp : Ff_sig.PRIME) (Params : sig
+    (Fp : Ff_sig.PRIME)
+    (Params : sig
       val a : Fq.t
 
       val b : Fq.t
@@ -258,7 +259,8 @@ end
 
 module MakeAffineWeierstrass
     (Fq : Ff_sig.PRIME)
-    (Fp : Ff_sig.PRIME) (Params : sig
+    (Fp : Ff_sig.PRIME)
+    (Params : sig
       val a : Fq.t
 
       val b : Fq.t
@@ -549,7 +551,8 @@ end
 
 module MakeProjectiveWeierstrass
     (Fq : Ff_sig.PRIME)
-    (Fp : Ff_sig.PRIME) (Params : sig
+    (Fp : Ff_sig.PRIME)
+    (Params : sig
       val a : Fq.t
 
       val b : Fq.t
@@ -752,7 +755,8 @@ end
 
 module MakeAffineMontgomery
     (Fq : Ff_sig.PRIME)
-    (Fp : Ff_sig.PRIME) (Params : sig
+    (Fp : Ff_sig.PRIME)
+    (Params : sig
       val a : Fq.t
 
       val b : Fq.t
@@ -1114,7 +1118,8 @@ end
 
 module MakeAffineEdwards
     (Base : Ff_sig.PRIME)
-    (Scalar : Ff_sig.PRIME) (Params : sig
+    (Scalar : Ff_sig.PRIME)
+    (Params : sig
       val a : Base.t
 
       val d : Base.t

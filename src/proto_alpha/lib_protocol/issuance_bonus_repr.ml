@@ -18,7 +18,7 @@ let bonus_unit = Q.of_int64 1_000_000_000_000_000L
 let zero = Q.zero
 
 let check_bounds ~max_bonus q = Q.(q >= zero && q <= max_bonus)
-  [@@inline always]
+[@@inline always]
 
 type error += Out_of_bounds_bonus
 
@@ -37,7 +37,7 @@ let () =
 let of_Q ~max_bonus q =
   let open Result_syntax in
   if check_bounds ~max_bonus q then return q else tzfail Out_of_bounds_bonus
-  [@@inline always]
+[@@inline always]
 
 let of_Q_unbounded q = if check_bounds ~max_bonus:Q.one q then Some q else None
 

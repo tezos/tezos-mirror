@@ -2197,7 +2197,7 @@ module Logger (Base : Logger_base) = struct
           accu
           stack
     | _ -> (step [@ocaml.tailcall]) g gas k ks accu stack
-   [@@inline]
+  [@@inline]
 
   let klog :
       type a s r f.
@@ -2307,7 +2307,7 @@ module Logger (Base : Logger_base) = struct
         (* This case should never happen. *)
         (next [@ocaml.tailcall]) g gas k accu stack
     | KNil as k -> (next [@ocaml.tailcall]) g gas k accu stack
-   [@@inline]
+  [@@inline]
 end
 
 let make (module Base : Logger_base) =

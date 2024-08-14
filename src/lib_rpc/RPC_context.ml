@@ -25,53 +25,47 @@
 
 open Error_monad
 
-class type ['pr] gen_simple =
-  object
-    method call_service :
-      'm 'p 'q 'i 'o.
-      (([< Resto.meth] as 'm), 'pr, 'p, 'q, 'i, 'o) RPC_service.t ->
-      'p ->
-      'q ->
-      'i ->
-      'o tzresult Lwt.t
-  end
+class type ['pr] gen_simple = object
+  method call_service :
+    'm 'p 'q 'i 'o.
+    (([< Resto.meth] as 'm), 'pr, 'p, 'q, 'i, 'o) RPC_service.t ->
+    'p ->
+    'q ->
+    'i ->
+    'o tzresult Lwt.t
+end
 
-class type ['pr] gen_streamed =
-  object
-    method call_streamed_service :
-      'm 'p 'q 'i 'o.
-      (([< Resto.meth] as 'm), 'pr, 'p, 'q, 'i, 'o) RPC_service.t ->
-      on_chunk:('o -> unit) ->
-      on_close:(unit -> unit) ->
-      'p ->
-      'q ->
-      'i ->
-      (unit -> unit) tzresult Lwt.t
-  end
+class type ['pr] gen_streamed = object
+  method call_streamed_service :
+    'm 'p 'q 'i 'o.
+    (([< Resto.meth] as 'm), 'pr, 'p, 'q, 'i, 'o) RPC_service.t ->
+    on_chunk:('o -> unit) ->
+    on_close:(unit -> unit) ->
+    'p ->
+    'q ->
+    'i ->
+    (unit -> unit) tzresult Lwt.t
+end
 
-class type ['pr] gen =
-  object
-    inherit ['pr] gen_simple
+class type ['pr] gen = object
+  inherit ['pr] gen_simple
 
-    inherit ['pr] gen_streamed
-  end
+  inherit ['pr] gen_streamed
+end
 
-class type simple =
-  object
-    inherit [unit] gen_simple
-  end
+class type simple = object
+  inherit [unit] gen_simple
+end
 
-class type streamed =
-  object
-    inherit [unit] gen_streamed
-  end
+class type streamed = object
+  inherit [unit] gen_streamed
+end
 
-class type t =
-  object
-    inherit simple
+class type t = object
+  inherit simple
 
-    inherit streamed
-  end
+  inherit streamed
+end
 
 type ('o, 'e) rest =
   [ `Ok of 'o
@@ -89,18 +83,17 @@ type generic_call_result =
   | `Binary of (string, string option) rest
   | `Other of (string * string) option * (string, string option) rest ]
 
-class type generic =
-  object
-    inherit t
+class type generic = object
+  inherit t
 
-    method generic_media_type_call :
-      RPC_service.meth ->
-      ?body:Data_encoding.json ->
-      Uri.t ->
-      generic_call_result tzresult Lwt.t
+  method generic_media_type_call :
+    RPC_service.meth ->
+    ?body:Data_encoding.json ->
+    Uri.t ->
+    generic_call_result tzresult Lwt.t
 
-    method base : Uri.t
-  end
+  method base : Uri.t
+end
 
 type error +=
   | Not_found of {meth : RPC_service.meth; uri : Uri.t}

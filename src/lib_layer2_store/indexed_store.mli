@@ -255,7 +255,10 @@ module Make_indexable (_ : NAME) (K : INDEX_KEY) (V : Index.Value.S) :
 module Make_indexable_removable (_ : NAME) (K : INDEX_KEY) (V : Index.Value.S) :
   INDEXABLE_REMOVABLE_STORE with type key := K.t and type value := V.t
 
-module Make_indexed_file (_ : NAME) (K : INDEX_KEY) (V : ENCODABLE_VALUE_HEADER) :
+module Make_indexed_file
+    (_ : NAME)
+    (K : INDEX_KEY)
+    (V : ENCODABLE_VALUE_HEADER) :
   INDEXED_FILE
     with type key := K.t
      and type value := V.t
@@ -263,7 +266,8 @@ module Make_indexed_file (_ : NAME) (K : INDEX_KEY) (V : ENCODABLE_VALUE_HEADER)
 
 module Make_simple_indexed_file
     (_ : NAME)
-    (K : INDEX_KEY) (V : sig
+    (K : INDEX_KEY)
+    (V : sig
       include ENCODABLE_VALUE_HEADER
 
       val header : t -> Header.t

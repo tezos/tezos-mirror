@@ -78,7 +78,8 @@ module Brassaia_hash = Hash
 (* A [Make] implementation providing the subset of [S] that can be implemented
    over abstract [key] types. *)
 module Make_core
-    (Hash : Hash.S) (Path : sig
+    (Hash : Hash.S)
+    (Path : sig
       type step [@@deriving brassaia]
 
       val step_encoding : step Data_encoding.t
@@ -397,7 +398,8 @@ module Portable = struct
 end
 
 module Make_generic_key
-    (Hash : Hash.S) (Path : sig
+    (Hash : Hash.S)
+    (Path : sig
       type step [@@deriving brassaia]
 
       val step_encoding : step Data_encoding.t
@@ -475,7 +477,8 @@ struct
 end
 
 module Make_generic_key_v2
-    (Hash : Hash.S) (Path : sig
+    (Hash : Hash.S)
+    (Path : sig
       type step [@@deriving brassaia]
 
       val step_encoding : step Data_encoding.t
@@ -496,7 +499,8 @@ struct
 end
 
 module Make
-    (Hash : Hash.S) (Path : sig
+    (Hash : Hash.S)
+    (Path : sig
       type step [@@deriving brassaia]
 
       val step_encoding : step Data_encoding.t

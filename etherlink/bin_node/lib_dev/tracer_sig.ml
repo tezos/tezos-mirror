@@ -22,7 +22,8 @@ module type Backend = sig
 end
 
 module Make
-    (Executor : Evm_execution.S) (Storage : sig
+    (Executor : Evm_execution.S)
+    (Storage : sig
       val transaction_receipt :
         Ethereum_types.hash -> Transaction_receipt.t option tzresult Lwt.t
     end)

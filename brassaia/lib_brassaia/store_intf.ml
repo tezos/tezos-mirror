@@ -90,7 +90,7 @@ module type S_generic_key = sig
     (** @inline *)
 
     val pp : t Fmt.t
-      [@@ocaml.toplevel_printer]
+    [@@ocaml.toplevel_printer]
     (** [pp] is a pretty-printer for info. *)
   end
 
@@ -268,7 +268,7 @@ module type S_generic_key = sig
     (** [t] is the value type for {!type-t}. *)
 
     val pp : t Fmt.t
-      [@@ocaml.toplevel_printer]
+    [@@ocaml.toplevel_printer]
     (** [pp] is the pretty-printer for store status. *)
   end
 
@@ -349,7 +349,7 @@ module type S_generic_key = sig
     (** [pp_hash] is a pretty-printer for a commit. Displays only the hash. *)
 
     val pp : t Fmt.t
-      [@@ocaml.toplevel_printer]
+    [@@ocaml.toplevel_printer]
     (** [pp] is a full pretty-printer for a commit. Displays all information. *)
 
     val init :
@@ -432,7 +432,7 @@ module type S_generic_key = sig
          and type hash := hash
 
     val pp : tree Type.pp
-      [@@ocaml.toplevel_printer]
+    [@@ocaml.toplevel_printer]
     (** [pp] is a pretty-printer for a tree. *)
 
     (** {1 Import/Export} *)
@@ -1086,7 +1086,7 @@ module type S_generic_key = sig
         including creation/deletion events. *)
 
     val pp : branch Fmt.t
-      [@@ocaml.toplevel_printer]
+    [@@ocaml.toplevel_printer]
     (** [pp] is a pretty-printer for a branch. *)
 
     include Branch.S with type t = branch
@@ -1149,7 +1149,7 @@ module type S_generic_key = sig
   (** {2 Deprecated} *)
 
   val master : repo -> t Lwt.t
-    [@@ocaml.deprecated "Use `main` instead."]
+  [@@ocaml.deprecated "Use `main` instead."]
   (** @deprecated Use {!main} instead *)
 end
 

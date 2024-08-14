@@ -133,13 +133,17 @@ module Internal_for_tests : sig
       so that it will fetch pages using a function [R.fetch] to load pages
       remotely and saved them in the page store of type [P], when a page
       is not present in said store. *)
-  module With_remote_fetch (R : sig
-    type remote_context
+  module With_remote_fetch
+      (R : sig
+        type remote_context
 
-    val fetch :
-      Dac_plugin.t -> remote_context -> Dac_plugin.hash -> bytes tzresult Lwt.t
-  end)
-  (P : S) :
+        val fetch :
+          Dac_plugin.t ->
+          remote_context ->
+          Dac_plugin.hash ->
+          bytes tzresult Lwt.t
+      end)
+      (P : S) :
     S
       with type configuration = R.remote_context * P.t
        and type t = R.remote_context * P.t

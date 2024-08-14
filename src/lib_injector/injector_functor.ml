@@ -662,7 +662,7 @@ module Make (Parameters : PARAMETERS) = struct
           | Successful -> return (op :: acc)
           | Unsuccessful
               ((Backtracked | Skipped | Other_branch | Never_included) as
-              err_status) -> (
+               err_status) -> (
               (* Not known to be failing *)
               let*! retry =
                 Parameters.retry_unsuccessful_operation
@@ -1435,7 +1435,7 @@ module Make (Parameters : PARAMETERS) = struct
         tags
         {
           signers;
-          cctxt = (cctxt :> Client_context.full);
+          cctxt :> Client_context.full;
           l1_ctxt;
           head_protocols;
           data_dir;

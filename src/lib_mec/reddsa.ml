@@ -39,7 +39,8 @@ module type SIGNATURE_SCHEME = sig
 end
 
 module MakeRedDSA
-    (Ec : Ec_sig.AffineEdwardsT) (Param : sig
+    (Ec : Ec_sig.AffineEdwardsT)
+    (Param : sig
       val length : int
 
       val hash : Bytes.t -> Bytes.t

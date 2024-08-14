@@ -200,7 +200,7 @@ module Internal_for_tests = struct
   let dummy cctxt =
     {
       l1 = Internal_for_tests.dummy (cctxt :> Tezos_rpc.Context.generic);
-      cctxt = (cctxt :> Client_context.full);
+      cctxt :> Client_context.full;
       blocks_cache = Blocks_cache.create 1;
       headers_cache = Blocks_cache.create 1;
       prefetch_blocks = 0;

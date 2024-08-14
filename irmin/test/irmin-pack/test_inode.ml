@@ -29,7 +29,8 @@ let wrong_depth = 100
 
 module Inode_modules
     (Conf : Irmin_pack.Conf.S)
-    (Schema : Irmin.Schema.S) (Contents : sig
+    (Schema : Irmin.Schema.S)
+    (Contents : sig
       val foo : Schema.Contents.t
       val bar : Schema.Contents.t
     end) =

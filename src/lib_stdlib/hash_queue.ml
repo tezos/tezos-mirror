@@ -24,7 +24,8 @@
 (*****************************************************************************)
 
 module Make
-    (K : Hashtbl.HashedType) (V : sig
+    (K : Hashtbl.HashedType)
+    (V : sig
       type t
     end) =
 struct

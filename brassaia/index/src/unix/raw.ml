@@ -61,7 +61,7 @@ let assert_read ~len n =
       Printf.eprintf "Attempted to read %d bytes, but got %d bytes instead!\n%!"
         len n;
       false))
-  [@@inline always]
+[@@inline always]
 
 module Offset = struct
   let off = Int63.zero

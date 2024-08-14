@@ -165,7 +165,7 @@ let rec do_connect ~count ~previous_status
       let heads =
         Lwt_stream.map
           (fun ((hash, Tezos_base.Block_header.{shell = {predecessor; _}; _}) as
-               head) ->
+                head) ->
             Precessor_cache.replace l1_ctxt.cache hash predecessor ;
             head)
           heads

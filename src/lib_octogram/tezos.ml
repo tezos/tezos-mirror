@@ -1333,8 +1333,7 @@ module Originate_smart_contract = struct
       conv
         (fun {client_base; wallet; alias; src; script_path; amount; init; wait} ->
           (client_base, (wallet, alias, src, script_path, amount, init, wait)))
-        (fun (client_base, (wallet, alias, src, script_path, amount, init, wait))
-             ->
+        (fun (client_base, (wallet, alias, src, script_path, amount, init, wait)) ->
           {client_base; wallet; alias; src; script_path; amount; init; wait})
         (merge_objs
            (client_base_args_encoding uri_encoding)
@@ -2185,8 +2184,7 @@ module Start_dac_node = struct
                mode;
              } ->
           (path_dac_node, path_client, endpoint, name, wallet, rpc_port, mode))
-        (fun (path_dac_node, path_client, endpoint, name, wallet, rpc_port, mode)
-             ->
+        (fun (path_dac_node, path_client, endpoint, name, wallet, rpc_port, mode) ->
           {path_dac_node; path_client; endpoint; name; wallet; rpc_port; mode})
         (obj7
            (req "path_dac_node" uri_encoding)

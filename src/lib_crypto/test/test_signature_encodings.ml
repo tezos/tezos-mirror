@@ -39,7 +39,8 @@ module type B58CHECK = sig
 end
 
 module Make_tests
-    (P : Intfs.SIGNATURE) (T : sig
+    (P : Intfs.SIGNATURE)
+    (T : sig
       val name : string
 
       val pkh_vectors : (string * string) list

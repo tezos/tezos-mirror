@@ -44,10 +44,11 @@ let gen_watermark =
   let open Gen in
   Gen.char >|= Bytes.make 1
 
-module Signature_Properties (Desc : sig
-  val name : string
-end)
-(X : SIGNATURE) =
+module Signature_Properties
+    (Desc : sig
+      val name : string
+    end)
+    (X : SIGNATURE) =
 struct
   (** Tests that a signature of [s], with optional [watermark], by a generated
       key and [X.sign] is accepted by [X.check] with the same key.  *)
@@ -79,10 +80,11 @@ module type AGGREGATE_SIGNATURE = sig
   val watermark_of_bytes : bytes -> watermark
 end
 
-module Aggregate_Signature_Properties (Desc : sig
-  val name : string
-end)
-(X : AGGREGATE_SIGNATURE) =
+module Aggregate_Signature_Properties
+    (Desc : sig
+      val name : string
+    end)
+    (X : AGGREGATE_SIGNATURE) =
 struct
   (** Tests that signatures of [msg1], [msg2], [msg3], (with optional
       corresponding watermarks) obtained using [X.sign] are accepted by

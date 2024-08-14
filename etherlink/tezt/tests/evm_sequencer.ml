@@ -667,7 +667,7 @@ module Protocol = struct
           "Do not call Protocol.register_test directly. Use register_test, or \
            register_both instead.")
       protocols
-    [@@warning "-unused-value-declaration"]
+  [@@warning "-unused-value-declaration"]
 end
 
 let test_remove_sequencer =

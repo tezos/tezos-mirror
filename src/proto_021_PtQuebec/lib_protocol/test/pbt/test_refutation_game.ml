@@ -488,8 +488,8 @@ module Dissection = struct
       ~name:"gen_dissection produces a valid dissection"
       ~print
       ~gen
-      (fun (dissection, new_dissection, default_number_of_sections, our_states)
-      ->
+      (fun
+        (dissection, new_dissection, default_number_of_sections, our_states) ->
         let open Lwt_syntax in
         match new_dissection with
         | None -> return (final_dissection ~our_states dissection)
@@ -1494,14 +1494,16 @@ let test_game ?(count = 10) ~p1_strategy ~p2_strategy () =
       p2_strategy
   in
   qcheck_make_lwt_res
-    ~print:(fun ( _block,
-                  _rollup,
-                  _commitment_level,
-                  _lcc,
-                  p1_client,
-                  p2_client,
-                  p1_start,
-                  _payloads_per_levels ) ->
+    ~print:(fun
+        ( _block,
+          _rollup,
+          _commitment_level,
+          _lcc,
+          p1_client,
+          p2_client,
+          p1_start,
+          _payloads_per_levels )
+      ->
       Format.asprintf
         "@[<v>@,@[<v 2>p1:@,%a@]@,@[<v 2>p2:@,%a@]@,%s@,@]"
         pp_player_client

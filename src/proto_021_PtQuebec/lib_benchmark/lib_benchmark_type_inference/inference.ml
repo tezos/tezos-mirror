@@ -249,7 +249,7 @@ module M = struct
   let ( >>= ) m f s =
     let x, s = m s in
     f x s
-    [@@inline]
+  [@@inline]
 
   let return x s = (x, s)
 
@@ -259,25 +259,25 @@ module M = struct
    fun computation state ->
     let res, uf = computation state.uf in
     (res, {state with uf})
-   [@@inline]
+  [@@inline]
 
   let repr_lift : 'a Repr_sm.t -> 'a t =
    fun computation state ->
     let res, repr = computation state.repr in
     (res, {state with repr})
-   [@@inline]
+  [@@inline]
 
   let annot_instr_lift : 'a Annot_instr_sm.t -> 'a t =
    fun computation state ->
     let res, annot_instr = computation state.annot_instr in
     (res, {state with annot_instr})
-   [@@inline]
+  [@@inline]
 
   let annot_data_lift : 'a Annot_data_sm.t -> 'a t =
    fun computation state ->
     let res, annot_data = computation state.annot_data in
     (res, {state with annot_data})
-   [@@inline]
+  [@@inline]
 
   let set_repr k v = repr_lift (Repr_sm.set k v) [@@inline]
 
@@ -285,7 +285,7 @@ module M = struct
     repr_lift (Repr_sm.get k) >>= function
     | None -> Stdlib.failwith "get_repr_exn"
     | Some res -> return res
-    [@@inline]
+  [@@inline]
 
   let set_instr_annot k v = annot_instr_lift (Annot_instr_sm.set k v) [@@inline]
 

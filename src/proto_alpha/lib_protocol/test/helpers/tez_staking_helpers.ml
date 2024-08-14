@@ -471,7 +471,7 @@ module Unstaked_frozen = struct
     |> List.map
          (fun
            ({cycle; requests = _; initial; current; slash_pct = old_slash_pct}
-           as r)
+            as r)
          ->
            if
              Cycle.(

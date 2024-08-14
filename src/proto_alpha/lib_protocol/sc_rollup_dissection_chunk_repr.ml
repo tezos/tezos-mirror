@@ -241,11 +241,13 @@ let () =
     ~id:"smart_rollup_dissection_edge_ticks_mismatch"
     ~title:description
     ~description
-    ~pp:(fun ppf
-             ( dissection_start_tick,
-               dissection_stop_tick,
-               chunk_start_tick,
-               chunk_stop_tick ) ->
+    ~pp:(fun
+        ppf
+        ( dissection_start_tick,
+          dissection_stop_tick,
+          chunk_start_tick,
+          chunk_stop_tick )
+      ->
       Sc_rollup_tick_repr.(
         Format.fprintf
           ppf

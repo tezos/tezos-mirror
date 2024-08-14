@@ -66,13 +66,13 @@ module Single (G : Bls.G_sig) = struct
     | None ->
         Format.kasprintf Stdlib.failwith "Unexpected data (KZG commitment)"
     | Some commitment -> commitment
-    [@@coverage off]
+  [@@coverage off]
 
   let to_string commitment = G.to_compressed_bytes commitment |> Bytes.to_string
-    [@@coverage off]
+  [@@coverage off]
 
   let of_string_opt str = G.of_compressed_bytes_opt (String.to_bytes str)
-    [@@coverage off]
+  [@@coverage off]
 end
 
 module Make (G : G_sig) = struct

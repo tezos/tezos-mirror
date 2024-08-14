@@ -1368,7 +1368,7 @@ module Make
       post_processing
       @@
       match request with
-      | Request.Flush (hash, event, live_blocks, live_operations) ->
+      | Request.Flush (hash, event, live_blocks, live_operations) -> (
           Requests.on_advertise pv.shell ;
           (* TODO: https://gitlab.com/tezos/tezos/-/issues/1727
              Rebase the advertisement instead. *)
@@ -1386,7 +1386,7 @@ module Make
             pv
             block
             live_blocks
-            live_operations
+            live_operations)
       | Request.Notify (peer, mempool) ->
           Requests.on_notify pv.shell peer mempool ;
           return_unit

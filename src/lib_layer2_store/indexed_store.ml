@@ -1159,7 +1159,8 @@ end
 
 module Make_simple_indexed_file
     (N : NAME)
-    (K : INDEX_KEY) (V : sig
+    (K : INDEX_KEY)
+    (V : sig
       include ENCODABLE_VALUE_HEADER
 
       val header : t -> Header.t

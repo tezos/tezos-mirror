@@ -43,7 +43,7 @@ module Stubs = struct
    - [size_b mod size_a = 0] *)
   external add : fr_array -> fr_array -> fr_array -> int -> int -> unit
     = "caml_bls12_381_polynomial_polynomial_evaluations_add_stubs"
-    [@@noalloc]
+  [@@noalloc]
 
   (** [mul_arrays res eval_evallen_comp_power_powlen size_res nb_evals] writes
       the result of computing [p₁(gᶜ₁·x)ᵐ₁·p₂(gᶜ₂·x)ᵐ₂·…·pₖ(gᶜₖ·x)ᵐₖ] using
@@ -69,7 +69,7 @@ module Stubs = struct
     int ->
     int ->
     unit = "caml_bls12_381_polynomial_polynomial_evaluations_mul_arrays_stubs"
-    [@@noalloc]
+  [@@noalloc]
 
   (** [linear_arrays res eval_evallen_coeff_comp add_constant size_res nb_evals]
       writes  the result of computing
@@ -91,7 +91,7 @@ module Stubs = struct
   external linear_arrays :
     fr_array -> (fr_array * int * fr * int) array -> fr -> int -> int -> unit
     = "caml_bls12_381_polynomial_polynomial_evaluations_linear_arrays_stubs"
-    [@@noalloc]
+  [@@noalloc]
 
   (** [fft_inplace p domain log log_degree] computes Fast Fourier Transform.
   It converts the coefficient representation of a polynomial [p] to
@@ -117,7 +117,7 @@ module Stubs = struct
   [n]-th root of unity and [n = 2^log] (as done by {!Domain.Stubs.compute_domain}) *)
   external ifft_inplace : fr_array -> domain:fr_array -> log:int -> unit
     = "caml_bls12_381_polynomial_ifft_inplace_on_stubs"
-    [@@noalloc]
+  [@@noalloc]
 
   (** [dft_inplace coefficients domain inverse length] computes the Fourier Transform.
 
@@ -130,7 +130,7 @@ module Stubs = struct
   [n]-th root of unity (as done by {!Domain.Stubs.compute_domain}) *)
   external dft_inplace : fr_array -> fr_array -> bool -> int -> unit
     = "caml_bls12_381_polynomial_dft_stubs"
-    [@@noalloc]
+  [@@noalloc]
 
   (** [fft_prime_factor_algorithm_inplace coefficient (domain1, domain1_length) (domain2, domain2_length) inverse]
   computes the Fast Fourier Transform following
@@ -149,7 +149,7 @@ module Stubs = struct
   external fft_prime_factor_algorithm_inplace :
     fr_array -> fr_array * int -> fr_array * int -> bool -> unit
     = "caml_bls12_381_polynomial_prime_factor_algorithm_fft_stubs"
-    [@@noalloc]
+  [@@noalloc]
 end
 
 module type Evaluations_sig = sig

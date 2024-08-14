@@ -10,7 +10,7 @@ module Topic = struct
     if c = 0 then Int.compare t1.shard t2.shard else c
 
   let pp fmtr {slot; shard} = Format.fprintf fmtr "slot=%d,shard=%d" slot shard
-    [@@ocaml.warning "-32"]
+  [@@ocaml.warning "-32"]
 end
 
 include Topic

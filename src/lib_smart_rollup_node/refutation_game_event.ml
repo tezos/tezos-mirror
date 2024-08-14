@@ -92,10 +92,11 @@ module Simple = struct
                  Octez_smart_rollup.Game.dissection_chunk_encoding)
               d))
 
-  module Worker (ARG : sig
-    val section : string list
-  end)
-  (Request : Worker_intf.REQUEST) =
+  module Worker
+      (ARG : sig
+        val section : string list
+      end)
+      (Request : Worker_intf.REQUEST) =
   struct
     include ARG
 

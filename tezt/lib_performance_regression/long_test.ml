@@ -570,42 +570,42 @@ module Stats = struct
         fun (a, (b, c)) -> (a, b, c) )
 
   let rec functions : 'a. 'a t -> _ =
-    fun (type a) (stats : a t) ->
-     match stats with
-     | Int func | Float func -> [func]
-     | Pair (a, b) -> functions a @ functions b
-     | Convert (stats, _, _) -> functions stats
+   fun (type a) (stats : a t) ->
+    match stats with
+    | Int func | Float func -> [func]
+    | Pair (a, b) -> functions a @ functions b
+    | Convert (stats, _, _) -> functions stats
 
   let rec get : 'a. _ -> 'a t -> 'a =
-    fun (type a) result_data_point (stats : a t) ->
-     let result : a =
-       match stats with
-       | Int func ->
-           InfluxDB.get
-             (InfluxDB.column_name_of_func func)
-             JSON.as_int
-             result_data_point
-       | Float func ->
-           InfluxDB.get
-             (InfluxDB.column_name_of_func func)
-             JSON.as_float
-             result_data_point
-       | Pair (a, b) -> (get result_data_point a, get result_data_point b)
-       | Convert (stats, _, decode) -> decode (get result_data_point stats)
-     in
-     result
+   fun (type a) result_data_point (stats : a t) ->
+    let result : a =
+      match stats with
+      | Int func ->
+          InfluxDB.get
+            (InfluxDB.column_name_of_func func)
+            JSON.as_int
+            result_data_point
+      | Float func ->
+          InfluxDB.get
+            (InfluxDB.column_name_of_func func)
+            JSON.as_float
+            result_data_point
+      | Pair (a, b) -> (get result_data_point a, get result_data_point b)
+      | Convert (stats, _, decode) -> decode (get result_data_point stats)
+    in
+    result
 
   let show stats values =
     let rec gather : 'a. 'a t -> 'a -> _ =
-      fun (type a) (stats : a t) (values : a) ->
-       match stats with
-       | Int func -> [(InfluxDB.column_name_of_func func, string_of_int values)]
-       | Float func ->
-           [(InfluxDB.column_name_of_func func, string_of_float values)]
-       | Pair (a, b) ->
-           let v, w = values in
-           gather a v @ gather b w
-       | Convert (stats, encode, _) -> gather stats (encode values)
+     fun (type a) (stats : a t) (values : a) ->
+      match stats with
+      | Int func -> [(InfluxDB.column_name_of_func func, string_of_int values)]
+      | Float func ->
+          [(InfluxDB.column_name_of_func func, string_of_float values)]
+      | Pair (a, b) ->
+          let v, w = values in
+          gather a v @ gather b w
+      | Convert (stats, encode, _) -> gather stats (encode values)
     in
     gather stats values
     |> List.map (fun (name, value) -> sf "%s = %s" name value)

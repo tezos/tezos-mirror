@@ -895,51 +895,58 @@ let args19 a b c d e f g h i j k l m n o p q r s =
 
 let args20 a b c d e f g h i j k l m n o p q r s t =
   map_arg
-    ~f:(fun _ ((a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p), (q, r, s, t)) ->
+    ~f:(fun
+        _ ((a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p), (q, r, s, t)) ->
       Lwt_result_syntax.return
         (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t))
     (args2 (args16 a b c d e f g h i j k l m n o p) (args4 q r s t))
 
 let args21 a b c d e f g h i j k l m n o p q r s t u =
   map_arg
-    ~f:(fun _ ((a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p), (q, r, s, t, u))
-            ->
+    ~f:(fun
+        _ ((a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p), (q, r, s, t, u)) ->
       Lwt_result_syntax.return
         (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u))
     (args2 (args16 a b c d e f g h i j k l m n o p) (args5 q r s t u))
 
 let args22 a b c d e f g h i j k l m n o p q r s t u v =
   map_arg
-    ~f:(fun _
-            ( (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p),
-              (q, r, s, t, u, v) ) ->
+    ~f:(fun
+        _
+        ((a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p), (q, r, s, t, u, v))
+      ->
       Lwt_result_syntax.return
         (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v))
     (args2 (args16 a b c d e f g h i j k l m n o p) (args6 q r s t u v))
 
 let args23 a b c d e f g h i j k l m n o p q r s t u v w =
   map_arg
-    ~f:(fun _
-            ( (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p),
-              (q, r, s, t, u, v, w) ) ->
+    ~f:(fun
+        _
+        ((a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p), (q, r, s, t, u, v, w))
+      ->
       Lwt_result_syntax.return
         (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w))
     (args2 (args16 a b c d e f g h i j k l m n o p) (args7 q r s t u v w))
 
 let args24 a b c d e f g h i j k l m n o p q r s t u v w x =
   map_arg
-    ~f:(fun _
-            ( (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p),
-              (q, r, s, t, u, v, w, x) ) ->
+    ~f:(fun
+        _
+        ( (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p),
+          (q, r, s, t, u, v, w, x) )
+      ->
       Lwt_result_syntax.return
         (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x))
     (args2 (args16 a b c d e f g h i j k l m n o p) (args8 q r s t u v w x))
 
 let args25 a b c d e f g h i j k l m n o p q r s t u v w x y =
   map_arg
-    ~f:(fun _
-            ( (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p),
-              (q, r, s, t, u, v, w, x, y) ) ->
+    ~f:(fun
+        _
+        ( (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p),
+          (q, r, s, t, u, v, w, x, y) )
+      ->
       Lwt_result_syntax.return
         ( a,
           b,
@@ -1221,7 +1228,7 @@ let search_command keyword (Command {params; _}) =
 (* Command execution *)
 let exec (type ctx)
     (Command {options = options_spec; params = spec; handler; conv; _} as
-    command) (ctx : ctx) params args_dict =
+     command) (ctx : ctx) params args_dict =
   let open Lwt_result_syntax in
   let rec exec :
       type ctx a.

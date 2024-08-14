@@ -1233,12 +1233,12 @@ external to_int : int32 -> int = "%int32_to_int"
     the number is outside the range \[{!Int32.min_int}, {!Int32.max_int}\]. *)
 external of_float : float -> int32
   = "caml_int32_of_float" "caml_int32_of_float_unboxed"
-  [@@unboxed] [@@noalloc]
+[@@unboxed] [@@noalloc]
 
 (** Convert the given 32-bit integer to a floating-point number. *)
 external to_float : int32 -> float
   = "caml_int32_to_float" "caml_int32_to_float_unboxed"
-  [@@unboxed] [@@noalloc]
+[@@unboxed] [@@noalloc]
 
 (** Convert the given string to a 32-bit integer.
     The string is read in decimal (by default, or if the string
@@ -1271,14 +1271,14 @@ val to_string : int32 -> string
     represent the mantissa. *)
 external bits_of_float : float -> int32
   = "caml_int32_bits_of_float" "caml_int32_bits_of_float_unboxed"
-  [@@unboxed] [@@noalloc]
+[@@unboxed] [@@noalloc]
 
 (** Return the floating-point number whose internal representation,
     according to the IEEE 754 floating-point 'single format' bit layout,
     is the given [int32]. *)
 external float_of_bits : int32 -> float
   = "caml_int32_float_of_bits" "caml_int32_float_of_bits_unboxed"
-  [@@unboxed] [@@noalloc]
+[@@unboxed] [@@noalloc]
 
 (** An alias for the type of 32-bit integers. *)
 type t = int32
@@ -1425,12 +1425,12 @@ external to_int : int64 -> int = "%int64_to_int"
     the number is outside the range \[{!Int64.min_int}, {!Int64.max_int}\]. *)
 external of_float : float -> int64
   = "caml_int64_of_float" "caml_int64_of_float_unboxed"
-  [@@unboxed] [@@noalloc]
+[@@unboxed] [@@noalloc]
 
 (** Convert the given 64-bit integer to a floating-point number. *)
 external to_float : int64 -> float
   = "caml_int64_to_float" "caml_int64_to_float_unboxed"
-  [@@unboxed] [@@noalloc]
+[@@unboxed] [@@noalloc]
 
 (** Convert the given 32-bit integer (type [int32])
     to a 64-bit integer (type [int64]). *)
@@ -1483,14 +1483,14 @@ val to_string : int64 -> string
     represent the mantissa. *)
 external bits_of_float : float -> int64
   = "caml_int64_bits_of_float" "caml_int64_bits_of_float_unboxed"
-  [@@unboxed] [@@noalloc]
+[@@unboxed] [@@noalloc]
 
 (** Return the floating-point number whose internal representation,
     according to the IEEE 754 floating-point 'double format' bit layout,
     is the given [int64]. *)
 external float_of_bits : int64 -> float
   = "caml_int64_float_of_bits" "caml_int64_float_of_bits_unboxed"
-  [@@unboxed] [@@noalloc]
+[@@unboxed] [@@noalloc]
 
 (** An alias for the type of 64-bit integers. *)
 type t = int64
@@ -5057,16 +5057,17 @@ end
 
 module Make_minimal (Name : Name) : S.MINIMAL_HASH
 
-module Make (Register : sig
-  val register_encoding :
-    prefix:string ->
-    length:int ->
-    to_raw:('a -> string) ->
-    of_raw:(string -> 'a option) ->
-    wrap:('a -> Base58.data) ->
-    'a Base58.encoding
-end)
-(Name : PrefixedName) : S.HASH
+module Make
+    (Register : sig
+      val register_encoding :
+        prefix:string ->
+        length:int ->
+        to_raw:('a -> string) ->
+        of_raw:(string -> 'a option) ->
+        wrap:('a -> Base58.data) ->
+        'a Base58.encoding
+    end)
+    (Name : PrefixedName) : S.HASH
 end
 # 64 "v0.in.ml"
 
@@ -5999,52 +6000,51 @@ end
 
 type t = Updater.rpc_context
 
-class type ['pr] simple =
-  object
-    method call_proto_service0 :
-      'm 'q 'i 'o.
-      (([< RPC_service.meth] as 'm), t, t, 'q, 'i, 'o) RPC_service.t ->
-      'pr ->
-      'q ->
-      'i ->
-      'o Error_monad.shell_tzresult Lwt.t
+class type ['pr] simple = object
+  method call_proto_service0 :
+    'm 'q 'i 'o.
+    (([< RPC_service.meth] as 'm), t, t, 'q, 'i, 'o) RPC_service.t ->
+    'pr ->
+    'q ->
+    'i ->
+    'o Error_monad.shell_tzresult Lwt.t
 
-    method call_proto_service1 :
-      'm 'a 'q 'i 'o.
-      (([< RPC_service.meth] as 'm), t, t * 'a, 'q, 'i, 'o) RPC_service.t ->
-      'pr ->
-      'a ->
-      'q ->
-      'i ->
-      'o Error_monad.shell_tzresult Lwt.t
+  method call_proto_service1 :
+    'm 'a 'q 'i 'o.
+    (([< RPC_service.meth] as 'm), t, t * 'a, 'q, 'i, 'o) RPC_service.t ->
+    'pr ->
+    'a ->
+    'q ->
+    'i ->
+    'o Error_monad.shell_tzresult Lwt.t
 
-    method call_proto_service2 :
-      'm 'a 'b 'q 'i 'o.
-      (([< RPC_service.meth] as 'm), t, (t * 'a) * 'b, 'q, 'i, 'o) RPC_service.t ->
-      'pr ->
-      'a ->
-      'b ->
-      'q ->
-      'i ->
-      'o Error_monad.shell_tzresult Lwt.t
+  method call_proto_service2 :
+    'm 'a 'b 'q 'i 'o.
+    (([< RPC_service.meth] as 'm), t, (t * 'a) * 'b, 'q, 'i, 'o) RPC_service.t ->
+    'pr ->
+    'a ->
+    'b ->
+    'q ->
+    'i ->
+    'o Error_monad.shell_tzresult Lwt.t
 
-    method call_proto_service3 :
-      'm 'a 'b 'c 'q 'i 'o.
-      ( ([< RPC_service.meth] as 'm),
-        t,
-        ((t * 'a) * 'b) * 'c,
-        'q,
-        'i,
-        'o )
-      RPC_service.t ->
-      'pr ->
-      'a ->
-      'b ->
-      'c ->
-      'q ->
-      'i ->
-      'o Error_monad.shell_tzresult Lwt.t
-  end
+  method call_proto_service3 :
+    'm 'a 'b 'c 'q 'i 'o.
+    ( ([< RPC_service.meth] as 'm),
+      t,
+      ((t * 'a) * 'b) * 'c,
+      'q,
+      'i,
+      'o )
+    RPC_service.t ->
+    'pr ->
+    'a ->
+    'b ->
+    'c ->
+    'q ->
+    'i ->
+    'o Error_monad.shell_tzresult Lwt.t
+end
 
 val make_call0 :
   ([< RPC_service.meth], t, t, 'q, 'i, 'o) RPC_service.t ->

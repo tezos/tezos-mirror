@@ -1,5 +1,6 @@
 module MakePedersenHash
-    (Ec : Ec_sig.BASE) (Params : sig
+    (Ec : Ec_sig.BASE)
+    (Params : sig
       val generators : Ec.t list
 
       val chunks_per_generator : int

@@ -32,7 +32,8 @@ open Custom_weak
 type hcons_info = {tag : int; hash : int}
 
 module Make
-    (X : Algebraic_signature.S) (P : sig
+    (X : Algebraic_signature.S)
+    (P : sig
       val initial_size : int option
     end) : Micheline_sig.S with type label = hcons_info and type head = X.t =
 struct

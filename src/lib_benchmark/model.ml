@@ -104,25 +104,25 @@ let pp ppf = function
         sub_models
 
 let apply_model : 'arg -> 'arg model -> applied =
-  fun (type e) (elim : e) ((module Impl) : e model) ->
-   let module Applied (X : Costlang.S) = struct
-     include Impl.Def (X)
+ fun (type e) (elim : e) ((module Impl) : e model) ->
+  let module Applied (X : Costlang.S) = struct
+    include Impl.Def (X)
 
-     type t = X.size X.repr
+    type t = X.size X.repr
 
-     let rec apply :
-         type a b c.
-         (int -> c X.repr) -> (c, a, b) arity -> a X.repr -> b -> c X.repr =
-      fun conv arity f arg ->
-       match arity with
-       | Zero_arity -> f
-       | Succ_arity ar ->
-           let arg, rest = arg in
-           apply conv ar (X.app f (conv arg)) rest
+    let rec apply :
+        type a b c.
+        (int -> c X.repr) -> (c, a, b) arity -> a X.repr -> b -> c X.repr =
+     fun conv arity f arg ->
+      match arity with
+      | Zero_arity -> f
+      | Succ_arity ar ->
+          let arg, rest = arg in
+          apply conv ar (X.app f (conv arg)) rest
 
-     let applied = apply X.int arity model elim
-   end in
-   ((module Applied) : applied)
+    let applied = apply X.int arity model elim
+  end in
+  ((module Applied) : applied)
 
 module Instantiate (X : Costlang.S) (M : Model_impl) :
   Instantiated
@@ -886,7 +886,8 @@ end
 module Synthesize
     (B : Binary_operation)
     (X : Model_impl)
-    (Y : Model_impl with type arg_type = X.arg_type) (Names : sig
+    (Y : Model_impl with type arg_type = X.arg_type)
+    (Names : sig
       val name : Namespace.t
 
       val x_label : string

@@ -1154,13 +1154,10 @@ let () =
     ~id:"store.bad_ordering_invariant"
     ~title:"Bad ordering invariant"
     ~description:"The ordering invariant does not hold"
-    ~pp:(fun ppf
-             ( genesis,
-               caboose,
-               savepoint,
-               cementing_highwatermark,
-               checkpoint,
-               head ) ->
+    ~pp:(fun
+        ppf
+        (genesis, caboose, savepoint, cementing_highwatermark, checkpoint, head)
+      ->
       Format.fprintf
         ppf
         "Invariant '%ld (genesis) ≤ %ld (caboose) ≤ %ld (savepoint) ≤ %a \
@@ -1202,8 +1199,7 @@ let () =
               checkpoint,
               head )
       | _ -> None)
-    (fun (genesis, caboose, savepoint, cementing_highwatermark, checkpoint, head)
-         ->
+    (fun (genesis, caboose, savepoint, cementing_highwatermark, checkpoint, head) ->
       Bad_ordering_invariant
         {genesis; caboose; savepoint; cementing_highwatermark; checkpoint; head})
 

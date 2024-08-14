@@ -35,10 +35,11 @@
 open Qcheck2_helpers
 open QCheck2
 
-module Hash_Properties (Desc : sig
-  val name : string
-end)
-(X : Hacl.Hash.S) =
+module Hash_Properties
+    (Desc : sig
+      val name : string
+    end)
+    (X : Hacl.Hash.S) =
 struct
   let pp_bytes fmt d = Format.fprintf fmt "%S" (Bytes.to_string d)
 

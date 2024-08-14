@@ -600,12 +600,14 @@ module Internal_operation_result = struct
               paid_storage_size_diff,
               lazy_storage_diff ))
       ~kind:Kind.Origination_manager_kind
-      ~inj:(fun ( balance_updates,
-                  originated_contracts,
-                  consumed_gas,
-                  storage_size,
-                  paid_storage_size_diff,
-                  lazy_storage_diff ) ->
+      ~inj:(fun
+          ( balance_updates,
+            originated_contracts,
+            consumed_gas,
+            storage_size,
+            paid_storage_size_diff,
+            lazy_storage_diff )
+        ->
         IOrigination_result
           {
             lazy_storage_diff;

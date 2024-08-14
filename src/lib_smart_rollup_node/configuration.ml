@@ -335,8 +335,7 @@ let batcher_encoding =
            max_batch_size;
          } ->
       (min_batch_elements, min_batch_size, max_batch_elements, max_batch_size))
-    (fun (min_batch_elements, min_batch_size, max_batch_elements, max_batch_size)
-         ->
+    (fun (min_batch_elements, min_batch_size, max_batch_elements, max_batch_size) ->
       let open Result_syntax in
       let error_when c s = if c then Error s else return_unit in
       let* () =

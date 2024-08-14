@@ -119,8 +119,7 @@ module Make (Main : Distribution.Main_protocol.S) : S = struct
           main_pid
           ~step:Msg.S_ppctt
           ~handler:(fun
-                     (Msg.PP_commit_to_t {index; content = all_ids_keys, alpha})
-                   ->
+              (Msg.PP_commit_to_t {index; content = all_ids_keys, alpha}) ->
             Some
               (fun () ->
                 let batched_ids =

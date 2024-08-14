@@ -43,7 +43,7 @@ let parameters_encoding =
        (req "page_size" uint16)
        (req "slot_size" int31)
        (req "number_of_shards" uint16))
-  [@@coverage off]
+[@@coverage off]
 
 type t = {activated : bool; bootstrap_peers : string list}
 
@@ -53,6 +53,6 @@ let encoding : t Data_encoding.t =
     (fun {activated; bootstrap_peers} -> (activated, bootstrap_peers))
     (fun (activated, bootstrap_peers) -> {activated; bootstrap_peers})
     (obj2 (dft "activated" bool true) (req "bootstrap_peers" (list string)))
-  [@@coverage off]
+[@@coverage off]
 
 let default = {activated = true; bootstrap_peers = []}

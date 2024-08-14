@@ -147,7 +147,7 @@ let checks (type ocaml_type) (ty : ocaml_type ty) ( < ) ( > ) ~min_value
          (ty_max_value ty)
          pp
          max_value)
-  [@@inline always]
+[@@inline always]
 
 (* A partial encoding that ensures the decoded value is in the specified bounds. *)
 let guarded_encoding ty ~to_value ~of_value =
@@ -157,11 +157,11 @@ let guarded_encoding ty ~to_value ~of_value =
     (fun x ->
       match of_value x with None -> Error "Out of bounds" | Some x -> Ok x)
     (encoding ty)
-  [@@inline always]
+[@@inline always]
 
 let of_value ( < ) ( > ) ~min_value ~max_value x =
   if x < min_value then None else if x > max_value then None else Some x
-  [@@inline always]
+[@@inline always]
 
 (* We introduce one functor by OCaml datatype so that comparison
    functions are statically known and consequently inlined. Using the
@@ -210,10 +210,11 @@ end)
 
 (* The parameter [T] of this functor allows to choose the desired
    encoding without duplicating the interface. *)
-module Make31 (T : sig
-  val ty : int ty
-end)
-(B : BOUNDS with type ocaml_type := int) =
+module Make31
+    (T : sig
+      val ty : int ty
+    end)
+    (B : BOUNDS with type ocaml_type := int) =
 struct
   include Compare.Int
   include B

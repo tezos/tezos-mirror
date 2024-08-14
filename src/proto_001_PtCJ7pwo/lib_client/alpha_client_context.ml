@@ -29,14 +29,12 @@ module Alpha_block_services =
 
 (** Client RPC context *)
 
-class type rpc_context =
-  object
-    inherit Tezos_rpc.Context.generic
+class type rpc_context = object
+  inherit Tezos_rpc.Context.generic
 
-    inherit
-      [Shell_services.chain * Shell_services.block] Environment.RPC_context
-                                                    .simple
-  end
+  inherit
+    [Shell_services.chain * Shell_services.block] Environment.RPC_context.simple
+end
 
 class wrap_rpc_context (t : Tezos_rpc.Context.generic) : rpc_context =
   object
@@ -70,17 +68,15 @@ class wrap_rpc_context (t : Tezos_rpc.Context.generic) : rpc_context =
         Shell_services.Blocks.path
   end
 
-class type full =
-  object
-    inherit Client_context.full
+class type full = object
+  inherit Client_context.full
 
-    inherit
-      [Shell_services.chain * Shell_services.block] Environment.RPC_context
-                                                    .simple
+  inherit
+    [Shell_services.chain * Shell_services.block] Environment.RPC_context.simple
 
-    inherit
-      [Shell_services.chain, Shell_services.block] Environment.proto_rpc_context
-  end
+  inherit
+    [Shell_services.chain, Shell_services.block] Environment.proto_rpc_context
+end
 
 class wrap_full (t : Client_context.full) : full =
   object

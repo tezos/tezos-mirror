@@ -26,7 +26,8 @@
 open Api
 
 module Make_vector
-    (Vector_type : Api_types.Vec) (Vector_funs : sig
+    (Vector_type : Api_types.Vec)
+    (Vector_funs : sig
       val new_ :
         Vector_type.t Ctypes.ptr ->
         Unsigned.Size_t.t ->

@@ -300,7 +300,8 @@ let uid = ref 0
     checks on it. *)
 module Runner
     (Key : GENERATABLE_DISTINCT)
-    (Value : GENERATABLE) (Store : sig
+    (Value : GENERATABLE)
+    (Store : sig
       type t
 
       val load : path:string -> t tzresult Lwt.t

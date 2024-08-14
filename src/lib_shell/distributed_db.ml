@@ -331,7 +331,8 @@ let commit_protocol db h p =
     [Distributed_db_requester.Raw_*.t] has been properly created before it is
     possible to use it *)
 module Make
-    (Table : Requester.REQUESTER) (Kind : sig
+    (Table : Requester.REQUESTER)
+    (Kind : sig
       type t
 
       val proj : t -> Table.t

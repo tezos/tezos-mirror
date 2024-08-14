@@ -35,8 +35,7 @@ module Event = struct
       ~msg:"replaying block {alias}{hash} ({level})"
       ~level:Notice
       ~pp1:(fun fmt -> function
-             | None -> ()
-             | Some alias -> Format.fprintf fmt "%s: " alias)
+        | None -> () | Some alias -> Format.fprintf fmt "%s: " alias)
       ("alias", Data_encoding.(option string))
       ~pp2:Block_hash.pp
       ("hash", Block_hash.encoding)

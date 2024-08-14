@@ -33,7 +33,7 @@ module M = struct
    fun sampler f rng_state ->
     let x = sampler rng_state in
     f x rng_state
-   [@@inline]
+  [@@inline]
 
   let bind = ( let* )
 

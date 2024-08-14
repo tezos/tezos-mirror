@@ -98,9 +98,12 @@ module To_ast (Ast : S) :
   Costlang.S with type 'a repr = 'a Ast.t and type size = Ast.size
 
 (** Code transformer via the AST tree *)
-module Transform (F : functor (Ast : S) -> sig
-  val transform : 'a Ast.t -> 'a Ast.t
-end) : Costlang.Transform
+module Transform
+    (F : functor
+      (Ast : S)
+      -> sig
+      val transform : 'a Ast.t -> 'a Ast.t
+    end) : Costlang.Transform
 
 (** A Costlang transformer for various code optimizations *)
 module Optimize : Transform

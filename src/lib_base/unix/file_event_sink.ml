@@ -119,7 +119,7 @@ module Event_filter = struct
              ~pp_sep:(fun fmt () -> fprintf fmt ",@ ")
              (fun fmt s -> fprintf fmt "(Some %a)" Internal_event.Section.pp s))
           l
-    [@@warning "-32"]
+  [@@warning "-32"]
 
   (* -> The "unused value" warning. *)
 
@@ -479,14 +479,14 @@ module Query = struct
                   (path // date // time)
                   ~init:(return previous)
                   ~f:(fun previous -> function
-                       | `Directory "." | `Directory ".." -> return previous
-                       | `Regular_file file ->
-                           f previous (path // date // time // file)
-                       | `Directory p | `Special (_, p) ->
-                           return_with_warning
-                             previous
-                             (`Expecting_regular_file_at
-                               (path // date // time // p)))
+                    | `Directory "." | `Directory ".." -> return previous
+                    | `Regular_file file ->
+                        f previous (path // date // time // file)
+                    | `Directory p | `Special (_, p) ->
+                        return_with_warning
+                          previous
+                          (`Expecting_regular_file_at
+                            (path // date // time // p)))
             | `Directory _ (* filtered out *) -> return previous
             | `Regular_file p | `Special (_, p) ->
                 return_with_warning
@@ -546,51 +546,50 @@ module Query = struct
       sink_path
       ~init:(return ([], init))
       ~f:(fun previous -> function
-           | `Directory ("." | "..") -> return previous
-           | `Directory dir -> (
-               match Section_dir.section_name dir with
-               | Ok sec when section_matches sec ->
-                   fold_directory
-                     (sink_path // dir)
-                     ~init:(return ([], init))
-                     ~f:(fun previous -> function
-                          | `Directory ("." | "..") -> return previous
-                          | `Directory event_name when name_matches event_name
-                            -> (
-                              let open Internal_event in
-                              match All_definitions.find (( = ) event_name) with
-                              | Some (Generic.Definition (_, _, ev)) ->
-                                  handle_event_kind_directory
-                                    ~time_query
-                                    ev
-                                    ~section_path:(sink_path // dir)
-                                    ~init:previous
-                                    ~f
-                              | None -> (
-                                  match on_unknown with
-                                  | None ->
-                                      return_with_warning
-                                        previous
-                                        (`Unknown_event_name_at
-                                          (event_name, sink_path // dir))
-                                  | Some f ->
-                                      fold_event_kind_directory
-                                        ~time_query
-                                        (sink_path // dir // event_name)
-                                        ~init:previous
-                                        ~f:(fun prev file ->
-                                          let* () = f file in
-                                          return prev)))
-                          | `Directory _ (* filtered out *) -> return previous
-                          | `Regular_file p | `Special (_, p) ->
-                              return_with_warning
-                                previous
-                                (`Expecting_directory_at (sink_path // p)))
-               | Ok _ (* section does not match *) -> return previous
-               | Error _ ->
-                   return_with_error previous (`Cannot_recognize_section dir))
-           | `Regular_file p | `Special (_, p) ->
-               return_with_warning
-                 previous
-                 (`Expecting_directory_at (sink_path // p)))
+        | `Directory ("." | "..") -> return previous
+        | `Directory dir -> (
+            match Section_dir.section_name dir with
+            | Ok sec when section_matches sec ->
+                fold_directory
+                  (sink_path // dir)
+                  ~init:(return ([], init))
+                  ~f:(fun previous -> function
+                    | `Directory ("." | "..") -> return previous
+                    | `Directory event_name when name_matches event_name -> (
+                        let open Internal_event in
+                        match All_definitions.find (( = ) event_name) with
+                        | Some (Generic.Definition (_, _, ev)) ->
+                            handle_event_kind_directory
+                              ~time_query
+                              ev
+                              ~section_path:(sink_path // dir)
+                              ~init:previous
+                              ~f
+                        | None -> (
+                            match on_unknown with
+                            | None ->
+                                return_with_warning
+                                  previous
+                                  (`Unknown_event_name_at
+                                    (event_name, sink_path // dir))
+                            | Some f ->
+                                fold_event_kind_directory
+                                  ~time_query
+                                  (sink_path // dir // event_name)
+                                  ~init:previous
+                                  ~f:(fun prev file ->
+                                    let* () = f file in
+                                    return prev)))
+                    | `Directory _ (* filtered out *) -> return previous
+                    | `Regular_file p | `Special (_, p) ->
+                        return_with_warning
+                          previous
+                          (`Expecting_directory_at (sink_path // p)))
+            | Ok _ (* section does not match *) -> return previous
+            | Error _ ->
+                return_with_error previous (`Cannot_recognize_section dir))
+        | `Regular_file p | `Special (_, p) ->
+            return_with_warning
+              previous
+              (`Expecting_directory_at (sink_path // p)))
 end
