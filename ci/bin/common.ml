@@ -890,6 +890,7 @@ let job_build_bin_package ?dependencies ?rules ~__POS__ ~name
     in
     Matrix [[("DISTRIBUTION", distributions)]]
   in
+  let timeout = match target with Rpm -> Some (Minutes 75) in
   let group_string = match group with A -> "A" | B -> "B" in
   let artifacts =
     artifacts
@@ -905,6 +906,7 @@ let job_build_bin_package ?dependencies ?rules ~__POS__ ~name
       | Rpm -> ["./scripts/ci/bin_packages_rpm_dependencies.sh"])
   in
   job
+    ?timeout
     ?rules
     ?dependencies
     ~__POS__

@@ -3911,6 +3911,7 @@ oc.build:rpm:amd64:
     allow_failure: true
   needs: []
   dependencies: []
+  timeout: 75 minutes
   before_script:
   - . ./scripts/version.sh
   - ./scripts/ci/bin_packages_rpm_dependencies.sh
