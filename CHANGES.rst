@@ -250,3 +250,5 @@ The paths or method of the following RPCs have been updated:
 
 Miscellaneous
 -------------
+
+- Depends on OCaml 4.14.2 (was 4.14.1 before). (MR :gl:`!14536`)
