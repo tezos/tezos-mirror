@@ -40,8 +40,34 @@ pattern_file="${script_dir}forbidden_commit_messages.txt"
 # Use git_merge_base.sh on merged result pipelines, to ensure we only
 # check commit messages of the MR in question.
 ORIGIN=${ORIGIN:-origin}
-head=${CI_MERGE_REQUEST_SOURCE_BRANCH_SHA:-HEAD}
-target=${CI_MERGE_REQUEST_TARGET_BRANCH_SHA:-${ORIGIN}/master}
+
+# CI_MERGE_REQUEST_{SOURCE,TARGET}_BRANCH_SHA are only available in
+# merged result pipelines. In merge request pipelines, use
+# CI_MERGE_REQUEST_TARGET_BRANCH_NAME instead.
+if [ -n "${CI_MERGE_REQUEST_SOURCE_BRANCH_SHA:-}" ] &&
+  [ -n "${CI_MERGE_REQUEST_TARGET_BRANCH_SHA:-}" ]; then
+  head=${CI_MERGE_REQUEST_SOURCE_BRANCH_SHA}
+  target=${CI_MERGE_REQUEST_TARGET_BRANCH_SHA}
+elif [ -n "${CI_MERGE_REQUEST_TARGET_BRANCH_NAME:-}" ]; then
+  head=HEAD
+  target=${ORIGIN}/${CI_MERGE_REQUEST_TARGET_BRANCH_NAME}
+
+  # Make CI_MERGE_REQUEST_TARGET_BRANCH_NAME available locally -- this
+  # is a prerequisite for 'git_merge_base.sh' when it's operands are
+  # not fully spelled out hex object names (e.g. when they are branch
+  # names instead of commit SHAs).
+  git fetch --depth 1 "${ORIGIN}" "${CI_MERGE_REQUEST_TARGET_BRANCH_NAME}"
+else
+  car << EOT
+None of:
+ - CI_MERGE_REQUEST_SOURCE_BRANCH_SHA
+ - CI_MERGE_REQUEST_TARGET_BRANCH_SHA
+ - CI_MERGE_REQUEST_TARGET_BRANCH_NAME
+are set. Cannot retrieve the commit history of this MR.
+EOT
+  exit 1
+fi
+
 merge_base=$("$src_dir"/scripts/ci/git_merge_base.sh "$target" "$head" || {
   # Print on stderr to make visible outside command substitution
   echo "Failed to get merge base, cannot check commit messages." >&2
