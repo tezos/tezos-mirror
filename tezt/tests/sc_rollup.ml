@@ -72,9 +72,18 @@ let commit_too_recent =
 
 let disputed_commit = "Attempted to cement a disputed commitment"
 
-let register_test ?supports ?(regression = false) ~__FILE__ ~tags ?uses ~title f
-    =
-  let tags = Tag.etherlink :: "sc_rollup" :: tags in
+let register_test ?kind ?supports ?(regression = false) ~__FILE__ ~tags ?uses
+    ~title f =
+  let kind_tags =
+    match kind with
+    | Some "riscv" ->
+        (* TODO: At the moment, the memory consumption of the RISC-V PVM when
+           executed by the rollup node is prohibitive for regular CI jobs. *)
+        ["riscv"; Tag.memory_4k]
+    | Some k -> [k]
+    | _ -> []
+  in
+  let tags = Tag.etherlink :: "sc_rollup" :: (kind_tags @ tags) in
   if regression then
     Protocol.register_regression_test ?supports ~__FILE__ ~title ~tags ?uses f
   else Protocol.register_test ?supports ~__FILE__ ~title ~tags ?uses f
@@ -148,6 +157,7 @@ let test_l1_scenario ?supports ?regression ?hooks ~kind ?boot_sector
     {variant; tags; description} scenario =
   let tags = kind :: tags in
   register_test
+    ~kind
     ?supports
     ?regression
     ~__FILE__
@@ -175,8 +185,8 @@ let test_full_scenario ?supports ?regression ?hooks ~kind ?mode ?boot_sector
     ?rollup_node_name ?whitelist_enable ?whitelist ?operator ?operators
     ?(uses = fun _protocol -> []) ?rpc_external ?allow_degraded
     ?kernel_debug_log {variant; tags; description} scenario =
-  let tags = kind :: tags in
   register_test
+    ~kind
     ?supports
     ?regression
     ~__FILE__
@@ -1224,6 +1234,7 @@ let test_snapshots ?(unsafe_pvm_patches = false) ~kind ~challenge_window
 
 let test_rollup_list ~kind =
   register_test
+    ~kind
     ~__FILE__
     ~tags:["sc_rollup"; "list"]
     ~title:"list originated rollups"
@@ -1257,6 +1268,7 @@ let test_rollup_list ~kind =
 
 let test_client_wallet ~kind =
   register_test
+    ~kind
     ~__FILE__
     ~tags:["sc_rollup"; "wallet"; "client"]
     ~title:"test the client wallet for smart rollup"
@@ -4390,7 +4402,7 @@ let test_rpcs ~kind
     ~boot_sector
     ~whitelist_enable:true
     {
-      tags = ["rpc"; "api"; Tag.memory_4k];
+      tags = ["rpc"; "api"];
       variant = None;
       description = "RPC API should work and be stable";
     }
