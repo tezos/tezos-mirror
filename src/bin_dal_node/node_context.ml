@@ -247,23 +247,81 @@ module P2P = struct
         []
 
     let get_topics_peers ~subscribed ctx =
-      let state = Gossipsub.Worker.state ctx.gs_worker in
+      let open Gossipsub.Worker in
+      let state = state ctx.gs_worker in
+      let open GS in
       let topic_to_peers_map =
-        Gossipsub.Worker.GS.Introspection.Connections.peers_per_topic_map
-          state.connections
+        Introspection.Connections.peers_per_topic_map state.connections
       in
-      let subscribed_topics = lazy (get_topics ctx) in
-      Gossipsub.Worker.GS.Topic.Map.fold
+      let subscribed_topics = state.mesh in
+      Topic.Map.fold
         (fun topic peers acc ->
-          if
-            (not subscribed)
-            || List.mem
-                 ~equal:Types.Topic.equal
-                 topic
-                 (Lazy.force subscribed_topics)
-          then (topic, Gossipsub.Worker.GS.Peer.Set.elements peers) :: acc
+          if (not subscribed) || Topic.Map.mem topic subscribed_topics then
+            (topic, Peer.Set.elements peers) :: acc
           else acc)
         topic_to_peers_map
+        []
+
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/7462
+       We could improve the performance of this function. *)
+    let get_slot_indexes_peers ~subscribed ctx =
+      let open Gossipsub.Worker in
+      let state = state ctx.gs_worker in
+      let open GS in
+      let topic_to_peers_map =
+        Introspection.Connections.peers_per_topic_map state.connections
+      in
+      let subscribed_topics = state.mesh in
+      let module IndexMap = Map.Make (Int) in
+      let res_map =
+        Gossipsub.Worker.GS.Topic.Map.fold
+          (fun topic peers acc ->
+            if (not subscribed) || Topic.Map.mem topic subscribed_topics then
+              IndexMap.update
+                topic.slot_index
+                (function
+                  | None -> Some peers
+                  | Some acc_peers -> Some (Peer.Set.union acc_peers peers))
+                acc
+            else acc)
+          topic_to_peers_map
+          IndexMap.empty
+      in
+      IndexMap.fold
+        (fun index peers acc -> (index, Peer.Set.elements peers) :: acc)
+        res_map
+        []
+
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/7462
+       We could improve the performance of this function. *)
+    let get_pkhs_peers ~subscribed ctx =
+      let open Gossipsub.Worker in
+      let state = state ctx.gs_worker in
+      let open GS in
+      let topic_to_peers_map =
+        Introspection.Connections.peers_per_topic_map state.connections
+      in
+      let subscribed_topics = state.mesh in
+      let module KeyHashMap = Map.Make (Signature.Public_key_hash) in
+      let res_map =
+        Topic.Map.fold
+          (fun topic peers acc ->
+            if (not subscribed) || Topic.Map.mem topic subscribed_topics then
+              KeyHashMap.update
+                topic.pkh
+                (function
+                  | None -> Some peers
+                  | Some acc_peers ->
+                      Some (Gossipsub.Worker.GS.Peer.Set.union acc_peers peers))
+                acc
+            else acc)
+          topic_to_peers_map
+          KeyHashMap.empty
+      in
+      KeyHashMap.fold
+        (fun pkh peers acc ->
+          (pkh, Gossipsub.Worker.GS.Peer.Set.elements peers) :: acc)
+        res_map
         []
 
     let get_connections ?(ignore_bootstrap_topics = false) {gs_worker; _} =

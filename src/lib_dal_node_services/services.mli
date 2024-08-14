@@ -293,6 +293,24 @@ module P2P : sig
       ; query : < subscribed : bool > >
       service
 
+    val get_slot_indexes_peers :
+      < meth : [`GET]
+      ; input : unit
+      ; output : (Types.slot_index * Types.Peer.t list) list
+      ; prefix : unit
+      ; params : unit
+      ; query : < subscribed : bool > >
+      service
+
+    val get_pkhs_peers :
+      < meth : [`GET]
+      ; input : unit
+      ; output : (Signature.public_key_hash * Types.Peer.t list) list
+      ; prefix : unit
+      ; params : unit
+      ; query : < subscribed : bool > >
+      service
+
     val get_connections :
       < meth : [`GET]
       ; input : unit

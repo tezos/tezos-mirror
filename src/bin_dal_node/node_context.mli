@@ -269,6 +269,24 @@ module P2P : sig
     val get_topics_peers :
       subscribed:bool -> t -> (Types.Topic.t * Types.Peer.t list) list
 
+    (** [get_slot_indexes_peers ~subscribed t] returns an association list
+        between the slot_indexes of topics of connected peers and the connected
+        peers subscribed to those topics, when [subscribed = false]. When
+        [subscribed = true], then the returned value is restricted to the topics
+        this node is subscribed to. *)
+    val get_slot_indexes_peers :
+      subscribed:bool -> t -> (Types.slot_index * Types.Peer.t list) list
+
+    (** [get_pkhs_peers ~subscribed t] returns an association list between the
+        pkhs of topics of connected peers and the connected peers subscribed to
+        those topics, when [subscribed = false]. When [subscribed = true], then
+        the returned value is restricted to the topics this node is subscribed
+        to. *)
+    val get_pkhs_peers :
+      subscribed:bool ->
+      t ->
+      (Signature.public_key_hash * Types.Peer.t list) list
+
     (** [get_connections t] returns the list of connections. If
         [ignore_bootstrap_topics] (false by default) is set to [true],
         bootstrap topics will not be included in the result *)
