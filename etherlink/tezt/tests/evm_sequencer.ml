@@ -5439,6 +5439,94 @@ let test_trace_transaction_call_trace_revert =
     call ;
   unit
 
+(* The test checks that each call is traced separately, not causing an error
+   having multiple top calls. *)
+let test_trace_transaction_calltracer_multiple_txs =
+  register_all
+    ~kernels:[Latest]
+    ~tags:["evm"; "rpc"; "trace"; "call_trace"; "multi_txs"]
+    ~title:
+      "debug_traceTransaction handles blocks containing several transactions"
+    ~da_fee:Wei.zero
+  @@ fun {sc_rollup_node; sequencer; client; proxy; _} _protocol ->
+  let endpoint = Evm_node.endpoint sequencer in
+  let sender_0 = Eth_account.bootstrap_accounts.(0) in
+  let sender_1 = Eth_account.bootstrap_accounts.(1) in
+  let* call_types = Solidity_contracts.call_types () in
+  let* () = Eth_cli.add_abi ~label:call_types.label ~abi:call_types.abi () in
+  let* address, _ =
+    send_transaction_to_sequencer
+      (fun () ->
+        Eth_cli.deploy
+          ~source_private_key:sender_0.Eth_account.private_key
+          ~endpoint
+          ~abi:call_types.label
+          ~bin:call_types.bin)
+      sequencer
+  in
+  let* () =
+    repeat 2 (fun () ->
+        next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client)
+  in
+  let* () = bake_until_sync ~sequencer ~sc_rollup_node ~proxy ~client () in
+  let* raw_tx_0 =
+    Cast.craft_tx
+      ~chain_id:1337
+      ~source_private_key:sender_0.private_key
+      ~nonce:1
+      ~gas_price:1_000_000_000
+      ~gas:300_000
+      ~value:Wei.zero
+      ~address
+      ~signature:"testProduceOpcodes()"
+      ()
+  in
+  let* raw_tx_1 =
+    Cast.craft_tx
+      ~chain_id:1337
+      ~source_private_key:sender_1.private_key
+      ~nonce:0
+      ~gas_price:1_000_000_000
+      ~gas:300_000
+      ~value:Wei.zero
+      ~address
+      ~signature:"testProduceOpcodes()"
+      ()
+  in
+  let*@ transaction_hash_0 =
+    Rpc.send_raw_transaction ~raw_tx:raw_tx_0 sequencer
+  in
+  let*@ transaction_hash_1 =
+    Rpc.send_raw_transaction ~raw_tx:raw_tx_1 sequencer
+  in
+  (* The transaction pool contains the two transactions above. *)
+  let*@ txpool_pending, _ = Rpc.txpool_content sequencer in
+  Check.((List.length txpool_pending = 2) int)
+    ~error_msg:
+      "Expected number of addresses with pending transaction to be %R, got %L." ;
+  let* () =
+    repeat 2 (fun () ->
+        next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client)
+  in
+  let* () = bake_until_sync ~sequencer ~sc_rollup_node ~proxy ~client () in
+  let*@ _ =
+    Rpc.trace_transaction
+      ~tracer:"callTracer"
+      ~transaction_hash:transaction_hash_0
+      ~tracer_config:[("withLog", `Bool false); ("onlyTopCall", `Bool false)]
+      sequencer
+  in
+  let*@ _ =
+    Rpc.trace_transaction
+      ~tracer:"callTracer"
+      ~transaction_hash:transaction_hash_1
+      ~tracer_config:[("withLog", `Bool false); ("onlyTopCall", `Bool false)]
+      sequencer
+  in
+  (* At this point, the two RPCs succeeded otherwise we'd get an error about having
+     multiple top calls. *)
+  unit
+
 let test_miner =
   let sequencer_pool_address =
     String.lowercase_ascii "0x8aaD6553Cf769Aa7b89174bE824ED0e53768ed70"
@@ -6113,4 +6201,5 @@ let () =
   test_trace_transaction_call_tracer_with_logs protocols ;
   test_trace_transaction_call_trace_certain_depth protocols ;
   test_trace_transaction_call_trace_revert protocols ;
+  test_trace_transaction_calltracer_multiple_txs protocols ;
   test_debug_print_store_schemas ()
