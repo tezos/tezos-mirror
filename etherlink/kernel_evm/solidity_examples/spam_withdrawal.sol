@@ -13,4 +13,11 @@ contract SpamWithdrawals {
             to.call{value: 1 ether}(abi.encodeWithSignature("withdraw_base58(string)", "tz1WrbkDrzKVqcGXkjw4Qk4fXkjXpAJuNP1j"));
         }
     }
+
+    function batchTopUp(address[] memory accounts) external {
+        for (uint256 i = 0; i < accounts.length; i++) {
+            address payable to = payable(accounts[i]);
+            to.transfer(5 ether);
+        }
+    }
 }

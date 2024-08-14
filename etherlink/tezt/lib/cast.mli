@@ -46,3 +46,12 @@ val craft_tx :
   ?arguments:string list ->
   unit ->
   string Lwt.t
+
+(** Wallet is a struct containing private key and Ethereum address 
+    derived from it (NOTE that public key is not included). *)
+type wallet = {address : string; private_key : string}
+
+(** [gen_wallets ~number ()]
+    generates [number] random wallets and returns a list of [wallet] structs.
+    This call does not store anything in the file system. *)
+val gen_wallets : number:int -> unit -> wallet list Lwt.t

@@ -62,3 +62,24 @@ let craft_tx ~source_private_key ~chain_id ~nonce ~value ~gas ~gas_price
       tx
   in
   return (String.sub encoded_tx 2 (String.length encoded_tx - 2))
+
+type wallet = {address : string; private_key : string}
+
+let wallet_of_json json =
+  let open JSON in
+  {
+    address = json |-> "address" |> as_string;
+    private_key = json |-> "private_key" |> as_string;
+  }
+
+let gen_wallets ~number () =
+  let* output =
+    spawn_command_and_read_string
+      ["wallet"; "new"; "--json"; "--number"; string_of_int number]
+  in
+  let wallets =
+    JSON.parse ~origin:"cast" output |> JSON.as_list_opt |> function
+    | Some l -> List.map wallet_of_json l
+    | None -> []
+  in
+  return wallets
