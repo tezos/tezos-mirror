@@ -22,14 +22,18 @@ end) : Services_backend_sig.Backend = struct
   end
 
   module TxEncoder = struct
-    type transactions = string list
+    type transactions = (string * Ethereum_types.transaction_object) list
 
     type messages = string list
 
     let encode_transactions ~smart_rollup_address:_ ~transactions =
       let open Result_syntax in
-      let hashes = List.map hash_raw_tx transactions in
-      return (hashes, transactions)
+      List.to_seq transactions
+      |> Seq.map (fun (raw_tx, (obj : transaction_object)) ->
+             (obj.hash, raw_tx))
+      |> Seq.split
+      |> (fun (l, r) -> (List.of_seq l, List.of_seq r))
+      |> return
   end
 
   module Publisher = struct

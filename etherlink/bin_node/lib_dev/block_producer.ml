@@ -127,10 +127,16 @@ let take_delayed_transactions maximum_number_of_chunks =
   return (delayed_transactions, remaining_cumulative_size)
 
 let produce_block_with_transactions ~sequencer_key ~cctxt ~timestamp
-    ~smart_rollup_address ~transactions_and_hashes ~delayed_transactions
+    ~smart_rollup_address ~transactions_and_objects ~delayed_transactions
     head_info =
   let open Lwt_result_syntax in
-  let transactions, tx_hashes = List.split transactions_and_hashes in
+  let transactions, tx_hashes =
+    List.to_seq transactions_and_objects
+    |> Seq.map (fun (raw, (obj : Ethereum_types.transaction_object)) ->
+           (raw, obj.hash))
+    |> Seq.split
+    |> fun (l, r) -> (List.of_seq l, List.of_seq r)
+  in
   Misc.with_timing
     (Blueprint_events.blueprint_production
        head_info.Evm_context.next_blueprint_number)
@@ -170,7 +176,7 @@ let produce_block_if_needed ~cctxt ~smart_rollup_address ~sequencer_key ~force
   let* delayed_transactions, remaining_cumulative_size =
     take_delayed_transactions maximum_number_of_chunks
   in
-  let* transactions_and_hashes =
+  let* transactions_and_objects =
     (* Low key optimization to avoid even checking the txpool if there is not
        enough space for the smallest transaction. *)
     if remaining_cumulative_size <= minimum_ethereum_transaction_size then
@@ -180,7 +186,7 @@ let produce_block_if_needed ~cctxt ~smart_rollup_address ~sequencer_key ~force
         ~maximum_cumulative_size:remaining_cumulative_size
   in
   let n =
-    List.length transactions_and_hashes + List.length delayed_transactions
+    List.length transactions_and_objects + List.length delayed_transactions
   in
   if force || n > 0 then
     let* () =
@@ -189,7 +195,7 @@ let produce_block_if_needed ~cctxt ~smart_rollup_address ~sequencer_key ~force
         ~cctxt
         ~timestamp
         ~smart_rollup_address
-        ~transactions_and_hashes
+        ~transactions_and_objects
         ~delayed_transactions
         head_info
     in
@@ -219,7 +225,7 @@ let produce_block ~cctxt ~smart_rollup_address ~sequencer_key ~force ~timestamp
           ~cctxt
           ~timestamp
           ~smart_rollup_address
-          ~transactions_and_hashes:[]
+          ~transactions_and_objects:[]
           ~delayed_transactions:[]
           head_info
       in

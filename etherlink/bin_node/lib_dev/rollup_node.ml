@@ -88,7 +88,7 @@ end) : Services_backend_sig.Backend = struct
   end
 
   module TxEncoder = struct
-    type transactions = string list
+    type transactions = (string * Ethereum_types.transaction_object) list
 
     type messages = string list
 
@@ -96,7 +96,7 @@ end) : Services_backend_sig.Backend = struct
       let open Result_syntax in
       let* rev_hashes, messages =
         List.fold_left_e
-          (fun (tx_hashes, to_publish) tx_raw ->
+          (fun (tx_hashes, to_publish) (tx_raw, _) ->
             let* tx_hash, messages =
               make_encoded_messages ~smart_rollup_address tx_raw
             in

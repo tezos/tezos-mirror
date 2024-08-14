@@ -29,14 +29,14 @@ module type S = sig
     Ethereum_types.Block_parameter.extended ->
     Ethereum_types.hex tzresult Lwt.t
 
-  (** [inject_raw_transactions ~timestamp ~smart_rollup_address
+  (** [inject_transactions ~timestamp ~smart_rollup_address
       ~transactions] crafts the hashes and chunks of each transaction
       of [transactions]. Injects the chunks and returns the hashes of
       injected transactions. *)
-  val inject_raw_transactions :
+  val inject_transactions :
     timestamp:Time.Protocol.t ->
     smart_rollup_address:string ->
-    transactions:string list ->
+    transactions:(string * Ethereum_types.transaction_object) list ->
     Ethereum_types.hash list tzresult Lwt.t
 
   (** [current_block ~full_transaction_object] returns the most recent
