@@ -358,19 +358,19 @@ let changeset_images = Changeset.make ["images/**/*"]
 
 (** Only if octez source code has changed *)
 let changeset_octez =
+  let octez_source_content =
+    List.map
+      (fun path -> if Sys.is_directory path then path ^ "/**/*" else path)
+      (read_lines_from_file "script-inputs/octez-source-content")
+    |> Changeset.make
+  in
   Changeset.(
-    changeset_base
+    changeset_base @ octez_source_content
     @ make
         [
-          "src/**/*";
-          "data-encoding/**/*";
           "etherlink/**/*";
-          "resto/**/*";
-          "tezt/**/*";
           "michelson_test_scripts/**/*";
           "tzt_reference_test_suite/**/*";
-          "irmin/**/*";
-          "brassaia/**/*";
         ])
 
 (** Only if octez source code has changed, if the images has changed or
