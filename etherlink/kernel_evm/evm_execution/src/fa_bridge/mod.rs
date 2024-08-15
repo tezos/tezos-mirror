@@ -131,6 +131,7 @@ pub fn execute_fa_deposit<'a, Host: Runtime>(
     deposit: &FaDeposit,
     allocated_ticks: u64,
     tracer_input: Option<TracerInput>,
+    gas_limit: u64,
 ) -> Result<ExecutionOutcome, EthereumError> {
     log!(host, Info, "Going to execute a {}", deposit.display());
 
@@ -148,7 +149,7 @@ pub fn execute_fa_deposit<'a, Host: Runtime>(
         tracer_input,
     );
 
-    handler.begin_initial_transaction(false, Some(FA_DEPOSIT_PROXY_GAS_LIMIT))?;
+    handler.begin_initial_transaction(false, Some(gas_limit))?;
 
     // It's ok if internal proxy call fails, we will update the ticket table anyways.
     let ticket_owner = if let Some(proxy) = deposit.proxy {

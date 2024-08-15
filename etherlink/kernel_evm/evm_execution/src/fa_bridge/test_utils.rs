@@ -154,9 +154,11 @@ pub fn run_fa_deposit(
     evm_account_storage: &mut EthereumAccountStorage,
     deposit: &FaDeposit,
     caller: &H160,
+    gas_limit: u64,
+    enable_fa_withdrawals: bool,
 ) -> ExecutionOutcome {
     let block = dummy_block_constants();
-    let precompiles = precompile_set::<MockKernelHost>(false);
+    let precompiles = precompile_set::<MockKernelHost>(enable_fa_withdrawals);
 
     execute_fa_deposit(
         host,
@@ -166,8 +168,9 @@ pub fn run_fa_deposit(
         Config::shanghai(),
         *caller,
         deposit,
-        1_000_000_000,
+        100_000_000_000,
         None,
+        gas_limit,
     )
     .expect("Failed to execute deposit")
 }
