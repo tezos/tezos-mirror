@@ -4290,8 +4290,8 @@ let test_outbox_size_limit_resilience ~slow =
       sequencer
   in
 
-  (* Create and topup 30 accounts (to overcome single account per block limitation) *)
-  let* wallets = Cast.gen_wallets ~number:30 () in
+  (* Create and topup many accounts (to overcome single account per block limitation) *)
+  let* wallets = Cast.gen_wallets ~number:150 () in
   let addresses =
     List.map (fun (w : Cast.wallet) -> sf "\"%s\"" w.address) wallets
   in
@@ -4319,7 +4319,7 @@ let test_outbox_size_limit_resilience ~slow =
       ~value:(Wei.of_eth_int 0)
       ~address:spammer_contract
       ~signature:"doWithdrawals(uint256)"
-      ~arguments:["5"]
+      ~arguments:["1"]
   in
   let* withdraw_txs =
     List.map (fun w -> withdraw_tx ~wallet:w ()) wallets |> Lwt.all

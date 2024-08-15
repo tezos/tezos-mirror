@@ -11,8 +11,8 @@
 //!     * Alters ticket table (changes balance)
 //!     * Increments outbox counter
 
-use evm::{Context, Transfer};
-use primitive_types::H160;
+use evm::{Context, Handler, Transfer};
+use primitive_types::{H160, U256};
 use tezos_smart_rollup_host::runtime::Runtime;
 
 use crate::{
@@ -24,13 +24,46 @@ use crate::{
 
 use super::{PrecompileOutcome, FA_BRIDGE_PRECOMPILE_ADDRESS};
 
-/// TODO: Overapproximation of the amount of ticks for parsing
-/// FA withdrawal from calldata, and checking transfer value.
-pub const FA_WITHDRAWAL_OUTER_TICKS: u64 = 3_000_000;
+/// Overapproximation of the amount of ticks for parsing
+/// FA withdrawal from calldata, checking transfer value,
+/// and executing the FA withdrawal, excluding the ticks consumed by
+/// the inner proxy call.
+///
+/// Linear regression parameters are obtained by running `bench_fa_withdrawal`
+/// script, evaluating `run_transaction_ticks` against `data_size`.
+/// Intercept is extended with +50% safe reserve.
+pub const FA_WITHDRAWAL_PRECOMPILE_TICKS_INTERCEPT: u64 = 4_000_000;
+pub const FA_WITHDRAWAL_PRECOMPILE_TICKS_SLOPE: u64 = 700;
 
-/// TODO: Cost of doing FA withdrawal excluding the gas consumed
-/// by the inner proxy contract call.
-pub const FA_WITHDRAWAL_OUTER_GAS_COST: u64 = 1500;
+/// Added ("artificial") cost of doing FA withdrawal not including actual gas
+/// spent for executing the withdrawal (and inner proxy contract call).
+///
+/// This is roughly the implied costs of executing the outbox message on L1
+/// as a spam prevention mechanism (outbox queue clogging).
+/// In particular it prevents cases when a big number of withdrawals is batched
+/// together in a single transaction which exploits the system.
+///
+/// An execution of a single outbox message carrying a FA withdrawal
+/// costs around 0.0025ꜩ on L1; the equivalent amount of gas units on L2 is:
+///  
+///  0.0025 * 10^18 / GAS_PRICE
+///
+/// Multiplying the numerator by 2 for a safe reserve and this is our cost in Wei.
+pub const FA_WITHDRAWAL_PRECOMPILE_ADDED_COST: u64 = 5_000_000_000_000_000;
+
+/// Hard cap for the added gas cost (0.5 of the maximum gas limit per transaction).
+/// If gas price drops the gas amount rises, but we don't want it to hit the transaction
+/// gas limit.
+pub const FA_WITHDRAWAL_PRECOMPILE_MAX_ADDED_CAS_COST: u64 = 15_000_000;
+
+/// Calculate precompile gas cost given the estimated amount of ticks and gas price.
+fn estimate_gas_cost(estimated_ticks: u64, gas_price: U256) -> u64 {
+    // Using 1 gas unit ~= 1000 ticks convert ratio
+    let execution_cost = estimated_ticks / 1000;
+    let added_cost = U256::from(FA_WITHDRAWAL_PRECOMPILE_MAX_ADDED_CAS_COST)
+        .min(U256::from(FA_WITHDRAWAL_PRECOMPILE_ADDED_COST) / gas_price);
+    execution_cost + added_cost.as_u64()
+}
 
 macro_rules! precompile_outcome_error {
     ($($arg:tt)*) => {
@@ -40,7 +73,7 @@ macro_rules! precompile_outcome_error {
             )),
             withdrawals: vec![],
             output: vec![],
-            estimated_ticks: FA_WITHDRAWAL_OUTER_TICKS,
+            estimated_ticks: 0,
         }
     };
 }
@@ -54,9 +87,16 @@ pub fn fa_bridge_precompile<Host: Runtime>(
     is_static: bool,
     transfer: Option<Transfer>,
 ) -> Result<PrecompileOutcome, EthereumError> {
-    fail_if_too_much!(FA_WITHDRAWAL_OUTER_TICKS, handler);
+    // We register the cost of the precompile early to prevent cases where inner proxy call
+    // consumes more ticks than allowed.
+    let estimated_ticks = FA_WITHDRAWAL_PRECOMPILE_TICKS_SLOPE * (input.len() as u64)
+        + FA_WITHDRAWAL_PRECOMPILE_TICKS_INTERCEPT;
+    handler.estimated_ticks_used += fail_if_too_much!(estimated_ticks, handler);
 
-    if handler.record_cost(FA_WITHDRAWAL_OUTER_GAS_COST).is_err() {
+    // We also record gas cost which consists of computation cost (1 gas unit per 1000 ticks)
+    // and added FA withdrawal cost (spam prevention measure).
+    let estimated_gas_cost = estimate_gas_cost(estimated_ticks, handler.gas_price());
+    if handler.record_cost(estimated_gas_cost).is_err() {
         return Ok(precompile_outcome_error!(
             "FA withdrawal: gas limit too low"
         ));
@@ -366,7 +406,7 @@ mod tests {
             ticket_owner,
             None,
             input,
-            Some(40000),
+            Some(30_000_000),
             false,
         );
         assert!(outcome.is_success());
