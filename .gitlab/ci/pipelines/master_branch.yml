@@ -15,6 +15,7 @@ oc.docker:ci:amd64:
   tags:
   - gcp
   dependencies: []
+  timeout: 60 minutes
   before_script: []
   script:
   - ./images/ci_create_ci_images.sh
@@ -34,6 +35,7 @@ oc.docker:rust-toolchain:amd64:
   tags:
   - gcp
   dependencies: []
+  timeout: 60 minutes
   before_script: []
   script:
   - ./scripts/ci/docker_rust_toolchain_build.sh
@@ -52,6 +54,7 @@ oc.docker:ci:arm64:
   tags:
   - gcp_arm64
   dependencies: []
+  timeout: 60 minutes
   before_script: []
   script:
   - ./images/ci_create_ci_images.sh
@@ -78,6 +81,7 @@ oc.build:static-x86_64-linux-binaries:
   - when: always
   dependencies:
   - oc.docker:ci:amd64
+  timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
@@ -113,6 +117,7 @@ oc.build:static-arm64-linux-binaries:
   - when: always
   dependencies:
   - oc.docker:ci:arm64
+  timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
@@ -149,6 +154,7 @@ oc.build_arm64-released:
     allow_failure: true
   dependencies:
   - oc.docker:ci:arm64
+  timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
@@ -193,6 +199,7 @@ oc.build_arm64-exp-dev-extra:
     allow_failure: true
   dependencies:
   - oc.docker:ci:arm64
+  timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
@@ -239,6 +246,7 @@ oc.docker:amd64:
   dependencies:
   - oc.docker:rust-toolchain:amd64
   - oc.docker:ci:amd64
+  timeout: 60 minutes
   before_script:
   - ./scripts/ci/docker_initialize.sh
   script:
@@ -261,6 +269,7 @@ oc.docker:arm64:
   - when: always
   dependencies:
   - oc.docker:ci:arm64
+  timeout: 60 minutes
   before_script:
   - ./scripts/ci/docker_initialize.sh
   script:
@@ -284,6 +293,7 @@ oc.unified_coverage:
   dependencies:
   - oc.docker:ci:amd64
   allow_failure: true
+  timeout: 60 minutes
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -338,6 +348,7 @@ publish:documentation:
   - oc.docker:ci:amd64
   dependencies:
   - oc.docker:ci:amd64
+  timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
@@ -372,6 +383,7 @@ docker:merge_manifests:
   - oc.docker:amd64
   - oc.docker:arm64
   dependencies: []
+  timeout: 60 minutes
   before_script:
   - ./scripts/ci/docker_initialize.sh
   script:
@@ -392,6 +404,7 @@ publish_kernel_sdk:
     allow_failure: true
   dependencies:
   - oc.docker:rust-toolchain:amd64
+  timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:

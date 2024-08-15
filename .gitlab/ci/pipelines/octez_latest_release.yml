@@ -10,6 +10,7 @@ docker:promote_to_latest:
   tags:
   - gcp
   dependencies: []
+  timeout: 60 minutes
   before_script:
   - ./scripts/ci/docker_initialize.sh
   script:

@@ -18,6 +18,7 @@ oc.docker-build-debian-dependencies:
   tags:
   - $TAGS
   dependencies: []
+  timeout: 60 minutes
   before_script:
   - ./scripts/ci/docker_initialize.sh
   script:
@@ -43,6 +44,7 @@ oc.build-debian:
   needs:
   - oc.docker-build-debian-dependencies
   dependencies: []
+  timeout: 60 minutes
   script:
   - export CARGO_NET_OFFLINE=false
   - ./scripts/ci/build-debian-packages.sh binaries
@@ -67,6 +69,7 @@ oc.build-debian-current_a:
   needs:
   - oc.docker-build-debian-dependencies
   dependencies: []
+  timeout: 60 minutes
   script:
   - export CARGO_NET_OFFLINE=false
   - ./scripts/ci/build-debian-packages_current.sh A
@@ -91,6 +94,7 @@ oc.build-debian-current_b:
   needs:
   - oc.docker-build-debian-dependencies
   dependencies: []
+  timeout: 60 minutes
   script:
   - export CARGO_NET_OFFLINE=false
   - ./scripts/ci/build-debian-packages_current.sh B
@@ -115,6 +119,7 @@ oc.build-data_packages:
   needs:
   - oc.docker-build-debian-dependencies
   dependencies: []
+  timeout: 60 minutes
   script:
   - export CARGO_NET_OFFLINE=false
   - ./scripts/ci/build-debian-packages.sh zcash
@@ -142,6 +147,7 @@ apt_repo_debian_current:
   dependencies:
   - oc.build-debian-current_a
   - oc.build-debian-current_b
+  timeout: 60 minutes
   before_script:
   - . ./scripts/version.sh
   - ./scripts/ci/prepare-apt-repo.sh
@@ -162,6 +168,7 @@ apt_repo_debian:
   dependencies:
   - oc.build-debian
   - oc.build-data_packages
+  timeout: 60 minutes
   before_script:
   - . ./scripts/version.sh
   - ./scripts/ci/prepare-apt-repo.sh
@@ -181,6 +188,7 @@ oc.lintian_debian:
   - oc.build-debian
   dependencies:
   - oc.build-debian
+  timeout: 60 minutes
   before_script:
   - . ./scripts/version.sh
   - export DEBIAN_FRONTEND=noninteractive
@@ -197,6 +205,7 @@ oc.install_bin_debian_bookworm_current:
   needs:
   - apt_repo_debian_current
   dependencies: []
+  timeout: 60 minutes
   script:
   - ./docs/introduction/install-bin-deb.sh debian bookworm
   variables: {}
@@ -209,6 +218,7 @@ oc.install_bin_debian_bookworm:
   needs:
   - apt_repo_debian
   dependencies: []
+  timeout: 60 minutes
   script:
   - ./docs/introduction/install-bin-deb.sh debian bookworm
   variables:

@@ -14,6 +14,7 @@ oc.docker:ci:amd64:
   tags:
   - gcp
   dependencies: []
+  timeout: 60 minutes
   before_script: []
   script:
   - ./images/ci_create_ci_images.sh
@@ -33,6 +34,7 @@ oc.docker:ci:arm64:
   tags:
   - gcp_arm64
   dependencies: []
+  timeout: 60 minutes
   before_script: []
   script:
   - ./images/ci_create_ci_images.sh
@@ -57,6 +59,7 @@ oc.build:static-x86_64-linux-binaries:
   - gcp
   dependencies:
   - oc.docker:ci:amd64
+  timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
@@ -91,6 +94,7 @@ oc.build:static-arm64-linux-binaries:
   - gcp_arm64
   dependencies:
   - oc.docker:ci:arm64
+  timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
@@ -125,6 +129,7 @@ oc.docker:amd64:
   - gcp
   dependencies:
   - oc.docker:ci:amd64
+  timeout: 60 minutes
   before_script:
   - ./scripts/ci/docker_initialize.sh
   script:
@@ -145,6 +150,7 @@ oc.docker:arm64:
   - gcp_arm64
   dependencies:
   - oc.docker:ci:arm64
+  timeout: 60 minutes
   before_script:
   - ./scripts/ci/docker_initialize.sh
   script:
@@ -213,6 +219,7 @@ docker:merge_manifests:
   - oc.docker:amd64
   - oc.docker:arm64
   dependencies: []
+  timeout: 60 minutes
   before_script:
   - ./scripts/ci/docker_initialize.sh
   script:
@@ -244,6 +251,7 @@ gitlab:release:
   - oc.build-debian-current_a
   - oc.build-ubuntu-current_b
   - oc.build-debian-current_b
+  timeout: 60 minutes
   interruptible: false
   script:
   - ./scripts/ci/restrict_export_to_octez_source.sh
@@ -255,6 +263,7 @@ oc.docker-build-debian-dependencies:
   tags:
   - $TAGS
   dependencies: []
+  timeout: 60 minutes
   before_script:
   - ./scripts/ci/docker_initialize.sh
   script:
@@ -282,6 +291,7 @@ oc.build-debian:
   needs:
   - oc.docker-build-debian-dependencies
   dependencies: []
+  timeout: 60 minutes
   script:
   - export CARGO_NET_OFFLINE=false
   - ./scripts/ci/build-debian-packages.sh binaries
@@ -308,6 +318,7 @@ oc.build-debian-current_a:
   needs:
   - oc.docker-build-debian-dependencies
   dependencies: []
+  timeout: 60 minutes
   script:
   - export CARGO_NET_OFFLINE=false
   - ./scripts/ci/build-debian-packages_current.sh A
@@ -334,6 +345,7 @@ oc.build-debian-current_b:
   needs:
   - oc.docker-build-debian-dependencies
   dependencies: []
+  timeout: 60 minutes
   script:
   - export CARGO_NET_OFFLINE=false
   - ./scripts/ci/build-debian-packages_current.sh B
@@ -360,6 +372,7 @@ oc.build-data_packages:
   needs:
   - oc.docker-build-debian-dependencies
   dependencies: []
+  timeout: 60 minutes
   script:
   - export CARGO_NET_OFFLINE=false
   - ./scripts/ci/build-debian-packages.sh zcash
@@ -389,6 +402,7 @@ apt_repo_debian_current:
   dependencies:
   - oc.build-debian-current_a
   - oc.build-debian-current_b
+  timeout: 60 minutes
   before_script:
   - . ./scripts/version.sh
   - ./scripts/ci/prepare-apt-repo.sh
@@ -409,6 +423,7 @@ apt_repo_debian:
   dependencies:
   - oc.build-debian
   - oc.build-data_packages
+  timeout: 60 minutes
   before_script:
   - . ./scripts/version.sh
   - ./scripts/ci/prepare-apt-repo.sh
@@ -425,6 +440,7 @@ oc.docker-build-ubuntu-dependencies:
   tags:
   - $TAGS
   dependencies: []
+  timeout: 60 minutes
   before_script:
   - ./scripts/ci/docker_initialize.sh
   script:
@@ -452,6 +468,7 @@ oc.build-ubuntu:
   needs:
   - oc.docker-build-ubuntu-dependencies
   dependencies: []
+  timeout: 60 minutes
   script:
   - export CARGO_NET_OFFLINE=false
   - ./scripts/ci/build-debian-packages.sh binaries
@@ -478,6 +495,7 @@ oc.build-ubuntu-current_a:
   needs:
   - oc.docker-build-ubuntu-dependencies
   dependencies: []
+  timeout: 60 minutes
   script:
   - export CARGO_NET_OFFLINE=false
   - ./scripts/ci/build-debian-packages_current.sh A
@@ -504,6 +522,7 @@ oc.build-ubuntu-current_b:
   needs:
   - oc.docker-build-ubuntu-dependencies
   dependencies: []
+  timeout: 60 minutes
   script:
   - export CARGO_NET_OFFLINE=false
   - ./scripts/ci/build-debian-packages_current.sh B
@@ -533,6 +552,7 @@ apt_repo_ubuntu_current:
   dependencies:
   - oc.build-ubuntu-current_a
   - oc.build-ubuntu-current_b
+  timeout: 60 minutes
   before_script:
   - . ./scripts/version.sh
   - ./scripts/ci/prepare-apt-repo.sh
@@ -553,6 +573,7 @@ apt_repo_ubuntu:
   dependencies:
   - oc.build-ubuntu
   - oc.build-data_packages
+  timeout: 60 minutes
   before_script:
   - . ./scripts/version.sh
   - ./scripts/ci/prepare-apt-repo.sh

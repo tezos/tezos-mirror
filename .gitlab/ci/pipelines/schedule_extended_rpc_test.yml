@@ -12,6 +12,7 @@ oc.docker:ci:amd64:
   tags:
   - gcp
   dependencies: []
+  timeout: 60 minutes
   before_script: []
   script:
   - ./images/ci_create_ci_images.sh
@@ -31,6 +32,7 @@ oc.docker:rust-toolchain:amd64:
   tags:
   - gcp
   dependencies: []
+  timeout: 60 minutes
   before_script: []
   script:
   - ./scripts/ci/docker_rust_toolchain_build.sh
@@ -116,6 +118,7 @@ tezt-memory-3k:
   - oc.build_x86_64-exp-dev-extra
   - oc.build_kernels
   - oc.tezt:fetch-records
+  timeout: 60 minutes
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -169,6 +172,7 @@ tezt-memory-4k:
   - oc.build_x86_64-exp-dev-extra
   - oc.build_kernels
   - oc.tezt:fetch-records
+  timeout: 60 minutes
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -222,6 +226,7 @@ tezt-time-sensitive:
   - oc.build_x86_64-exp-dev-extra
   - oc.build_kernels
   - oc.tezt:fetch-records
+  timeout: 60 minutes
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -274,6 +279,7 @@ tezt-slow:
   - oc.build_x86_64-exp-dev-extra
   - oc.build_kernels
   - oc.tezt:fetch-records
+  timeout: 60 minutes
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -327,6 +333,7 @@ tezt-flaky:
   - oc.build_x86_64-exp-dev-extra
   - oc.build_kernels
   - oc.tezt:fetch-records
+  timeout: 60 minutes
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -367,6 +374,7 @@ oc.build_x86_64-released:
   - gcp
   dependencies:
   - oc.docker:ci:amd64
+  timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
@@ -409,6 +417,7 @@ oc.build_x86_64-exp-dev-extra:
   - gcp
   dependencies:
   - oc.docker:ci:amd64
+  timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
@@ -453,6 +462,7 @@ oc.build_kernels:
   - gcp
   dependencies:
   - oc.docker:rust-toolchain:amd64
+  timeout: 60 minutes
   cache:
   - key: kernels-sccache
     paths:
@@ -499,6 +509,7 @@ oc.tezt:fetch-records:
   dependencies:
   - oc.docker:ci:amd64
   allow_failure: true
+  timeout: 60 minutes
   before_script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -525,6 +536,7 @@ select_tezts:
   - oc.docker:ci:amd64
   allow_failure:
     exit_codes: 17
+  timeout: 60 minutes
   before_script:
   - ./scripts/ci/take_ownership.sh
   - eval $(opam env)
