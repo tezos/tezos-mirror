@@ -25,6 +25,10 @@
     }
     // {
       conf-pkg-config = final.lib.overrideNativeDepends prev.conf-pkg-config [pkg-config];
+
+      ocamlformat-lib = prev.ocamlformat-lib.overrideAttrs (old: {
+        propagatedBuildInputs = old.propagatedBuildInputs ++ [prev.ocp-indent];
+      });
     };
 
   darwin-overlay = final: prev: {
