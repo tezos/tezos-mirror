@@ -94,8 +94,6 @@ depends: [
   "hidapi" {= "1.2.1"}
   "hidapi-lwt" {= "1.2.1"}
   "hkdf" {= "1.0.4"}
-
-
   "index" {= "1.6.2"}
   "integers" {= "0.7.0"}
   "ipaddr" {= "5.6.0"}

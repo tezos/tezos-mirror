@@ -106,8 +106,11 @@ opam lock opam/virtual/octez-deps.opam
 # depends on system libraries. We need to remove them from our lockfile,
 # otherwise they won’t be portable.
 # See https://github.com/ocaml/opam-repository/commit/0b240d2960133fd3d8aa8f008d7aa79534caa3b9
-sed -i -E 's/.*"host-arch-.*?".*//' octez-deps.opam.locked
-sed -i -E 's/.*"host-system-.*?".*//' octez-deps.opam.locked
+ed -s octez-deps.opam.locked << EOF
+g/host-arch-/d
+g/host-system-/d
+w
+EOF
 
 mv octez-deps.opam.locked opam/virtual
 echo "---- Updated: opam/virtual/octez-deps.opam.locked"
