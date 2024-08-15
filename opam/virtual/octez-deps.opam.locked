@@ -132,7 +132,6 @@ depends: [
   "ocaml-base-compiler" {= "4.14.2"}
   "ocaml-compiler-libs" {= "v0.12.4"}
   "ocaml-config" {= "2"}
-  "ocaml-migrate-parsetree" {= "2.4.0"}
   "ocaml-options-vanilla" {= "1"}
   "ocaml-syntax-shims" {= "1.0.0"}
   "ocaml-version" {= "3.6.7"}

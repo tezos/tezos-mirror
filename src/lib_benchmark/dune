@@ -17,8 +17,7 @@
   prbnmcn-stats
   pringo
   pyml
-  ocamlgraph
-  ocaml-migrate-parsetree)
+  ocamlgraph)
  (inline_tests
   (flags -verbose)
   (modes native)
