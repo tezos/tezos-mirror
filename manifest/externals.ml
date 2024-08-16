@@ -159,8 +159,6 @@ let mtime = external_lib "mtime" V.(at_least "2.0.0")
 
 let mtime_clock_os = external_sublib mtime "mtime.clock.os"
 
-let ocaml_migrate_parsetree = external_lib "ocaml-migrate-parsetree" V.True
-
 let ocaml_protoc_compiler =
   external_lib "ocaml-protoc-plugin" V.(at_least "4.5.0")
 

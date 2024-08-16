@@ -4184,7 +4184,6 @@ let octez_benchmark =
         pringo;
         pyml;
         ocamlgraph;
-        ocaml_migrate_parsetree;
         opam_only "hashcons" V.True;
       ]
     ~inline_tests:ppx_expect
