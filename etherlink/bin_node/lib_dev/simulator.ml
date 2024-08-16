@@ -156,7 +156,7 @@ module Make (SimulationBackend : SimulationBackend) = struct
     let da_fee = Fees.gas_for_fees ?da_fee_per_byte ~gas_price tx_data in
     return da_fee
 
-  let check_node_da_fees ~previous_gas ~node_da_fees ~simulation_version
+  let check_node_da_fees ~execution_gas ~node_da_fees ~simulation_version
       simulation_state call =
     let open Lwt_result_syntax in
     let* kernel_da_fees =
@@ -172,7 +172,7 @@ module Make (SimulationBackend : SimulationBackend) = struct
       in
       (* DA fees computed by the kernel is the difference between total gas
          and previous gas call. *)
-      return (Z.sub total_gas previous_gas)
+      return (Z.sub total_gas execution_gas)
     in
     unless (node_da_fees = kernel_da_fees) (fun () ->
         let*! () = Events.invalid_node_da_fees ~node_da_fees ~kernel_da_fees in
@@ -198,7 +198,7 @@ module Make (SimulationBackend : SimulationBackend) = struct
         if reached_max new_gas then
           failwith "Gas estimate reached max gas limit."
         else confirm_gas ~simulation_version call new_gas simulation_state
-    | Ok (Ok {gas_used = Some _; _}) ->
+    | Ok (Ok {gas_used = Some gas_used; _}) ->
         (* The gas returned by confirm gas can be ignored. What we care about
            is only knowing if the gas provided in {!new_call} is enough. The
            gas used returned when confirming may remove the "safe" amount
@@ -226,9 +226,9 @@ module Make (SimulationBackend : SimulationBackend) = struct
              are consistent.
           *)
           let* () =
-            let (Qty gas) = gas in
+            let (Qty gas_used) = gas_used in
             check_node_da_fees
-              ~previous_gas:gas
+              ~execution_gas:gas_used
               ~node_da_fees:da_fees
               ~simulation_version
               simulation_state
