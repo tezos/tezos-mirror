@@ -193,3 +193,13 @@ val outbox_proof_simple :
   message_index:int ->
   unit ->
   outbox_proof option RPC_core.t
+
+type outbox_msg = {message_index : int; message : JSON.t}
+
+(** RPC: [GET /local/outbox/pending/executable] *)
+val get_local_outbox_pending_executable :
+  unit -> (int * outbox_msg list) list RPC_core.t
+
+(** RPC: [GET /local/outbox/pending/unexecutable] *)
+val get_local_outbox_pending_unexecutable :
+  unit -> (int * outbox_msg list) list RPC_core.t

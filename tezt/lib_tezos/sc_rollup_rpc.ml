@@ -312,3 +312,25 @@ let outbox_proof_simple ?(block = "head") ~outbox_level ~message_index () =
       (* There is 0x return in the proof hash as it is a hex *)
       let proof_hex = sf "0x%s" proof_string in
       Some {commitment_hash; proof = proof_hex})
+
+type outbox_msg = {message_index : int; message : JSON.t}
+
+let outbox_list_of_json json =
+  let open JSON in
+  as_list json
+  |> List.map @@ fun json ->
+     let outbox_level = json |-> "outbox_level" |> as_int in
+     let msgs =
+       json |-> "messages" |> as_list
+       |> List.map @@ fun json ->
+          let message_index = json |-> "message_index" |> as_int in
+          let message = json |-> "message" in
+          {message_index; message}
+     in
+     (outbox_level, msgs)
+
+let get_local_outbox_pending_executable () =
+  make GET ["local"; "outbox"; "pending"; "executable"] outbox_list_of_json
+
+let get_local_outbox_pending_unexecutable () =
+  make GET ["local"; "outbox"; "pending"; "unexecutable"] outbox_list_of_json

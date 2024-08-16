@@ -4019,6 +4019,8 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
     ?outbox_parameters_ty ?boot_sector ~input_message ~expected_storage ~kind
     ~message_kind =
   let commitment_period = 2 and challenge_window = 5 in
+  let outbox_level = 5 in
+  let message_index = 0 in
   let message_kind_s =
     match message_kind with `Internal -> "intern" | `External -> "extern"
   in
@@ -4106,6 +4108,36 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
            string
            ~error_msg:"Invalid contract storage: expecting '%R', got '%L'.")
   in
+  let check_outbox_execution outbox_level status =
+    let* _ = Sc_rollup_node.wait_sync rollup_node ~timeout:10. in
+    let* executable_outboxes =
+      Sc_rollup_node.RPC.call rollup_node
+      @@ Sc_rollup_rpc.get_local_outbox_pending_executable ()
+    in
+    let* unexecutable_outboxes =
+      Sc_rollup_node.RPC.call rollup_node
+      @@ Sc_rollup_rpc.get_local_outbox_pending_unexecutable ()
+    in
+    let get_nb l =
+      match List.assoc_opt outbox_level l with
+      | None -> 0
+      | Some l -> List.length l
+    in
+    let executable = get_nb executable_outboxes in
+    let unexecutable = get_nb unexecutable_outboxes in
+    match (status, executable, unexecutable) with
+    | `Executable, 1, 0 -> unit
+    | `Unexecutable, 0, 1 -> unit
+    | _ ->
+        Test.fail
+          "Outbox level should be %s but there is %d executable, %d \
+           unexecutable."
+          (match status with
+          | `Executable -> "executable"
+          | `Unexecutable -> "unexecutable")
+          executable
+          unexecutable
+  in
   let perform_rollup_execution_and_cement source_address target_address =
     let* payload = input_message protocol target_address in
     let* () =
@@ -4138,13 +4170,12 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
     in
     Check.((nb_outbox_transactions_in_block = [1]) (list int))
       ~error_msg:"Block has %L outbox transactions but expected %R" ;
+    let* () = check_outbox_execution outbox_level `Unexecutable in
     let blocks_to_wait =
       3 + (2 * commitment_period) + challenge_window - earliness
     in
     repeat blocks_to_wait @@ fun () -> Client.bake_for_and_wait client
   in
-  let outbox_level = 5 in
-  let message_index = 0 in
   let trigger_outbox_message_execution ?expected_l1_error address =
     let parameters = "37" in
     let check_expected_outbox () =
@@ -4202,6 +4233,7 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
     | Some {commitment_hash; proof}, None -> (
         match expected_l1_error with
         | None ->
+            let* () = check_outbox_execution outbox_level `Executable in
             let*! () =
               Client.Sc_rollup.execute_outbox_message
                 ~hooks
