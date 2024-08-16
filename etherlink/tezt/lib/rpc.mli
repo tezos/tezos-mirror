@@ -127,10 +127,10 @@ val get_transaction_receipt :
 val estimate_gas :
   (string * Ezjsonm.value) list -> Evm_node.t -> (int64, error) result Lwt.t
 
-(** [get_transaction_count ~address evm_node] calls [eth_getTransactionCount]
-    with [address] as argument (on block ["latest"]). *)
+(** [get_transaction_count ?block ~address evm_node] calls [eth_getTransactionCount]
+    with [address] as argument (on [block], default to ["latest"] if omitted). *)
 val get_transaction_count :
-  address:string -> Evm_node.t -> (int64, error) result Lwt.t
+  ?block:string -> address:string -> Evm_node.t -> (int64, error) result Lwt.t
 
 (** [tez_kernelVersion evm_node] calls [tez_kernelVersion]. Returns the
     kernel commit hash. *)

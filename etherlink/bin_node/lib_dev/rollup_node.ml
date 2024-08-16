@@ -39,18 +39,22 @@ module MakeBackend (Base : sig
   val smart_rollup_address : string
 
   val finalized : bool
+
+  val ignore_block_param : bool
 end) : Services_backend_sig.Backend = struct
   module Reader = struct
     let read ?block path =
       let open Lwt_result_syntax in
+      let block = if Base.ignore_block_param then None else block in
       let* block_id =
         match block with
-        | Some Ethereum_types.Block_parameter.(Block_parameter Latest) | None ->
+        | Some Ethereum_types.Block_parameter.(Block_parameter Finalized) ->
+            return Block_id.Finalized
+        | Some (Block_parameter Latest) | None ->
             let level : Rollup_services.Block_id.t =
               if Base.finalized then Finalized else Head
             in
             return level
-        | Some (Block_parameter Finalized) -> return Block_id.Finalized
         | Some _ ->
             failwith
               "The EVM node in proxy mode support state requests only on \
@@ -231,5 +235,7 @@ module Make (Base : sig
   val smart_rollup_address : string
 
   val finalized : bool
+
+  val ignore_block_param : bool
 end) =
   Services_backend_sig.Make (MakeBackend (Base)) (Evm_execution.No_execution)

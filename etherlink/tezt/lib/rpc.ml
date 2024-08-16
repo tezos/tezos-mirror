@@ -361,11 +361,11 @@ let estimate_gas eth_call evm_node =
        (fun response -> Evm_node.extract_result response |> JSON.as_int64)
        response
 
-let get_transaction_count ~address evm_node =
+let get_transaction_count ?(block = "latest") ~address evm_node =
   let* response =
     Evm_node.call_evm_rpc
       evm_node
-      (Request.eth_getTransactionCount ~address ~block:"latest")
+      (Request.eth_getTransactionCount ~address ~block)
   in
   return
   @@ decode_or_error

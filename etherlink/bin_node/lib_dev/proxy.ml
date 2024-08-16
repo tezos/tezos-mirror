@@ -55,6 +55,8 @@ let main
     let smart_rollup_address = smart_rollup_address
 
     let finalized = config.proxy.finalized_view
+
+    let ignore_block_param = config.proxy.ignore_block_param
   end) in
   let mode =
     match config.proxy.evm_node_endpoint with

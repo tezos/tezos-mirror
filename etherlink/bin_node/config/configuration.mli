@@ -92,6 +92,7 @@ type proxy = {
   evm_node_endpoint : Uri.t option;
       (** If provided, the EVM node will inject transactions to this endpoint
           instead of to its companian rollup node. *)
+  ignore_block_param : bool;
 }
 
 type fee_history = {max_count : int option; max_past : int option}
@@ -230,6 +231,7 @@ module Cli : sig
     ?sequencer_sidecar_endpoint:Uri.t ->
     ?restricted_rpcs:restricted_rpcs ->
     ?proxy_finalized_view:bool ->
+    ?proxy_ignore_block_param:bool ->
     ?dal_slots:int list ->
     unit ->
     t
@@ -265,6 +267,7 @@ module Cli : sig
     ?sequencer_sidecar_endpoint:Uri.t ->
     ?restricted_rpcs:restricted_rpcs ->
     ?proxy_finalized_view:bool ->
+    ?proxy_ignore_block_param:bool ->
     dal_slots:int trace option ->
     t ->
     t
@@ -301,6 +304,7 @@ module Cli : sig
     ?sequencer_sidecar_endpoint:Uri.t ->
     ?restricted_rpcs:restricted_rpcs ->
     ?proxy_finalized_view:bool ->
+    ?proxy_ignore_block_param:bool ->
     ?dal_slots:int list ->
     unit ->
     t tzresult Lwt.t

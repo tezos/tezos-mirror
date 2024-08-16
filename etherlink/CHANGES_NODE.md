@@ -49,6 +49,8 @@
   (!14553)
 - The observer node now starts a private RPC server when `private_rpc_port` is
   set in the configuration file. (!14460)
+- Support ignoring the block parameter in RPCs in proxy node, always defaulting
+  to the latest block instead. (!14557)
 
 ### Bug fixes
 
