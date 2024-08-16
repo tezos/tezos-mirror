@@ -28,16 +28,6 @@ echo "DOCKER_BUILD_TARGET=${DOCKER_BUILD_TARGET:-}"
 echo "RUST_TOOLCHAIN_IMAGE_NAME=${RUST_TOOLCHAIN_IMAGE_NAME:-}"
 echo "CI_COMMIT_REF_PROTECTED=${CI_COMMIT_REF_PROTECTED:-}"
 
-# CI_DOCKER_HUB is used to switch to Docker Hub if credentials are available with CI_DOCKER_AUTH
-# /!\ CI_DOCKER_HUB can be unset, CI_DOCKER_AUTH is only available on protected branches
-if [ "${CI_DOCKER_HUB:-}" = 'true' ] && [ "${CI_PROJECT_NAMESPACE}" = "tezos" ] && [ -n "${CI_DOCKER_AUTH:-}" ]; then
-  # Docker Hub
-  echo "### Logging into Docker Hub for pushing images"
-  docker_image_name="docker.io/${CI_PROJECT_PATH}-"
-  echo "{\"auths\":{\"https://index.docker.io/v1/\":{\"auth\":\"${CI_DOCKER_AUTH}\"}}}" > ~/.docker/config.json
-  logged_in=true
-fi
-
 # Allow to push to private GCP Artifact Registry if the CI/CD variable is defined
 if [ -n "${GCP_REGISTRY:-}" ]; then
   # There are two registries for storing Docker images. The first allows pushes from
@@ -57,6 +47,18 @@ if [ -n "${GCP_REGISTRY:-}" ]; then
     echo "${GCP_ARTIFACT_REGISTRY_TOKEN}" | docker login us-central1-docker.pkg.dev -u oauth2accesstoken --password-stdin
   fi
   docker_image_name="${GCP_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/"
+  logged_in=true
+fi
+
+# CI_DOCKER_HUB is used to switch to Docker Hub if credentials are available with CI_DOCKER_AUTH
+# /!\ CI_DOCKER_HUB can be unset, CI_DOCKER_AUTH is only available on protected branches
+if [ "${CI_DOCKER_HUB:-}" = 'true' ] && [ "${CI_PROJECT_NAMESPACE}" = "tezos" ] && [ -n "${CI_DOCKER_AUTH:-}" ]; then
+  # Docker Hub
+  echo "### Logging into Docker Hub for pushing images"
+  # Over-write docker_image_name if set.
+  # Publishing to Docker Hub, as done on protected refs, has higher priority.
+  docker_image_name="docker.io/${CI_PROJECT_PATH}-"
+  echo "{\"auths\":{\"https://index.docker.io/v1/\":{\"auth\":\"${CI_DOCKER_AUTH}\"}}}" > ~/.docker/config.json
   logged_in=true
 fi
 
