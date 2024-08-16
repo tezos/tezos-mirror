@@ -6350,6 +6350,19 @@ let test_debug_print_store_schemas () =
   let hooks = Tezos_regression.hooks in
   Evm_node.debug_print_store_schemas ~hooks ()
 
+let test_man () =
+  Regression.register
+    ~__FILE__
+    ~title:"EVM Node: man"
+    ~tags:["evm"; "man"]
+    ~uses:[Constant.octez_evm_node]
+    ~uses_node:false
+    ~uses_client:false
+    ~uses_admin_client:false
+  @@ fun () ->
+  let hooks = Tezos_regression.hooks in
+  Evm_node.man ~hooks ()
+
 let test_relay_restricted_rpcs =
   register_all
     ~bootstrap_accounts:Eth_account.lots_of_address
@@ -6456,6 +6469,7 @@ let () =
   test_trace_transaction_calltracer_multiple_txs protocols ;
   test_trace_transaction_calltracer_on_simple_transfer protocols ;
   test_debug_print_store_schemas () ;
+  test_man () ;
   test_outbox_size_limit_resilience ~slow:true protocols ;
   test_outbox_size_limit_resilience ~slow:false protocols ;
   test_proxy_node_can_forward_to_evm_endpoint protocols

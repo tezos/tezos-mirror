@@ -1071,6 +1071,11 @@ let debug_print_store_schemas ?(path = Uses.path Constant.octez_evm_node) ?hooks
   let process = Process.spawn ?hooks path @@ args in
   Process.check process
 
+let man ?(path = Uses.path Constant.octez_evm_node) ?hooks () =
+  let args = ["man"] in
+  let process = Process.spawn ?hooks path @@ args in
+  Process.check process
+
 let chunk_data ~rollup_address ?sequencer_key ?timestamp ?parent_hash ?number
     ?client data =
   let args = "chunk" :: "data" :: data in
