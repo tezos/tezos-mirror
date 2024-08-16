@@ -91,6 +91,9 @@ type proxy = {
   finalized_view : bool;
       (** Provide a view on the latest final state of the rollup, not its
           current HEAD. *)
+  evm_node_endpoint : Uri.t option;
+      (** If provided, the EVM node will inject transactions to this endpoint
+          instead of to its companian rollup node. *)
 }
 
 type fee_history = {max_count : int option; max_past : int option}

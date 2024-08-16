@@ -6,7 +6,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type mode = Proxy | Sequencer | Relay
+type mode =
+  | Proxy
+  | Sequencer
+  | Relay
+  | Forward of {
+      injector : string -> (Ethereum_types.hash, string) result tzresult Lwt.t;
+    }
 
 type parameters = {
   rollup_node : (module Services_backend_sig.S);  (** The backend RPC module. *)
