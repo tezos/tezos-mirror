@@ -112,7 +112,7 @@ warnings() {
 
 getOctezVersion() {
 
-  if [ -n "$CI" ]; then
+  if [ -n "${CI:-}" ]; then
     . scripts/ci/octez-release.sh
 
     if [ -n "${gitlab_release_no_v:-}" ]; then
