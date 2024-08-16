@@ -419,9 +419,11 @@ let group_commands commands =
 let print_group print_command ppf ({title; _}, commands) =
   Format.fprintf
     ppf
-    "@{<title>%s@}@,@{<list>%a@}"
+    "@{<title>%s@}@,@,@{<list>%a@}"
     title
-    (Format.pp_print_list print_command)
+    (Format.pp_print_list
+       ~pp_sep:(fun ppf () -> Format.fprintf ppf "@,@,")
+       print_command)
     commands
 
 type formatter_state =
