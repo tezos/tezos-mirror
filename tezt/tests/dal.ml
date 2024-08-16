@@ -262,6 +262,10 @@ let slot_size_param slot_size =
 (* Some initialization functions to start needed nodes. *)
 type l1_history_mode =
   | Default_with_refutation
+    (* to be used when the node starts for the first time *)
+  | Default_with_refutation_full
+    (* to be used when the node restarts, and it was first started more than the
+       default storage period time ago *)
   | Default_without_refutation
   | Custom of Node.history_mode
 
@@ -316,7 +320,17 @@ let history_mode base protocol parameter_overrides proto_parameters
       return (parameter_overrides, Node.Rolling (Some additional_cycles))
   | Default_with_refutation ->
       let cycles =
-        Dal.Parameters.storage_period_with_refutation_in_cycles
+        Dal.Parameters.initial_storage_period_with_refutation_in_cycles
+          ~proto_parameters
+      in
+      let blocks_preservation_cycles =
+        JSON.(proto_parameters |-> "blocks_preservation_cycles" |> as_int)
+      in
+      let additional_cycles = cycles - blocks_preservation_cycles in
+      return (parameter_overrides, Node.Rolling (Some additional_cycles))
+  | Default_with_refutation_full ->
+      let cycles =
+        Dal.Parameters.full_storage_period_with_refutation_in_cycles
           ~proto_parameters
       in
       let blocks_preservation_cycles =
@@ -343,7 +357,7 @@ let history_mode base protocol parameter_overrides proto_parameters
            'dal_attested_slots_validity_lag' by a factor of %d."
           factor ;
         let cycles =
-          Dal.Parameters.storage_period_with_refutation_in_cycles
+          Dal.Parameters.full_storage_period_with_refutation_in_cycles
             ~proto_parameters
         in
         Log.info
@@ -8054,6 +8068,7 @@ let register ~protocols =
     ~tags:["restart"]
     ~activation_timestamp:Now
     ~producer_profiles:[0]
+    ~l1_history_mode:(Custom (Rolling (Some 5)))
     "restart DAL node (producer)"
     test_restart_dal_node
     protocols ;

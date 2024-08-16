@@ -44,10 +44,20 @@ module Parameters : sig
   val from_client : Client.t -> t Lwt.t
 
   (* This function computes the period (in cycles) during which the node stores
-     data about attested slots assuming the node supports refutations. See the
-     functions [Profile_manager.get_attested_data_default_store_period] and
-     [Daemon.get_proto_plugins] in src/bin_dal_node/. *)
-  val storage_period_with_refutation_in_cycles : proto_parameters:JSON.t -> int
+     data about attested slots assuming the node supports refutations and it has
+     been start sufficiently far in the past. See the functions
+     [Profile_manager.get_attested_data_default_store_period] and
+     [Daemon.get_storage_period] in src/bin_dal_node/. *)
+  val full_storage_period_with_refutation_in_cycles :
+    proto_parameters:JSON.t -> int
+
+  (* This function computes the period (in cycles) during which the node stores
+     data about attested slots assuming the node supports refutations and it
+     hash just been started. See the functions
+     [Profile_manager.get_attested_data_default_store_period] and
+     [Daemon.get_storage_period] in src/bin_dal_node/. *)
+  val initial_storage_period_with_refutation_in_cycles :
+    proto_parameters:JSON.t -> int
 
   (* This function computes the period (in cycles) during which the node stores
      data about attested slots assuming the node does not supports
