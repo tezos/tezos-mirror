@@ -47,6 +47,8 @@ type ex_operator = Operator : 'a operator -> ex_operator
 
 type operators = ex_operator Map.t
 
+let no_operators = Map.empty
+
 let to_string (type kind) : kind t -> string = function
   | Operating -> "operating"
   | Batching -> "batching"

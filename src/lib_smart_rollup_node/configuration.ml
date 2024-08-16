@@ -568,12 +568,13 @@ let encoding default_display : t Data_encoding.t =
                 ~description:"Smart rollup address"
                 Tezos_crypto.Hashed.Smart_rollup_address.encoding)
              (opt "boot-sector" ~description:"Boot sector" string)
-             (req
+             (dft
                 "smart-rollup-node-operator"
                 ~description:
                   "Operators that sign operations of the smart rollup, by \
                    purpose"
-                Purpose.operators_encoding)
+                Purpose.operators_encoding
+                Purpose.no_operators)
              (dft "rpc-addr" ~description:"RPC address" string default_rpc_addr)
              (dft "rpc-port" ~description:"RPC port" uint16 default_rpc_port)
              (dft

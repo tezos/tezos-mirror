@@ -60,6 +60,9 @@ val of_string_ex_purpose : string -> ex_purpose option
     string [s]. *)
 val of_string_exn_ex_purpose : string -> ex_purpose
 
+(** Empty map of operators. *)
+val no_operators : operators
+
 val operators_encoding : operators Data_encoding.t
 
 (** [make_operators ?default ~needed_purposes operators] constructs a
