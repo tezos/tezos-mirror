@@ -45,6 +45,8 @@
   (!14432)
 - Allow a proxy node to forward incoming transactions to a companion EVM node.
   (!14540)
+- Ensure the EVM node always uses the very last version of the WASM PVM.
+  (!14553)
 
 ### Bug fixes
 
