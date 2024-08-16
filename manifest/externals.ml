@@ -50,7 +50,7 @@ let bisect_ppx = opam_only "bisect_ppx" V.(at_least "2.7.0")
 
 let camlp_streams = external_lib "camlp-streams" V.(at_least "5.0.1")
 
-let camlzip = external_lib "camlzip" V.(at_least "1.11" && less_than "1.12")
+let camlzip = external_lib "camlzip" V.(at_least "1.12" && less_than "1.13")
 
 let caqti = external_lib "caqti" V.True
 

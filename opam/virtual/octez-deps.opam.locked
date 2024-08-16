@@ -34,7 +34,7 @@ depends: [
   "bos" {= "0.2.1"}
   "ca-certs" {= "0.2.3"}
   "camlp-streams" {= "5.0.1"}
-  "camlzip" {= "1.11"}
+  "camlzip" {= "1.12"}
   "caqti" {= "2.1.1"}
   "caqti-driver-sqlite3" {= "2.1.1"}
   "caqti-dynload" {= "2.0.1"}
