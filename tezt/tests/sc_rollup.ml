@@ -3305,7 +3305,7 @@ let bailout_mode_fail_to_start_without_operator ~kind =
   and* () =
     Sc_rollup_node.check_error
       ~exit_code:1
-      ~msg:(rex "Missing operator for the purpose of operating.")
+      ~msg:(rex "Missing operators for purposes operating.")
       sc_rollup_node
   in
   unit

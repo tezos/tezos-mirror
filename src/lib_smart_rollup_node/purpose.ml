@@ -86,7 +86,7 @@ module Set = struct
       (list encoding)
 end
 
-type error += Missing_operator of ex_purpose | Missing_operators of Set.t
+type error += Missing_operators of Set.t
 
 let of_string_ex_purpose = function
   (* For backward compability:
@@ -140,21 +140,6 @@ let operators_encoding =
        ~value_encoding:(fun _ -> ex_operator_encoding))
 
 let () =
-  register_error_kind
-    ~id:"sc_rollup.node.missing_mode_operator"
-    ~title:"Missing operator for the chosen mode"
-    ~description:"Missing operator for the chosen mode."
-    ~pp:(fun ppf missing_purpose ->
-      Format.fprintf
-        ppf
-        "@[<hov>Missing operator for the purpose of %a.@]"
-        pp_ex_purpose
-        missing_purpose)
-    `Permanent
-    Data_encoding.(obj1 (req "missing_purpose" encoding))
-    (function
-      | Missing_operator missing_purpose -> Some missing_purpose | _ -> None)
-    (fun missing_purpose -> Missing_operator missing_purpose) ;
   register_error_kind
     ~id:"sc_rollup.node.missing_operators"
     ~title:"Missing operators for the chosen mode"
@@ -230,33 +215,6 @@ let update :
       invalid_arg "multiple keys for a purpose allowing only one key"
   | None -> Some (Operator (new_operator_for_purpose purpose pkh_to_add))
 
-(* ~default:pkh1 ~needed_purpose:[operating,batching] [batching,pkh2;
-   batching, pkh3] *)
-let make_operator ?default_operator ~needed_purposes purposed_key =
-  let open Result_syntax in
-  List.fold_left_e
-    (fun map (Purpose purpose as ex_purpose) ->
-      let keys_for_purpose =
-        List.filter_map
-          (fun (ex_purpose', key) ->
-            if ex_purpose' = ex_purpose then Some key else None)
-          purposed_key
-      in
-      let+ keys_for_purpose =
-        (* first the purpose then if none default *)
-        if List.is_empty keys_for_purpose then
-          let* default_key =
-            Option.value_e
-              default_operator
-              ~error:(TzTrace.make (Missing_operator ex_purpose))
-          in
-          return [default_key]
-        else return keys_for_purpose
-      in
-      Map.update ex_purpose (update purpose keys_for_purpose) map)
-    Map.empty
-    needed_purposes
-
 let replace_operators ?default_operator ~needed_purposes
     (purposed_key : (ex_purpose * Signature.public_key_hash) list) operators =
   let open Lwt_result_syntax in
@@ -267,34 +225,42 @@ let replace_operators ?default_operator ~needed_purposes
       Map.empty
       purposed_key
   in
-  let operators =
-    Map.merge
-      (fun (Purpose purpose) replacement_operator existing_operator ->
-        (* replacement_operator > default_operator > existing_operator *)
-        match (replacement_operator, existing_operator) with
-        | Some replacement_operator, _ -> Some replacement_operator
-        | _, existing_operator ->
-            let default_operator =
-              Option.map
-                (fun pkh -> Operator (new_operator_for_purpose purpose [pkh]))
-                default_operator
-            in
-            Option.either default_operator existing_operator)
-      replacement_map
-      operators
-  in
   let needed_purposes = Set.of_list needed_purposes in
-  let given_purposes = Map.bindings operators |> List.map fst |> Set.of_list in
-  let missing = Set.diff needed_purposes given_purposes in
+  let given_purposes =
+    Map.bindings replacement_map |> List.map fst |> Set.of_list
+  in
+  let operators, missing, extra =
+    Set.fold
+      (fun (Purpose p as purpose) (acc, missing, extra) ->
+        (* replacement_operator > default_operator > existing_operator *)
+        let op =
+          match Map.find purpose replacement_map with
+          | Some op -> Some op
+          | None -> (
+              match default_operator with
+              | Some pkh -> Some (Operator (new_operator_for_purpose p [pkh]))
+              | None -> (
+                  match Map.find purpose operators with
+                  | Some op -> Some op
+                  | None -> None))
+        in
+        match op with
+        | Some op -> (Map.add purpose op acc, missing, Set.remove purpose extra)
+        | None -> (acc, Set.add purpose missing, extra))
+      needed_purposes
+      (Map.empty, Set.empty, given_purposes)
+  in
   let*? () = error_unless (Set.is_empty missing) (Missing_operators missing) in
-  let extra = Set.diff given_purposes needed_purposes in
   let*! () =
     if not (Set.is_empty extra) then Event.(emit unused_operators) extra
     else Lwt.return_unit
   in
-  (* Narrow operators to required purposes. *)
-  let operators = Map.filter (fun p _ -> Set.mem p needed_purposes) operators in
   return operators
+
+(* ~default:pkh1 ~needed_purpose:[operating,batching] [batching,pkh2;
+   batching, pkh3] *)
+let make_operators ?default_operator ~needed_purposes purposed_key =
+  replace_operators ?default_operator ~needed_purposes purposed_key Map.empty
 
 let single_operator : ex_operator -> Signature.public_key_hash operator =
   function

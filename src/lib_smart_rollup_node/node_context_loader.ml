@@ -228,8 +228,8 @@ module For_snapshots = struct
       | Some m -> Ok m
     in
     let mode = Configuration.Observer in
-    let*? operators =
-      Purpose.make_operator
+    let* operators =
+      Purpose.make_operators
         ~needed_purposes:(Configuration.purposes_of_mode mode)
         []
     in
@@ -341,8 +341,8 @@ module Internal_for_tests = struct
     let open Lwt_result_syntax in
     let rollup_address = Address.zero in
     let mode = Configuration.Observer in
-    let*? operators =
-      Purpose.make_operator
+    let* operators =
+      Purpose.make_operators
         ~needed_purposes:(Configuration.purposes_of_mode mode)
         []
     in

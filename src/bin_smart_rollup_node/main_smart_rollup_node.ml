@@ -105,7 +105,7 @@ let config_init_command =
          sc_rollup_address
          operators
          cctxt ->
-      let*? config =
+      let* config =
         Configuration.Cli.configuration_from_args
           ~rpc_addr
           ~rpc_port

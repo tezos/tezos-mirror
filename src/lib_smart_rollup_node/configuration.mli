@@ -295,7 +295,7 @@ module Cli : sig
     allowed_headers:string list option ->
     apply_unsafe_patches:bool ->
     bail_on_disagree:bool ->
-    t tzresult
+    t tzresult Lwt.t
 
   val create_or_read_config :
     data_dir:string ->

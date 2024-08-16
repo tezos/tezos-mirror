@@ -43,7 +43,7 @@ type ex_operator = Operator : 'a operator -> ex_operator
     operator] are correctly related with [`kind] *)
 type operators = private ex_operator Map.t
 
-type error += Missing_operator of ex_purpose | Missing_operators of Set.t
+type error += Missing_operators of Set.t
 
 (** [to_string_ex_purpose p] returns a string representation of purpose [p]. *)
 val to_string_ex_purpose : ex_purpose -> string
@@ -62,16 +62,16 @@ val of_string_exn_ex_purpose : string -> ex_purpose
 
 val operators_encoding : operators Data_encoding.t
 
-(** [make_operator ?default ~needed_purposes operators] constructs a
+(** [make_operators ?default ~needed_purposes operators] constructs a
     purpose map from a list of bindings [operators], with a potential
     [default] key. If [operators] does not cover all purposes of
     [needed_purposes] and does not contains a [default] key then
     fails.*)
-val make_operator :
+val make_operators :
   ?default_operator:Signature.public_key_hash ->
   needed_purposes:ex_purpose list ->
   (ex_purpose * Signature.public_key_hash) list ->
-  operators tzresult
+  operators tzresult Lwt.t
 
 (** [replace_operators ?default_operator ~needed_purposes purposed_keys
     operators] replaces keys of [operators] by [default_operator] if
