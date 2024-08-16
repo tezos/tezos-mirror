@@ -4,6 +4,7 @@ version = "0.0.0"
 edition = "2021"
 
 [dependencies]
+bincode.workspace = true
 hex.workspace = true
 jstz_kernel.workspace = true
 serde.workspace = true
