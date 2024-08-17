@@ -188,6 +188,13 @@ module Remote = struct
         let* agent = deploy_proxy () in
         let* () =
           if Env.dns then
+            let tezt_cloud = Env.tezt_cloud in
+            let* ip = Gcloud.DNS.get_ip ~tezt_cloud ~zone:"tezt-cloud" in
+            let* () =
+              match ip with
+              | None -> Lwt.return_unit
+              | Some ip -> Gcloud.DNS.remove ~tezt_cloud ~zone:"tezt-cloud" ~ip
+            in
             Gcloud.DNS.add
               ~tezt_cloud:Env.tezt_cloud
               ~zone:"tezt-cloud"
