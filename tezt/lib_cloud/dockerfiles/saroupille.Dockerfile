@@ -11,6 +11,8 @@ RUN apt-get update && apt-get install -y \
     openssh-server \
     # Tezos dependencies
     libgmp-dev curl libev-dev libhidapi-dev \
+    # Teztale dependencies
+    libpq-dev \
     # Dependencies needed for tezt-cloud
     docker.io docker-cli screen file \
     # iproute2 installs traffic control tooling 
@@ -56,5 +58,8 @@ COPY ./octez-baker-alpha $BINARIES_DESTINATION_PATH/octez-baker-alpha
 COPY ./octez-smart-rollup-node $BINARIES_DESTINATION_PATH/octez-smart-rollup-node
 COPY ./smart-rollup-installer $BINARIES_DESTINATION_PATH/smart-rollup-installer
 COPY ./octez-evm-node  $BINARIES_DESTINATION_PATH/octez-evm-node
+COPY ./octez-teztale-archiver $BINARIES_DESTINATION_PATH/octez-teztale-archiver
+COPY ./octez-teztale-server $BINARIES_DESTINATION_PATH/octez-teztale-server
+
 # You can compile it by executing `make build` in the `etherlink/firehose` directory
 COPY ./etherlink/firehose/target/release/firehose $BINARIES_DESTINATION_PATH/firehose
