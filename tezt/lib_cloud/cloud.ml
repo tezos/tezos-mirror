@@ -27,14 +27,40 @@ let sigint =
       previous_behaviour := previous_handler ;
       promise
 
-let input = Lwt_io.read_line Lwt_io.stdin
+module Input : sig
+  (** This module should be the only one that reads on [stdin]. *)
+
+  (** [next ()] returns the next line on stdin. *)
+  val next : unit -> string Lwt.t
+end = struct
+  type t = {mutable resolvers : string Lwt.u list}
+
+  let state = {resolvers = []}
+
+  let next () =
+    let t, u = Lwt.task () in
+    state.resolvers <- u :: state.resolvers ;
+    t
+
+  let rec loop () =
+    let* input = Lwt_io.read_line Lwt_io.stdin in
+    state.resolvers
+    |> List.iter (fun resolver -> Lwt.wakeup_later resolver input) ;
+    state.resolvers <- [] ;
+    loop ()
+
+  let _ = loop ()
+end
 
 let eof =
   let promise, resolver = Lwt.task () in
   Lwt.dont_wait
     (fun () ->
-      let* _ = input in
-      Lwt.return_unit)
+      let rec loop () =
+        let* _ = Input.next () in
+        loop ()
+      in
+      loop ())
     (fun _ -> Lwt.wakeup resolver ()) ;
   promise
 
@@ -53,6 +79,7 @@ let shutdown ?exn t =
   let* () =
     if Env.keep_alive then (
       Log.info "Please press <enter> to terminate the scenario." ;
+      let* _ = Input.next () in
       Lwt.return_unit)
     else Lwt.return_unit
   in
