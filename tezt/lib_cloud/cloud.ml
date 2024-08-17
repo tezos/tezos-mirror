@@ -27,11 +27,13 @@ let sigint =
       previous_behaviour := previous_handler ;
       promise
 
+let input = Lwt_io.read_line Lwt_io.stdin
+
 let eof =
   let promise, resolver = Lwt.task () in
   Lwt.dont_wait
     (fun () ->
-      let* _ = Lwt_io.read_line Lwt_io.stdin in
+      let* _ = input in
       Lwt.return_unit)
     (fun _ -> Lwt.wakeup resolver ()) ;
   promise
@@ -51,7 +53,6 @@ let shutdown ?exn t =
   let* () =
     if Env.keep_alive then (
       Log.info "Please press <enter> to terminate the scenario." ;
-      let* _ = Lwt_io.read_line Lwt_io.stdin in
       Lwt.return_unit)
     else Lwt.return_unit
   in
