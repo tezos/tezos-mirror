@@ -3641,6 +3641,68 @@ module Revamped = struct
     let* () = check_mempool ~validated:[oph2; oph3] client2 in
 
     unit
+
+  (** Test that [request_operations] RPC does retrieve operations from peers.
+
+    Scenario:
+    - Start two nodes, connect them and activate alpha.
+    - Disconnect them
+    - Inject an operation in node1
+    - Reconnect nodes, request_operations from node2 and wait for the operation
+      arrival in node2
+  *)
+  let request_operations_from_peer =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"request_operations RPC retrieves operations from peers"
+      ~tags:[team; "mempool"; "request_operations"; "rpc"]
+    @@ fun protocol ->
+    log_step 1 "spawn two nodes, connect them and activate alpha" ;
+    let* node1, client1 =
+      Client.init_with_protocol
+        ~protocol
+        ~nodes_args:[Synchronisation_threshold 0]
+        `Client
+        ()
+    in
+    let* node2, client2 =
+      Client.init_with_node
+        ~event_sections_levels:[("prevalidator", `Debug)]
+        ~nodes_args:[Synchronisation_threshold 0]
+        `Client
+        ()
+    in
+    let* () = Client.Admin.connect_address client1 ~peer:node2 in
+    let* _ = Node.wait_for_level node2 1 in
+
+    log_step 2 "disconnect nodes" ;
+    let* node2_id = Node.wait_for_identity node2 in
+    let* () = Client.Admin.kick_peer ~peer:node2_id client1 in
+
+    log_step 3 "inject a transfer from client1" ;
+    let* (`OpHash oph) =
+      Operation.Manager.(inject [make (transfer ())] client1)
+    in
+
+    log_step 4 "check that operation is validated within node1's mempool" ;
+    let* () = check_mempool ~validated:[oph] client1 in
+
+    log_step 5 "start listening for operation arrival on node2" ;
+    let wait_for = Node_event_level.wait_for_arrival node2 in
+
+    log_step 6 "reconnect nodes together and call [request_operations]" ;
+    let* () = Client.Admin.connect_address ~peer:node1 client2 in
+    let* _ =
+      Client.RPC.call client2 @@ RPC.post_chain_mempool_request_operations ()
+    in
+
+    log_step 7 "wait for operation arrival to be witnessed on node2" ;
+    let* () = wait_for in
+
+    log_step 4 "check that operation is validated within node2's mempool" ;
+    let* () = check_mempool ~validated:[oph] client2 in
+
+    unit
 end
 
 let check_operation_is_in_validated_mempool ops oph =
@@ -4181,66 +4243,6 @@ let injecting_old_operation_fails =
   in
   Process.check_error ~msg:Operation_core.injection_error_unknown_branch process
 
-let test_request_operations_peer =
-  let step1_msg = "Step 1: Connect and initialise two nodes " in
-  let step2_msg = "Step 2: Disconnect nodes " in
-  let step3_msg = "Step 3: Inject an operation " in
-  let step4_msg =
-    "Step 4: Reconnect nodes, request operations and witness arrival of \
-     operation previously injected "
-  in
-  Protocol.register_test
-    ~__FILE__
-    ~title:"Test request_operations rpc"
-    ~tags:[team; "mempool"; "request_operations"]
-  @@ fun protocol ->
-  Log.info "%s" step1_msg ;
-  let init_node () =
-    Node.init
-      ~event_sections_levels:[("prevalidator", `Debug)]
-      [Synchronisation_threshold 0; Private_mode]
-  in
-  let* node_1 = init_node () and* node_2 = init_node () in
-  let* client_1 = Client.init ~endpoint:(Node node_1) ()
-  and* client_2 = Client.init ~endpoint:(Node node_2) () in
-  let* () = Client.Admin.trust_address client_1 ~peer:node_2
-  and* () = Client.Admin.trust_address client_2 ~peer:node_1 in
-  let* () = Client.Admin.connect_address client_1 ~peer:node_2 in
-  let* () = Client.activate_protocol_and_wait ~protocol client_1 in
-  Log.info "Activated protocol." ;
-  let* _ = Node.wait_for_level node_2 1 in
-  Log.info "%s" step2_msg ;
-  let* node2_identity = Node.wait_for_identity node_2 in
-  let* () = Client.Admin.kick_peer ~peer:node2_identity client_1 in
-  Log.info "%s" step3_msg ;
-  let transfer_1 = wait_for_injection node_1 in
-  let _ =
-    Client.transfer
-      ~wait:"0"
-      ~amount:(Tez.of_int 1)
-      ~giver:Constant.bootstrap1.alias
-      ~receiver:Constant.bootstrap2.alias
-      ~counter:1
-      client_1
-  in
-  let* _ = transfer_1 in
-  let* oph =
-    let* ophs = get_validated_operation_hash_list client_1 in
-    match ophs with
-    | [oph] -> return oph
-    | _ -> Test.fail "Validated mempool should contain exactly one operation"
-  in
-  Log.info "%s" step4_msg ;
-  let wait_mempool = wait_for_arrival_of_ophash oph node_2 in
-  let* () = Client.Admin.connect_address ~peer:node_1 client_2 in
-  let* node1_identity = Node.wait_for_identity node_1 in
-  let* _ =
-    Client.RPC.call client_2
-    @@ RPC.post_chain_mempool_request_operations ~peer:node1_identity ()
-  in
-  let* () = wait_mempool in
-  unit
-
 let register ~protocols =
   Revamped.flush_mempool protocols ;
   Revamped.recycling_branch_refused protocols ;
@@ -4276,6 +4278,6 @@ let register ~protocols =
   Revamped.fetch_failed_operation protocols ;
   Revamped.ban_operation_and_check_validated protocols ;
   Revamped.refused_operations_are_not_reclassified protocols ;
+  Revamped.request_operations_from_peer protocols ;
   force_operation_injection protocols ;
-  injecting_old_operation_fails protocols ;
-  test_request_operations_peer protocols
+  injecting_old_operation_fails protocols
