@@ -441,6 +441,8 @@ val make_kernel_installer_config :
 val debug_print_store_schemas :
   ?path:string -> ?hooks:Process_hooks.t -> unit -> unit Lwt.t
 
+val man : ?path:string -> ?hooks:Process_hooks.t -> unit -> unit Lwt.t
+
 module Agent : sig
   val create :
     ?path:string ->

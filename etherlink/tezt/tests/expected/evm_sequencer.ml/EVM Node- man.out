@@ -1,0 +1,629 @@
+
+./octez-evm-node man
+Usage:
+  octez-evm-node [global options] command [command options]
+  octez-evm-node --help (for global options)
+  octez-evm-node [global options] command --help (for command options)
+  octez-evm-node --version (for version information)
+
+To browse the documentation:
+  octez-evm-node [global options] man (for a list of commands)
+  octez-evm-node [global options] man -v 3 (for the full manual)
+
+Global options (must come before the command):
+  
+
+Access the documentation:
+
+  man [<keyword>...] [-v --verbosity <0|1|2|3>]
+      [--format <plain|colors|html>]
+    Print documentation of commands.
+    <keyword>: keyword to search for
+    -v --verbosity <0|1|2|3>: level of details
+    --format <plain|colors|html>: the manual's output format
+
+Miscellaneous commands:
+
+  run sandbox [--data-dir <data-dir>] [--rpc-addr <ADDR>] [--rpc-port <PORT>]
+      [--rpc-batch-limit <PORT>] [--devmode]
+      [--cors-origins <ALLOWED_ORIGINS>] [--cors-headers <ALLOWED_HEADERS>]
+      [--max-number-blocks <100>] [--max-number-logs <1000>]
+      [--chunk-size <10>] [-K --keep-alive] [--rollup-node-endpoint <url>]
+      [--tx-pool-timeout-limit <3_600>] [--tx-pool-addr-limit <4_000>]
+      [--tx-pool-tx-per-addr-limit <16>] [-v --verbose]
+      [--restricted-rpcs <regexp>] [--blacklisted-rpcs <blacklist>]
+      [--whitelisted-rpcs <whitelist>]
+      [--preimages-dir <_evm_installer_preimages>]
+      [--preimages-endpoint <url>] [--time-between-blocks <10.>]
+      [--max-number-of-chunks <10.>] [--private-rpc-port <PORT>]
+      [--genesis-timestamp <[TIMESTAMP]>]
+      [--initial-kernel <evm_installer.wasm>] [-d --wallet-dir <path>]
+      [-f --password-filename <filename>]
+    Start the EVM node in sandbox mode. The sandbox mode is a sequencer-like mode that produces blocks with a fake key and no rollup node connection.
+    --data-dir <data-dir>: The path to the EVM node data directory
+    --rpc-addr <ADDR>: The EVM node server rpc address.
+    --rpc-port <PORT>: The EVM node server rpc port.
+    --rpc-batch-limit <PORT>: A limit on the number of requests allowed in a single batch. Can either be `unlimited` or a positive integer.
+    --devmode: DEPRECATED — The EVM node now aims to be backward compatible with the kernel deployed on Mainnet and Ghostnet
+    --cors-origins <ALLOWED_ORIGINS>: List of accepted cors origins.
+    --cors-headers <ALLOWED_HEADERS>: List of accepted cors headers.
+    --max-number-blocks <100>: maximum number of blocks kept in the log.
+    --max-number-logs <1000>: maximum number of logs kept.
+    --chunk-size <10>: Blocks to be filtered are split in chunks, which will be filtered in sequence. Within each chunk, the block filtering is done concurrently.
+    -K --keep-alive: Keep the EVM node process alive even if the connection is lost with the rollup node.
+    --rollup-node-endpoint <url>: The address of a rollup node.
+    --tx-pool-timeout-limit <3_600>: Transaction timeout limit inside the transaction pool (in seconds).
+    --tx-pool-addr-limit <4_000>: Maximum allowed addresses inside the transaction pool.
+    --tx-pool-tx-per-addr-limit <16>: Maximum allowed transactions per user address inside the transaction pool.
+    -v --verbose: Sets logging level to debug. Beware, it is highly verbose.
+    --restricted-rpcs <regexp>: Disable methods that matches the given Perl-like regular expression. Cannot be used with --whitelisted-rpcs or --blacklisted-rpcs.
+    --blacklisted-rpcs <blacklist>: Disable the RPC methods which are part of the provided list. Cannot be used with --restricted-rpcs or --blacklisted-rpcs.
+    --whitelisted-rpcs <whitelist>: Disable the RPC methods which are not part of the provided list. Cannot be used with --restricted-rpcs or --blacklisted-rpcs.
+    --preimages-dir <_evm_installer_preimages>: Path to the preimages directory
+    --preimages-endpoint <url>: The address of a service which provides pre-images for the rollup. Missing pre-images will be downloaded remotely if they are not already present on disk.
+    --time-between-blocks <10.>: Interval (in seconds) at which the sequencer creates an empty block by default. If set to `none`, blocks are produced on demand only (see private method produceBlock).
+    --max-number-of-chunks <10.>: Maximum number of chunks per blueprint.
+    --private-rpc-port <PORT>: The EVM node private server rpc port.
+    --genesis-timestamp <[TIMESTAMP]>: Timestamp used for the genesis block, uses machine's clock if not provided
+    --initial-kernel <evm_installer.wasm>: Path to the EVM kernel used to launch the PVM, it will be loaded from storage afterward
+    -d --wallet-dir <path>: client data directory (absent: TEZOS_CLIENT_DIR env)
+    -f --password-filename <filename>: path to the password filename
+  
+  run proxy with endpoint <rollup-node-endpoint> [--data-dir <data-dir>]
+      [--rpc-addr <ADDR>] [--rpc-port <PORT>] [--rpc-batch-limit <PORT>]
+      [--devmode] [--cors-origins <ALLOWED_ORIGINS>]
+      [--cors-headers <ALLOWED_HEADERS>] [--max-number-blocks <100>]
+      [--max-number-logs <1000>] [--chunk-size <10>] [-K --keep-alive]
+      [--rollup-node-endpoint <url>] [--tx-pool-timeout-limit <3_600>]
+      [--tx-pool-addr-limit <4_000>] [--tx-pool-tx-per-addr-limit <16>]
+      [-v --verbose] [--restricted-rpcs <regexp>]
+      [--blacklisted-rpcs <blacklist>] [--whitelisted-rpcs <whitelist>]
+      [--read-only]
+    Start the EVM node in proxy mode. DEPRECATED, please uses the `run proxy` command.
+    <rollup-node-endpoint>: The smart rollup node endpoint address (as ADDR:PORT) the node will communicate with.
+    --data-dir <data-dir>: The path to the EVM node data directory
+    --rpc-addr <ADDR>: The EVM node server rpc address.
+    --rpc-port <PORT>: The EVM node server rpc port.
+    --rpc-batch-limit <PORT>: A limit on the number of requests allowed in a single batch. Can either be `unlimited` or a positive integer.
+    --devmode: DEPRECATED — The EVM node now aims to be backward compatible with the kernel deployed on Mainnet and Ghostnet
+    --cors-origins <ALLOWED_ORIGINS>: List of accepted cors origins.
+    --cors-headers <ALLOWED_HEADERS>: List of accepted cors headers.
+    --max-number-blocks <100>: maximum number of blocks kept in the log.
+    --max-number-logs <1000>: maximum number of logs kept.
+    --chunk-size <10>: Blocks to be filtered are split in chunks, which will be filtered in sequence. Within each chunk, the block filtering is done concurrently.
+    -K --keep-alive: Keep the EVM node process alive even if the connection is lost with the rollup node.
+    --rollup-node-endpoint <url>: The address of a rollup node.
+    --tx-pool-timeout-limit <3_600>: Transaction timeout limit inside the transaction pool (in seconds).
+    --tx-pool-addr-limit <4_000>: Maximum allowed addresses inside the transaction pool.
+    --tx-pool-tx-per-addr-limit <16>: Maximum allowed transactions per user address inside the transaction pool.
+    -v --verbose: Sets logging level to debug. Beware, it is highly verbose.
+    --restricted-rpcs <regexp>: Disable methods that matches the given Perl-like regular expression. Cannot be used with --whitelisted-rpcs or --blacklisted-rpcs.
+    --blacklisted-rpcs <blacklist>: Disable the RPC methods which are part of the provided list. Cannot be used with --restricted-rpcs or --blacklisted-rpcs.
+    --whitelisted-rpcs <whitelist>: Disable the RPC methods which are not part of the provided list. Cannot be used with --restricted-rpcs or --blacklisted-rpcs.
+    --read-only: If the flag is set, the node refuses transactions
+  
+  run proxy [--data-dir <data-dir>] [--rpc-addr <ADDR>] [--rpc-port <PORT>]
+      [--rpc-batch-limit <PORT>] [--devmode]
+      [--cors-origins <ALLOWED_ORIGINS>] [--cors-headers <ALLOWED_HEADERS>]
+      [--max-number-blocks <100>] [--max-number-logs <1000>]
+      [--chunk-size <10>] [-K --keep-alive] [--rollup-node-endpoint <url>]
+      [--tx-pool-timeout-limit <3_600>] [--tx-pool-addr-limit <4_000>]
+      [--tx-pool-tx-per-addr-limit <16>] [-v --verbose]
+      [--restricted-rpcs <regexp>] [--blacklisted-rpcs <blacklist>]
+      [--whitelisted-rpcs <whitelist>] [--read-only] [--finalized-view]
+      [--evm-node-endpoint <url>]
+    Start the EVM node in proxy mode.
+    --data-dir <data-dir>: The path to the EVM node data directory
+    --rpc-addr <ADDR>: The EVM node server rpc address.
+    --rpc-port <PORT>: The EVM node server rpc port.
+    --rpc-batch-limit <PORT>: A limit on the number of requests allowed in a single batch. Can either be `unlimited` or a positive integer.
+    --devmode: DEPRECATED — The EVM node now aims to be backward compatible with the kernel deployed on Mainnet and Ghostnet
+    --cors-origins <ALLOWED_ORIGINS>: List of accepted cors origins.
+    --cors-headers <ALLOWED_HEADERS>: List of accepted cors headers.
+    --max-number-blocks <100>: maximum number of blocks kept in the log.
+    --max-number-logs <1000>: maximum number of logs kept.
+    --chunk-size <10>: Blocks to be filtered are split in chunks, which will be filtered in sequence. Within each chunk, the block filtering is done concurrently.
+    -K --keep-alive: Keep the EVM node process alive even if the connection is lost with the rollup node.
+    --rollup-node-endpoint <url>: The address of a rollup node.
+    --tx-pool-timeout-limit <3_600>: Transaction timeout limit inside the transaction pool (in seconds).
+    --tx-pool-addr-limit <4_000>: Maximum allowed addresses inside the transaction pool.
+    --tx-pool-tx-per-addr-limit <16>: Maximum allowed transactions per user address inside the transaction pool.
+    -v --verbose: Sets logging level to debug. Beware, it is highly verbose.
+    --restricted-rpcs <regexp>: Disable methods that matches the given Perl-like regular expression. Cannot be used with --whitelisted-rpcs or --blacklisted-rpcs.
+    --blacklisted-rpcs <blacklist>: Disable the RPC methods which are part of the provided list. Cannot be used with --restricted-rpcs or --blacklisted-rpcs.
+    --whitelisted-rpcs <whitelist>: Disable the RPC methods which are not part of the provided list. Cannot be used with --restricted-rpcs or --blacklisted-rpcs.
+    --read-only: If the flag is set, the node refuses transactions
+    --finalized-view: If the flag is set, the node exposes a view of the latest final state of the rollup, not its current HEAD.
+    --evm-node-endpoint <url>: The address of an EVM node to connect to.
+  
+  run sequencer with endpoint <rollup-node-endpoint> signing with <sequencer-key> [--data-dir <data-dir>]
+      [--rpc-addr <ADDR>] [--rpc-port <PORT>] [--rpc-batch-limit <PORT>]
+      [--devmode] [--cors-origins <ALLOWED_ORIGINS>]
+      [--cors-headers <ALLOWED_HEADERS>] [--max-number-blocks <100>]
+      [--max-number-logs <1000>] [--chunk-size <10>] [-K --keep-alive]
+      [--rollup-node-endpoint <url>] [--tx-pool-timeout-limit <3_600>]
+      [--tx-pool-addr-limit <4_000>] [--tx-pool-tx-per-addr-limit <16>]
+      [-v --verbose] [--restricted-rpcs <regexp>]
+      [--blacklisted-rpcs <blacklist>] [--whitelisted-rpcs <whitelist>]
+      [--initial-kernel <evm_installer.wasm>] [--private-rpc-port <PORT>]
+      [--preimages-dir <_evm_installer_preimages>]
+      [--preimages-endpoint <url>] [--time-between-blocks <10.>]
+      [--genesis-timestamp <[TIMESTAMP]>]
+      [--maximum-blueprints-lag <LAG>] [--maximum-blueprints-ahead <AHEAD>]
+      [--maximum-blueprints-catch-up <CATCH_UP>]
+      [--catch-up-cooldown <COOLDOWN>] [--max-number-of-chunks <10.>]
+      [-d --wallet-dir <path>] [-f --password-filename <filename>]
+      [--dal-slots <slot indices>]
+    Start the EVM node in sequencer mode. DEPRECATED, please uses `run sequencer` command.
+    <rollup-node-endpoint>: The smart rollup node endpoint address (as ADDR:PORT) the node will communicate with.
+    <sequencer-key>: key to sign the blueprints.
+    --data-dir <data-dir>: The path to the EVM node data directory
+    --rpc-addr <ADDR>: The EVM node server rpc address.
+    --rpc-port <PORT>: The EVM node server rpc port.
+    --rpc-batch-limit <PORT>: A limit on the number of requests allowed in a single batch. Can either be `unlimited` or a positive integer.
+    --devmode: DEPRECATED — The EVM node now aims to be backward compatible with the kernel deployed on Mainnet and Ghostnet
+    --cors-origins <ALLOWED_ORIGINS>: List of accepted cors origins.
+    --cors-headers <ALLOWED_HEADERS>: List of accepted cors headers.
+    --max-number-blocks <100>: maximum number of blocks kept in the log.
+    --max-number-logs <1000>: maximum number of logs kept.
+    --chunk-size <10>: Blocks to be filtered are split in chunks, which will be filtered in sequence. Within each chunk, the block filtering is done concurrently.
+    -K --keep-alive: Keep the EVM node process alive even if the connection is lost with the rollup node.
+    --rollup-node-endpoint <url>: The address of a rollup node.
+    --tx-pool-timeout-limit <3_600>: Transaction timeout limit inside the transaction pool (in seconds).
+    --tx-pool-addr-limit <4_000>: Maximum allowed addresses inside the transaction pool.
+    --tx-pool-tx-per-addr-limit <16>: Maximum allowed transactions per user address inside the transaction pool.
+    -v --verbose: Sets logging level to debug. Beware, it is highly verbose.
+    --restricted-rpcs <regexp>: Disable methods that matches the given Perl-like regular expression. Cannot be used with --whitelisted-rpcs or --blacklisted-rpcs.
+    --blacklisted-rpcs <blacklist>: Disable the RPC methods which are part of the provided list. Cannot be used with --restricted-rpcs or --blacklisted-rpcs.
+    --whitelisted-rpcs <whitelist>: Disable the RPC methods which are not part of the provided list. Cannot be used with --restricted-rpcs or --blacklisted-rpcs.
+    --initial-kernel <evm_installer.wasm>: Path to the EVM kernel used to launch the PVM, it will be loaded from storage afterward
+    --private-rpc-port <PORT>: The EVM node private server rpc port.
+    --preimages-dir <_evm_installer_preimages>: Path to the preimages directory
+    --preimages-endpoint <url>: The address of a service which provides pre-images for the rollup. Missing pre-images will be downloaded remotely if they are not already present on disk.
+    --time-between-blocks <10.>: Interval (in seconds) at which the sequencer creates an empty block by default. If set to `none`, blocks are produced on demand only (see private method produceBlock).
+    --genesis-timestamp <[TIMESTAMP]>: Timestamp used for the genesis block, uses machine's clock if not provided
+    --maximum-blueprints-lag <LAG>: The maximum advance (in blueprints) the Sequencer accepts to have before trying to send its backlog again.
+    --maximum-blueprints-ahead <AHEAD>: The maximum advance (in blueprints) the Sequencer accepts
+    --maximum-blueprints-catch-up <CATCH_UP>: The maximum number of blueprints the Sequencer resends at once.
+    --catch-up-cooldown <COOLDOWN>: The maximum number of Layer 1 blocks the Sequencer waits after resending its blueprints before trying to catch-up again.
+    --max-number-of-chunks <10.>: Maximum number of chunks per blueprint.
+    -d --wallet-dir <path>: client data directory (absent: TEZOS_CLIENT_DIR env)
+    -f --password-filename <filename>: path to the password filename
+    --dal-slots <slot indices>: The DAL slots indices on which the sequencer is allowed to send blueprints.
+  
+  run sequencer [--data-dir <data-dir>] [--rpc-addr <ADDR>]
+      [--rpc-port <PORT>] [--rpc-batch-limit <PORT>] [--devmode]
+      [--cors-origins <ALLOWED_ORIGINS>] [--cors-headers <ALLOWED_HEADERS>]
+      [--max-number-blocks <100>] [--max-number-logs <1000>]
+      [--chunk-size <10>] [-K --keep-alive] [--rollup-node-endpoint <url>]
+      [--tx-pool-timeout-limit <3_600>] [--tx-pool-addr-limit <4_000>]
+      [--tx-pool-tx-per-addr-limit <16>] [-v --verbose]
+      [--restricted-rpcs <regexp>] [--blacklisted-rpcs <blacklist>]
+      [--whitelisted-rpcs <whitelist>]
+      [--preimages-dir <_evm_installer_preimages>]
+      [--preimages-endpoint <url>] [--time-between-blocks <10.>]
+      [--max-number-of-chunks <10.>] [--private-rpc-port <PORT>]
+      [--sequencer-key <edsk...>] [--maximum-blueprints-lag <LAG>]
+      [--maximum-blueprints-ahead <AHEAD>]
+      [--maximum-blueprints-catch-up <CATCH_UP>]
+      [--catch-up-cooldown <COOLDOWN>]
+      [--genesis-timestamp <[TIMESTAMP]>]
+      [--initial-kernel <evm_installer.wasm>] [-d --wallet-dir <path>]
+      [-f --password-filename <filename>] [--dal-slots <slot indices>]
+    Start the EVM node in sequencer mode
+    --data-dir <data-dir>: The path to the EVM node data directory
+    --rpc-addr <ADDR>: The EVM node server rpc address.
+    --rpc-port <PORT>: The EVM node server rpc port.
+    --rpc-batch-limit <PORT>: A limit on the number of requests allowed in a single batch. Can either be `unlimited` or a positive integer.
+    --devmode: DEPRECATED — The EVM node now aims to be backward compatible with the kernel deployed on Mainnet and Ghostnet
+    --cors-origins <ALLOWED_ORIGINS>: List of accepted cors origins.
+    --cors-headers <ALLOWED_HEADERS>: List of accepted cors headers.
+    --max-number-blocks <100>: maximum number of blocks kept in the log.
+    --max-number-logs <1000>: maximum number of logs kept.
+    --chunk-size <10>: Blocks to be filtered are split in chunks, which will be filtered in sequence. Within each chunk, the block filtering is done concurrently.
+    -K --keep-alive: Keep the EVM node process alive even if the connection is lost with the rollup node.
+    --rollup-node-endpoint <url>: The address of a rollup node.
+    --tx-pool-timeout-limit <3_600>: Transaction timeout limit inside the transaction pool (in seconds).
+    --tx-pool-addr-limit <4_000>: Maximum allowed addresses inside the transaction pool.
+    --tx-pool-tx-per-addr-limit <16>: Maximum allowed transactions per user address inside the transaction pool.
+    -v --verbose: Sets logging level to debug. Beware, it is highly verbose.
+    --restricted-rpcs <regexp>: Disable methods that matches the given Perl-like regular expression. Cannot be used with --whitelisted-rpcs or --blacklisted-rpcs.
+    --blacklisted-rpcs <blacklist>: Disable the RPC methods which are part of the provided list. Cannot be used with --restricted-rpcs or --blacklisted-rpcs.
+    --whitelisted-rpcs <whitelist>: Disable the RPC methods which are not part of the provided list. Cannot be used with --restricted-rpcs or --blacklisted-rpcs.
+    --preimages-dir <_evm_installer_preimages>: Path to the preimages directory
+    --preimages-endpoint <url>: The address of a service which provides pre-images for the rollup. Missing pre-images will be downloaded remotely if they are not already present on disk.
+    --time-between-blocks <10.>: Interval (in seconds) at which the sequencer creates an empty block by default. If set to `none`, blocks are produced on demand only (see private method produceBlock).
+    --max-number-of-chunks <10.>: Maximum number of chunks per blueprint.
+    --private-rpc-port <PORT>: The EVM node private server rpc port.
+    --sequencer-key <edsk...>: key to sign the blueprints.
+    --maximum-blueprints-lag <LAG>: The maximum advance (in blueprints) the Sequencer accepts to have before trying to send its backlog again.
+    --maximum-blueprints-ahead <AHEAD>: The maximum advance (in blueprints) the Sequencer accepts
+    --maximum-blueprints-catch-up <CATCH_UP>: The maximum number of blueprints the Sequencer resends at once.
+    --catch-up-cooldown <COOLDOWN>: The maximum number of Layer 1 blocks the Sequencer waits after resending its blueprints before trying to catch-up again.
+    --genesis-timestamp <[TIMESTAMP]>: Timestamp used for the genesis block, uses machine's clock if not provided
+    --initial-kernel <evm_installer.wasm>: Path to the EVM kernel used to launch the PVM, it will be loaded from storage afterward
+    -d --wallet-dir <path>: client data directory (absent: TEZOS_CLIENT_DIR env)
+    -f --password-filename <filename>: path to the password filename
+    --dal-slots <slot indices>: The DAL slots indices on which the sequencer is allowed to send blueprints.
+  
+  run threshold encryption sequencer [--data-dir <data-dir>]
+      [--rpc-addr <ADDR>] [--rpc-port <PORT>] [--rpc-batch-limit <PORT>]
+      [--devmode] [--cors-origins <ALLOWED_ORIGINS>]
+      [--cors-headers <ALLOWED_HEADERS>] [--max-number-blocks <100>]
+      [--max-number-logs <1000>] [--chunk-size <10>] [-K --keep-alive]
+      [--rollup-node-endpoint <url>] [--tx-pool-timeout-limit <3_600>]
+      [--tx-pool-addr-limit <4_000>] [--tx-pool-tx-per-addr-limit <16>]
+      [-v --verbose] [--restricted-rpcs <regexp>]
+      [--blacklisted-rpcs <blacklist>] [--whitelisted-rpcs <whitelist>]
+      [--preimages-dir <_evm_installer_preimages>]
+      [--preimages-endpoint <url>] [--time-between-blocks <10.>]
+      [--max-number-of-chunks <10.>] [--private-rpc-port <PORT>]
+      [--sequencer-key <edsk...>] [--maximum-blueprints-lag <LAG>]
+      [--maximum-blueprints-ahead <AHEAD>]
+      [--maximum-blueprints-catch-up <CATCH_UP>]
+      [--catch-up-cooldown <COOLDOWN>]
+      [--genesis-timestamp <[TIMESTAMP]>]
+      [--initial-kernel <evm_installer.wasm>] [-d --wallet-dir <path>]
+      [--sequencer-sidecar-endpoint <url>]
+      [-f --password-filename <filename>] [--dal-slots <slot indices>]
+    Start the EVM node in sequencer mode
+    --data-dir <data-dir>: The path to the EVM node data directory
+    --rpc-addr <ADDR>: The EVM node server rpc address.
+    --rpc-port <PORT>: The EVM node server rpc port.
+    --rpc-batch-limit <PORT>: A limit on the number of requests allowed in a single batch. Can either be `unlimited` or a positive integer.
+    --devmode: DEPRECATED — The EVM node now aims to be backward compatible with the kernel deployed on Mainnet and Ghostnet
+    --cors-origins <ALLOWED_ORIGINS>: List of accepted cors origins.
+    --cors-headers <ALLOWED_HEADERS>: List of accepted cors headers.
+    --max-number-blocks <100>: maximum number of blocks kept in the log.
+    --max-number-logs <1000>: maximum number of logs kept.
+    --chunk-size <10>: Blocks to be filtered are split in chunks, which will be filtered in sequence. Within each chunk, the block filtering is done concurrently.
+    -K --keep-alive: Keep the EVM node process alive even if the connection is lost with the rollup node.
+    --rollup-node-endpoint <url>: The address of a rollup node.
+    --tx-pool-timeout-limit <3_600>: Transaction timeout limit inside the transaction pool (in seconds).
+    --tx-pool-addr-limit <4_000>: Maximum allowed addresses inside the transaction pool.
+    --tx-pool-tx-per-addr-limit <16>: Maximum allowed transactions per user address inside the transaction pool.
+    -v --verbose: Sets logging level to debug. Beware, it is highly verbose.
+    --restricted-rpcs <regexp>: Disable methods that matches the given Perl-like regular expression. Cannot be used with --whitelisted-rpcs or --blacklisted-rpcs.
+    --blacklisted-rpcs <blacklist>: Disable the RPC methods which are part of the provided list. Cannot be used with --restricted-rpcs or --blacklisted-rpcs.
+    --whitelisted-rpcs <whitelist>: Disable the RPC methods which are not part of the provided list. Cannot be used with --restricted-rpcs or --blacklisted-rpcs.
+    --preimages-dir <_evm_installer_preimages>: Path to the preimages directory
+    --preimages-endpoint <url>: The address of a service which provides pre-images for the rollup. Missing pre-images will be downloaded remotely if they are not already present on disk.
+    --time-between-blocks <10.>: Interval (in seconds) at which the sequencer creates an empty block by default. If set to `none`, blocks are produced on demand only (see private method produceBlock).
+    --max-number-of-chunks <10.>: Maximum number of chunks per blueprint.
+    --private-rpc-port <PORT>: The EVM node private server rpc port.
+    --sequencer-key <edsk...>: key to sign the blueprints.
+    --maximum-blueprints-lag <LAG>: The maximum advance (in blueprints) the Sequencer accepts to have before trying to send its backlog again.
+    --maximum-blueprints-ahead <AHEAD>: The maximum advance (in blueprints) the Sequencer accepts
+    --maximum-blueprints-catch-up <CATCH_UP>: The maximum number of blueprints the Sequencer resends at once.
+    --catch-up-cooldown <COOLDOWN>: The maximum number of Layer 1 blocks the Sequencer waits after resending its blueprints before trying to catch-up again.
+    --genesis-timestamp <[TIMESTAMP]>: Timestamp used for the genesis block, uses machine's clock if not provided
+    --initial-kernel <evm_installer.wasm>: Path to the EVM kernel used to launch the PVM, it will be loaded from storage afterward
+    -d --wallet-dir <path>: client data directory (absent: TEZOS_CLIENT_DIR env)
+    --sequencer-sidecar-endpoint <url>: The address of The sequencer sidecar to connect to.
+    -f --password-filename <filename>: path to the password filename
+    --dal-slots <slot indices>: The DAL slots indices on which the sequencer is allowed to send blueprints.
+  
+  run observer with endpoint <evm-node-endpoint> and rollup node endpoint <rollup-node-endpoint> [--data-dir <data-dir>]
+      [--rpc-addr <ADDR>] [--rpc-port <PORT>] [--rpc-batch-limit <PORT>]
+      [--devmode] [--cors-origins <ALLOWED_ORIGINS>]
+      [--cors-headers <ALLOWED_HEADERS>] [--max-number-blocks <100>]
+      [--max-number-logs <1000>] [--chunk-size <10>] [-K --keep-alive]
+      [--rollup-node-endpoint <url>] [--tx-pool-timeout-limit <3_600>]
+      [--tx-pool-addr-limit <4_000>] [--tx-pool-tx-per-addr-limit <16>]
+      [-v --verbose] [--restricted-rpcs <regexp>]
+      [--blacklisted-rpcs <blacklist>] [--whitelisted-rpcs <whitelist>]
+      [--initial-kernel <evm_installer.wasm>]
+      [--preimages-dir <_evm_installer_preimages>]
+      [--preimages-endpoint <url>] [--bundler-node-endpoint <url>]
+      [--dont-track-rollup-node]
+    Start the EVM node in observer mode. DEPRECATED, please uses `run observer` command.
+    <evm-node-endpoint>: The EVM node endpoint address (as ADDR:PORT) the node will communicate with.
+    <rollup-node-endpoint>: The address of a rollup node.
+    --data-dir <data-dir>: The path to the EVM node data directory
+    --rpc-addr <ADDR>: The EVM node server rpc address.
+    --rpc-port <PORT>: The EVM node server rpc port.
+    --rpc-batch-limit <PORT>: A limit on the number of requests allowed in a single batch. Can either be `unlimited` or a positive integer.
+    --devmode: DEPRECATED — The EVM node now aims to be backward compatible with the kernel deployed on Mainnet and Ghostnet
+    --cors-origins <ALLOWED_ORIGINS>: List of accepted cors origins.
+    --cors-headers <ALLOWED_HEADERS>: List of accepted cors headers.
+    --max-number-blocks <100>: maximum number of blocks kept in the log.
+    --max-number-logs <1000>: maximum number of logs kept.
+    --chunk-size <10>: Blocks to be filtered are split in chunks, which will be filtered in sequence. Within each chunk, the block filtering is done concurrently.
+    -K --keep-alive: Keep the EVM node process alive even if the connection is lost with the rollup node.
+    --rollup-node-endpoint <url>: The address of a rollup node.
+    --tx-pool-timeout-limit <3_600>: Transaction timeout limit inside the transaction pool (in seconds).
+    --tx-pool-addr-limit <4_000>: Maximum allowed addresses inside the transaction pool.
+    --tx-pool-tx-per-addr-limit <16>: Maximum allowed transactions per user address inside the transaction pool.
+    -v --verbose: Sets logging level to debug. Beware, it is highly verbose.
+    --restricted-rpcs <regexp>: Disable methods that matches the given Perl-like regular expression. Cannot be used with --whitelisted-rpcs or --blacklisted-rpcs.
+    --blacklisted-rpcs <blacklist>: Disable the RPC methods which are part of the provided list. Cannot be used with --restricted-rpcs or --blacklisted-rpcs.
+    --whitelisted-rpcs <whitelist>: Disable the RPC methods which are not part of the provided list. Cannot be used with --restricted-rpcs or --blacklisted-rpcs.
+    --initial-kernel <evm_installer.wasm>: Path to the EVM kernel used to launch the PVM, it will be loaded from storage afterward
+    --preimages-dir <_evm_installer_preimages>: Path to the preimages directory
+    --preimages-endpoint <url>: The address of a service which provides pre-images for the rollup. Missing pre-images will be downloaded remotely if they are not already present on disk.
+    --bundler-node-endpoint <url>: The address of a service which encrypts incoming transactions for the rollup.
+    --dont-track-rollup-node: Disable tracking the head of the rollup node. Tracking the state of a rollup node allows to confirm the blocks received from the upstream EVM node.
+  
+  run observer [--data-dir <data-dir>] [--rpc-addr <ADDR>]
+      [--rpc-port <PORT>] [--rpc-batch-limit <PORT>] [--devmode]
+      [--cors-origins <ALLOWED_ORIGINS>] [--cors-headers <ALLOWED_HEADERS>]
+      [--max-number-blocks <100>] [--max-number-logs <1000>]
+      [--chunk-size <10>] [-K --keep-alive] [--rollup-node-endpoint <url>]
+      [--tx-pool-timeout-limit <3_600>] [--tx-pool-addr-limit <4_000>]
+      [--tx-pool-tx-per-addr-limit <16>] [-v --verbose]
+      [--restricted-rpcs <regexp>] [--blacklisted-rpcs <blacklist>]
+      [--whitelisted-rpcs <whitelist>] [--evm-node-endpoint <url>]
+      [--bundler-node-endpoint <url>]
+      [--preimages-dir <_evm_installer_preimages>]
+      [--preimages-endpoint <url>] [--initial-kernel <evm_installer.wasm>]
+      [--dont-track-rollup-node]
+    Start the EVM node in observer mode
+    --data-dir <data-dir>: The path to the EVM node data directory
+    --rpc-addr <ADDR>: The EVM node server rpc address.
+    --rpc-port <PORT>: The EVM node server rpc port.
+    --rpc-batch-limit <PORT>: A limit on the number of requests allowed in a single batch. Can either be `unlimited` or a positive integer.
+    --devmode: DEPRECATED — The EVM node now aims to be backward compatible with the kernel deployed on Mainnet and Ghostnet
+    --cors-origins <ALLOWED_ORIGINS>: List of accepted cors origins.
+    --cors-headers <ALLOWED_HEADERS>: List of accepted cors headers.
+    --max-number-blocks <100>: maximum number of blocks kept in the log.
+    --max-number-logs <1000>: maximum number of logs kept.
+    --chunk-size <10>: Blocks to be filtered are split in chunks, which will be filtered in sequence. Within each chunk, the block filtering is done concurrently.
+    -K --keep-alive: Keep the EVM node process alive even if the connection is lost with the rollup node.
+    --rollup-node-endpoint <url>: The address of a rollup node.
+    --tx-pool-timeout-limit <3_600>: Transaction timeout limit inside the transaction pool (in seconds).
+    --tx-pool-addr-limit <4_000>: Maximum allowed addresses inside the transaction pool.
+    --tx-pool-tx-per-addr-limit <16>: Maximum allowed transactions per user address inside the transaction pool.
+    -v --verbose: Sets logging level to debug. Beware, it is highly verbose.
+    --restricted-rpcs <regexp>: Disable methods that matches the given Perl-like regular expression. Cannot be used with --whitelisted-rpcs or --blacklisted-rpcs.
+    --blacklisted-rpcs <blacklist>: Disable the RPC methods which are part of the provided list. Cannot be used with --restricted-rpcs or --blacklisted-rpcs.
+    --whitelisted-rpcs <whitelist>: Disable the RPC methods which are not part of the provided list. Cannot be used with --restricted-rpcs or --blacklisted-rpcs.
+    --evm-node-endpoint <url>: The address of an EVM node to connect to.
+    --bundler-node-endpoint <url>: The address of a service which encrypts incoming transactions for the rollup.
+    --preimages-dir <_evm_installer_preimages>: Path to the preimages directory
+    --preimages-endpoint <url>: The address of a service which provides pre-images for the rollup. Missing pre-images will be downloaded remotely if they are not already present on disk.
+    --initial-kernel <evm_installer.wasm>: Path to the EVM kernel used to launch the PVM, it will be loaded from storage afterward
+    --dont-track-rollup-node: Disable tracking the head of the rollup node. Tracking the state of a rollup node allows to confirm the blocks received from the upstream EVM node.
+  
+  experimental run rpc [--data-dir <data-dir>] [--rpc-addr <ADDR>]
+      [--rpc-port <PORT>] [--rpc-batch-limit <PORT>] [--devmode]
+      [--cors-origins <ALLOWED_ORIGINS>] [--cors-headers <ALLOWED_HEADERS>]
+      [--max-number-blocks <100>] [--max-number-logs <1000>]
+      [--chunk-size <10>] [-K --keep-alive] [--rollup-node-endpoint <url>]
+      [--tx-pool-timeout-limit <3_600>] [--tx-pool-addr-limit <4_000>]
+      [--tx-pool-tx-per-addr-limit <16>] [-v --verbose]
+      [--restricted-rpcs <regexp>] [--blacklisted-rpcs <blacklist>]
+      [--whitelisted-rpcs <whitelist>] [--evm-node-endpoint <url>]
+      [--preimages-dir <_evm_installer_preimages>]
+      [--preimages-endpoint <url>]
+    Start the EVM node in sequencer mode
+    --data-dir <data-dir>: The path to the EVM node data directory
+    --rpc-addr <ADDR>: The EVM node server rpc address.
+    --rpc-port <PORT>: The EVM node server rpc port.
+    --rpc-batch-limit <PORT>: A limit on the number of requests allowed in a single batch. Can either be `unlimited` or a positive integer.
+    --devmode: DEPRECATED — The EVM node now aims to be backward compatible with the kernel deployed on Mainnet and Ghostnet
+    --cors-origins <ALLOWED_ORIGINS>: List of accepted cors origins.
+    --cors-headers <ALLOWED_HEADERS>: List of accepted cors headers.
+    --max-number-blocks <100>: maximum number of blocks kept in the log.
+    --max-number-logs <1000>: maximum number of logs kept.
+    --chunk-size <10>: Blocks to be filtered are split in chunks, which will be filtered in sequence. Within each chunk, the block filtering is done concurrently.
+    -K --keep-alive: Keep the EVM node process alive even if the connection is lost with the rollup node.
+    --rollup-node-endpoint <url>: The address of a rollup node.
+    --tx-pool-timeout-limit <3_600>: Transaction timeout limit inside the transaction pool (in seconds).
+    --tx-pool-addr-limit <4_000>: Maximum allowed addresses inside the transaction pool.
+    --tx-pool-tx-per-addr-limit <16>: Maximum allowed transactions per user address inside the transaction pool.
+    -v --verbose: Sets logging level to debug. Beware, it is highly verbose.
+    --restricted-rpcs <regexp>: Disable methods that matches the given Perl-like regular expression. Cannot be used with --whitelisted-rpcs or --blacklisted-rpcs.
+    --blacklisted-rpcs <blacklist>: Disable the RPC methods which are part of the provided list. Cannot be used with --restricted-rpcs or --blacklisted-rpcs.
+    --whitelisted-rpcs <whitelist>: Disable the RPC methods which are not part of the provided list. Cannot be used with --restricted-rpcs or --blacklisted-rpcs.
+    --evm-node-endpoint <url>: The address of an EVM node to connect to.
+    --preimages-dir <_evm_installer_preimages>: Path to the preimages directory
+    --preimages-endpoint <url>: The address of a service which provides pre-images for the rollup. Missing pre-images will be downloaded remotely if they are not already present on disk.
+  
+  chunk data [<data or file>...] [--devmode] [--rollup-address <sr1...>]
+      [--as-blueprint] [--timestamp <[TIMESTAMP]>] [--number <0>]
+      [--parent-hash <ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff>]
+      [--sequencer-key <edsk...>] [-d --wallet-dir <path>]
+      [-f --password-filename <filename>]
+    Chunk hexadecimal data according to the message representation of the EVM rollup
+    <data or file>: Data to prepare and chunk with the EVM rollup format. If the data is prefixed with `file:`, the content is read from the given filename and can contain a list of data separated by a whitespace.
+    --devmode: DEPRECATED — The EVM node now aims to be backward compatible with the kernel deployed on Mainnet and Ghostnet
+    --rollup-address <sr1...>: The smart rollup address in Base58 encoding used to produce the chunked messages
+    --as-blueprint: Chunk the data into a blueprint usable in sequencer mode
+    --timestamp <[TIMESTAMP]>: 
+    --number <0>: Level of the blueprint
+    --parent-hash <ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff>: Blueprint's parent hash
+    --sequencer-key <edsk...>: key to sign the blueprints.
+    -d --wallet-dir <path>: client data directory (absent: TEZOS_CLIENT_DIR env)
+    -f --password-filename <filename>: path to the password filename
+  
+  make upgrade payload with root hash <preimage_hash> at activation timestamp <activation_timestamp> [--devmode]
+    Create bytes payload for the upgrade entrypoint
+    <preimage_hash>: Root hash of the kernel to upgrade to
+    <activation_timestamp>: After activation timestamp, the kernel will upgrade to this value
+    --devmode: DEPRECATED — The EVM node now aims to be backward compatible with the kernel deployed on Mainnet and Ghostnet
+  
+  make sequencer upgrade payload with pool address <pool_address> at activation timestamp <activation_timestamp> for <sequencer-key> [-d --wallet-dir <path>]
+      [--devmode]
+    Create bytes payload for the sequencer upgrade entrypoint
+    <pool_address>: pool address of the sequencer
+    <activation_timestamp>: After activation timestamp, the kernel will upgrade to this value
+    <sequencer-key>: key to sign the blueprints.
+    -d --wallet-dir <path>: client data directory (absent: TEZOS_CLIENT_DIR env)
+    --devmode: DEPRECATED — The EVM node now aims to be backward compatible with the kernel deployed on Mainnet and Ghostnet
+  
+  init from rollup node <rollup-node-data-dir> [--data-dir <data-dir>]
+      [--devmode] [--omit-delayed-tx-events]
+      [--reconstruct <boot-sector.wasm>]
+    initialises the EVM node data-dir using the data-dir of a rollup node.
+    <rollup-node-data-dir>: The path to the rollup node data directory.
+    --data-dir <data-dir>: The path to the EVM node data directory
+    --devmode: DEPRECATED — The EVM node now aims to be backward compatible with the kernel deployed on Mainnet and Ghostnet
+    --omit-delayed-tx-events: Don't populate the delayed transactions in the store of the EVM node. This is necessary when creating the data dir for an observer EVM node because delayed transactions are going to be fetched from the sequencer.
+    --reconstruct <boot-sector.wasm>: /!\ DO NOT USE. /!\"
+  
+  transform dump <dump.json> to rlp <dump.rlp> [--devmode]
+      [-k --keep-everything]
+    Transforms the JSON list of instructions to a RLP list
+    <dump.json>: Description
+    <dump.rlp>: Description
+    --devmode: DEPRECATED — The EVM node now aims to be backward compatible with the kernel deployed on Mainnet and Ghostnet
+    -k --keep-everything: Do not filter out files outside of the `/evm` directory
+  
+  reset at <level> [--data-dir <data-dir>] [-f --force]
+    Reset evm node data-dir to a specific block level.
+    <level>: level to reset to state to.
+    --data-dir <data-dir>: The path to the EVM node data directory
+    -f --force: force suppression of data to reset state of sequencer to a specified l2 level.
+  
+  replay blueprint <level> [--data-dir <data-dir>]
+      [--preimages-dir <_evm_installer_preimages>]
+      [--preimages-endpoint <url>] [-v --verbose]
+      [--kernel <evm_kernel.wasm>] [--profile]
+    Replay a specific block level.
+    <level>: level to replay
+    --data-dir <data-dir>: The path to the EVM node data directory
+    --preimages-dir <_evm_installer_preimages>: Path to the preimages directory
+    --preimages-endpoint <url>: The address of a service which provides pre-images for the rollup. Missing pre-images will be downloaded remotely if they are not already present on disk.
+    -v --verbose: Sets logging level to debug. Beware, it is highly verbose.
+    --kernel <evm_kernel.wasm>: Path to the EVM kernel used to launch the PVM, it will be loaded from storage afterward
+    --profile: Profile the execution of the WASM PVM
+  
+  patch kernel with <kernel_path> [--data-dir <data-dir>] [-f --force]
+    Patch the kernel used by the EVM node from its current HEAD. This is an unsafe command, which can lead to the EVM node diverging from the Etherlink main branch if the new kernel is not compatible with the one deployed on the network.
+    <kernel_path>: Path to the kernel
+    --data-dir <data-dir>: The path to the EVM node data directory
+    -f --force: Force patching the kernel
+  
+  init config [--data-dir <data-dir>] [--rpc-addr <ADDR>] [--rpc-port <PORT>]
+      [--rpc-batch-limit <PORT>] [--devmode]
+      [--cors-origins <ALLOWED_ORIGINS>] [--cors-headers <ALLOWED_HEADERS>]
+      [--max-number-blocks <100>] [--max-number-logs <1000>]
+      [--chunk-size <10>] [-K --keep-alive] [--rollup-node-endpoint <url>]
+      [--tx-pool-timeout-limit <3_600>] [--tx-pool-addr-limit <4_000>]
+      [--tx-pool-tx-per-addr-limit <16>] [-v --verbose]
+      [--restricted-rpcs <regexp>] [--blacklisted-rpcs <blacklist>]
+      [--whitelisted-rpcs <whitelist>]
+      [--preimages-dir <_evm_installer_preimages>]
+      [--preimages-endpoint <url>] [--time-between-blocks <10.>]
+      [--max-number-of-chunks <10.>] [--private-rpc-port <PORT>]
+      [--sequencer-key <edsk...>] [--maximum-blueprints-lag <LAG>]
+      [--maximum-blueprints-ahead <AHEAD>]
+      [--maximum-blueprints-catch-up <CATCH_UP>]
+      [--catch-up-cooldown <COOLDOWN>] [--evm-node-endpoint <url>]
+      [--bundler-node-endpoint <url>] [--sequencer-sidecar-endpoint <url>]
+      [--dont-track-rollup-node] [-d --wallet-dir <path>] [-f --force]
+      [--dal-slots <slot indices>]
+    Create an initial config with default value.
+    --data-dir <data-dir>: The path to the EVM node data directory
+    --rpc-addr <ADDR>: The EVM node server rpc address.
+    --rpc-port <PORT>: The EVM node server rpc port.
+    --rpc-batch-limit <PORT>: A limit on the number of requests allowed in a single batch. Can either be `unlimited` or a positive integer.
+    --devmode: DEPRECATED — The EVM node now aims to be backward compatible with the kernel deployed on Mainnet and Ghostnet
+    --cors-origins <ALLOWED_ORIGINS>: List of accepted cors origins.
+    --cors-headers <ALLOWED_HEADERS>: List of accepted cors headers.
+    --max-number-blocks <100>: maximum number of blocks kept in the log.
+    --max-number-logs <1000>: maximum number of logs kept.
+    --chunk-size <10>: Blocks to be filtered are split in chunks, which will be filtered in sequence. Within each chunk, the block filtering is done concurrently.
+    -K --keep-alive: Keep the EVM node process alive even if the connection is lost with the rollup node.
+    --rollup-node-endpoint <url>: The address of a rollup node.
+    --tx-pool-timeout-limit <3_600>: Transaction timeout limit inside the transaction pool (in seconds).
+    --tx-pool-addr-limit <4_000>: Maximum allowed addresses inside the transaction pool.
+    --tx-pool-tx-per-addr-limit <16>: Maximum allowed transactions per user address inside the transaction pool.
+    -v --verbose: Sets logging level to debug. Beware, it is highly verbose.
+    --restricted-rpcs <regexp>: Disable methods that matches the given Perl-like regular expression. Cannot be used with --whitelisted-rpcs or --blacklisted-rpcs.
+    --blacklisted-rpcs <blacklist>: Disable the RPC methods which are part of the provided list. Cannot be used with --restricted-rpcs or --blacklisted-rpcs.
+    --whitelisted-rpcs <whitelist>: Disable the RPC methods which are not part of the provided list. Cannot be used with --restricted-rpcs or --blacklisted-rpcs.
+    --preimages-dir <_evm_installer_preimages>: Path to the preimages directory
+    --preimages-endpoint <url>: The address of a service which provides pre-images for the rollup. Missing pre-images will be downloaded remotely if they are not already present on disk.
+    --time-between-blocks <10.>: Interval (in seconds) at which the sequencer creates an empty block by default. If set to `none`, blocks are produced on demand only (see private method produceBlock).
+    --max-number-of-chunks <10.>: Maximum number of chunks per blueprint.
+    --private-rpc-port <PORT>: The EVM node private server rpc port.
+    --sequencer-key <edsk...>: key to sign the blueprints.
+    --maximum-blueprints-lag <LAG>: The maximum advance (in blueprints) the Sequencer accepts to have before trying to send its backlog again.
+    --maximum-blueprints-ahead <AHEAD>: The maximum advance (in blueprints) the Sequencer accepts
+    --maximum-blueprints-catch-up <CATCH_UP>: The maximum number of blueprints the Sequencer resends at once.
+    --catch-up-cooldown <COOLDOWN>: The maximum number of Layer 1 blocks the Sequencer waits after resending its blueprints before trying to catch-up again.
+    --evm-node-endpoint <url>: The address of an EVM node to connect to.
+    --bundler-node-endpoint <url>: The address of a service which encrypts incoming transactions for the rollup.
+    --sequencer-sidecar-endpoint <url>: The address of The sequencer sidecar to connect to.
+    --dont-track-rollup-node: Disable tracking the head of the rollup node. Tracking the state of a rollup node allows to confirm the blocks received from the upstream EVM node.
+    -d --wallet-dir <path>: client data directory (absent: TEZOS_CLIENT_DIR env)
+    -f --force: Overwrites the configuration file when it exists.
+    --dal-slots <slot indices>: The DAL slots indices on which the sequencer is allowed to send blueprints.
+  
+  make kernel installer config <kernel config file> [--mainnet-compat]
+      [--kernel-root-hash <root hash>] [--chain-id <chain id>]
+      [--sequencer <edpk...>] [--delayed-bridge <KT1...>]
+      [--ticketer <KT1...>] [--admin <KT1..>]
+      [--sequencer-governance <KT1...>] [--kernel-governance <KT1...>]
+      [--kernel-security-governance <KT1...>]
+      [--minimum-base-fee-per-gas <111...>] [--da-fee-per-byte <111...>]
+      [--delayed-inbox-timeout <111...>]
+      [--delayed-inbox-min-levels <111...>]
+      [--sequencer-pool-address <0x...>] [--maximum-allowed-ticks <11000...>]
+      [--maximum-gas-per-transaction <30000...>]
+      [--max-blueprint-lookahead-in-seconds <500>] [--remove-whitelist]
+      [--bootstrap-balance <9999000000000000000000>]
+      [--bootstrap-account <0x...>] [--enable-fa-bridge] [--enable-dal]
+      [--dal-slots <0,1,4,6,...>]
+    Transforms the JSON list of instructions to a RLP list
+    <kernel config file>: file path where the config will be written to
+    --mainnet-compat: Generate a configuration compatible with the first Etherlink Mainnet kernel
+    --kernel-root-hash <root hash>: value for kernel_root_hash in the installer config
+    --chain-id <chain id>: value for chain_id in the installer config
+    --sequencer <edpk...>: value for sequencer in the installer config
+    --delayed-bridge <KT1...>: value for delayed_bridge in the installer config
+    --ticketer <KT1...>: value for ticketer in the installer config
+    --admin <KT1..>: value for admin in the installer config
+    --sequencer-governance <KT1...>: value for sequencer_governance in the installer config
+    --kernel-governance <KT1...>: value for kernel_governance in the installer config
+    --kernel-security-governance <KT1...>: value for kernel_security_governance in the installer config
+    --minimum-base-fee-per-gas <111...>: value for minimum_base_fee_per_gas in the installer config
+    --da-fee-per-byte <111...>: value for da_fee_per_byte in the installer config
+    --delayed-inbox-timeout <111...>: value for delayed_inbox_timeout in the installer config
+    --delayed-inbox-min-levels <111...>: value for delayed_inbox_min_levels in the installer config
+    --sequencer-pool-address <0x...>: value for sequencer_pool_address in the installer config
+    --maximum-allowed-ticks <11000...>: value for maximum_allowed_ticks in the installer config
+    --maximum-gas-per-transaction <30000...>: value for maximum_gas_per_transaction in the installer config
+    --max-blueprint-lookahead-in-seconds <500>: value for max_blueprint_lookahead_in_seconds in the installer config
+    --remove-whitelist: enable flag remove_whitelist in the installer config
+    --bootstrap-balance <9999000000000000000000>: balance of the bootstrap accounts
+    --bootstrap-account <0x...>: add a bootstrap account in the installer config.
+    --enable-fa-bridge: enable flag enable_fa_bridge in the installer config
+    --enable-dal: enable flag enable_dal in the installer config
+    --dal-slots <0,1,4,6,...>: value for dal_slots in the installer config
+  
+  snapshot export [--data-dir <data-dir>] [--dest <path>]
+      [--compress-on-the-fly] [--uncompressed]
+    Export a snapshot of the EVM node.
+    --data-dir <data-dir>: The path to the EVM node data directory
+    --dest <path>: Directory in which to export the snapshot (defaults to current directory)
+    --compress-on-the-fly: Produce a compressed snapshot on the fly. The rollup node will use less disk space to produce the snapshot but will lock the rollup node (if running) for a longer time. Without this option, producing a snaphsot requires the available disk space to be around the size of the data dir.
+    --uncompressed: Produce an uncompressed snapshot.
+  
+  snapshot export <snapshot_file> [--data-dir <data-dir>]
+      [--compress-on-the-fly] [--uncompressed]
+    Export a snapshot of the EVM node to a given file.
+    <snapshot_file>: Snapshot archive file
+    --data-dir <data-dir>: The path to the EVM node data directory
+    --compress-on-the-fly: Produce a compressed snapshot on the fly. The rollup node will use less disk space to produce the snapshot but will lock the rollup node (if running) for a longer time. Without this option, producing a snaphsot requires the available disk space to be around the size of the data dir.
+    --uncompressed: Produce an uncompressed snapshot.
+  
+  patch state at <path> with <value> [--data-dir <data-dir>] [-f --force]
+    Patches the state with an arbitrary value. This is an unsafe command, it should be used for debugging only. Patched state is persisted and you need to use the command `reset` to revert the changes.
+    <path>: Durable storage path
+    <value>: Patched value
+    --data-dir <data-dir>: The path to the EVM node data directory
+    -f --force: Force patching the state
+  
+  download kernel with root hash <root hash> [--data-dir <data-dir>]
+      [--preimages-dir <_evm_installer_preimages>]
+      [--preimages-endpoint <url>]
+    Transforms the JSON list of instructions to a RLP list
+    <root hash>: root hash of the kernel to download
+    --data-dir <data-dir>: The path to the EVM node data directory
+    --preimages-dir <_evm_installer_preimages>: Path to the preimages directory
+    --preimages-endpoint <url>: The address of a service which provides pre-images for the rollup. Missing pre-images will be downloaded remotely if they are not already present on disk.
+  
+  debug print store schemas
+    Print SQL statements describing the tables created in the store
