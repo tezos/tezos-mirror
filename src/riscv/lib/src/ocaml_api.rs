@@ -283,6 +283,13 @@ pub fn octez_riscv_set_metadata(
 }
 
 #[ocaml::func]
+#[ocaml::sig("state -> string -> state")]
+pub fn octez_riscv_reveal_raw_data(_state: Pointer<State>, _data: &[u8]) -> Pointer<State> {
+    // TODO: RV-110. Support all revelations in set_input method
+    todo!()
+}
+
+#[ocaml::func]
 #[ocaml::sig("state -> int64")]
 pub fn octez_riscv_get_message_counter(state: Pointer<State>) -> u64 {
     state.as_ref().0.get_message_counter()

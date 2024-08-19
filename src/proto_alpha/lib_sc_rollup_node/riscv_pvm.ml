@@ -89,6 +89,7 @@ module PVM :
           state
           (Sc_rollup.Address.to_bytes address)
           (Raw_level.to_int32 origination_level)
+    | Sc_rollup.(Reveal (Raw_data data)) -> Backend.reveal_raw_data state data
     | _ -> assert false
 
   let eval state = Backend.compute_step state

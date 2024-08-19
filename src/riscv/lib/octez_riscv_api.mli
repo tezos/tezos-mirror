@@ -29,5 +29,6 @@ external octez_riscv_install_boot_sector: state -> bytes -> state = "octez_riscv
 external octez_riscv_state_hash: state -> bytes = "octez_riscv_state_hash"
 external octez_riscv_set_input_message: state -> int32 -> int64 -> bytes -> state = "octez_riscv_set_input_message"
 external octez_riscv_set_metadata: state -> bytes -> int32 -> state = "octez_riscv_set_metadata"
+external octez_riscv_reveal_raw_data: state -> string -> state = "octez_riscv_reveal_raw_data"
 external octez_riscv_get_message_counter: state -> int64 = "octez_riscv_get_message_counter"
 external octez_riscv_storage_export_snapshot: repo -> id -> string -> (unit, [`Msg of string]) result = "octez_riscv_storage_export_snapshot"
