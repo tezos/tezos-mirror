@@ -1,12 +1,12 @@
-Protocol Quebec
-================
+Protocol Beta
+==============
 
-This page documents the changes brought by protocol Quebec with respect
+This page documents the changes brought by protocol Beta with respect
 to Paris (see :ref:`naming_convention`).
 
 For changes brought by Paris with respect to Oxford, see :doc:`../protocols/019_paris`.
 
-The code can be found in directory :src:`src/proto_021_PtQuebec` of the ``master``
+The code can be found in directory :src:`src/proto_beta` of the ``master``
 branch of Octez.
 
 Environment Version
