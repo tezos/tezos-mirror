@@ -9,7 +9,7 @@ Staking mechanism
 Staking is an evolution of the existing Tezos :doc:`Liquid Proof-of-Stake
 mechanism <proof_of_stake>`. It
 introduces a new role for network participants, called **staker**,
-complementary to the existing :ref:`delegate <def_delegate_quebec>`
+complementary to the existing :ref:`delegate <def_delegate_beta>`
 (also known as *baker*) and *delegator* roles. A staker must also be a
 *delegator* – that is, they must first choose a delegate.
 
@@ -25,8 +25,8 @@ delegated funds.
 
 Unlike delegated funds, staked funds are considered to contribute to the
 security deposit associated with their chosen delegate. Thus, they are
-subject to :ref:`slashing <slashing_quebec>` if
-the delegate misbehaves by :ref:`double-signing <def_double_signing_quebec>`
+subject to :ref:`slashing <slashing_beta>` if
+the delegate misbehaves by :ref:`double-signing <def_double_signing_beta>`
 block proposals or consensus operations, and are subject to the same
 withdrawal delays – colloquially, they are "frozen".
 
@@ -41,12 +41,12 @@ abusing the slashing mechanism for profit at the expense of their
 stakers.
 
 *Delegates* :ref:`configure their staking
-policy <staking_policy_configuration_quebec>` by setting staking parameters
+policy <staking_policy_configuration_beta>` by setting staking parameters
 which regulate whether they accept stakers (the default being to reject
 them), and if so, up to which fraction of their total staking balance.
 They can also configure which proportion of the staking rewards from other stakers is set
 to accrue to their own staked balance instead.
-As :ref:`participation rewards <adaptive_rewards_quebec>` are
+As :ref:`participation rewards <adaptive_rewards_beta>` are
 automatically shared between delegates and their
 stakers, delegates can use this parameter to collect an *edge* from the
 rewards attributable to their stakers.
@@ -55,14 +55,14 @@ Freezing and unfreezing of staked funds is controlled directly by delegates and
 stakers.
 This entails that staked funds are frozen until manually
 unfrozen by stakers. This is a two step process which spans for at least
-4 cycles (cf. :ref:`Staked funds management <staked_funds_management_quebec>`).
+4 cycles (cf. :ref:`Staked funds management <staked_funds_management_beta>`).
 
 A user interface is provided for delegates and stakers to interact
 with the mechanism. It is based on four *pseudo-operations*: ``stake``,
 ``unstake``, ``finalize_unstake``, and ``set_delegate_parameters``.
 Pseudo-operations are self-transfers: a transfer operation where the
 destination matches the source – each involving a special entry-point of
-the same name introduced for :ref:`user accounts <def_user_account_quebec>`.
+the same name introduced for :ref:`user accounts <def_user_account_beta>`.
 This approach was chosen to minimize the work required by wallets,
 custodians, exchanges, and other parties to support the functionality.
 
@@ -70,7 +70,7 @@ custodians, exchanges, and other parties to support the functionality.
 stakers. In other words, smart contracts cannot stake funds (they can
 of course still delegate them).
 
-.. _staking_policy_configuration_quebec:
+.. _staking_policy_configuration_beta:
 
 Staking policy configuration
 ----------------------------
@@ -114,7 +114,7 @@ stake) nor its consequence on voting and baking powers. That is,
 overdelegated funds are not counted towards a delegate baking power, but
 they do increase their voting power.
 
-.. _staked_funds_management_quebec:
+.. _staked_funds_management_beta:
 
 Staked funds management
 -----------------------

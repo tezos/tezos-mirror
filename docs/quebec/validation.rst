@@ -30,7 +30,7 @@ From a higher-level, *abstract* perspective, the validation system in
 the Tezos protocol implements this business logic in a functional,
 state-passing machine where:
 
-- Its state is given by the :ref:`context<def_context_quebec>`, the internal
+- Its state is given by the :ref:`context<def_context_beta>`, the internal
   representation of the state of the Tezos ledger at a given blockchain
   level. For instance, the context contains the information of all
   activated accounts and contracts, and their balances. More
@@ -60,7 +60,7 @@ does not implement this business logic *monolithically*, as described
 above, but it rather presents a more fine-grained API. The rationale
 is to provide specialized variations of the core *validation* and
 *application* functionality, dubbed :ref:`Validation
-modes<validation_modes_quebec>`. For example, these modes enable the
+modes<validation_modes_beta>`. For example, these modes enable the
 protocol to distinguish operations "in the mempool", whose validation
 is triggered by the :doc:`prevalidator<../shell/prevalidation>`, from
 operations included in newly received blocks, whose validation is
@@ -71,7 +71,7 @@ specified by the :package-api:`Protocol
 module in the :doc:`protocol
 environment<../shell/protocol_environment>` ``V13``, and it is
 implemented by this protocol in the
-:package-api:`Main<tezos-protocol-021-PtQuebec/Tezos_raw_protocol_021_PtQuebec/Main/index.html>`
+:package-api:`Main<tezos-protocol-beta/Tezos_raw_protocol_beta/Main/index.html>`
 module.
 
 The rest of this document is organized as follows: we first describe
@@ -79,7 +79,7 @@ the different validation modes implemented by this Tezos economic
 protocol, and then we delve deeper into the particulars of validation
 and application for blocks and the operations supported.
 
-.. _validation_modes_quebec:
+.. _validation_modes_beta:
 
 Validation modes
 ================
@@ -93,7 +93,7 @@ specified by the protocol environment offers an entry point so that
 protocol-agnostic components, the Tezos shell for instance, are able
 to use these different modes.
 
-.. _full_application_quebec:
+.. _full_application_beta:
 
 Full Application
 ~~~~~~~~~~~~~~~~
@@ -108,7 +108,7 @@ signature is correct, and **all** operations included in the block are
 valid; the correct amount of consensus operations have been included
 in order to satisfy the consensus' threshold, etc.
 
-.. _full_construction_quebec:
+.. _full_construction_beta:
 
 Full Construction
 ~~~~~~~~~~~~~~~~~
@@ -126,7 +126,7 @@ construction is finalized.
 
 In Octez, this mode is mainly used by the baker daemon.
 
-.. _partial_construction_quebec:
+.. _partial_construction_beta:
 
 Partial Construction
 ~~~~~~~~~~~~~~~~~~~~
@@ -142,7 +142,7 @@ potential validity of operations (and whether they can safely included
 into a block), so that the latter can **classify** incoming
 operations, and further decide how to process them accordingly.
 
-.. _protocol_classification_quebec:
+.. _protocol_classification_beta:
 
 The protocol provides the shell with the following classification of
 an operation, consisting of one valid kind -- ``Applied`` --, and
@@ -176,7 +176,7 @@ protocol environment:
   case of an attestation which was received *too late*, but that could
   still be used to form a consensus quorum.
 
-.. _partial_application_quebec:
+.. _partial_application_beta:
 
 Partial Application
 ~~~~~~~~~~~~~~~~~~~
@@ -206,7 +206,7 @@ application`` mode provides an over-approximation of the branch's
 validity, and as a result intermediate results are not committed on
 disk in order to prevent potential attacks.
 
-.. _block_validation_overview_quebec:
+.. _block_validation_overview_beta:
 
 Block Validation
 ================
@@ -223,20 +223,20 @@ The first step in the process is to decide whether a candidate block
 is *well-formed*, that is, that it has the expected "shape" of a valid
 block under the current Tezos economic protocol. Given a block
 candidate, the block validation process will then verify that the
-candidate block declares consistent :ref:`level<def_level_quebec>`,
-:ref:`round<def_round_quebec>`, and timestamp values; that it carries a valid
+candidate block declares consistent :ref:`level<def_level_beta>`,
+:ref:`round<def_round_beta>`, and timestamp values; that it carries a valid
 signature, etc. At this step, the block validation process will also
 initialize the data-structures required for subsequent steps.
 
 The second step iterates over the block's operations and proceeds to
 apply them sequentially. When at least one operation is found to be
 invalid, under the conditions described in
-:ref:`operation_validity_quebec` further below, the whole block is
+:ref:`operation_validity_beta` further below, the whole block is
 considered as invalid.
 
 The last step in the block validation process, known as "block
 finalization", aims to verify that the collected consensus operations
-constitute a sufficiently large :ref:`quorum<quorum_quebec>`. That is,
+constitute a sufficiently large :ref:`quorum<quorum_beta>`. That is,
 it will verify that the total attesting power present in the block is
 greater than the ``CONSENSUS_THRESHOLD`` constant.
 
@@ -246,14 +246,14 @@ candidate block. The shell may decide to commit this context to disk.
 
 The Tezos economic protocol also offers a cheap (read "faster")
 alternative to determine an over-approximation of the validity of a
-block (see :ref:`partial_application_quebec` above). This feature
+block (see :ref:`partial_application_beta` above). This feature
 allows the shell to propagate blocks faster without needing to fully
 validate them, speeding-up block propagation over the network. Of
 course, as this is an over-approximation, this feature cannot be
 considered to provide a safe guarantee that a block will be valid: in
 particular, it does not validate all kinds of operations.
 
-.. _operation_validity_quebec:
+.. _operation_validity_beta:
 
 Operation Validation and Application
 ====================================
@@ -280,7 +280,7 @@ application process for each of the different validation passes.
 
    Expand validity and application for other validation classes.
 
-.. _manager_operations_validity_quebec:
+.. _manager_operations_validity_beta:
 
 Validity of Manager Operations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -292,7 +292,7 @@ suitable for inclusion in a block.
 Validity of Individual Manager Operations
 .........................................
 
-:ref:`Manager operation<manager_operations_quebec>` are a class of
+:ref:`Manager operation<manager_operations_beta>` are a class of
 operations, issued by a single *manager* account which signs the
 operation and pays their fees. The different manager operation kinds
 share several common fields:
@@ -328,7 +328,7 @@ conditions hold:
 Validity of Manager Operation Batches
 .....................................
 
-A :ref:`batch<manager_operations_batches_quebec>` of manager operations
+A :ref:`batch<manager_operations_batches_beta>` of manager operations
 includes one or more manager operations for sequential and atomic
 execution. The atomicity property imposes that the validity of a batch
 should entail the validity of each individual operation in the batch,
@@ -355,7 +355,7 @@ defined as the conjunction of the following conditions:
   solvent to pay the announced fees for all the operations in the
   batch.
 
-.. _manager_operations_application_quebec:
+.. _manager_operations_application_beta:
 
 Application of Manager Operations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

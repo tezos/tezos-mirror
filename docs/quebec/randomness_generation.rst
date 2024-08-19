@@ -46,7 +46,7 @@ if a malicious participant can make sure she is the last revealer, then she
 can choose whether to reveal its committed value, effectively choosing between
 two different predetermined seeds.
 
-.. _vdf_quebec:
+.. _vdf_beta:
 
 Verifiable Delay Function
 ^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -77,7 +77,7 @@ cheaper and based on a weaker security assumption (low order assumption).
 Protocol
 --------
 
-.. _randomness_generation_quebec:
+.. _randomness_generation_beta:
 
 Randomness generation overview
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -114,7 +114,7 @@ iterated revealed nonce.
 
 A *nonce revelation* is an operation and multiple nonce revelations can thus be
 included in a block. A reward ``SEED_NONCE_REVELATION_TIP``, :ref:`potentially adjusted
-by the adaptive issuance coefficient <adaptive_issuance_quebec>`, is given for
+by the adaptive issuance coefficient <adaptive_issuance_beta>`, is given for
 including a revelation. Revelations are free operations which do not compete
 with transactions for block space. Up to ``MAX_ANON_OPS_PER_BLOCK`` revelations,
 wallet activations and denunciations can be contained in any given block.
@@ -137,10 +137,10 @@ solution.
 
 A *VDF revelation* is an operation. A reward ``SEED_NONCE_REVELATION_TIP``,
 :ref:`potentially adjusted by the adaptive issuance coefficient
-<adaptive_issuance_quebec>`, is given for the first correct VDF revelation,
+<adaptive_issuance_beta>`, is given for the first correct VDF revelation,
 subsequent VDF revelation operations being discarded.
 
-.. _rg_constants_quebec:
+.. _rg_constants_beta:
 
 Randomness generation parameters
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
