@@ -181,6 +181,90 @@ module Node = struct
             Lwt.return node)
 end
 
+module Teztale = struct
+  type t = {
+    server_daemon : Process.t;
+    port : int;
+    mutable archivers : Process.t list;
+  }
+
+  let make_configuration ~port =
+    let teztale_sqlite =
+      Format.asprintf
+        "sqlite3:%s/teztale.sqlite"
+        (Filename.get_temp_dir_name ())
+    in
+    Format.asprintf
+      {|
+{
+    "db": "%s",
+    "interfaces": [
+      {
+        "address": "127.0.0.1",
+        "port": %d
+      }
+    ],
+    "admins": [
+      {
+        "login": "admin",
+        "password": "saucisse"
+      }
+    ],
+    "users": [
+      {
+        "login": "user",
+        "password": "saucisse"
+      }
+    ],
+    "with_transaction": "FULL"
+}
+|}
+      teztale_sqlite
+      port
+
+  let run_server
+      ?(path = Uses.(path (make ~tag:"codec" ~path:"./octez-teztale-server")))
+      agent =
+    let runner = Agent.runner agent in
+    let configuration_file =
+      Filename.get_temp_dir_name () // "teztale-config.json"
+    in
+    let port = Agent.next_available_port agent in
+    let configuration = make_configuration ~port in
+    let cmd =
+      Runner.Shell.(
+        redirect_stdout (cmd [] "echo" [configuration]) configuration_file)
+    in
+    let cmd, args = Runner.wrap_with_ssh runner cmd in
+    let* () = Process.spawn cmd args |> Process.check in
+    let* path = Agent.copy agent ~source:path in
+    let server_daemon =
+      Process.spawn ~name:"teztale-server" ~runner path [configuration_file]
+    in
+    (* Wait a bit it starts. *)
+    let* () = Lwt_unix.sleep 0.5 in
+    Lwt.return {server_daemon; port; archivers = []}
+
+  let run_archiver
+      ?(path = Uses.(path (make ~tag:"codec" ~path:"./octez-teztale-archiver")))
+      t agent ~node_port =
+    let runner = Agent.runner agent in
+    let node_endpoint = Format.asprintf "http://127.0.0.1:%d" node_port in
+    let teztale_endpoint =
+      Format.asprintf "http://user:saucisse@127.0.0.1:%d" t.port
+    in
+    let* path = Agent.copy agent ~source:path in
+    let archiver_daemon =
+      Process.spawn
+        ~name:"teztale-archiver"
+        ~runner
+        path
+        ["--endpoint"; node_endpoint; "feed"; teztale_endpoint]
+    in
+    t.archivers <- archiver_daemon :: t.archivers ;
+    Lwt.return_unit
+end
+
 module Cli = struct
   let section =
     Clap.section
@@ -359,6 +443,14 @@ module Cli = struct
 
   let etherlink_dal_slots =
     Clap.list_int ~section ~long:"etherlink-dal-slots" ()
+
+  let teztale =
+    Clap.flag
+      ~section
+      ~set_long:"teztale"
+      ~unset_long:"no-teztale"
+      ~description:"Runs teztale"
+      bootstrap
 end
 
 type configuration = {
@@ -383,6 +475,7 @@ type configuration = {
 type bootstrap = {
   node : Node.t option;
   dal_node : Dal_node.t option;
+  teztale : Teztale.t option;
   node_p2p_endpoint : string;
   node_rpc_endpoint : Endpoint.t;
   dal_node_p2p_endpoint : string;
@@ -1171,6 +1264,18 @@ let init_bootstrap_and_activate_protocol cloud (configuration : configuration)
         port = Node.rpc_port bootstrap_node;
       }
   in
+  let* teztale =
+    if Cli.teztale then
+      let* teztale = Teztale.run_server agent in
+      let* () =
+        Teztale.run_archiver
+          teztale
+          agent
+          ~node_port:(Node.rpc_port bootstrap_node)
+      in
+      Lwt.return_some teztale
+    else Lwt.return_none
+  in
   let (bootstrap : bootstrap) =
     {
       node = Some bootstrap_node;
@@ -1179,6 +1284,7 @@ let init_bootstrap_and_activate_protocol cloud (configuration : configuration)
       node_rpc_endpoint;
       dal_node_p2p_endpoint = Dal_node.point_str dal_bootstrap_node;
       client;
+      teztale;
     }
   in
   Lwt.return
