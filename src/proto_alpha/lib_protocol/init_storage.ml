@@ -207,7 +207,7 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
         return (ctxt, [])
         (* End of Alpha stitching. Comment used for automatic snapshot *)
         (* Start of alpha predecessor stitching. Comment used for automatic snapshot *)
-    | Quebec ->
+    | Beta ->
         let* ctxt =
           Storage.Tenderbake.First_level_of_protocol.update ctxt level
         in
