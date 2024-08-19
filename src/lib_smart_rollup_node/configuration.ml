@@ -4,6 +4,7 @@
 (* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
+(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -567,12 +568,13 @@ let encoding default_display : t Data_encoding.t =
                 ~description:"Smart rollup address"
                 Tezos_crypto.Hashed.Smart_rollup_address.encoding)
              (opt "boot-sector" ~description:"Boot sector" string)
-             (req
+             (dft
                 "smart-rollup-node-operator"
                 ~description:
                   "Operators that sign operations of the smart rollup, by \
                    purpose"
-                Purpose.operators_encoding)
+                Purpose.operators_encoding
+                Purpose.no_operators)
              (dft "rpc-addr" ~description:"RPC address" string default_rpc_addr)
              (dft "rpc-port" ~description:"RPC port" uint16 default_rpc_port)
              (dft
@@ -753,80 +755,81 @@ module Cli = struct
       ~index_buffer_size ~irmin_cache_size ~log_kernel_debug ~no_degraded
       ~gc_frequency ~history_mode ~allowed_origins ~allowed_headers
       ~apply_unsafe_patches ~bail_on_disagree =
-    let open Result_syntax in
-    let* purposed_operator, default_operator =
+    let open Lwt_result_syntax in
+    let*? purposed_operators, default_operator =
       get_purposed_and_default_operators operators
     in
     let* operators =
-      Purpose.make_operator
+      Purpose.make_operators
         ?default_operator
         ~needed_purposes:(purposes_of_mode mode)
-        purposed_operator
+        purposed_operators
     in
     let rpc_addr = Option.value ~default:default_rpc_addr rpc_addr in
     let rpc_port = Option.value ~default:default_rpc_port rpc_port in
     let acl = override_acl ~rpc_addr ~rpc_port default_acl acl_override in
-    let+ () = check_custom_mode mode in
-    {
-      sc_rollup_address;
-      boot_sector_file;
-      operators;
-      rpc_addr;
-      rpc_port;
-      acl;
-      reconnection_delay =
-        Option.value ~default:default_reconnection_delay reconnection_delay;
-      dal_node_endpoint;
-      dac_observer_endpoint;
-      dac_timeout;
-      pre_images_endpoint;
-      metrics_addr;
-      performance_metrics = enable_performance_metrics;
-      fee_parameters = Operation_kind.Map.empty;
-      mode;
-      loser_mode = Option.value ~default:Loser_mode.no_failures loser_mode;
-      apply_unsafe_patches;
-      unsafe_pvm_patches = [];
-      batcher = default_batcher;
-      injector =
-        {
-          retention_period =
-            Option.value
-              ~default:default_injector.retention_period
-              injector_retention_period;
-          attempts =
-            Option.value ~default:default_injector.attempts injector_attempts;
-          injection_ttl =
-            Option.value ~default:default_injector.injection_ttl injection_ttl;
-        };
-      l1_blocks_cache_size = default_l1_blocks_cache_size;
-      l2_blocks_cache_size = default_l2_blocks_cache_size;
-      prefetch_blocks = None;
-      l1_rpc_timeout = default_l1_rpc_timeout;
-      loop_retry_delay = default_loop_retry_delay;
-      index_buffer_size;
-      irmin_cache_size;
-      log_kernel_debug;
-      no_degraded;
-      gc_parameters =
-        {
-          frequency_in_blocks =
-            Option.value
-              ~default:default_gc_parameters.frequency_in_blocks
-              gc_frequency;
-          context_splitting_period = None;
-        };
-      history_mode;
-      cors =
-        Resto_cohttp.Cors.
+    let*? () = check_custom_mode mode in
+    return
+      {
+        sc_rollup_address;
+        boot_sector_file;
+        operators;
+        rpc_addr;
+        rpc_port;
+        acl;
+        reconnection_delay =
+          Option.value ~default:default_reconnection_delay reconnection_delay;
+        dal_node_endpoint;
+        dac_observer_endpoint;
+        dac_timeout;
+        pre_images_endpoint;
+        metrics_addr;
+        performance_metrics = enable_performance_metrics;
+        fee_parameters = Operation_kind.Map.empty;
+        mode;
+        loser_mode = Option.value ~default:Loser_mode.no_failures loser_mode;
+        apply_unsafe_patches;
+        unsafe_pvm_patches = [];
+        batcher = default_batcher;
+        injector =
           {
-            allowed_headers =
-              Option.value ~default:default.allowed_headers allowed_headers;
-            allowed_origins =
-              Option.value ~default:default.allowed_origins allowed_origins;
+            retention_period =
+              Option.value
+                ~default:default_injector.retention_period
+                injector_retention_period;
+            attempts =
+              Option.value ~default:default_injector.attempts injector_attempts;
+            injection_ttl =
+              Option.value ~default:default_injector.injection_ttl injection_ttl;
           };
-      bail_on_disagree;
-    }
+        l1_blocks_cache_size = default_l1_blocks_cache_size;
+        l2_blocks_cache_size = default_l2_blocks_cache_size;
+        prefetch_blocks = None;
+        l1_rpc_timeout = default_l1_rpc_timeout;
+        loop_retry_delay = default_loop_retry_delay;
+        index_buffer_size;
+        irmin_cache_size;
+        log_kernel_debug;
+        no_degraded;
+        gc_parameters =
+          {
+            frequency_in_blocks =
+              Option.value
+                ~default:default_gc_parameters.frequency_in_blocks
+                gc_frequency;
+            context_splitting_period = None;
+          };
+        history_mode;
+        cors =
+          Resto_cohttp.Cors.
+            {
+              allowed_headers =
+                Option.value ~default:default.allowed_headers allowed_headers;
+              allowed_origins =
+                Option.value ~default:default.allowed_origins allowed_origins;
+            };
+        bail_on_disagree;
+      }
 
   let patch_configuration_from_args configuration ~rpc_addr ~rpc_port
       ~acl_override ~metrics_addr ~enable_performance_metrics ~loser_mode
@@ -836,17 +839,17 @@ module Cli = struct
       ~index_buffer_size ~irmin_cache_size ~log_kernel_debug ~no_degraded
       ~gc_frequency ~history_mode ~allowed_origins ~allowed_headers
       ~apply_unsafe_patches ~bail_on_disagree =
-    let open Result_syntax in
+    let open Lwt_result_syntax in
     let mode = Option.value ~default:configuration.mode mode in
-    let* () = check_custom_mode mode in
-    let* purposed_operator, default_operator =
+    let*? () = check_custom_mode mode in
+    let*? purposed_operators, default_operator =
       get_purposed_and_default_operators operators
     in
     let* operators =
-      Purpose.replace_operator
+      Purpose.replace_operators
         ?default_operator
         ~needed_purposes:(purposes_of_mode mode)
-        purposed_operator
+        purposed_operators
         configuration.operators
     in
     let rpc_addr = Option.value ~default:configuration.rpc_addr rpc_addr in
@@ -953,7 +956,7 @@ module Cli = struct
       (* Read configuration from file and patch if user wanted to override
          some fields with values provided by arguments. *)
       let* configuration = load ~data_dir in
-      let*? configuration =
+      let* configuration =
         patch_configuration_from_args
           configuration
           ~rpc_addr
@@ -1006,7 +1009,7 @@ module Cli = struct
                  "Argument --rollup is required when configuration file is not \
                   present.")
       in
-      let*? config =
+      let* config =
         configuration_from_args
           ~rpc_addr
           ~rpc_port

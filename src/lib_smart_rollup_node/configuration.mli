@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
+(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -294,7 +295,7 @@ module Cli : sig
     allowed_headers:string list option ->
     apply_unsafe_patches:bool ->
     bail_on_disagree:bool ->
-    t tzresult
+    t tzresult Lwt.t
 
   val create_or_read_config :
     data_dir:string ->

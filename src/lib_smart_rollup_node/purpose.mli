@@ -4,6 +4,8 @@
 (* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
 (* Copyright (c) 2023 Marigold, <contact@marigold.dev>                       *)
+(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
+(*                                                                           *)
 (*****************************************************************************)
 
 (** Purposes for operators, indicating their role and thus the kinds of
@@ -23,6 +25,8 @@ val all : ex_purpose list
 
 module Map : Map.S with type key = ex_purpose
 
+module Set : Set.S with type elt = ex_purpose
+
 (** Operator type. An operator is either a single key or a list of
    keys. *)
 type 'a operator =
@@ -39,12 +43,7 @@ type ex_operator = Operator : 'a operator -> ex_operator
     operator] are correctly related with [`kind] *)
 type operators = private ex_operator Map.t
 
-type error +=
-  | Missing_operator of ex_purpose
-  | Too_many_operators of {
-      expected_purposes : ex_purpose list;
-      given_operators : operators;
-    }
+type error += Missing_operators of Set.t
 
 (** [to_string_ex_purpose p] returns a string representation of purpose [p]. *)
 val to_string_ex_purpose : ex_purpose -> string
@@ -61,31 +60,34 @@ val of_string_ex_purpose : string -> ex_purpose option
     string [s]. *)
 val of_string_exn_ex_purpose : string -> ex_purpose
 
+(** Empty map of operators. *)
+val no_operators : operators
+
 val operators_encoding : operators Data_encoding.t
 
-(** [make_operator ?default ~needed_purposes operators] constructs a
+(** [make_operators ?default ~needed_purposes operators] constructs a
     purpose map from a list of bindings [operators], with a potential
     [default] key. If [operators] does not cover all purposes of
     [needed_purposes] and does not contains a [default] key then
     fails.*)
-val make_operator :
+val make_operators :
   ?default_operator:Signature.public_key_hash ->
   needed_purposes:ex_purpose list ->
   (ex_purpose * Signature.public_key_hash) list ->
-  operators tzresult
+  operators tzresult Lwt.t
 
-(** [replace_operator ?default_operator ~needed_purposes purposed_keys
+(** [replace_operators ?default_operator ~needed_purposes purposed_keys
     operators] replaces keys of [operators] by [default_operator] if
     it's set or by the purposed key in [purposed_keys]. It does
     nothing if [default_operator] is not set or [purposed_keys] is
     empty. Similar to {!make_operator} the returns [operators]
     contains only mapping of purpose from needed_purposes.*)
-val replace_operator :
+val replace_operators :
   ?default_operator:Signature.public_key_hash ->
   needed_purposes:ex_purpose list ->
   (ex_purpose * Signature.public_key_hash) list ->
   operators ->
-  operators tzresult
+  operators tzresult Lwt.t
 
 (** For each purpose, it returns a list of associated operation
     kinds. *)
