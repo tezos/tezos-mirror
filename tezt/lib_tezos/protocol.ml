@@ -25,13 +25,13 @@
 (*****************************************************************************)
 
 (* Declaration order must respect the version order. *)
-type t = Quebec | ParisC | Alpha
+type t = Beta | ParisC | Alpha
 
-let all = [Quebec; ParisC; Alpha]
+let all = [Beta; ParisC; Alpha]
 
 let encoding =
   Data_encoding.string_enum
-    [("parisc", ParisC); ("alpha", Alpha); ("quebec", Quebec)]
+    [("parisc", ParisC); ("alpha", Alpha); ("beta", Beta)]
 
 type constants =
   | Constants_sandbox
@@ -45,12 +45,12 @@ let constants_to_string = function
   | Constants_mainnet_with_chain_id -> "mainnet-with-chain-id"
   | Constants_test -> "test"
 
-let name = function Alpha -> "Alpha" | Quebec -> "Quebec" | ParisC -> "Parisc"
+let name = function Alpha -> "Alpha" | Beta -> "Beta" | ParisC -> "Parisc"
 
-let number = function ParisC -> 020 | Quebec -> 021 | Alpha -> 022
+let number = function ParisC -> 020 | Beta -> 021 | Alpha -> 022
 
 let directory = function
-  | Quebec -> "proto_021_PtQuebec"
+  | Beta -> "proto_beta"
   | Alpha -> "proto_alpha"
   | ParisC -> "proto_020_PsParisC"
 
@@ -60,7 +60,7 @@ let tag protocol = String.lowercase_ascii (name protocol)
 let hash = function
   | Alpha -> "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
   | ParisC -> "PsParisCZo7KAh1Z1smVd9ZMZ1HHn5gkzbM94V3PLCpknFWhUAi"
-  | Quebec -> "PtQuebeckFQ2o9nDghrNQf6N9qyBM8kHf2daUzEcSPKo1C7B35T"
+  | Beta -> "PtQ2DrEGKLgFVzti6LSwK9c6SHHANWi1Wdzy4X4AY2BGoazwaAW"
 (* DO NOT REMOVE, AUTOMATICALLY ADD STABILISED PROTOCOL HASH HERE *)
 
 let genesis_hash = "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im"
@@ -77,7 +77,10 @@ let parameter_file ?(constants = default_constants) protocol =
   let name = constants_to_string constants in
   sf "src/%s/parameters/%s-parameters.json" (directory protocol) name
 
-let daemon_name = function Alpha -> "alpha" | p -> String.sub (hash p) 0 8
+let daemon_name = function
+  | Alpha -> "alpha"
+  | Beta -> "beta"
+  | p -> String.sub (hash p) 0 8
 
 let protocol_dependent_uses ~tag ~path =
   let make protocol =
@@ -97,6 +100,7 @@ let baker = protocol_dependent_uses ~tag:"baker_" ~path:"./octez-baker-"
 
 let encoding_prefix = function
   | Alpha -> "alpha"
+  | Beta -> "beta"
   | p -> sf "%03d-%s" (number p) (String.sub (hash p) 0 8)
 
 type parameter_overrides =
@@ -271,8 +275,8 @@ let write_parameter_file :
   Lwt.return output_file
 
 let previous_protocol = function
-  | Alpha -> Some Quebec
-  | Quebec -> Some ParisC
+  | Alpha -> Some Beta
+  | Beta -> Some ParisC
   | ParisC -> None
 
 let has_predecessor p = previous_protocol p <> None
