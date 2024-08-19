@@ -136,6 +136,7 @@ function usage() {
   h="${green}-h${reset}"
   s="${green}-s${reset}"
   p="${green}-p${reset}"
+  c="${green}-c${reset}"
   a="${green}-a${reset}"
   from="${green}--from${reset}"
   to="${green}--to${reset}"
@@ -144,10 +145,12 @@ function usage() {
   stabilise="${green}--stabilise${reset}"
   snapshot="${green}--snapshot${reset}"
   hash="${green}--hash${reset}"
+  copy="${green}--copy${reset}"
   ## colored vars
   alpha="${red}alpha${reset}"
   beta="${red}beta${reset}"
   stockholm_023="${red}stockholm_023${reset}"
+  stockholm="${magenta}stockholm${reset}"
   script=${blue}$0${reset}
 
   echo -e "
@@ -161,6 +164,8 @@ ${red}Options:${reset}
     Snapshot a protocol.
   ${hash}
     Updates the hash of a protocol.
+  ${c}, ${copy}
+    Copy a protocol.
   ${f}, ${from} ${red}<protocol_source>${reset}
     The source protocol to stabilise or snapshot.
   ${t}, ${to} ${red}<protocol_target>${reset}
@@ -182,6 +187,11 @@ ${yellow}tl;dr:${reset}
   ${script} ${hash} ${f} ${beta}
   or
   ${script} ${hash} ${from} ${beta}
+
+- To copy stockholm_023 known as stockholm into beta and link it in the node, client and codec:
+  ${script} ${copy} ${from} ${stockholm_023} ${as} ${stockholm} ${to} ${beta}
+  or
+  ${script} ${c} ${f} ${stockholm_023} ${a} ${stockholm} ${t} ${beta}
 "
 }
 
@@ -202,6 +212,10 @@ while true; do
     ;;
   --hash)
     command="hash"
+    shift
+    ;;
+  -c | --copy)
+    command="copy"
     shift
     ;;
   -f | --from)
@@ -234,10 +248,10 @@ fi
 
 ## ensure command is known
 case ${command} in
-stabilise | snapshot | hash) ;;
+stabilise | snapshot | hash | copy) ;;
 *)
   error "Unknown command: ${command}" 1>&2
-  error "Command should be one of stabilise, snapshot or hash" 1>&2
+  error "Command should be one of stabilise, snapshot, hash or copy" 1>&2
   usage 1>&2
   print_and_exit 1 "${LINENO}"
   ;;
@@ -250,7 +264,7 @@ if [[ -z ${protocol_source} ]]; then
 fi
 
 case ${command} in
-stabilise | snapshot)
+stabilise | snapshot | copy)
   if [[ -z ${protocol_target} ]]; then
     error "No protocol target specified" 1>&2
     usage 1>&2
@@ -282,7 +296,7 @@ fi
 
 log_blue "${msg}."
 
-# Check if the protocol_target source exists
+# Check if the protocol source exists
 if [[ ! -d "src/proto_${protocol_source}" ]]; then
   error "'src/proto_${protocol_source}'" "does not exist" 1>&2
   print_and_exit 1 "${LINENO}"
@@ -303,6 +317,23 @@ if [[ ${command} == "stabilise" ]]; then
   fi
 fi
 
+# if copy command is used, protocol_source should be of the form [0-9][0-9][0-9]_P[A-Za-z]+
+if [[ ${command} == "copy" ]]; then
+  if ! [[ ${protocol_source} =~ ^[0-9][0-9][0-9]_P[A-Za-z]+$ ]]; then
+    error "To ${yellow}copy${red}, protocol_source should be of the form [0-9][0-9][0-9]_P[A-Za-z]+" 1>&2
+    print_and_exit 1 "${LINENO}"
+  fi
+  if ! [[ ${protocol_target} =~ ^[a-z]+[0-9]*$ ]]; then
+    error "To ${yellow}copy${red}, protocol_target should be of the form [a-z]+[0-9]+" 1>&2
+    print_and_exit 1 "${LINENO}"
+  fi
+  if [[ -z ${source_label} ]]; then
+    error "No source label specified" 1>&2
+    usage 1>&2
+    print_and_exit 1 "${LINENO}"
+  fi
+fi
+
 # if snapshot_command is used, protocol_target should be of the form [a-z]+_[0-9][0-9][0-9]
 if [[ ${command} == "snapshot" ]]; then
   if ! [[ ${protocol_source} =~ ^[a-z]+[0-9]*$ ]]; then
@@ -313,10 +344,16 @@ if [[ ${command} == "snapshot" ]]; then
     error "To ${red}snapshot${reset}, protocol_target should be of the form [a-z]+_[0-9][0-9][0-9]" 1>&2
     clean_and_exit 1 "${LINENO}"
   fi
-  # warn if source_label is given that it will not be used
+  warn if source_label is given that it will not be used
   if [[ -n ${source_label} ]]; then
     warning "source_label will not be used for stabilisation"
   fi
+fi
+
+# check if ./octez-protocol-compiler is present
+if [[ ! -f "./octez-protocol-compiler" ]]; then
+  error "octez-protocol-compiler" "not found, compile it before running this script" 1>&2
+  print_and_exit 1 "${LINENO}"
 fi
 
 rm -rf /tmp/tezos_proto_snapshot
@@ -397,13 +434,19 @@ function sanity_check_before_script() {
     print_and_exgxit 1 "${LINENO}"
   fi
 
-  if ! [[ -d "docs/${protocol_source}" ]]; then
-    error "'docs/${protocol_source}'" "does not exist" 1>&2
-    print_and_exit 1 "${LINENO}"
+  if [[ ${command} == "copy" ]]; then
+    if ! [[ -d "docs/${source_label}" ]]; then
+      error "'docs/${source_label}'" "does not exist" 1>&2
+      print_and_exit 1 "${LINENO}"
+    fi
+  else
+    if ! [[ -d "docs/${protocol_source}" ]]; then
+      error "'docs/${protocol_source}'" "does not exist" 1>&2
+      print_and_exit 1 "${LINENO}"
+    fi
   fi
-
   case ${command} in
-  stabilise | snapshot)
+  stabilise | snapshot | copy)
     if [[ -d "src/proto_${version}" ]]; then
       error "'src/proto_${version}'" "already exists, you should remove it."
       print_and_exit 1 "${LINENO}"
@@ -437,6 +480,14 @@ function copy_source() {
   #delete all dune files in src/proto_${version} containing the line "; This file was automatically generated, do not edit."
   find "src/proto_${version}" -name dune -exec grep -q "; This file was automatically generated, do not edit." {} \; -exec rm {} \;
   commit_no_hooks "src: copy from ${protocol_source}"
+
+  if [[ ${command} == "copy" ]]; then
+    protocol_source_original="${protocol_source}"
+    #use first part of protocol_source + source_label as new protocol_source (e.g. 023_PtStockholm + stockholm -> stockholm_023)
+    protocol_source=$(echo "${protocol_source}" | cut -d'_' -f1)
+    protocol_source="${source_label}_${protocol_source}"
+    log_blue "protocol_source is now ${protocol_source}"
+  fi
 
   # set current version
   # Starting from 018 the version value moved to `constants_repr`. To be
@@ -473,6 +524,11 @@ function copy_source() {
   commit_no_hooks "src: adapt ${capitalized_label} predecessors"
 
   cd ../../..
+
+  if [[ ${command} == "copy" ]]; then
+    sed -i 's/Vanity nonce: .* /Vanity nonce: TBD /' "src/proto_${version}/lib_protocol/main.ml"
+    commit_if_changes "src: restore default vanity nonce"
+  fi
 
   log_cyan "Computing hash"
   long_hash=$(./octez-protocol-compiler -hash-only "src/proto_${version}/lib_protocol")
@@ -542,6 +598,11 @@ function copy_source() {
     new_versioned_name="${label}"
   fi
 
+  # switch protocol_source with protocol_source_original if it was changed
+  if [[ ${command} == "copy" ]]; then
+    protocol_source="${protocol_source_original}"
+  fi
+
   cd "src/proto_${new_protocol_name}"
   # rename main_*.ml{,i} files of the binaries
   find . -name main_\*_"${protocol_source}".ml -or -name main_\*_"${protocol_source}".mli | while read -r file; do
@@ -570,7 +631,12 @@ function copy_source() {
   commit_no_hooks "src: add protocol to final_protocol_versions"
   cd ../../..
 
-  if [[ ${is_snapshot} == true ]]; then
+  if [[ ${command} == "copy" ]]; then
+    cp "src/proto_alpha/README.md" "src/proto_${label}/README.md"
+    commit_no_hooks "src: copy alpha/README"
+    sed -i "s/alpha/${label}/g" "src/proto_${label}/README.md"
+    commit_no_hooks "src: rename protocol in the README"
+  elif [[ ${is_snapshot} == true ]]; then
     rm "src/proto_${new_protocol_name}/README.md"
     commit_no_hooks "src: remove README"
   else
@@ -581,6 +647,8 @@ function copy_source() {
   echo -e "\e[33mLinking protocol in the node, client and codec\e[0m"
   if [[ ${is_snapshot} == true ]]; then
     sed "s/let _${protocol_source} = active .*/  let _${version}_${short_hash} = active (Name.v \"${short_hash}\" ${version})\n/" -i manifest/product_octez.ml
+  elif [[ ${command} == "copy" ]]; then
+    sed "/let alpha = active (Name.dev \"alpha\")/i \  let _${label} = active (Name.dev \"${label}\")\n" -i manifest/product_octez.ml
   else
     sed "/let *${protocol_source} = active (Name.dev \"${protocol_source}\")/i \  let _${label} = active (Name.dev \"${label}\")\n" -i manifest/product_octez.ml
   fi
@@ -647,18 +715,25 @@ function update_protocol_tests() {
 
   else
     sed "/Proto_alpha -> \"Proto_alpha\"/i \  | ${capitalized_label} -> \"${capitalized_label}\"" -i.old src/lib_scoru_wasm/test/test_protocol_migration.ml
-
-    sed -r "s/\((V.*, V.*,) Proto_${protocol_source}\);/ \(\1 Proto_${protocol_source}\); \(\1 ${capitalized_label});/" -i.old src/lib_scoru_wasm/test/test_protocol_migration.ml
-
+    if [[ ${command} == "copy" ]]; then
+      sed -r "s/\((V.*, V.*,) ${capitalized_source}\);/ \(\1 ${capitalized_source}\); \(\1 ${capitalized_label});/" -i.old src/lib_scoru_wasm/test/test_protocol_migration.ml
+    else
+      sed -r "s/\((V.*, V.*,) Proto_${protocol_source}\);/ \(\1 Proto_${protocol_source}\); \(\1 ${capitalized_label});/" -i.old src/lib_scoru_wasm/test/test_protocol_migration.ml
+    fi
     ocamlformat -i src/lib_scoru_wasm/test/test_protocol_migration.ml
 
     sed -r "s/(type protocol =.*)/\1 | ${capitalized_label}/" -i.old src/lib_scoru_wasm/pvm_input_kind.ml
     sed -r "s/(type protocol =.*)/\1 | ${capitalized_label}/" -i.old src/lib_scoru_wasm/pvm_input_kind.mli
-
-    sed "/let proto_${protocol_source}_name = .*/i \let proto_${label}_name = \"${label}\"" -i.old src/lib_scoru_wasm/constants.ml
-    sed "/| payload when String.equal payload Constants.proto_${protocol_source}_name ->/i \  | payload when String.equal payload Constants.proto_${label}_name -> Some (Protocol_migration $capitalized_label)" -i.old src/lib_scoru_wasm/pvm_input_kind.ml
-    sed -r "s/(Data_encoding.\(Binary.to_string_exn string Constants.proto_${protocol_source}_name\))/\1 | ${capitalized_label} ->Data_encoding.(Binary.to_string_exn string Constants.proto_beta_name)/" -i.old src/lib_scoru_wasm/pvm_input_kind.ml
-
+    if [[ ${command} == "copy" ]]; then
+      sed "/let proto_${source_label}_name = .*/i \let proto_${label}_name = \"${label}\"" -i.old src/lib_scoru_wasm/constants.ml
+      sed "/| payload when String.equal payload Constants.proto_${source_label}_name ->/i \  | payload when String.equal payload Constants.proto_${label}_name -> Some (Protocol_migration $capitalized_label)" -i.old src/lib_scoru_wasm/pvm_input_kind.ml
+      sed -r "s/(Data_encoding.\(Binary.to_string_exn string Constants.proto_${source_label}_name\))/\1 | ${capitalized_label} ->Data_encoding.(Binary.to_string_exn string Constants.proto_beta_name)/" -i.old src/lib_scoru_wasm/pvm_input_kind.ml
+      sed -r "s/${capitalized_source} -> (V.*)/ ${capitalized_source} -> \1 | ${capitalized_label} -> \1/" -i.old src/lib_scoru_wasm/wasm_vm.ml
+    else
+      sed "/let proto_${protocol_source}_name = .*/i \let proto_${label}_name = \"${label}\"" -i.old src/lib_scoru_wasm/constants.ml
+      sed "/| payload when String.equal payload Constants.proto_${protocol_source}_name ->/i \  | payload when String.equal payload Constants.proto_${label}_name -> Some (Protocol_migration $capitalized_label)" -i.old src/lib_scoru_wasm/pvm_input_kind.ml
+      sed -r "s/(Data_encoding.\(Binary.to_string_exn string Constants.proto_${protocol_source}_name\))/\1 | ${capitalized_label} ->Data_encoding.(Binary.to_string_exn string Constants.proto_beta_name)/" -i.old src/lib_scoru_wasm/pvm_input_kind.ml
+    fi
     ocamlformat -i src/lib_scoru_wasm/constants.ml
     ocamlformat -i src/lib_scoru_wasm/pvm_input_kind.ml
     ocamlformat -i src/lib_scoru_wasm/pvm_input_kind.mli
@@ -667,11 +742,17 @@ function update_protocol_tests() {
 
   commit_no_hooks "scoru: update scoru_wasm protocol_migration"
 
-  sed -e "s/Proto_${protocol_source}/${capitalized_label}/g" \
-    -e "s/\(Protocol_migration ${capitalized_source}\)/(Protocol_migration ${capitalized_label})/g" \
-    -e "s/Tezos_scoru_wasm.Constants.proto_${protocol_source}_name/Tezos_scoru_wasm.Constants.proto_${label}_name/g" \
-    -i.old "src/proto_${new_protocol_name}/lib_protocol/test/unit/test_sc_rollup_wasm.ml"
-
+  if [[ ${command} == "copy" ]]; then
+    sed -e "s/Proto_${protocol_source}/${capitalized_label}/g" \
+      -e "s/\(Protocol_migration ${capitalized_source}\)/(Protocol_migration ${capitalized_label})/g" \
+      -e "s/Tezos_scoru_wasm.Constants.proto_${source_label}_name/Tezos_scoru_wasm.Constants.proto_${label}_name/g" \
+      -i.old "src/proto_${new_protocol_name}/lib_protocol/test/unit/test_sc_rollup_wasm.ml"
+  else
+    sed -e "s/Proto_${protocol_source}/${capitalized_label}/g" \
+      -e "s/\(Protocol_migration ${capitalized_source}\)/(Protocol_migration ${capitalized_label})/g" \
+      -e "s/Tezos_scoru_wasm.Constants.proto_${protocol_source}_name/Tezos_scoru_wasm.Constants.proto_${label}_name/g" \
+      -i.old "src/proto_${new_protocol_name}/lib_protocol/test/unit/test_sc_rollup_wasm.ml"
+  fi
   ocamlformat -i "src/proto_${new_protocol_name}/lib_protocol/test/unit/test_sc_rollup_wasm.ml"
   commit_no_hooks "sc_rollup: update proto_${new_protocol_name}/test/unit/test_sc_rollup_wasm"
 
@@ -681,18 +762,21 @@ function update_source() {
 
   log_blue "update teztale"
   #  Teztale
+  source_short_hash=$(echo "${protocol_source}" | cut -d'_' -f2)
   if [[ ${is_snapshot} == true ]]; then
-    git mv "teztale/bin_teztale_archiver/${protocol_source}_machine.real.ml" "teztale/bin_teztale_archiver/${short_hash}_machine.real.ml"
+    git mv "teztale/bin_teztale_archiver/${source_short_hash}_machine.real.ml" "teztale/bin_teztale_archiver/${short_hash}_machine.real.ml"
     sed -e "s/${protocol_source}/${new_protocol_name}/g" -i.old "teztale/bin_teztale_archiver/${short_hash}_machine.real.ml"
     sed -e "s/${protocol_source}/${version}/g" \
       -e "s/${capitalized_source}/${short_hash}/g" -i.old "teztale/bin_teztale_archiver/teztale_archiver_main.ml"
+    ocamlformat -i "teztale/bin_teztale_archiver/${short_hash}_machine.real.ml"
   else
-    git mv "teztale/bin_teztale_archiver/${protocol_source}_machine.real.ml" "teztale/bin_teztale_archiver/${label}_machine.real.ml"
+    cp "teztale/bin_teztale_archiver/${source_short_hash}_machine.real.ml" "teztale/bin_teztale_archiver/${label}_machine.real.ml"
+    git add "teztale/bin_teztale_archiver/${label}_machine.real.ml"
     sed -e "s/${protocol_source}/${label}/g" -i.old "teztale/bin_teztale_archiver/${label}_machine.real.ml"
     sed -e "s/${protocol_source}/${version}/g" \
       -e "s/${capitalized_source}/${short_hash}/g" -i.old "teztale/bin_teztale_archiver/teztale_archiver_main.ml"
+    ocamlformat -i "teztale/bin_teztale_archiver/${label}_machine.real.ml"
   fi
-  ocamlformat -i "teztale/bin_teztale_archiver/${short_hash}_machine.real.ml"
   ocamlformat -i "teztale/bin_teztale_archiver/teztale_archiver_main.ml"
   commit_if_changes "teztale: update teztale_archiver_main.ml"
 
@@ -715,11 +799,21 @@ function update_source() {
 
   log_blue "fix prepare_first_block"
 
-  if [[ ${is_snapshot} == true ]]; then
+  if [[ ${is_snapshot} == true ]] || [[ ${command} == "copy" ]]; then
+    if [[ ${command} == "copy" ]]; then
+      protocol_source_original="${protocol_source}"
+      #use first part of protocol_source + source_label as new protocol_source (e.g. 023_PtStockholm + stockholm -> stockholm_023)
+      protocol_source=$(echo "${protocol_source}" | cut -d'_' -f1)
+      protocol_source="${source_label}_${protocol_source}"
+      log_blue "protocol_source is now ${protocol_source}"
 
-    sed -i.old -e "s/s = \"${protocol_source}\"/s = \"${label}_${version}\"/g" \
-      "src/proto_alpha/lib_protocol/raw_context.ml"
-
+      sed -i.old -e "s/s = \"${protocol_source}\"/s = \"${label}\"/g" \
+        "src/proto_alpha/lib_protocol/raw_context.ml"
+      protocol_source="${protocol_source_original}"
+    else
+      sed -i.old -e "s/s = \"${protocol_source}\"/s = \"${label}_${version}\"/g" \
+        "src/proto_alpha/lib_protocol/raw_context.ml"
+    fi
     sed -i.old -e "s/${capitalized_source}/${capitalized_label}/g" \
       -e "s/${protocol_source}/${label}/g" "src/proto_alpha/lib_protocol/raw_context.ml"
     ocamlformat -i "src/proto_alpha/lib_protocol/raw_context.ml"
@@ -863,18 +957,24 @@ function update_tezt_tests() {
     #source=Alpha; echo "let number = function ParisC -> 020 | Alpha -> 021" |sed -r 's/(.*) '$source' -> ([0-9][0-9][0-9])/printf "\1 Beta -> \2 | '$source' -> %03i" "$(echo \2+1 | bc)"/ge'
     # shellcheck disable=SC2086
     # shellcheck disable=SC2016
-
-    sed -r 's/(.*) '${capitalized_source}' -> ([0-9][0-9][0-9])/printf "\1 '${capitalized_label}' -> \2 | '${capitalized_source}' -> %03i" "$(echo \2+1 | bc)"/ge' -i.old tezt/lib_tezos/protocol.ml
-
+    if [[ ${command} == "copy" ]]; then
+      sed -i.old -e "s/Alpha -> \"alpha\"/Alpha -> \"alpha\" | ${capitalized_label} -> \"${label}\"/g" tezt/lib_tezos/protocol.ml
+      sed -r 's/(.*) '${capitalized_source}' -> ([0-9][0-9][0-9])/\1 '${capitalized_source}' -> \2 | '${capitalized_label}' -> \2/' -i.old tezt/lib_tezos/protocol.ml
+    else
+      sed -r 's/(.*) '${capitalized_source}' -> ([0-9][0-9][0-9])/printf "\1 '${capitalized_label}' -> \2 | '${capitalized_source}' -> %03i" "$(echo \2+1 | bc)"/ge' -i.old tezt/lib_tezos/protocol.ml
+    fi
     sed "/| ${capitalized_source} -> \"proto_${protocol_source}\"/i | ${capitalized_label} -> \"proto_${label}\"\n" -i.old tezt/lib_tezos/protocol.ml
 
     # add $(capitalized_label) -> "$long_hash" before "(* DO NOT REMOVE, AUTOMATICALLY ADD STABILISED PROTOCOL HASH HERE *)"
     sed "/\(\* DO NOT REMOVE, AUTOMATICALLY ADD STABILISED PROTOCOL HASH HERE \*\)/i \ | ${capitalized_label} -> \"${long_hash}\"" -i.old tezt/lib_tezos/protocol.ml
 
-    sed -r "s/(.*) ${capitalized_source} -> Some (.*)/\1 ${capitalized_source} -> Some ${capitalized_label} | ${capitalized_label} -> Some \2/g" -i.old tezt/lib_tezos/protocol.ml
-
+    if [[ ${command} == "copy" ]]; then
+      sed -r "s/(.*) Alpha -> Some (.*)/\1 Alpha -> Some ${capitalized_label}/g" -i.old tezt/lib_tezos/protocol.ml
+      sed -r "s/(.*) ${capitalized_source} -> Some (.*)/\1 ${capitalized_source} -> Some \2 | ${capitalized_label} -> Some \2/g" -i.old tezt/lib_tezos/protocol.ml
+    else
+      sed -r "s/(.*) ${capitalized_source} -> Some (.*)/\1 ${capitalized_source} -> Some ${capitalized_label} | ${capitalized_label} -> Some \2/g" -i.old tezt/lib_tezos/protocol.ml
+    fi
     sed -i.old -e "s/type t = / type t =  ${capitalized_label} | /g" tezt/lib_tezos/protocol.mli
-
   fi
   ocamlformat -i tezt/lib_tezos/protocol.ml
   ocamlformat -i tezt/lib_tezos/protocol.mli
@@ -896,6 +996,9 @@ function update_tezt_tests() {
   if [[ ${is_snapshot} == true ]]; then
     git mv tezt/tests/encoding_samples/"${protocol_source}"/* tezt/tests/encoding_samples/"${label}"
     commit "tezt: move ${protocol_source} encoding samples to ${label}"
+  elif [[ ${command} == "copy" ]]; then
+    cp -r tezt/tests/encoding_samples/"${source_label}"/* tezt/tests/encoding_samples/"${label}"
+    commit "tezt: move ${source_label} encoding samples to ${label}"
   else
     cp -r tezt/tests/encoding_samples/"${protocol_source}"/* tezt/tests/encoding_samples/"${label}"
     commit "tezt: copy ${protocol_source} encoding samples to ${label}"
@@ -938,6 +1041,9 @@ function update_tezt_tests() {
       sed -i.old -e "s/${protocol_source}/${version}-${short_hash}/g" "${NEW_FILENAME}"
     else
       sed -i.old -e "s/${protocol_source}/${label}/g" "${NEW_FILENAME}"
+    fi
+    if [[ ${command} == "copy" ]]; then
+      sed -i.old -e "s/${version}-${short_hash}/${label}/g" "${NEW_FILENAME}"
     fi
 
     #replace all occurences of old hash with new hash
@@ -1029,7 +1135,11 @@ function misc_updates() {
 
 function generate_doc() {
 
-  doc_path="${protocol_source}"
+  if [[ ${command} == "copy" ]]; then
+    doc_path="${source_label}"
+  else
+    doc_path="${protocol_source}"
+  fi
 
   # Create docs
   if [[ ${is_snapshot} == true ]]; then
@@ -1047,21 +1157,40 @@ function generate_doc() {
   # fix versioned links (in labels, references, and paths) in docs
   echo "Fixing versioned links in docs"
   cd "docs/${label}"
-
-  find . -name \*.rst -exec \
-    sed -i.old \
-    -e "s,src/proto_${protocol_source},src/proto_${new_protocol_name},g" \
-    -e "s,tezos-protocol-${tezos_protocol_source}/,tezos-protocol-${new_tezos_protocol}/,g" \
-    -e "s,raw_protocol_${protocol_source}/,raw_protocol_${new_protocol_name}/,g" \
-    -e "s/_${protocol_source}:/_${label}:/g" \
-    -e "s/_${protocol_source}>/_${label}>/g" \
-    -e "s/_${protocol_source}\`/_${label}\`/g" \
-    -e "s/-${protocol_source}.html/-${label}.html/g" \
-    \{\} \;
-
+  if [[ ${command} == "copy" ]]; then
+    find . -name \*.rst -exec \
+      sed -i.old \
+      -e "s,src/proto_${protocol_source},src/proto_${new_protocol_name},g" \
+      -e "s,tezos-protocol-${tezos_protocol_source}/,tezos-protocol-${new_tezos_protocol}/,g" \
+      -e "s,raw_protocol_${protocol_source}/,raw_protocol_${new_protocol_name}/,g" \
+      -e "s/_${source_label}:/_${label}:/g" \
+      -e "s/_${source_label}>/_${label}>/g" \
+      -e "s/_${source_label}\`/_${label}\`/g" \
+      -e "s/-${source_label}.html/-${label}.html/g" \
+      \{\} \;
+  else
+    find . -name \*.rst -exec \
+      sed -i.old \
+      -e "s,src/proto_${protocol_source},src/proto_${new_protocol_name},g" \
+      -e "s,tezos-protocol-${tezos_protocol_source}/,tezos-protocol-${new_tezos_protocol}/,g" \
+      -e "s,raw_protocol_${protocol_source}/,raw_protocol_${new_protocol_name}/,g" \
+      -e "s/_${protocol_source}:/_${label}:/g" \
+      -e "s/_${protocol_source}>/_${label}>/g" \
+      -e "s/_${protocol_source}\`/_${label}\`/g" \
+      -e "s/-${protocol_source}.html/-${label}.html/g" \
+      \{\} \;
+  fi
   commit "docs: fix versioned links"
 
   cd ../..
+
+  if [[ ${command} == "copy" ]]; then
+    protocol_source_original="${protocol_source}"
+    #use first part of protocol_source + source_label as new protocol_source (e.g. 023_PtStockholm + stockholm -> stockholm_023)
+    protocol_source=$(echo "${protocol_source}" | cut -d'_' -f1)
+    protocol_source="${protocol_source}_${source_label}"
+    log_blue "protocol_source is now ${protocol_source}"
+  fi
 
   # generate docs/protocols/${new_versioned_name}.rst from docs/protocols/${protocol_source}.rst
   echo "Copying docs/protocols/${protocol_source}.rst to docs/protocols/${new_versioned_name}.rst"
@@ -1072,7 +1201,14 @@ function generate_doc() {
     cp "docs/protocols/${protocol_source}.rst" "docs/protocols/${new_versioned_name}.rst"
     commit "docs: copy docs/protocols/${protocol_source}.rst to docs/protocols/${new_versioned_name}.rst"
   fi
-
+  if [[ ${command} == "copy" ]]; then
+    sed -e "s/^Protocol ${capitalized_source}/Protocol ${capitalized_label}/" \
+      -e "s/protocol ${capitalized_source}/protocol ${capitalized_label}/" \
+      -e "s,src/proto_${protocol_source},src/proto_${new_protocol_name},g" \
+      -e "s/${source_label}/${label}/g" \
+      -i "docs/protocols/${new_versioned_name}.rst"
+    protocol_source="${protocol_source_original}"
+  fi
   sed -e "s/^Protocol ${capitalized_source}/Protocol ${capitalized_label}/" \
     -e "s/protocol ${capitalized_source}/protocol ${capitalized_label}/" \
     -e "s,src/proto_${protocol_source},src/proto_${new_protocol_name},g" \
@@ -1157,7 +1293,11 @@ function generate_doc() {
 function snapshot_protocol() {
   capitalized_label=$(tr '[:lower:]' '[:upper:]' <<< "${label:0:1}")${label:1}
 
-  capitalized_source=$(tr '[:lower:]' '[:upper:]' <<< "${protocol_source:0:1}")${protocol_source:1}
+  if [[ ${command} == "copy" ]]; then
+    capitalized_source=$(tr '[:lower:]' '[:upper:]' <<< "${source_label:0:1}")${source_label:1}
+  else
+    capitalized_source=$(tr '[:lower:]' '[:upper:]' <<< "${protocol_source:0:1}")${protocol_source:1}
+  fi
   #replace _ with - in protocol_source
   tezos_protocol_source=$(echo "${protocol_source}" | tr '_' '-')
 
@@ -1531,7 +1671,7 @@ function hash() {
       echo "Press y to continue or n to stop"
       read -r continue
       if [[ ${continue} != "y" ]]; then
-        rm -rf proto_to_hash.txt
+        rm -f proto_to_hash.txt
         print_and_exit 1 "${LINENO}"
       else
         echo "Continuing with the current hash"
@@ -1876,6 +2016,11 @@ hash)
   capitalized_label=$(tr '[:lower:]' '[:upper:]' <<< "${source_label:0:1}")${source_label:1}
   capitalized_source="${capitalized_label}"
   hash
+  ;;
+copy)
+  label=${protocol_target}
+  version=${protocol_target}
+  snapshot_protocol "${protocol_source}" "${protocol_target}"
   ;;
 esac
 
