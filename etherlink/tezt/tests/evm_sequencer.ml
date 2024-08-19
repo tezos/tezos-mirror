@@ -5779,6 +5779,126 @@ let test_trace_transaction_calltracer_on_simple_transfer =
   in
   unit
 
+let test_trace_transaction_calltracer_precompiles =
+  register_all
+    ~kernels:[Latest]
+    ~tags:["evm"; "rpc"; "trace"; "call_trace"; "precompiles"]
+    ~title:"debug_traceTransaction with calltracer can trace precompiles"
+    ~da_fee:Wei.zero
+    ~maximum_allowed_ticks:100_000_000_000_000L
+  @@ fun {sc_rollup_node; sequencer; client; proxy; _} _protocol ->
+  let endpoint = Evm_node.endpoint sequencer in
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let* precompiles = Solidity_contracts.precompiles () in
+  let* () = Eth_cli.add_abi ~label:precompiles.label ~abi:precompiles.abi () in
+  let* contract_address, _ =
+    send_transaction_to_sequencer
+      (fun () ->
+        Eth_cli.deploy
+          ~source_private_key:sender.Eth_account.private_key
+          ~endpoint
+          ~abi:precompiles.label
+          ~bin:precompiles.bin)
+      sequencer
+  in
+  let* () =
+    repeat 2 (fun () ->
+        next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client)
+  in
+  let* () = bake_until_sync ~sequencer ~sc_rollup_node ~proxy ~client () in
+  let* transaction_hash =
+    send_transaction_to_sequencer
+      (Eth_cli.contract_send
+         ~source_private_key:sender.private_key
+         ~endpoint
+         ~abi_label:precompiles.label
+         ~address:contract_address
+         ~method_call:"callPrecompiles()")
+      sequencer
+  in
+  let* () =
+    repeat 2 (fun () ->
+        next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client)
+  in
+  let* () = bake_until_sync ~sequencer ~sc_rollup_node ~proxy ~client () in
+  let*@ trace_result =
+    Rpc.trace_transaction
+      ~tracer:"callTracer"
+      ~transaction_hash
+      ~tracer_config:[("withLog", `Bool false); ("onlyTopCall", `Bool false)]
+      sequencer
+  in
+  let call_list = JSON.(trace_result |-> "calls" |> as_list) in
+  Check.(
+    (JSON.(trace_result |-> "type" |> as_string) = "CALL")
+      string
+      ~error_msg:"Wrong type, expected %R but got %L") ;
+  (* All precompiles from 0x00..01 to 0x00..09. *)
+  Check.(
+    (List.length call_list = 9)
+      int
+      ~error_msg:"Wrong call list size, expected %R but got %L") ;
+  List.iteri
+    (fun position call ->
+      match position with
+      | 0 ->
+          Check.(
+            (JSON.(call |-> "to" |> as_string)
+            = "0x0000000000000000000000000000000000000001")
+              string
+              ~error_msg:"Wrong precompiled contract, expected %R but got %L")
+      | 1 ->
+          Check.(
+            (JSON.(call |-> "to" |> as_string)
+            = "0x0000000000000000000000000000000000000002")
+              string
+              ~error_msg:"Wrong precompiled contract, expected %R but got %L")
+      | 2 ->
+          Check.(
+            (JSON.(call |-> "to" |> as_string)
+            = "0x0000000000000000000000000000000000000003")
+              string
+              ~error_msg:"Wrong precompiled contract, expected %R but got %L")
+      | 3 ->
+          Check.(
+            (JSON.(call |-> "to" |> as_string)
+            = "0x0000000000000000000000000000000000000004")
+              string
+              ~error_msg:"Wrong precompiled contract, expected %R but got %L")
+      | 4 ->
+          Check.(
+            (JSON.(call |-> "to" |> as_string)
+            = "0x0000000000000000000000000000000000000005")
+              string
+              ~error_msg:"Wrong precompiled contract, expected %R but got %L")
+      | 5 ->
+          Check.(
+            (JSON.(call |-> "to" |> as_string)
+            = "0x0000000000000000000000000000000000000006")
+              string
+              ~error_msg:"Wrong precompiled contract, expected %R but got %L")
+      | 6 ->
+          Check.(
+            (JSON.(call |-> "to" |> as_string)
+            = "0x0000000000000000000000000000000000000007")
+              string
+              ~error_msg:"Wrong precompiled contract, expected %R but got %L")
+      | 7 ->
+          Check.(
+            (JSON.(call |-> "to" |> as_string)
+            = "0x0000000000000000000000000000000000000008")
+              string
+              ~error_msg:"Wrong precompiled contract, expected %R but got %L")
+      | 8 ->
+          Check.(
+            (JSON.(call |-> "to" |> as_string)
+            = "0x0000000000000000000000000000000000000009")
+              string
+              ~error_msg:"Wrong precompiled contract, expected %R but got %L")
+      | _ -> failwith "Impossible case, call list's size should be 9")
+    call_list ;
+  unit
+
 let test_miner =
   let sequencer_pool_address =
     String.lowercase_ascii "0x8aaD6553Cf769Aa7b89174bE824ED0e53768ed70"
@@ -6468,6 +6588,7 @@ let () =
   test_trace_transaction_call_trace_revert protocols ;
   test_trace_transaction_calltracer_multiple_txs protocols ;
   test_trace_transaction_calltracer_on_simple_transfer protocols ;
+  test_trace_transaction_calltracer_precompiles protocols ;
   test_debug_print_store_schemas () ;
   test_man () ;
   test_outbox_size_limit_resilience ~slow:true protocols ;
