@@ -144,7 +144,9 @@ module Rpc = struct
 end
 
 module Tx_pool = struct
-  let () =
+  type size_info = {number_of_addresses : int; number_of_transactions : int}
+
+  let register (tx_pool_size_info : unit -> size_info tzresult Lwt.t) =
     CollectorRegistry.register_lwt
       registry
       MetricInfo.
@@ -157,7 +159,7 @@ module Tx_pool = struct
         }
       (fun () ->
         let open Lwt_syntax in
-        let+ size_info = Tx_pool.size_info () in
+        let+ size_info = tx_pool_size_info () in
         let number_of_addresses, number_of_transactions =
           match size_info with
           | Ok {number_of_addresses; number_of_transactions} ->
@@ -181,6 +183,10 @@ let metrics =
   let chain = Chain.init name in
   let block = Block.init name in
   {chain; block}
+
+let init ~mode ~tx_pool_size_info =
+  Info.init ~mode ;
+  Tx_pool.register tx_pool_size_info
 
 let set_level ~level = Gauge.set metrics.chain.head (Z.to_float level)
 

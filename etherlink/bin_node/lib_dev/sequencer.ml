@@ -110,7 +110,6 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
     ~(configuration : Configuration.t) ?kernel ?sandbox_key () =
   let open Lwt_result_syntax in
   let open Configuration in
-  Metrics.Info.init ~mode:"sequencer" ;
   let {rollup_node_endpoint; keep_alive; _} = configuration in
   let*? sequencer_config = Configuration.sequencer_config_exn configuration in
   let* rollup_node_smart_rollup_address =
@@ -207,6 +206,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
           | None -> None);
       }
   in
+  Metrics.init ~mode:"sequencer" ~tx_pool_size_info:Tx_pool.size_info ;
   let* () =
     Block_producer.start
       {
