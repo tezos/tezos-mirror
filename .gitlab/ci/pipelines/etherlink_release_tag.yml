@@ -11,6 +11,7 @@ docker:prepare-etherlink-release:
   tags:
   - gcp
   dependencies: []
+  timeout: 60 minutes
   before_script:
   - ./scripts/ci/docker_initialize.sh
   script:
@@ -32,6 +33,7 @@ gitlab:etherlink-release:
   needs:
   - docker:prepare-etherlink-release
   dependencies: []
+  timeout: 60 minutes
   interruptible: false
   script:
   - ./scripts/ci/create_gitlab_etherlink_release.sh

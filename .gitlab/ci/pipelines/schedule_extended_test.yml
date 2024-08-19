@@ -16,6 +16,7 @@ oc.docker:ci:amd64:
   tags:
   - gcp
   dependencies: []
+  timeout: 60 minutes
   before_script: []
   script:
   - ./images/ci_create_ci_images.sh
@@ -35,6 +36,7 @@ oc.docker:client-libs-dependencies:
   tags:
   - gcp
   dependencies: []
+  timeout: 60 minutes
   before_script: []
   script:
   - ./scripts/ci/docker_client_libs_dependencies_build.sh
@@ -53,6 +55,7 @@ oc.docker:rust-toolchain:amd64:
   tags:
   - gcp
   dependencies: []
+  timeout: 60 minutes
   before_script: []
   script:
   - ./scripts/ci/docker_rust_toolchain_build.sh
@@ -71,6 +74,7 @@ oc.docker:ci:arm64:
   tags:
   - gcp_arm64
   dependencies: []
+  timeout: 60 minutes
   before_script: []
   script:
   - ./images/ci_create_ci_images.sh
@@ -95,6 +99,7 @@ sanity_ci:
   - gcp
   dependencies:
   - oc.docker:ci:amd64
+  timeout: 60 minutes
   before_script:
   - ./scripts/ci/take_ownership.sh
   - eval $(opam env)
@@ -112,6 +117,7 @@ docker:hadolint-schedule_extended_test:
   rules:
   - when: always
   dependencies: []
+  timeout: 60 minutes
   script:
   - hadolint build.Dockerfile
   - hadolint Dockerfile
@@ -125,6 +131,7 @@ oc.build_arm64-released:
   - when: always
   dependencies:
   - oc.docker:ci:arm64
+  timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
@@ -168,6 +175,7 @@ oc.build_arm64-exp-dev-extra:
   - when: always
   dependencies:
   - oc.docker:ci:arm64
+  timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
@@ -213,6 +221,7 @@ oc.build:static-x86_64-linux-binaries:
   - when: always
   dependencies:
   - oc.docker:ci:amd64
+  timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
@@ -248,6 +257,7 @@ oc.build_x86_64-released:
   - when: always
   dependencies:
   - oc.docker:ci:amd64
+  timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
@@ -292,6 +302,7 @@ oc.build_x86_64-exp-dev-extra:
   - when: always
   dependencies:
   - oc.docker:ci:amd64
+  timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
@@ -345,6 +356,7 @@ ocaml-check:
   - when: always
   dependencies:
   - oc.docker:ci:amd64
+  timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
@@ -376,6 +388,7 @@ oc.build_kernels:
   - when: on_success
   dependencies:
   - oc.docker:rust-toolchain:amd64
+  timeout: 60 minutes
   cache:
   - key: kernels-sccache
     paths:
@@ -423,6 +436,7 @@ oc.build_dsn_node:
   - when: on_success
   dependencies:
   - oc.docker:rust-toolchain:amd64
+  timeout: 60 minutes
   cache:
   - key: sccache-$CI_JOB_NAME_SLUG
     paths:
@@ -460,6 +474,7 @@ oc.tezt:fetch-records:
   dependencies:
   - oc.docker:ci:amd64
   allow_failure: true
+  timeout: 60 minutes
   before_script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -486,6 +501,7 @@ select_tezts:
   - oc.docker:ci:amd64
   allow_failure:
     exit_codes: 17
+  timeout: 60 minutes
   before_script:
   - ./scripts/ci/take_ownership.sh
   - eval $(opam env)
@@ -506,6 +522,7 @@ build_octez_source:
   - when: always
   dependencies:
   - oc.docker:ci:amd64
+  timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
@@ -542,6 +559,7 @@ oc.build:rpm:amd64:
   - gcp
   needs: []
   dependencies: []
+  timeout: 75 minutes
   before_script:
   - . ./scripts/version.sh
   - ./scripts/ci/bin_packages_rpm_dependencies.sh
@@ -590,6 +608,7 @@ opam:prepare:
     start_in: 1 minute
   dependencies:
   - oc.docker:ci:amd64
+  timeout: 60 minutes
   before_script:
   - eval $(opam env)
   script:
@@ -615,6 +634,7 @@ opam:all_6:
   dependencies:
   - oc.docker:ci:amd64
   - opam:prepare
+  timeout: 60 minutes
   cache:
   - key: opam-sccache
     paths:
@@ -680,6 +700,7 @@ opam:exec_6:
   dependencies:
   - oc.docker:ci:amd64
   - opam:prepare
+  timeout: 60 minutes
   cache:
   - key: opam-sccache
     paths:
@@ -732,6 +753,7 @@ opam:all_2:
   dependencies:
   - oc.docker:ci:amd64
   - opam:prepare
+  timeout: 60 minutes
   cache:
   - key: opam-sccache
     paths:
@@ -798,6 +820,7 @@ opam:all_1:
   dependencies:
   - oc.docker:ci:amd64
   - opam:prepare
+  timeout: 60 minutes
   cache:
   - key: opam-sccache
     paths:
@@ -850,6 +873,7 @@ opam:all_3:
   dependencies:
   - oc.docker:ci:amd64
   - opam:prepare
+  timeout: 60 minutes
   cache:
   - key: opam-sccache
     paths:
@@ -916,6 +940,7 @@ opam:exec_7:
   dependencies:
   - oc.docker:ci:amd64
   - opam:prepare
+  timeout: 60 minutes
   cache:
   - key: opam-sccache
     paths:
@@ -968,6 +993,7 @@ opam:exec_4:
   dependencies:
   - oc.docker:ci:amd64
   - opam:prepare
+  timeout: 60 minutes
   cache:
   - key: opam-sccache
     paths:
@@ -1020,6 +1046,7 @@ opam:all_4:
   dependencies:
   - oc.docker:ci:amd64
   - opam:prepare
+  timeout: 60 minutes
   cache:
   - key: opam-sccache
     paths:
@@ -1085,6 +1112,7 @@ opam:exec_1:
   dependencies:
   - oc.docker:ci:amd64
   - opam:prepare
+  timeout: 60 minutes
   cache:
   - key: opam-sccache
     paths:
@@ -1150,6 +1178,7 @@ opam:all_5:
   dependencies:
   - oc.docker:ci:amd64
   - opam:prepare
+  timeout: 60 minutes
   cache:
   - key: opam-sccache
     paths:
@@ -1216,6 +1245,7 @@ opam:all_7:
   dependencies:
   - oc.docker:ci:amd64
   - opam:prepare
+  timeout: 60 minutes
   cache:
   - key: opam-sccache
     paths:
@@ -1276,6 +1306,7 @@ kaitai_checks:
   - when: always
   dependencies:
   - oc.docker:ci:amd64
+  timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
@@ -1317,6 +1348,7 @@ kaitai_e2e_checks:
   dependencies:
   - oc.docker:client-libs-dependencies
   - kaitai_checks
+  timeout: 60 minutes
   before_script:
   - . ./scripts/version.sh
   - . ./scripts/install_build_deps.js.sh
@@ -1333,6 +1365,7 @@ oc.check_lift_limits_patch:
   - when: always
   dependencies:
   - oc.docker:ci:amd64
+  timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
@@ -1366,6 +1399,7 @@ oc.misc_checks:
   - when: always
   dependencies:
   - oc.docker:ci:amd64
+  timeout: 60 minutes
   before_script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -1385,6 +1419,7 @@ oc.python_check:
   - when: always
   dependencies:
   - oc.docker:ci:amd64
+  timeout: 60 minutes
   before_script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -1401,6 +1436,7 @@ oc.ocaml_fmt:
   - when: always
   dependencies:
   - oc.docker:ci:amd64
+  timeout: 60 minutes
   before_script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -1417,6 +1453,7 @@ oc.semgrep:
   rules:
   - when: always
   dependencies: []
+  timeout: 60 minutes
   script:
   - echo "OCaml code linting. For information on how to reproduce locally, check out
     scripts/semgrep/README.md"
@@ -1435,6 +1472,7 @@ oc.integration:compiler-rejections:
   - oc.build_x86_64-exp-dev-extra
   dependencies:
   - oc.docker:ci:amd64
+  timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
@@ -1465,6 +1503,7 @@ oc.script:test-gen-genesis:
   - when: always
   dependencies:
   - oc.docker:ci:amd64
+  timeout: 60 minutes
   before_script:
   - eval $(opam env)
   - cd scripts/gen-genesis
@@ -1480,6 +1519,7 @@ oc.script:snapshot_alpha_and_link:
   - when: always
   dependencies:
   - oc.docker:ci:amd64
+  timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
@@ -1522,6 +1562,7 @@ oc.script:test_octez_release_versions:
   - oc.build_x86_64-exp-dev-extra
   dependencies:
   - oc.docker:ci:amd64
+  timeout: 60 minutes
   before_script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -1538,6 +1579,7 @@ oc.script:b58_prefix:
   - when: always
   dependencies:
   - oc.docker:ci:amd64
+  timeout: 60 minutes
   before_script:
   - . ./scripts/version.sh
   - . $HOME/.venv/bin/activate
@@ -1561,6 +1603,7 @@ oc.test-liquidity-baking-scripts:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
   - oc.build_x86_64-exp-dev-extra
+  timeout: 60 minutes
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -1579,6 +1622,7 @@ test_kernels:
   - oc.build_kernels
   dependencies:
   - oc.docker:rust-toolchain:amd64
+  timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
@@ -1613,6 +1657,7 @@ test_etherlink_kernel:
   - oc.build_kernels
   dependencies:
   - oc.docker:rust-toolchain:amd64
+  timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
@@ -1647,6 +1692,7 @@ test_etherlink_firehose:
   - oc.build_kernels
   dependencies:
   - oc.docker:rust-toolchain:amd64
+  timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
@@ -1677,6 +1723,7 @@ check_riscv_kernels:
   - when: on_success
   dependencies:
   - oc.docker:rust-toolchain:amd64
+  timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
@@ -1710,6 +1757,7 @@ test_riscv_kernels:
   - check_riscv_kernels
   dependencies:
   - oc.docker:rust-toolchain:amd64
+  timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
@@ -1744,6 +1792,7 @@ test_evm_compatibility:
   - oc.build_kernels
   dependencies:
   - oc.docker:rust-toolchain:amd64
+  timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
@@ -1781,6 +1830,7 @@ oc.unit:non-proto-x86_64:
   - oc.build_x86_64-exp-dev-extra
   dependencies:
   - oc.docker:ci:amd64
+  timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
@@ -1837,6 +1887,7 @@ oc.unit:other-x86_64:
   - oc.build_x86_64-exp-dev-extra
   dependencies:
   - oc.docker:ci:amd64
+  timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
@@ -1893,6 +1944,7 @@ oc.unit:proto-x86_64:
   - oc.build_x86_64-exp-dev-extra
   dependencies:
   - oc.docker:ci:amd64
+  timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
@@ -1949,6 +2001,7 @@ oc.unit:non-proto-arm64:
   - oc.build_arm64-exp-dev-extra
   dependencies:
   - oc.docker:ci:arm64
+  timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
@@ -2016,6 +2069,7 @@ oc.unit:protocol_compiles:
   - oc.build_x86_64-exp-dev-extra
   dependencies:
   - oc.docker:ci:amd64
+  timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
@@ -2050,6 +2104,7 @@ de.unit:x86_64:
   - oc.build_x86_64-exp-dev-extra
   dependencies:
   - oc.docker:ci:amd64
+  timeout: 60 minutes
   before_script:
   - eval $(opam env)
   script:
@@ -2068,6 +2123,7 @@ de.unit:arm64:
   - oc.build_arm64-exp-dev-extra
   dependencies:
   - oc.docker:ci:arm64
+  timeout: 60 minutes
   before_script:
   - eval $(opam env)
   script:
@@ -2086,6 +2142,7 @@ resto.unit:x86_64:
   - oc.build_x86_64-exp-dev-extra
   dependencies:
   - oc.docker:ci:amd64
+  timeout: 60 minutes
   before_script:
   - eval $(opam env)
   script:
@@ -2104,6 +2161,7 @@ resto.unit:arm64:
   - oc.build_arm64-exp-dev-extra
   dependencies:
   - oc.docker:ci:arm64
+  timeout: 60 minutes
   before_script:
   - eval $(opam env)
   script:
@@ -2132,6 +2190,7 @@ oc.compile_sources_doc_bookworm:
   rules:
   - when: always
   dependencies: []
+  timeout: 60 minutes
   script:
   - ./docs/introduction/compile-sources.sh tezos/tezos latest-release
   variables:
@@ -2146,6 +2205,7 @@ oc.compile_sources_doc_mantic:
   rules:
   - when: always
   dependencies: []
+  timeout: 60 minutes
   script:
   - ./docs/introduction/compile-sources.sh tezos/tezos latest-release
   variables:
@@ -2237,6 +2297,7 @@ tezt-memory-3k:
   - oc.build_kernels
   - oc.build_dsn_node
   - oc.tezt:fetch-records
+  timeout: 60 minutes
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -2298,6 +2359,7 @@ tezt-memory-4k:
   - oc.build_kernels
   - oc.build_dsn_node
   - oc.tezt:fetch-records
+  timeout: 60 minutes
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -2359,6 +2421,7 @@ tezt-time-sensitive:
   - oc.build_kernels
   - oc.build_dsn_node
   - oc.tezt:fetch-records
+  timeout: 60 minutes
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -2419,6 +2482,7 @@ tezt-slow:
   - oc.build_kernels
   - oc.build_dsn_node
   - oc.tezt:fetch-records
+  timeout: 60 minutes
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -2476,6 +2540,7 @@ tezt-flaky:
   - oc.build_kernels
   - oc.build_dsn_node
   - oc.tezt:fetch-records
+  timeout: 60 minutes
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -2532,6 +2597,7 @@ tezt:static-binaries:
   - oc.build_x86_64-exp-dev-extra
   - oc.build:static-x86_64-linux-binaries
   - oc.tezt:fetch-records
+  timeout: 60 minutes
   before_script:
   - mv octez-binaries/x86_64/octez-* .
   script:
@@ -2571,6 +2637,7 @@ oc.install_python_noble:
   rules:
   - when: always
   dependencies: []
+  timeout: 60 minutes
   script:
   - ./docs/developer/install-python-debian-ubuntu.sh tezos/tezos latest-release
 
@@ -2582,6 +2649,7 @@ oc.install_python_jammy:
   rules:
   - when: always
   dependencies: []
+  timeout: 60 minutes
   script:
   - ./docs/developer/install-python-debian-ubuntu.sh tezos/tezos latest-release
 
@@ -2593,6 +2661,7 @@ oc.install_python_bookworm:
   rules:
   - when: always
   dependencies: []
+  timeout: 60 minutes
   script:
   - ./docs/developer/install-python-debian-ubuntu.sh tezos/tezos latest-release
 
@@ -2605,6 +2674,7 @@ documentation:odoc:
   - when: always
   dependencies:
   - oc.docker:ci:amd64
+  timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
@@ -2640,6 +2710,7 @@ documentation:manuals:
   - when: always
   dependencies:
   - oc.docker:ci:amd64
+  timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
@@ -2676,6 +2747,7 @@ documentation:docgen:
   - when: always
   dependencies:
   - oc.docker:ci:amd64
+  timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
@@ -2721,6 +2793,7 @@ documentation:build_all:
   - documentation:odoc
   - documentation:manuals
   - documentation:docgen
+  timeout: 60 minutes
   before_script:
   - eval $(opam env)
   - . $HOME/.venv/bin/activate
@@ -2750,6 +2823,7 @@ documentation:linkcheck:
   - documentation:docgen
   - documentation:build_all
   allow_failure: true
+  timeout: 60 minutes
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
