@@ -61,11 +61,6 @@ Gas improvements
 Breaking Changes
 ----------------
 
-- Deprecated legacy encoding of tickets (``Pair (Pair _ _) _``) in favor of
-  the ``Ticket`` constructor introduced in Paris. This new notation will
-  notably be used in operations metadata (MRs :gl:`!11619` :gl:`!11620`
-  :gl:`!12048`).
-
 - Reworked RPC ``GET
   /chains/<chain_id>/blocks/<block_id>/context/delegates/<baker_pkh>``,
   which returns a lot of information about a given baker. Its fields
