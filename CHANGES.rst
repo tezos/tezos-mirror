@@ -289,3 +289,13 @@ Miscellaneous
 -------------
 
 - Depends on OCaml 4.14.2 (was 4.14.1 before). (MR :gl:`!14536`)
+
+- Current Debian packages are now available via APT repository for Ubuntu
+  (Noble and Jammy) and Debian Bookworm, both for AMD64 and ARM64.
+
+- New set of Debian packages are now available for testing. These new set of
+  packages are built following Debian best practices for packaging, use debconf
+  for configuration and systemd to handle the runtime lifecycle of the daemons.
+  These new packages are going to introduce few breaking changes starting from
+  the next release. Please check our documentation for more details. (MR
+  :gl:`!13273`)
