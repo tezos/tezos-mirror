@@ -18,9 +18,9 @@
   (select void_for_linking-octez_injector_PsParisC from
    (octez_injector_PsParisC -> void_for_linking-octez_injector_PsParisC.empty)
    (-> void_for_linking-octez_injector_PsParisC.empty))
-  (select void_for_linking-octez_injector_PtQuebec from
-   (octez_injector_PtQuebec -> void_for_linking-octez_injector_PtQuebec.empty)
-   (-> void_for_linking-octez_injector_PtQuebec.empty))
+  (select void_for_linking-octez_injector_beta from
+   (octez_injector_beta -> void_for_linking-octez_injector_beta.empty)
+   (-> void_for_linking-octez_injector_beta.empty))
   (select void_for_linking-octez_injector_alpha from
    (octez_injector_alpha -> void_for_linking-octez_injector_alpha.empty)
    (-> void_for_linking-octez_injector_alpha.empty)))
@@ -43,5 +43,5 @@
  (action
   (progn
    (write-file void_for_linking-octez_injector_PsParisC.empty "")
-   (write-file void_for_linking-octez_injector_PtQuebec.empty "")
+   (write-file void_for_linking-octez_injector_beta.empty "")
    (write-file void_for_linking-octez_injector_alpha.empty ""))))

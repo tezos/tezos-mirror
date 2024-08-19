@@ -43,7 +43,7 @@ depopts: [
   "octez-protocol-018-Proxford-libs"
   "octez-protocol-019-PtParisB-libs"
   "octez-protocol-020-PsParisC-libs"
-  "octez-protocol-021-PtQuebec-libs"
+  "octez-protocol-beta-libs"
   "octez-protocol-alpha-libs"
 ]
 conflicts: [
@@ -70,7 +70,7 @@ conflicts: [
   "octez-protocol-018-Proxford-libs" { != version }
   "octez-protocol-019-PtParisB-libs" { != version }
   "octez-protocol-020-PsParisC-libs" { != version }
-  "octez-protocol-021-PtQuebec-libs" { != version }
+  "octez-protocol-beta-libs" { != version }
   "octez-protocol-alpha-libs" { != version }
 ]
 build: [
