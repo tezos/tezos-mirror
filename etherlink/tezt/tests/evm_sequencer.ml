@@ -5746,6 +5746,39 @@ let test_trace_transaction_calltracer_multiple_txs =
      multiple top calls. *)
   unit
 
+let test_trace_transaction_calltracer_on_simple_transfer =
+  register_all
+    ~kernels:[Latest]
+    ~tags:["evm"; "rpc"; "trace"; "call_trace"; "simple_transfer"]
+    ~title:"debug_traceTransaction can trace a simple transfer"
+    ~da_fee:Wei.zero
+  @@ fun {sc_rollup_node; sequencer; client; proxy; _} _protocol ->
+  let endpoint = Evm_node.endpoint sequencer in
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let receiver = Eth_account.bootstrap_accounts.(1) in
+  let* transaction_hash =
+    send_transaction_to_sequencer
+      (Eth_cli.transaction_send
+         ~source_private_key:sender.private_key
+         ~to_public_key:receiver.address
+         ~value:(Wei.of_eth_int 10)
+         ~endpoint)
+      sequencer
+  in
+  let* () =
+    repeat 2 (fun () ->
+        next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client)
+  in
+  let* () = bake_until_sync ~sequencer ~sc_rollup_node ~proxy ~client () in
+  let*@ _ =
+    Rpc.trace_transaction
+      ~tracer:"callTracer"
+      ~transaction_hash
+      ~tracer_config:[("withLog", `Bool false); ("onlyTopCall", `Bool false)]
+      sequencer
+  in
+  unit
+
 let test_miner =
   let sequencer_pool_address =
     String.lowercase_ascii "0x8aaD6553Cf769Aa7b89174bE824ED0e53768ed70"
@@ -6421,6 +6454,7 @@ let () =
   test_trace_transaction_call_trace_certain_depth protocols ;
   test_trace_transaction_call_trace_revert protocols ;
   test_trace_transaction_calltracer_multiple_txs protocols ;
+  test_trace_transaction_calltracer_on_simple_transfer protocols ;
   test_debug_print_store_schemas () ;
   test_outbox_size_limit_resilience ~slow:true protocols ;
   test_outbox_size_limit_resilience ~slow:false protocols ;
