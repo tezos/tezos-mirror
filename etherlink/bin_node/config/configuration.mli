@@ -62,7 +62,6 @@ type sequencer = {
       (** See {!type-time_between_blocks}. *)
   max_number_of_chunks : int;
       (** The maximum number of chunks per blueprints. *)
-  private_rpc_port : int option;  (** Port for internal RPC services *)
   sequencer : Client_keys.sk_uri;  (** The key used to sign the blueprints. *)
   blueprints_publisher_config : blueprints_publisher_config;
 }
@@ -73,7 +72,6 @@ type threshold_encryption_sequencer =
           (** See {!type-time_between_blocks}. *)
       max_number_of_chunks : int;
           (** The maximum number of chunks per blueprints. *)
-      private_rpc_port : int option;  (** Port for internal RPC services *)
       sequencer : Client_keys.sk_uri;
           (** The key used to sign the blueprints. *)
       blueprints_publisher_config : blueprints_publisher_config;
@@ -108,6 +106,7 @@ type limit = Unlimited | Limit of int
 type t = {
   rpc_addr : string;
   rpc_port : int;
+  private_rpc_port : int option;  (** Port for internal RPC services *)
   rpc_batch_limit : limit;
   cors_origins : string list;
   cors_headers : string list;
@@ -163,7 +162,6 @@ val observer_config_exn : t -> observer tzresult
 val sequencer_config_dft :
   ?time_between_blocks:time_between_blocks ->
   ?max_number_of_chunks:int ->
-  ?private_rpc_port:int ->
   sequencer:Client_keys.sk_uri ->
   ?max_blueprints_lag:int ->
   ?max_blueprints_ahead:int ->
@@ -178,7 +176,6 @@ val sequencer_config_dft :
 val threshold_encryption_sequencer_config_dft :
   ?time_between_blocks:time_between_blocks ->
   ?max_number_of_chunks:int ->
-  ?private_rpc_port:int ->
   sequencer:Client_keys.sk_uri ->
   ?sidecar_endpoint:Uri.t ->
   ?max_blueprints_lag:int ->

@@ -606,7 +606,7 @@ let dispatch_request (config : Configuration.t)
   Lwt.return JSONRPC.{value; id}
 
 let dispatch_private_request (_config : Configuration.t)
-    ((module Backend_rpc : Services_backend_sig.S), _) ~threshold_encryption
+    ((module Backend_rpc : Services_backend_sig.S), _) ~block_production
     ({method_; parameters; id} : JSONRPC.request) : JSONRPC.response Lwt.t =
   let open Lwt_syntax in
   let unsupported () =
@@ -634,7 +634,7 @@ let dispatch_private_request (_config : Configuration.t)
                })
     | Unsupported -> unsupported ()
     | Disabled -> Lwt.return_error (Rpc_errors.method_disabled method_)
-    | Method (Produce_block.Method, _) when threshold_encryption ->
+    | Method (Produce_block.Method, _) when block_production <> `Single_node ->
         unsupported ()
     | Method (Produce_block.Method, module_) ->
         let f (timestamp : Time.Protocol.t option) =
@@ -646,7 +646,8 @@ let dispatch_private_request (_config : Configuration.t)
           rpc_ok (Ethereum_types.quantity_of_z @@ Z.of_int nb_transactions)
         in
         build ~f module_ parameters
-    | Method (Produce_proposal.Method, _) when not threshold_encryption ->
+    | Method (Produce_proposal.Method, _)
+      when block_production <> `Threshold_encryption ->
         unsupported ()
     | Method (Produce_proposal.Method, module_) ->
         let f (timestamp : Time.Protocol.t option) =
@@ -734,13 +735,13 @@ let generic_dispatch config ctx dir path dispatch_request =
 let dispatch_public config ctx dir =
   generic_dispatch config ctx dir Path.root dispatch_request
 
-let dispatch_private ~threshold_encryption config ctx dir =
+let dispatch_private ~block_production config ctx dir =
   generic_dispatch
     config
     ctx
     dir
     Path.(add_suffix root "private")
-    (dispatch_private_request ~threshold_encryption)
+    (dispatch_private_request ~block_production)
 
 let directory config
     ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address) =

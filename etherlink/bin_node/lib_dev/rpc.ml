@@ -288,71 +288,11 @@ struct
   let current_block_number () = Lwt_result.return Base.ctxt.current_block_number
 end
 
-let callback server dir =
-  let open Cohttp in
-  let open Lwt_syntax in
-  let callback_log conn req body =
-    let path = Request.uri req |> Uri.path in
-    if path = "/metrics" then
-      let* response = Metrics.Metrics_server.callback conn req body in
-      Lwt.return (`Response response)
-    else
-      let uri = req |> Request.uri |> Uri.to_string in
-      let meth = req |> Request.meth |> Code.string_of_method in
-      let* body_str = body |> Cohttp_lwt.Body.to_string in
-      let* () = Events.callback_log ~uri ~meth ~body:body_str in
-      Tezos_rpc_http_server.RPC_server.resto_callback
-        server
-        conn
-        req
-        (Cohttp_lwt.Body.of_string body_str)
-  in
-  let update_metrics uri meth =
-    Prometheus.Summary.(time (labels Metrics.Rpc.metrics [uri; meth]) Sys.time)
-  in
-  Tezos_rpc_http_server.RPC_middleware.rpc_metrics_transform_callback
-    ~update_metrics
-    dir
-    callback_log
-
-let rpc_start
-    ({rpc_addr; rpc_port; cors_origins; cors_headers; max_active_connections; _} :
-      Configuration.t) ~directory =
-  let open Lwt_result_syntax in
-  let open Tezos_rpc_http_server in
-  Metrics.Info.init ~mode:"rpc" ;
-  let p2p_addr = P2p_addr.of_string_exn rpc_addr in
-  let host = Ipaddr.V6.to_string p2p_addr in
-  let node = `TCP (`Port rpc_port) in
-  let acl = RPC_server.Acl.allow_all in
-  let cors =
-    Resto_cohttp.Cors.
-      {allowed_headers = cors_headers; allowed_origins = cors_origins}
-  in
-  let server =
-    RPC_server.init_server
-      ~acl
-      ~cors
-      ~media_types:Media_type.all_media_types
-      directory
-  in
-  let*! () =
-    RPC_server.launch
-      ~max_active_connections
-      ~host
-      ~callback:(callback server directory)
-      server
-      node
-  in
-  let*! () = Events.is_ready ~rpc_addr ~rpc_port in
-  return server
-
-let install_finalizer_rpc server =
+let install_finalizer_rpc server_public_finalizer =
   let open Lwt_syntax in
   Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
   let* () = Events.shutdown_node ~exit_status in
-  let* () = Tezos_rpc_http_server.RPC_server.shutdown server in
-  let* () = Events.shutdown_rpc_server ~private_:false in
+  let* () = server_public_finalizer () in
   Misc.unwrap_error_monad @@ fun () -> Tx_pool.shutdown ()
 
 let next_blueprint_number ctxt () =
@@ -470,22 +410,25 @@ let main ~data_dir ~evm_node_endpoint ~(config : Configuration.t) =
       }
   in
 
-  let directory =
-    Services.directory config (rpc_backend, ctxt.smart_rollup_address)
+  let* server_public_finalizer =
+    Rpc_server.start_public_server
+      ~evm_services:
+        {
+          next_blueprint_number = next_blueprint_number ctxt;
+          find_blueprint =
+            (fun level ->
+              Evm_store.use ctxt.store (fun conn ->
+                  Evm_store.Blueprints.find_with_events conn level));
+          smart_rollup_address = ctxt.smart_rollup_address;
+          time_between_blocks;
+        }
+      config
+      (rpc_backend, ctxt.smart_rollup_address)
   in
-  let directory =
-    directory
-    |> Evm_services.register
-         (next_blueprint_number ctxt)
-         (fun level ->
-           Evm_store.use ctxt.store (fun conn ->
-               Evm_store.Blueprints.find_with_events conn level))
-         ctxt.smart_rollup_address
-         time_between_blocks
-  in
-  let* server = rpc_start config ~directory in
 
-  let (_ : Lwt_exit.clean_up_callback_id) = install_finalizer_rpc server in
+  let (_ : Lwt_exit.clean_up_callback_id) =
+    install_finalizer_rpc server_public_finalizer
+  in
 
   Blueprints_follower.start
     ~time_between_blocks

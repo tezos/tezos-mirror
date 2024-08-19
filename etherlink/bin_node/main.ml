@@ -1175,12 +1175,12 @@ let rpc_command =
       Evm_node_lib_dev.Rpc.main ~data_dir ~evm_node_endpoint ~config)
 
 let start_observer ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?rpc_batch_limit
-    ?cors_origins ?cors_headers ~verbose ?preimages ?rollup_node_endpoint
-    ~dont_track_rollup_node ?preimages_endpoint ?evm_node_endpoint
-    ?threshold_encryption_bundler_endpoint ?tx_pool_timeout_limit
-    ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit ?log_filter_chunk_size
-    ?log_filter_max_nb_logs ?log_filter_max_nb_blocks ?restricted_rpcs ?kernel
-    () =
+    ?private_rpc_port ?cors_origins ?cors_headers ~verbose ?preimages
+    ?rollup_node_endpoint ~dont_track_rollup_node ?preimages_endpoint
+    ?evm_node_endpoint ?threshold_encryption_bundler_endpoint
+    ?tx_pool_timeout_limit ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit
+    ?log_filter_chunk_size ?log_filter_max_nb_logs ?log_filter_max_nb_blocks
+    ?restricted_rpcs ?kernel () =
   let open Lwt_result_syntax in
   let* config =
     Cli.create_or_read_config
@@ -1188,6 +1188,7 @@ let start_observer ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?rpc_batch_limit
       ~keep_alive
       ?rpc_addr
       ?rpc_port
+      ?private_rpc_port
       ?rpc_batch_limit
       ?cors_origins
       ?cors_headers
@@ -1241,12 +1242,13 @@ let observer_command =
        observer` command."
     (merge_options
        common_config_args
-       (args5
+       (args6
           initial_kernel_arg
           preimages_arg
           preimages_endpoint_arg
           bundler_node_endpoint_arg
-          dont_track_rollup_node_arg))
+          dont_track_rollup_node_arg
+          private_rpc_port_arg))
     (prefixes ["run"; "observer"; "with"; "endpoint"]
     @@ param
          ~name:"evm-node-endpoint"
@@ -1279,7 +1281,8 @@ let observer_command =
              preimages,
              preimages_endpoint,
              threshold_encryption_bundler_endpoint,
-             dont_track_rollup_node ) )
+             dont_track_rollup_node,
+             private_rpc_port ) )
              evm_node_endpoint
              rollup_node_endpoint
              () ->
@@ -1300,6 +1303,7 @@ let observer_command =
     ?rpc_addr
     ?rpc_port
     ?rpc_batch_limit
+    ?private_rpc_port
     ?cors_origins
     ?cors_headers
     ~verbose

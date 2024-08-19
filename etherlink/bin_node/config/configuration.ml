@@ -36,7 +36,6 @@ type experimental_features = {
 type sequencer = {
   time_between_blocks : time_between_blocks;
   max_number_of_chunks : int;
-  private_rpc_port : int option;
   sequencer : Client_keys.sk_uri;
   blueprints_publisher_config : blueprints_publisher_config;
 }
@@ -46,7 +45,6 @@ type threshold_encryption_sequencer =
   | Threshold_encryption_sequencer of {
       time_between_blocks : time_between_blocks;
       max_number_of_chunks : int;
-      private_rpc_port : int option;
       sequencer : Client_keys.sk_uri;
       blueprints_publisher_config : blueprints_publisher_config;
       sidecar_endpoint : Uri.t;
@@ -74,6 +72,7 @@ type limit = Unlimited | Limit of int
 type t = {
   rpc_addr : string;
   rpc_port : int;
+  private_rpc_port : int option;
   rpc_batch_limit : limit;
   cors_origins : string list;
   cors_headers : string list;
@@ -217,9 +216,9 @@ let kernel_execution_config_dft ~data_dir ?preimages ?preimages_endpoint () =
     preimages_endpoint;
   }
 
-let sequencer_config_dft ?time_between_blocks ?max_number_of_chunks
-    ?private_rpc_port ~sequencer ?max_blueprints_lag ?max_blueprints_ahead
-    ?max_blueprints_catchup ?catchup_cooldown ?dal_slots () =
+let sequencer_config_dft ?time_between_blocks ?max_number_of_chunks ~sequencer
+    ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
+    ?catchup_cooldown ?dal_slots () =
   let blueprints_publisher_config =
     {
       max_blueprints_lag =
@@ -246,15 +245,14 @@ let sequencer_config_dft ?time_between_blocks ?max_number_of_chunks
       Option.value ~default:default_time_between_blocks time_between_blocks;
     max_number_of_chunks =
       Option.value ~default:default_max_number_of_chunks max_number_of_chunks;
-    private_rpc_port;
     sequencer;
     blueprints_publisher_config;
   }
 
 let threshold_encryption_sequencer_config_dft ?time_between_blocks
-    ?max_number_of_chunks ?private_rpc_port ~sequencer ?sidecar_endpoint
-    ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
-    ?catchup_cooldown ?dal_slots () =
+    ?max_number_of_chunks ~sequencer ?sidecar_endpoint ?max_blueprints_lag
+    ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown ?dal_slots
+    () =
   let blueprints_publisher_config =
     {
       max_blueprints_lag =
@@ -282,7 +280,6 @@ let threshold_encryption_sequencer_config_dft ?time_between_blocks
         Option.value ~default:default_time_between_blocks time_between_blocks;
       max_number_of_chunks =
         Option.value ~default:default_max_number_of_chunks max_number_of_chunks;
-      private_rpc_port;
       sequencer;
       blueprints_publisher_config;
       sidecar_endpoint =
@@ -381,43 +378,38 @@ let sequencer_encoding =
     (fun {
            time_between_blocks;
            max_number_of_chunks;
-           private_rpc_port;
            sequencer;
            blueprints_publisher_config;
          } ->
       ( None,
         None,
+        None,
         time_between_blocks,
         max_number_of_chunks,
-        private_rpc_port,
         Client_keys.string_of_sk_uri sequencer,
         blueprints_publisher_config ))
     (fun ( _,
            _,
+           _,
            time_between_blocks,
            max_number_of_chunks,
-           private_rpc_port,
            sequencer,
            blueprints_publisher_config ) ->
       {
         time_between_blocks;
         max_number_of_chunks;
-        private_rpc_port;
         sequencer = Client_keys.sk_uri_of_string sequencer;
         blueprints_publisher_config;
       })
     (obj7
        (deprecated "preimages")
        (deprecated "preimages_endpoint")
+       (deprecated "private-rpc-port")
        (dft
           "time_between_blocks"
           time_between_blocks_encoding
           default_time_between_blocks)
        (dft "max_number_of_chunks" int31 default_max_number_of_chunks)
-       (opt
-          "private-rpc-port"
-          ~description:"RPC port for private server"
-          uint16)
        (req "sequencer" string)
        (dft
           "blueprints_publisher_config"
@@ -432,7 +424,6 @@ let threshold_encryption_sequencer_encoding =
           {
             time_between_blocks;
             max_number_of_chunks;
-            private_rpc_port;
             sequencer;
             blueprints_publisher_config;
             sidecar_endpoint;
@@ -441,7 +432,6 @@ let threshold_encryption_sequencer_encoding =
             None,
             time_between_blocks,
             max_number_of_chunks,
-            private_rpc_port,
             Client_keys.string_of_sk_uri sequencer,
             blueprints_publisher_config,
             sidecar_endpoint ))
@@ -449,7 +439,6 @@ let threshold_encryption_sequencer_encoding =
            _,
            time_between_blocks,
            max_number_of_chunks,
-           private_rpc_port,
            sequencer,
            blueprints_publisher_config,
            sidecar_endpoint ) ->
@@ -457,12 +446,11 @@ let threshold_encryption_sequencer_encoding =
         {
           time_between_blocks;
           max_number_of_chunks;
-          private_rpc_port;
           sequencer = Client_keys.sk_uri_of_string sequencer;
           blueprints_publisher_config;
           sidecar_endpoint;
         })
-    (obj8
+    (obj7
        (deprecated "preimages")
        (deprecated "preimages_endpoint")
        (dft
@@ -470,10 +458,6 @@ let threshold_encryption_sequencer_encoding =
           time_between_blocks_encoding
           default_time_between_blocks)
        (dft "max_number_of_chunks" int31 default_max_number_of_chunks)
-       (opt
-          "private-rpc-port"
-          ~description:"RPC port for private server"
-          uint16)
        (req "sequencer" string)
        (dft
           "blueprints_publisher_config"
@@ -588,6 +572,7 @@ let encoding data_dir : t Data_encoding.t =
            rpc_addr;
            rpc_port;
            rpc_batch_limit;
+           private_rpc_port;
            cors_origins;
            cors_headers;
            log_filter;
@@ -628,7 +613,7 @@ let encoding data_dir : t Data_encoding.t =
             proxy,
             fee_history,
             restricted_rpcs ),
-          (kernel_execution, rpc_batch_limit) ) ))
+          (kernel_execution, rpc_batch_limit, private_rpc_port) ) ))
     (fun ( ( rpc_addr,
              rpc_port,
              _devmode,
@@ -649,11 +634,12 @@ let encoding data_dir : t Data_encoding.t =
                proxy,
                fee_history,
                restricted_rpcs ),
-             (kernel_execution, rpc_batch_limit) ) ) ->
+             (kernel_execution, rpc_batch_limit, private_rpc_port) ) ) ->
       {
         rpc_addr;
         rpc_port;
         rpc_batch_limit;
+        private_rpc_port;
         cors_origins;
         cors_headers;
         log_filter;
@@ -728,12 +714,13 @@ let encoding data_dir : t Data_encoding.t =
              (dft "proxy" proxy_encoding (default_proxy ()))
              (dft "fee_history" fee_history_encoding default_fee_history)
              (opt "restricted_rpcs" restricted_rpcs_encoding))
-          (obj2
+          (obj3
              (dft
                 "kernel_execution"
                 (kernel_execution_encoding data_dir)
                 (kernel_execution_config_dft ~data_dir ()))
-             (dft "rpc-batch-limit" limit_encoding Unlimited))))
+             (dft "rpc-batch-limit" limit_encoding Unlimited)
+             (opt "private-rpc-port" int31))))
 
 let save ~force ~data_dir config =
   let open Lwt_result_syntax in
@@ -785,7 +772,6 @@ module Cli = struct
           sequencer_config_dft
             ?time_between_blocks
             ?max_number_of_chunks
-            ?private_rpc_port
             ?max_blueprints_lag
             ?max_blueprints_ahead
             ?max_blueprints_catchup
@@ -801,7 +787,6 @@ module Cli = struct
           threshold_encryption_sequencer_config_dft
             ?time_between_blocks
             ?max_number_of_chunks
-            ?private_rpc_port
             ?max_blueprints_lag
             ?max_blueprints_ahead
             ?max_blueprints_catchup
@@ -843,6 +828,7 @@ module Cli = struct
       rpc_addr = Option.value ~default:default_rpc_addr rpc_addr;
       rpc_port = Option.value ~default:default_rpc_port rpc_port;
       rpc_batch_limit = Option.value ~default:Unlimited rpc_batch_limit;
+      private_rpc_port;
       cors_origins = Option.value ~default:default_cors_origins cors_origins;
       cors_headers = Option.value ~default:default_cors_headers cors_headers;
       log_filter;
@@ -929,8 +915,6 @@ module Cli = struct
                 Option.value
                   ~default:sequencer_config.max_number_of_chunks
                   max_number_of_chunks;
-              private_rpc_port =
-                Option.either private_rpc_port sequencer_config.private_rpc_port;
               sequencer =
                 Option.value ~default:sequencer_config.sequencer sequencer_key;
               blueprints_publisher_config;
@@ -941,7 +925,6 @@ module Cli = struct
               sequencer_config_dft
                 ?time_between_blocks
                 ?max_number_of_chunks
-                ?private_rpc_port
                 ?max_blueprints_lag
                 ?max_blueprints_ahead
                 ?max_blueprints_catchup
@@ -998,10 +981,6 @@ module Cli = struct
                        threshold_encryption_sequencer_config
                          .max_number_of_chunks
                      max_number_of_chunks;
-                 private_rpc_port =
-                   Option.either
-                     private_rpc_port
-                     threshold_encryption_sequencer_config.private_rpc_port;
                  sequencer =
                    Option.value
                      ~default:threshold_encryption_sequencer_config.sequencer
@@ -1019,7 +998,6 @@ module Cli = struct
               threshold_encryption_sequencer_config_dft
                 ?time_between_blocks
                 ?max_number_of_chunks
-                ?private_rpc_port
                 ?max_blueprints_lag
                 ?max_blueprints_ahead
                 ?max_blueprints_catchup
@@ -1093,11 +1071,14 @@ module Cli = struct
         ~default:configuration.rollup_node_endpoint
         rollup_node_endpoint
     in
+
     {
       rpc_addr = Option.value ~default:configuration.rpc_addr rpc_addr;
       rpc_port = Option.value ~default:configuration.rpc_port rpc_port;
       rpc_batch_limit =
         Option.value ~default:configuration.rpc_batch_limit rpc_batch_limit;
+      private_rpc_port =
+        Option.either private_rpc_port configuration.private_rpc_port;
       cors_origins =
         Option.value ~default:configuration.cors_origins cors_origins;
       cors_headers =

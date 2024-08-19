@@ -47,6 +47,8 @@
   (!14540)
 - Ensure the EVM node always uses the very last version of the WASM PVM.
   (!14553)
+- The observer node now starts a private RPC server when `private_rpc_port` is
+  set in the configuration file. (!14460)
 
 ### Bug fixes
 
@@ -65,6 +67,8 @@
   (!14327)
 - Deprecate the `preimages` and `preimages_endpoint` fields specific to each
   mode, in favor of a new `kernel_execution` top-level configuration. (!14332)
+- Deprecate the `sequencer.private_rpc_port` field in favor of the new
+  `private_rpc_port` top-level field of the configuration. (!14460)
 
 ### Experimental
 

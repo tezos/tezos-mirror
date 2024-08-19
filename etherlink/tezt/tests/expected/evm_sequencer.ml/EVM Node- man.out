@@ -315,7 +315,7 @@ Miscellaneous commands:
       [--initial-kernel <evm_installer.wasm>]
       [--preimages-dir <_evm_installer_preimages>]
       [--preimages-endpoint <url>] [--bundler-node-endpoint <url>]
-      [--dont-track-rollup-node]
+      [--dont-track-rollup-node] [--private-rpc-port <PORT>]
     Start the EVM node in observer mode. DEPRECATED, please uses `run observer` command.
     <evm-node-endpoint>: The EVM node endpoint address (as ADDR:PORT) the node will communicate with.
     <rollup-node-endpoint>: The address of a rollup node.
@@ -343,6 +343,7 @@ Miscellaneous commands:
     --preimages-endpoint <url>: The address of a service which provides pre-images for the rollup. Missing pre-images will be downloaded remotely if they are not already present on disk.
     --bundler-node-endpoint <url>: The address of a service which encrypts incoming transactions for the rollup.
     --dont-track-rollup-node: Disable tracking the head of the rollup node. Tracking the state of a rollup node allows to confirm the blocks received from the upstream EVM node.
+    --private-rpc-port <PORT>: The EVM node private server rpc port.
   
   run observer [--data-dir <data-dir>] [--rpc-addr <ADDR>]
       [--rpc-port <PORT>] [--rpc-batch-limit <PORT>] [--devmode]
