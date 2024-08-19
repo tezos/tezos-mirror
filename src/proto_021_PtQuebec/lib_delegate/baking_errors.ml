@@ -33,8 +33,6 @@ type error +=
       baker_commit_info : Tezos_version.Octez_node_version.commit_info option;
     }
 
-type error += Node_version_malformatted of string
-
 type error += Cannot_load_local_file of string
 
 type error += Broken_locked_values_invariant
@@ -78,30 +76,19 @@ let () =
         fmt
         "@[Node version is %a (%a) but it is expected to be more recent than \
          %a (%a).@ This check can be bypassed at your own risk with the flag \
-         --node-version-check-bypass or the argument --node-version-allowed \
-         %a%a .@]"
-        Tezos_version.Version.pp
+         --node-version-check-bypass.@]"
+        Tezos_version.Version.pp_simple
         node_version
         (Format.pp_print_option
            ~none:(fun ppf () -> Format.pp_print_string ppf "none")
            Tezos_version.Octez_node_version.commit_info_pp_short)
         node_commit_info
-        Tezos_version.Version.pp
+        Tezos_version.Version.pp_simple
         baker_version
         (Format.pp_print_option
            ~none:(fun ppf () -> Format.pp_print_string ppf "none")
            Tezos_version.Octez_node_version.commit_info_pp_short)
-        baker_commit_info
-        Tezos_version.Version.pp_arg
-        node_version
-        (Format.pp_print_option
-           ~none:(fun _ppf () -> ())
-           (fun ppf ->
-             Format.fprintf
-               ppf
-               ":%a"
-               Tezos_version.Octez_node_version.commit_info_pp_short))
-        node_commit_info)
+        baker_commit_info)
     Data_encoding.(
       obj4
         (req "node_version" Tezos_version.Octez_node_version.version_encoding)
@@ -120,20 +107,6 @@ let () =
     (fun (node_version, node_commit_info, baker_version, baker_commit_info) ->
       Node_version_incompatible
         {node_version; node_commit_info; baker_version; baker_commit_info}) ;
-  register_error_kind
-    `Temporary
-    ~id:"Baking_commands.node_version_malformatted"
-    ~title:"Node version in command argument is malformatted"
-    ~description:"The node version provided in command argument is malformatted"
-    ~pp:(fun fmt version ->
-      Format.fprintf
-        fmt
-        "The node version provided in command argument: '%s' is a malformatted \
-         version"
-        version)
-    Data_encoding.(obj1 (req "provided_version" string))
-    (function Node_version_malformatted v -> Some v | _ -> None)
-    (fun v -> Node_version_malformatted v) ;
   register_error_kind
     `Temporary
     ~id:"Baking_scheduling.cannot_load_local_file"

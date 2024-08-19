@@ -46,42 +46,9 @@ let may_lock_pidfile pidfile_opt f =
         ~filename:pidfile
         f
 
-let check_node_version cctxt bypass allowed =
+let check_node_version cctxt check_node_version_bypass =
   let open Lwt_result_syntax in
-  (* Parse and check allowed versions *)
-  let*? allowed =
-    let open Result_syntax in
-    Option.map_e
-      (fun allowed ->
-        match
-          Tezos_version_parser.version_commit (Lexing.from_string allowed)
-        with
-        | None -> tzfail (Node_version_malformatted allowed)
-        | Some x -> return x)
-      allowed
-  in
-  let is_allowed node_version
-      (node_commit_info : Tezos_version.Octez_node_version.commit_info option) =
-    match allowed with
-    | None -> false
-    | Some (v, c) -> (
-        let c =
-          Option.map
-            (fun commit_hash ->
-              Tezos_version.Octez_node_version.{commit_hash; commit_date = ""})
-            c
-        in
-        match
-          Tezos_version.Octez_node_version.partially_compare
-            v
-            c
-            node_version
-            node_commit_info
-        with
-        | None -> false
-        | Some x -> x = 0)
-  in
-  if bypass then
+  if check_node_version_bypass then
     let*! () = Events.(emit node_version_check_bypass ()) in
     return_unit
   else
@@ -104,25 +71,23 @@ let check_node_version cctxt bypass allowed =
             baker_version,
             baker_commit_info ))
     in
-    if is_allowed node_version.version node_version.commit_info then return_unit
-    else
-      match
-        Tezos_version.Octez_node_version.partially_compare
-          baker_version
-          baker_commit_info
-          node_version.version
-          node_version.commit_info
-      with
-      | Some r when r <= 0 -> return_unit
-      | _ ->
-          tzfail
-            (Node_version_incompatible
-               {
-                 node_version = node_version.version;
-                 node_commit_info = node_version.commit_info;
-                 baker_version;
-                 baker_commit_info;
-               })
+    match
+      Tezos_version.Octez_node_version.partially_compare
+        baker_version
+        baker_commit_info
+        node_version.version
+        node_version.commit_info
+    with
+    | Some r when r <= 0 -> return_unit
+    | _ ->
+        tzfail
+          (Node_version_incompatible
+             {
+               node_version = node_version.version;
+               node_commit_info = node_version.commit_info;
+               baker_version;
+               baker_commit_info;
+             })
 
 let http_headers_env_variable =
   "TEZOS_CLIENT_REMOTE_OPERATIONS_POOL_HTTP_HEADERS"
@@ -284,19 +249,6 @@ let node_version_check_bypass_arg =
       "If node-version-check-bypass flag is set, the baker will not check its \
        compatibility with the version of the node to which it is connected."
     ()
-
-let node_version_allowed_arg =
-  Tezos_clic.arg
-    ~long:"node-version-allowed"
-    ~placeholder:"<product>-[v]<major>.<minor>[.0]<info>[:<commit>]"
-    ~doc:
-      "When specified the baker will accept to run with a node of this \
-       version. The specified version is composed of the product, for example \
-       'octez'; the major and the minor versions that are positive integers; \
-       the info, for example '-rc', '-beta1+dev' or realese if none is \
-       provided; optionally the commit that is the hash of the last git commit \
-       or a prefix of at least 8 characters long."
-    string_parameter
 
 let get_delegates (cctxt : Protocol_client_context.full)
     (pkhs : Signature.public_key_hash list) =
@@ -664,10 +616,9 @@ let lookup_default_vote_file_path (cctxt : Protocol_client_context.full) =
 type baking_mode = Local of {local_data_dir_path : string} | Remote
 
 let baker_args =
-  Tezos_clic.args15
+  Tezos_clic.args14
     pidfile_arg
     node_version_check_bypass_arg
-    node_version_allowed_arg
     minimal_fees_arg
     minimal_nanotez_per_gas_unit_arg
     minimal_nanotez_per_byte_arg
@@ -683,8 +634,7 @@ let baker_args =
 
 let run_baker
     ( pidfile,
-      node_version_check_bypass,
-      node_version_allowed,
+      check_node_version_bypass,
       minimal_fees,
       minimal_nanotez_per_gas_unit,
       minimal_nanotez_per_byte,
@@ -699,9 +649,7 @@ let run_baker
       pre_emptive_forge_time ) baking_mode sources cctxt =
   let open Lwt_result_syntax in
   may_lock_pidfile pidfile @@ fun () ->
-  let* () =
-    check_node_version cctxt node_version_check_bypass node_version_allowed
-  in
+  let* () = check_node_version cctxt check_node_version_bypass in
   let*! per_block_vote_file =
     if per_block_vote_file = None then
       (* If the votes file was not explicitly given, we
