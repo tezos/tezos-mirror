@@ -31,7 +31,7 @@
     Subject:    This module tests that Michelson instructions related to block time are correct.
 *)
 
-open Tezos_protocol_021_PtQuebec_parameters
+open Tezos_protocol_beta_parameters
 open Protocol
 open Alpha_context
 
