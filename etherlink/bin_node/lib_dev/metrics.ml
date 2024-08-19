@@ -176,13 +176,31 @@ module Tx_pool = struct
           ])
 end
 
-type t = {chain : Chain.t; block : Block.t}
+module Simulation = struct
+  type t = {inconsistent_da_fees : Counter.t}
+
+  let init name =
+    let inconsistent_da_fees =
+      Counter.v_label
+        ~registry
+        ~label_name:"inconsistent_da_fees"
+        ~help:"Node DA fees are inconsistent with kernel ones"
+        ~namespace
+        ~subsystem
+        "inconsistent_da_fees"
+        name
+    in
+    {inconsistent_da_fees}
+end
+
+type t = {chain : Chain.t; block : Block.t; simulation : Simulation.t}
 
 let metrics =
   let name = "Etherlink" in
   let chain = Chain.init name in
   let block = Block.init name in
-  {chain; block}
+  let simulation = Simulation.init name in
+  {chain; block; simulation}
 
 let init ~mode ~tx_pool_size_info =
   Info.init ~mode ;

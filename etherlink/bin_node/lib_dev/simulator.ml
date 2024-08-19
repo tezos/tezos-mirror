@@ -175,6 +175,8 @@ module Make (SimulationBackend : SimulationBackend) = struct
       return (Z.sub total_gas execution_gas)
     in
     unless (node_da_fees = kernel_da_fees) (fun () ->
+        Prometheus.Counter.inc_one
+          Metrics.metrics.simulation.inconsistent_da_fees ;
         let*! () = Events.invalid_node_da_fees ~node_da_fees ~kernel_da_fees in
         return_unit)
 
