@@ -368,12 +368,6 @@ let evm_node_endpoint_arg =
     ~doc:"The address of an EVM node to connect to."
     Params.evm_node_endpoint
 
-let rollup_node_endpoint_param =
-  Tezos_clic.param
-    ~name:"rollup-node-endpoint"
-    ~desc:"The address of a rollup node."
-    Params.rollup_node_endpoint
-
 let bundler_node_endpoint_arg =
   Tezos_clic.arg
     ~long:"bundler-node-endpoint"
@@ -641,18 +635,6 @@ let snapshot_dir_arg =
        directory)"
     Params.string
 
-let assert_rollup_node_endpoint_equal ~arg ~param =
-  if arg <> param then
-    Error
-      [
-        error_of_fmt
-          "parameter rollup node endpoint %s is different to arg rollup node \
-           endpoint %s"
-          (Uri.to_string param)
-          (Uri.to_string arg);
-      ]
-  else Ok ()
-
 let start_proxy ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?rpc_batch_limit
     ?cors_origins ?cors_headers ?log_filter_max_nb_blocks
     ?log_filter_max_nb_logs ?log_filter_chunk_size ?rollup_node_endpoint
@@ -706,77 +688,6 @@ let start_proxy ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?rpc_batch_limit
   let wait, _resolve = Lwt.wait () in
   let* () = wait in
   return_unit
-
-let proxy_command =
-  let open Tezos_clic in
-  let open Lwt_result_syntax in
-  command
-    ~desc:
-      "Start the EVM node in proxy mode. DEPRECATED, please uses the `run \
-       proxy` command."
-    (merge_options common_config_args (args1 read_only_arg))
-    (prefixes ["run"; "proxy"; "with"; "endpoint"]
-    @@ param
-         ~name:"rollup-node-endpoint"
-         ~desc:
-           "The smart rollup node endpoint address (as ADDR:PORT) the node \
-            will communicate with."
-         Params.rollup_node_endpoint
-    @@ stop)
-    (fun ( ( data_dir,
-             rpc_addr,
-             rpc_port,
-             rpc_batch_limit,
-             _devmode,
-             cors_origins,
-             cors_headers,
-             log_filter_max_nb_blocks,
-             log_filter_max_nb_logs,
-             log_filter_chunk_size,
-             keep_alive,
-             rollup_node_endpoint_from_arg,
-             tx_pool_timeout_limit,
-             tx_pool_addr_limit,
-             tx_pool_tx_per_addr_limit,
-             verbose,
-             restricted_rpcs,
-             whitelisted_rpcs,
-             blacklisted_rpcs ),
-           read_only )
-         rollup_node_endpoint
-         () ->
-      let* restricted_rpcs =
-        pick_restricted_rpcs restricted_rpcs whitelisted_rpcs blacklisted_rpcs
-      in
-      let*? () =
-        Option.iter_e
-          (fun rollup_node_endpoint_from_arg ->
-            assert_rollup_node_endpoint_equal
-              ~arg:rollup_node_endpoint_from_arg
-              ~param:rollup_node_endpoint)
-          rollup_node_endpoint_from_arg
-      in
-      start_proxy
-        ~data_dir
-        ~keep_alive
-        ?rpc_addr
-        ?rpc_port
-        ?rpc_batch_limit
-        ?cors_origins
-        ?cors_headers
-        ?log_filter_max_nb_blocks
-        ?log_filter_max_nb_logs
-        ?log_filter_chunk_size
-        ~rollup_node_endpoint
-        ?tx_pool_timeout_limit
-        ?tx_pool_addr_limit
-        ?tx_pool_tx_per_addr_limit
-        ?restricted_rpcs
-        ~verbose
-        ~read_only
-        ~finalized_view:false
-        ~ignore_block_param:false
-        ())
 
 let register_wallet ?password_filename ~wallet_dir () =
   let wallet_ctxt =
@@ -951,120 +862,6 @@ let start_threshold_encryption_sequencer ?password_filename ~wallet_dir
     ~configuration
     ?kernel
     ()
-
-let sequencer_command =
-  let open Tezos_clic in
-  let open Lwt_result_syntax in
-  command
-    ~desc:
-      "Start the EVM node in sequencer mode. DEPRECATED, please uses `run \
-       sequencer` command."
-    (merge_options
-       common_config_args
-       (args14
-          initial_kernel_arg
-          private_rpc_port_arg
-          preimages_arg
-          preimages_endpoint_arg
-          time_between_blocks_arg
-          genesis_timestamp_arg
-          maximum_blueprints_lag_arg
-          maximum_blueprints_ahead_arg
-          maximum_blueprints_catchup_arg
-          catchup_cooldown_arg
-          max_number_of_chunks_arg
-          wallet_dir_arg
-          (Client_config.password_filename_arg ())
-          dal_slots_arg))
-    (prefixes ["run"; "sequencer"; "with"; "endpoint"]
-    @@ param
-         ~name:"rollup-node-endpoint"
-         ~desc:
-           "The smart rollup node endpoint address (as ADDR:PORT) the node \
-            will communicate with."
-         Params.rollup_node_endpoint
-    @@ prefixes ["signing"; "with"]
-    @@ Params.sequencer_key @@ stop)
-    (fun ( ( data_dir,
-             rpc_addr,
-             rpc_port,
-             rpc_batch_limit,
-             _devmode,
-             cors_origins,
-             cors_headers,
-             log_filter_max_nb_blocks,
-             log_filter_max_nb_logs,
-             log_filter_chunk_size,
-             keep_alive,
-             rollup_node_endpoint_from_arg,
-             tx_pool_timeout_limit,
-             tx_pool_addr_limit,
-             tx_pool_tx_per_addr_limit,
-             verbose,
-             restricted_rpcs,
-             blacklisted_rpcs,
-             whitelisted_rpcs ),
-           ( kernel,
-             private_rpc_port,
-             preimages,
-             preimages_endpoint,
-             time_between_blocks,
-             genesis_timestamp,
-             max_blueprints_lag,
-             max_blueprints_ahead,
-             max_blueprints_catchup,
-             catchup_cooldown,
-             max_number_of_chunks,
-             wallet_dir,
-             password_filename,
-             dal_slots ) )
-         rollup_node_endpoint
-         sequencer_str
-         () ->
-      let* restricted_rpcs =
-        pick_restricted_rpcs restricted_rpcs whitelisted_rpcs blacklisted_rpcs
-      in
-      let*? () =
-        Option.iter_e
-          (fun rollup_node_endpoint_from_arg ->
-            assert_rollup_node_endpoint_equal
-              ~arg:rollup_node_endpoint_from_arg
-              ~param:rollup_node_endpoint)
-          rollup_node_endpoint_from_arg
-      in
-      start_sequencer
-        ?password_filename
-        ~wallet_dir
-        ~data_dir
-        ?rpc_addr
-        ?rpc_port
-        ?rpc_batch_limit
-        ?cors_origins
-        ?cors_headers
-        ?tx_pool_timeout_limit
-        ?tx_pool_addr_limit
-        ?tx_pool_tx_per_addr_limit
-        ~keep_alive
-        ~rollup_node_endpoint
-        ~verbose
-        ?preimages
-        ?preimages_endpoint
-        ?time_between_blocks
-        ?max_number_of_chunks
-        ?private_rpc_port
-        ~sequencer_str
-        ?max_blueprints_lag
-        ?max_blueprints_ahead
-        ?max_blueprints_catchup
-        ?catchup_cooldown
-        ?log_filter_max_nb_blocks
-        ?log_filter_max_nb_logs
-        ?log_filter_chunk_size
-        ?genesis_timestamp
-        ?restricted_rpcs
-        ?kernel
-        ?dal_slots
-        ())
 
 let rpc_run_args =
   Tezos_clic.args3 evm_node_endpoint_arg preimages_arg preimages_endpoint_arg
@@ -1243,96 +1040,6 @@ let start_observer ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?rpc_batch_limit
   in
   let*! () = Internal_event.Simple.emit Event.event_starting "observer" in
   Evm_node_lib_dev.Observer.main ?kernel_path:kernel ~data_dir ~config ()
-
-let observer_command =
-  let open Tezos_clic in
-  let open Lwt_result_syntax in
-  command
-    ~desc:
-      "Start the EVM node in observer mode. DEPRECATED, please uses `run \
-       observer` command."
-    (merge_options
-       common_config_args
-       (args6
-          initial_kernel_arg
-          preimages_arg
-          preimages_endpoint_arg
-          bundler_node_endpoint_arg
-          dont_track_rollup_node_arg
-          private_rpc_port_arg))
-    (prefixes ["run"; "observer"; "with"; "endpoint"]
-    @@ param
-         ~name:"evm-node-endpoint"
-         ~desc:
-           "The EVM node endpoint address (as ADDR:PORT) the node will \
-            communicate with."
-         Params.evm_node_endpoint
-    @@ prefixes ["and"; "rollup"; "node"; "endpoint"]
-    @@ rollup_node_endpoint_param @@ stop)
-  @@ fun ( ( data_dir,
-             rpc_addr,
-             rpc_port,
-             rpc_batch_limit,
-             _devmode,
-             cors_origins,
-             cors_headers,
-             log_filter_max_nb_blocks,
-             log_filter_max_nb_logs,
-             log_filter_chunk_size,
-             keep_alive,
-             rollup_node_endpoint_from_arg,
-             tx_pool_timeout_limit,
-             tx_pool_addr_limit,
-             tx_pool_tx_per_addr_limit,
-             verbose,
-             restricted_rpcs,
-             blacklisted_rpcs,
-             whitelisted_rpcs ),
-           ( kernel,
-             preimages,
-             preimages_endpoint,
-             threshold_encryption_bundler_endpoint,
-             dont_track_rollup_node,
-             private_rpc_port ) )
-             evm_node_endpoint
-             rollup_node_endpoint
-             () ->
-  let* restricted_rpcs =
-    pick_restricted_rpcs restricted_rpcs whitelisted_rpcs blacklisted_rpcs
-  in
-  let*? () =
-    Option.iter_e
-      (fun rollup_node_endpoint_from_arg ->
-        assert_rollup_node_endpoint_equal
-          ~arg:rollup_node_endpoint_from_arg
-          ~param:rollup_node_endpoint)
-      rollup_node_endpoint_from_arg
-  in
-  start_observer
-    ~data_dir
-    ~keep_alive
-    ?rpc_addr
-    ?rpc_port
-    ?rpc_batch_limit
-    ?private_rpc_port
-    ?cors_origins
-    ?cors_headers
-    ~verbose
-    ?preimages
-    ~rollup_node_endpoint
-    ~dont_track_rollup_node
-    ?preimages_endpoint
-    ~evm_node_endpoint
-    ?threshold_encryption_bundler_endpoint
-    ?tx_pool_timeout_limit
-    ?tx_pool_addr_limit
-    ?tx_pool_tx_per_addr_limit
-    ?log_filter_chunk_size
-    ?log_filter_max_nb_logs
-    ?log_filter_max_nb_blocks
-    ?restricted_rpcs
-    ?kernel
-    ()
 
 let make_dev_messages ~kind ~smart_rollup_address data =
   let open Lwt_result_syntax in
@@ -1947,7 +1654,7 @@ let make_kernel_config_command =
         ~output
         ())
 
-let proxy_simple_command =
+let proxy_command =
   let open Tezos_clic in
   command
     ~desc:"Start the EVM node in proxy mode."
@@ -2037,7 +1744,7 @@ let sandbox_config_args =
     wallet_dir_arg
     (Client_config.password_filename_arg ())
 
-let sequencer_simple_command =
+let sequencer_command =
   let open Tezos_clic in
   command
     ~desc:"Start the EVM node in sequencer mode"
@@ -2308,7 +2015,7 @@ let observer_run_args =
     initial_kernel_arg
     dont_track_rollup_node_arg
 
-let observer_simple_command =
+let observer_command =
   let open Tezos_clic in
   command
     ~desc:"Start the EVM node in observer mode"
@@ -2506,12 +2213,9 @@ let commands =
   [
     sandbox_command;
     proxy_command;
-    proxy_simple_command;
     sequencer_command;
-    sequencer_simple_command;
     threshold_encryption_sequencer_command;
     observer_command;
-    observer_simple_command;
     rpc_command;
     chunker_command;
     make_upgrade_command;
