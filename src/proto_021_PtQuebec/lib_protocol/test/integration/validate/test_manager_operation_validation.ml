@@ -8,7 +8,7 @@
 (** Testing
     -------
     Component:  Protocol (validate manager)
-    Invocation: dune exec src/proto_021_PtQuebec/lib_protocol/test/integration/validate/main.exe \
+    Invocation: dune exec src/proto_beta/lib_protocol/test/integration/validate/main.exe \
                   -- --file test_manager_operation_validation.ml
     Subject:    Validation of manager operation.
 *)

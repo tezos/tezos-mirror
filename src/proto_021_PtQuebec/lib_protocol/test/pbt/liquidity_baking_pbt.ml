@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    pbt for liquidity baking
-    Invocation:   dune exec src/proto_021_PtQuebec/lib_protocol/test/pbt/main.exe \
+    Invocation:   dune exec src/proto_beta/lib_protocol/test/pbt/main.exe \
                   -- --file liquidity_baking_pbt.ml
     Subject:      Test liquidity baking contracts using randomly generated inputs.
 *)

@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:  Lib_dac_node Dac_hash
-    Invocation: dune exec src/proto_021_PtQuebec/lib_dac_plugin/test/main.exe \
+    Invocation: dune exec src/proto_beta/lib_dac_plugin/test/main.exe \
                   -- --file test_dac_plugin_registration.ml
     Subject:    Tests for the interoperability between Dac hash
                 and given protocol hash

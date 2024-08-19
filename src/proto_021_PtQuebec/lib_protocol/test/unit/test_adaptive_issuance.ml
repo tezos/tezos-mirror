@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (rewards)
-    Invocation: dune exec src/proto_021_PtQuebec/lib_protocol/test/unit/main.exe \
+    Invocation: dune exec src/proto_beta/lib_protocol/test/unit/main.exe \
                  -- --file test_adaptive_issuance.ml
     Subject:    Test reward values under adaptive issuance
 *)

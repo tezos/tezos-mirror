@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (gas costs)
-    Invocation: dune exec src/proto_021_PtQuebec/lib_protocol/test/integration/gas/main.exe \
+    Invocation: dune exec src/proto_beta/lib_protocol/test/integration/gas/main.exe \
                   -- --file test_gas_costs.ml
     Subject:    Gas costs
                 Current limitations: for maps, sets & compare, we only test

@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (smart contract rollup inbox)
-    Invocation: dune exec src/proto_021_PtQuebec/lib_protocol/test/unit/main.exe \
+    Invocation: dune exec src/proto_beta/lib_protocol/test/unit/main.exe \
                   -- --file test_sc_rollup_inbox.ml
     Subject:    These unit tests check the off-line inbox implementation for
                 smart contract rollups
