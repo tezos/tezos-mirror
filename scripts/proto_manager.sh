@@ -992,7 +992,7 @@ function misc_updates() {
 
   if [[ ${is_snapshot} == true ]]; then
     # update linter to remove special rule for stabilised protocol
-    sed -i.old -e "s/-not -name \"proto_${protocol_source}\"//" scripts/lint.sh
+    sed -i.old -e "s/ -not -name \"proto_${protocol_source}\"//" scripts/lint.sh
     commit "scripts: update linter to remove special rule for ${protocol_source} protocol"
   else
     # update linter to allow reformating of beta protocol
