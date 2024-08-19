@@ -103,7 +103,7 @@ let register_test ~__FILE__ ~tags ((title, is_slow, test) : test_closure) : unit
       ~uses_client:false
       ~uses_admin_client:false
       test
-      [Quebec])
+      [Beta])
 
 let register_tests ~__FILE__ ~tags (l : test_closure list) : unit =
   List.iter (register_test ~__FILE__ ~tags) l

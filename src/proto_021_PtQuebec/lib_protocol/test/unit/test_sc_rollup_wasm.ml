@@ -321,12 +321,12 @@ let test_reveal_compat_raw_data () =
      - Update [src/lib_scoru_wasm/pvm_input_kind.ml] to add a new case
        to the type [protocol], and update the functions
        [protocol_from_raw] and [Internal_for_tests.proto_to_binary]
-       accordingly (by copy/pasting the [Quebec] case and doing
+       accordingly (by copy/pasting the [Beta] case and doing
        the necessary renaming.
      - Update [src/lib_scoru_wasm/wasm_vm.ml], more precisely the
        [version_for_protocol] function, to take into account the new
        protocol. The expected result is the same as for
-       [Quebec]. *)
+       [Beta]. *)
 let test_protocol_names () =
   let open Alpha_context.Sc_rollup.Inbox_message in
   let protocol_migration_message_str =
