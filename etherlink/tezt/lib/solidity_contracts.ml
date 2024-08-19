@@ -338,3 +338,10 @@ let call_tracer_revert () =
     ~label:"call_tracer_revert"
     ~contract:"ErrorContract"
     ~evm_version:"shanghai"
+
+let precompiles () =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/precompiles.sol")
+    ~label:"precompiles"
+    ~contract:"PrecompileCaller"
+    ~evm_version:"shanghai"
