@@ -81,8 +81,8 @@ RPC Changes
 
 - In the following paths, ``../`` is short for
   ``/chains/<chain_id>/blocks/<block_id>/context/delegates/<baker_pkh>/``.
-  See https://tezos.gitlab.io/quebec/baking_power.html for more
-  details on the renamed and new RPCs.
+  The documentation for the RPCs can be found on
+  https://tezos.gitlab.io/quebec/rpc.html.
 
   * Renamed RPC ``GET ../current_frozen_deposits`` to ``GET
     ../total_staked``.  The old path is now **deprecated**. (MR
