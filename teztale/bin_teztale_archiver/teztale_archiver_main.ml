@@ -41,9 +41,11 @@ let main_json cctxt prefix =
   let dumper = Json_archiver.launch cctxt prefix in
   let main =
     let*! () =
-      Lwt.Infix.(
-        General_archiver.Json_loops.blocks_loop cctxt
-        <&> General_archiver.Json_loops.endorsements_loop cctxt)
+      Lwt.join
+        [
+          General_archiver.Json_loops.blocks_loop cctxt;
+          General_archiver.Json_loops.endorsements_loop cctxt;
+        ]
     in
     let () = Json_archiver.stop () in
     Lwt.return_unit
@@ -59,9 +61,11 @@ let main_server state cctxt =
   let dumper = Server_archiver.launch state "source-not-used" in
   let main =
     let*! () =
-      Lwt.Infix.(
-        General_archiver.Server_loops.blocks_loop cctxt
-        <&> General_archiver.Server_loops.endorsements_loop cctxt)
+      Lwt.join
+        [
+          General_archiver.Server_loops.blocks_loop cctxt;
+          General_archiver.Server_loops.endorsements_loop cctxt;
+        ]
     in
     let () = Server_archiver.stop () in
     Lwt.return_unit

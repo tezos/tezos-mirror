@@ -208,96 +208,102 @@ let rec merge_baking_rights (acc : Data.baking_right list) = function
 let dump_included_in_block logger path block_level block_hash block_predecessor
     block_round timestamp reception_times baker cycle_info consensus_ops
     baking_rights =
-  let open Lwt.Infix in
-  (let endorsements_level = Int32.pred block_level in
-   let filename = filename_of_level path endorsements_level in
-   Log.info logger (fun () ->
-       Format.asprintf
-         "Dumping delegate operations in block %a at level %li."
-         Block_hash.pp
-         block_hash
-         block_level) ;
-   let mutex = get_file_mutex filename in
-   Lwt_mutex.with_lock mutex (fun () ->
-       let* (info : level_file_content) =
-         load filename level_file_content_encoding level_file_content_empty
-       in
-       let delegate_operations =
-         add_inclusion_in_block
-           block_hash
-           consensus_ops
-           info.delegate_operations
-       in
-       let out =
-         {
-           cycle_info;
-           blocks = info.blocks;
-           delegate_operations;
-           unaccurate = info.unaccurate;
-           baking_rights = info.baking_rights;
-         }
-       in
-       write filename level_file_content_encoding out)
-   >>= fun out ->
-   let () = drop_file_mutex filename in
-   match out with
-   | Ok () -> Lwt.return_unit
-   | Error err ->
-       Log.error logger (fun () ->
-           Format.asprintf
-             "@[Failed to dump delegate operations in block %a at level %li :@ \
-              @[%a@]@]"
-             Block_hash.pp
-             block_hash
-             block_level
-             Error_monad.pp_print_trace
-             err) ;
-       Lwt.return_unit)
-  <&>
-  let filename = filename_of_level path block_level in
-  let mutex = get_file_mutex filename in
-  Lwt_mutex.with_lock mutex (fun () ->
-      let* infos =
-        load filename level_file_content_encoding level_file_content_empty
-      in
-      let delegate_operations = infos.delegate_operations in
-      let blocks =
-        Data.Block.
-          {
-            hash = block_hash;
-            predecessor = block_predecessor;
-            delegate = baker;
-            round = block_round;
-            reception_times;
-            timestamp;
-            nonce = None;
-          }
-        :: infos.blocks
-      in
-      write
-        filename
-        level_file_content_encoding
-        {
-          cycle_info;
-          blocks;
-          delegate_operations;
-          unaccurate = infos.unaccurate;
-          baking_rights = merge_baking_rights infos.baking_rights baking_rights;
-        })
-  >>= fun out ->
-  let () = drop_file_mutex filename in
-  match out with
-  | Ok () -> Lwt.return_unit
-  | Error err ->
-      Log.error logger (fun () ->
-          Format.asprintf
-            "@[Failed to dump block %a at level %li :@ @[%a@]@]"
-            Block_hash.pp
-            block_hash
-            block_level
-            Error_monad.pp_print_trace
-            err) ;
-      Lwt.return_unit
+  let delegate_operations_t =
+    let endorsements_level = Int32.pred block_level in
+    let filename = filename_of_level path endorsements_level in
+    Log.info logger (fun () ->
+        Format.asprintf
+          "Dumping delegate operations in block %a at level %li."
+          Block_hash.pp
+          block_hash
+          block_level) ;
+    let mutex = get_file_mutex filename in
+    let*! out =
+      Lwt_mutex.with_lock mutex (fun () ->
+          let* (info : level_file_content) =
+            load filename level_file_content_encoding level_file_content_empty
+          in
+          let delegate_operations =
+            add_inclusion_in_block
+              block_hash
+              consensus_ops
+              info.delegate_operations
+          in
+          let out =
+            {
+              cycle_info;
+              blocks = info.blocks;
+              delegate_operations;
+              unaccurate = info.unaccurate;
+              baking_rights = info.baking_rights;
+            }
+          in
+          write filename level_file_content_encoding out)
+    in
+    let () = drop_file_mutex filename in
+    match out with
+    | Ok () -> Lwt.return_unit
+    | Error err ->
+        Log.error logger (fun () ->
+            Format.asprintf
+              "@[Failed to dump delegate operations in block %a at level %li \
+               :@ @[%a@]@]"
+              Block_hash.pp
+              block_hash
+              block_level
+              Error_monad.pp_print_trace
+              err) ;
+        Lwt.return_unit
+  in
+  let blocks_t =
+    let filename = filename_of_level path block_level in
+    let mutex = get_file_mutex filename in
+    let*! out =
+      Lwt_mutex.with_lock mutex (fun () ->
+          let* infos =
+            load filename level_file_content_encoding level_file_content_empty
+          in
+          let delegate_operations = infos.delegate_operations in
+          let blocks =
+            Data.Block.
+              {
+                hash = block_hash;
+                predecessor = block_predecessor;
+                delegate = baker;
+                round = block_round;
+                reception_times;
+                timestamp;
+                nonce = None;
+              }
+            :: infos.blocks
+          in
+          write
+            filename
+            level_file_content_encoding
+            {
+              cycle_info;
+              blocks;
+              delegate_operations;
+              unaccurate = infos.unaccurate;
+              baking_rights =
+                merge_baking_rights infos.baking_rights baking_rights;
+            })
+    in
+    let () = drop_file_mutex filename in
+    match out with
+    | Ok () -> Lwt.return_unit
+    | Error err ->
+        Log.error logger (fun () ->
+            Format.asprintf
+              "@[Failed to dump block %a at level %li :@ @[%a@]@]"
+              Block_hash.pp
+              block_hash
+              block_level
+              Error_monad.pp_print_trace
+              err) ;
+        Lwt.return_unit
+  in
+  Lwt.join [delegate_operations_t; blocks_t]
 
 (* NB: the same operation may be received several times; we only record the
    first reception time. *)
