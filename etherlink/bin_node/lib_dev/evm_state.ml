@@ -74,6 +74,7 @@ let execute ?(wasm_pvm_fallback = false) ?(profile = false)
     if profile then
       let* evm_state, _, _ =
         Wasm.Commands.profile
+          ~migrate_to:Proto_alpha
           ~collapse:false
           ~with_time:true
           ~no_reboot:false
@@ -93,6 +94,7 @@ let execute ?(wasm_pvm_fallback = false) ?(profile = false)
       in
       let* evm_state, _, _, _ =
         Wasm.Commands.eval
+          ~migrate_to:Proto_alpha
           ~hooks
           ~write_debug
           ~wasm_entrypoint

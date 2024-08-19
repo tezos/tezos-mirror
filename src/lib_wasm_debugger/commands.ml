@@ -607,13 +607,14 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
   (* [load_inputs_gen inboxes level tree] reads the next inbox from [inboxes], set the
      messages at [level] in the [tree], and returns the remaining inbox, the next
      level and the tree. *)
-  let load_inputs_gen inboxes level tree =
+  let load_inputs_gen ?migrate_to inboxes level tree =
     let open Lwt_result_syntax in
     match Seq.uncons inboxes with
     | Some (inputs, inboxes) ->
         let* tree =
           trap_exn (fun () ->
               set_full_input_step_gen
+                ?migrate_to
                 set_raw_message_input_step
                 inputs
                 level
@@ -624,17 +625,18 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
         let*! () = Lwt_fmt.printf "No more inputs at level %ld\n%!" level in
         return (tree, inboxes, level)
 
-  let load_inputs inboxes level tree =
+  let load_inputs ?migrate_to inboxes level tree =
     let open Lwt_result_syntax in
     let*! status = check_input_request tree in
     match status with
-    | Ok () -> load_inputs_gen inboxes level tree
+    | Ok () -> load_inputs_gen ?migrate_to inboxes level tree
     | Error msg ->
         Format.printf "%s\n%!" msg ;
         return (tree, inboxes, level)
 
   (* Eval dispatcher. *)
-  let eval ?hooks ?write_debug ~wasm_entrypoint level inboxes config step tree =
+  let eval ?hooks ?migrate_to ?write_debug ~wasm_entrypoint level inboxes config
+      step tree =
     let open Lwt_result_syntax in
     let return' ?(inboxes = inboxes) f =
       let* tree, count = f in
@@ -649,7 +651,9 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
         let*! status = check_input_request tree in
         match status with
         | Ok () ->
-            let* tree, inboxes, level = load_inputs inboxes level tree in
+            let* tree, inboxes, level =
+              load_inputs ?migrate_to inboxes level tree
+            in
             let* tree, ticks =
               eval_until_input_requested
                 ?hooks
@@ -663,7 +667,7 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
             return'
               (eval_until_input_requested ?hooks ~wasm_entrypoint config tree))
 
-  let profile ~collapse ~with_time ~no_reboot level inboxes config
+  let profile ?migrate_to ~collapse ~with_time ~no_reboot level inboxes config
       function_symbols tree =
     let open Lwt_result_syntax in
     let*! pvm_state =
@@ -681,7 +685,9 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
 
     match status with
     | Ok () when is_profilable ->
-        let* tree, inboxes, level = load_inputs inboxes level tree in
+        let* tree, inboxes, level =
+          load_inputs ?migrate_to inboxes level tree
+        in
         let* tree =
           eval_and_profile
             ~collapse
