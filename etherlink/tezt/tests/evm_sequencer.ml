@@ -5375,36 +5375,38 @@ let test_trace_transaction_calltracer_all_types =
       ~error_msg:"Wrong call list size, expected %R but got %L") ;
   List.iteri
     (fun position call ->
-      (if position = 0 then
-         Check.(
-           (JSON.(call |-> "type" |> as_string) = "CREATE")
-             string
-             ~error_msg:"Wrong type, expected %R but got %L")) ;
-      (if position = 1 then
-         Check.(
-           (JSON.(call |-> "type" |> as_string) = "CREATE2")
-             string
-             ~error_msg:"Wrong type, expected %R but got %L")) ;
-      (if position = 2 then
-         Check.(
-           (JSON.(call |-> "type" |> as_string) = "CALL")
-             string
-             ~error_msg:"Wrong type, expected %R but got %L")) ;
-      (if position = 3 then
-         Check.(
-           (JSON.(call |-> "type" |> as_string) = "DELEGATECALL")
-             string
-             ~error_msg:"Wrong type, expected %R but got %L")) ;
-      (if position = 4 then
-         Check.(
-           (JSON.(call |-> "type" |> as_string) = "STATICCALL")
-             string
-             ~error_msg:"Wrong type, expected %R but got %L")) ;
-      if position = 5 then
-        Check.(
-          (JSON.(call |-> "type" |> as_string) = "CALLCODE")
-            string
-            ~error_msg:"Wrong type, expected %R but got %L"))
+      match position with
+      | 0 ->
+          Check.(
+            (JSON.(call |-> "type" |> as_string) = "CREATE")
+              string
+              ~error_msg:"Wrong type, expected %R but got %L")
+      | 1 ->
+          Check.(
+            (JSON.(call |-> "type" |> as_string) = "CREATE2")
+              string
+              ~error_msg:"Wrong type, expected %R but got %L")
+      | 2 ->
+          Check.(
+            (JSON.(call |-> "type" |> as_string) = "CALL")
+              string
+              ~error_msg:"Wrong type, expected %R but got %L")
+      | 3 ->
+          Check.(
+            (JSON.(call |-> "type" |> as_string) = "DELEGATECALL")
+              string
+              ~error_msg:"Wrong type, expected %R but got %L")
+      | 4 ->
+          Check.(
+            (JSON.(call |-> "type" |> as_string) = "STATICCALL")
+              string
+              ~error_msg:"Wrong type, expected %R but got %L")
+      | 5 ->
+          Check.(
+            (JSON.(call |-> "type" |> as_string) = "CALLCODE")
+              string
+              ~error_msg:"Wrong type, expected %R but got %L")
+      | _ -> failwith "Impossible case, call list's size should be 6")
     call_list ;
   unit
 
