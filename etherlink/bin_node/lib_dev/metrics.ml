@@ -177,7 +177,7 @@ module Tx_pool = struct
 end
 
 module Simulation = struct
-  type t = {inconsistent_da_fees : Counter.t}
+  type t = {inconsistent_da_fees : Counter.t; confirm_gas_needed : Counter.t}
 
   let init name =
     let inconsistent_da_fees =
@@ -190,7 +190,17 @@ module Simulation = struct
         "inconsistent_da_fees"
         name
     in
-    {inconsistent_da_fees}
+    let confirm_gas_needed =
+      Counter.v_label
+        ~registry
+        ~label_name:"confirm_gas_needed"
+        ~help:"Initially provided gas was not enough, confirmation was needed"
+        ~namespace
+        ~subsystem
+        "confirm_gas_needed"
+        name
+    in
+    {inconsistent_da_fees; confirm_gas_needed}
 end
 
 type t = {chain : Chain.t; block : Block.t; simulation : Simulation.t}

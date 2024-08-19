@@ -196,6 +196,7 @@ module Make (SimulationBackend : SimulationBackend) = struct
     | Error _ | Ok (Error _) ->
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/6984
            All errors should not be treated the same *)
+        Prometheus.Counter.inc_one Metrics.metrics.simulation.confirm_gas_needed ;
         let new_gas = double gas in
         if reached_max new_gas then
           failwith "Gas estimate reached max gas limit."
