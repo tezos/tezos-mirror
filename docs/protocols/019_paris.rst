@@ -177,15 +177,6 @@ Protocol parameters
 
 - Added feature flag to force AI activation at protocol activation. (MR :gl:`!11559`)
 
-Operation receipts
-------------------
-
-- To better differentiate Deposits coming from 'rewards from bakers own stakes'
-  from 'the edge bakers may take from their stakers rewards', the balance updates
-  field has been specialized. The field {"staker":{"baker": <delegate_pkh>}} is now
-  split into {"staker":{"baker_own_stake": <delegate_pkh>}} and {"staker":{"baker_edge":
-  <delegate_pkh>}}. (MR :gl:`!12258`)
-
 10s Blocks Time (MR :gl:`!11288`)
 ---------------------------------
 
