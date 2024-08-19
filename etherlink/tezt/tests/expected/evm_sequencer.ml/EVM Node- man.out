@@ -111,7 +111,7 @@ Miscellaneous commands:
       [--tx-pool-tx-per-addr-limit <16>] [-v --verbose]
       [--restricted-rpcs <regexp>] [--blacklisted-rpcs <blacklist>]
       [--whitelisted-rpcs <whitelist>] [--read-only] [--finalized-view]
-      [--evm-node-endpoint <url>]
+      [--ignore-block-param] [--evm-node-endpoint <url>]
     Start the EVM node in proxy mode.
     --data-dir <data-dir>: The path to the EVM node data directory
     --rpc-addr <ADDR>: The EVM node server rpc address.
@@ -134,6 +134,7 @@ Miscellaneous commands:
     --whitelisted-rpcs <whitelist>: Disable the RPC methods which are not part of the provided list. Cannot be used with --restricted-rpcs or --blacklisted-rpcs.
     --read-only: If the flag is set, the node refuses transactions
     --finalized-view: If the flag is set, the node exposes a view of the latest final state of the rollup, not its current HEAD.
+    --ignore-block-param: If the flag is set, the node in proxy mode ignores the block parameter submitted by the client and defaults to the latest block for unsupported blocks.
     --evm-node-endpoint <url>: The address of an EVM node to connect to.
   
   run sequencer with endpoint <rollup-node-endpoint> signing with <sequencer-key> [--data-dir <data-dir>]

@@ -38,5 +38,7 @@ module Make : functor
      val smart_rollup_address : string
 
      val finalized : bool
+
+     val ignore_block_param : bool
    end)
   -> Services_backend_sig.S

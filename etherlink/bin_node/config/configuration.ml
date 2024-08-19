@@ -56,7 +56,11 @@ type observer = {
   rollup_node_tracking : bool;
 }
 
-type proxy = {finalized_view : bool; evm_node_endpoint : Uri.t option}
+type proxy = {
+  finalized_view : bool;
+  evm_node_endpoint : Uri.t option;
+  ignore_block_param : bool;
+}
 
 type fee_history = {max_count : int option; max_past : int option}
 
@@ -537,17 +541,24 @@ let experimental_features_encoding =
 let proxy_encoding =
   let open Data_encoding in
   conv
-    (fun {finalized_view; evm_node_endpoint} ->
-      (finalized_view, Option.map Uri.to_string evm_node_endpoint))
-    (fun (finalized_view, evm_node_endpoint) ->
+    (fun {finalized_view; evm_node_endpoint; ignore_block_param} ->
+      ( finalized_view,
+        Option.map Uri.to_string evm_node_endpoint,
+        ignore_block_param ))
+    (fun (finalized_view, evm_node_endpoint, ignore_block_param) ->
       {
         finalized_view;
         evm_node_endpoint = Option.map Uri.of_string evm_node_endpoint;
+        ignore_block_param;
       })
-  @@ obj2 (dft "finalized_view" bool false) (opt "evm_node_endpoint" string)
+  @@ obj3
+       (dft "finalized_view" bool false)
+       (opt "evm_node_endpoint" string)
+       (dft "ignore_block_param" bool false)
 
-let default_proxy ?(finalized_view = false) ?evm_node_endpoint () =
-  {finalized_view; evm_node_endpoint}
+let default_proxy ?(finalized_view = false) ?evm_node_endpoint
+    ?(ignore_block_param = false) () =
+  {finalized_view; evm_node_endpoint; ignore_block_param}
 
 let fee_history_encoding =
   let open Data_encoding in
@@ -765,7 +776,7 @@ module Cli = struct
       ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
       ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
       ?catchup_cooldown ?sequencer_sidecar_endpoint ?restricted_rpcs
-      ?proxy_finalized_view ?dal_slots () =
+      ?proxy_finalized_view ?proxy_ignore_block_param ?dal_slots () =
     let sequencer =
       Option.map
         (fun sequencer ->
@@ -809,7 +820,11 @@ module Cli = struct
         evm_node_endpoint
     in
     let proxy =
-      default_proxy ?finalized_view:proxy_finalized_view ?evm_node_endpoint ()
+      default_proxy
+        ?finalized_view:proxy_finalized_view
+        ?evm_node_endpoint
+        ?ignore_block_param:proxy_ignore_block_param
+        ()
     in
     let log_filter =
       default_filter_config
@@ -875,7 +890,7 @@ module Cli = struct
       ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
       ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
       ?catchup_cooldown ?sequencer_sidecar_endpoint ?restricted_rpcs
-      ?proxy_finalized_view ~dal_slots configuration =
+      ?proxy_finalized_view ?proxy_ignore_block_param ~dal_slots configuration =
     let sequencer =
       let sequencer_config = configuration.sequencer in
       match sequencer_config with
@@ -1038,7 +1053,11 @@ module Cli = struct
             evm_node_endpoint
     in
     let proxy =
-      default_proxy ?finalized_view:proxy_finalized_view ?evm_node_endpoint ()
+      default_proxy
+        ?finalized_view:proxy_finalized_view
+        ?evm_node_endpoint
+        ?ignore_block_param:proxy_ignore_block_param
+        ()
     in
     let log_filter =
       {
@@ -1119,7 +1138,7 @@ module Cli = struct
       ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
       ?catchup_cooldown ?log_filter_max_nb_blocks ?log_filter_max_nb_logs
       ?log_filter_chunk_size ?sequencer_sidecar_endpoint ?restricted_rpcs
-      ?proxy_finalized_view ?dal_slots () =
+      ?proxy_finalized_view ?proxy_ignore_block_param ?dal_slots () =
     let open Lwt_result_syntax in
     let open Filename.Infix in
     (* Check if the data directory of the evm node is not the one of Octez
@@ -1172,6 +1191,7 @@ module Cli = struct
           ?sequencer_sidecar_endpoint
           ?restricted_rpcs
           ?proxy_finalized_view
+          ?proxy_ignore_block_param
           ~dal_slots
           configuration
       in
@@ -1210,6 +1230,7 @@ module Cli = struct
           ?sequencer_sidecar_endpoint
           ?restricted_rpcs
           ?proxy_finalized_view
+          ?proxy_ignore_block_param
           ?dal_slots
           ()
       in

@@ -6289,6 +6289,53 @@ let test_cast_work () =
       let* _version = Cast.version () in
       unit)
 
+let test_proxy_ignore_block_param =
+  register_proxy
+    ~tags:["evm"; "ignore_block_param"; "proxy"]
+    ~title:"Proxy can ignore block parameter"
+    ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
+  @@ fun ~protocol:_ ~evm_setup:{produce_block; evm_node; _} ->
+  let int_to_hex i = Format.sprintf "0x%x" i in
+  (* Restart the proxy node with the --ignore-block-param flag *)
+  let* () = Evm_node.terminate evm_node in
+  let* () = Evm_node.run ~extra_arguments:["--ignore-block-param"] evm_node in
+  (* Produce a bunch of blocks to get a “realistic” history. *)
+  let* () =
+    fold 3 () @@ fun i () ->
+    let* raw_tx =
+      Cast.craft_tx
+        ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+        ~chain_id:1337
+        ~nonce:i
+        ~gas_price:21_000
+        ~gas:2_000_000
+        ~value:Wei.zero
+        ~address:Eth_account.bootstrap_accounts.(0).address
+        ()
+    in
+    let* _ = send_n_transactions ~produce_block ~evm_node [raw_tx] in
+    unit
+  in
+  (* Check the nonce for latest and genesis blocks, and assert they are
+     equal. *)
+  let*@ latest_nonce =
+    Rpc.get_transaction_count
+      ~block:"latest"
+      ~address:Eth_account.bootstrap_accounts.(0).address
+      evm_node
+  in
+  let*@ genesis_nonce =
+    Rpc.get_transaction_count
+      ~block:(int_to_hex 0)
+      ~address:Eth_account.bootstrap_accounts.(0).address
+      evm_node
+  in
+  Check.(
+    (latest_nonce = genesis_nonce)
+      int64
+      ~error_msg:"Nonces should be equal since the block param is ignored") ;
+  unit
+
 let register_evm_node ~protocols =
   test_cast_work () ;
   test_originate_evm_kernel protocols ;
@@ -6422,7 +6469,8 @@ let register_evm_node ~protocols =
     ~chain_id_hex:
       "29a7000000000000000000000000000000000000000000000000000000000000"
     ~flag_expected:false
-    protocols
+    protocols ;
+  test_proxy_ignore_block_param protocols
 
 let protocols = Protocol.all
 

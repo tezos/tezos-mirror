@@ -530,6 +530,15 @@ let finalized_view_arg =
     ~long:"finalized-view"
     ()
 
+let ignore_block_param_arg =
+  Tezos_clic.switch
+    ~doc:
+      "If the flag is set, the node in proxy mode ignores the block parameter \
+       submitted by the client and defaults to the latest block for \
+       unsupported blocks."
+    ~long:"ignore-block-param"
+    ()
+
 let restricted_rpcs_arg =
   Tezos_clic.arg
     ~doc:
@@ -649,7 +658,7 @@ let start_proxy ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?rpc_batch_limit
     ?log_filter_max_nb_logs ?log_filter_chunk_size ?rollup_node_endpoint
     ?evm_node_endpoint ?tx_pool_timeout_limit ?tx_pool_addr_limit
     ?tx_pool_tx_per_addr_limit ?restricted_rpcs ~verbose ~read_only
-    ~finalized_view () =
+    ~finalized_view ~ignore_block_param () =
   let open Lwt_result_syntax in
   let* config =
     Cli.create_or_read_config
@@ -670,6 +679,7 @@ let start_proxy ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?rpc_batch_limit
       ?tx_pool_tx_per_addr_limit
       ?restricted_rpcs
       ~proxy_finalized_view:finalized_view
+      ~proxy_ignore_block_param:ignore_block_param
       ~verbose
       ()
   in
@@ -765,6 +775,7 @@ let proxy_command =
         ~verbose
         ~read_only
         ~finalized_view:false
+        ~ignore_block_param:false
         ())
 
 let register_wallet ?password_filename ~wallet_dir () =
@@ -1942,7 +1953,11 @@ let proxy_simple_command =
     ~desc:"Start the EVM node in proxy mode."
     (merge_options
        common_config_args
-       (args3 read_only_arg finalized_view_arg evm_node_endpoint_arg))
+       (args4
+          read_only_arg
+          finalized_view_arg
+          ignore_block_param_arg
+          evm_node_endpoint_arg))
     (prefixes ["run"; "proxy"] @@ stop)
     (fun ( ( data_dir,
              rpc_addr,
@@ -1963,7 +1978,7 @@ let proxy_simple_command =
              restricted_rpcs,
              blacklisted_rpcs,
              whitelisted_rpcs ),
-           (read_only, finalized_view, evm_node_endpoint) )
+           (read_only, finalized_view, ignore_block_param, evm_node_endpoint) )
          () ->
       let open Lwt_result_syntax in
       let* restricted_rpcs =
@@ -1989,6 +2004,7 @@ let proxy_simple_command =
         ~verbose
         ~read_only
         ~finalized_view
+        ~ignore_block_param
         ())
 
 let sequencer_config_args =
