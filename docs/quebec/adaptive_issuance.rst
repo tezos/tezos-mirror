@@ -205,93 +205,50 @@ Where:
   below this bound for the initial period.
 - ``issuance_global_max`` (10%) is the final value for the upper bound, reached at the end of the transition period.
 
-.. _adaptive_maximum_quebec:
+.. _dynmax_rate_quebec:
 
-Adaptive Maximum
-................
+Dynamic Maximum
+......................
 
-In addition to the issuance bounds described above, the Quebec protocol introduces
-another upper bound on the total issuance rate. This new bound, called
-**adaptive maximum**, prevents the issuance rate from taking
-undesirably high values when the staked ratio of the chain is already
-close to the 50% target.
+In addition to the previous bounds, from Alpha onwards we are adding another upper bound to the issuance.
+Called **DynMax**, this maximum is defined as a function of the stake ratio, like the static rate. This
+bound ensures that the issuance rate stays close enough to the static rate, by bounding the dynamic rate
+following a function of the stake ratio.
 
-The adaptive maximum is defined as a function of the staked ratio that
-decreases smoothly as the staked ratio grows closer to the 50% target,
-down to a 1% maximal issuance rate when the staked ratio is at 50% or
-above. See the blue curve on Figure 2, as well as a few sample values
-in Figure 3. The exact formula is provided further below.
-
-Thanks to the adaptive maximum, the total issuance rate (static rate +
-dynamic rate) cannot be too far above the static rate (green dashed
-curve). More precisely, the total issuance rate is forced to stay
-between the static rate (green) and the adaptive maximum (blue). In
-other words, the dynamic rate is effectively bounded to stay below the
-red dotted curve, which plots the adaptive maximum minus the static
-rate. Note that this no longer holds if the adaptive maximum gets
-overridden by the minimum issuance, as discussed below.
-
-.. figure:: adaptive_maximum.png
-
-  Figure 2. Adaptive maximum compared to the static rate, in the range from 5% to 50% staked ratio.
-
-.. list-table:: Figure 3. Adaptive maximum: a few data points.
-
-   * - Staked ratio
-     - 5% and below
-     - 10%
-     - 20%
-     - 30%
-     - 40%
-     - 50% and above
-   * - Adaptive maximum issuance (approx.)
-     - 10%
-     - 8.4%
-     - 3.9%
-     - 2%
-     - 1.2%
-     - 1%
-
-The function that defines the adaptive maximum is:
+The function chosen for the maximum applied to the total issuance is the following:
 
 .. code-block:: python
 
-  def adaptive_maximum(r): # r is the staked ratio of the chain
+  def dynmax(stake_ratio):
+    r = stake_ratio
     if r >= 0.5:
       return 0.01
     elif r <= 0.05:
       return 0.1
-    y = (5115 - 17670 * r + 19437 * (r ** 2)) / (24149 + 178695 * r)
-    if y > 0.1:
+    dm = (5115 - 17670 * r + 19437 * (r ** 2)) / (24149 + 178695 * r)
+    if dm > 0.1:
       return 0.1
-    elif y < 0.01:
+    elif dm < 0.01:
       return 0.01
     else:
-      return y
+      return dm
 
-.. note::
 
-  Until the final value of the :ref:`minimum
-  rate<minimum_and_maximum_rates_quebec>` is reached, it is possible,
-  with a high enough staked ratio, for the corresponding adaptive
-  maximum to be smaller than the minimum rate. If this happens, then
-  the minimum rate takes priority, that is, the total issuance rate
-  (static + dynamic) is set to the minimum rate exactly. This way, the
-  total issuance rate is as close to the adaptive maximum as can be
-  while fully satisfying the minimum rate.
+.. figure:: dynmax.png
 
+ Figure 2. DynMax compared to the static rate in the range from 5% to 50% of stake ratio.
+
+Note that before reaching the final value of the minimum in the previous section, it is possible for
+this maximum value to theoretically be smaller than  the minimum bound. In this case, the minimum value
+takes priority, and the max is set to the min. In other words, the bounds in the previous section are always
+applied, regardless of the value of dynmax.
 
 .. _issuance_rate_quebec:
 
 Issuance rate
 ......................
 
-Finally, as mentioned before, the nominal adaptive issuance rate [1]_
-for a cycle ``c + consensus_rights_delay + 1`` is defined as the sum
-of the static rate and the dynamic rate computed for the cycle ``c``,
-bounded within the :ref:`minimum and maximum rates
-<minimum_and_maximum_rates_quebec>`, along with the :ref:`adaptive
-maximum <adaptive_maximum_quebec>`, computed for the cycle ``c + 1``.
+Finally, as mentioned before, the nominal adaptive issuance rate [1]_ for a cycle ``c + consensus_rights_delay + 1`` is defined as the sum of the static rate and the dynamic rate computed for the cycle ``c``, bounded within the :ref:`minimum and maximum rates <minimum_and_maximum_rates_quebec>`, along with the :ref:`dynamic maximum <dynmax_rate_quebec>`, computed for the cycle ``c + 1``.
 
 .. code-block:: python
 
@@ -300,7 +257,7 @@ maximum <adaptive_maximum_quebec>`, computed for the cycle ``c + 1``.
     static_rate = static_rate(adjusted_cycle - 1)
     dynamic_rate = dynamic_rate(adjusted_cycle - 1)
     minimum_rate = minimum_rate(adjusted_cycle)
-    maximum_rate = min(maximum_rate(adjusted_cycle), adaptive_maximum(stake_ratio(adjusted_cycle)))
+    maximum_rate = min(maximum_rate(adjusted_cycle), dynmax(stake_ratio(adjusted_cycle)))
     total_rate = static_rate + dynamic_rate
     return max( min(total_rate, maximum_rate), minimum_rate )
 
