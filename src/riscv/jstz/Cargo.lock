@@ -1113,6 +1113,7 @@ dependencies = [
 name = "jstz"
 version = "0.0.0"
 dependencies = [
+ "bincode",
  "hex",
  "jstz_kernel",
  "serde",
@@ -1124,7 +1125,7 @@ dependencies = [
 [[package]]
 name = "jstz_api"
 version = "0.1.0-alpha.0"
-source = "git+https://github.com/jstz-dev/jstz.git#05dc370ada33e20a28c80cdfd521770fc097aa3e"
+source = "git+https://github.com/jstz-dev/jstz.git#5a0dbe9b0c9070e13f7e1e1e2c0fc4db2a394072"
 dependencies = [
  "base64 0.21.7",
  "boa_engine",
@@ -1148,7 +1149,7 @@ dependencies = [
 [[package]]
 name = "jstz_core"
 version = "0.1.0-alpha.0"
-source = "git+https://github.com/jstz-dev/jstz.git#05dc370ada33e20a28c80cdfd521770fc097aa3e"
+source = "git+https://github.com/jstz-dev/jstz.git#5a0dbe9b0c9070e13f7e1e1e2c0fc4db2a394072"
 dependencies = [
  "bincode",
  "boa_engine",
@@ -1166,7 +1167,7 @@ dependencies = [
 [[package]]
 name = "jstz_crypto"
 version = "0.1.0-alpha.0"
-source = "git+https://github.com/jstz-dev/jstz.git#05dc370ada33e20a28c80cdfd521770fc097aa3e"
+source = "git+https://github.com/jstz-dev/jstz.git#5a0dbe9b0c9070e13f7e1e1e2c0fc4db2a394072"
 dependencies = [
  "anyhow",
  "boa_gc",
@@ -1180,7 +1181,7 @@ dependencies = [
 [[package]]
 name = "jstz_kernel"
 version = "0.1.0-alpha.0"
-source = "git+https://github.com/jstz-dev/jstz.git#05dc370ada33e20a28c80cdfd521770fc097aa3e"
+source = "git+https://github.com/jstz-dev/jstz.git#5a0dbe9b0c9070e13f7e1e1e2c0fc4db2a394072"
 dependencies = [
  "bincode",
  "boa_engine",
@@ -1199,7 +1200,7 @@ dependencies = [
 [[package]]
 name = "jstz_proto"
 version = "0.1.0-alpha.0"
-source = "git+https://github.com/jstz-dev/jstz.git#05dc370ada33e20a28c80cdfd521770fc097aa3e"
+source = "git+https://github.com/jstz-dev/jstz.git#5a0dbe9b0c9070e13f7e1e1e2c0fc4db2a394072"
 dependencies = [
  "boa_engine",
  "boa_gc",
