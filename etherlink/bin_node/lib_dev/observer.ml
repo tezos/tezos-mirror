@@ -270,7 +270,9 @@ let main ?kernel_path ~data_dir ~(config : Configuration.t) () =
           ()
       in
       return_unit
-    else return_unit
+    else
+      let*! () = Rollup_node_follower_events.disabled () in
+      return_unit
   in
 
   let (_ : Lwt_exit.clean_up_callback_id) =

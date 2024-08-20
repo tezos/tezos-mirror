@@ -1001,7 +1001,11 @@ let start_observer ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?rpc_batch_limit
       ?cors_origins
       ?cors_headers
       ?rollup_node_endpoint
-      ~dont_track_rollup_node
+      ?dont_track_rollup_node:
+        (* If `dont_track_rollup_node` is false, it means the argument was
+           omitted from the command-line. As a consequence, we default to
+           the config value by passing [None]. *)
+        (if dont_track_rollup_node then Some true else None)
       ~verbose
       ?preimages
       ?preimages_endpoint
@@ -1521,7 +1525,11 @@ mode.|}
           ?log_filter_chunk_size
           ~keep_alive
           ?rollup_node_endpoint
-          ~dont_track_rollup_node
+          ?dont_track_rollup_node:
+            (* If `dont_track_rollup_node` is false, it means the argument was
+               omitted from the command-line. As a consequence, we default to
+               the config value by passing [None]. *)
+            (if dont_track_rollup_node then Some true else None)
           ?tx_pool_timeout_limit
           ?tx_pool_addr_limit
           ?tx_pool_tx_per_addr_limit
