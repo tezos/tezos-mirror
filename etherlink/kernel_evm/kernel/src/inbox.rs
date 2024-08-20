@@ -8,13 +8,15 @@
 use crate::blueprint_storage::store_sequencer_blueprint;
 use crate::bridge::Deposit;
 use crate::configuration::{fetch_limits, DalConfiguration, TezosContracts};
-use crate::dal::fetch_and_parse_sequencer_blueprints_from_dal;
+use crate::dal::fetch_and_parse_sequencer_blueprint_from_dal;
+use crate::dal_slot_import_signal::{DalSlotImportSignal, UnsignedDalSlotImportSignal};
 use crate::delayed_inbox::DelayedInbox;
 use crate::parsing::{
     Input, InputResult, Parsable, ProxyInput, SequencerInput, SequencerParsingContext,
     MAX_SIZE_PER_CHUNK,
 };
 
+use crate::sequencer_blueprint::SequencerBlueprint;
 use crate::storage::{
     chunked_hash_transaction_path, chunked_transaction_num_chunks,
     chunked_transaction_path, clear_events, create_chunked_transaction, read_l1_level,
@@ -37,6 +39,7 @@ use tezos_ethereum::transaction::{
 use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_encoding::public_key::PublicKey;
+use tezos_smart_rollup_host::metadata::RAW_ROLLUP_ADDRESS_SIZE;
 use tezos_smart_rollup_host::runtime::Runtime;
 
 #[allow(clippy::large_enum_variant)]
@@ -206,7 +209,10 @@ pub fn read_input<Host: Runtime, Mode: Parsable>(
 }
 
 /// The InputHandler abstracts how the input is handled once it has been parsed.
-pub trait InputHandler {
+pub trait InputHandler
+where
+    Self: Parsable,
+{
     /// Abstracts the type used to store the inputs once handled
     type Inbox;
 
@@ -214,6 +220,8 @@ pub trait InputHandler {
         host: &mut Host,
         input: Self,
         inbox_content: &mut Self::Inbox,
+        smart_rollup_address: [u8; RAW_ROLLUP_ADDRESS_SIZE],
+        parsing_context: &mut Self::Context,
     ) -> anyhow::Result<()>;
 
     fn handle_deposit<Host: Runtime>(
@@ -238,6 +246,8 @@ impl InputHandler for ProxyInput {
         host: &mut Host,
         input: Self,
         inbox_content: &mut Self::Inbox,
+        _smart_rollup_address: [u8; RAW_ROLLUP_ADDRESS_SIZE],
+        _parsing_context: &mut (),
     ) -> anyhow::Result<()> {
         match input {
             Self::SimpleTransaction(tx) => inbox_content.transactions.push(*tx),
@@ -285,6 +295,21 @@ impl InputHandler for ProxyInput {
     }
 }
 
+fn handle_blueprint_chunk<Host: Runtime>(
+    host: &mut Host,
+    blueprint: SequencerBlueprint,
+) -> anyhow::Result<()> {
+    log!(host, Benchmarking, "Handling a blueprint input");
+    log!(
+        host,
+        Debug,
+        "Storing chunk {} of sequencer blueprint number {}",
+        blueprint.blueprint.chunk_index,
+        blueprint.blueprint.number
+    );
+    store_sequencer_blueprint(host, blueprint).map_err(Error::into)
+}
+
 impl InputHandler for SequencerInput {
     // For the sequencer, inputs are stored directly in the storage. The delayed
     // inbox represents part of the storage, but `Unit` would also be enough as
@@ -295,27 +320,52 @@ impl InputHandler for SequencerInput {
         host: &mut Host,
         input: Self,
         delayed_inbox: &mut Self::Inbox,
+        smart_rollup_address: [u8; RAW_ROLLUP_ADDRESS_SIZE],
+        parsing_context: &mut SequencerParsingContext,
     ) -> anyhow::Result<()> {
         match input {
             Self::DelayedInput(tx) => {
                 let previous_timestamp = read_last_info_per_level_timestamp(host)?;
                 let level = read_l1_level(host)?;
                 log!(host, Benchmarking, "Handling a delayed input");
-                delayed_inbox.save_transaction(host, *tx, previous_timestamp, level)?
+                delayed_inbox.save_transaction(host, *tx, previous_timestamp, level)
             }
             Self::SequencerBlueprint(seq_blueprint) => {
-                log!(host, Benchmarking, "Handling a blueprint input");
+                handle_blueprint_chunk(host, seq_blueprint)
+            }
+            Self::DalSlotImportSignal(DalSlotImportSignal {
+                signal:
+                    UnsignedDalSlotImportSignal {
+                        slot_index,
+                        published_level,
+                    },
+                signature: _,
+            }) => {
                 log!(
                     host,
                     Debug,
-                    "Storing chunk {} of sequencer blueprint number {}",
-                    seq_blueprint.blueprint.chunk_index,
-                    seq_blueprint.blueprint.number
+                    "Handling a signal for slot index {} and published_level {}",
+                    slot_index,
+                    published_level
                 );
-                store_sequencer_blueprint(host, seq_blueprint)?
+                let params = host.reveal_dal_parameters();
+                if let Some(Self::SequencerBlueprint(seq_blueprint)) =
+                    fetch_and_parse_sequencer_blueprint_from_dal(
+                        host,
+                        smart_rollup_address,
+                        parsing_context,
+                        &params,
+                        slot_index,
+                        published_level,
+                    )
+                {
+                    log!(host, Debug, "DAL slot is a blueprint chunk");
+                    handle_blueprint_chunk(host, seq_blueprint)
+                } else {
+                    Ok(())
+                }
             }
         }
-        Ok(())
     }
 
     fn handle_deposit<Host: Runtime>(
@@ -439,9 +489,17 @@ pub fn handle_input<Mode: Parsable + InputHandler>(
     host: &mut impl Runtime,
     input: Input<Mode>,
     inbox_content: &mut Mode::Inbox,
+    smart_rollup_address: [u8; RAW_ROLLUP_ADDRESS_SIZE],
+    parsing_context: &mut Mode::Context,
 ) -> anyhow::Result<()> {
     match input {
-        Input::ModeSpecific(input) => Mode::handle_input(host, input, inbox_content)?,
+        Input::ModeSpecific(input) => Mode::handle_input(
+            host,
+            input,
+            inbox_content,
+            smart_rollup_address,
+            parsing_context,
+        )?,
         Input::Upgrade(kernel_upgrade) => store_kernel_upgrade(host, &kernel_upgrade)?,
         Input::SequencerUpgrade(sequencer_upgrade) => {
             store_sequencer_upgrade(host, sequencer_upgrade)?
@@ -507,7 +565,7 @@ fn read_and_dispatch_input<Host: Runtime, Mode: Parsable + InputHandler>(
             Ok(ReadStatus::FinishedIgnore)
         }
         InputResult::Input(input) => {
-            handle_input(host, input, res)?;
+            handle_input(host, input, res, smart_rollup_address, parsing_context)?;
             Ok(ReadStatus::Ongoing)
         }
     }
@@ -599,14 +657,7 @@ pub fn read_sequencer_inbox<Host: Runtime>(
         allocated_ticks: limits
             .maximum_allowed_ticks
             .saturating_sub(TICKS_FOR_BLUEPRINT_INTERCEPT),
-    };
-    if let Some(dal_config) = dal {
-        fetch_and_parse_sequencer_blueprints_from_dal(
-            host,
-            smart_rollup_address,
-            dal_config,
-            &mut parsing_context,
-        )?;
+        dal_configuration: dal,
     };
     loop {
         // Checks there will be enough ticks to handle at least another chunk of

@@ -47,6 +47,7 @@ mod blueprint_storage;
 mod bridge;
 mod configuration;
 mod dal;
+mod dal_slot_import_signal;
 mod delayed_inbox;
 mod error;
 mod event;
