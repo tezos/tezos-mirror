@@ -77,6 +77,8 @@ make -C src/riscv all
 
 /unassign me
 /unassign_reviewer me
+
+/ready
 ```
 
 </details>
