@@ -17,31 +17,6 @@ end
 let max_gas_limit = Z.of_int64 0x3FFFFFFFFFFFFFFFL
 
 module Make (SimulationBackend : SimulationBackend) = struct
-  let get_kernel_version simulation_state =
-    let open Lwt_result_syntax in
-    let* bytes =
-      SimulationBackend.read
-        simulation_state
-        Durable_storage_path.kernel_version
-    in
-    let result =
-      match bytes with
-      | Some bytes -> Bytes.to_string bytes
-      | None -> "KERNEL_VERSION_NOT_INITIALISED"
-    in
-    return result
-
-  let get_storage_version simulation_state =
-    let open Lwt_result_syntax in
-    let+ bytes =
-      SimulationBackend.read
-        simulation_state
-        Durable_storage_path.storage_version
-    in
-    match bytes with
-    | Some bytes -> Z.of_bits (Bytes.unsafe_to_string bytes) |> Z.to_int
-    | None -> 0
-
   let call_simulation ~log_file ~input_encoder ~input simulation_state =
     let open Lwt_result_syntax in
     let*? messages = input_encoder input in
@@ -73,13 +48,17 @@ module Make (SimulationBackend : SimulationBackend) = struct
   *)
   let simulation_version simulation_state =
     let open Lwt_result_syntax in
-    let* storage_version = get_storage_version simulation_state in
+    let* storage_version =
+      Durable_storage.storage_version (SimulationBackend.read simulation_state)
+    in
     if storage_version < 12 then return `V0
     else if storage_version > 12 then return `V2
     else
       (* We are in the unknown, some kernels with STORAGE_VERSION = 12 have
          the features, some do not. *)
-      let* kernel_version = get_kernel_version simulation_state in
+      let* kernel_version =
+        Durable_storage.kernel_version (SimulationBackend.read simulation_state)
+      in
       (* This is supposed to be the only version where STORAGE_VERSION is 12,
          but with_da_fees isn't enabled. *)
       if kernel_version = "ec7c3b349624896b269e179384d0a45cf39e1145" then

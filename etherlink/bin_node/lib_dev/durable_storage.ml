@@ -292,6 +292,13 @@ let coinbase read =
             "0x0000000000000000000000000000000000000000"))
     res
 
+let storage_version read =
+  let open Lwt_result_syntax in
+  let+ bytes = read Durable_storage_path.storage_version in
+  match bytes with
+  | Some bytes -> Z.of_bits (Bytes.unsafe_to_string bytes) |> Z.to_int
+  | None -> 0
+
 module Make (Reader : READER) = struct
   let read = Reader.read
 
