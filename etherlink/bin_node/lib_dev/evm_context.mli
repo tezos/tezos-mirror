@@ -21,9 +21,16 @@ type head = {
     a lock. *)
 val lock_data_dir : data_dir:string -> unit tzresult Lwt.t
 
-(** [vacuum ~data_dir ~output_db_file] initialize the database with data
-    from the [data_dir] and vacuum it into the [output_db_file]. *)
-val vacuum : data_dir:string -> output_db_file:string -> unit tzresult Lwt.t
+type store_info = {
+  rollup_address : Address.t;
+  current_number : Ethereum_types.quantity;
+}
+
+(** [export_store ~data_dir ~output_db_file] exports the store database with
+    data from the [data_dir] into the [output_db_file] and returns the rollup
+    address and the current level. *)
+val export_store :
+  data_dir:string -> output_db_file:string -> store_info tzresult Lwt.t
 
 (** [start ~data_dir ~preimages ~preimages_endpoint
     ~smart_rollup_address ()] creates a new worker to

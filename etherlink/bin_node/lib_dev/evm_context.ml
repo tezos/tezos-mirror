@@ -46,6 +46,11 @@ type t = {
   fail_on_missing_blueprint : bool;
 }
 
+type store_info = {
+  rollup_address : Address.t;
+  current_number : Ethereum_types.quantity;
+}
+
 let session_to_head_info session =
   {
     evm_state = session.evm_state;
@@ -1419,10 +1424,17 @@ let worker_wait_for_request req =
   let*! res = Worker.Queue.push_request_and_wait w req in
   return_ res
 
-let vacuum ~data_dir ~output_db_file =
+let export_store ~data_dir ~output_db_file =
   let open Lwt_result_syntax in
   let* store = Evm_store.init ~data_dir ~perm:`Read_only () in
-  Evm_store.use store @@ fun conn -> Evm_store.vacuum ~conn ~output_db_file
+  Evm_store.use store @@ fun conn ->
+  let* rollup_address = Evm_store.Metadata.get conn in
+  let* l1_l2_rel = Evm_store.L1_l2_levels_relationships.find conn in
+  match l1_l2_rel with
+  | None -> failwith "No L1/L2 relationship in store"
+  | Some {current_number; _} ->
+      let* () = Evm_store.vacuum ~conn ~output_db_file in
+      return {rollup_address; current_number}
 
 let start ?kernel_path ~data_dir ~preimages ~preimages_endpoint
     ?smart_rollup_address ~fail_on_missing_blueprint ~store_perm () =

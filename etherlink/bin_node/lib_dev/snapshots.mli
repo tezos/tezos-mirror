@@ -21,9 +21,13 @@ module Header : sig
   (** Versioning of snapshot format. Only one version for now. *)
   type version = V0
 
-  (** Snapshot metadata for version 0. This information is written as a header of
-    the archive snapshot file. *)
-  type t = {version : version}
+  (** Snapshot metadata for version 0. This information is written as a header
+      of the archive snapshot file. *)
+  type t = {
+    version : version;
+    rollup_address : Address.t;
+    current_level : Ethereum_types.quantity;
+  }
 
   (** Fixed size metadata encoding. *)
   val encoding : t Data_encoding.t

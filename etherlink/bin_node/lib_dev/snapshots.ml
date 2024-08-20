@@ -23,11 +23,26 @@ module Header = struct
         else Error "Invalid magic bytes for evm node snapshot")
       (obj1 (req "magic_bytes" (Fixed.string (String.length magic_bytes))))
 
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/7433
-     header with more information. *)
-  type t = {version : version}
+  type t = {
+    version : version;
+    rollup_address : Address.t;
+    current_level : Ethereum_types.quantity;
+  }
 
-  let v0_encoding = Data_encoding.unit
+  let v0_encoding =
+    let open Data_encoding in
+    conv
+      (fun {version = V0; rollup_address; current_level} ->
+        (rollup_address, Ethereum_types.encode_u256_le current_level))
+      (fun (rollup_address, current_level) ->
+        {
+          version = V0;
+          rollup_address;
+          current_level = Ethereum_types.decode_number_le current_level;
+        })
+    @@ obj2
+         (req "rollup_address" Address.encoding)
+         (req "current_level" (Fixed.bytes 32))
 
   let header_encoding =
     let open Data_encoding in
@@ -37,8 +52,8 @@ module Header = struct
           ~title:"evm_node.snapshot_header.v0"
           (Tag 0)
           v0_encoding
-          (fun {version = V0} -> Some ())
-          (fun () -> {version = V0});
+          (fun ({version = V0; _} as h) -> Some h)
+          (fun h -> h);
       ]
 
   let encoding =
@@ -56,7 +71,6 @@ open Snapshot_utils.Make (Header)
 let export ?dest ?filename ~compression ~data_dir () =
   let open Lwt_result_syntax in
   let* () = Evm_context.lock_data_dir ~data_dir in
-  let header = Header.{version = V0} in
   let dest_file_name =
     match filename with
     | Some f -> f
@@ -89,7 +103,10 @@ let export ?dest ?filename ~compression ~data_dir () =
   (* Export SQLite database *)
   Lwt_utils_unix.with_tempdir "evm_node_sqlite_export_" @@ fun tmp_dir ->
   let output_db_file = Filename.concat tmp_dir Evm_store.sqlite_file_name in
-  let* () = Evm_context.vacuum ~data_dir ~output_db_file in
+  let* {rollup_address; current_number = current_level} =
+    Evm_context.export_store ~data_dir ~output_db_file
+  in
+  let header = Header.{version = V0; rollup_address; current_level} in
   let files = (output_db_file, Evm_store.sqlite_file_name) :: files in
   let writer =
     match compression with
