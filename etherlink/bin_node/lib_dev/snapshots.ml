@@ -12,21 +12,39 @@ type compression = No | On_the_fly | After
 module Header = struct
   type version = V0
 
+  let magic_bytes = "OCTEZ_EVM_node_snapshot"
+
+  let magic_bytes_encoding =
+    let open Data_encoding in
+    conv_with_guard
+      (fun () -> magic_bytes)
+      (fun s ->
+        if s = magic_bytes then Ok ()
+        else Error "Invalid magic bytes for evm node snapshot")
+      (obj1 (req "magic_bytes" (Fixed.string (String.length magic_bytes))))
+
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/7433
      header with more information. *)
   type t = {version : version}
 
-  let encoding =
+  let v0_encoding = Data_encoding.unit
+
+  let header_encoding =
     let open Data_encoding in
     union
       [
         case
           ~title:"evm_node.snapshot_header.v0"
           (Tag 0)
-          Data_encoding.unit
+          v0_encoding
           (fun {version = V0} -> Some ())
           (fun () -> {version = V0});
       ]
+
+  let encoding =
+    let open Data_encoding in
+    conv (fun h -> ((), h)) (fun ((), h) -> h)
+    @@ merge_objs magic_bytes_encoding header_encoding
 
   let size =
     Data_encoding.Binary.fixed_length encoding
