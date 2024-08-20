@@ -51,6 +51,7 @@ mod dal_slot_import_signal;
 mod delayed_inbox;
 mod error;
 mod event;
+mod evm_node_entrypoint;
 mod fallback_upgrade;
 mod fees;
 mod gas_price;
