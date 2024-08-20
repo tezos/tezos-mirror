@@ -130,6 +130,11 @@ local query = grafonnet.query;
         local overrides = std.map(f, colors);
         timeSeries.standardOptions.withOverrides(overrides),
 
+      // Applies log scale
+      withLogScale():
+        timeSeries.fieldConfig.defaults.custom.scaleDistribution.withType('log')
+        + timeSeries.fieldConfig.defaults.custom.scaleDistribution.withLog(10),
+
     },
 
   table(title, q, h, w, x, y):
