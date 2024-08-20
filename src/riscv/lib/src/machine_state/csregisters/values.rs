@@ -6,7 +6,7 @@ use super::root::RootCSRegister;
 use crate::struct_layout;
 use crate::{
     bits::Bits64,
-    state_backend::{AllocatedOf, Atom, Cell, Choreographer, Layout, Manager, PlacedOf},
+    state_backend::{AllocatedOf, Atom, Cell, Choreographer, Layout, PlacedOf},
 };
 
 /// Representation of a value in a CSR
@@ -58,7 +58,7 @@ macro_rules! csregisters_boilerplate {
             $($name: Cell<$cell_repr, M>,)+
         }
 
-        impl<M: Manager> $struct_t<M> {
+        impl<M: $crate::state_backend::ManagerBase> $struct_t<M> {
             pub fn bind(space: AllocatedOf<$layout_t, M>) -> Self {
                 Self {
                     $($name: space.$name,)*
@@ -70,17 +70,27 @@ macro_rules! csregisters_boilerplate {
             // CSR rules like side-effects, shadowing, WLRL, WARL, WPRI.
             $(
                 #[inline(always)]
-                pub(super) fn [<read_ $name>](&self) -> $cell_repr {
+                pub(super) fn [<read_ $name>](&self) -> $cell_repr
+                where
+                    M: $crate::state_backend::ManagerRead
+                {
                     self.$name.read()
                 }
 
                 #[inline(always)]
-                pub(super) fn [<write_ $name>](&mut self, value: $cell_repr) {
+                pub(super) fn [<write_ $name>](&mut self, value: $cell_repr)
+                where
+                    M: $crate::state_backend::ManagerWrite
+                {
                     self.$name.write(value)
                 }
 
                 #[inline(always)]
-                pub(super) fn [<replace_ $name>](&mut self, value: $cell_repr) -> $cell_repr {
+                pub(super) fn [<replace_ $name>](&mut self, value: $cell_repr) -> $cell_repr
+                where
+                    M: $crate::state_backend::ManagerReadWrite
+                {
+
                     self.$name.replace(value)
                 }
             )*
@@ -90,21 +100,31 @@ macro_rules! csregisters_boilerplate {
             // hence they need to go through a match statement.
             // e.g. the CSRRW / CSRRC etc instructions
             #[inline(always)]
-            pub(super) fn general_raw_read(&self, csr: RootCSRegister) -> CSRRepr {
+            pub(super) fn general_raw_read(&self, csr: RootCSRegister) -> CSRRepr
+            where
+                M: $crate::state_backend::ManagerRead
+            {
                 match csr {
                     $( RootCSRegister::$name => self.[<read_ $name>]() ),*
                 }
             }
 
             #[inline(always)]
-            pub(super) fn general_raw_write(&mut self, csr: RootCSRegister, value: CSRRepr) {
+            pub(super) fn general_raw_write(&mut self, csr: RootCSRegister, value: CSRRepr)
+            where
+                M: $crate::state_backend::ManagerWrite
+            {
                 match csr {
                     $( RootCSRegister::$name => self.[<write_ $name>](value) ),*
                 }
             }
 
             #[inline(always)]
-            pub(super) fn general_raw_replace(&mut self, csr: RootCSRegister, value: CSRRepr) -> CSRRepr {
+            pub(super) fn general_raw_replace(&mut self, csr: RootCSRegister, value: CSRRepr) -> CSRRepr
+            where
+                M: $crate::state_backend::ManagerReadWrite
+            {
+
                 match csr {
                     $( RootCSRegister::$name => self.[<replace_ $name>](value) ),*
                 }
