@@ -350,7 +350,7 @@ let test_direct_transfer_tickets_from_implicit_account_to_originated_with_pair_c
     ~__FILE__
     ~title:"Send Pair tickets from implicit account to originated directly"
     ~tags:["client"; "michelson"; "implicit"; "ticket"; "originated"]
-    ~supports:(Protocol.From_protocol 21)
+    ~supports:(Protocol.From_protocol 22)
   @@ fun protocol ->
   test_direct_transfer_tickets_from_implicit_account_to_originated
     protocol
@@ -554,7 +554,7 @@ let test_direct_transfer_tickets_from_implicit_account_to_originated_complex_wit
       "Send Pair tickets (with complex parameters) from implicit account to \
        originated directly"
     ~tags:["client"; "michelson"; "implicit"; "ticket"; "originated"]
-    ~supports:(Protocol.From_protocol 21)
+    ~supports:(Protocol.From_protocol 22)
   @@ fun protocol ->
   test_direct_transfer_tickets_from_implicit_account_to_originated_complex
     protocol
