@@ -24,3 +24,16 @@ pub fn less_than_bound(num: usize, bound: Bound<usize>) -> bool {
         Bound::Unbounded => true,
     }
 }
+
+/// Turn a bound into a fixed number.
+///
+/// `Unbounded` is replaced by `usize::MAX`. When using this function additional
+/// logic should be supplied to recheck the original bound.
+#[inline(always)]
+pub fn unwrap_bound(bound: Bound<usize>) -> usize {
+    match bound {
+        Bound::Included(x) => x,
+        Bound::Excluded(x) => x.saturating_sub(1),
+        Bound::Unbounded => usize::MAX,
+    }
+}

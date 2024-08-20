@@ -26,7 +26,7 @@ use crate::{
     },
     parser::{instruction::Instr, Parser},
     program::Program,
-    range_utils::{bound_saturating_sub, less_than_bound},
+    range_utils::{bound_saturating_sub, less_than_bound, unwrap_bound},
     state_backend::{self as backend},
     traps::{EnvironException, Exception, Interrupt, TrapContext},
 };
@@ -326,12 +326,16 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::ManagerBase> MachineState<ML
     /// The spec stipulates translation is performed for each byte respectively.
     /// However, we assume the `raw_pc` is 2-byte aligned.
     #[inline]
-    fn fetch_instr(&mut self, virt_addr: Address, mode: Mode) -> Result<Instr, Exception>
+    fn fetch_instr(
+        &mut self,
+        mode: Mode,
+        satp: CSRRepr,
+        virt_addr: Address,
+        phys_addr: Address,
+    ) -> Result<Instr, Exception>
     where
         M: backend::ManagerReadWrite,
     {
-        let satp: CSRRepr = self.hart.csregisters.read(CSRegister::satp);
-        let phys_addr = self.translate_instr_address(mode, satp, virt_addr)?;
         let first_halfword = self.fetch_instr_halfword(phys_addr)?;
 
         // The reasons to provide the second half in the lambda is
@@ -616,14 +620,18 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::ManagerBase> MachineState<ML
     /// Fetch & run the instruction located at address `instr_pc`
     fn run_instr_at(
         &mut self,
-        instr_pc: u64,
         current_mode: Mode,
+        satp: CSRRepr,
+        instr_pc: Address,
+        phys_addr: Address,
     ) -> Result<ProgramCounterUpdate, Exception>
     where
         M: backend::ManagerReadWrite,
     {
-        let instr = self.fetch_instr(instr_pc, current_mode)?;
-        self.run_instr(instr)
+        match self.fetch_instr(current_mode, satp, instr_pc, phys_addr) {
+            Ok(instr) => self.run_instr(instr),
+            Err(e) => Err(e),
+        }
     }
 
     /// Handle interrupts (also known as asynchronous exceptions)
@@ -684,20 +692,19 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::ManagerBase> MachineState<ML
     where
         M: backend::ManagerReadWrite,
     {
-        let current_mode = self.hart.mode.read();
+        self.step_max_inner(&mut 0, 1)
+    }
 
-        // Try to take an interrupt if available, and then
-        // obtain the pc for the next instruction to be executed
-        let instr_pc = match self.hart.get_pending_interrupt(current_mode) {
-            None => self.hart.pc.read(),
-            Some(interrupt) => self.address_on_interrupt(interrupt)?,
-        };
-
-        // Fetch & run the instruction
-        let instr_result = self.run_instr_at(instr_pc, current_mode);
-
-        // Take exception if needed
-        let pc_update = match instr_result {
+    #[inline]
+    fn handle_step_result(
+        &mut self,
+        instr_pc: Address,
+        result: Result<ProgramCounterUpdate, Exception>,
+    ) -> Result<(), EnvironException>
+    where
+        M: backend::ManagerReadWrite,
+    {
+        let pc_update = match result {
             Err(exc) => ProgramCounterUpdate::Set(self.address_on_exception(exc, instr_pc)?),
             Ok(upd) => upd,
         };
@@ -711,6 +718,36 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::ManagerBase> MachineState<ML
         Ok(())
     }
 
+    fn step_max_inner(
+        &mut self,
+        steps: &mut usize,
+        max_steps: usize,
+    ) -> Result<(), EnvironException>
+    where
+        M: backend::ManagerReadWrite,
+    {
+        while *steps < max_steps {
+            let current_mode = self.hart.mode.read();
+
+            // Try to take an interrupt if available, and then
+            // obtain the pc for the next instruction to be executed
+            let instr_pc = match self.hart.get_pending_interrupt(current_mode) {
+                None => self.hart.pc.read(),
+                Some(interrupt) => self.address_on_interrupt(interrupt)?,
+            };
+
+            let satp: CSRRepr = self.hart.csregisters.read(CSRegister::satp);
+            let instr_result = self
+                .translate_instr_address(current_mode, satp, instr_pc)
+                .and_then(|phys_addr| self.run_instr_at(current_mode, satp, instr_pc, phys_addr));
+
+            self.handle_step_result(instr_pc, instr_result)?;
+            *steps += 1;
+        }
+
+        Ok(())
+    }
+
     /// Perform as many steps as the given `max_steps` bound allows. Returns the number of retired
     /// instructions.
     #[inline]
@@ -720,8 +757,8 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::ManagerBase> MachineState<ML
     {
         let mut steps = 0;
 
-        while less_than_bound(steps, max_steps) {
-            match self.step() {
+        loop {
+            match self.step_max_inner(&mut steps, unwrap_bound(max_steps)) {
                 Ok(_) => {}
                 Err(e) => {
                     return StepManyResult {
@@ -731,7 +768,9 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::ManagerBase> MachineState<ML
                 }
             };
 
-            steps += 1;
+            if !less_than_bound(steps, max_steps) {
+                break;
+            }
         }
 
         StepManyResult { steps, error: None }
