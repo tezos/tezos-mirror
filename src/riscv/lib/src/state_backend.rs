@@ -211,6 +211,7 @@ pub trait Backend: BackendManagement + Sized {
 
 pub mod test_helpers {
     use super::{Backend, Layout};
+    use std::fmt;
 
     /// Generate a test against all test backends.
     #[macro_export]
@@ -230,7 +231,7 @@ pub mod test_helpers {
 
     /// This lets you construct backends for any layout.
     pub trait TestBackendFactory {
-        type Backend<L: Layout>: Backend<Layout = L> + Clone;
+        type Backend<L: Layout>: Backend<Layout = L> + Clone + fmt::Debug + Eq;
 
         /// Construct a backend for the given layout `L`.
         fn new<L: Layout>() -> Self::Backend<L>;
