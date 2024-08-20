@@ -31,10 +31,7 @@ pub trait InternalRuntime {
 // The path is optional to be able to get the hash
 // of the root directory.
 pub trait ExtendedRuntime {
-    fn store_get_hash<T: Path>(
-        &mut self,
-        path: Option<T>,
-    ) -> Result<Vec<u8>, RuntimeError>;
+    fn store_get_hash<T: Path>(&mut self, path: &T) -> Result<Vec<u8>, RuntimeError>;
 }
 
 pub struct InternalStorage();

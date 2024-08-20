@@ -312,7 +312,7 @@ impl BlockInProgress {
 
     fn safe_store_get_hash<Host: KernelRuntime>(
         host: &mut Host,
-        path: Option<RefPath>,
+        path: &RefPath,
     ) -> Result<Vec<u8>, anyhow::Error> {
         match host.store_get_hash(path) {
             Ok(hash) => Ok(hash),
@@ -325,11 +325,10 @@ impl BlockInProgress {
         host: &mut Host,
         block_constants: &BlockConstants,
     ) -> Result<L2Block, anyhow::Error> {
-        let state_root = Self::safe_store_get_hash(host, Some(EVM_ACCOUNTS_PATH))?;
-        let receipts_root =
-            Self::safe_store_get_hash(host, Some(EVM_TRANSACTIONS_RECEIPTS))?;
+        let state_root = Self::safe_store_get_hash(host, &EVM_ACCOUNTS_PATH)?;
+        let receipts_root = Self::safe_store_get_hash(host, &EVM_TRANSACTIONS_RECEIPTS)?;
         let transactions_root =
-            Self::safe_store_get_hash(host, Some(EVM_TRANSACTIONS_OBJECTS))?;
+            Self::safe_store_get_hash(host, &EVM_TRANSACTIONS_OBJECTS)?;
         let base_fee_per_gas = base_fee_per_gas(host, self.timestamp);
         let new_block = L2Block::new(
             self.number,
