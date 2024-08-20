@@ -382,7 +382,14 @@ module State = struct
   let on_new_delayed_transaction ~delayed_transaction evm_state =
     let open Lwt_result_syntax in
     let*! data_dir, config = execution_config in
-    let* evm_state =
+    let* storage_version =
+      let read path =
+        let*! res = Evm_state.inspect evm_state path in
+        return res
+      in
+      Durable_storage.storage_version read
+    in
+    if storage_version < 15 then
       Evm_state.execute
         ~data_dir
         ~config
@@ -393,8 +400,21 @@ module State = struct
             ^ Bytes.to_string
                 (Evm_events.Delayed_transaction.to_rlp delayed_transaction));
         ]
-    in
-    return evm_state
+    else
+      let*! evm_state =
+        Evm_state.modify
+          ~key:"/__delayed_input"
+          ~value:
+            (Bytes.to_string
+               (Evm_events.Delayed_transaction.to_rlp delayed_transaction))
+          evm_state
+      in
+      Evm_state.execute
+        ~wasm_entrypoint:"populate_delayed_inbox"
+        ~data_dir
+        ~config
+        evm_state
+        []
 
   let apply_evm_event_unsafe on_success ctxt conn evm_state event =
     let open Lwt_result_syntax in
