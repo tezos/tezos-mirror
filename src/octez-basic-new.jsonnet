@@ -78,7 +78,7 @@ dashboard.new('Octez basic dashboard')
 
   //#######
   + grafonnet.util.grid.wrapPanels(panels=[
-    panel.row.new('P2P stats stats'),
+    panel.row.new('P2P stats'),
   ], panelWidth=26, panelHeight=32, startY=p2p_y)
   + [
     p2p.mempoolPending(h=8, w=12, x=0, y=p2p_y),
