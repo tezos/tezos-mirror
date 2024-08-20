@@ -120,8 +120,8 @@ and run:
 
 .. literalinclude:: install-bin-deb.sh
    :language: shell
-   :start-after: [add repository]
-   :end-before: [install tezos]
+   :start-after: [install prerequisites]
+   :end-before: [ preeseed octez ]
 
 We also maintain a separate repository for release candidates. To install
 the last release candidate simply prepend ``RC/`` to the distribution name
@@ -132,7 +132,14 @@ Then, to install the binaries, run the following commands:
 .. literalinclude:: install-bin-deb.sh
    :language: shell
    :start-after: [install tezos]
-   :end-before: [test executables]
+   :end-before: [install octez additional packages]
+
+To remove the octez packages you can simly run the following command.
+
+.. literalinclude:: install-bin-deb.sh
+   :language: shell
+   :start-after: [test autopurge]
+   :end-before: [check autopurge]
 
 Also there are some experimental packages:
 

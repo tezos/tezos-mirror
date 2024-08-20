@@ -21,7 +21,8 @@ Depends: adduser,
   octez-zcash-params,
   ${misc:Depends},
   ${shlibs:Depends},
-  debconf (>= 0.5) | debconf-2.0
+  debconf (>= 0.5) | debconf-2.0,
+  systemd
 Recommends: octez-client (= ${source:Version}),
 Suggests: lz4, curl
 Description: L1 Octez node for the Tezos network
@@ -49,7 +50,7 @@ Depends:
  ${misc:Depends}, ${shlibs:Depends},
  octez-client (= ${source:Version}),
  octez-node (= ${source:Version}),
- curl
+ curl, systemd
 Recommends: octez-signer (= ${source:Version}),
 Description: Octez baking software for the Tezos blockchain.
  The Octez baker includes the necessary tools and functionalities for
@@ -62,6 +63,7 @@ Description: Octez baking software for the Tezos blockchain.
 Package: octez-signer
 Architecture: amd64 arm64
 Depends: ${misc:Depends}, ${shlibs:Depends}, octez-client (= ${source:Version}),
+Recommends: systemd
 Suggests: wireguard, openssh-client
 Description: Signing client for the Tezos blockchain.
  The Octez signer provides the essential tools and functionalities for securely
@@ -89,7 +91,9 @@ Description: Octez experimental binaries
 
 Package: octez-smart-rollup-node
 Architecture: amd64 arm64
-Depends: ${misc:Depends}, ${shlibs:Depends}, octez-node (= ${source:Version}),
+Depends: ${misc:Depends}, ${shlibs:Depends},
+ octez-node (= ${source:Version}),
+ systemd
 Recommends: octez-client (= ${source:Version})
 Description: Smart Rollup node for the Tezos blockchain.
  The Octez Smart Rollup node enables rollup deployment, managing progress
@@ -100,7 +104,9 @@ Description: Smart Rollup node for the Tezos blockchain.
 
 Package: octez-dal-node
 Architecture: amd64 arm64
-Depends: ${misc:Depends}, ${shlibs:Depends}, octez-zcash-dal-params
+Depends: ${misc:Depends}, ${shlibs:Depends},
+ octez-zcash-dal-params,
+ systemd
 Suggests: octez-baker (= ${source:Version})
 Description: Octez distribution Availability Layer (DAL) node
  The DAL node is responsible for temporarily storing data and providing it to

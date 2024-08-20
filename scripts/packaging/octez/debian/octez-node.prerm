@@ -5,38 +5,10 @@ set -e
 # shellcheck disable=SC1091
 . /usr/share/debconf/confmodule
 
-# make sure to ask this question
-db_reset octez-node/purge_warning
-
 # display a warning before proceding
 db_input critical octez-node/purge_warning || true
 # shellcheck disable=SC2119
 db_go || true
-
-case "${1}" in
-remove)
-  DATADIR=/var/tezos
-  # display a warning before proceding
-  # This question must be asked in the prerm, before
-  # all data related to this package is removed.
-  db_get octez-node/purge_warning || true
-  case "$RET" in
-  "yes")
-    echo "Removing data and tezos user"
-    rm -Rf "$DATADIR"
-    deluser --quiet tezos || true
-    delgroup --quiet --only-if-empty tezos || true
-    rm -Rf /var/log/tezos
-    ;;
-  *) ;;
-  esac
-  ;;
-upgrade | failed-upgrade | deconfigure) ;;
-*)
-  echo "postrm called with unknown argument \`$1'" >&2
-  exit 1
-  ;;
-esac
 
 # Check if the daemon is active before stopping it
 if systemctl is-active --quiet octez-node.service; then
