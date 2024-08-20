@@ -7,22 +7,6 @@
 
 open Snapshot_utils
 
-module Event = struct
-  open Internal_event.Simple
-
-  let section = ["evm_node"; "snapshot"]
-
-  let take_evm_stats_lock =
-    declare_0
-      ~section
-      ~name:"evm_stats_lock"
-      ~msg:"Acquiring EVM state lock"
-      ~level:Info
-      ()
-
-  let emit_evm_stats_lock = emit take_evm_stats_lock
-end
-
 type compression = No | On_the_fly | After
 
 module Header = struct
@@ -53,6 +37,7 @@ open Snapshot_utils.Make (Header)
 
 let export ?dest ?filename ~compression ~data_dir () =
   let open Lwt_result_syntax in
+  let* () = Evm_context.lock_data_dir ~data_dir in
   let header = Header.{version = V0} in
   let dest_file_name =
     match filename with
@@ -74,36 +59,26 @@ let export ?dest ?filename ~compression ~data_dir () =
   in
   let*! () = Lwt_utils_unix.create_dir (Filename.dirname dest_file) in
   let evm_state_path = Evm_context.State.store_path ~data_dir in
-  let lockfile_name =
-    Evm_context.State.lockfile_path ~store_path:evm_state_path
+  let evm_context_files =
+    Tezos_stdlib_unix.Utils.fold_files
+      evm_state_path
+      (fun relative_path acc ->
+        let full_path = Filename.concat evm_state_path relative_path in
+        (full_path, Filename.concat "store" relative_path) :: acc)
+      []
   in
-  let* () =
-    let*! () = Event.emit_evm_stats_lock () in
-    Lwt_lock_file.with_lock ~when_locked:`Block ~filename:lockfile_name
-    @@ fun () ->
-    let evm_context_files =
-      Tezos_stdlib_unix.Utils.fold_files
-        evm_state_path
-        (fun relative_path acc ->
-          let full_path = Filename.concat evm_state_path relative_path in
-          if full_path = lockfile_name then acc
-          else (full_path, Filename.concat "store" relative_path) :: acc)
-        []
-    in
-    let files = evm_context_files in
-    (* Export SQLite database *)
-    Lwt_utils_unix.with_tempdir "evm_node_sqlite_export_" @@ fun tmp_dir ->
-    let output_db_file = Filename.concat tmp_dir Evm_store.sqlite_file_name in
-    let* () = Evm_context.vacuum ~data_dir ~output_db_file in
-    let files = (output_db_file, Evm_store.sqlite_file_name) :: files in
-    let writer =
-      match compression with
-      | On_the_fly -> gzip_writer
-      | No | After -> stdlib_writer
-    in
-    create stdlib_reader writer header ~files ~dest:dest_file ;
-    return_unit
+  let files = evm_context_files in
+  (* Export SQLite database *)
+  Lwt_utils_unix.with_tempdir "evm_node_sqlite_export_" @@ fun tmp_dir ->
+  let output_db_file = Filename.concat tmp_dir Evm_store.sqlite_file_name in
+  let* () = Evm_context.vacuum ~data_dir ~output_db_file in
+  let files = (output_db_file, Evm_store.sqlite_file_name) :: files in
+  let writer =
+    match compression with
+    | On_the_fly -> gzip_writer
+    | No | After -> stdlib_writer
   in
+  create stdlib_reader writer header ~files ~dest:dest_file ;
   let snapshot_file =
     match compression with
     | No | On_the_fly -> dest_file
