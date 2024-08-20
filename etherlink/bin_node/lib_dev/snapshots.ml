@@ -71,49 +71,56 @@ open Snapshot_utils.Make (Header)
 let export ?dest ?filename ~compression ~data_dir () =
   let open Lwt_result_syntax in
   let* () = Evm_context.lock_data_dir ~data_dir in
-  let dest_file_name =
-    match filename with
-    | Some f -> f
-    | None ->
-        let suffix =
-          match compression with
-          | On_the_fly -> ".compressed"
-          | No | After -> ".uncompressed"
-        in
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/7433
-           name based on header *)
-        Format.asprintf "evm-snapshot%s" suffix
-  in
-  let dest_file =
-    match dest with
-    | Some dest -> Filename.concat dest dest_file_name
-    | None -> dest_file_name
-  in
-  let*! () = Lwt_utils_unix.create_dir (Filename.dirname dest_file) in
   let evm_state_path = Evm_context.State.store_path ~data_dir in
-  let evm_context_files =
-    Tezos_stdlib_unix.Utils.fold_files
-      evm_state_path
-      (fun relative_path acc ->
-        let full_path = Filename.concat evm_state_path relative_path in
-        (full_path, Filename.concat "store" relative_path) :: acc)
-      []
+  let* dest_file =
+    let evm_context_files =
+      Tezos_stdlib_unix.Utils.fold_files
+        evm_state_path
+        (fun relative_path acc ->
+          let full_path = Filename.concat evm_state_path relative_path in
+          (full_path, Filename.concat "store" relative_path) :: acc)
+        []
+    in
+    let files = evm_context_files in
+    (* Export SQLite database *)
+    Lwt_utils_unix.with_tempdir "evm_node_sqlite_export_" @@ fun tmp_dir ->
+    let output_db_file = Filename.concat tmp_dir Evm_store.sqlite_file_name in
+    let* {rollup_address; current_number = current_level} =
+      Evm_context.export_store ~data_dir ~output_db_file
+    in
+    let header = Header.{version = V0; rollup_address; current_level} in
+    let files = (output_db_file, Evm_store.sqlite_file_name) :: files in
+    let writer =
+      match compression with
+      | On_the_fly -> gzip_writer
+      | No | After -> stdlib_writer
+    in
+    let dest_file_name =
+      match filename with
+      | Some f -> f
+      | None ->
+          let suffix =
+            match compression with
+            | On_the_fly -> ".compressed"
+            | No | After -> ".uncompressed"
+          in
+          Format.asprintf
+            "evm-snapshot-%a-%a%s"
+            Address.pp_short
+            header.rollup_address
+            Ethereum_types.pp_quantity
+            header.current_level
+            suffix
+    in
+    let dest_file =
+      match dest with
+      | Some dest -> Filename.concat dest dest_file_name
+      | None -> dest_file_name
+    in
+    let*! () = Lwt_utils_unix.create_dir (Filename.dirname dest_file) in
+    create stdlib_reader writer header ~files ~dest:dest_file ;
+    return dest_file
   in
-  let files = evm_context_files in
-  (* Export SQLite database *)
-  Lwt_utils_unix.with_tempdir "evm_node_sqlite_export_" @@ fun tmp_dir ->
-  let output_db_file = Filename.concat tmp_dir Evm_store.sqlite_file_name in
-  let* {rollup_address; current_number = current_level} =
-    Evm_context.export_store ~data_dir ~output_db_file
-  in
-  let header = Header.{version = V0; rollup_address; current_level} in
-  let files = (output_db_file, Evm_store.sqlite_file_name) :: files in
-  let writer =
-    match compression with
-    | On_the_fly -> gzip_writer
-    | No | After -> stdlib_writer
-  in
-  create stdlib_reader writer header ~files ~dest:dest_file ;
   let snapshot_file =
     match compression with
     | No | On_the_fly -> dest_file
