@@ -4,6 +4,7 @@
 
 //! Crypto and RLP encoding helpers.
 
+use blst::{blst_fr, blst_fr_from_scalar};
 use blstrs::{G1Affine, G2Affine, G2Projective, Scalar};
 use chacha20::{
     cipher::{errors::LoopError, NewCipher, StreamCipher},
@@ -118,6 +119,16 @@ pub fn rlp_decode_array<const N: usize>(
     let mut raw_bytes = [0u8; N];
     raw_bytes.copy_from_slice(raw_bytes_iter);
     Ok(raw_bytes)
+}
+
+pub(crate) fn hash_to_scalar(b: &[u8]) -> Scalar {
+    let dst: &[u8; 50] = b"TEZOS_THRESHOLD_ENCRYPTION_V1_BLS12_381_SCALAR_DST"; // Domain Separator Tag, unique to the application see https://datatracker.ietf.org/doc/html/rfc9380#section-3.1
+    let hash = blst::blst_scalar::hash_to(b, dst).unwrap();
+    let mut ret = blst_fr::default();
+    unsafe {
+        blst_fr_from_scalar(&mut ret, &hash);
+    }
+    <blstrs::Scalar as From<blst_fr>>::from(ret)
 }
 
 #[cfg(test)]

@@ -70,6 +70,7 @@ libsecp256k1 = { version = "0.7", default-features = false, features = [
   "hmac",
 ] }
 blstrs = { version = "0.7.1", features = ["portable"] }
+blst = "0.3.13"
 zeroize = "1.5.7"
 ff = "0.13.0"
 pairing_lib = { version = "0.23", package = "pairing" }

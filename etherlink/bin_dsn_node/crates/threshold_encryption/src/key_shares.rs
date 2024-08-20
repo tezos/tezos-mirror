@@ -10,7 +10,7 @@
 
 use std::ops::Mul;
 
-use blstrs::{G1Affine, Scalar};
+use blstrs::{G1Affine, G2Affine, Scalar};
 use ff::Field;
 use pairing_lib::group::prime::PrimeCurveAffine;
 use serde::{Deserialize, Serialize};
@@ -23,8 +23,11 @@ pub struct PublicKeyShare {
     pub authority: u8,
     /// Public keys in G1 (minpk)
     pub share: G1Affine,
+    /// Public keys in G2 (minpk)
+    pub share_g2: G2Affine,
     /// Public key inverted, used for faster pairing checks
     share_inv: G1Affine,
+    share_g2_inv: G2Affine,
 }
 
 /// Secret key share, used for partial decryption
@@ -37,16 +40,22 @@ pub struct SecretKeyShare {
 }
 
 impl PublicKeyShare {
-    pub fn new(authority: u8, share: G1Affine) -> Self {
+    pub fn new(authority: u8, share: G1Affine, share_g2: G2Affine) -> Self {
         Self {
             authority,
             share_inv: -share,
             share,
+            share_g2,
+            share_g2_inv: -share_g2,
         }
     }
 
     pub fn inv(&self) -> &G1Affine {
         &self.share_inv
+    }
+
+    pub fn inv_g2(&self) -> &G2Affine {
+        &self.share_g2_inv
     }
 }
 
@@ -56,7 +65,11 @@ impl SecretKeyShare {
     }
 
     pub fn public_key_share(&self) -> PublicKeyShare {
-        PublicKeyShare::new(self.authority, G1Affine::generator().mul(self.share).into())
+        PublicKeyShare::new(
+            self.authority,
+            G1Affine::generator().mul(self.share).into(),
+            G2Affine::generator().mul(self.share).into(),
+        )
     }
 
     #[cfg(any(test, feature = "testing"))]

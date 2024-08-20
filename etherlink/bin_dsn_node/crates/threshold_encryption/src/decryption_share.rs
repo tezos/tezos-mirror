@@ -13,13 +13,16 @@
 
 use std::ops::Mul;
 
-use blstrs::{Bls12, G1Affine, G1Projective, Gt, Scalar};
+use blstrs::{Bls12, G1Affine, G1Projective, G2Affine, G2Prepared, Gt, Scalar};
+use ff::Field;
+use pairing_lib::group::prime::PrimeCurveAffine;
 use pairing_lib::{group::Group, MillerLoopResult, MultiMillerLoop};
 use rlp::{Decodable, DecoderError, Encodable};
 
 use crate::{
     ciphertext::UHW,
     error::ThresholdEncryptionError,
+    helpers,
     helpers::{lagrange_coeff, rlp_decode_array, G1Compressed},
     key_shares::{PublicKeyShare, SecretKeyShare},
 };
@@ -86,14 +89,108 @@ impl DecryptionShare {
 
     /// Verify multiple decryption shares at once and output fully deserialized form.
     /// NOTE that if verification fails it's not possible to tell which decryption share is invalid in particular.
+    /// see https://hackmd.io/s3gtlLiNQHmFYokL600cuA#Scaling-with-the-number-of-ciphertexts
     pub fn batch_verify_decode(
-        _shares: &[DecryptionShare],
-        _ciphertexts: &[UHW],
-        _public_key_share: &PublicKeyShare,
+        decryption_shares: &[DecryptionShare],
+        ciphertexts: &[UHW],
+        public_key_share: &PublicKeyShare,
     ) -> Result<Vec<DSH>, ThresholdEncryptionError> {
-        // See https://hackmd.io/@m-kus/rJXTo9_pT#Verify-share
-        // Also https://github.com/anoma/ferveo/blob/1022ab2c7ccc689abcc05e5a08df6fb0c2a3fc65/tpke/src/decryption.rs#L24
-        todo!()
+        if decryption_shares.is_empty() {
+            return Err(ThresholdEncryptionError::DecryptionShareInvalid(
+                "size of decryption shares array should be greater or equal to 1",
+            ));
+        };
+
+        if decryption_shares.len() != ciphertexts.len() {
+            return Err(ThresholdEncryptionError::DecryptionShareInvalid(
+                "dimension of decryption shares does not match that of ciphertexts",
+            ));
+        };
+
+        let authority = decryption_shares[0].authority;
+        if !decryption_shares.iter().all(|d| d.authority == authority) {
+            return Err(ThresholdEncryptionError::DecryptionShareInvalid(
+                "decryption shares must come from the same authority",
+            ));
+        }
+
+        // Hashing all arguments to the pairings
+        let mut pairings_arguments: Vec<u8> = decryption_shares
+            .iter()
+            .flat_map(|s| s.share.to_vec())
+            .collect();
+
+        pairings_arguments.extend_from_slice(&public_key_share.share.to_compressed());
+        pairings_arguments.extend(
+            ciphertexts
+                .iter()
+                .flat_map(|e| e.0.to_compressed().to_vec()),
+        );
+        pairings_arguments.extend_from_slice(&public_key_share.share_g2.to_compressed());
+        pairings_arguments.extend_from_slice(&G1Affine::generator().to_compressed());
+
+        let random_scalar = helpers::hash_to_scalar(pairings_arguments.as_slice());
+
+        let mut scalar_powers = Vec::with_capacity(decryption_shares.len());
+        let mut pow = Scalar::ONE;
+        for _ in 0..decryption_shares.len() {
+            scalar_powers.push(pow);
+            pow *= random_scalar;
+        }
+
+        let mut decompressed_shares: Vec<G1Affine> = vec![];
+        for share in decryption_shares {
+            match G1Affine::from_compressed(&share.share).into() {
+                Some(g1) => decompressed_shares.push(g1),
+                None => {
+                    return Err(ThresholdEncryptionError::DecryptionShareInvalid(
+                        "failed to decompress decryption share",
+                    ))
+                }
+            }
+        }
+
+        let combined_decryption_shares = G1Projective::multi_exp(
+            decompressed_shares
+                .iter()
+                .map(|e| e.into())
+                .collect::<Vec<G1Projective>>()
+                .as_slice(),
+            scalar_powers.as_slice(),
+        )
+        .into();
+
+        let combined_ciphertexts = G1Projective::multi_exp(
+            ciphertexts
+                .iter()
+                .map(|e| e.0.into())
+                .collect::<Vec<G1Projective>>()
+                .as_slice(),
+            scalar_powers.as_slice(),
+        )
+        .into();
+
+        let inverted_public_key_share = public_key_share.inv_g2();
+
+        let res = Bls12::multi_miller_loop(&[
+            (&combined_decryption_shares, &G2Affine::generator().into()),
+            (
+                &combined_ciphertexts,
+                &G2Prepared::from(*inverted_public_key_share),
+            ),
+        ])
+        .final_exponentiation();
+
+        if res != Gt::identity() {
+            return Err(ThresholdEncryptionError::DecryptionShareInvalid(
+                "product of pairings is not 1",
+            ));
+        }
+
+        Ok(decompressed_shares
+            .into_iter()
+            .map(|s| (authority, s))
+            .collect())
     }
 
     /// Combine multiple decryption shares to obtain the shared ElGamal key.
@@ -138,14 +235,16 @@ impl Decodable for DecryptionShare {
 
 #[cfg(test)]
 mod tests {
-    use std::ops::Mul;
+    use std::ops::{Mul, Neg};
+    use std::time::Instant;
 
     use blstrs::{G1Affine, G2Affine, Scalar};
     use pairing_lib::group::prime::PrimeCurveAffine;
-    use rand::{rngs::OsRng, CryptoRng, RngCore};
+    use rand::{rngs::OsRng, CryptoRng, Rng, RngCore};
     use rlp::Encodable;
 
-    use crate::helpers::random_non_zero_scalar;
+    use crate::ciphertext::Ciphertext;
+    use crate::helpers::{keccak_256, random_non_zero_scalar};
     use crate::{
         ciphertext::UHW,
         decryption_share::{DecryptionShare, DSH},
@@ -197,6 +296,71 @@ mod tests {
     }
 
     #[test]
+    fn test_batched_verify_decryption_share_invalid() {
+        // Key generation for 7 participants, 4 of which are required for decryption
+        let KeygenResult {
+            master_public_key,
+            public_key_shares,
+            secret_key_shares,
+            secret_key: _,
+        } = keygen(7, 4, 1);
+
+        let mut rng = rand::thread_rng();
+        let mut messages = vec![];
+        let mut ciphertexts = vec![];
+        let mut uhws = vec![];
+        let num_transactions = 100;
+
+        // Generate random messages, encrypt them, and compute their UHW
+        for _ in 0..num_transactions {
+            let mut message = [0u8; 32];
+            rng.fill(&mut message);
+            messages.push(message);
+
+            let ciphertext =
+                Ciphertext::encrypt(&message, keccak_256(&message), &master_public_key)
+                    .expect("Failed to encrypt message");
+            ciphertexts.push(ciphertext.clone());
+
+            let uhw = ciphertext
+                .verify_decode()
+                .expect("Failed to decode ciphertext");
+            uhws.push(uhw);
+        }
+
+        // Create decryption shares for each transaction
+        let mut decryption_shares = vec![];
+        for i in 0..num_transactions {
+            let shares: Vec<DecryptionShare> = secret_key_shares
+                .iter()
+                .enumerate()
+                .map(|(_, sk)| DecryptionShare::create(&uhws[i], sk))
+                .collect();
+            decryption_shares.push(shares);
+        }
+
+        let mut shares = decryption_shares
+            .iter()
+            .map(|s| s[0].clone())
+            .collect::<Vec<DecryptionShare>>();
+
+        // Modify one decryption share so as to make the batch verification fail
+        let mut res = shares[2].clone();
+        let mut e = G1Affine::from_compressed(&res.share).unwrap();
+        e = e.neg();
+        res.share = e.to_compressed();
+        shares[2] = res;
+
+        let valid = DecryptionShare::batch_verify_decode(
+            shares.as_slice(),
+            uhws.as_slice(),
+            &public_key_shares[0],
+        );
+
+        assert!(valid.is_err())
+    }
+
+    #[test]
     fn test_verify_decryption_share() {
         let secret_key_share = SecretKeyShare::random(0, &mut OsRng);
         let public_key_share = secret_key_share.public_key_share();
@@ -209,6 +373,113 @@ mod tests {
 
         let dsh = DecryptionShare::create(&ciphertext, &secret_key_share);
         let _ = dsh.verify_decode(&ciphertext, &public_key_share).unwrap();
+    }
+
+    #[test]
+    fn test_batched_verify_decryption_share() {
+        // Key generation for 7 participants, 4 of which are required for decryption
+        let KeygenResult {
+            master_public_key,
+            public_key_shares,
+            secret_key_shares,
+            secret_key: _,
+        } = keygen(7, 4, 1);
+
+        let mut rng = rand::thread_rng();
+        let mut messages = vec![];
+        let mut ciphertexts = vec![];
+        let mut uhws = vec![];
+        let num_transactions = 100;
+
+        // Generate random messages, encrypt them, and compute their UHW
+        for _ in 0..num_transactions {
+            let mut message = [0u8; 32];
+            rng.fill(&mut message);
+            messages.push(message);
+
+            let ciphertext =
+                Ciphertext::encrypt(&message, keccak_256(&message), &master_public_key)
+                    .expect("Failed to encrypt message");
+            ciphertexts.push(ciphertext.clone());
+
+            let uhw = ciphertext
+                .verify_decode()
+                .expect("Failed to decode ciphertext");
+            uhws.push(uhw);
+        }
+
+        // Create decryption shares for each transaction
+        let mut decryption_shares = vec![];
+        for i in 0..num_transactions {
+            let shares: Vec<DecryptionShare> = secret_key_shares
+                .iter()
+                .enumerate()
+                .map(|(_, sk)| DecryptionShare::create(&uhws[i], sk))
+                .collect();
+            decryption_shares.push(shares);
+        }
+
+        // Measure the time taken to batch verify decryption shares
+        let start_time = Instant::now();
+        let validated_shares: Vec<Vec<DSH>> = (0..4)
+            .filter_map(|i| {
+                DecryptionShare::batch_verify_decode(
+                    decryption_shares
+                        .iter()
+                        .map(|s| s[i].clone())
+                        .collect::<Vec<DecryptionShare>>()
+                        .as_slice(),
+                    uhws.as_slice(),
+                    &public_key_shares[i],
+                )
+                .ok()
+            })
+            .collect();
+        let batch_verify_duration = start_time.elapsed();
+        println!(
+            "Batch verification for 4 keyholders elapsed time: {:.2?}",
+            batch_verify_duration
+        );
+
+        // Measure the time taken to verify each decryption share individually
+        let start_time = Instant::now();
+        for j in 0..num_transactions {
+            for i in 0..4 {
+                decryption_shares[j][i]
+                    .verify_decode(&uhws[j], &public_key_shares[i])
+                    .expect("Failed to verify and decode decryption share");
+            }
+        }
+        let individual_verify_duration = start_time.elapsed();
+        println!(
+            "Individual verification elapsed time: {:.2?}",
+            individual_verify_duration
+        );
+
+        // Measure the time taken to combine and decrypt
+        let start_time = Instant::now();
+        for j in 0..num_transactions {
+            let combined_key = DecryptionShare::combine(
+                &validated_shares
+                    .iter()
+                    .map(|s| s[j])
+                    .collect::<Vec<_>>()
+                    .as_slice(),
+            )
+            .expect("Failed to combine decryption shares");
+
+            assert_eq!(
+                ciphertexts[j]
+                    .decrypt_checked(&combined_key)
+                    .expect("Failed to decrypt ciphertext"),
+                messages[j]
+            );
+        }
+        let combine_decrypt_duration = start_time.elapsed();
+        println!(
+            "Combine and decryption for {} transactions elapsed time: {:.2?}",
+            num_transactions, combine_decrypt_duration
+        );
     }
 
     #[test]
