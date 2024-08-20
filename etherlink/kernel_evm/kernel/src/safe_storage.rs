@@ -28,17 +28,9 @@ pub trait KernelRuntime: Runtime + ExtendedRuntime {}
 // Every type implementing an InternalRuntime will implement
 // the ExtendedRuntime.
 impl<T: InternalRuntime> ExtendedRuntime for T {
-    fn store_get_hash<P: Path>(
-        &mut self,
-        path: Option<P>,
-    ) -> Result<Vec<u8>, RuntimeError> {
-        match path {
-            Some(p) => {
-                let path = safe_path(&p)?;
-                self.__internal_store_get_hash(&path)
-            }
-            None => self.__internal_store_get_hash(&TMP_PATH),
-        }
+    fn store_get_hash<P: Path>(&mut self, path: &P) -> Result<Vec<u8>, RuntimeError> {
+        let path = safe_path(path)?;
+        self.__internal_store_get_hash(&path)
     }
 }
 
