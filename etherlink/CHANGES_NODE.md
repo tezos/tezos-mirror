@@ -4,6 +4,9 @@
 
 ### Breaking changes
 
+- Remove the deprecated `run <mode> with endpoint` commands, use
+  `run <mode>` instead. (!14566)
+
 ### Features
 
 - Metrics register the number of calls to each RPC method, e.g. `eth_blockNumber`.
