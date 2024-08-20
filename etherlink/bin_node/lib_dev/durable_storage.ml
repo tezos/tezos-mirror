@@ -30,7 +30,9 @@ let inspect_durable_and_decode_opt read path decode =
 let inspect_durable_and_decode read path decode =
   let open Lwt_result_syntax in
   let* res_opt = inspect_durable_and_decode_opt read path decode in
-  match res_opt with Some res -> return res | None -> failwith "null"
+  match res_opt with
+  | Some res -> return res
+  | None -> failwith "No value found under %s" path
 
 let balance read address =
   let open Lwt_result_syntax in
