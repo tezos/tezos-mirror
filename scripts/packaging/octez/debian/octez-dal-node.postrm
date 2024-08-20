@@ -12,19 +12,18 @@ debsystemctl=$(command -v deb-systemd-invoke || echo systemctl)
 
 # temp file to make sure we remember to restart the
 # daemon when we upgrade
-DAEMON_RUNNING=/var/run/octez-dal-node/daemon_was_running
+DAEMON_RUNNING=/run/octez-dal-node/daemon_was_running
 
 case "${1}" in
 purge)
-  rm -Rf /var/run/octez-dal-node
+  rm -Rf /run/octez-dal-node
   # Purge debconf data for the package in any case
   # shellcheck disable=SC2119
   db_purge || true
   ;;
 upgrade)
   # Check if the daemon was running before the upgrade
-  if [ -f "$DAEMON_RUNNING" ] &&
-    [ "$(cat "$DAEMON_RUNNING")" = "1" ]; then
+  if [ -f "$DAEMON_RUNNING" ]; then
     # Start the daemon if it was running
     $debsystemctl "start octez-dal-node.service"
   fi

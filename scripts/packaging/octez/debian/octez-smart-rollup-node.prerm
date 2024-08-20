@@ -8,7 +8,7 @@ set -e
 # Check if the daemon is active before stopping it
 if systemctl is-active --quiet octez-smart-rollup-node.service; then
   # Set a flag in a temporary file to indicate the daemon was running
-  echo "1" > "/var/lib/octez-smart-rollup-node/daemon_was_running"
+  touch "/run/octez-smart-rollup-node/daemon_was_running"
   echo "Stopping octez-smart-rollup-node"
   sudo systemctl stop octez-smart-rollup-node.service
 fi
