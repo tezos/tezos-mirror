@@ -34,3 +34,11 @@ octez-compact-new:
 		-J vendor src/octez-compact-new.jsonnet \
 		--ext-str node_instance_label="$(NODE_INSTANCE_LABEL)" \
 		> output/$@.json
+
+octez-basic-new:
+	jsonnet \
+		-J vendor src/octez-basic-new.jsonnet \
+		--ext-str node_instance_label="$(NODE_INSTANCE_LABEL)" \
+		> output/$@.json
+
+new: octez-compact-new octez-basic-new

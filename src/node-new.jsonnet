@@ -89,6 +89,10 @@ local table = base.table;
     local q = prometheus('store_savepoint_level', legendFormat='current savepoint');
     info.new('Current savepoint level', q, h, w, x, y),
 
+  checkpointLevel(h, w, x, y):
+    local q = prometheus('store_checkpoint_level', legendFormat='current checkpoint');
+    info.new('Current checkpoint level', q, h, w, x, y),
+
   cabooseLevel(h, w, x, y):
     local q = prometheus('store_caboose_level', legendFormat='current caboose');
     info.new('Current caboose level', q, h, w, x, y),
@@ -110,8 +114,10 @@ local table = base.table;
     + timeSeries.options.legend.withShowLegend(false),
 
   invalidBlocksHistory(h, w, x, y):
-    local q = prometheus('store_invalid_blocks');
-    graph.new('Invalid blocks history', [q], h, w, x, y),
+    local q = prometheus('store_invalid_blocks', legendFormat='Invalid blocks history');
+    graph.new('Invalid blocks history', [q], h, w, x, y)
+    + graph.withFixedColor('light-red')
+    + graph.withLegendBottom(calcs=['lastNotNull', 'max']),
 
   invalidBlocksMean(h, w, x, y):
     local q = prometheus('store_invalid_blocks', legendFormat='current cycle');
@@ -183,6 +189,13 @@ local table = base.table;
     + stat.options.withGraphMode('area')
     + stat.standardOptions.color.withMode('fixed'),
 
+  storeMergeTimeGraph(h, w, x, y):
+    local q = prometheus('store_last_merge_time', legendFormat='Merge Time');
+    graph.new('Store merge time', [q], h, w, x, y)
+    + graph.withLegendBottom(calcs=['lastNotNull', 'max'])
+    + graph.withFixedColor('light-blue')
+    + timeSeries.standardOptions.withUnit('s'),
+
   storeMergeTime(h, w, x, y):
     local q = prometheus('store_last_merge_time', legendFormat='Round');
     info.new('Store merge time', q, h, w, x, y, instant=false)
@@ -194,5 +207,34 @@ local table = base.table;
     graph.new('Last written block size', [q], h, w, x, y)
     + graph.withLegendBottom(calcs=['mean', 'lastNotNull', 'max', 'min'])
     + timeSeries.standardOptions.withUnit('bytes'),
+
+
+  //## GC
+
+  gcOperations(h, w, x, y):
+    local minor = 'Minor collections';
+    local major = 'Major collections';
+    local forced = 'Forced major collections';
+    local compact = 'Heap compactions';
+    local minorQuery = query.prometheus.new('Prometheus', 'ocaml_gc_minor_collections' + base.node_instance_query)
+                       + query.prometheus.withLegendFormat(minor);
+    local majorQuery = query.prometheus.new('Prometheus', 'ocaml_gc_major_collections' + base.node_instance_query)
+                       + query.prometheus.withLegendFormat(major);
+    local forcedQuery = query.prometheus.new('Prometheus', 'ocaml_gc_forced_major_collections' + base.node_instance_query)
+                        + query.prometheus.withLegendFormat(forced);
+    local compactQuery = query.prometheus.new('Prometheus', 'ocaml_gc_compactions' + base.node_instance_query)
+                         + query.prometheus.withLegendFormat(compact);
+    graph.new('GC maintenance operations', [minorQuery, majorQuery, forcedQuery, compactQuery], h, w, x, y)
+    + graph.withLogScale()
+    + graph.withQueryColor([[minor, 'light-green'], [major, 'light-yellow'], [forced, 'light-blue'], [compact, 'light-red']]),
+
+  gcMajorHeap(h, w, x, y):
+    local major = 'Major heap';
+    local majorQuery = query.prometheus.new('Prometheus', 'ocaml_gc_heap_words' + base.node_instance_query + '* 8')
+                       + query.prometheus.withLegendFormat(major);
+    graph.new('GC major word sizes', [majorQuery], h, w, x, y)
+    + graph.withQueryColor([[major, 'light-green']])
+    + timeSeries.standardOptions.withUnit('bytes')
+    + timeSeries.options.legend.withShowLegend(false),
 
 }
