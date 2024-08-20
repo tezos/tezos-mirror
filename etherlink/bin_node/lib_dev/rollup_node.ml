@@ -129,19 +129,9 @@ end) : Services_backend_sig.Backend = struct
   end
 
   module SimulatorBackend = struct
-    type simulation_state = unit
+    include Reader
 
-    let simulation_state ?block () =
-      let open Lwt_result_syntax in
-      match block with
-      | Some param
-        when param <> Ethereum_types.Block_parameter.(Block_parameter Latest) ->
-          failwith
-            "The EVM node in proxy mode support state requests only on latest \
-             block."
-      | _ -> return_unit
-
-    let simulate_and_read _simulation_state ~input =
+    let simulate_and_read _state ~input =
       let open Lwt_result_syntax in
       let* json =
         call_service
@@ -158,15 +148,6 @@ end) : Services_backend_sig.Backend = struct
       match eval_result.insights with
       | [data] -> return data
       | _ -> failwith "Inconsistent simulation results"
-
-    let read () ~path =
-      call_service
-        ~keep_alive:Base.keep_alive
-        ~base:Base.base
-        durable_state_value
-        ((), Block_id.Head)
-        {key = path}
-        ()
   end
 
   let block_param_to_block_number

@@ -200,13 +200,7 @@ struct
   end
 
   module SimulatorBackend = struct
-    type simulation_state = Evm_state.t
-
-    let simulation_state
-        ?(block = Ethereum_types.Block_parameter.(Block_parameter Latest)) () =
-      let open Lwt_result_syntax in
-      let* hash = find_irmin_hash Ctxt.ctxt block in
-      with_evm_state Ctxt.ctxt hash return
+    include Reader
 
     let simulate_and_read simulate_state ~input =
       let open Lwt_result_syntax in
@@ -228,11 +222,6 @@ struct
       match raw_insights with
       | [Some bytes] -> return bytes
       | _ -> Error_monad.failwith "Invalid insights format"
-
-    let read simulation_state ~path =
-      let open Lwt_result_syntax in
-      let*! res = Evm_state.inspect simulation_state path in
-      return res
   end
 
   module Tracer = Tracer

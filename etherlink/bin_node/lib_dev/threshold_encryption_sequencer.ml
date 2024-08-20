@@ -10,6 +10,7 @@ module MakeBackend (Ctxt : sig
   val smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t
 end) : Services_backend_sig.Backend = struct
   module Reader = Evm_context_based_reader
+  module SimulatorBackend = Evm_context_based_reader
 
   module TxEncoder = struct
     type transactions = (string * Ethereum_types.transaction_object) list
@@ -25,28 +26,6 @@ end) : Services_backend_sig.Backend = struct
 
     let publish_messages ~timestamp:_ ~smart_rollup_address:_ ~messages:_ =
       assert false
-  end
-
-  module SimulatorBackend = struct
-    type simulation_state = Evm_state.t
-
-    let simulation_state
-        ?(block = Ethereum_types.Block_parameter.(Block_parameter Latest)) () =
-      Evm_context.get_evm_state block
-
-    let simulate_and_read simulation_state ~input =
-      let open Lwt_result_syntax in
-      let* raw_insights =
-        Evm_context.execute_and_inspect simulation_state input
-      in
-      match raw_insights with
-      | [Some bytes] -> return bytes
-      | _ -> Error_monad.failwith "Invalid insights format"
-
-    let read simulation_state ~path =
-      let open Lwt_result_syntax in
-      let*! res = Evm_state.inspect simulation_state path in
-      return res
   end
 
   let block_param_to_block_number = Evm_context.block_param_to_block_number
