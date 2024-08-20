@@ -27,6 +27,11 @@ let inspect_durable_and_decode_opt read path decode =
   | Some bytes -> return_some (decode bytes)
   | None -> return_none
 
+let inspect_durable_and_decode_default ~default read path decode =
+  let open Lwt_result_syntax in
+  let* res_opt = inspect_durable_and_decode_opt read path decode in
+  match res_opt with Some res -> return res | None -> return default
+
 let inspect_durable_and_decode read path decode =
   let open Lwt_result_syntax in
   let* res_opt = inspect_durable_and_decode_opt read path decode in
@@ -35,27 +40,25 @@ let inspect_durable_and_decode read path decode =
   | None -> failwith "No value found under %s" path
 
 let balance read address =
-  let open Lwt_result_syntax in
-  let+ answer = read (Durable_storage_path.Accounts.balance address) in
-  match answer with
-  | Some bytes ->
-      Bytes.to_string bytes |> Z.of_bits |> Ethereum_types.quantity_of_z
-  | None -> Ethereum_types.Qty Z.zero
+  inspect_durable_and_decode_default
+    ~default:(Ethereum_types.Qty Z.zero)
+    read
+    (Durable_storage_path.Accounts.balance address)
+    decode_number_le
 
 let nonce read address =
-  let open Lwt_result_syntax in
-  let+ answer = read (Durable_storage_path.Accounts.nonce address) in
-  answer
-  |> Option.map (fun bytes ->
-         bytes |> Bytes.to_string |> Z.of_bits |> Ethereum_types.quantity_of_z)
+  inspect_durable_and_decode_opt
+    read
+    (Durable_storage_path.Accounts.nonce address)
+    decode_number_le
 
 let code read address =
-  let open Lwt_result_syntax in
-  let+ answer = read (Durable_storage_path.Accounts.code address) in
-  match answer with
-  | Some bytes ->
-      bytes |> Hex.of_bytes |> Hex.show |> Ethereum_types.hex_of_string
-  | None -> Ethereum_types.Hex ""
+  inspect_durable_and_decode_default
+    ~default:(Ethereum_types.Hex "")
+    read
+    (Durable_storage_path.Accounts.code address)
+    (fun bytes ->
+      bytes |> Hex.of_bytes |> Hex.show |> Ethereum_types.hex_of_string)
 
 exception Invalid_block_structure of string
 
@@ -279,27 +282,22 @@ let storage_at read address (Qty pos) =
   | None -> Ethereum_types.Hex (pad32left0 "0")
 
 let coinbase read =
-  let open Lwt_result_syntax in
-  let+ res =
-    inspect_durable_and_decode_opt
-      read
-      Durable_storage_path.sequencer_pool_address
-      (fun bytes ->
-        Address (Hex.of_bytes bytes |> Hex.show |> Ethereum_types.hex_of_string))
-  in
-  Option.value
+  inspect_durable_and_decode_default
     ~default:
       (Address
          (Ethereum_types.hex_of_string
             "0x0000000000000000000000000000000000000000"))
-    res
+    read
+    Durable_storage_path.sequencer_pool_address
+    (fun bytes ->
+      Address (Hex.of_bytes bytes |> Hex.show |> Ethereum_types.hex_of_string))
 
 let storage_version read =
-  let open Lwt_result_syntax in
-  let+ bytes = read Durable_storage_path.storage_version in
-  match bytes with
-  | Some bytes -> Z.of_bits (Bytes.unsafe_to_string bytes) |> Z.to_int
-  | None -> 0
+  inspect_durable_and_decode_default
+    ~default:0
+    read
+    Durable_storage_path.storage_version
+    (fun bytes -> decode_number_le bytes |> un_qty |> Z.to_int)
 
 module Make (Reader : READER) = struct
   let read = Reader.read
