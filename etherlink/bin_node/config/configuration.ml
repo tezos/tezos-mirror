@@ -67,27 +67,33 @@ type fee_history = {max_count : int option; max_past : int option}
 (* The regular expression is compiled at the launch of the node, and encoded
    into its raw form. *)
 type restricted_rpcs =
+  | Unrestricted
   | Pattern of {raw : string; regex : Re.re}
   | Blacklist of string list
   | Whitelist of string list
 
 type limit = Unlimited | Limit of int
 
-type t = {
-  rpc_addr : string;
-  rpc_port : int;
-  private_rpc_port : int option;
-  rpc_batch_limit : limit;
+type rpc = {
+  port : int;
+  addr : string;
   cors_origins : string list;
   cors_headers : string list;
+  max_active_connections :
+    Tezos_rpc_http_server.RPC_server.Max_active_rpc_connections.t;
+  batch_limit : limit;
+  restricted_rpcs : restricted_rpcs;
+}
+
+type t = {
+  public_rpc : rpc;
+  private_rpc : rpc option;
   log_filter : log_filter_config;
   kernel_execution : kernel_execution_config;
   sequencer : sequencer option;
   threshold_encryption_sequencer : threshold_encryption_sequencer option;
   observer : observer option;
   proxy : proxy;
-  max_active_connections :
-    Tezos_rpc_http_server.RPC_server.Max_active_rpc_connections.t;
   tx_pool_timeout_limit : int64;
   tx_pool_addr_limit : int64;
   tx_pool_tx_per_addr_limit : int64;
@@ -96,7 +102,6 @@ type t = {
   verbose : Internal_event.level;
   experimental_features : experimental_features;
   fee_history : fee_history;
-  restricted_rpcs : restricted_rpcs option;
 }
 
 let default_filter_config ?max_nb_blocks ?max_nb_logs ?chunk_size () =
@@ -134,6 +139,23 @@ let default_rollup_node_tracking = true
 let default_cors_origins = []
 
 let default_cors_headers = []
+
+let default_rpc ?(rpc_port = default_rpc_port) ?(rpc_addr = default_rpc_addr)
+    ?(cors_origins = default_cors_origins)
+    ?(cors_headers = default_cors_headers) ?(batch_limit = Unlimited)
+    ?(restricted_rpcs = Unrestricted)
+    ?(max_active_connections =
+      Tezos_rpc_http_server.RPC_server.Max_active_rpc_connections.Unlimited) ()
+    =
+  {
+    port = rpc_port;
+    addr = rpc_addr;
+    cors_headers;
+    cors_origins;
+    batch_limit;
+    restricted_rpcs;
+    max_active_connections;
+  }
 
 let default_max_active_connections =
   Tezos_rpc_http_server.RPC_server.Max_active_rpc_connections.default
@@ -576,22 +598,64 @@ let kernel_execution_encoding data_dir =
          (dft "preimages" string (default_preimages data_dir))
          (opt "preimages_endpoint" Tezos_rpc.Encoding.uri_encoding)))
 
+let rpc_encoding =
+  Data_encoding.(
+    conv
+      (fun {
+             port;
+             addr;
+             cors_origins;
+             cors_headers;
+             batch_limit;
+             restricted_rpcs;
+             max_active_connections;
+           } ->
+        ( port,
+          addr,
+          cors_origins,
+          cors_headers,
+          batch_limit,
+          restricted_rpcs,
+          max_active_connections ))
+      (fun ( port,
+             addr,
+             cors_origins,
+             cors_headers,
+             batch_limit,
+             restricted_rpcs,
+             max_active_connections ) ->
+        {
+          port;
+          addr;
+          cors_origins;
+          cors_headers;
+          batch_limit;
+          restricted_rpcs;
+          max_active_connections;
+        })
+      (obj7
+         (dft "port" int31 default_rpc_port)
+         (dft "addr" string default_rpc_addr)
+         (dft "cors_origins" (list string) default_cors_origins)
+         (dft "cors_headers" (list string) default_cors_headers)
+         (dft "batch_limit" limit_encoding Unlimited)
+         (dft "restricted_rpcs" restricted_rpcs_encoding Unrestricted)
+         (dft
+            "max_active_connections"
+            Tezos_rpc_http_server.RPC_server.Max_active_rpc_connections.encoding
+            default_max_active_connections)))
+
 let encoding data_dir : t Data_encoding.t =
   let open Data_encoding in
   conv
     (fun {
-           rpc_addr;
-           rpc_port;
-           rpc_batch_limit;
-           private_rpc_port;
-           cors_origins;
-           cors_headers;
+           public_rpc;
+           private_rpc;
            log_filter;
            sequencer;
            threshold_encryption_sequencer;
            observer;
            proxy;
-           max_active_connections;
            tx_pool_timeout_limit;
            tx_pool_addr_limit;
            tx_pool_tx_per_addr_limit;
@@ -600,20 +664,18 @@ let encoding data_dir : t Data_encoding.t =
            verbose;
            experimental_features;
            fee_history;
-           restricted_rpcs;
            kernel_execution;
          } ->
-      ( ( rpc_addr,
-          rpc_port,
-          None
-          (* devmode is still part of the encoding for compatibiltiy reasons. *),
-          cors_origins,
-          cors_headers,
+      ( ( None,
+          None,
+          None,
+          None,
+          None,
           log_filter,
           sequencer,
           threshold_encryption_sequencer,
           observer,
-          max_active_connections ),
+          None ),
         ( ( tx_pool_timeout_limit,
             tx_pool_addr_limit,
             tx_pool_tx_per_addr_limit,
@@ -623,18 +685,18 @@ let encoding data_dir : t Data_encoding.t =
             experimental_features,
             proxy,
             fee_history,
-            restricted_rpcs ),
-          (kernel_execution, rpc_batch_limit, private_rpc_port) ) ))
-    (fun ( ( rpc_addr,
-             rpc_port,
+            None ),
+          (kernel_execution, None, None, public_rpc, private_rpc) ) ))
+    (fun ( ( _rpc_addr,
+             _rpc_port,
              _devmode,
-             cors_origins,
-             cors_headers,
+             _cors_origins,
+             _cors_headers,
              log_filter,
              sequencer,
              threshold_encryption_sequencer,
              observer,
-             max_active_connections ),
+             _max_active_connections ),
            ( ( tx_pool_timeout_limit,
                tx_pool_addr_limit,
                tx_pool_tx_per_addr_limit,
@@ -644,21 +706,20 @@ let encoding data_dir : t Data_encoding.t =
                experimental_features,
                proxy,
                fee_history,
-               restricted_rpcs ),
-             (kernel_execution, rpc_batch_limit, private_rpc_port) ) ) ->
+               _restricted_rpcs ),
+             ( kernel_execution,
+               _rpc_batch_limit,
+               _private_rpc_port,
+               public_rpc,
+               private_rpc ) ) ) ->
       {
-        rpc_addr;
-        rpc_port;
-        rpc_batch_limit;
-        private_rpc_port;
-        cors_origins;
-        cors_headers;
+        public_rpc;
+        private_rpc;
         log_filter;
         sequencer;
         threshold_encryption_sequencer;
         observer;
         proxy;
-        max_active_connections;
         tx_pool_timeout_limit;
         tx_pool_addr_limit;
         tx_pool_tx_per_addr_limit;
@@ -667,16 +728,15 @@ let encoding data_dir : t Data_encoding.t =
         verbose;
         experimental_features;
         fee_history;
-        restricted_rpcs;
         kernel_execution;
       })
     (merge_objs
        (obj10
-          (dft "rpc-addr" ~description:"RPC address" string default_rpc_addr)
-          (dft "rpc-port" ~description:"RPC port" uint16 default_rpc_port)
-          (opt ~description:"DEPRECATED" "devmode" bool)
-          (dft "cors_origins" (list string) default_cors_origins)
-          (dft "cors_headers" (list string) default_cors_headers)
+          (deprecated "rpc-addr")
+          (deprecated "rpc-port")
+          (deprecated "devmode")
+          (deprecated "cors_origins")
+          (deprecated "cors_headers")
           (dft
              "log_filter"
              log_filter_config_encoding
@@ -686,11 +746,7 @@ let encoding data_dir : t Data_encoding.t =
              "threshold_encryption_sequencer"
              threshold_encryption_sequencer_encoding)
           (opt "observer" observer_encoding)
-          (dft
-             "max_active_connections"
-             Tezos_rpc_http_server.RPC_server.Max_active_rpc_connections
-             .encoding
-             default_max_active_connections))
+          (deprecated "max_active_connections"))
        (merge_objs
           (obj10
              (dft
@@ -724,14 +780,16 @@ let encoding data_dir : t Data_encoding.t =
                 default_experimental_features)
              (dft "proxy" proxy_encoding (default_proxy ()))
              (dft "fee_history" fee_history_encoding default_fee_history)
-             (opt "restricted_rpcs" restricted_rpcs_encoding))
-          (obj3
+             (deprecated "restricted_rpcs"))
+          (obj5
              (dft
                 "kernel_execution"
                 (kernel_execution_encoding data_dir)
                 (kernel_execution_config_dft ~data_dir ()))
-             (dft "rpc-batch-limit" limit_encoding Unlimited)
-             (opt "private-rpc-port" int31))))
+             (deprecated "rpc-batch-limit")
+             (deprecated "private-rpc-port")
+             (dft "public-rpc" rpc_encoding (default_rpc ()))
+             (opt "private-rpc" rpc_encoding))))
 
 let save ~force ~data_dir config =
   let open Lwt_result_syntax in
@@ -777,6 +835,19 @@ module Cli = struct
       ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
       ?catchup_cooldown ?sequencer_sidecar_endpoint ?restricted_rpcs
       ?proxy_finalized_view ?proxy_ignore_block_param ?dal_slots () =
+    let public_rpc =
+      default_rpc
+        ?rpc_port
+        ?rpc_addr
+        ?batch_limit:rpc_batch_limit
+        ?cors_origins
+        ?cors_headers
+        ?restricted_rpcs
+        ()
+    in
+    let private_rpc =
+      Option.map (fun port -> default_rpc ~rpc_port:port ()) private_rpc_port
+    in
     let sequencer =
       Option.map
         (fun sequencer ->
@@ -840,19 +911,14 @@ module Cli = struct
       kernel_execution_config_dft ~data_dir ?preimages ?preimages_endpoint ()
     in
     {
-      rpc_addr = Option.value ~default:default_rpc_addr rpc_addr;
-      rpc_port = Option.value ~default:default_rpc_port rpc_port;
-      rpc_batch_limit = Option.value ~default:Unlimited rpc_batch_limit;
-      private_rpc_port;
-      cors_origins = Option.value ~default:default_cors_origins cors_origins;
-      cors_headers = Option.value ~default:default_cors_headers cors_headers;
+      public_rpc;
+      private_rpc;
       log_filter;
       kernel_execution;
       sequencer;
       threshold_encryption_sequencer;
       observer;
       proxy;
-      max_active_connections = default_max_active_connections;
       tx_pool_timeout_limit =
         Option.value
           ~default:default_tx_pool_timeout_limit
@@ -868,7 +934,6 @@ module Cli = struct
       verbose = (if verbose then Debug else Internal_event.Notice);
       experimental_features = default_experimental_features;
       fee_history = default_fee_history;
-      restricted_rpcs;
     }
 
   let patch_kernel_execution_config kernel_execution ?preimages
@@ -881,6 +946,20 @@ module Cli = struct
     in
     {preimages; preimages_endpoint}
 
+  let patch_rpc ?rpc_addr ?rpc_port ?cors_origins ?cors_headers ?batch_limit
+      ?restricted_rpcs ?max_active_connections rpc =
+    {
+      port = Option.value ~default:rpc.port rpc_port;
+      addr = Option.value ~default:rpc.addr rpc_addr;
+      cors_headers = Option.value ~default:rpc.cors_headers cors_headers;
+      cors_origins = Option.value ~default:rpc.cors_origins cors_origins;
+      batch_limit = Option.value ~default:rpc.batch_limit batch_limit;
+      restricted_rpcs =
+        Option.value ~default:rpc.restricted_rpcs restricted_rpcs;
+      max_active_connections =
+        Option.value ~default:rpc.max_active_connections max_active_connections;
+    }
+
   let patch_configuration_from_args ?rpc_addr ?rpc_port ?rpc_batch_limit
       ?cors_origins ?cors_headers ?tx_pool_timeout_limit ?tx_pool_addr_limit
       ?tx_pool_tx_per_addr_limit ~keep_alive ?rollup_node_endpoint
@@ -891,6 +970,21 @@ module Cli = struct
       ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
       ?catchup_cooldown ?sequencer_sidecar_endpoint ?restricted_rpcs
       ?proxy_finalized_view ?proxy_ignore_block_param ~dal_slots configuration =
+    let public_rpc =
+      patch_rpc
+        ?rpc_addr
+        ?rpc_port
+        ?cors_headers
+        ?cors_origins
+        ?batch_limit:rpc_batch_limit
+        ?restricted_rpcs
+        configuration.public_rpc
+    in
+    let private_rpc =
+      Option.map
+        (patch_rpc ?rpc_port:private_rpc_port)
+        configuration.private_rpc
+    in
     let sequencer =
       let sequencer_config = configuration.sequencer in
       match sequencer_config with
@@ -1082,9 +1176,6 @@ module Cli = struct
         ?preimages_endpoint
         ()
     in
-    let restricted_rpcs =
-      Option.either restricted_rpcs configuration.restricted_rpcs
-    in
     let rollup_node_endpoint =
       Option.value
         ~default:configuration.rollup_node_endpoint
@@ -1092,23 +1183,14 @@ module Cli = struct
     in
 
     {
-      rpc_addr = Option.value ~default:configuration.rpc_addr rpc_addr;
-      rpc_port = Option.value ~default:configuration.rpc_port rpc_port;
-      rpc_batch_limit =
-        Option.value ~default:configuration.rpc_batch_limit rpc_batch_limit;
-      private_rpc_port =
-        Option.either private_rpc_port configuration.private_rpc_port;
-      cors_origins =
-        Option.value ~default:configuration.cors_origins cors_origins;
-      cors_headers =
-        Option.value ~default:configuration.cors_headers cors_headers;
+      public_rpc;
+      private_rpc;
       log_filter;
       kernel_execution;
       sequencer;
       threshold_encryption_sequencer;
       observer;
       proxy;
-      max_active_connections = configuration.max_active_connections;
       tx_pool_timeout_limit =
         Option.value
           ~default:configuration.tx_pool_timeout_limit
@@ -1126,7 +1208,6 @@ module Cli = struct
       verbose = (if verbose then Debug else configuration.verbose);
       experimental_features = configuration.experimental_features;
       fee_history = configuration.fee_history;
-      restricted_rpcs;
     }
 
   let create_or_read_config ~data_dir ?rpc_addr ?rpc_port ?rpc_batch_limit

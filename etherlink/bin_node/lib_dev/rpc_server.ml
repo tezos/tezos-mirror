@@ -44,16 +44,17 @@ let callback server dir =
     dir
     callback_log
 
-let start_server ~rpc_port directory config =
+let start_server rpc directory =
   let open Lwt_result_syntax in
   let open Tezos_rpc_http_server in
   let Configuration.
-        {rpc_addr; cors_origins; cors_headers; max_active_connections; _} =
-    config
+        {port; addr; cors_origins; cors_headers; max_active_connections; _} =
+    rpc
   in
-  let p2p_addr = P2p_addr.of_string_exn rpc_addr in
+
+  let p2p_addr = P2p_addr.of_string_exn addr in
   let host = Ipaddr.V6.to_string p2p_addr in
-  let node = `TCP (`Port rpc_port) in
+  let node = `TCP (`Port port) in
   let acl = RPC_server.Acl.allow_all in
   let cors =
     Resto_cohttp.Cors.
@@ -84,7 +85,7 @@ let start_server ~rpc_port directory config =
 
   return finalizer
 
-let start_public_server ?evm_services config ctxt =
+let start_public_server ?evm_services (config : Configuration.t) ctxt =
   let open Lwt_result_syntax in
   let register_evm_services =
     match evm_services with
@@ -96,27 +97,29 @@ let start_public_server ?evm_services config ctxt =
           impl.smart_rollup_address
           impl.time_between_blocks
   in
-  let directory = Services.directory config ctxt |> register_evm_services in
-  let* finalizer = start_server ~rpc_port:config.rpc_port directory config in
+  let directory =
+    Services.directory config.public_rpc config ctxt |> register_evm_services
+  in
+  let* finalizer = start_server config.public_rpc directory in
   let*! () =
-    Events.is_ready ~rpc_addr:config.rpc_addr ~rpc_port:config.rpc_port
+    Events.is_ready
+      ~rpc_addr:config.public_rpc.addr
+      ~rpc_port:config.public_rpc.port
   in
   return finalizer
 
 let start_private_server ?(block_production = `Disabled) config ctxt =
   let open Lwt_result_syntax in
-  match config.Configuration.private_rpc_port with
-  | Some private_rpc_port ->
+  match config.Configuration.private_rpc with
+  | Some private_rpc ->
       let directory =
-        Services.private_directory ~block_production config ctxt
+        Services.private_directory private_rpc ~block_production config ctxt
       in
-      let* finalizer =
-        start_server ~rpc_port:private_rpc_port directory config
-      in
+      let* finalizer = start_server private_rpc directory in
       let*! () =
         Events.private_server_is_ready
-          ~rpc_addr:config.rpc_addr
-          ~rpc_port:private_rpc_port
+          ~rpc_addr:private_rpc.addr
+          ~rpc_port:private_rpc.port
       in
       return finalizer
   | None -> return (fun () -> Lwt_syntax.return_unit)

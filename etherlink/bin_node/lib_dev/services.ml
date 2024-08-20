@@ -253,13 +253,13 @@ let process_trace_result trace =
       let msg = Format.asprintf "%a" pp_print_trace e in
       rpc_error (Rpc_errors.internal_error msg)
 
-let dispatch_request (config : Configuration.t)
+let dispatch_request (rpc : Configuration.rpc) (config : Configuration.t)
     ((module Backend_rpc : Services_backend_sig.S), _)
     ({method_; parameters; id} : JSONRPC.request) : JSONRPC.response Lwt.t =
   let open Lwt_result_syntax in
   let open Ethereum_types in
   let*! value =
-    match map_method_name ?restrict:config.restricted_rpcs method_ with
+    match map_method_name ~restrict:rpc.restricted_rpcs method_ with
     | Unknown ->
         Prometheus.Counter.inc_one (Metrics.Rpc.method_ "unknown") ;
         Lwt.return_error (Rpc_errors.method_not_found method_)
@@ -605,7 +605,8 @@ let dispatch_request (config : Configuration.t)
   in
   Lwt.return JSONRPC.{value; id}
 
-let dispatch_private_request (_config : Configuration.t)
+let dispatch_private_request (rpc : Configuration.rpc)
+    (_config : Configuration.t)
     ((module Backend_rpc : Services_backend_sig.S), _) ~block_production
     ({method_; parameters; id} : JSONRPC.request) : JSONRPC.response Lwt.t =
   let open Lwt_syntax in
@@ -622,7 +623,7 @@ let dispatch_private_request (_config : Configuration.t)
   let* value =
     (* Private RPCs can only be accessed locally, they're not accessible to the
        end user. *)
-    match map_method_name method_ with
+    match map_method_name ~restrict:rpc.restricted_rpcs method_ with
     | Unknown ->
         return
           (Error
@@ -709,7 +710,8 @@ let can_process_batch size = function
   | Configuration.Limit l -> size <= l
   | Unlimited -> true
 
-let generic_dispatch config ctx dir path dispatch_request =
+let generic_dispatch (rpc : Configuration.rpc) config ctx dir path
+    dispatch_request =
   Directory.register0 dir (dispatch_service ~path) (fun () input ->
       let open Lwt_result_syntax in
       match input with
@@ -718,11 +720,8 @@ let generic_dispatch config ctx dir path dispatch_request =
           return (Singleton response)
       | Batch requests ->
           let process =
-            if
-              can_process_batch
-                (List.length requests)
-                config.Configuration.rpc_batch_limit
-            then dispatch_request config ctx
+            if can_process_batch (List.length requests) rpc.batch_limit then
+              dispatch_request config ctx
             else fun req ->
               let value =
                 Error Rpc_errors.(invalid_request "too many requests in batch")
@@ -732,28 +731,32 @@ let generic_dispatch config ctx dir path dispatch_request =
           let*! outputs = List.map_s process requests in
           return (Batch outputs))
 
-let dispatch_public config ctx dir =
-  generic_dispatch config ctx dir Path.root dispatch_request
+let dispatch_public (rpc : Configuration.rpc) config ctx dir =
+  generic_dispatch rpc config ctx dir Path.root (dispatch_request rpc)
 
-let dispatch_private ~block_production config ctx dir =
+let dispatch_private (rpc : Configuration.rpc) ~block_production config ctx dir
+    =
   generic_dispatch
+    rpc
     config
     ctx
     dir
     Path.(add_suffix root "private")
-    (dispatch_private_request ~block_production)
+    (dispatch_private_request rpc ~block_production)
 
-let directory config
+let directory rpc config
     ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address) =
   Directory.empty |> version
   |> dispatch_public
+       rpc
        config
        ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address)
 
-let private_directory config
+let private_directory rpc config
     ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address) =
   Directory.empty |> version
   |> dispatch_private
+       rpc
        config
        ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address)
 
