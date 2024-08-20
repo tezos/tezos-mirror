@@ -54,6 +54,8 @@ Adaptive Issuance
 Gas improvements
 ----------------
 
+- Updated a few gas parameters to be more accurate. (MR :gl:`!13171`)
+
 .. _breaking_changes_beta:
 
 Breaking Changes
