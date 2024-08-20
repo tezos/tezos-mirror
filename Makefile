@@ -41,4 +41,11 @@ octez-basic-new:
 		--ext-str node_instance_label="$(NODE_INSTANCE_LABEL)" \
 		> output/$@.json
 
-new: octez-compact-new octez-basic-new
+octez-full-new:
+	jsonnet \
+		-J vendor src/octez-full-new.jsonnet \
+		--ext-str node_instance_label="$(NODE_INSTANCE_LABEL)" \
+		--ext-str storage_mode="$(STORAGE_MODE)" \
+		> output/$@.json
+
+new: octez-compact-new octez-basic-new octez-full-new
