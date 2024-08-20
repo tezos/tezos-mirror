@@ -423,6 +423,9 @@ Miscellaneous commands:
     -f --force: Overwrites the configuration file when it exists.
     --dal-slots <slot indices>: The DAL slots indices on which the sequencer is allowed to send blueprints.
   
+  describe config
+    Prints the JSON schema of the configuration file to the standard output.
+  
   make kernel installer config <kernel config file> [--mainnet-compat]
       [--kernel-root-hash <root hash>] [--chain-id <chain id>]
       [--sequencer <edpk...>] [--delayed-bridge <KT1...>]

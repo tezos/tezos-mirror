@@ -6,6 +6,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let strictly_positive_encoding = Data_encoding.ranged_int 1 ((1 lsl 30) - 1)
+
 type log_filter_config = {
   max_nb_blocks : int;
   max_nb_logs : int;
@@ -200,12 +202,16 @@ let limit_encoding =
     [
       case
         ~title:"unlimited"
+        ~description:"No limit on the size of a JSON RPC API batch."
         Json_only
         (constant "unlimited")
         (function Unlimited -> Some () | _ -> None)
         (fun () -> Unlimited);
       case
         ~title:"limited"
+        ~description:
+          "Upper bound on the size of a JSON RPC API batch. For batches larger \
+           than the limit, every request fails."
         Json_only
         int31
         (function Limit i -> Some i | _ -> None)
@@ -217,19 +223,32 @@ let restricted_rpcs_encoding =
   union
     [
       case
+        ~title:"unrestricted"
+        ~description:"Allow all JSON RPC API methods supported by the server."
+        Json_only
+        (constant "unrestricted")
+        (function Unrestricted -> Some () | _ -> None)
+        (fun () -> Unrestricted);
+      case
         ~title:"pattern"
+        ~description:
+          "Disallow the JSON RPC API methods whose name match this Perl-like \
+           regexp."
         Json_only
         string
         (function Pattern {raw; _} -> Some raw | _ -> None)
         make_pattern_restricted_rpcs;
       case
         ~title:"whitelist"
+        ~description:"The list of JSON RPC API methods allowed for this server."
         Json_only
         (obj1 (req "whitelist" (list string)))
         (function Whitelist l -> Some l | _ -> None)
         (fun l -> Whitelist l);
       case
         ~title:"blacklist"
+        ~description:
+          "The list of JSON RPC API methods disallowed for this server."
         Json_only
         (obj1 (req "blacklist" (list string)))
         (function Blacklist l -> Some l | _ -> None)
@@ -332,13 +351,27 @@ let log_filter_config_encoding : log_filter_config Data_encoding.t =
     (fun (max_nb_blocks, max_nb_logs, chunk_size) ->
       {max_nb_blocks; max_nb_logs; chunk_size})
     (obj3
-       (dft "max_nb_blocks" int31 default_filter_config.max_nb_blocks)
-       (dft "max_nb_logs" int31 default_filter_config.max_nb_logs)
-       (dft "chunk_size" int31 default_filter_config.chunk_size))
-
-let deprecated name =
-  Data_encoding.(
-    opt name ~description:"Deprecated field, value is ignored" Json.encoding)
+       (dft
+          "max_nb_blocks"
+          ~description:
+            "The maximum number of blocks that can be visited when executing a \
+             `eth_getLogs` request."
+          strictly_positive_encoding
+          default_filter_config.max_nb_blocks)
+       (dft
+          "max_nb_logs"
+          ~description:
+            "The maximum number of logs that can be collected when executing a \
+             `eth_getLogs` request."
+          strictly_positive_encoding
+          default_filter_config.max_nb_logs)
+       (dft
+          "chunk_size"
+          ~description:
+            "Number of blocks to be filter concurrently when executing a \
+             `eth_getLogs` request."
+          strictly_positive_encoding
+          default_filter_config.chunk_size))
 
 let pp_time_between_blocks fmt = function
   | Nothing -> Format.pp_print_string fmt "nothing"
@@ -381,22 +414,65 @@ let blueprints_publisher_config_encoding =
       })
     (obj5
        (dft
+          ~description:
+            "The number of EVM blocks after which the sequencer considers that \
+             something went wrong with the injection of a previous blueprint. \
+             Once reached, the sequencer tries to send them a second time."
           "max_blueprints_lag"
-          int31
+          strictly_positive_encoding
           default_blueprints_publisher_config.max_blueprints_lag)
        (dft
+          ~description:
+            "The maximum number of EVM blocks that the sequencer accepts to \
+             create speculatively. If the difference between its head and the \
+             head of its companion rollup node reaches this number, the \
+             sequencer will stop creating new blueprints until the rollup node \
+             has caught up."
           "max_blueprints_ahead"
-          int31
+          strictly_positive_encoding
           default_blueprints_publisher_config.max_blueprints_ahead)
        (dft
+          ~description:
+            "The maximum number of blueprints the sequencer retries to send at \
+             once whenever its companion rollup node is lagging behind."
           "max_blueprints_catchup"
-          int31
+          strictly_positive_encoding
           default_blueprints_publisher_config.max_blueprints_catchup)
        (dft
+          ~description:
+            "The number of Layer 1 blocks the sequencer awaits before sending \
+             another batch of blueprints, as part of its catchup mechanism."
           "catchup_cooldown"
-          int31
+          strictly_positive_encoding
           default_blueprints_publisher_config.catchup_cooldown)
        (opt "dal_slots" (list int8)))
+
+let time_between_blocks_field =
+  Data_encoding.dft
+    ~description:
+      "The maximum number of seconds separating two consecutive blocks. If the \
+       TX pool of the sequencer is empty after this duration, an empty \
+       blueprint is produced."
+    "time_between_blocks"
+    time_between_blocks_encoding
+    default_time_between_blocks
+
+let max_number_of_chunks_field =
+  Data_encoding.(
+    dft
+      ~description:
+        "Maximum number of chunks a blueprint can be divided into. The \
+         sequencer will not produce blueprints unable to fit in this limit."
+      "max_number_of_chunks"
+      (ranged_int 1 hard_maximum_number_of_chunks)
+      default_max_number_of_chunks)
+
+let sequencer_field =
+  Data_encoding.(
+    req
+      ~description:"Secret key URI of the sequencer."
+      "sequencer"
+      (string' Plain))
 
 let sequencer_encoding =
   let open Data_encoding in
@@ -407,17 +483,11 @@ let sequencer_encoding =
            sequencer;
            blueprints_publisher_config;
          } ->
-      ( None,
-        None,
-        None,
-        time_between_blocks,
+      ( time_between_blocks,
         max_number_of_chunks,
         Client_keys.string_of_sk_uri sequencer,
         blueprints_publisher_config ))
-    (fun ( _,
-           _,
-           _,
-           time_between_blocks,
+    (fun ( time_between_blocks,
            max_number_of_chunks,
            sequencer,
            blueprints_publisher_config ) ->
@@ -427,16 +497,10 @@ let sequencer_encoding =
         sequencer = Client_keys.sk_uri_of_string sequencer;
         blueprints_publisher_config;
       })
-    (obj7
-       (deprecated "preimages")
-       (deprecated "preimages_endpoint")
-       (deprecated "private-rpc-port")
-       (dft
-          "time_between_blocks"
-          time_between_blocks_encoding
-          default_time_between_blocks)
-       (dft "max_number_of_chunks" int31 default_max_number_of_chunks)
-       (req "sequencer" string)
+    (obj4
+       time_between_blocks_field
+       max_number_of_chunks_field
+       sequencer_field
        (dft
           "blueprints_publisher_config"
           blueprints_publisher_config_encoding
@@ -454,16 +518,12 @@ let threshold_encryption_sequencer_encoding =
             blueprints_publisher_config;
             sidecar_endpoint;
           } ->
-          ( None,
-            None,
-            time_between_blocks,
+          ( time_between_blocks,
             max_number_of_chunks,
             Client_keys.string_of_sk_uri sequencer,
             blueprints_publisher_config,
             sidecar_endpoint ))
-    (fun ( _,
-           _,
-           time_between_blocks,
+    (fun ( time_between_blocks,
            max_number_of_chunks,
            sequencer,
            blueprints_publisher_config,
@@ -476,15 +536,10 @@ let threshold_encryption_sequencer_encoding =
           blueprints_publisher_config;
           sidecar_endpoint;
         })
-    (obj7
-       (deprecated "preimages")
-       (deprecated "preimages_endpoint")
-       (dft
-          "time_between_blocks"
-          time_between_blocks_encoding
-          default_time_between_blocks)
+    (obj5
+       time_between_blocks_field
        (dft "max_number_of_chunks" int31 default_max_number_of_chunks)
-       (req "sequencer" string)
+       sequencer_field
        (dft
           "blueprints_publisher_config"
           blueprints_publisher_config_encoding
@@ -502,16 +557,10 @@ let observer_encoding =
            threshold_encryption_bundler_endpoint;
            rollup_node_tracking;
          } ->
-      ( None,
-        None,
-        None,
-        Uri.to_string evm_node_endpoint,
+      ( Uri.to_string evm_node_endpoint,
         threshold_encryption_bundler_endpoint,
         rollup_node_tracking ))
-    (fun ( _,
-           _,
-           _,
-           evm_node_endpoint,
+    (fun ( evm_node_endpoint,
            threshold_encryption_bundler_endpoint,
            rollup_node_tracking ) ->
       {
@@ -519,15 +568,24 @@ let observer_encoding =
         threshold_encryption_bundler_endpoint;
         rollup_node_tracking;
       })
-    (obj6
-       (deprecated "preimages")
-       (deprecated "preimages_endpoint")
-       (deprecated "time_between_blocks")
-       (req "evm_node_endpoint" string)
+    (obj3
+       (req
+          ~description:
+            "Upstream EVM node endpoint used to fetch speculative blueprints \
+             and forward incoming transactions."
+          "evm_node_endpoint"
+          (string' Plain))
        (opt
           "threshold_encryption_bundler_endpoint"
           Tezos_rpc.Encoding.uri_encoding)
-       (dft "rollup_node_tracking" bool default_rollup_node_tracking))
+       (dft
+          ~description:
+            "Enable or disable monitoring a companion rollup node to verify \
+             the correctness of the speculative history coming from the \
+             upstream EVM node."
+          "rollup_node_tracking"
+          bool
+          default_rollup_node_tracking))
 
 let experimental_features_encoding =
   let open Data_encoding in
@@ -537,12 +595,10 @@ let experimental_features_encoding =
            enable_send_raw_transaction;
            node_transaction_validation;
          } ->
-      ( None,
-        drop_duplicate_on_injection,
+      ( drop_duplicate_on_injection,
         enable_send_raw_transaction,
         node_transaction_validation ))
-    (fun ( _,
-           drop_duplicate_on_injection,
+    (fun ( drop_duplicate_on_injection,
            enable_send_raw_transaction,
            node_transaction_validation ) ->
       {
@@ -550,11 +606,19 @@ let experimental_features_encoding =
         enable_send_raw_transaction;
         node_transaction_validation;
       })
-    (obj4
-       (* `sqlite_journal_mode` field is kept for now for backward compatibility. *)
-       (deprecated "sqlite_journal_mode")
-       (dft "drop_duplicate_on_injection" bool false)
+    (obj3
        (dft
+          ~description:
+            "Request the rollup node to filter messages it has already \
+             forwarded to the Layer 1 network. Require an unreleased version \
+             of the Smart Rollup node."
+          "drop_duplicate_on_injection"
+          bool
+          false)
+       (dft
+          ~description:
+            "Enable or disable the `eth_sendRawTransaction` method. \
+             DEPRECATED:  You should use \"rpc.restricted_rpcs\" instead."
           "enable_send_raw_transaction"
           bool
           default_enable_send_raw_transaction)
@@ -587,7 +651,19 @@ let fee_history_encoding =
   conv
     (fun {max_count; max_past} -> (max_count, max_past))
     (fun (max_count, max_past) -> {max_count; max_past})
-    (obj2 (opt "max_count" int31) (opt "max_past" int31))
+    (obj2
+       (opt
+          ~description:
+            "The maximum number of blocks whose fee history can be retrieved \
+             at once"
+          "max_count"
+          strictly_positive_encoding)
+       (opt
+          ~description:
+            "The maximum number of blocks in the past where the fee history is \
+             available"
+          "max_past"
+          strictly_positive_encoding))
 
 let kernel_execution_encoding data_dir =
   Data_encoding.(
@@ -595,8 +671,20 @@ let kernel_execution_encoding data_dir =
       (fun {preimages; preimages_endpoint} -> (preimages, preimages_endpoint))
       (fun (preimages, preimages_endpoint) -> {preimages; preimages_endpoint})
       (obj2
-         (dft "preimages" string (default_preimages data_dir))
-         (opt "preimages_endpoint" Tezos_rpc.Encoding.uri_encoding)))
+         (dft
+            ~description:
+              "Path to a directory containing the preimages the kernel can \
+               reveal."
+            "preimages"
+            string
+            (default_preimages data_dir))
+         (opt
+            ~description:
+              "Endpoint for downloading the preimages that cannot be found in \
+               the preimages directory. These preimages are downloaded by the \
+               node, stored in the preimages directory and fed to the kernel."
+            "preimages_endpoint"
+            Tezos_rpc.Encoding.uri_encoding)))
 
 let rpc_encoding =
   Data_encoding.(
@@ -634,10 +722,31 @@ let rpc_encoding =
           max_active_connections;
         })
       (obj7
-         (dft "port" int31 default_rpc_port)
-         (dft "addr" string default_rpc_addr)
-         (dft "cors_origins" (list string) default_cors_origins)
-         (dft "cors_headers" (list string) default_cors_headers)
+         (dft
+            ~description:"The port used to bind the socket of the RPC server."
+            "port"
+            (ranged_int 1 65535)
+            default_rpc_port)
+         (dft
+            ~description:
+              "The address used to bind the socket of the RPC server."
+            "addr"
+            (string' Plain)
+            default_rpc_addr)
+         (dft
+            ~description:
+              "Cross-Origin Resource Sharing (CORS) origin values. See the \
+               CORS specification."
+            "cors_origins"
+            (list (string' Plain))
+            default_cors_origins)
+         (dft
+            ~description:
+              "Cross-Origin Resource Sharing (CORS) header values. See the \
+               CORS specification."
+            "cors_headers"
+            (list (string' Plain))
+            default_cors_headers)
          (dft "batch_limit" limit_encoding Unlimited)
          (dft "restricted_rpcs" restricted_rpcs_encoding Unrestricted)
          (dft
@@ -666,16 +775,7 @@ let encoding data_dir : t Data_encoding.t =
            fee_history;
            kernel_execution;
          } ->
-      ( ( None,
-          None,
-          None,
-          None,
-          None,
-          log_filter,
-          sequencer,
-          threshold_encryption_sequencer,
-          observer,
-          None ),
+      ( (log_filter, sequencer, threshold_encryption_sequencer, observer),
         ( ( tx_pool_timeout_limit,
             tx_pool_addr_limit,
             tx_pool_tx_per_addr_limit,
@@ -684,19 +784,9 @@ let encoding data_dir : t Data_encoding.t =
             verbose,
             experimental_features,
             proxy,
-            fee_history,
-            None ),
-          (kernel_execution, None, None, public_rpc, private_rpc) ) ))
-    (fun ( ( _rpc_addr,
-             _rpc_port,
-             _devmode,
-             _cors_origins,
-             _cors_headers,
-             log_filter,
-             sequencer,
-             threshold_encryption_sequencer,
-             observer,
-             _max_active_connections ),
+            fee_history ),
+          (kernel_execution, public_rpc, private_rpc) ) ))
+    (fun ( (log_filter, sequencer, threshold_encryption_sequencer, observer),
            ( ( tx_pool_timeout_limit,
                tx_pool_addr_limit,
                tx_pool_tx_per_addr_limit,
@@ -705,13 +795,8 @@ let encoding data_dir : t Data_encoding.t =
                verbose,
                experimental_features,
                proxy,
-               fee_history,
-               _restricted_rpcs ),
-             ( kernel_execution,
-               _rpc_batch_limit,
-               _private_rpc_port,
-               public_rpc,
-               private_rpc ) ) ) ->
+               fee_history ),
+             (kernel_execution, public_rpc, private_rpc) ) ) ->
       {
         public_rpc;
         private_rpc;
@@ -731,12 +816,7 @@ let encoding data_dir : t Data_encoding.t =
         kernel_execution;
       })
     (merge_objs
-       (obj10
-          (deprecated "rpc-addr")
-          (deprecated "rpc-port")
-          (deprecated "devmode")
-          (deprecated "cors_origins")
-          (deprecated "cors_headers")
+       (obj4
           (dft
              "log_filter"
              log_filter_config_encoding
@@ -745,32 +825,43 @@ let encoding data_dir : t Data_encoding.t =
           (opt
              "threshold_encryption_sequencer"
              threshold_encryption_sequencer_encoding)
-          (opt "observer" observer_encoding)
-          (deprecated "max_active_connections"))
+          (opt "observer" observer_encoding))
        (merge_objs
-          (obj10
+          (obj9
              (dft
-                "tx-pool-timeout-limit"
+                "tx_pool_timeout_limit"
                 ~description:
                   "Transaction timeout limit inside the transaction pool"
                 int64
                 default_tx_pool_timeout_limit)
              (dft
-                "tx-pool-addr-limit"
+                "tx_pool_addr_limit"
                 ~description:
                   "Maximum allowed addresses inside the transaction pool."
                 int64
                 default_tx_pool_addr_limit)
              (dft
-                "tx-pool-tx-per-addr-limit"
+                "tx_pool_tx_per_addr_limit"
                 ~description:
                   "Maximum allowed transactions per user address inside the \
                    transaction pool."
                 int64
                 default_tx_pool_tx_per_addr_limit)
-             (dft "keep_alive" bool default_keep_alive)
+             (dft
+                "keep_alive"
+                ~description:
+                  "Enable or disable if the EVM node retries HTTP requests on \
+                   failure."
+                bool
+                default_keep_alive)
              (dft
                 "rollup_node_endpoint"
+                ~description:
+                  "An endpoint to a companion rollup node. It is mainly used \
+                   to keep track of the state of the smart rollup powering the \
+                   Layer 2 chain. In sequencer mode, the blueprint created by \
+                   the node are forwarded to the rollup node to be injected in \
+                   Layer 1 blocks."
                 Tezos_rpc.Encoding.uri_encoding
                 default_rollup_node_endpoint)
              (dft "verbose" Internal_event.Level.encoding Internal_event.Notice)
@@ -779,17 +870,14 @@ let encoding data_dir : t Data_encoding.t =
                 experimental_features_encoding
                 default_experimental_features)
              (dft "proxy" proxy_encoding (default_proxy ()))
-             (dft "fee_history" fee_history_encoding default_fee_history)
-             (deprecated "restricted_rpcs"))
-          (obj5
+             (dft "fee_history" fee_history_encoding default_fee_history))
+          (obj3
              (dft
                 "kernel_execution"
                 (kernel_execution_encoding data_dir)
                 (kernel_execution_config_dft ~data_dir ()))
-             (deprecated "rpc-batch-limit")
-             (deprecated "private-rpc-port")
-             (dft "public-rpc" rpc_encoding (default_rpc ()))
-             (opt "private-rpc" rpc_encoding))))
+             (dft "public_rpc" rpc_encoding (default_rpc ()))
+             (opt "private_rpc" rpc_encoding))))
 
 let save ~force ~data_dir config =
   let open Lwt_result_syntax in
@@ -1317,3 +1405,7 @@ module Cli = struct
       in
       return config
 end
+
+let describe () =
+  Data_encoding.Json.schema (encoding "DATA_DIR_PATH")
+  |> Format.printf "%a" Json_schema.pp
