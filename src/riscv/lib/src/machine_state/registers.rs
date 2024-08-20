@@ -151,15 +151,26 @@ impl XRegister {
 /// Integer register value
 pub type XValue = u64;
 
+/// Layout for [XRegisters]
+pub type XRegistersLayout = backend::Array<XValue, 31>;
+
 /// Integer registers
 pub struct XRegisters<M: backend::ManagerBase> {
     registers: backend::Cells<XValue, 31, M>,
 }
 
-impl<M: backend::Manager> XRegisters<M> {
+impl<M: backend::ManagerBase> XRegisters<M> {
+    /// Bind the integer register state to the given allocated space.
+    pub fn bind(space: backend::AllocatedOf<XRegistersLayout, M>) -> Self {
+        XRegisters { registers: space }
+    }
+
     /// Read an integer from the registers.
     #[inline]
-    pub fn read(&self, reg: XRegister) -> XValue {
+    pub fn read(&self, reg: XRegister) -> XValue
+    where
+        M: backend::ManagerRead,
+    {
         if reg.is_zero() {
             return 0;
         }
@@ -169,26 +180,22 @@ impl<M: backend::Manager> XRegisters<M> {
 
     /// Write an integer to the registers.
     #[inline]
-    pub fn write(&mut self, reg: XRegister, val: XValue) {
+    pub fn write(&mut self, reg: XRegister, val: XValue)
+    where
+        M: backend::ManagerWrite,
+    {
         if reg.is_zero() {
             return;
         }
 
         self.registers.write(reg as usize, val)
     }
-}
-
-/// Layout for [XRegisters]
-pub type XRegistersLayout = backend::Array<XValue, 31>;
-
-impl<M: backend::Manager> XRegisters<M> {
-    /// Bind the integer register state to the given allocated space.
-    pub fn bind(space: backend::AllocatedOf<XRegistersLayout, M>) -> Self {
-        XRegisters { registers: space }
-    }
 
     /// Reset the integer registers.
-    pub fn reset(&mut self) {
+    pub fn reset(&mut self)
+    where
+        M: backend::ManagerWrite,
+    {
         for i in 0..31 {
             self.registers.write(i, XValue::default());
         }
@@ -345,39 +352,46 @@ impl backend::Elem for FValue {
     }
 }
 
+/// Layout for [FRegisters]
+pub type FRegistersLayout = backend::Array<FValue, 32>;
+
 /// Floating-point number registers
 pub struct FRegisters<M: backend::ManagerBase> {
     registers: backend::Cells<FValue, 32, M>,
 }
 
-impl<M: backend::Manager> FRegisters<M> {
-    /// Read a floating-point number from the registers.
-    #[inline(always)]
-    pub fn read(&self, reg: FRegister) -> FValue {
-        self.registers.read(reg as usize)
-    }
-
-    /// Write a floating-point number to the registers.
-    #[inline(always)]
-    pub fn write(&mut self, reg: FRegister, val: FValue) {
-        self.registers.write(reg as usize, val)
-    }
-}
-
-/// Layout for [FRegisters]
-pub type FRegistersLayout = backend::Array<FValue, 32>;
-
-impl<M: backend::Manager> FRegisters<M> {
+impl<M: backend::ManagerBase> FRegisters<M> {
     /// Bind the floating-point register space to the allocated space.
     pub fn bind(space: backend::AllocatedOf<FRegistersLayout, M>) -> Self {
         FRegisters { registers: space }
     }
 
     /// Reset the floating-point registers.
-    pub fn reset(&mut self) {
+    pub fn reset(&mut self)
+    where
+        M: backend::ManagerWrite,
+    {
         for i in 0..32 {
             self.registers.write(i, FValue::default());
         }
+    }
+
+    /// Read a floating-point number from the registers.
+    #[inline(always)]
+    pub fn read(&self, reg: FRegister) -> FValue
+    where
+        M: backend::ManagerRead,
+    {
+        self.registers.read(reg as usize)
+    }
+
+    /// Write a floating-point number to the registers.
+    #[inline(always)]
+    pub fn write(&mut self, reg: FRegister, val: FValue)
+    where
+        M: backend::ManagerWrite,
+    {
+        self.registers.write(reg as usize, val)
     }
 }
 
