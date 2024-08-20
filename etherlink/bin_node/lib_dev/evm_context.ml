@@ -464,6 +464,7 @@ module State = struct
             return (evm_state, on_success))
     | New_delayed_transaction delayed_transaction ->
         let*! data_dir, config = execution_config in
+
         let* evm_state =
           Evm_state.execute
             ~data_dir

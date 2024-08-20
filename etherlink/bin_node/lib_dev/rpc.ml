@@ -113,20 +113,22 @@ module MakeBackend (Ctxt : sig
 end) =
 struct
   module Reader = struct
-    open Ethereum_types.Block_parameter
+    type state = Evm_state.t
 
-    let read ?(block = Block_parameter Latest) path =
+    let get_state
+        ?(block = Ethereum_types.Block_parameter.Block_parameter Latest) () =
       let open Lwt_result_syntax in
       let* hash = find_irmin_hash Ctxt.ctxt block in
-      with_evm_state Ctxt.ctxt hash @@ fun tree ->
-      let*! res = Evm_state.inspect tree path in
+      with_evm_state Ctxt.ctxt hash @@ fun tree -> return tree
+
+    let read state path =
+      let open Lwt_result_syntax in
+      let*! res = Evm_state.inspect state path in
       return res
 
-    let subkeys ?(block = Block_parameter Latest) path =
+    let subkeys state path =
       let open Lwt_result_syntax in
-      let* hash = find_irmin_hash Ctxt.ctxt block in
-      with_evm_state Ctxt.ctxt hash @@ fun tree ->
-      let*! res = Evm_state.subkeys tree path in
+      let*! res = Evm_state.subkeys state path in
       return res
   end
 

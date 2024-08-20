@@ -9,11 +9,7 @@
 module MakeBackend (Ctxt : sig
   val smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t
 end) : Services_backend_sig.Backend = struct
-  module Reader = struct
-    let read ?block path = Evm_context.inspect ?block path
-
-    let subkeys ?block path = Evm_context.inspect_subkeys ?block path
-  end
+  module Reader = Evm_context_based_reader
 
   module TxEncoder = struct
     type transactions = (string * Ethereum_types.transaction_object) list
