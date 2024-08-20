@@ -589,7 +589,7 @@
   alpha_services.ml alpha_services.mli
   main.ml main.mli
   (:src_dir TEZOS_PROTOCOL))
- (action (run %{bin:octez-protocol-compiler} -no-hash-check -warn-error +a .)))
+ (action (run %{bin:octez-protocol-compiler} -warn-error +a .)))
 
 (library
  (name tezos_protocol_beta_lifted)

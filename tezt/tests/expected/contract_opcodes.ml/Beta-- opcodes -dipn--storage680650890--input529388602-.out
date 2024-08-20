@@ -1,5 +1,5 @@
 
-./octez-client --protocol PtQ2DrEGKLgFVzti6LSwK9c6SHHANWi1Wdzy4X4AY2BGoazwaAW --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/dipn.tz on storage 0 and input '(Pair (Pair (Pair (Pair 1 2) 3) 4) 5)' --level 1 --trace-stack
+./octez-client --protocol PsPxPKEtaNmZbEArSYm2HdPk419cHLqe8DpkxDmMWpToKHwu2Bg --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/dipn.tz on storage 0 and input '(Pair (Pair (Pair (Pair 1 2) 3) 4) 5)' --level 1 --trace-stack
 storage
   6
 emitted operations
