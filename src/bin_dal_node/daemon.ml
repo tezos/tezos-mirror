@@ -25,10 +25,24 @@
 
 let fetch_dal_config cctxt =
   let open Lwt_syntax in
-  let* r = Config_services.dal_config cctxt in
-  match r with
-  | Error e -> return_error e
-  | Ok dal_config -> return_ok dal_config
+  let delay = 0.1 in
+  let delay_max = 10. *. 60.0 in
+  let rec retry delay =
+    let* r = Config_services.dal_config cctxt in
+    match r with
+    | Error
+        [RPC_client_errors.(Request_failed {error = Connection_failed _; _})] ->
+        let delay = min delay_max (delay *. 2.) in
+        let* () =
+          Event.(
+            emit retry_fetching_node_config (Uri.to_string cctxt#base, delay))
+        in
+        let* () = Lwt_unix.sleep delay in
+        retry delay
+    | Error err -> return_error err
+    | Ok dal_config -> return_ok dal_config
+  in
+  retry delay
 
 let init_cryptobox config (proto_parameters : Dal_plugin.proto_parameters) =
   let open Lwt_result_syntax in
