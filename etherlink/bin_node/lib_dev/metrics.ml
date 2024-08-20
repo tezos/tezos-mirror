@@ -144,7 +144,9 @@ module Rpc = struct
 end
 
 module Tx_pool = struct
-  let () =
+  type size_info = {number_of_addresses : int; number_of_transactions : int}
+
+  let register (tx_pool_size_info : unit -> size_info tzresult Lwt.t) =
     CollectorRegistry.register_lwt
       registry
       MetricInfo.
@@ -157,7 +159,7 @@ module Tx_pool = struct
         }
       (fun () ->
         let open Lwt_syntax in
-        let+ size_info = Tx_pool.size_info () in
+        let+ size_info = tx_pool_size_info () in
         let number_of_addresses, number_of_transactions =
           match size_info with
           | Ok {number_of_addresses; number_of_transactions} ->
@@ -174,13 +176,45 @@ module Tx_pool = struct
           ])
 end
 
-type t = {chain : Chain.t; block : Block.t}
+module Simulation = struct
+  type t = {inconsistent_da_fees : Counter.t; confirm_gas_needed : Counter.t}
+
+  let init name =
+    let inconsistent_da_fees =
+      Counter.v_label
+        ~registry
+        ~label_name:"inconsistent_da_fees"
+        ~help:"Node DA fees are inconsistent with kernel ones"
+        ~namespace
+        ~subsystem
+        "inconsistent_da_fees"
+        name
+    in
+    let confirm_gas_needed =
+      Counter.v_label
+        ~registry
+        ~label_name:"confirm_gas_needed"
+        ~help:"Initially provided gas was not enough, confirmation was needed"
+        ~namespace
+        ~subsystem
+        "confirm_gas_needed"
+        name
+    in
+    {inconsistent_da_fees; confirm_gas_needed}
+end
+
+type t = {chain : Chain.t; block : Block.t; simulation : Simulation.t}
 
 let metrics =
   let name = "Etherlink" in
   let chain = Chain.init name in
   let block = Block.init name in
-  {chain; block}
+  let simulation = Simulation.init name in
+  {chain; block; simulation}
+
+let init ~mode ~tx_pool_size_info =
+  Info.init ~mode ;
+  Tx_pool.register tx_pool_size_info
 
 let set_level ~level = Gauge.set metrics.chain.head (Z.to_float level)
 

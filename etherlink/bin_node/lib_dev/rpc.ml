@@ -324,7 +324,6 @@ let preload_known_kernels ctxt =
 
 let main ~data_dir ~evm_node_endpoint ~(config : Configuration.t) =
   let open Lwt_result_syntax in
-  Metrics.Info.init ~mode:"rpc" ;
   let* time_between_blocks =
     Evm_services.get_time_between_blocks
       ~fallback:(Time_between_blocks 10.)
@@ -410,6 +409,7 @@ let main ~data_dir ~evm_node_endpoint ~(config : Configuration.t) =
         max_number_of_chunks = None;
       }
   in
+  Metrics.init ~mode:"rpc" ~tx_pool_size_info:Tx_pool.size_info ;
 
   let* server_public_finalizer =
     Rpc_server.start_public_server

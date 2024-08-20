@@ -231,8 +231,6 @@ module Name = struct
   let equal () () = true
 end
 
-type size_info = {number_of_addresses : int; number_of_transactions : int}
-
 module Request = struct
   type ('a, 'b) t =
     | Add_transaction :
@@ -245,7 +243,7 @@ module Request = struct
     | Lock_transactions : (unit, tztrace) t
     | Unlock_transactions : (unit, tztrace) t
     | Is_locked : (bool, tztrace) t
-    | Size_info : (size_info, tztrace) t
+    | Size_info : (Metrics.Tx_pool.size_info, tztrace) t
     | Find :
         Ethereum_types.hash
         -> (Ethereum_types.transaction_object option, tztrace) t
@@ -635,7 +633,7 @@ let size_info (state : Types.state) =
       pool.transactions
       (0, 0)
   in
-  {number_of_addresses; number_of_transactions}
+  Metrics.Tx_pool.{number_of_addresses; number_of_transactions}
 
 let find state tx_hash =
   let res =
