@@ -12,6 +12,7 @@ DAL P2P network
 The ``octez-dal-node`` executable runs a node in the DAL’s P2P network. Recall that :ref:`the DAL's P2P protocol <dal_p2p>` is based on a gossip algorithm for distributing shards, running on top of a networking layer using the same p2p library as L1 nodes.
 
 Actors with various roles may need to run a DAL node, they need different views of the network depending on their role:
+
 - operators of smart rollups care about the slots published on some slot indices (those used by the rollup they operate), they don't care about the slots used by other rollups;
 - bakers however care about what happens on all slot indices but they only care about a few shard indices (those assigned to the address of the baker);
 - finally bootstrap nodes have a global view of the DAL P2P network but they don't care about the content of the messages that transit on the network.
