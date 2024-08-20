@@ -324,6 +324,7 @@ let preload_known_kernels ctxt =
 
 let main ~data_dir ~evm_node_endpoint ~(config : Configuration.t) =
   let open Lwt_result_syntax in
+  Metrics.Info.init ~mode:"rpc" ;
   let* time_between_blocks =
     Evm_services.get_time_between_blocks
       ~fallback:(Time_between_blocks 10.)
