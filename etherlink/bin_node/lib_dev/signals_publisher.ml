@@ -226,10 +226,6 @@ module Worker = struct
                  ~keep_alive:false
                  ~rollup_node_endpoint:state.rollup_node_endpoint
                  [payload]
-               (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7385
-
-                  Implement included DAL slots anouncement to the kernel.
-               *)
            | Unknown | Pending_batch | Pending_injection _ | Injected _
            | Included _ | Committed _ ->
                return_unit)
