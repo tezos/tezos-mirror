@@ -77,6 +77,15 @@ let validate_gas_limit (module Backend_rpc : Services_backend_sig.S)
   if Z.leq execution_gas_limit maximum_gas_limit then return (Ok ())
   else return (Error "Gas limit for execution is too high")
 
+let validate_sender_not_a_contract (module Backend_rpc : Services_backend_sig.S)
+    caller : (unit, string) result tzresult Lwt.t =
+  let open Lwt_result_syntax in
+  let* (Hex code) =
+    Backend_rpc.code caller Block_parameter.(Block_parameter Latest)
+  in
+  if code = "" then return (Ok ())
+  else return (Error "Sender is a contract which is not possible")
+
 let validate_max_fee_per_gas (module Backend_rpc : Services_backend_sig.S)
     (transaction : Transaction.transaction) =
   let open Lwt_result_syntax in
@@ -100,6 +109,7 @@ let validate backend_rpc transaction ~caller =
   let** () = validate_nonce backend_rpc transaction caller in
   let** () = validate_max_fee_per_gas backend_rpc transaction in
   let** () = validate_pay_for_fees backend_rpc transaction caller in
+  let** () = validate_sender_not_a_contract backend_rpc caller in
   let** () = validate_gas_limit backend_rpc transaction in
   return (Ok ())
 

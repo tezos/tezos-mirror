@@ -392,7 +392,7 @@ let find_and_execute_withdrawal ~withdrawal_level ~commitment_period
   in
   return withdrawal_level
 
-let init_sequencer_sandbox ?da_fee_per_byte ?patch_config
+let init_sequencer_sandbox ?set_account_code ?da_fee_per_byte ?patch_config
     ?(kernel = Constant.WASM.evm_kernel)
     ?(bootstrap_accounts =
       List.map
@@ -404,6 +404,7 @@ let init_sequencer_sandbox ?da_fee_per_byte ?patch_config
 
   let*! () =
     Evm_node.make_kernel_installer_config
+      ?set_account_code
       ?da_fee_per_byte
       ~output:output_config
       ~bootstrap_accounts
