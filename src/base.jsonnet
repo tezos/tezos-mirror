@@ -25,6 +25,7 @@ local stat = panel.stat;
 local table = panel.table;
 local timeSeries = panel.timeSeries;
 local query = grafonnet.query;
+local logs = panel.logs;
 
 {
 
@@ -161,6 +162,17 @@ local query = grafonnet.query;
         },
       ]
     ),
+
+  logs:
+    {
+
+      new(title, q, h, w, x, y):
+        logs.new(title)
+        + logs.panelOptions.withGridPos(h, w, x, y)
+        + logs.queryOptions.withDatasource('loki', 'Loki')
+        + logs.queryOptions.withTargets(q),
+
+    },
 
   // Variables
   nodeInstance:
