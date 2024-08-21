@@ -379,21 +379,30 @@ let recovery_id : transaction -> (bytes, string) result =
     Ok buffer)
   else Error "Invalid recovery id"
 
+let secp256k1n_2 =
+  Z.of_string
+    "0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0"
+
+let is_high s =
+  let (Qty s) = decode_number_be s in
+  if s > secp256k1n_2 then Error "High s value" else Ok ()
+
 let uncompressed_signature ~r ~s recovery_id =
+  let open Result_syntax in
   let uncompressed_32_bytes v =
     let len = Bytes.length v in
     if len < 32 then Bytes.cat (Bytes.make (32 - len) '\000') v else v
   in
   let r = uncompressed_32_bytes r in
   let s = uncompressed_32_bytes s in
-  (* TODO: we are missing the s.is_high() check. *)
+  let+ () = is_high s in
   Bytes.concat Bytes.empty [r; s; recovery_id]
 
 let caller ({r; s; _} as transaction) =
   let open Result_syntax in
   let message = message transaction in
   let* recovery_id = recovery_id transaction in
-  let sig_ = uncompressed_signature ~r ~s recovery_id in
+  let* sig_ = uncompressed_signature ~r ~s recovery_id in
   let+ caller = Tezos_crypto.Signature.Secp256k1.recover sig_ message in
   Address (Hex (Hex.of_bytes caller |> Hex.show))
 
