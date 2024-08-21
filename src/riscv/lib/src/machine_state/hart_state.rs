@@ -51,7 +51,7 @@ pub type HartStateLayout = (
     reservation_set::ReservationSetLayout, // Reservation set layout
 );
 
-impl<M: backend::Manager> HartState<M> {
+impl<M: backend::ManagerBase> HartState<M> {
     /// Bind the hart state to the given allocated space.
     pub fn bind(space: backend::AllocatedOf<HartStateLayout, M>) -> Self {
         Self {
@@ -65,7 +65,10 @@ impl<M: backend::Manager> HartState<M> {
     }
 
     /// Reset the hart state.
-    pub fn reset(&mut self, pc: Address) {
+    pub fn reset(&mut self, pc: Address)
+    where
+        M: backend::ManagerWrite,
+    {
         self.xregisters.reset();
         self.fregisters.reset();
         self.csregisters.reset();
@@ -75,7 +78,10 @@ impl<M: backend::Manager> HartState<M> {
     }
 
     /// Given a trap source and a return address, take a trap on the machine.
-    pub fn take_trap<TC: TrapContext>(&mut self, trap_source: TC, return_pc: u64) -> u64 {
+    pub fn take_trap<TC: TrapContext>(&mut self, trap_source: TC, return_pc: u64) -> u64
+    where
+        M: backend::ManagerReadWrite,
+    {
         self.take_trap_from_mode(trap_source, self.mode.read(), return_pc)
     }
 
@@ -86,7 +92,10 @@ impl<M: backend::Manager> HartState<M> {
         trap_source: TC,
         current_mode: Mode,
         return_pc: Address,
-    ) -> Address {
+    ) -> Address
+    where
+        M: backend::ManagerReadWrite,
+    {
         let trap_mode = self.csregisters.get_trap_mode(&trap_source, current_mode);
         let (xtvec_reg, xepc_reg, xcause_reg, xtval_reg) = match trap_mode {
             TrapMode::Supervisor => (
@@ -157,7 +166,10 @@ impl<M: backend::Manager> HartState<M> {
 
     /// Return the current [`Interrupt`] with highest priority to be handled
     /// or [`None`] if there isn't any available
-    pub fn get_pending_interrupt(&mut self, current_mode: Mode) -> Option<Interrupt> {
+    pub fn get_pending_interrupt(&mut self, current_mode: Mode) -> Option<Interrupt>
+    where
+        M: backend::ManagerRead,
+    {
         let possible = match self.get_interrupts_cache(current_mode) {
             InterruptsCacheResult::PendingInterrupt(result) => return result,
             InterruptsCacheResult::PossibleInterrupts(possible_interrupts) => possible_interrupts,
