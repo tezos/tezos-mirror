@@ -314,7 +314,7 @@
  (action
   (write-file
    %{targets}
-   "\nlet hash = Tezos_crypto.Hashed.Protocol_hash.of_b58check_exn \"PtQ2DrEGKLgFVzti6LSwK9c6SHHANWi1Wdzy4X4AY2BGoazwaAW\"\nlet name = Tezos_protocol_environment_beta.Name.name\ninclude Tezos_raw_protocol_beta\ninclude Tezos_raw_protocol_beta.Main\n")))
+   "\nlet hash = Tezos_crypto.Hashed.Protocol_hash.of_b58check_exn \"PsPxPKEtaNmZbEArSYm2HdPk419cHLqe8DpkxDmMWpToKHwu2Bg\"\nlet name = Tezos_protocol_environment_beta.Name.name\ninclude Tezos_raw_protocol_beta\ninclude Tezos_raw_protocol_beta.Main\n")))
 
 (rule
  (targets tezos_protocol_beta.ml)
@@ -589,7 +589,7 @@
   alpha_services.ml alpha_services.mli
   main.ml main.mli
   (:src_dir TEZOS_PROTOCOL))
- (action (run %{bin:octez-protocol-compiler} -warn-error +a .)))
+ (action (run %{bin:octez-protocol-compiler} -no-hash-check -warn-error +a .)))
 
 (library
  (name tezos_protocol_beta_lifted)
