@@ -16,13 +16,6 @@
 
 let octez_legal_versions =
   [
-    ( "octez-10.93",
-      {
-        product = Octez;
-        Version.major = 10;
-        minor = 93;
-        additional_info = Release;
-      } );
     ( "octez-v10.93",
       {
         product = Octez;
@@ -30,27 +23,27 @@ let octez_legal_versions =
         minor = 93;
         additional_info = Release;
       } );
-    ( "octez-10.93+dev",
+    ( "octez-v10.93+dev",
       {product = Octez; Version.major = 10; minor = 93; additional_info = Dev}
     );
-    ( "octez-10.93-rc1",
+    ( "octez-v10.93-rc1",
       {product = Octez; Version.major = 10; minor = 93; additional_info = RC 1}
     );
-    ( "octez-10.93-rc1+dev",
+    ( "octez-v10.93-rc1+dev",
       {
         product = Octez;
         Version.major = 10;
         minor = 93;
         additional_info = RC_dev 1;
       } );
-    ( "octez-10.93-beta1",
+    ( "octez-v10.93-beta1",
       {
         product = Octez;
         Version.major = 10;
         minor = 93;
         additional_info = Beta 1;
       } );
-    ( "octez-10.93-beta1+dev",
+    ( "octez-v10.93-beta1+dev",
       {
         product = Octez;
         Version.major = 10;
@@ -59,53 +52,53 @@ let octez_legal_versions =
       } );
   ]
 
-let etherlink_legal_versions =
+let octez_evm_node_legal_versions =
   [
-    ( "etherlink-10.93",
+    ( "octez-evm-node-v10.93",
       {
-        product = Etherlink;
+        product = Octez_evm_node;
         Version.major = 10;
         minor = 93;
         additional_info = Release;
       } );
-    ( "etherlink-v10.93",
+    ( "octez-evm-node-v10.93",
       {
-        product = Etherlink;
+        product = Octez_evm_node;
         Version.major = 10;
         minor = 93;
         additional_info = Release;
       } );
-    ( "etherlink-10.93+dev",
+    ( "octez-evm-node-v10.93+dev",
       {
-        product = Etherlink;
+        product = Octez_evm_node;
         Version.major = 10;
         minor = 93;
         additional_info = Dev;
       } );
-    ( "etherlink-10.93-rc1",
+    ( "octez-evm-node-v10.93-rc1",
       {
-        product = Etherlink;
+        product = Octez_evm_node;
         Version.major = 10;
         minor = 93;
         additional_info = RC 1;
       } );
-    ( "etherlink-10.93-rc1+dev",
+    ( "octez-evm-node-v10.93-rc1+dev",
       {
-        product = Etherlink;
+        product = Octez_evm_node;
         Version.major = 10;
         minor = 93;
         additional_info = RC_dev 1;
       } );
-    ( "etherlink-10.93-beta1",
+    ( "octez-evm-node-v10.93-beta1",
       {
-        product = Etherlink;
+        product = Octez_evm_node;
         Version.major = 10;
         minor = 93;
         additional_info = Beta 1;
       } );
-    ( "etherlink-10.93-beta1+dev",
+    ( "octez-evm-node-v10.93-beta1+dev",
       {
-        product = Etherlink;
+        product = Octez_evm_node;
         Version.major = 10;
         minor = 93;
         additional_info = Beta_dev 1;
@@ -157,10 +150,10 @@ let () =
 let () =
   Test.register
     ~__FILE__
-    ~title:"Version: Test Etherlink versions parser"
-    ~tags:["version"; "etherlink"]
+    ~title:"Version: Test octez-evm-node versions parser"
+    ~tags:["version"; "octez_evm_node"]
   @@ fun () ->
-  ( Fun.flip List.iter etherlink_legal_versions @@ fun (x, e) ->
+  ( Fun.flip List.iter octez_evm_node_legal_versions @@ fun (x, e) ->
     Check.(
       (Some e = parse_version x)
         version_typ
