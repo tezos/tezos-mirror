@@ -162,7 +162,11 @@ let produce_block_with_transactions ~sequencer_key ~cctxt ~timestamp
     Evm_context.apply_blueprint timestamp blueprint_payload delayed_transactions
   in
   let (Qty number) = head_info.next_blueprint_number in
-  let* () = Blueprints_publisher.publish number blueprint_payload in
+  let* () =
+    Blueprints_publisher.publish
+      number
+      (Blueprints_publisher_types.Request.Blueprint blueprint_chunks)
+  in
   let*! () =
     List.iter_p
       (fun hash -> Block_producer_events.transaction_selected ~hash)

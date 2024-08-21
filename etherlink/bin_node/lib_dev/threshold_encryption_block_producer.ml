@@ -96,7 +96,11 @@ let produce_block ~sequencer_key ~cctxt ~smart_rollup_address preblock =
   let* () =
     Evm_context.apply_blueprint timestamp payload delayed_transactions
   in
-  let* () = Blueprints_publisher.publish number payload in
+  let* () =
+    Blueprints_publisher.publish
+      number
+      (Blueprints_publisher_types.Request.Blueprint chunks)
+  in
   let*! () =
     List.iter_p
       (fun hash -> Block_producer_events.transaction_selected ~hash)

@@ -124,7 +124,9 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
       let* () =
         Evm_context.apply_blueprint genesis_timestamp genesis_payload []
       in
-      Blueprints_publisher.publish Z.zero genesis_payload
+      Blueprints_publisher.publish
+        Z.zero
+        (Blueprints_publisher_types.Request.Blueprint genesis_chunks)
     else return_unit
   in
   let* ro_ctxt =
