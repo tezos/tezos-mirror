@@ -252,52 +252,54 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
                 failing_ticks
                 next_state)
       | Needs_reveal (Reveal_raw_data hash) -> (
-          let* data =
-            get_reveal
-              ~dac_client:node_ctxt.dac_client
-              ~pre_images_endpoint:node_ctxt.config.pre_images_endpoint
-              ~data_dir:node_ctxt.data_dir
-              ~pvm_kind:node_ctxt.kind
-              reveal_map
-              hash
-          in
-          let*! next_state = PVM.set_input (Reveal (Raw_data data)) state in
           match F.consume F.one_tick_consumption fuel with
           | None -> abort state fuel current_tick
           | Some fuel ->
+              let* data =
+                get_reveal
+                  ~dac_client:node_ctxt.dac_client
+                  ~pre_images_endpoint:node_ctxt.config.pre_images_endpoint
+                  ~data_dir:node_ctxt.data_dir
+                  ~pvm_kind:node_ctxt.kind
+                  reveal_map
+                  hash
+              in
+              let*! next_state = PVM.set_input (Reveal (Raw_data data)) state in
               go fuel (Int64.succ current_tick) failing_ticks next_state)
       | Needs_reveal Reveal_metadata -> (
-          let*! next_state = PVM.set_input (Reveal (Metadata metadata)) state in
           match F.consume F.one_tick_consumption fuel with
           | None -> abort state fuel current_tick
           | Some fuel ->
+              let*! next_state =
+                PVM.set_input (Reveal (Metadata metadata)) state
+              in
               go fuel (Int64.succ current_tick) failing_ticks next_state)
       | Needs_reveal (Request_dal_page page_id) -> (
-          let* content_opt =
-            Dal_pages_request.page_content
-              constants.dal
-              ~inbox_level:(Int32.of_int level)
-              ~dal_activation_level
-              ~dal_attested_slots_validity_lag
-              node_ctxt
-              page_id
-          in
-          let*! next_state =
-            PVM.set_input (Reveal (Dal_page content_opt)) state
-          in
           match F.consume F.one_tick_consumption fuel with
           | None -> abort state fuel current_tick
           | Some fuel ->
+              let* content_opt =
+                Dal_pages_request.page_content
+                  constants.dal
+                  ~inbox_level:(Int32.of_int level)
+                  ~dal_activation_level
+                  ~dal_attested_slots_validity_lag
+                  node_ctxt
+                  page_id
+              in
+              let*! next_state =
+                PVM.set_input (Reveal (Dal_page content_opt)) state
+              in
               go fuel (Int64.succ current_tick) failing_ticks next_state)
       | Needs_reveal Reveal_dal_parameters -> (
           (* TODO: https://gitlab.com/tezos/tezos/-/issues/6562
              Consider supporting revealing of historical DAL parameters. *)
-          let*! next_state =
-            PVM.set_input (Reveal (Dal_parameters dal_parameters)) state
-          in
           match F.consume F.one_tick_consumption fuel with
           | None -> abort state fuel current_tick
           | Some fuel ->
+              let*! next_state =
+                PVM.set_input (Reveal (Dal_parameters dal_parameters)) state
+              in
               go fuel (Int64.succ current_tick) failing_ticks next_state)
       | Initial | First_after _ ->
           complete state fuel current_tick failing_ticks
