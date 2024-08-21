@@ -6,6 +6,7 @@
 (*****************************************************************************)
 
 type parameters = {
+  smart_rollup_address : string;
   rollup_node_endpoint : Uri.t;
   latest_level_seen : Z.t;
   config : Configuration.blueprints_publisher_config;
@@ -13,6 +14,7 @@ type parameters = {
 }
 
 type state = {
+  smart_rollup_address : string;
   rollup_node_endpoint : Uri.t;
   max_blueprints_lag : Z.t;
   max_blueprints_ahead : Z.t;
@@ -224,6 +226,7 @@ module Handlers = struct
 
   let on_launch _self ()
       ({
+         smart_rollup_address;
          rollup_node_endpoint;
          config =
            {
@@ -240,6 +243,7 @@ module Handlers = struct
     let open Lwt_result_syntax in
     return
       {
+        smart_rollup_address;
         latest_level_confirmed =
           (* Will be set at the correct value once the next L2 block is
              received from the rollup node *)
@@ -301,13 +305,20 @@ let table = Worker.create_table Queue
 
 let worker_promise, worker_waker = Lwt.task ()
 
-let start ~rollup_node_endpoint ~config ~latest_level_seen ~keep_alive () =
+let start ~smart_rollup_address ~rollup_node_endpoint ~config ~latest_level_seen
+    ~keep_alive () =
   let open Lwt_result_syntax in
   let* worker =
     Worker.launch
       table
       ()
-      {rollup_node_endpoint; config; latest_level_seen; keep_alive}
+      {
+        smart_rollup_address;
+        rollup_node_endpoint;
+        config;
+        latest_level_seen;
+        keep_alive;
+      }
       (module Handlers)
   in
   let*! () = Blueprint_events.publisher_is_ready () in

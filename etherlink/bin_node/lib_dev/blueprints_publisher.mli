@@ -6,6 +6,7 @@
 (*****************************************************************************)
 
 val start :
+  smart_rollup_address:string ->
   rollup_node_endpoint:Uri.t ->
   config:Configuration.blueprints_publisher_config ->
   latest_level_seen:Z.t ->
