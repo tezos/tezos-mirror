@@ -130,25 +130,25 @@ local mkPeersPanel(h, w, x, y, legendRightSide) =
         + graph.withQueryColor([[getSent, 'green'], [received, 'light-blue'], [getReceived, 'blue'], [sent, 'light-green']]),
 
 
-      CurrentBranch(h, w, x, y): self.base('current branch', 'current branch', 'current_branch', 'current_branch', h, w, x, y),
+      currentBranch(h, w, x, y): self.base('current branch', 'current branch', 'current_branch', 'current_branch', h, w, x, y),
 
-      BlockHeaders(h, w, x, y): self.base('block header', 'block headers', 'block_header', 'block_headers', h, w, x, y),
+      blockHeaders(h, w, x, y): self.base('block header', 'block headers', 'block_header', 'block_headers', h, w, x, y),
 
-      PredHeader(h, w, x, y): self.base('predecessor header', 'protocols', 'predecessor_header', 'predecessor_header', h, w, x, y),
+      predHeader(h, w, x, y): self.base('predecessor header', 'protocols', 'predecessor_header', 'predecessor_header', h, w, x, y),
 
-      Operations(h, w, x, y): self.base('operation', 'operations', 'operation', 'operations', h, w, x, y),
+      operations(h, w, x, y): self.base('operation', 'operations', 'operation', 'operations', h, w, x, y),
 
-      Ops4Blocks(h, w, x, y): self.base('ops for block', 'ops for blocks', 'operations_for_block', 'operations_for_blocks', h, w, x, y),
+      ops4Blocks(h, w, x, y): self.base('ops for block', 'ops for blocks', 'operations_for_block', 'operations_for_blocks', h, w, x, y),
 
-      Protocols(h, w, x, y): self.base('protocol', 'protocols', 'protocol', 'protocols', h, w, x, y),
+      protocols(h, w, x, y): self.base('protocol', 'protocols', 'protocol', 'protocols', h, w, x, y),
 
-      ProtoBranch(h, w, x, y): self.base('protocol branch', 'protocol branch', 'protocol_branch', 'protocol_branch', h, w, x, y),
+      protoBranch(h, w, x, y): self.base('protocol branch', 'protocol branch', 'protocol_branch', 'protocol_branch', h, w, x, y),
 
-      Checkpoint(h, w, x, y): self.base('checkpoint', 'checkpoint', 'checkpoint', 'checkpoint', h, w, x, y),
+      checkpoint(h, w, x, y): self.base('checkpoint', 'checkpoint', 'checkpoint', 'checkpoint', h, w, x, y),
 
-      Deactivate(h, w, x, y): self.base('deactivate', 'deactivate', 'deactivate', 'deactivate', h, w, x, y),
+      deactivate(h, w, x, y): self.base('deactivate', 'deactivate', 'deactivate', 'deactivate', h, w, x, y),
 
-      CurrentHead(h, w, x, y):
+      currentHead(h, w, x, y):
         local getBroadcasted = 'get current head broadcasted';
         local getSent = 'get current head sent';
         local received = 'current head received';
