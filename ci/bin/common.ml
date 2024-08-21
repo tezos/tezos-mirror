@@ -742,8 +742,9 @@ end
      (no need to test that we pass the -static flag twice)
    - released variants exist, that are used in release tag pipelines
      (they do not build experimental executables) *)
-let job_build_static_binaries ~__POS__ ~arch ?(release = false) ?rules
-    ?dependencies () : tezos_job =
+let job_build_static_binaries ~__POS__ ~arch
+    ?(executable_files = "script-inputs/released-executables")
+    ?version_executable ?(release = false) ?rules ?dependencies () : tezos_job =
   let arch_string = arch_to_string arch in
   let name = "oc.build:static-" ^ arch_string ^ "-linux-binaries" in
   let artifacts =
@@ -752,8 +753,13 @@ let job_build_static_binaries ~__POS__ ~arch ?(release = false) ?rules
     artifacts ?expire_in ["octez-binaries/$ARCH/*"]
   in
   let executable_files =
-    "script-inputs/released-executables"
+    executable_files
     ^ if not release then " script-inputs/experimental-executables" else ""
+  in
+  let version_executable =
+    match version_executable with
+    | Some exe -> [("VERSION_EXECUTABLE", exe)]
+    | None -> []
   in
   job
     ?rules
@@ -764,7 +770,9 @@ let job_build_static_binaries ~__POS__ ~arch ?(release = false) ?rules
     ~name
     ~image:Images.CI.build
     ~before_script:(before_script ~take_ownership:true ~eval_opam:true [])
-    ~variables:[("ARCH", arch_string); ("EXECUTABLE_FILES", executable_files)]
+    ~variables:
+      ([("ARCH", arch_string); ("EXECUTABLE_FILES", executable_files)]
+      @ version_executable)
     ~artifacts
     ["./scripts/ci/build_static_binaries.sh"]
   |> enable_cargo_cache |> enable_sccache
@@ -782,6 +790,7 @@ let job_build_static_binaries ~__POS__ ~arch ?(release = false) ?rules
 
     - [Release] Docker builds include only released executables whereas other
       types also includes experimental ones.
+    - [Octez_evm_node_release] Docker build include only `octez-evm-node`
     - [Test_manual] and [Experimental] Docker builds include the EVM kernels in
       amd64 builds.
     - [Release] and [Experimental] Docker builds are pushed to Docker hub,
@@ -789,7 +798,12 @@ let job_build_static_binaries ~__POS__ ~arch ?(release = false) ?rules
     - [Test_manual] Docker builds are started manually, put in the stage
       [manual] and their failure is allowed. The other types are in the build
       stage, run [on_success] and are not allowed to fail. *)
-type docker_build_type = Experimental | Release | Test | Test_manual
+type docker_build_type =
+  | Experimental
+  | Release
+  | Octez_evm_node_release
+  | Test
+  | Test_manual
 
 (** Creates a Docker build job of the given [arch] and [docker_build_type]. *)
 let job_docker_build ?rules ?dependencies ~__POS__ ~arch docker_build_type :
@@ -797,7 +811,7 @@ let job_docker_build ?rules ?dependencies ~__POS__ ~arch docker_build_type :
   let arch_string = arch_to_string_alt arch in
   let ci_docker_hub =
     match docker_build_type with
-    | Release | Experimental -> true
+    | Release | Octez_evm_node_release | Experimental -> true
     | Test | Test_manual -> false
   in
   (* Whether to include evm artifacts.
@@ -828,6 +842,7 @@ let job_docker_build ?rules ?dependencies ~__POS__ ~arch docker_build_type :
       ( "EXECUTABLE_FILES",
         match docker_build_type with
         | Release -> "script-inputs/released-executables"
+        | Octez_evm_node_release -> "script-inputs/octez-evm-node-executable"
         | Test | Test_manual | Experimental ->
             "script-inputs/released-executables \
              script-inputs/experimental-executables" );
