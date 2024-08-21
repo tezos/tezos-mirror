@@ -2219,6 +2219,10 @@ let debug_print_store_schemas_command =
       Format.printf "%s\n" output ;
       return_unit)
 
+(* List of commands not ready to be used by our end-users *)
+let in_development_commands =
+  [export_snapshot_auto_name_command; export_snapshot_named_command]
+
 (* List of program commands *)
 let commands =
   [
@@ -2239,8 +2243,6 @@ let commands =
     init_config_command;
     describe_config_command;
     make_kernel_config_command;
-    export_snapshot_auto_name_command;
-    export_snapshot_named_command;
     patch_state_command;
     preemptive_kernel_download_command;
     debug_print_store_schemas_command;
@@ -2261,6 +2263,7 @@ let dispatch args =
       (if Unix.isatty Unix.stdout then Tezos_clic.Ansi else Tezos_clic.Plain)
       Format.std_formatter
       commands
+    @ in_development_commands
   in
   let* (), remaining_args =
     Tezos_clic.parse_global_options global_options () args
