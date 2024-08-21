@@ -1412,7 +1412,9 @@ let test_advances_state_with_kernel ~title ~boot_sector ~kind ~messages =
  * in `src/riscv/jstz` *)
 let test_advances_state_with_inbox ~title ~boot_sector ~kind ~inbox_file =
   let inbox =
-    JSON.(parse_file inbox_file |> as_list |> List.map as_list |> List.concat)
+    JSON.(
+      Uses.path inbox_file |> parse_file |> as_list |> List.map as_list
+      |> List.concat)
   in
   let messages =
     List.map (fun m -> JSON.(m |-> "external" |> as_string)) inbox
@@ -6046,16 +6048,18 @@ let start_rollup_node_with_encrypted_key ~kind =
 
 (* TODO: https://linear.app/tezos/issue/RV-109/port-kernel-installer-to-risc-v
  * Originate RISC-V kernels using installer kernel instead *)
-let read_riscv_kernel (kernel_path : string) (checksum_path : string) : string =
-  let checksum = String.split_on_char ' ' (read_file checksum_path) in
-  "kernel:" ^ kernel_path ^ ":" ^ List.hd checksum
+let read_riscv_kernel (kernel_path : Uses.t) (checksum_path : Uses.t) : string =
+  let checksum =
+    String.split_on_char ' ' (read_file (Uses.path checksum_path))
+  in
+  "kernel:" ^ Uses.path kernel_path ^ ":" ^ List.hd checksum
 
 let register_riscv ~protocols =
   let kind = "riscv" in
   let boot_sector =
     read_riscv_kernel
-      "src/riscv/assets/riscv-dummy.elf"
-      "src/riscv/assets/riscv-dummy.elf.checksum"
+      (Uses.make ~tag:"riscv" ~path:"src/riscv/assets/riscv-dummy.elf")
+      (Uses.make ~tag:"riscv" ~path:"src/riscv/assets/riscv-dummy.elf.checksum")
   in
   test_origination ~kind protocols ;
   test_rpcs ~kind ~boot_sector protocols ~kernel_debug_log:true ;
@@ -6070,14 +6074,17 @@ let register_riscv ~protocols =
 let register_riscv_jstz ~protocols =
   let kind = "riscv" in
   let boot_sector =
-    read_riscv_kernel "src/riscv/assets/jstz" "src/riscv/assets/jstz.checksum"
+    read_riscv_kernel
+      (Uses.make ~tag:"riscv" ~path:"src/riscv/assets/jstz")
+      (Uses.make ~tag:"riscv" ~path:"src/riscv/assets/jstz.checksum")
   in
   test_advances_state_with_inbox
     protocols
     ~kind
     ~title:"node advances PVM state with jstz kernel"
     ~boot_sector
-    ~inbox_file:"tezt/tests/riscv-tests/jstz-inbox.json"
+    ~inbox_file:
+      (Uses.make ~tag:"riscv" ~path:"tezt/tests/riscv-tests/jstz-inbox.json")
 
 let register ~kind ~protocols =
   test_origination ~kind protocols ;
