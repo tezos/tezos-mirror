@@ -1,6 +1,15 @@
 # Changelog
 
-## Version for NEXT
+## Version 0.1.0 (2024-08-21)
+
+This release concludes two months of development since the freeze of the
+Etherlink kernel ec7c3b349624896b269e179384d0a45cf39e1145 on June 6, 2024. It
+contains a number of breaking changes, making the upgrade potentially
+challenging. This was deemed necessary to clean-up the UX of the node and
+provide a better foundation for further changes.
+
+This version is compatible with every kernel deployed on Etherlink Mainnet
+Beta.
 
 ### Breaking changes
 
@@ -11,9 +20,9 @@
 - Remove the `preimages` and `preimages_endpoint` fields specific to each
   mode, in favor of a new `kernel_execution` top-level configuration.
   (!14332)
-- Deprecate the field related to the RPC servers configuration (`rpc-port`,
-  `rpc-addr`, `max_active_connections`, `sequencer.private_rpc_port`,
-  etc.) in favor of `publc_rpc` and `private_rpc`. (!14460 !14527)
+- Replace the fields related to the RPC servers configuration (`rpc-port`,
+  `rpc-addr`, `max_active_connections`, `sequencer.private_rpc_port`, etc.) in
+  favor of `publc_rpc` and `private_rpc`. (!14460 !14527)
 - Use `_` consistently instead of `-` in every fields. (!14527)
 - Remove the `--devmode` CLI argument. (!14602)
 
