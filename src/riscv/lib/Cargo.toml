@@ -13,6 +13,7 @@ goblin.workspace = true
 hex.workspace = true
 ieee-apsqrt.workspace = true
 num_enum.workspace = true
+once_cell.workspace = true
 paste.workspace = true
 rustc_apfloat.workspace = true
 serde.workspace = true

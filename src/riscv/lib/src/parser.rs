@@ -1267,16 +1267,65 @@ pub fn parse_segment(contents: &[u8], range: Range<usize>) -> Vec<Instr> {
     parse_block(&contents[range])
 }
 
+/// A faster parser that leverages jump-tables where possible.
+pub struct Parser {
+    u16_jump_table: Box<[Instr; (u16::MAX as usize) + 1]>,
+}
+
+impl Parser {
+    /// Creates a new parser.
+    ///
+    /// *NB* this initialises an internal compressed instruction
+    /// jump table.
+    pub fn new() -> Self {
+        let u16_jump_table = (0..=u16::MAX)
+            .map(parse_compressed_instruction)
+            .collect::<Vec<_>>()
+            .try_into()
+            .unwrap();
+
+        Self { u16_jump_table }
+    }
+
+    /// Attempt to parse `bytes` into an instruction. If `bytes` encodes a 2-byte
+    /// compressed instruction, parse it immediately. If it encodes a 4-byte
+    /// uncompressed instruction, request 2 extra bytes via `more`.
+    ///
+    /// Behaves identically to [`parse`], but more optimally.
+    #[inline(always)]
+    pub fn parse<E>(&self, bytes: u16, more: impl FnOnce() -> Result<u16, E>) -> Result<Instr, E> {
+        if bytes & 0b11 != 0b11 {
+            Ok(self.parse_compressed(bytes))
+        } else {
+            let upper = more()?;
+            let combined = (upper as u32) << 16 | (bytes as u32);
+            Ok(parse_uncompressed_instruction(combined))
+        }
+    }
+
+    #[inline(always)]
+    const fn parse_compressed(&self, bytes: u16) -> Instr {
+        self.u16_jump_table[bytes as usize]
+    }
+}
+
+impl Default for Parser {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
         instruction::{CsrArgs, ITypeArgs, Instr::*, SBTypeArgs, UJTypeArgs},
-        parse_block,
+        parse, parse_block, Parser,
     };
     use crate::{
         machine_state::{csregisters::CSRegister::mcause, registers::XRegister::*},
-        parser::instruction::CIBTypeArgs,
+        parser::{instruction::CIBTypeArgs, parse_compressed_instruction},
     };
+    use proptest::prelude::*;
 
     // rv64ui-p-addiw
     // 0000000080000000 <_start>:
@@ -1410,5 +1459,31 @@ mod tests {
         let expected = [Mnret];
         let instructions = parse_block(&bytes);
         assert_eq!(instructions, expected)
+    }
+
+    // Ensure the u16 jump table is initialised correctly.
+    #[test]
+    fn parser_compressed() {
+        let parser = Parser::new();
+
+        for i in 0..=u16::MAX {
+            assert_eq!(parser.parse_compressed(i), parse_compressed_instruction(i));
+        }
+    }
+
+    proptest! {
+        // Ensure the optimised parser behaves the same on inputs
+        #[test]
+        fn fast_parser(
+            first_halfword in any::<u16>(),
+            second_halfword in any::<Option<u16>>())
+        {
+            let parser = Parser::new();
+
+            assert_eq!(
+                parse(first_halfword, || second_halfword.ok_or(())),
+                parser.parse(first_halfword, || second_halfword.ok_or(()))
+            );
+        }
     }
 }
