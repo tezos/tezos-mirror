@@ -16,12 +16,12 @@ depends: [
 ]
 depopts: [
   "tezos-injector-020-PsParisC"
-  "tezos-injector-021-PtQuebec"
+  "tezos-injector-beta"
   "tezos-injector-alpha"
 ]
 conflicts: [
   "tezos-injector-020-PsParisC" { != version }
-  "tezos-injector-021-PtQuebec" { != version }
+  "tezos-injector-beta" { != version }
   "tezos-injector-alpha" { != version }
 ]
 build: [

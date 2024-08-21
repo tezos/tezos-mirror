@@ -15,18 +15,19 @@ depends: [
   "octez-l2-libs" { = version }
   "octez-smart-rollup-node-lib" { = version }
   "octez-smart-rollup-node-PsParisC" { = version }
-  "octez-smart-rollup-node-PtQuebec" { = version }
 ]
 depopts: [
   "octez-smart-rollup-node-PtNairob"
   "octez-smart-rollup-node-Proxford"
   "octez-smart-rollup-node-PtParisB"
+  "octez-smart-rollup-node-beta"
   "octez-smart-rollup-node-alpha"
 ]
 conflicts: [
   "octez-smart-rollup-node-PtNairob" { != version }
   "octez-smart-rollup-node-Proxford" { != version }
   "octez-smart-rollup-node-PtParisB" { != version }
+  "octez-smart-rollup-node-beta" { != version }
   "octez-smart-rollup-node-alpha" { != version }
 ]
 build: [

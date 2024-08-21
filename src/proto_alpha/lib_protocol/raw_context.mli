@@ -96,7 +96,7 @@ val prepare :
 type previous_protocol =
   | Genesis of Parameters_repr.t
   | Alpha
-  | (* Alpha predecessor *) Quebec (* Alpha predecessor *)
+  | (* Alpha predecessor *) Beta (* Alpha predecessor *)
 
 val prepare_first_block :
   level:int32 ->

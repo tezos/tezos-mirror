@@ -2,9 +2,9 @@ Protocol Alpha
 ==============
 
 This page documents the changes brought by protocol Alpha with respect
-to Quebec (see :ref:`naming_convention`).
+to Beta (see :ref:`naming_convention`).
 
-For changes brought by Quebec with respect to Paris, see :doc:`../protocols/021_quebec`.
+For changes brought by Paris with respect to Oxford, see :doc:`../protocols/019_paris`.
 
 The code can be found in directory :src:`src/proto_alpha` of the ``master``
 branch of Octez.
@@ -58,3 +58,5 @@ Minor Changes
 
 Internal
 --------
+
+

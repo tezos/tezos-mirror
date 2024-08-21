@@ -896,13 +896,12 @@ opam:all_6:
       - tezos-protocol-genesis
       - tezos-protocol-demo-noops
       - tezos-protocol-demo-counter
+      - tezos-protocol-beta
       - tezos-protocol-alpha
-      - tezos-protocol-021-PtQuebec
       - tezos-protocol-020-PsParisC
       - tezos-protocol-019-PtParisB
       - tezos-protocol-018-Proxford
-      - tezos-protocol-017-PtNairob
-      - tezos-protocol-016-PtMumbai
+      - tezos-benchmark
       - octez-shell-libs
       - octez-riscv-pvm
       - octez-proto-libs
@@ -974,6 +973,7 @@ opam:exec_6:
   parallel:
     matrix:
     - package:
+      - octez-version
       - octez-protocol-compiler
 
 opam:all_2:
@@ -1044,21 +1044,21 @@ opam:all_2:
   parallel:
     matrix:
     - package:
+      - tezos-dac-node-lib
       - octez-smart-rollup-wasm-debugger-lib
       - octez-smart-rollup-node-lib
-      - octez-smart-rollup-node-alpha
-      - octez-smart-rollup-node-PtQuebec
+      - octez-smart-rollup-node-beta
       - octez-smart-rollup-node-PtParisB
       - octez-smart-rollup-node-PtNairob
-      - octez-smart-rollup-node-PsParisC
       - octez-smart-rollup-node-Proxford
+      - octez-protocol-beta-libs
       - octez-protocol-alpha-libs
-      - octez-protocol-021-PtQuebec-libs
       - octez-protocol-020-PsParisC-libs
       - octez-protocol-019-PtParisB-libs
       - octez-protocol-018-Proxford-libs
       - octez-protocol-017-PtNairob-libs
       - octez-protocol-016-PtMumbai-libs
+      - octez-injector
 
 opam:all_1:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
@@ -1128,6 +1128,8 @@ opam:all_1:
   parallel:
     matrix:
     - package:
+      - octez-smart-rollup-node-alpha
+      - octez-smart-rollup-node-PsParisC
       - octez-evm-node-libs
 
 opam:all_3:
@@ -1198,7 +1200,8 @@ opam:all_3:
   parallel:
     matrix:
     - package:
-      - tezos-dac-node-lib
+      - octez-protocol-014-PtKathma-libs
+      - octez-protocol-013-PtJakart-libs
       - octez-protocol-012-Psithaca-libs
       - octez-protocol-011-PtHangz2-libs
       - octez-protocol-010-PtGRANAD-libs
@@ -1212,75 +1215,6 @@ opam:all_3:
       - octez-protocol-002-PsYLVpVv-libs
       - octez-protocol-001-PtCJ7pwo-libs
       - octez-protocol-000-Ps9mPmXa-libs
-      - octez-injector
-
-opam:exec_7:
-  image: ${ci_image_name}/prebuild:${ci_image_tag}
-  stage: packaging
-  tags:
-  - gcp
-  rules:
-  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
-    when: delayed
-    start_in: 7 minutes
-  - changes:
-    - '**/*.dune.inc'
-    - '**/*.opam'
-    - '**/dune'
-    - '**/dune-project'
-    - '**/dune-workspace'
-    - '**/dune.inc'
-    - .gitlab/ci/jobs/packaging/opam:prepare.yml
-    - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/**/*.ml*
-    - scripts/opam-prepare-repo.sh
-    - scripts/version.sh
-    when: delayed
-    start_in: 7 minutes
-  needs:
-  - oc.docker:ci:amd64
-  - opam:prepare
-  dependencies:
-  - oc.docker:ci:amd64
-  - opam:prepare
-  timeout: 60 minutes
-  cache:
-  - key: opam-sccache
-    paths:
-    - $CI_PROJECT_DIR/_build/_sccache
-    policy: pull-push
-  - key: cargo-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  before_script:
-  - eval $(opam env)
-  - mkdir -p $CI_PROJECT_DIR/opam_logs
-  - . ./scripts/ci/sccache-start.sh
-  script:
-  - opam remote add dev-repo ./_opam-repo-for-release
-  - opam install --yes ${package}.dev
-  - opam reinstall --yes --with-test ${package}.dev
-  after_script:
-  - eval $(opam env)
-  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
-  - sccache --stop-server || true
-  variables:
-    RUNTEZTALIAS: "true"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
-    SCCACHE_IDLE_TIMEOUT: "0"
-    CARGO_NET_OFFLINE: "false"
-  artifacts:
-    expire_in: 1 week
-    paths:
-    - opam_logs/
-    when: always
-  retry: 2
-  parallel:
-    matrix:
-    - package:
-      - octez-version
 
 opam:exec_4:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
@@ -1418,6 +1352,8 @@ opam:all_4:
   parallel:
     matrix:
     - package:
+      - tezos-protocol-004-Pt24m4xi
+      - tezos-protocol-003-PsddFKi3
       - tezos-protocol-002-PsYLVpVv
       - tezos-protocol-001-PtCJ7pwo
       - tezos-protocol-000-Ps9mPmXa
@@ -1428,8 +1364,6 @@ opam:all_4:
       - tezos-client-demo-counter
       - octez-rpc-process
       - octez-protocol-015-PtLimaPt-libs
-      - octez-protocol-014-PtKathma-libs
-      - octez-protocol-013-PtJakart-libs
       - octez-node-config
       - octez-crawler
 
@@ -1509,9 +1443,7 @@ opam:exec_1:
       - octez-dac-client
       - octez-codec
       - octez-client
-      - octez-baker-PtQuebec
       - octez-baker-PsParisC
-      - octez-accuser-PtQuebec
       - octez-accuser-PsParisC
 
 opam:all_5:
@@ -1582,6 +1514,8 @@ opam:all_5:
   parallel:
     matrix:
     - package:
+      - tezos-protocol-017-PtNairob
+      - tezos-protocol-016-PtMumbai
       - tezos-protocol-015-PtLimaPt
       - tezos-protocol-014-PtKathma
       - tezos-protocol-013-PtJakart
@@ -1595,8 +1529,6 @@ opam:all_5:
       - tezos-protocol-006-PsCARTHA
       - tezos-protocol-005-PsBabyM1
       - tezos-protocol-005-PsBABY5H
-      - tezos-protocol-004-Pt24m4xi
-      - tezos-protocol-003-PsddFKi3
 
 opam:all_7:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
@@ -1670,7 +1602,6 @@ opam:all_7:
       - tezos-proxy-server-config
       - tezos-openapi
       - tezos-dal-node-services
-      - tezos-benchmark
       - octez-smart-rollup-wasm-debugger-plugin
       - octez-rust-deps
       - octez-riscv-api
@@ -3043,7 +2974,7 @@ tezt:
       junit: $JUNIT
     when: always
   retry: 2
-  parallel: 100
+  parallel: 120
 
 tezt-memory-3k:
   image: ${ci_image_name}/e2etest:${ci_image_tag}

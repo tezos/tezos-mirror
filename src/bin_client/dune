@@ -128,9 +128,15 @@
   octez-protocol-020-PsParisC-libs.client.commands-registration
   octez-protocol-020-PsParisC-libs.baking-commands.registration
   octez-protocol-020-PsParisC-libs.plugin
-  octez-protocol-021-PtQuebec-libs.client.commands-registration
-  octez-protocol-021-PtQuebec-libs.baking-commands.registration
-  octez-protocol-021-PtQuebec-libs.plugin
+  (select void_for_linking-octez-protocol-beta-libs-client-commands-registration from
+   (octez-protocol-beta-libs.client.commands-registration -> void_for_linking-octez-protocol-beta-libs-client-commands-registration.empty)
+   (-> void_for_linking-octez-protocol-beta-libs-client-commands-registration.empty))
+  (select void_for_linking-octez-protocol-beta-libs-baking-commands-registration from
+   (octez-protocol-beta-libs.baking-commands.registration -> void_for_linking-octez-protocol-beta-libs-baking-commands-registration.empty)
+   (-> void_for_linking-octez-protocol-beta-libs-baking-commands-registration.empty))
+  (select void_for_linking-octez-protocol-beta-libs-plugin from
+   (octez-protocol-beta-libs.plugin -> void_for_linking-octez-protocol-beta-libs-plugin.empty)
+   (-> void_for_linking-octez-protocol-beta-libs-plugin.empty))
   (select void_for_linking-octez-protocol-alpha-libs-client-commands-registration from
    (octez-protocol-alpha-libs.client.commands-registration -> void_for_linking-octez-protocol-alpha-libs-client-commands-registration.empty)
    (-> void_for_linking-octez-protocol-alpha-libs-client-commands-registration.empty))
@@ -194,6 +200,9 @@
    (write-file void_for_linking-octez-protocol-018-Proxford-libs-plugin.empty "")
    (write-file void_for_linking-octez-protocol-019-PtParisB-libs-client-commands-registration.empty "")
    (write-file void_for_linking-octez-protocol-019-PtParisB-libs-plugin.empty "")
+   (write-file void_for_linking-octez-protocol-beta-libs-client-commands-registration.empty "")
+   (write-file void_for_linking-octez-protocol-beta-libs-baking-commands-registration.empty "")
+   (write-file void_for_linking-octez-protocol-beta-libs-plugin.empty "")
    (write-file void_for_linking-octez-protocol-alpha-libs-client-commands-registration.empty "")
    (write-file void_for_linking-octez-protocol-alpha-libs-baking-commands-registration.empty "")
    (write-file void_for_linking-octez-protocol-alpha-libs-plugin.empty ""))))

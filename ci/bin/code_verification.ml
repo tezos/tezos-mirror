@@ -1130,7 +1130,7 @@ let jobs pipeline_type =
                [tezt_tags_exclusive_tags]. *)
           ~tezt_tests:(Tezt.tests_tag_selector [Not (Has_tag "flaky")])
           ~tezt_parallel:3
-          ~parallel:(Vector 100)
+          ~parallel:(Vector 120)
           ~timeout:(Minutes 40)
           ~rules
           ~dependencies

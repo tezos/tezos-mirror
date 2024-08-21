@@ -37,7 +37,9 @@
   octez-libs.prometheus
   octez-crawler
   octez-protocol-020-PsParisC-libs.dal
-  octez-protocol-021-PtQuebec-libs.dal
+  (select void_for_linking-octez-protocol-beta-libs-dal from
+   (octez-protocol-beta-libs.dal -> void_for_linking-octez-protocol-beta-libs-dal.empty)
+   (-> void_for_linking-octez-protocol-beta-libs-dal.empty))
   (select void_for_linking-octez-protocol-alpha-libs-dal from
    (octez-protocol-alpha-libs.dal -> void_for_linking-octez-protocol-alpha-libs-dal.empty)
    (-> void_for_linking-octez-protocol-alpha-libs-dal.empty)))
@@ -70,4 +72,6 @@
 
 (rule
  (action
-  (progn (write-file void_for_linking-octez-protocol-alpha-libs-dal.empty ""))))
+  (progn
+   (write-file void_for_linking-octez-protocol-beta-libs-dal.empty "")
+   (write-file void_for_linking-octez-protocol-alpha-libs-dal.empty ""))))
