@@ -2241,6 +2241,26 @@ let test_init_from_rollup_node_with_delayed_inbox =
 
   unit
 
+let check_applies_blueprint ~timeout sequencer_node observer_node levels_to_wait
+    =
+  let*@ current_head = Rpc.block_number sequencer_node in
+  let levels_to_wait = Int32.to_int current_head + levels_to_wait in
+
+  let* _ =
+    Evm_node.wait_for_blueprint_applied ~timeout observer_node levels_to_wait
+  and* _ =
+    Evm_node.wait_for_blueprint_applied ~timeout sequencer_node levels_to_wait
+  in
+
+  let* () =
+    check_block_consistency
+      ~left:sequencer_node
+      ~right:observer_node
+      ~block:(`Level (Int32.of_int levels_to_wait))
+      ()
+  in
+  unit
+
 let test_observer_applies_blueprint =
   let tbb = 3. in
   register_all
@@ -2251,18 +2271,8 @@ let test_observer_applies_blueprint =
   let levels_to_wait = 3 in
   let timeout = tbb *. float_of_int levels_to_wait *. 2. in
 
-  let* _ =
-    Evm_node.wait_for_blueprint_applied ~timeout observer_node levels_to_wait
-  and* _ =
-    Evm_node.wait_for_blueprint_applied ~timeout sequencer_node levels_to_wait
-  in
-
   let* () =
-    check_block_consistency
-      ~left:sequencer_node
-      ~right:observer_node
-      ~block:(`Level (Int32.of_int levels_to_wait))
-      ()
+    check_applies_blueprint ~timeout sequencer_node observer_node levels_to_wait
   in
 
   (* We stop and start the sequencer, to ensure the observer node correctly
@@ -2273,44 +2283,61 @@ let test_observer_applies_blueprint =
     Evm_node.run sequencer_node
   in
 
-  let*@ current_head = Rpc.block_number sequencer_node in
-  let levels_to_wait = Int32.to_int current_head + levels_to_wait in
-
-  let* _ =
-    Evm_node.wait_for_blueprint_applied ~timeout observer_node levels_to_wait
-  and* _ =
-    Evm_node.wait_for_blueprint_applied ~timeout sequencer_node levels_to_wait
-  in
-
   let* () =
-    check_block_consistency
-      ~left:sequencer_node
-      ~right:observer_node
-      ~block:(`Level (Int32.of_int levels_to_wait))
-      ()
+    check_applies_blueprint ~timeout sequencer_node observer_node levels_to_wait
   in
 
-  (* We stop and start the observer, to disable rollup node tracking. *)
+  unit
+
+let test_observer_applies_blueprint_dont_track_rollup_node =
+  let tbb = 3. in
+  register_all
+    ~time_between_blocks:(Time_between_blocks tbb)
+    ~tags:["evm"; "observer"; "dont_track_rollup_node"]
+    ~title:"Can start an Observer node without a rollup node"
+  @@ fun {
+           sequencer = sequencer_node;
+           sc_rollup_node;
+           observer = observer_node;
+           _;
+         }
+             _protocols ->
+  let levels_to_wait = 3 in
+  let timeout = tbb *. float_of_int levels_to_wait *. 2. in
+  (* We stop the rollup node. This will allow to demonstrate it is not needed
+     to start an observer node when the latter is configure accordingly. *)
+  let* () = Sc_rollup_node.terminate sc_rollup_node in
+
+  (* We demonstrate we can start a working observer node with the
+     `--dont-track-rollup-node` CLI flag. *)
   let* () = Evm_node.terminate observer_node in
   let* () =
     Evm_node.run ~extra_arguments:["--dont-track-rollup-node"] observer_node
-  in
-
-  let*@ current_head = Rpc.block_number sequencer_node in
-  let levels_to_wait = Int32.to_int current_head + levels_to_wait in
-
-  let* _ =
-    Evm_node.wait_for_blueprint_applied ~timeout observer_node levels_to_wait
-  and* _ =
-    Evm_node.wait_for_blueprint_applied ~timeout sequencer_node levels_to_wait
-  in
+  and* () = Evm_node.wait_for_rollup_node_follower_disabled observer_node in
 
   let* () =
-    check_block_consistency
-      ~left:sequencer_node
-      ~right:observer_node
-      ~block:(`Level (Int32.of_int levels_to_wait))
-      ()
+    check_applies_blueprint ~timeout sequencer_node observer_node levels_to_wait
+  in
+
+  (* We demonstrate we can start a working observer node with the
+     `observer.rollup_node_tracking` configuration. *)
+  let* () = Evm_node.terminate observer_node in
+  let* () =
+    Evm_node.Config_file.update observer_node (fun json ->
+        JSON.update
+          "observer"
+          (fun json ->
+            JSON.put
+              ("rollup_node_tracking", JSON.annotate ~origin:"" (`Bool false))
+              json)
+          json)
+  in
+
+  let* () = Evm_node.run observer_node
+  and* () = Evm_node.wait_for_rollup_node_follower_disabled observer_node in
+
+  let* () =
+    check_applies_blueprint ~timeout sequencer_node observer_node levels_to_wait
   in
 
   unit
@@ -6551,6 +6578,7 @@ let () =
   test_init_from_rollup_node_data_dir protocols ;
   test_init_from_rollup_node_with_delayed_inbox protocols ;
   test_observer_applies_blueprint protocols ;
+  test_observer_applies_blueprint_dont_track_rollup_node protocols ;
   test_observer_applies_blueprint_from_rpc_node protocols ;
   test_observer_applies_blueprint_when_restarted protocols ;
   test_observer_applies_blueprint_when_sequencer_restarted protocols ;

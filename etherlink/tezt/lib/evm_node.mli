@@ -201,6 +201,8 @@ val wait_for_retrying_connect : ?timeout:float -> t -> unit Lwt.t
 val wait_for_rollup_node_follower_connection_acquired :
   ?timeout:float -> t -> unit Lwt.t
 
+val wait_for_rollup_node_follower_disabled : ?timeout:float -> t -> unit Lwt.t
+
 module Config_file : sig
   (** Node configuration files. *)
 
