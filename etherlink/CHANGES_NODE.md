@@ -15,6 +15,7 @@
   `rpc-addr`, `max_active_connections`, `sequencer.private_rpc_port`,
   etc.) in favor of `publc_rpc` and `private_rpc`. (!14460 !14527)
 - Use `_` consistently instead of `-` in every fields. (!14527)
+- Remove the `--devmode` CLI argument. (!14602)
 
 ### Features
 

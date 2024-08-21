@@ -224,14 +224,6 @@ let cors_allowed_origins_arg =
     ~doc:"List of accepted cors origins."
     Params.string_list
 
-let devmode_arg =
-  Tezos_clic.switch
-    ~long:"devmode"
-    ~doc:
-      "DEPRECATED — The EVM node now aims to be backward compatible with the \
-       kernel deployed on Mainnet and Ghostnet"
-    ()
-
 let mainnet_compat_arg =
   Tezos_clic.switch
     ~long:"mainnet-compat"
@@ -588,12 +580,11 @@ let dal_slots_arg =
          |> Lwt_result_syntax.return))
 
 let common_config_args =
-  Tezos_clic.args19
+  Tezos_clic.args18
     data_dir_arg
     rpc_addr_arg
     rpc_port_arg
     rpc_batch_limit_arg
-    devmode_arg
     cors_allowed_origins_arg
     cors_allowed_headers_arg
     log_filter_max_nb_blocks_arg
@@ -877,7 +868,6 @@ let rpc_command =
              rpc_addr,
              rpc_port,
              rpc_batch_limit,
-             _devmode,
              cors_origins,
              cors_headers,
              log_filter_max_nb_blocks,
@@ -1103,8 +1093,7 @@ let chunker_command =
     ~desc:
       "Chunk hexadecimal data according to the message representation of the \
        EVM rollup"
-    (args9
-       devmode_arg
+    (args8
        rollup_address_arg
        blueprint_mode_arg
        timestamp_arg
@@ -1122,8 +1111,7 @@ let chunker_command =
             is prefixed with `file:`, the content is read from the given \
             filename and can contain a list of data separated by a whitespace."
          (Tezos_clic.parameter (fun _ -> from_data_or_file)))
-    (fun ( _devmode,
-           rollup_address,
+    (fun ( rollup_address,
            as_blueprint,
            blueprint_timestamp,
            blueprint_number,
@@ -1169,7 +1157,7 @@ let make_upgrade_command =
   let open Lwt_result_syntax in
   command
     ~desc:"Create bytes payload for the upgrade entrypoint"
-    (args1 devmode_arg)
+    no_options
     (prefixes ["make"; "upgrade"; "payload"; "with"; "root"; "hash"]
     @@ param
          ~name:"preimage_hash"
@@ -1182,7 +1170,7 @@ let make_upgrade_command =
            "After activation timestamp, the kernel will upgrade to this value"
          Params.timestamp
     @@ stop)
-    (fun _devmode root_hash timestamp () ->
+    (fun () root_hash timestamp () ->
       let payload =
         Evm_node_lib_dev_encoding.Evm_events.Upgrade.(
           to_bytes @@ {hash = Hash (Hex root_hash); timestamp})
@@ -1195,7 +1183,7 @@ let make_sequencer_upgrade_command =
   let open Lwt_result_syntax in
   command
     ~desc:"Create bytes payload for the sequencer upgrade entrypoint"
-    (args2 wallet_dir_arg devmode_arg)
+    (args1 wallet_dir_arg)
     (prefixes ["make"; "sequencer"; "upgrade"; "payload"]
     @@ prefixes ["with"; "pool"; "address"]
     @@ Tezos_clic.param
@@ -1209,11 +1197,7 @@ let make_sequencer_upgrade_command =
            "After activation timestamp, the kernel will upgrade to this value"
          Params.timestamp
     @@ prefix "for" @@ Params.sequencer_key @@ stop)
-    (fun (wallet_dir, _devmode)
-         pool_address
-         activation_timestamp
-         sequencer_str
-         () ->
+    (fun wallet_dir pool_address activation_timestamp sequencer_str () ->
       let wallet_ctxt = register_wallet ~wallet_dir () in
       let* _pk_uri, sequencer_sk_opt =
         Client_keys.Public_key.parse_source_string wallet_ctxt sequencer_str
@@ -1244,13 +1228,10 @@ let init_from_rollup_node_command =
   command
     ~desc:
       "initialises the EVM node data-dir using the data-dir of a rollup node."
-    (args4 data_dir_arg devmode_arg omit_delayed_tx_events_arg reconstruct_arg)
+    (args3 data_dir_arg omit_delayed_tx_events_arg reconstruct_arg)
     (prefixes ["init"; "from"; "rollup"; "node"]
     @@ rollup_node_data_dir_param @@ stop)
-    (fun ( data_dir,
-           _devmode,
-           omit_delayed_tx_events,
-           reconstruct_from_boot_sector )
+    (fun (data_dir, omit_delayed_tx_events, reconstruct_from_boot_sector)
          rollup_node_data_dir
          () ->
       Evm_node_lib_dev.Evm_context.init_from_rollup_node
@@ -1265,13 +1246,13 @@ let dump_to_rlp_command =
   let open Lwt_result_syntax in
   command
     ~desc:"Transforms the JSON list of instructions to a RLP list"
-    (args2 devmode_arg keep_everything_arg)
+    (args1 keep_everything_arg)
     (prefixes ["transform"; "dump"]
     @@ param ~name:"dump.json" ~desc:"Description" Params.string
     @@ prefixes ["to"; "rlp"]
     @@ param ~name:"dump.rlp" ~desc:"Description" Params.string
     @@ stop)
-    (fun (_devmode, keep_everything) dump_json dump_rlp () ->
+    (fun keep_everything dump_json dump_rlp () ->
       let* dump_json = Lwt_utils_unix.Json.read_file dump_json in
       let config =
         Data_encoding.Json.destruct
@@ -1469,7 +1450,6 @@ mode.|}
              rpc_addr,
              rpc_port,
              rpc_batch_limit,
-             _devmode,
              cors_origins,
              cors_headers,
              log_filter_max_nb_blocks,
@@ -1706,7 +1686,6 @@ let proxy_command =
              rpc_addr,
              rpc_port,
              rpc_batch_limit,
-             _devmode,
              cors_origins,
              cors_headers,
              log_filter_max_nb_blocks,
@@ -1790,7 +1769,6 @@ let sequencer_command =
              rpc_addr,
              rpc_port,
              rpc_batch_limit,
-             _devmode,
              cors_origins,
              cors_headers,
              log_filter_max_nb_blocks,
@@ -1872,7 +1850,6 @@ let sandbox_command =
              rpc_addr,
              rpc_port,
              rpc_batch_limit,
-             _devmode,
              cors_origins,
              cors_headers,
              log_filter_max_nb_blocks,
@@ -1971,7 +1948,6 @@ let threshold_encryption_sequencer_command =
              rpc_addr,
              rpc_port,
              rpc_batch_limit,
-             _devmode,
              cors_origins,
              cors_headers,
              log_filter_max_nb_blocks,
@@ -2061,7 +2037,6 @@ let observer_command =
              rpc_addr,
              rpc_port,
              rpc_batch_limit,
-             _devmode,
              cors_origins,
              cors_headers,
              log_filter_max_nb_blocks,
