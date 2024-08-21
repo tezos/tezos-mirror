@@ -260,7 +260,7 @@ module Raw = struct
     let ks = instrument @@ KMap_enter_body (body, xs, ys, ty, ks) in
     let accu, stack = stack in
     (next [@ocaml.tailcall]) g gas ks accu stack
-   [@@inline]
+  [@@inline]
 
   and kmap_enter :
       type a b c d f i j k. (a, b, c, d, f, i, j, k) kmap_enter_type =
@@ -272,7 +272,7 @@ module Raw = struct
         let res = (xk, xv) in
         let stack = (accu, stack) in
         (step [@ocaml.tailcall]) g gas body ks res stack
-   [@@inline]
+  [@@inline]
 
   and klist_exit : type a b c d e i j. (a, b, c, d, e, i, j) klist_exit_type =
    fun instrument g gas body xs ys ty len ks accu stack ->
@@ -280,7 +280,7 @@ module Raw = struct
     let ks = instrument @@ KList_enter_body (body, xs, ys, ty, len, ks) in
     let accu, stack = stack in
     (next [@ocaml.tailcall]) g gas ks accu stack
-   [@@inline]
+  [@@inline]
 
   and klist_enter : type a b c d e f j. (a, b, c, d, e, f, j) klist_enter_type =
    fun instrument g gas body xs ys ty len ks' accu stack ->
@@ -291,7 +291,7 @@ module Raw = struct
     | x :: xs ->
         let ks = instrument @@ KList_exit_body (body, xs, ys, ty, len, ks') in
         (step [@ocaml.tailcall]) g gas body ks x (accu, stack)
-   [@@inline]
+  [@@inline]
 
   and kloop_in_left :
       type a b c d e f g. (a, b, c, d, e, f, g) kloop_in_left_type =
@@ -299,14 +299,14 @@ module Raw = struct
     match accu with
     | L v -> (step [@ocaml.tailcall]) g gas ki ks0 v stack
     | R v -> (next [@ocaml.tailcall]) g gas ks' v stack
-   [@@inline]
+  [@@inline]
 
   and kloop_in : type a b c r f s. (a, b, c, r, f, s) kloop_in_type =
    fun g gas ks0 ki ks' accu stack ->
     let accu', stack' = stack in
     if accu then (step [@ocaml.tailcall]) g gas ki ks0 accu' stack'
     else (next [@ocaml.tailcall]) g gas ks' accu' stack'
-   [@@inline]
+  [@@inline]
 
   and kiter : type a b s r f c. (a, b, s, r, f, c) kiter_type =
    fun instrument g gas body ty xs ks accu stack ->
@@ -315,7 +315,7 @@ module Raw = struct
     | x :: xs ->
         let ks = instrument @@ KIter (body, ty, xs, ks) in
         (step [@ocaml.tailcall]) g gas body ks x (accu, stack)
-   [@@inline]
+  [@@inline]
 
   and next :
       type a s r f.
@@ -413,7 +413,7 @@ module Raw = struct
     in
     let accu, stack = stack in
     (next [@ocaml.tailcall]) g gas ks accu stack
-   [@@inline]
+  [@@inline]
 
   and ilist_iter :
       type a b c d e f g cmp. (a, b, c, d, e, f, g, cmp) ilist_iter_type =
@@ -422,7 +422,7 @@ module Raw = struct
     let ks = instrument @@ KIter (body, ty, xs, KCons (k, ks)) in
     let accu, stack = stack in
     (next [@ocaml.tailcall]) g gas ks accu stack
-   [@@inline]
+  [@@inline]
 
   and iset_iter : type a b c d e f g. (a, b, c, d, e, f, g) iset_iter_type =
    fun instrument g gas body ty k ks accu stack ->
@@ -431,7 +431,7 @@ module Raw = struct
     let ks = instrument @@ KIter (body, ty, l, KCons (k, ks)) in
     let accu, stack = stack in
     (next [@ocaml.tailcall]) g gas ks accu stack
-   [@@inline]
+  [@@inline]
 
   and imap_map :
       type a b c d e f g h i j. (a, b, c, d, e, f, g, h, i, j) imap_map_type =
@@ -442,7 +442,7 @@ module Raw = struct
     let ks = instrument @@ KMap_enter_body (body, xs, ys, ty, KCons (k, ks)) in
     let accu, stack = stack in
     (next [@ocaml.tailcall]) g gas ks accu stack
-   [@@inline]
+  [@@inline]
 
   and imap_iter :
       type a b c d e f g h cmp. (a, b, c, d, e, f, g, h, cmp) imap_iter_type =
@@ -452,7 +452,7 @@ module Raw = struct
     let ks = instrument @@ KIter (body, ty, l, KCons (k, ks)) in
     let accu, stack = stack in
     (next [@ocaml.tailcall]) g gas ks accu stack
-   [@@inline]
+  [@@inline]
 
   and imul_teznat : type a b c d e f. (a, b, c, d, e, f) imul_teznat_type =
     let open Lwt_result_syntax in

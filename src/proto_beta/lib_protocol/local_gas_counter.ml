@@ -67,32 +67,32 @@ let outdated_context ctxt = Outdated_context ctxt [@@ocaml.inline always]
 
 let update_context (Local_gas_counter gas_counter) (Outdated_context ctxt) =
   Gas.update_remaining_operation_gas ctxt (Gas.fp_of_milligas_int gas_counter)
-  [@@ocaml.inline always]
+[@@ocaml.inline always]
 
 let local_gas_counter ctxt =
   Local_gas_counter (Gas.remaining_operation_gas ctxt :> int)
-  [@@ocaml.inline always]
+[@@ocaml.inline always]
 
 let local_gas_counter_and_outdated_context ctxt =
   (local_gas_counter ctxt, outdated_context ctxt)
-  [@@ocaml.inline always]
+[@@ocaml.inline always]
 
 let use_gas_counter_in_context ctxt gas_counter f =
   let open Lwt_result_syntax in
   let ctxt = update_context gas_counter ctxt in
   let+ y, ctxt = f ctxt in
   (y, outdated_context ctxt, local_gas_counter ctxt)
-  [@@ocaml.inline always]
+[@@ocaml.inline always]
 
 let consume_opt (Local_gas_counter gas_counter) (cost : Gas.cost) =
   let gas_counter = gas_counter - (cost :> int) in
   if Compare.Int.(gas_counter < 0) then None
   else Some (Local_gas_counter gas_counter)
-  [@@ocaml.inline always]
+[@@ocaml.inline always]
 
 let consume local_gas_counter cost =
   let open Result_syntax in
   match consume_opt local_gas_counter cost with
   | None -> tzfail Gas.Operation_quota_exceeded
   | Some local_gas_counter -> return local_gas_counter
-  [@@ocaml.inline always]
+[@@ocaml.inline always]

@@ -133,30 +133,30 @@ let () =
     ~title:description
     ~description
     ~pp:(fun ppf -> function
-          | Outdated_message_index {given; last_update} ->
-              Format.fprintf
-                ppf
-                "%s: got message index %a at outbox level %a, while the \
-                 lastest whitelist update occurred with message index %a."
-                description
-                Z.pp_print
-                given
-                Z.pp_print
-                last_update.message_index
-                Raw_level.pp
-                last_update.outbox_level
-          | Outdated_outbox_level {given; last_update} ->
-              Format.fprintf
-                ppf
-                "%s: got outbox level %a, while the current outbox level is %a \
-                 with message index %a."
-                description
-                Raw_level.pp
-                given
-                Raw_level.pp
-                last_update.outbox_level
-                Z.pp_print
-                last_update.message_index)
+      | Outdated_message_index {given; last_update} ->
+          Format.fprintf
+            ppf
+            "%s: got message index %a at outbox level %a, while the lastest \
+             whitelist update occurred with message index %a."
+            description
+            Z.pp_print
+            given
+            Z.pp_print
+            last_update.message_index
+            Raw_level.pp
+            last_update.outbox_level
+      | Outdated_outbox_level {given; last_update} ->
+          Format.fprintf
+            ppf
+            "%s: got outbox level %a, while the current outbox level is %a \
+             with message index %a."
+            description
+            Raw_level.pp
+            given
+            Raw_level.pp
+            last_update.outbox_level
+            Z.pp_print
+            last_update.message_index)
     outdated_whitelist_update_encoding
     (function Sc_rollup_outdated_whitelist_update e -> Some e | _ -> None)
     (fun e -> Sc_rollup_outdated_whitelist_update e)

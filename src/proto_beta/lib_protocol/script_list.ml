@@ -44,4 +44,4 @@ let uncons = function
       Some (hd, {elements = tl; length = length - 1})
 
 let rev {elements; length} = {elements = List.rev elements; length}
-  [@@inline always]
+[@@inline always]

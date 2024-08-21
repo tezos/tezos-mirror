@@ -104,34 +104,34 @@ let timestamp (tstamp : Script_timestamp.t) : t =
 
 let rec size_of_comparable_value :
     type a. a Script_typed_ir.comparable_ty -> a -> t =
-  fun (type a) (wit : a Script_typed_ir.comparable_ty) (v : a) ->
-   match wit with
-   | Never_t -> ( match v with _ -> .)
-   | Unit_t -> unit
-   | Int_t -> integer v
-   | Nat_t -> integer v
-   | String_t -> script_string v
-   | Bytes_t -> bytes v
-   | Mutez_t -> mutez v
-   | Bool_t -> bool v
-   | Key_hash_t -> key_hash v
-   | Timestamp_t -> timestamp v
-   | Address_t -> address v
-   | Pair_t (leaf, node, _, YesYes) ->
-       let lv, rv = v in
-       let size =
-         size_of_comparable_value leaf lv + size_of_comparable_value node rv
-       in
-       size + 1
-   | Or_t (left, right, _, YesYes) ->
-       let size =
-         match v with
-         | L v -> size_of_comparable_value left v
-         | R v -> size_of_comparable_value right v
-       in
-       size + 1
-   | Option_t (ty, _, Yes) -> (
-       match v with None -> 1 | Some x -> size_of_comparable_value ty x + 1)
-   | Signature_t -> signature v
-   | Key_t -> public_key v
-   | Chain_id_t -> chain_id v
+ fun (type a) (wit : a Script_typed_ir.comparable_ty) (v : a) ->
+  match wit with
+  | Never_t -> ( match v with _ -> .)
+  | Unit_t -> unit
+  | Int_t -> integer v
+  | Nat_t -> integer v
+  | String_t -> script_string v
+  | Bytes_t -> bytes v
+  | Mutez_t -> mutez v
+  | Bool_t -> bool v
+  | Key_hash_t -> key_hash v
+  | Timestamp_t -> timestamp v
+  | Address_t -> address v
+  | Pair_t (leaf, node, _, YesYes) ->
+      let lv, rv = v in
+      let size =
+        size_of_comparable_value leaf lv + size_of_comparable_value node rv
+      in
+      size + 1
+  | Or_t (left, right, _, YesYes) ->
+      let size =
+        match v with
+        | L v -> size_of_comparable_value left v
+        | R v -> size_of_comparable_value right v
+      in
+      size + 1
+  | Option_t (ty, _, Yes) -> (
+      match v with None -> 1 | Some x -> size_of_comparable_value ty x + 1)
+  | Signature_t -> signature v
+  | Key_t -> public_key v
+  | Chain_id_t -> chain_id v

@@ -110,9 +110,10 @@ module type T = sig
   end
 end
 
-module Make (El : sig
-  type t
+module Make
+    (El : sig
+      type t
 
-  val to_bytes : t -> bytes
-end)
-(H : S.HASH) : T with type elt = El.t and type h = H.t
+      val to_bytes : t -> bytes
+    end)
+    (H : S.HASH) : T with type elt = El.t and type h = H.t

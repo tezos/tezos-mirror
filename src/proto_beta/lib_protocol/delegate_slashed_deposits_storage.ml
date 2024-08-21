@@ -506,7 +506,7 @@ module For_RPC = struct
         List.fold_left_es
           (fun estimated_punishing_amount denunciation ->
             let ({Misbehaviour_repr.level = raw_level; kind; _} as
-                misbehaviour_key) =
+                 misbehaviour_key) =
               denunciation.Denunciations_repr.misbehaviour
             in
             match MisMap.find misbehaviour_key pending_misbehaviour_map with

@@ -78,7 +78,7 @@ let () =
 let of_int32 i =
   let open Result_syntax in
   if i >= 0l then return i else tzfail (Negative_round (Int32.to_int i))
-  [@@inline]
+[@@inline]
 
 let pred r =
   let p = Int32.pred r in

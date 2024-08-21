@@ -183,7 +183,7 @@ let originated_contracts
       Origination_nonce.{origination_index = first; operation_hash = first_hash}
     ~until:
       (Origination_nonce.{origination_index = last; operation_hash = last_hash}
-      as origination_nonce) =
+       as origination_nonce) =
   assert (Operation_hash.equal first_hash last_hash) ;
   let rec contracts acc origination_index =
     if Compare.Int32.(origination_index < first) then acc

@@ -404,12 +404,14 @@ module Manager_result = struct
               paid_storage_size_diff,
               lazy_storage_diff ))
       ~kind:Kind.Origination_manager_kind
-      ~inj:(fun ( balance_updates,
-                  originated_contracts,
-                  consumed_gas,
-                  storage_size,
-                  paid_storage_size_diff,
-                  lazy_storage_diff ) ->
+      ~inj:(fun
+          ( balance_updates,
+            originated_contracts,
+            consumed_gas,
+            storage_size,
+            paid_storage_size_diff,
+            lazy_storage_diff )
+        ->
         Origination_result
           {
             lazy_storage_diff;
@@ -439,8 +441,8 @@ module Manager_result = struct
             {balance_updates; consumed_gas; size_of_constant; global_address} ->
             (balance_updates, consumed_gas, size_of_constant, global_address))
       ~kind:Kind.Register_global_constant_manager_kind
-      ~inj:(fun (balance_updates, consumed_gas, size_of_constant, global_address)
-                ->
+      ~inj:(fun
+          (balance_updates, consumed_gas, size_of_constant, global_address) ->
         Register_global_constant_result
           {balance_updates; consumed_gas; size_of_constant; global_address})
 
@@ -537,10 +539,9 @@ module Manager_result = struct
               ticket_receipt,
               consumed_gas,
               paid_storage_size_diff ))
-      ~inj:(fun ( balance_updates,
-                  ticket_receipt,
-                  consumed_gas,
-                  paid_storage_size_diff ) ->
+      ~inj:(fun
+          (balance_updates, ticket_receipt, consumed_gas, paid_storage_size_diff)
+        ->
         Transfer_ticket_result
           {
             balance_updates;
@@ -587,10 +588,8 @@ module Manager_result = struct
             {balance_updates; originated_zk_rollup; consumed_gas; storage_size}
           ->
             (balance_updates, originated_zk_rollup, consumed_gas, storage_size))
-      ~inj:(fun ( balance_updates,
-                  originated_zk_rollup,
-                  consumed_gas,
-                  storage_size ) ->
+      ~inj:(fun
+          (balance_updates, originated_zk_rollup, consumed_gas, storage_size) ->
         Zk_rollup_origination_result
           {balance_updates; originated_zk_rollup; consumed_gas; storage_size})
 
@@ -666,11 +665,9 @@ module Manager_result = struct
               consumed_gas,
               size ))
       ~kind:Kind.Sc_rollup_originate_manager_kind
-      ~inj:(fun ( balance_updates,
-                  address,
-                  genesis_commitment_hash,
-                  consumed_gas,
-                  size ) ->
+      ~inj:(fun
+          (balance_updates, address, genesis_commitment_hash, consumed_gas, size)
+        ->
         Sc_rollup_originate_result
           {
             balance_updates;
@@ -731,7 +728,8 @@ module Manager_result = struct
             {consumed_gas; staked_hash; published_at_level; balance_updates} ->
             (consumed_gas, staked_hash, published_at_level, balance_updates))
       ~kind:Kind.Sc_rollup_publish_manager_kind
-      ~inj:(fun (consumed_gas, staked_hash, published_at_level, balance_updates) ->
+      ~inj:(fun
+          (consumed_gas, staked_hash, published_at_level, balance_updates) ->
         Sc_rollup_publish_result
           {consumed_gas; staked_hash; published_at_level; balance_updates})
 
@@ -808,11 +806,13 @@ module Manager_result = struct
               whitelist_update,
               consumed_gas,
               paid_storage_size_diff ))
-      ~inj:(fun ( balance_updates,
-                  ticket_receipt,
-                  whitelist_update,
-                  consumed_gas,
-                  paid_storage_size_diff ) ->
+      ~inj:(fun
+          ( balance_updates,
+            ticket_receipt,
+            whitelist_update,
+            consumed_gas,
+            paid_storage_size_diff )
+        ->
         Sc_rollup_execute_outbox_message_result
           {
             balance_updates;
@@ -1458,7 +1458,7 @@ module Encoding = struct
       (function
         | Contents_and_result
             ( (Manager_operation {operation = Register_global_constant _; _} as
-              op),
+               op),
               res ) ->
             Some (op, res)
         | _ -> None)
