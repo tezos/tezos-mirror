@@ -9,4 +9,4 @@
 
 open Current_git_info
 
-let () = Print_version.print_version etherlink_version
+let () = Print_version.print_version octez_evm_node_version
