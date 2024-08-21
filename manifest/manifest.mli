@@ -866,7 +866,7 @@ type 'a maker =
   ?optional:bool ->
   ?ppx_kind:Dune.ppx_kind ->
   ?ppx_runtime_libraries:target list ->
-  ?preprocess:preprocessor list ->
+  ?preprocess:preprocessor ->
   ?preprocessor_deps:preprocessor_dep list ->
   ?private_modules:string list ->
   ?profile:string ->
@@ -969,7 +969,7 @@ val tezt :
   ?with_macos_security_framework:bool ->
   ?flags:Flags.t ->
   ?dune:Dune.s_expr ->
-  ?preprocess:preprocessor list ->
+  ?preprocess:preprocessor ->
   ?preprocessor_deps:preprocessor_dep list ->
   ?source:string list ->
   product:string ->

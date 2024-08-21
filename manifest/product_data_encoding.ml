@@ -96,7 +96,7 @@ let data_encoding =
     ~internal_name:"data_encoding"
     ~path:"data-encoding/src"
     ~conflicts
-    ~preprocess:[pps ppx_hash]
+    ~preprocess:(pps ppx_hash)
     ~bisect_ppx:No
     ~deps:
       [

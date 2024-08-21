@@ -24,7 +24,7 @@ let kaitai =
     "kaitai"
     ~path:"client-libs/kaitai-ocaml/src"
     ~release_status:Unreleased
-    ~preprocess:[pps ppx_sexp_conv]
+    ~preprocess:(pps ppx_sexp_conv)
     ~deps:[yaml; sexplib]
     ~dune:Dune.[ocamllex "lexer"; menhir "parser"]
     ~synopsis:"OCaml library for reading Kaitai spec files"
