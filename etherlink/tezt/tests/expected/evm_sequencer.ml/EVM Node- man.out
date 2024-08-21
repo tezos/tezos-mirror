@@ -452,22 +452,6 @@ Miscellaneous commands:
     --enable-dal: enable flag enable_dal in the installer config
     --dal-slots <0,1,4,6,...>: value for dal_slots in the installer config
   
-  snapshot export [--data-dir <data-dir>] [--dest <path>]
-      [--compress-on-the-fly] [--uncompressed]
-    Export a snapshot of the EVM node.
-    --data-dir <data-dir>: The path to the EVM node data directory
-    --dest <path>: Directory in which to export the snapshot (defaults to current directory)
-    --compress-on-the-fly: Produce a compressed snapshot on the fly. The rollup node will use less disk space to produce the snapshot but will lock the rollup node (if running) for a longer time. Without this option, producing a snaphsot requires the available disk space to be around the size of the data dir.
-    --uncompressed: Produce an uncompressed snapshot.
-  
-  snapshot export <snapshot_file> [--data-dir <data-dir>]
-      [--compress-on-the-fly] [--uncompressed]
-    Export a snapshot of the EVM node to a given file.
-    <snapshot_file>: Snapshot archive file
-    --data-dir <data-dir>: The path to the EVM node data directory
-    --compress-on-the-fly: Produce a compressed snapshot on the fly. The rollup node will use less disk space to produce the snapshot but will lock the rollup node (if running) for a longer time. Without this option, producing a snaphsot requires the available disk space to be around the size of the data dir.
-    --uncompressed: Produce an uncompressed snapshot.
-  
   patch state at <path> with <value> [--data-dir <data-dir>] [-f --force]
     Patches the state with an arbitrary value. This is an unsafe command, it should be used for debugging only. Patched state is persisted and you need to use the command `reset` to revert the changes.
     <path>: Durable storage path
