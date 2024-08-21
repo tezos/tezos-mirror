@@ -117,11 +117,14 @@ pub enum InstrRoundingMode {
 
 impl InstrRoundingMode {
     /// Read the parsing mode from the byte given
-    pub fn from_rm(rm: u32) -> Option<Self> {
+    pub const fn from_rm(rm: u32) -> Option<Self> {
         if rm == 0b111 {
             Some(Self::Dynamic)
         } else {
-            RoundingMode::try_from(rm as u64).map(Self::Static).ok()
+            match RoundingMode::from_csrrepr(rm as u64) {
+                Ok(rm) => Some(Self::Static(rm)),
+                _ => None,
+            }
         }
     }
 }

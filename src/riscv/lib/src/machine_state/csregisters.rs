@@ -352,11 +352,6 @@ pub enum CSRegister {
     dscratch1 = 0x7B3,
 }
 
-/// Attempt to parse the 32-bit integer as a register identifier.
-pub fn try_parse_csregister(r: u32) -> Option<CSRegister> {
-    CSRegister::try_from(r as usize).ok()
-}
-
 // We want to allow shifts by 0 for clarity and consistency.
 #[allow(clippy::identity_op)]
 impl CSRegister {
@@ -995,6 +990,303 @@ impl CSRegister {
             CSRegister::dscratch1 => 0,
         }
     }
+
+    /// Attempt to parse the 32-bit integer as a register identifier.
+    pub const fn try_parse(r: u32) -> Option<Self> {
+        use CSRegister::*;
+
+        match r {
+            // Unprivileged Floating-Point CSRs
+            0x001 => Some(fflags),
+            0x002 => Some(frm),
+            0x003 => Some(fcsr),
+
+            // Unprivileged Counter/Timers
+            0xC00 => Some(cycle),
+            0xC01 => Some(time),
+            0xC02 => Some(instret),
+            0xC03 => Some(hpmcounter3),
+            0xC04 => Some(hpmcounter4),
+            0xC05 => Some(hpmcounter5),
+            0xC06 => Some(hpmcounter6),
+            0xC07 => Some(hpmcounter7),
+            0xC08 => Some(hpmcounter8),
+            0xC09 => Some(hpmcounter9),
+            0xC0A => Some(hpmcounter10),
+            0xC0B => Some(hpmcounter11),
+            0xC0C => Some(hpmcounter12),
+            0xC0D => Some(hpmcounter13),
+            0xC0E => Some(hpmcounter14),
+            0xC0F => Some(hpmcounter15),
+            0xC10 => Some(hpmcounter16),
+            0xC11 => Some(hpmcounter17),
+            0xC12 => Some(hpmcounter18),
+            0xC13 => Some(hpmcounter19),
+            0xC14 => Some(hpmcounter20),
+            0xC15 => Some(hpmcounter21),
+            0xC16 => Some(hpmcounter22),
+            0xC17 => Some(hpmcounter23),
+            0xC18 => Some(hpmcounter24),
+            0xC19 => Some(hpmcounter25),
+            0xC1A => Some(hpmcounter26),
+            0xC1B => Some(hpmcounter27),
+            0xC1C => Some(hpmcounter28),
+            0xC1D => Some(hpmcounter29),
+            0xC1E => Some(hpmcounter30),
+            0xC1F => Some(hpmcounter31),
+
+            // Supervisor Trap Setup
+            0x100 => Some(sstatus),
+            0x104 => Some(sie),
+            0x105 => Some(stvec),
+            0x106 => Some(scounteren),
+
+            // Supervisor Configuration
+            0x10A => Some(senvcfg),
+
+            // Supervisor Trap Handling
+            0x140 => Some(sscratch),
+            0x141 => Some(sepc),
+            0x142 => Some(scause),
+            0x143 => Some(stval),
+            0x144 => Some(sip),
+
+            // Supervisor Protection and Translation
+            0x180 => Some(satp),
+
+            // Supervisor Debug/Trace Registers
+            0x5A8 => Some(scontext),
+
+            // Hypervisor Trap Setup
+            0x600 => Some(hstatus),
+            0x602 => Some(hedeleg),
+            0x603 => Some(hideleg),
+            0x604 => Some(hie),
+            0x606 => Some(hcounteren),
+            0x607 => Some(hgeie),
+
+            // Hypervisor Trap Handling
+            0x643 => Some(htval),
+            0x644 => Some(hip),
+            0x645 => Some(hvip),
+            0x64A => Some(htinst),
+            0xE12 => Some(hgeip),
+
+            // Hypervisor Configuration
+            0x60A => Some(henvcfg),
+
+            // Hypervisor Protection and Translation
+            0x680 => Some(hgatp),
+
+            // Hypervisor Debug/ Trace Registers
+            0x6A8 => Some(hcontext),
+
+            // Hypervisor Counter/Timer Virtualization Registers
+            0x605 => Some(htimedelta),
+
+            // Virtual Supervisor Registers
+            0x200 => Some(vsstatus),
+            0x204 => Some(vsie),
+            0x205 => Some(vstvec),
+            0x240 => Some(vsscratch),
+            0x241 => Some(vsepc),
+            0x242 => Some(vscause),
+            0x243 => Some(vstval),
+            0x244 => Some(vsip),
+            0x280 => Some(vsatp),
+
+            // Machine Information Registers
+            0xF11 => Some(mvendorid),
+            0xF12 => Some(marchid),
+            0xF13 => Some(mimpid),
+            0xF14 => Some(mhartid),
+            0xF15 => Some(mconfigptr),
+
+            // Machine Trap Setup
+            0x300 => Some(mstatus),
+            0x301 => Some(misa),
+            0x302 => Some(medeleg),
+            0x303 => Some(mideleg),
+            0x304 => Some(mie),
+            0x305 => Some(mtvec),
+            0x306 => Some(mcounteren),
+
+            // Machine Trap Handling
+            0x340 => Some(mscratch),
+            0x341 => Some(mepc),
+            0x342 => Some(mcause),
+            0x343 => Some(mtval),
+            0x344 => Some(mip),
+            0x34A => Some(mtinst),
+            0x34B => Some(mtval2),
+
+            // Machine Configuration
+            0x30A => Some(menvcfg),
+            0x747 => Some(mseccfg),
+
+            // Machine Memory Protection
+            0x3A0 => Some(pmpcfg0),
+            0x3A2 => Some(pmpcfg2),
+            0x3A4 => Some(pmpcfg4),
+            0x3A6 => Some(pmpcfg6),
+            0x3A8 => Some(pmpcfg8),
+            0x3AA => Some(pmpcfg10),
+            0x3AC => Some(pmpcfg12),
+            0x3AE => Some(pmpcfg14),
+            0x3B0 => Some(pmpaddr0),
+            0x3B1 => Some(pmpaddr1),
+            0x3B2 => Some(pmpaddr2),
+            0x3B3 => Some(pmpaddr3),
+            0x3B4 => Some(pmpaddr4),
+            0x3B5 => Some(pmpaddr5),
+            0x3B6 => Some(pmpaddr6),
+            0x3B7 => Some(pmpaddr7),
+            0x3B8 => Some(pmpaddr8),
+            0x3B9 => Some(pmpaddr9),
+            0x3BA => Some(pmpaddr10),
+            0x3BB => Some(pmpaddr11),
+            0x3BC => Some(pmpaddr12),
+            0x3BD => Some(pmpaddr13),
+            0x3BE => Some(pmpaddr14),
+            0x3BF => Some(pmpaddr15),
+            0x3C0 => Some(pmpaddr16),
+            0x3C1 => Some(pmpaddr17),
+            0x3C2 => Some(pmpaddr18),
+            0x3C3 => Some(pmpaddr19),
+            0x3C4 => Some(pmpaddr20),
+            0x3C5 => Some(pmpaddr21),
+            0x3C6 => Some(pmpaddr22),
+            0x3C7 => Some(pmpaddr23),
+            0x3C8 => Some(pmpaddr24),
+            0x3C9 => Some(pmpaddr25),
+            0x3CA => Some(pmpaddr26),
+            0x3CB => Some(pmpaddr27),
+            0x3CC => Some(pmpaddr28),
+            0x3CD => Some(pmpaddr29),
+            0x3CE => Some(pmpaddr30),
+            0x3CF => Some(pmpaddr31),
+            0x3D0 => Some(pmpaddr32),
+            0x3D1 => Some(pmpaddr33),
+            0x3D2 => Some(pmpaddr34),
+            0x3D3 => Some(pmpaddr35),
+            0x3D4 => Some(pmpaddr36),
+            0x3D5 => Some(pmpaddr37),
+            0x3D6 => Some(pmpaddr38),
+            0x3D7 => Some(pmpaddr39),
+            0x3D8 => Some(pmpaddr40),
+            0x3D9 => Some(pmpaddr41),
+            0x3DA => Some(pmpaddr42),
+            0x3DB => Some(pmpaddr43),
+            0x3DC => Some(pmpaddr44),
+            0x3DD => Some(pmpaddr45),
+            0x3DE => Some(pmpaddr46),
+            0x3DF => Some(pmpaddr47),
+            0x3E0 => Some(pmpaddr48),
+            0x3E1 => Some(pmpaddr49),
+            0x3E2 => Some(pmpaddr50),
+            0x3E3 => Some(pmpaddr51),
+            0x3E4 => Some(pmpaddr52),
+            0x3E5 => Some(pmpaddr53),
+            0x3E6 => Some(pmpaddr54),
+            0x3E7 => Some(pmpaddr55),
+            0x3E8 => Some(pmpaddr56),
+            0x3E9 => Some(pmpaddr57),
+            0x3EA => Some(pmpaddr58),
+            0x3EB => Some(pmpaddr59),
+            0x3EC => Some(pmpaddr60),
+            0x3ED => Some(pmpaddr61),
+            0x3EE => Some(pmpaddr62),
+            0x3EF => Some(pmpaddr63),
+
+            // Machine Non-Maskable Interrupt Handling
+            // The draft `Smrnmi` extension is not supported in objdump, printing
+            // CSR address directly instead
+            0x740 => Some(mnscratch),
+            0x741 => Some(mnepc),
+            0x742 => Some(mncause),
+            0x744 => Some(mnstatus),
+
+            // Machine Counter/Timers
+            0xB00 => Some(mcycle),
+            0xB02 => Some(minstret),
+            0xB03 => Some(mhpmcounter3),
+            0xB04 => Some(mhpmcounter4),
+            0xB05 => Some(mhpmcounter5),
+            0xB06 => Some(mhpmcounter6),
+            0xB07 => Some(mhpmcounter7),
+            0xB08 => Some(mhpmcounter8),
+            0xB09 => Some(mhpmcounter9),
+            0xB0A => Some(mhpmcounter10),
+            0xB0B => Some(mhpmcounter11),
+            0xB0C => Some(mhpmcounter12),
+            0xB0D => Some(mhpmcounter13),
+            0xB0E => Some(mhpmcounter14),
+            0xB0F => Some(mhpmcounter15),
+            0xB10 => Some(mhpmcounter16),
+            0xB11 => Some(mhpmcounter17),
+            0xB12 => Some(mhpmcounter18),
+            0xB13 => Some(mhpmcounter19),
+            0xB14 => Some(mhpmcounter20),
+            0xB15 => Some(mhpmcounter21),
+            0xB16 => Some(mhpmcounter22),
+            0xB17 => Some(mhpmcounter23),
+            0xB18 => Some(mhpmcounter24),
+            0xB19 => Some(mhpmcounter25),
+            0xB1A => Some(mhpmcounter26),
+            0xB1B => Some(mhpmcounter27),
+            0xB1C => Some(mhpmcounter28),
+            0xB1D => Some(mhpmcounter29),
+            0xB1E => Some(mhpmcounter30),
+            0xB1F => Some(mhpmcounter31),
+
+            // Machine Counter Setup
+            0x320 => Some(mcountinhibit),
+            0x323 => Some(mhpmevent3),
+            0x324 => Some(mhpmevent4),
+            0x325 => Some(mhpmevent5),
+            0x326 => Some(mhpmevent6),
+            0x327 => Some(mhpmevent7),
+            0x328 => Some(mhpmevent8),
+            0x329 => Some(mhpmevent9),
+            0x32A => Some(mhpmevent10),
+            0x32B => Some(mhpmevent11),
+            0x32C => Some(mhpmevent12),
+            0x32D => Some(mhpmevent13),
+            0x32E => Some(mhpmevent14),
+            0x32F => Some(mhpmevent15),
+            0x330 => Some(mhpmevent16),
+            0x331 => Some(mhpmevent17),
+            0x332 => Some(mhpmevent18),
+            0x333 => Some(mhpmevent19),
+            0x334 => Some(mhpmevent20),
+            0x335 => Some(mhpmevent21),
+            0x336 => Some(mhpmevent22),
+            0x337 => Some(mhpmevent23),
+            0x338 => Some(mhpmevent24),
+            0x339 => Some(mhpmevent25),
+            0x33A => Some(mhpmevent26),
+            0x33B => Some(mhpmevent27),
+            0x33C => Some(mhpmevent28),
+            0x33D => Some(mhpmevent29),
+            0x33E => Some(mhpmevent30),
+            0x33F => Some(mhpmevent31),
+
+            // Debug/Trace Registers (shared with Debug Mode)
+            0x7A0 => Some(tselect),
+            0x7A1 => Some(tdata1),
+            0x7A2 => Some(tdata2),
+            0x7A3 => Some(tdata3),
+            0x7A5 => Some(tcontrol),
+            0x7A8 => Some(mcontext),
+
+            // Debug Mode Registers
+            0x7B0 => Some(dcsr),
+            0x7B1 => Some(dpc),
+            0x7B2 => Some(dscratch0),
+            0x7B3 => Some(dscratch1),
+            _ => None,
+        }
+    }
 }
 
 /// Representation of a value in a CSR
@@ -1384,6 +1676,7 @@ mod tests {
         },
         traps::{Interrupt, TrapContext},
     };
+    use strum::IntoEnumIterator;
 
     #[test]
     fn test_privilege_access() {
@@ -1582,6 +1875,17 @@ mod tests {
 
         // non warl register
         assert!(check(csreg::instret, 0x42) == 0x42);
+    }
+
+    /// Ensure that parsing CSRs matches the values assigned in the enum.
+    #[test]
+    fn test_csr_parser_roundtrip() {
+        for csr in CSRegister::iter() {
+            let value = csr as usize;
+            let result = CSRegister::try_parse(value as u32);
+
+            assert_eq!(Some(csr), result, "Expected {csr}, got {result:?}");
+        }
     }
 
     backend_test!(test_write_read, F, {

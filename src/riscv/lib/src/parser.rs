@@ -9,7 +9,7 @@ pub mod instruction;
 
 use crate::bits::u16;
 use crate::machine_state::{
-    csregisters::{try_parse_csregister, CSRegister},
+    csregisters::CSRegister,
     registers::{parse_fregister, parse_xregister, x0, x2, FRegister, XRegister},
 };
 use arbitrary_int::{u3, u5};
@@ -24,17 +24,17 @@ const fn bits(bytes: u32, pos: usize, n: usize) -> u32 {
 }
 
 #[inline(always)]
-fn bit(bytes: u32, pos: usize) -> bool {
+const fn bit(bytes: u32, pos: usize) -> bool {
     bytes & (1 << pos) != 0
 }
 
 #[inline(always)]
-fn opcode(instr: u32) -> u32 {
+const fn opcode(instr: u32) -> u32 {
     bits(instr, 0, 7)
 }
 
 #[inline(always)]
-fn funct3(instr: u32) -> u32 {
+const fn funct3(instr: u32) -> u32 {
     bits(instr, 12, 3)
 }
 
@@ -44,22 +44,22 @@ const fn funct5(instr: u32) -> u32 {
 }
 
 #[inline(always)]
-fn funct7(instr: u32) -> u32 {
+const fn funct7(instr: u32) -> u32 {
     bits(instr, 25, 7)
 }
 
 #[inline(always)]
-fn rd(instr: u32) -> XRegister {
+const fn rd(instr: u32) -> XRegister {
     parse_xregister(u5::extract_u32(instr, 7))
 }
 
 #[inline(always)]
-fn rd_f(instr: u32) -> FRegister {
+const fn rd_f(instr: u32) -> FRegister {
     parse_fregister(u5::extract_u32(instr, 7))
 }
 
 #[inline(always)]
-fn rs1_bits(instr: u32) -> u32 {
+const fn rs1_bits(instr: u32) -> u32 {
     bits(instr, 15, 5)
 }
 
@@ -69,53 +69,49 @@ const fn rs1_bits_u5(instr: u32) -> u5 {
 }
 
 #[inline(always)]
-fn rs1(instr: u32) -> XRegister {
+const fn rs1(instr: u32) -> XRegister {
     parse_xregister(rs1_bits_u5(instr))
 }
 
 #[inline(always)]
-fn rs1_f(instr: u32) -> FRegister {
+const fn rs1_f(instr: u32) -> FRegister {
     parse_fregister(rs1_bits_u5(instr))
 }
 
 #[inline(always)]
-fn rs2_bits(instr: u32) -> u32 {
+const fn rs2_bits(instr: u32) -> u32 {
     bits(instr, 20, 5)
 }
 
 #[inline(always)]
-fn rs2_bits_u5(instr: u32) -> u5 {
+const fn rs2_bits_u5(instr: u32) -> u5 {
     u5::extract_u32(instr, 20)
 }
 
 #[inline(always)]
-fn rs2(instr: u32) -> XRegister {
+const fn rs2(instr: u32) -> XRegister {
     parse_xregister(rs2_bits_u5(instr))
 }
 
 #[inline(always)]
-fn rs2_f(instr: u32) -> FRegister {
+const fn rs2_f(instr: u32) -> FRegister {
     parse_fregister(rs2_bits_u5(instr))
 }
 
 #[inline(always)]
-fn rs3_f(instr: u32) -> FRegister {
+const fn rs3_f(instr: u32) -> FRegister {
     parse_fregister(u5::extract_u32(instr, 27))
 }
 
 #[inline(always)]
-fn imm_11_6(instr: u32) -> u32 {
+const fn imm_11_6(instr: u32) -> u32 {
     bits(instr, 26, 6) << 1
 }
 
 #[inline(always)]
-fn fm(instr: u32) -> u32 {
+const fn fm(instr: u32) -> u32 {
     bits(instr, 28, 4)
 }
-
-/// Rounding mode for F/D
-#[allow(non_upper_case_globals)]
-const rm: fn(u32) -> u32 = funct3;
 
 /// Floating-point format field encoding
 #[inline(always)]
@@ -129,8 +125,8 @@ const fn width(instr: u32) -> u32 {
     bits(instr, 12, 3)
 }
 
-fn csr(instr: u32) -> Option<CSRegister> {
-    try_parse_csregister(bits(instr, 20, 12))
+const fn csr(instr: u32) -> Option<CSRegister> {
+    CSRegister::try_parse(bits(instr, 20, 12))
 }
 
 // Immediates are produced by extracting the relevant bits according to the
@@ -139,19 +135,19 @@ fn csr(instr: u32) -> Option<CSRegister> {
 // performed by first casting each segment to i32, then casting the produced
 // immediate to i64.
 
-fn i_imm(instr: u32) -> i64 {
+const fn i_imm(instr: u32) -> i64 {
     // instr[31:20]
     (((instr & 0b1111_1111_1111_0000_0000_0000_0000_0000) as i32) >> 20) as i64
 }
 
-fn s_imm(instr: u32) -> i64 {
+const fn s_imm(instr: u32) -> i64 {
     // instr[31:25] | instr[11:7]
     let instr_31_25 = (instr & 0b1111_1110_0000_0000_0000_0000_0000_0000) as i32;
     let instr_11_7 = (instr & 0b0000_0000_0000_0000_0000_1111_1000_0000) as i32;
     ((instr_31_25 >> 20) | (instr_11_7 >> 7)) as i64
 }
 
-fn b_imm(instr: u32) -> i64 {
+const fn b_imm(instr: u32) -> i64 {
     // instr[31] | instr[7] | instr[30:25] | instr[11:8] | 0
     let instr_31 = (instr & 0b1000_0000_0000_0000_0000_0000_0000_0000) as i32;
     let instr_7 = (instr & 0b0000_0000_0000_0000_0000_0000_1000_0000) as i32;
@@ -160,12 +156,12 @@ fn b_imm(instr: u32) -> i64 {
     ((instr_31 >> 19) | (instr_7 << 4) | (instr_30_25 >> 20) | (instr_11_8 >> 7)) as i64
 }
 
-fn u_imm(instr: u32) -> i64 {
+const fn u_imm(instr: u32) -> i64 {
     // instr[31:12] | 0000_0000_0000
     ((instr & 0b1111_1111_1111_1111_1111_0000_0000_0000) as i32) as i64
 }
 
-fn j_imm(instr: u32) -> i64 {
+const fn j_imm(instr: u32) -> i64 {
     // instr[31] | instr[19:12] | instr[20] | instr[30:21] | 0
     let instr_31 = (instr & 0b1000_0000_0000_0000_0000_0000_0000_0000) as i32;
     let instr_19_12 = (instr & 0b0000_0000_0000_1111_1111_0000_0000_0000) as i32;
@@ -173,11 +169,6 @@ fn j_imm(instr: u32) -> i64 {
     let instr_30_21 = (instr & 0b0111_1111_1110_0000_0000_0000_0000_0000) as i32;
     ((instr_31 >> 11) | instr_19_12 | (instr_20 >> 9) | (instr_30_21 >> 20)) as i64
 }
-
-#[allow(non_upper_case_globals)]
-const fl_imm: fn(u32) -> i64 = i_imm;
-#[allow(non_upper_case_globals)]
-const fs_imm: fn(u32) -> i64 = s_imm;
 
 macro_rules! r_instr {
     ($enum_variant:ident, $instr:expr) => {
@@ -242,7 +233,7 @@ macro_rules! fl_instr {
         $enum_variant(instruction::FLoadArgs {
             rd: rd_f($instr),
             rs1: rs1($instr),
-            imm: fl_imm($instr),
+            imm: i_imm($instr),
         })
     };
 }
@@ -252,7 +243,7 @@ macro_rules! fs_instr {
         $enum_variant(instruction::FStoreArgs {
             rs1: rs1($instr),
             rs2: rs2_f($instr),
-            imm: fs_imm($instr),
+            imm: s_imm($instr),
         })
     };
 }
@@ -336,7 +327,7 @@ macro_rules! f_r_rm_2_instr {
 
 macro_rules! f_r_rm_3_instr {
     ($enum_variant:ident, $instr:expr) => {
-        if let Some(rounding) = InstrRoundingMode::from_rm(rm($instr)) {
+        if let Some(rounding) = InstrRoundingMode::from_rm(funct3($instr)) {
             $enum_variant(instruction::FR3ArgsWithRounding {
                 rd: rd_f($instr),
                 rs1: rs1_f($instr),
@@ -492,7 +483,7 @@ const FM_0: u32 = 0b0;
 const FM_8: u32 = 0b1000;
 
 #[inline]
-fn parse_uncompressed_instruction(instr: u32) -> Instr {
+const fn parse_uncompressed_instruction(instr: u32) -> Instr {
     use Instr::*;
     match opcode(instr) {
         // R-type instructions
@@ -728,7 +719,7 @@ fn parse_uncompressed_instruction(instr: u32) -> Instr {
 
         // F/D-type instructions
         OP_FP => match fmt(instr) {
-            FMT_S => match (funct5(instr), rm(instr), rs2_bits_u5(instr)) {
+            FMT_S => match (funct5(instr), funct3(instr), rs2_bits_u5(instr)) {
                 (F5_0, rounding, rs2_bits) => {
                     f_r_rm_2_instr!(Fadds, instr, rs2_bits, rounding)
                 }
@@ -773,7 +764,7 @@ fn parse_uncompressed_instruction(instr: u32) -> Instr {
                 }),
                 _ => Unknown { instr },
             },
-            FMT_D => match (funct5(instr), rm(instr), rs2_bits_u5(instr)) {
+            FMT_D => match (funct5(instr), funct3(instr), rs2_bits_u5(instr)) {
                 (F5_0, rounding, rs2_bits) => {
                     f_r_rm_2_instr!(Faddd, instr, rs2_bits, rounding)
                 }
@@ -887,76 +878,76 @@ const fn c_bits(bytes: u16, pos: usize, n: usize) -> u16 {
 }
 
 #[inline(always)]
-fn c_rd_rs1(instr: u16) -> XRegister {
+const fn c_rd_rs1(instr: u16) -> XRegister {
     parse_xregister(u5::extract_u16(instr, 7))
 }
 
 #[inline(always)]
-fn c_f_rd_rs1(instr: u16) -> FRegister {
+const fn c_f_rd_rs1(instr: u16) -> FRegister {
     parse_fregister(u5::extract_u16(instr, 7))
 }
 
 #[inline(always)]
-fn c_rs2(instr: u16) -> XRegister {
+const fn c_rs2(instr: u16) -> XRegister {
     parse_xregister(u5::extract_u16(instr, 2))
 }
 
 #[inline(always)]
-fn c_f_rs2(instr: u16) -> FRegister {
+const fn c_f_rs2(instr: u16) -> FRegister {
     parse_fregister(u5::extract_u16(instr, 2))
 }
 
 /// Encodings for the most used registers for certain compressed instructions
 /// See U:C-16.2
 #[inline(always)]
-fn c_reg_prime(instr: u16, pos: usize) -> u5 {
+const fn c_reg_prime(instr: u16, pos: usize) -> u5 {
     const EIGHT: u5 = u5::new(8);
 
     u3::extract_u16(instr, pos).widen::<5>().wrapping_add(EIGHT)
 }
 
 #[inline(always)]
-fn c_rs1p(instr: u16) -> XRegister {
+const fn c_rs1p(instr: u16) -> XRegister {
     parse_xregister(c_reg_prime(instr, 7))
 }
 
 #[inline(always)]
-fn c_rdp_rs2p(instr: u16) -> XRegister {
+const fn c_rdp_rs2p(instr: u16) -> XRegister {
     parse_xregister(c_reg_prime(instr, 2))
 }
 
 #[inline(always)]
-fn c_f_rdp_rs2p(instr: u16) -> FRegister {
+const fn c_f_rdp_rs2p(instr: u16) -> FRegister {
     parse_fregister(c_reg_prime(instr, 2))
 }
 
 #[inline(always)]
-fn c_opcode(instr: u16) -> u16 {
+const fn c_opcode(instr: u16) -> u16 {
     c_bits(instr, 0, 2)
 }
 
 #[inline(always)]
-fn c_funct3(instr: u16) -> u16 {
+const fn c_funct3(instr: u16) -> u16 {
     c_bits(instr, 13, 3)
 }
 
 #[inline(always)]
-fn c_q1_10(instr: u16) -> u16 {
+const fn c_q1_10(instr: u16) -> u16 {
     c_bits(instr, 10, 2)
 }
 
 #[inline(always)]
-fn c_q1_5(instr: u16) -> u16 {
+const fn c_q1_5(instr: u16) -> u16 {
     c_bits(instr, 5, 2)
 }
 
-fn sign_extend_u16(value: u16, size: usize) -> i64 {
+const fn sign_extend_u16(value: u16, size: usize) -> i64 {
     assert!(size < 16);
     let shift = 16 - size;
     (((value as i16) << shift) >> shift) as i64
 }
 
-fn clw_imm(instr: u16) -> i64 {
+const fn clw_imm(instr: u16) -> i64 {
     // instr[5] | instr[12:10] | instr[6] | 00
     let res = u16::bits_subset(instr, 5, 5) << 6
         | u16::bits_subset(instr, 12, 10) << 3
@@ -964,25 +955,25 @@ fn clw_imm(instr: u16) -> i64 {
     res as i64
 }
 
-fn cld_imm(instr: u16) -> i64 {
+const fn cld_imm(instr: u16) -> i64 {
     // instr[6:5] | instr[12:10] | 000
     let res = u16::bits_subset(instr, 6, 5) << 6 | u16::bits_subset(instr, 12, 10) << 3;
     res as i64
 }
 
-fn ci_imm(instr: u16) -> i64 {
+const fn ci_imm(instr: u16) -> i64 {
     // instr[12] | instr[6:2]
     let res = u16::bits_subset(instr, 12, 12) << 5 | u16::bits_subset(instr, 6, 2);
     sign_extend_u16(res, 6)
 }
 
-fn cslli_imm(instr: u16) -> i64 {
+const fn cslli_imm(instr: u16) -> i64 {
     // instr[12] | instr[6:2]
     let res = u16::bits_subset(instr, 12, 12) << 5 | u16::bits_subset(instr, 6, 2);
     res as i64
 }
 
-fn ci_addi16sp_imm(instr: u16) -> i64 {
+const fn ci_addi16sp_imm(instr: u16) -> i64 {
     // instr[12] | instr[4:3] | instr[5] | instr[2] | instr[6] | 0000
     let res = u16::bits_subset(instr, 12, 12) << 9
         | u16::bits_subset(instr, 4, 3) << 7
@@ -992,7 +983,7 @@ fn ci_addi16sp_imm(instr: u16) -> i64 {
     sign_extend_u16(res, 10)
 }
 
-fn ci_lwsp_imm(instr: u16) -> i64 {
+const fn ci_lwsp_imm(instr: u16) -> i64 {
     // instr[3:2] | instr[12] | instr[6:4] | 00
     let res = u16::bits_subset(instr, 3, 2) << 6
         | u16::bits_subset(instr, 12, 12) << 5
@@ -1000,7 +991,7 @@ fn ci_lwsp_imm(instr: u16) -> i64 {
     res as i64
 }
 
-fn ci_ldsp_imm(instr: u16) -> i64 {
+const fn ci_ldsp_imm(instr: u16) -> i64 {
     // instr[4:2] | instr[12] | instr[6:5] | 000
     let res = u16::bits_subset(instr, 4, 2) << 6
         | u16::bits_subset(instr, 12, 12) << 5
@@ -1008,19 +999,19 @@ fn ci_ldsp_imm(instr: u16) -> i64 {
     res as i64
 }
 
-fn css_swsp_imm(instr: u16) -> i64 {
+const fn css_swsp_imm(instr: u16) -> i64 {
     // instr[8:7] | instr[12:9] | 00
     let res = u16::bits_subset(instr, 8, 7) << 6 | u16::bits_subset(instr, 12, 9) << 2;
     res as i64
 }
 
-fn css_sdsp_imm(instr: u16) -> i64 {
+const fn css_sdsp_imm(instr: u16) -> i64 {
     // instr[9:7] | instr[12:10] | 000
     let res = u16::bits_subset(instr, 9, 7) << 6 | u16::bits_subset(instr, 12, 10) << 3;
     res as i64
 }
 
-fn ciw_imm(instr: u16) -> i64 {
+const fn ciw_imm(instr: u16) -> i64 {
     // instr[10:7] | instr[12:11] | instr[5] | instr[6] | 00
     let res = u16::bits_subset(instr, 10, 7) << 6
         | u16::bits_subset(instr, 12, 11) << 4
@@ -1029,7 +1020,7 @@ fn ciw_imm(instr: u16) -> i64 {
     res as i64
 }
 
-fn cb_imm(instr: u16) -> i64 {
+const fn cb_imm(instr: u16) -> i64 {
     // instr[12] | instr[6:5] | instr[2] | instr[11:10] | instr[4:3] | 0
     let res = u16::bits_subset(instr, 12, 12) << 8
         | u16::bits_subset(instr, 6, 5) << 6
@@ -1039,19 +1030,19 @@ fn cb_imm(instr: u16) -> i64 {
     sign_extend_u16(res, 9)
 }
 
-fn cb_shamt_imm(instr: u16) -> i64 {
+const fn cb_shamt_imm(instr: u16) -> i64 {
     // instr[12] | instr[6:2]
     let res = u16::bits_subset(instr, 12, 12) << 5 | u16::bits_subset(instr, 6, 2);
     res as i64
 }
 
-fn cb_andi_imm(instr: u16) -> i64 {
+const fn cb_andi_imm(instr: u16) -> i64 {
     // instr[12] | instr[6:2]
     let res = u16::bits_subset(instr, 12, 12) << 5 | u16::bits_subset(instr, 6, 2);
     sign_extend_u16(res, 6)
 }
 
-fn cj_imm(instr: u16) -> i64 {
+const fn cj_imm(instr: u16) -> i64 {
     // instr[12] | instr[8] | instr[10:9] | instr[6] | instr[7] | instr[2] | instr[11] | instr[5:3] | 0
     let res = u16::bits_subset(instr, 12, 12) << 11
         | u16::bits_subset(instr, 8, 8) << 10
@@ -1083,7 +1074,7 @@ const C_Q1_2: u16 = 0b10;
 const C_Q1_3: u16 = 0b11;
 
 #[inline]
-fn parse_compressed_instruction(instr: u16) -> Instr {
+const fn parse_compressed_instruction(instr: u16) -> Instr {
     use Instr::*;
     match c_opcode(instr) {
         OP_C0 => match c_funct3(instr) {

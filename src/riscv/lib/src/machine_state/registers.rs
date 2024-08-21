@@ -92,7 +92,7 @@ pub const t5: XRegister = x30;
 pub const t6: XRegister = x31;
 
 #[inline(always)]
-pub fn parse_xregister(r: u5) -> XRegister {
+pub const fn parse_xregister(r: u5) -> XRegister {
     let r = r.value().wrapping_sub(1);
 
     // SAFETY: the bounds of u5, under a wrapping decrement
@@ -242,7 +242,7 @@ pub enum FRegister {
 }
 
 #[inline(always)]
-pub fn parse_fregister(r: u5) -> FRegister {
+pub const fn parse_fregister(r: u5) -> FRegister {
     let r = r.value() as usize;
 
     // SAFETY: the possible values of u5 are known to correspond to
