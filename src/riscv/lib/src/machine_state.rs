@@ -24,7 +24,7 @@ use crate::{
         csregisters::CSRegister,
         hart_state::{HartState, HartStateLayout},
     },
-    parser::{instruction::Instr, Parser},
+    parser::{instruction::Instr, parse},
     program::Program,
     range_utils::{bound_saturating_sub, less_than_bound, unwrap_bound},
     state_backend::{self as backend},
@@ -37,16 +37,7 @@ use address_translation::{
 };
 use csregisters::{values::CSRValue, CSRRepr};
 use mode::Mode;
-use once_cell::sync::Lazy;
 use std::ops::Bound;
-
-/// Initialise the parser - requires runtime setup for
-/// jump tables.
-///
-/// Doing it here allows a static reference in [`MachineState`] -
-/// ensuring we don't run into lifetime issues in closures etc
-/// that require a mutable reference.
-static PARSER: Lazy<Parser> = Lazy::new(Parser::new);
 
 /// Layout for the machine state
 pub type MachineStateLayout<ML> = (HartStateLayout, bus::BusLayout<ML>, TranslationCacheLayout);
@@ -56,7 +47,6 @@ pub struct MachineState<ML: main_memory::MainMemoryLayout, M: backend::ManagerBa
     pub hart: HartState<M>,
     pub bus: Bus<ML, M>,
     pub translation_cache: TranslationCache<M>,
-    pub parser: &'static Parser,
 }
 
 /// How to modify the program counter
@@ -257,7 +247,6 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::ManagerBase> MachineState<ML
             hart: HartState::bind(space.0),
             bus: Bus::bind(space.1),
             translation_cache: TranslationCache::bind(space.2),
-            parser: Lazy::force(&PARSER),
         }
     }
 
@@ -341,7 +330,7 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::ManagerBase> MachineState<ML
         // The reasons to provide the second half in the lambda is
         // because those bytes may be inaccessible or may trigger an exception when read.
         // Hence we can't read all 4 bytes eagerly.
-        self.parser.parse(first_halfword, || {
+        parse(first_halfword, || {
             let next_addr = phys_addr + 2;
 
             // Optimization to skip an extra address translation lookup:
