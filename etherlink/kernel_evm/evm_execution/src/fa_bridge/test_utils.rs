@@ -110,6 +110,7 @@ pub fn run_fa_deposit(
         *caller,
         deposit,
         1_000_000_000,
+        None,
     )
     .expect("Failed to execute deposit")
 }
