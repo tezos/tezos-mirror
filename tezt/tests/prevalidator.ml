@@ -95,6 +95,12 @@ module Revamped = struct
     in
     Node.wait_for node "banned_operation_encountered.v0" filter
 
+  (* Wait for [node] to log the event [operation_classified oph].
+     Debug events must be enabled. *)
+  let wait_for_classified oph node =
+    let filter json = if JSON.as_string json = oph then Some () else None in
+    Node.wait_for node "operation_classified.v0" filter
+
   (* [synchronize_mempool client node] calls the [request_operations] RPC from
      the [client] to retrieve mempool from its peers and waits for a [notify]
      event on the [node] (debug events must be enabled). *)
