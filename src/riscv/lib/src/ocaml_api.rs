@@ -3,29 +3,35 @@
 //
 // SPDX-License-Identifier: MIT
 
+mod move_semantics;
+mod pointer_apply;
+
 use crate::pvm::{
     node_pvm::{NodePvm, PvmStorage, PvmStorageError},
     PvmHooks, PvmStatus,
 };
 use crate::storage::{self, StorageError};
+use move_semantics::ImmutableState;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use ocaml::{Pointer, ToValue};
+use pointer_apply::ImmutableApply;
 use sha2::{Digest, Sha256};
 use std::{fs, str};
 
 const HERMIT_LOADER: &[u8] = include_bytes!("../../assets/hermit-loader");
 
+type OcamlFallible<T> = Result<T, ocaml::Error>;
+
 #[ocaml::sig]
 pub struct Repo(PvmStorage);
 
 #[ocaml::sig]
-pub struct State(NodePvm);
+pub type State = ImmutableState<NodePvm>;
 
 #[ocaml::sig]
 pub struct Id(storage::Hash);
 
 ocaml::custom!(Repo);
-ocaml::custom!(State);
 ocaml::custom!(Id);
 
 #[derive(ocaml::FromValue, ocaml::ToValue, IntoPrimitive, TryFromPrimitive)]
@@ -93,18 +99,18 @@ pub fn octez_riscv_storage_id_equal(id1: Pointer<Id>, id2: Pointer<Id>) -> bool 
 #[ocaml::func]
 #[ocaml::sig("state -> state -> bool")]
 pub fn octez_riscv_storage_state_equal(state1: Pointer<State>, state2: Pointer<State>) -> bool {
-    state1.as_ref().0 == state2.as_ref().0
+    state1.apply_ro(|pvm1| state2.apply_ro(|pvm2| pvm1.to_bytes() == pvm2.to_bytes()))
 }
 
 #[ocaml::func]
 #[ocaml::sig("unit -> state")]
 pub fn octez_riscv_storage_state_empty() -> Pointer<State> {
-    State(NodePvm::empty()).into()
+    ImmutableState::new(NodePvm::empty()).into()
 }
 
 #[ocaml::func]
 #[ocaml::sig("string -> repo")]
-pub fn octez_riscv_storage_load(path: String) -> Result<Pointer<Repo>, ocaml::Error> {
+pub fn octez_riscv_storage_load(path: String) -> OcamlFallible<Pointer<Repo>> {
     match PvmStorage::load(path) {
         Ok(repo) => Ok(Repo(repo).into()),
         Err(e) => Err(ocaml::Error::Error(Box::new(e))),
@@ -120,12 +126,11 @@ pub fn octez_riscv_storage_close(_repo: Pointer<Repo>) {}
 pub fn octez_riscv_storage_commit(
     mut repo: Pointer<Repo>,
     state: Pointer<State>,
-) -> Result<Pointer<Id>, ocaml::Error> {
-    let state = &state.as_ref().0;
-    match repo.as_mut().0.commit(state) {
+) -> OcamlFallible<Pointer<Id>> {
+    state.apply_ro(|pvm| match repo.as_mut().0.commit(pvm) {
         Ok(hash) => Ok(Id(hash).into()),
         Err(e) => Err(ocaml::Error::Error(Box::new(e))),
-    }
+    })
 }
 
 #[ocaml::func]
@@ -133,10 +138,10 @@ pub fn octez_riscv_storage_commit(
 pub fn octez_riscv_storage_checkout(
     repo: Pointer<Repo>,
     id: Pointer<Id>,
-) -> Result<Option<Pointer<State>>, ocaml::Error> {
+) -> OcamlFallible<Option<Pointer<State>>> {
     let id = &id.as_ref().0;
     match repo.as_ref().0.checkout(id) {
-        Ok(state) => Ok(Some(State(state).into())),
+        Ok(pvm) => Ok(Some(ImmutableState::new(pvm).into())),
         Err(PvmStorageError::StorageError(StorageError::NotFound(_))) => Ok(None),
         Err(e) => Err(ocaml::Error::Error(Box::new(e))),
     }
@@ -145,7 +150,7 @@ pub fn octez_riscv_storage_checkout(
 #[ocaml::func]
 #[ocaml::sig("state -> status")]
 pub fn octez_riscv_get_status(state: Pointer<State>) -> Status {
-    state.as_ref().0.get_status().into()
+    state.apply_ro(NodePvm::get_status).into()
 }
 
 #[ocaml::func]
@@ -157,8 +162,9 @@ pub fn octez_riscv_string_of_status(status: Status) -> String {
 #[ocaml::func]
 #[ocaml::sig("state -> state")]
 pub fn octez_riscv_compute_step(state: Pointer<State>) -> Pointer<State> {
-    let mut default_pvm_hooks = PvmHooks::default();
-    State(state.as_ref().0.compute_step(&mut default_pvm_hooks)).into()
+    state
+        .apply(|pvm| pvm.compute_step(&mut PvmHooks::default()))
+        .0
 }
 
 #[ocaml::func]
@@ -173,7 +179,8 @@ pub fn octez_riscv_compute_step_with_debug(
         printer(gc, &c).expect("compute_step: putchar error")
     };
     let mut hooks = PvmHooks::new(putchar);
-    State(state.as_ref().0.compute_step(&mut hooks)).into()
+
+    state.apply(|pvm| pvm.compute_step(&mut hooks)).0
 }
 
 #[ocaml::func]
@@ -183,11 +190,8 @@ pub fn octez_riscv_compute_step_many(
     state: Pointer<State>,
 ) -> (Pointer<State>, i64) {
     let mut default_pvm_hooks = PvmHooks::default();
-    let (s, steps) = state
-        .as_ref()
-        .0
-        .compute_step_many(&mut default_pvm_hooks, max_steps);
-    (State(s).into(), steps)
+
+    state.apply(|pvm| pvm.compute_step_many(&mut default_pvm_hooks, max_steps))
 }
 
 #[ocaml::func]
@@ -203,20 +207,20 @@ pub fn octez_riscv_compute_step_many_with_debug(
         printer(gc, &c).expect("compute_step_many: putchar error")
     };
     let mut hooks = PvmHooks::new(putchar);
-    let (s, steps) = state.as_ref().0.compute_step_many(&mut hooks, max_steps);
-    (State(s).into(), steps)
+
+    state.apply(|pvm| pvm.compute_step_many(&mut hooks, max_steps))
 }
 
 #[ocaml::func]
 #[ocaml::sig("state -> int64")]
 pub fn octez_riscv_get_tick(state: Pointer<State>) -> u64 {
-    state.as_ref().0.get_tick()
+    state.apply_ro(NodePvm::get_tick)
 }
 
 #[ocaml::func]
 #[ocaml::sig("state -> int32 option")]
 pub fn octez_riscv_get_level(state: Pointer<State>) -> Option<u32> {
-    state.as_ref().0.get_current_level()
+    state.apply_ro(NodePvm::get_current_level)
 }
 
 fn verify_checksum(contents: &[u8], checksum: &str) -> bool {
@@ -250,57 +254,59 @@ pub fn octez_riscv_install_boot_sector(
     // can also be passed in the origination string:
     // "kernel:<path to kernel>:<kernel checksum>[:<path to loader>:<loader checksum>]"
     // Any string not matching this format will be treated as an actual kernel to be installed.
-    let state = &state.as_ref().0;
-    if let Ok(s) = str::from_utf8(boot_sector) {
-        let parts: Vec<&str> = s.split(':').collect();
-        match parts.as_slice() {
-            ["kernel", kernel_path, kernel_checksum] => {
-                let kernel = read_boot_sector_binary(kernel_path, kernel_checksum);
-                return State(state.install_boot_sector(HERMIT_LOADER, &kernel)).into();
+    let install_loader_and_kernel = |pvm: &mut NodePvm, boot_sector| {
+        if let Ok(s) = str::from_utf8(boot_sector) {
+            let parts: Vec<&str> = s.split(':').collect();
+            match parts.as_slice() {
+                ["kernel", kernel_path, kernel_checksum] => {
+                    let kernel = read_boot_sector_binary(kernel_path, kernel_checksum);
+                    return pvm.install_boot_sector(HERMIT_LOADER, &kernel);
+                }
+                ["kernel", kernel_path, kernel_checksum, loader_path, loader_checksum] => {
+                    let kernel = read_boot_sector_binary(kernel_path, kernel_checksum);
+                    let loader = read_boot_sector_binary(loader_path, loader_checksum);
+                    return pvm.install_boot_sector(&loader, &kernel);
+                }
+                _ => (),
             }
-            ["kernel", kernel_path, kernel_checksum, loader_path, loader_checksum] => {
-                let kernel = read_boot_sector_binary(kernel_path, kernel_checksum);
-                let loader = read_boot_sector_binary(loader_path, loader_checksum);
-                return State(state.install_boot_sector(&loader, &kernel)).into();
-            }
-            _ => (),
         }
+        pvm.install_boot_sector(HERMIT_LOADER, boot_sector);
     };
-    State(state.install_boot_sector(HERMIT_LOADER, boot_sector)).into()
+
+    state
+        .apply(|pvm| install_loader_and_kernel(pvm, boot_sector))
+        .0
 }
 
 #[ocaml::func]
 #[ocaml::sig("state -> bytes")]
 pub fn octez_riscv_state_hash(state: Pointer<State>) -> [u8; 32] {
-    state.as_ref().0.hash().into()
+    state.apply_ro(NodePvm::hash).into()
 }
 
 #[ocaml::func]
 #[ocaml::sig("state -> input -> state")]
 pub fn octez_riscv_set_input(state: Pointer<State>, input: Input) -> Pointer<State> {
-    match input {
-        Input::InboxMessage(level, message_counter, payload) => State(
-            state
-                .as_ref()
-                .0
-                .set_input_message(level, message_counter, payload.to_vec()),
-        )
-        .into(),
+    let (new_ptr_state, _) = match input {
+        Input::InboxMessage(level, message_counter, payload) => {
+            state.apply(|pvm| pvm.set_input_message(level, message_counter, payload.to_vec()))
+        }
         Input::Reveal(RevealData::Metadata(address, origination_level)) => {
             let address: &[u8; 20] = address.try_into().expect("Unexpected rollup address size");
-            State(state.as_ref().0.set_metadata(address, origination_level)).into()
+            state.apply(|pvm| pvm.set_metadata(address, origination_level))
         }
         _ => {
             // TODO: RV-110. Support all revelations in set_input method
             todo!()
         }
-    }
+    };
+    new_ptr_state
 }
 
 #[ocaml::func]
 #[ocaml::sig("state -> int64")]
 pub fn octez_riscv_get_message_counter(state: Pointer<State>) -> u64 {
-    state.as_ref().0.get_message_counter()
+    state.apply_ro(NodePvm::get_message_counter)
 }
 
 #[ocaml::func]
