@@ -917,7 +917,7 @@ let octez_bls12_381_polynomial =
       "Polynomials over BLS12-381 finite field - Temporary vendored version of \
        Octez"
     ~c_library_flags:["-Wall"; "-Wextra"; ":standard"]
-    ~preprocess:[pps ppx_repr]
+    ~preprocess:(pps ppx_repr)
     ~deps:[bls12_381; ppx_repr; bigstringaf]
     ~foreign_stubs:
       {
@@ -1054,7 +1054,7 @@ let octez_plompiler =
         octez_polynomial;
         octez_mec;
       ]
-    ~preprocess:[staged_pps [ppx_repr; ppx_deriving_show]]
+    ~preprocess:(staged_pps [ppx_repr; ppx_deriving_show])
 
 (* Deactivating z3 tests. z3 is not installed in the CI *)
 (* ~dune: *)
@@ -1116,7 +1116,7 @@ let octez_kzg =
         octez_bls12_381_polynomial |> open_;
         octez_crypto;
       ]
-    ~preprocess:[pps ppx_repr]
+    ~preprocess:(pps ppx_repr)
 
 let octez_plonk =
   octez_lib
@@ -1124,14 +1124,14 @@ let octez_plonk =
     ~path:"src/lib_plonk"
     ~synopsis:"Plonk zero-knowledge proving system"
     ~deps:[octez_kzg; octez_plompiler |> open_; str]
-    ~preprocess:[pps ppx_repr]
+    ~preprocess:(pps ppx_repr)
 
 let octez_plonk_aggregation =
   octez_lib
     "plonk.aggregation"
     ~path:"src/lib_aplonk/plonk-aggregation"
     ~internal_name:"aggregation"
-    ~preprocess:[pps ppx_repr]
+    ~preprocess:(pps ppx_repr)
     ~deps:[octez_plonk; octez_bls12_381_polynomial |> open_]
 
 let octez_aplonk =
@@ -1139,7 +1139,7 @@ let octez_aplonk =
     "aplonk"
     ~internal_name:"aplonk"
     ~path:"src/lib_aplonk"
-    ~preprocess:[pps ppx_repr]
+    ~preprocess:(pps ppx_repr)
     ~deps:[octez_plonk_aggregation]
 
 let octez_plonk_distribution =
@@ -1148,7 +1148,7 @@ let octez_plonk_distribution =
     ~internal_name:"distribution"
     ~path:"src/lib_distributed_plonk/distribution"
     ~deps:[octez_plonk; octez_plonk_aggregation]
-    ~preprocess:[pps ppx_repr]
+    ~preprocess:(pps ppx_repr)
 
 let octez_plonk_communication =
   octez_lib
@@ -1156,7 +1156,7 @@ let octez_plonk_communication =
     ~internal_name:"communication"
     ~path:"src/lib_distributed_plonk/communication"
     ~deps:[logs; distributed_internal_lwt; octez_plonk_distribution |> open_]
-    ~preprocess:[pps ppx_repr]
+    ~preprocess:(pps ppx_repr)
 
 let octez_plonk_test_helpers =
   octez_lib
@@ -1165,7 +1165,7 @@ let octez_plonk_test_helpers =
     ~internal_name:"plonk_test"
     ~deps:[octez_plonk; octez_plonk_aggregation; octez_plonk_distribution]
     ~modules:["helpers"; "cases"]
-    ~preprocess:[pps ppx_repr]
+    ~preprocess:(pps ppx_repr)
     ~dune:(make_plonk_runtest_invocation ~package:"octez-libs")
 
 let _octez_plonk_test_helpers_main =
@@ -1280,7 +1280,7 @@ let octez_distributed_plonk =
         "distribution_helpers";
         "worker";
       ]
-    ~preprocess:[pps ppx_repr]
+    ~preprocess:(pps ppx_repr)
     ~bisect_ppx:Yes
 
 let _octez_distributed_plonk_test_main =
@@ -1517,7 +1517,7 @@ let ppx_irmin_internal =
     ~deps:[ppxlib; ppx_irmin_internal_lib; ppx_irmin]
     ~ppx_kind:Ppx_rewriter
     ~ppx_runtime_libraries:[logs; ppx_irmin_internal_lib]
-    ~preprocess:[pps ppxlib_metaquot]
+    ~preprocess:(pps ppxlib_metaquot)
 
 let irmin_data =
   octez_internal_lib
@@ -1546,14 +1546,14 @@ let irmin =
         uutf;
         re_export repr;
       ]
-    ~preprocess:[pps ~args:["--"; "--lib"; "Type"] ppx_irmin_internal]
+    ~preprocess:(pps ~args:["--"; "--lib"; "Type"] ppx_irmin_internal)
 
 let irmin_mem =
   octez_internal_lib
     "irmin.mem"
     ~path:"irmin/lib_irmin/mem"
     ~deps:[irmin; logs; lwt]
-    ~preprocess:[pps ppx_irmin_internal]
+    ~preprocess:(pps ppx_irmin_internal)
     ~flags:(Flags.standard ~disable_warnings:[68] ())
 
 let irmin_pack =
@@ -1561,7 +1561,7 @@ let irmin_pack =
     "irmin_pack"
     ~path:"irmin/lib_irmin_pack"
     ~deps:[fmt; irmin; irmin_data; logs; lwt; optint]
-    ~preprocess:[pps ppx_irmin_internal]
+    ~preprocess:(pps ppx_irmin_internal)
     ~flags:(Flags.standard ~disable_warnings:[66] ())
 
 let irmin_pack_mem =
@@ -1569,7 +1569,7 @@ let irmin_pack_mem =
     "irmin_pack.mem"
     ~path:"irmin/lib_irmin_pack/mem"
     ~deps:[irmin_pack; irmin_mem]
-    ~preprocess:[pps ppx_irmin_internal]
+    ~preprocess:(pps ppx_irmin_internal)
 
 let irmin_pack_unix =
   octez_internal_lib
@@ -1592,7 +1592,7 @@ let irmin_pack_unix =
         checkseum_ocaml;
         rusage;
       ]
-    ~preprocess:[pps ppx_irmin_internal]
+    ~preprocess:(pps ppx_irmin_internal)
     ~flags:(Flags.standard ~disable_warnings:[66; 68] ())
 
 let irmin_tezos =
@@ -1600,7 +1600,7 @@ let irmin_tezos =
     "irmin_tezos"
     ~path:"irmin/lib_irmin_tezos"
     ~deps:[fmt; zarith; digestif; irmin; irmin_pack; irmin_pack_unix]
-    ~preprocess:[pps ppx_irmin_internal]
+    ~preprocess:(pps ppx_irmin_internal)
 
 let irmin_test_helpers =
   octez_internal_lib
@@ -1608,7 +1608,7 @@ let irmin_test_helpers =
     ~path:"irmin/test/helpers"
     ~deps:
       [alcotezt; astring; fmt; irmin; jsonm; logs; lwt; mtime; mtime_clock_os]
-    ~preprocess:[pps ppx_irmin_internal]
+    ~preprocess:(pps ppx_irmin_internal)
     ~flags:(Flags.standard ~disable_warnings:[66; 68] ())
 
 let octez_clic =
@@ -1695,7 +1695,7 @@ let octez_version_parser =
     ~internal_name:"tezos_version_parser"
     ~path:"src/lib_version/parser"
     ~dune:Dune.[ocamllex "tezos_version_parser"]
-    ~preprocess:[pps ppx_deriving_show]
+    ~preprocess:(pps ppx_deriving_show)
 
 let octez_version =
   octez_lib
@@ -1915,7 +1915,7 @@ let ppx_brassaia_internal =
     ~deps:[ppxlib; ppx_brassaia_internal_lib; ppx_brassaia]
     ~ppx_kind:Ppx_rewriter
     ~ppx_runtime_libraries:[logs; ppx_brassaia_internal_lib]
-    ~preprocess:[pps ppxlib_metaquot]
+    ~preprocess:(pps ppxlib_metaquot)
 
 let brassaia_data =
   octez_lib
@@ -1946,14 +1946,14 @@ let brassaia =
         uutf;
         re_export repr;
       ]
-    ~preprocess:[pps ~args:["--"; "--lib"; "Type"] ppx_brassaia_internal]
+    ~preprocess:(pps ~args:["--"; "--lib"; "Type"] ppx_brassaia_internal)
 
 let brassaia_mem =
   octez_lib
     "brassaia.mem"
     ~path:"brassaia/lib_brassaia/mem"
     ~deps:[brassaia; logs; lwt]
-    ~preprocess:[pps ppx_brassaia_internal]
+    ~preprocess:(pps ppx_brassaia_internal)
     ~flags:(Flags.standard ~disable_warnings:[68] ())
 
 let brassaia_pack =
@@ -1971,7 +1971,7 @@ let brassaia_pack =
         lwt;
         optint;
       ]
-    ~preprocess:[pps ppx_brassaia_internal]
+    ~preprocess:(pps ppx_brassaia_internal)
     ~flags:(Flags.standard ~disable_warnings:[66] ())
 
 let brassaia_pack_mem =
@@ -1979,14 +1979,14 @@ let brassaia_pack_mem =
     "brassaia_pack.mem"
     ~path:"brassaia/lib_brassaia_pack/mem"
     ~deps:[brassaia_pack; brassaia_mem; brassaia]
-    ~preprocess:[pps ppx_brassaia_internal]
+    ~preprocess:(pps ppx_brassaia_internal)
 
 let brassaia_index =
   octez_lib
     "brassaia.index"
     ~path:"brassaia/index/src/"
     ~deps:[optint; mtime; fmt; rusage; lwt; progress; cmdliner; repr; lru]
-    ~preprocess:[pps ppx_repr]
+    ~preprocess:(pps ppx_repr)
     ~flags:(Flags.standard ~disable_warnings:[66; 68] ())
 
 let brassaia_index_unix =
@@ -2018,7 +2018,7 @@ let brassaia_pack_unix =
         checkseum_ocaml;
         rusage;
       ]
-    ~preprocess:[pps ppx_brassaia_internal]
+    ~preprocess:(pps ppx_brassaia_internal)
     ~flags:(Flags.standard ~disable_warnings:[66; 68] ())
 
 let brassaia_tezos =
@@ -2026,7 +2026,7 @@ let brassaia_tezos =
     "brassaia_tezos"
     ~path:"brassaia/lib_brassaia_tezos"
     ~deps:[fmt; zarith; digestif; brassaia; brassaia_pack; brassaia_pack_unix]
-    ~preprocess:[pps ppx_brassaia_internal]
+    ~preprocess:(pps ppx_brassaia_internal)
 
 let brassaia_test_helpers =
   octez_lib
@@ -2036,7 +2036,7 @@ let brassaia_test_helpers =
       [
         alcotezt; astring; fmt; brassaia; jsonm; logs; lwt; mtime; mtime_clock_os;
       ]
-    ~preprocess:[pps ppx_brassaia_internal]
+    ~preprocess:(pps ppx_brassaia_internal)
     ~flags:(Flags.standard ~disable_warnings:[66; 68] ())
 
 let octez_context_sigs =
@@ -2100,7 +2100,7 @@ let octez_webassembly_interpreter =
         zarith;
         lazy_containers |> open_;
       ]
-    ~preprocess:[pps ppx_deriving_show]
+    ~preprocess:(pps ppx_deriving_show)
 
 let octez_webassembly_interpreter_extra =
   octez_l2_lib
@@ -2452,7 +2452,7 @@ let octez_wasmer =
     ~synopsis:"Wasmer bindings for SCORU WASM"
     ~deps:[ctypes; ctypes_foreign; lwt; lwt_unix; octez_rust_deps]
     ~dep_globs_rec:["../rust_deps/wasmer-3.3.0/*"]
-    ~preprocess:[pps ppx_deriving_show]
+    ~preprocess:(pps ppx_deriving_show)
     ~flags:(Flags.standard ~disable_warnings:[9; 27] ())
     ~ctypes:
       Ctypes.
@@ -2802,7 +2802,7 @@ let _irmin_generic_key_tests =
         octez_test_helpers |> open_;
         tezt_lib |> open_ |> open_ ~m:"Base";
       ]
-    ~preprocess:[pps ppx_irmin_internal]
+    ~preprocess:(pps ppx_irmin_internal)
 
 let _brassaia_generic_key_tests =
   tezt
@@ -2821,7 +2821,7 @@ let _brassaia_generic_key_tests =
         octez_test_helpers |> open_;
         tezt_lib |> open_ |> open_ ~m:"Base";
       ]
-    ~preprocess:[pps ppx_brassaia_internal]
+    ~preprocess:(pps ppx_brassaia_internal)
 
 let _irmin_tests =
   tezt
@@ -2840,7 +2840,7 @@ let _irmin_tests =
         octez_test_helpers |> open_;
         tezt_lib |> open_ |> open_ ~m:"Base";
       ]
-    ~preprocess:[pps ppx_irmin_internal]
+    ~preprocess:(pps ppx_irmin_internal)
 
 let _brassaia_tests =
   tezt
@@ -2859,7 +2859,7 @@ let _brassaia_tests =
         octez_test_helpers |> open_;
         tezt_lib |> open_ |> open_ ~m:"Base";
       ]
-    ~preprocess:[pps ppx_brassaia_internal]
+    ~preprocess:(pps ppx_brassaia_internal)
 
 let _irmin_mem_tests =
   tezt
@@ -2958,7 +2958,7 @@ let _irmin_pack_tests =
         fpath;
         tezt_lib |> open_ |> open_ ~m:"Base";
       ]
-    ~preprocess:[pps ppx_irmin_internal]
+    ~preprocess:(pps ppx_irmin_internal)
 
 let _brassaia_pack_tests =
   tezt
@@ -3001,7 +3001,7 @@ let _brassaia_pack_tests =
         fpath;
         tezt_lib |> open_ |> open_ ~m:"Base";
       ]
-    ~preprocess:[pps ppx_brassaia_internal]
+    ~preprocess:(pps ppx_brassaia_internal)
 
 (* This binding assumes that librustzcash.a is installed in the system default
    directories or in: $OPAM_SWITCH_PREFIX/lib
@@ -4689,7 +4689,7 @@ let octez_scoru_wasm_helpers =
         octez_scoru_wasm_fast;
         octez_webassembly_interpreter_extra |> open_;
       ]
-    ~preprocess:[staged_pps [ppx_import; ppx_deriving_show]]
+    ~preprocess:(staged_pps [ppx_import; ppx_deriving_show])
 
 let octez_scoru_wasm_durable_snapshot =
   octez_l2_lib
@@ -4703,7 +4703,7 @@ let octez_scoru_wasm_durable_snapshot =
         tree_encoding;
         octez_webassembly_interpreter_extra |> open_;
       ]
-    ~preprocess:[staged_pps [ppx_import; ppx_deriving_show]]
+    ~preprocess:(staged_pps [ppx_import; ppx_deriving_show])
 
 let octez_scoru_wasm_tests_helpers =
   octez_l2_lib
@@ -4726,7 +4726,7 @@ let octez_scoru_wasm_tests_helpers =
         alcotezt;
         octez_webassembly_interpreter_extra |> open_;
       ]
-    ~preprocess:[staged_pps [ppx_import; ppx_deriving_show]]
+    ~preprocess:(staged_pps [ppx_import; ppx_deriving_show])
 
 let octez_scoru_wasm_benchmark =
   octez_l2_lib
@@ -4743,14 +4743,14 @@ let octez_scoru_wasm_benchmark =
         octez_scoru_wasm_helpers;
         lwt_unix;
       ]
-    ~preprocess:[pps ppx_deriving_show]
+    ~preprocess:(pps ppx_deriving_show)
 
 let _octez_scoru_wasm_benchmark_exe =
   private_exe
     "octez_smart_rollup_wasm_benchmark"
     ~path:"src/lib_scoru_wasm/bench/executable"
     ~opam:"octez-l2-libs"
-    ~preprocess:[pps ppx_deriving_show]
+    ~preprocess:(pps ppx_deriving_show)
     ~deps:[octez_base |> open_ ~m:"TzPervasives"; octez_scoru_wasm_benchmark]
 
 let _octez_scoru_wasm_tests =
@@ -4794,7 +4794,7 @@ let _octez_scoru_wasm_tests =
         octez_scoru_wasm_tests_helpers |> open_;
         octez_webassembly_interpreter_extra |> open_;
       ]
-    ~preprocess:[staged_pps [ppx_import; ppx_deriving_show]]
+    ~preprocess:(staged_pps [ppx_import; ppx_deriving_show])
 
 let _octez_scoru_wasm_fast_tests =
   tezt
@@ -4822,7 +4822,7 @@ let _octez_scoru_wasm_fast_tests =
         qcheck_alcotest;
         alcotezt;
       ]
-    ~preprocess:[staged_pps [ppx_import; ppx_deriving_show]]
+    ~preprocess:(staged_pps [ppx_import; ppx_deriving_show])
 
 (* PROTOCOL PACKAGES *)
 
@@ -8249,7 +8249,7 @@ let _octez_scoru_wasm_regressions =
         "../test/messages/deposit.out";
         "../test/messages/withdrawal.out";
       ]
-    ~preprocess:[staged_pps [ppx_import; ppx_deriving_show]]
+    ~preprocess:(staged_pps [ppx_import; ppx_deriving_show])
 
 let tezos_time_measurement =
   external_lib ~opam:"" "tezos-time-measurement" V.True

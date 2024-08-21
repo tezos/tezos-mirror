@@ -24,7 +24,7 @@ let cohttp_lwt =
     "octez-libs.cohttp-lwt"
     ~internal_name:"cohttp_lwt"
     ~path:"cohttp/cohttp-lwt/src"
-    ~preprocess:[pps ppx_sexp_conv]
+    ~preprocess:(pps ppx_sexp_conv)
     ~deps:[lwt; uri; cohttp; logs; logs_lwt]
     ~conflicts
 
@@ -33,7 +33,7 @@ let cohttp_lwt_unix =
     "octez-libs.cohttp-lwt-unix"
     ~internal_name:"cohttp_lwt_unix"
     ~path:"cohttp/cohttp-lwt-unix/src"
-    ~preprocess:[pps ppx_sexp_conv]
+    ~preprocess:(pps ppx_sexp_conv)
     ~deps:
       [
         fmt;

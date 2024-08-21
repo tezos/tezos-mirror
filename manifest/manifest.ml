@@ -223,7 +223,7 @@ module Dune = struct
       ?(instrumentation = Stdlib.List.[]) ?(libraries = []) ?flags
       ?library_flags ?link_flags ?(inline_tests = false)
       ?(inline_tests_deps = Stdlib.List.[]) ?(optional = false) ?ppx_kind
-      ?(ppx_runtime_libraries = []) ?(preprocess = Stdlib.List.[])
+      ?(ppx_runtime_libraries = []) ?preprocess
       ?(preprocessor_deps = Stdlib.List.[]) ?(virtual_modules = Stdlib.List.[])
       ?default_implementation ?implements ?modules
       ?modules_without_implementation ?modes
@@ -290,9 +290,7 @@ module Dune = struct
           (match ppx_runtime_libraries with
           | [] -> E
           | _ -> [V (S "ppx_runtime_libraries" :: ppx_runtime_libraries)]);
-          (match preprocess with
-          | [] -> E
-          | _ :: _ -> S "preprocess" :: of_list preprocess);
+          opt preprocess (fun p -> [S "preprocess"; p]);
           (match preprocessor_deps with
           | [] -> E
           | _ :: _ -> S "preprocessor_deps" :: of_list preprocessor_deps);
@@ -1212,7 +1210,7 @@ module Target = struct
     path : string;
     ppx_kind : Dune.ppx_kind option;
     ppx_runtime_libraries : t list;
-    preprocess : preprocessor list;
+    preprocess : preprocessor;
     preprocessor_deps : preprocessor_dep list;
     private_modules : string list;
     profile : string option;
@@ -1236,6 +1234,7 @@ module Target = struct
   }
 
   and preprocessor =
+    | No_PPS
     | PPS of {targets : t list; args : string list}
     | Staged_PPS of t list
 
@@ -1414,7 +1413,7 @@ module Target = struct
     ?optional:bool ->
     ?ppx_kind:Dune.ppx_kind ->
     ?ppx_runtime_libraries:t option list ->
-    ?preprocess:preprocessor list ->
+    ?preprocess:preprocessor ->
     ?preprocessor_deps:preprocessor_dep list ->
     ?private_modules:string list ->
     ?profile:string ->
@@ -1460,7 +1459,7 @@ module Target = struct
       ?(ocaml = default_ocaml_dependency) ?opam ?opam_bug_reports ?opam_doc
       ?opam_homepage ?(opam_with_test = Always) ?opam_version
       ?(optional = false) ?ppx_kind ?(ppx_runtime_libraries = [])
-      ?(preprocess = []) ?(preprocessor_deps = []) ?(private_modules = [])
+      ?(preprocess = No_PPS) ?(preprocessor_deps = []) ?(private_modules = [])
       ?profile ?(opam_only_deps = []) ?(release_status = Auto_opam) ?static
       ?synopsis ?description ?(time_measurement_ppx = false)
       ?(available : available = Always) ?(virtual_modules = [])
@@ -1496,8 +1495,15 @@ module Target = struct
              inline_tests"
       | Some (Inline_tests_backend target), (Some _ | None) -> (
           match kind with
-          | Public_library _ | Private_library _ ->
-              (PPS {targets = [target]; args = []} :: preprocess, true)
+          | Public_library _ | Private_library _ -> (
+              match preprocess with
+              | No_PPS -> (PPS {targets = [target]; args = []}, true)
+              | PPS {targets; args} ->
+                  (PPS {targets = target :: targets; args}, true)
+              | Staged_PPS _ ->
+                  invalid_arg
+                    "Target.internal: cannot specify `inline_tests` for staged \
+                     preprocessors")
           | Public_executable _ | Private_executable _ | Test_executable _ ->
               invalid_arg
                 "Target.internal: cannot specify `inline_tests` for \
@@ -2045,9 +2051,10 @@ module Target = struct
 
   let all_internal_deps internal =
     let extract_targets = function
+      | No_PPS -> []
       | PPS {targets; args = _} | Staged_PPS targets -> targets
     in
-    List.concat_map extract_targets internal.preprocess
+    extract_targets internal.preprocess
     @ internal.deps @ internal.opam_only_deps @ internal.ppx_runtime_libraries
 end
 
@@ -2077,7 +2084,7 @@ type tezt_target = {
   flags : Flags.t option;
   dune : Dune.s_expr;
   tezt_local_test_lib : target;
-  preprocess : Target.preprocessor list;
+  preprocess : Target.preprocessor;
   preprocessor_deps : Target.preprocessor_dep list;
   product : string;
 }
@@ -2087,8 +2094,8 @@ let tezt_targets_by_path : tezt_target String_map.t ref = ref String_map.empty
 let tezt ~opam ~path ?modes ?(lib_deps = []) ?(exe_deps = []) ?(dep_globs = [])
     ?(dep_globs_rec = []) ?(dep_files = []) ?synopsis ?opam_with_test
     ?dune_with_test ?(with_macos_security_framework = false) ?flags
-    ?(dune = Dune.[]) ?(preprocess = []) ?(preprocessor_deps = []) ?source
-    ~product modules =
+    ?(dune = Dune.[]) ?(preprocess = Target.No_PPS) ?(preprocessor_deps = [])
+    ?source ~product modules =
   if String_map.mem path !tezt_targets_by_path then
     invalid_arg
       ("cannot call Manifest.tezt twice for the same directory: " ^ path) ;
@@ -2663,13 +2670,14 @@ let generate_dune (internal : Target.internal) =
             ^ String.concat ", " (hd :: tl))
     in
     let make_preprocessors = function
+      | Target.No_PPS -> None
       | (PPS {targets; args} : Target.preprocessor) ->
-          Dune.pps ~args @@ List.map get_target_name targets
+          Some (Dune.pps ~args @@ List.map get_target_name targets)
       | Staged_PPS targets ->
-          Dune.staged_pps @@ List.map get_target_name targets
+          Some (Dune.staged_pps @@ List.map get_target_name targets)
     in
 
-    List.map make_preprocessors internal.preprocess
+    make_preprocessors internal.preprocess
   in
   let preprocessor_deps =
     let make_pp_dep = function
@@ -2792,7 +2800,7 @@ let generate_dune (internal : Target.internal) =
       ~optional:internal.optional
       ?ppx_kind:internal.ppx_kind
       ~ppx_runtime_libraries
-      ~preprocess
+      ?preprocess
       ~preprocessor_deps
       ~virtual_modules:internal.virtual_modules
       ?default_implementation:internal.default_implementation
@@ -4081,6 +4089,7 @@ let list_tests_to_run_after_changes ~(tezt_exe : target)
   (* Variant for preprocessors. *)
   let preprocessor_has_changed (preprocessor : Target.preprocessor) =
     match preprocessor with
+    | No_PPS -> false
     | PPS {targets; args = _} | Staged_PPS targets ->
         List.exists target_has_changed targets
   in
@@ -4174,7 +4183,7 @@ let list_tests_to_run_after_changes ~(tezt_exe : target)
       List.exists target_option_has_changed lib_deps
       || List.exists target_option_has_changed exe_deps
       || target_option_has_changed tezt_local_test_lib
-      || List.exists preprocessor_has_changed preprocess
+      || preprocessor_has_changed preprocess
       || List.exists
            file_has_changed
            (List.map (fun file -> tezt_target_dir // file) dep_files)
