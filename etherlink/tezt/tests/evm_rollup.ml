@@ -4402,54 +4402,6 @@ let test_rpc_getLogs =
   Check.((List.length new_logs = 0) int) ~error_msg:"Expected %R logs, got %L" ;
   unit
 
-let test_tx_pool_replacing_transactions =
-  register_both
-    ~tags:["evm"; "tx_pool"]
-    ~title:"Transactions can be replaced"
-    ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
-  @@ fun ~protocol:_ ~evm_setup:{evm_node; produce_block; _} ->
-  let bob = Eth_account.bootstrap_accounts.(0) in
-  let*@ bob_nonce = Rpc.get_transaction_count evm_node ~address:bob.address in
-  (* nonce: 0, private_key: bootstrappe_account(0), amount: 10; max_fees: 21000*)
-  let* tx_a =
-    Cast.craft_tx
-      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
-      ~chain_id:1337
-      ~nonce:0
-      ~gas_price:21_000
-      ~gas:21_000
-      ~value:(Wei.of_eth_int 10)
-      ~address:"0x0000000000000000000000000000000000000000"
-      ()
-  in
-  (* nonce: 0, private_key: bootstrappe_account(0), amount: 5; max_fees: 30000*)
-  let* tx_b =
-    Cast.craft_tx
-      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
-      ~chain_id:1337
-      ~nonce:0
-      ~gas_price:30_000
-      ~gas:21_000
-      ~value:(Wei.of_eth_int 5)
-      ~address:"0x0000000000000000000000000000000000000000"
-      ()
-  in
-  (* Send the transactions to the proxy*)
-  let*@ _tx_a_hash = Rpc.send_raw_transaction ~raw_tx:tx_a evm_node in
-  let*@ tx_b_hash = Rpc.send_raw_transaction ~raw_tx:tx_b evm_node in
-  let* receipt =
-    wait_for_application
-      ~produce_block
-      (wait_for_transaction_receipt ~evm_node ~transaction_hash:tx_b_hash)
-  in
-  let*@ new_bob_nonce =
-    Rpc.get_transaction_count evm_node ~address:bob.address
-  in
-  Check.((receipt.status = true) bool) ~error_msg:"Transaction has failed" ;
-  Check.((new_bob_nonce = Int64.(add bob_nonce one)) int64)
-    ~error_msg:"Bob has sent more than one transaction" ;
-  unit
-
 let test_l2_nested_create =
   register_both
     ~tags:["evm"; "l2_deploy"; "l2_create"; "inter_contract"]
@@ -6414,7 +6366,6 @@ let register_evm_node ~protocols =
   test_l2_call_inter_contract protocols ;
   test_rpc_getLogs protocols ;
   test_log_index protocols ;
-  test_tx_pool_replacing_transactions protocols ;
   test_l2_nested_create protocols ;
   test_block_hash_regression protocols ;
   test_l2_revert_returns_unused_gas protocols ;

@@ -6547,6 +6547,56 @@ let test_relay_restricted_rpcs =
   let*@? _ = Rpc.tez_kernelVersion sequencer in
   unit
 
+let test_tx_pool_replacing_transactions =
+  register_all
+    ~time_between_blocks:Nothing
+    ~kernels:[Latest] (* Not a kernel specific test. *)
+    ~tags:["evm"; "tx_pool"]
+    ~title:"Transactions can be replaced"
+  @@ fun {sequencer; _} _protocol ->
+  let* gas_price = Rpc.get_gas_price sequencer in
+  let gas_price = Int32.to_int gas_price in
+  let* tx_a =
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas_price
+      ~gas:21_000
+      ~value:(Wei.of_eth_int 10)
+      ~address:"0x0000000000000000000000000000000000000000"
+      ()
+  in
+  let* tx_b =
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas_price:(gas_price + 1)
+      ~gas:21_000
+      ~value:(Wei.of_eth_int 5)
+      ~address:"0x0000000000000000000000000000000000000000"
+      ()
+  in
+  (* Send the transactions to the proxy*)
+  let*@ tx_a_hash = Rpc.send_raw_transaction ~raw_tx:tx_a sequencer in
+  let*@ tx_b_hash = Rpc.send_raw_transaction ~raw_tx:tx_b sequencer in
+  (* Get the transaction objects, if it has been replaced, [tx_a_hash] will
+     be missing. *)
+  let*@ tx_a =
+    Rpc.get_transaction_by_hash ~transaction_hash:tx_a_hash sequencer
+  in
+  let*@ tx_b =
+    Rpc.get_transaction_by_hash ~transaction_hash:tx_b_hash sequencer
+  in
+  Check.is_true
+    (Option.is_none tx_a)
+    ~error_msg:"First transaction should have been replaced" ;
+  Check.is_true
+    (Option.is_some tx_b)
+    ~error_msg:"Second transaction should have replaced the previous one" ;
+  unit
+
 let protocols = Protocol.all
 
 let () =
@@ -6637,4 +6687,5 @@ let () =
   test_describe_config () ;
   test_outbox_size_limit_resilience ~slow:true protocols ;
   test_outbox_size_limit_resilience ~slow:false protocols ;
-  test_proxy_node_can_forward_to_evm_endpoint protocols
+  test_proxy_node_can_forward_to_evm_endpoint protocols ;
+  test_tx_pool_replacing_transactions protocols
