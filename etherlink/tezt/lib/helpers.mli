@@ -202,7 +202,7 @@ val l1_timestamp : Client.t -> Tezos_base.Time.Protocol.t Lwt.t
 
 (** [find_and_execute_withdrawal ~withdrawal_level ~commitment_period ~challenge_window
     ~evm_node ~sc_rollup_node ~sc_rollup_address ~client] bakes enough levels to have
-    a commitment and cement it, then constructs outbox proof 
+    a commitment and cement it, then constructs outbox proof
     and executes the outbox message *)
 val find_and_execute_withdrawal :
   withdrawal_level:int ->

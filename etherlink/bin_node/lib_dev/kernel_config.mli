@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2024 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -33,6 +34,7 @@ val make :
   ?enable_fa_bridge:string * string ->
   ?enable_dal:string * string ->
   ?dal_slots:string * string ->
+  ?set_account_code:(string * string) list ->
   output:string ->
   unit ->
   unit tzresult Lwt.t

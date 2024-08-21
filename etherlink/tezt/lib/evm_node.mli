@@ -433,6 +433,7 @@ val make_kernel_installer_config :
   ?maximum_allowed_ticks:int64 ->
   ?maximum_gas_per_transaction:int64 ->
   ?max_blueprint_lookahead_in_seconds:int64 ->
+  ?set_account_code:(string * string) list ->
   ?enable_fa_bridge:bool ->
   ?enable_dal:bool ->
   ?dal_slots:int list ->
