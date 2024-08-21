@@ -78,14 +78,55 @@ let encode_u16_le i =
   Bytes.set_uint16_le bytes 0 i ;
   bytes
 
-type t = Blueprint_types.payload
+type t =
+  | Chunk of {
+      value : bytes;
+      number : quantity;
+      nb_chunks : int;
+      chunk_index : int;
+      signature : Signature.t;
+    }
 
-let create ~cctxt ~sequencer_key ~timestamp ~smart_rollup_address ~number
-    ~parent_hash ~(delayed_transactions : Ethereum_types.hash list)
-    ~transactions =
+let chunk_encoding =
+  Data_encoding.(
+    let bytes_hex = bytes' Hex in
+    conv
+      (fun (Chunk {value; number; nb_chunks; chunk_index; signature}) ->
+        (value, number, nb_chunks, chunk_index, signature))
+      (fun (value, number, nb_chunks, chunk_index, signature) ->
+        Chunk {value; number; nb_chunks; chunk_index; signature})
+      (obj5
+         (req "value" bytes_hex)
+         (req "number" quantity_encoding)
+         (req "nb_chunks" int31)
+         (req "chunk_index" int31)
+         (req "signature" Signature.encoding)))
+
+let unsigned_chunk_to_rlp (Chunk {value; number; nb_chunks; chunk_index; _}) =
+  Rlp.(
+    List
+      [
+        Value value;
+        Value (encode_u256_le number);
+        Value (encode_u16_le nb_chunks);
+        Value (encode_u16_le chunk_index);
+      ])
+
+let chunk_to_rlp (Chunk {value; number; nb_chunks; chunk_index; signature}) =
+  Rlp.(
+    List
+      [
+        Value value;
+        Value (encode_u256_le number);
+        Value (encode_u16_le nb_chunks);
+        Value (encode_u16_le chunk_index);
+        Value (Signature.to_bytes signature);
+      ])
+
+let prepare ~cctxt ~sequencer_key ~timestamp ~number ~parent_hash
+    ~(delayed_transactions : Ethereum_types.hash list) ~transactions =
   let open Lwt_result_syntax in
   let open Rlp in
-  let number = Value (encode_u256_le number) in
   let chunks =
     make_blueprint_chunks
       ~timestamp
@@ -93,29 +134,32 @@ let create ~cctxt ~sequencer_key ~timestamp ~smart_rollup_address ~number
       ~delayed_transactions
       ~parent_hash
   in
-  let nb_chunks = Rlp.Value (encode_u16_le @@ List.length chunks) in
+  let nb_chunks = List.length chunks in
   let message_from_chunk nb_chunks chunk_index chunk =
-    let chunk_index = Rlp.Value (encode_u16_le chunk_index) in
-    let value = Value (Bytes.of_string chunk) in
+    let value = Bytes.of_string chunk in
+    let (Chunk r as chunk_without_signature) =
+      Chunk {value; number; nb_chunks; chunk_index; signature = Signature.zero}
+    in
     (* Takes the blueprints fields and sign them. *)
     let rlp_unsigned_blueprint =
-      List [value; number; nb_chunks; chunk_index] |> encode
+      unsigned_chunk_to_rlp chunk_without_signature |> encode
     in
-    let* signature =
+    let+ signature =
       Client_keys.sign cctxt sequencer_key rlp_unsigned_blueprint
     in
-    let signature_bytes = Signature.to_bytes signature in
-    (* Encode the blueprints fields and its signature. *)
-    let rlp_sequencer_blueprint =
-      List [value; number; nb_chunks; chunk_index; Value signature_bytes]
-      |> encode |> Bytes.to_string
-    in
-    `External
-      Message_format.(
-        frame_message
-          smart_rollup_address
-          Blueprint_chunk
-          rlp_sequencer_blueprint)
-    |> return
+    Chunk {r with signature}
   in
   List.mapi_ep (message_from_chunk nb_chunks) chunks
+
+let prepare_message smart_rollup_address kind rlp =
+  let rlp_sequencer_blueprint = rlp |> Rlp.encode |> Bytes.to_string in
+  `External
+    Message_format.(
+      frame_message smart_rollup_address kind rlp_sequencer_blueprint)
+
+let create ~smart_rollup_address ~chunks : Blueprint_types.payload =
+  List.map
+    (fun chunk ->
+      chunk_to_rlp chunk
+      |> prepare_message smart_rollup_address Message_format.Blueprint_chunk)
+    chunks

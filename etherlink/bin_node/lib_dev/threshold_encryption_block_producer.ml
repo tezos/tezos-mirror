@@ -81,17 +81,17 @@ let produce_block ~sequencer_key ~cctxt ~smart_rollup_address preblock =
     List.map Threshold_encryption_types.Transaction.to_string transactions
   in
   let*? hashes = get_hashes ~transactions ~delayed_transactions in
-  let* payload =
-    Sequencer_blueprint.create
+  let* chunks =
+    Sequencer_blueprint.prepare
       ~sequencer_key
       ~cctxt
       ~timestamp
-      ~smart_rollup_address
       ~transactions
       ~delayed_transactions
       ~parent_hash:previous_block_hash
       ~number:current_blueprint_number
   in
+  let payload = Sequencer_blueprint.create ~smart_rollup_address ~chunks in
   let (Qty number) = current_blueprint_number in
   let* () =
     Evm_context.apply_blueprint timestamp payload delayed_transactions

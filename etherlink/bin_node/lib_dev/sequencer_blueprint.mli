@@ -5,24 +5,36 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = Blueprint_types.payload
+type t =
+  | Chunk of {
+      value : bytes;
+      number : Ethereum_types.quantity;
+      nb_chunks : int;
+      chunk_index : int;
+      signature : Signature.t;
+    }
 
-(** [create ~secret_key ~timestamp ~smart_rollup_address ~number
-    ~parent_hash ~delayed_transactions ~transactions]
-    creates a sequencer blueprint at [timestamp] with a given [number]
-    containing [transactions], signed with [secret_key].  Returns
-    valid list of external messages inputs to put in the inbox.
+val chunk_encoding : t Data_encoding.t
+
+(** [prepare ~secret_key ~timestamp ~number ~parent_hash ~delayed_transactions
+    ~transactions] creates a sequencer blueprint at [timestamp] with a given
+    [number] containing [transactions], signed with [secret_key]. Returns the
+    list of prepared chunks.
 *)
-val create :
+val prepare :
   cctxt:#Client_context.wallet ->
   sequencer_key:Client_keys.sk_uri ->
   timestamp:Time.Protocol.t ->
-  smart_rollup_address:string ->
   number:Ethereum_types.quantity ->
   parent_hash:Ethereum_types.block_hash ->
   delayed_transactions:Ethereum_types.hash list ->
   transactions:string list ->
-  t tzresult Lwt.t
+  t list tzresult Lwt.t
+
+(** [create ~smart_rollup_address ~rlp_chunks] encodes the chunks into
+    message(s) that can be read by the kernel. *)
+val create :
+  smart_rollup_address:string -> chunks:t list -> Blueprint_types.payload
 
 (** [maximum_usable_size_in_blueprint chunks_count] returns the available space
     for transactions in a blueprint composed of [chunks_count] chunks. *)

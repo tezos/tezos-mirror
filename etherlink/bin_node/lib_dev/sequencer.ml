@@ -107,19 +107,23 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
   let* () =
     if status = Created then
       (* Create the first empty block. *)
-      let* genesis =
-        Sequencer_blueprint.create
+      let* genesis_chunks =
+        Sequencer_blueprint.prepare
           ~cctxt
           ~sequencer_key:sequencer_config.sequencer
           ~timestamp:genesis_timestamp
-          ~smart_rollup_address
           ~transactions:[]
           ~delayed_transactions:[]
           ~number:Ethereum_types.(Qty Z.zero)
           ~parent_hash:Ethereum_types.genesis_parent_hash
       in
-      let* () = Evm_context.apply_blueprint genesis_timestamp genesis [] in
-      Blueprints_publisher.publish Z.zero genesis
+      let genesis_payload =
+        Sequencer_blueprint.create ~smart_rollup_address ~chunks:genesis_chunks
+      in
+      let* () =
+        Evm_context.apply_blueprint genesis_timestamp genesis_payload []
+      in
+      Blueprints_publisher.publish Z.zero genesis_payload
     else return_unit
   in
   let* ro_ctxt =

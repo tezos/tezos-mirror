@@ -1071,18 +1071,22 @@ let make_dev_messages ~kind ~smart_rollup_address data =
   let* messages =
     match kind with
     | `Blueprint (cctxt, sk_uri, timestamp, number, parent_hash) ->
-        let* blueprint =
-          Sequencer_blueprint.create
+        let* blueprint_chunks =
+          Sequencer_blueprint.prepare
             ~cctxt
             ~sequencer_key:sk_uri
             ~timestamp
-            ~smart_rollup_address
             ~number:(Ethereum_types.quantity_of_z number)
             ~parent_hash:(Ethereum_types.block_hash_of_string parent_hash)
             ~transactions
             ~delayed_transactions:[]
         in
-        return @@ List.map (fun (`External s) -> s) blueprint
+        let blueprint_payload =
+          Sequencer_blueprint.create
+            ~smart_rollup_address
+            ~chunks:blueprint_chunks
+        in
+        return @@ List.map (fun (`External s) -> s) blueprint_payload
     | `Transaction ->
         let*? chunks =
           List.map_e
