@@ -262,7 +262,7 @@ let setup_sequencer ?sequencer_rpc_port ?sequencer_private_rpc_port
     ?preimages_dir ?maximum_allowed_ticks ?maximum_gas_per_transaction
     ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
     ?(threshold_encryption = false) ?(drop_duplicate_when_injection = true)
-    ?node_transaction_validation ?history_mode ~enable_dal ?dal_slots protocol =
+    ?history_mode ~enable_dal ?dal_slots protocol =
   let* node, client =
     setup_l1
       ?commitment_period
@@ -340,7 +340,7 @@ let setup_sequencer ?sequencer_rpc_port ?sequencer_private_rpc_port
   let patch_config =
     Evm_node.patch_config_with_experimental_feature
       ~drop_duplicate_when_injection
-      ?node_transaction_validation
+      ~node_transaction_validation:true
       (* When adding new experimental feature please make sure it's a
          good idea to activate it for all test or not. *)
       ()

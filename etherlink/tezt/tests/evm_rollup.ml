@@ -433,12 +433,18 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
       unit
     else unit
   in
+  let patch_config =
+    Evm_node.patch_config_with_experimental_feature
+      ~node_transaction_validation:true
+      ()
+  in
   let* produce_block, evm_node =
     match setup_mode with
     | Setup_proxy ->
         let mode = Evm_node.(Proxy {finalized_view = false}) in
         let* evm_node =
           Evm_node.init
+            ~patch_config
             ~mode
             ?restricted_rpcs
             (Sc_rollup_node.endpoint sc_rollup_node)
@@ -473,6 +479,7 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
         in
         let* sequencer =
           Evm_node.init
+            ~patch_config
             ~mode:sequencer_mode
             ?restricted_rpcs
             (Sc_rollup_node.endpoint sc_rollup_node)
