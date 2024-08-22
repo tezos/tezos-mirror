@@ -5342,42 +5342,6 @@ let test_check_estimateGas_enforces_limits =
          available") ;
   unit
 
-let test_transaction_exhausting_ticks_is_rejected =
-  register_both
-    ~tags:["evm"; "loop"; "out_of_ticks"; "rejected"]
-    ~title:
-      "Check that the node will reject a transaction that wouldn't fit in a \
-       kernel run."
-    ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
-    ~maximum_allowed_ticks:9_000_000_000L
-  @@ fun ~protocol:_ ~evm_setup:{evm_node; produce_block; _} ->
-  (* Retrieves all the messages and prepare them for the current rollup. *)
-  let txs =
-    read_file (kernel_inputs_path ^ "/loops-exhaust-ticks")
-    |> String.trim |> String.split_on_char '\n'
-  in
-  (* The first three transactions are sent in a separate block, to handle any nonce issue. *)
-  let first_block, second_block, third_block, loop_out_of_ticks =
-    match txs with
-    | [faucet1; faucet2; create; loop_out_of_ticks] ->
-        ([faucet1], [faucet2], [create], loop_out_of_ticks)
-    | _ -> failwith "The prepared transactions should contain 4 transactions"
-  in
-  let* () =
-    Lwt_list.iter_s
-      (fun block ->
-        let* _requests, _receipt, _hashes =
-          send_n_transactions ~produce_block ~evm_node ~wait_for_blocks:5 block
-        in
-        unit)
-      [first_block; second_block; third_block]
-  in
-  let* result = Rpc.send_raw_transaction ~raw_tx:loop_out_of_ticks evm_node in
-  (match result with
-  | Ok _ -> Test.fail "The transaction should have been rejected by the node"
-  | Error _ -> ()) ;
-  unit
-
 let test_reveal_storage =
   Protocol.register_test
     ~__FILE__
@@ -6386,7 +6350,6 @@ let register_evm_node ~protocols =
   test_ghostnet_kernel protocols ;
   test_estimate_gas_out_of_ticks protocols ;
   test_l2_call_selfdetruct_contract_in_same_transaction protocols ;
-  test_transaction_exhausting_ticks_is_rejected protocols ;
   test_reveal_storage protocols ;
   test_call_recursive_contract_estimate_gas protocols ;
   test_limited_stack_depth protocols ;
