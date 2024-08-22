@@ -72,6 +72,11 @@ fn migrate_to<Host: Runtime>(
                 Ok(MigrationStatus::None)
             }
         }
+        StorageVersion::V15 => {
+            // Starting version 15, the entrypoint `populate_delayed_inbox`
+            // is available.
+            Ok(MigrationStatus::Done)
+        }
     }
 }
 
