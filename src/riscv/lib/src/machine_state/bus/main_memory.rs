@@ -44,24 +44,27 @@ pub trait MainMemoryLayout: backend::Layout {
     fn refl<M: backend::ManagerBase>(space: backend::AllocatedOf<Self, M>) -> MainMemory<Self, M>;
 
     /// Read an element in the region. `address` is in bytes.
-    fn data_read<E: backend::Elem, M: backend::Manager>(data: &Self::Data<M>, address: usize) -> E;
+    fn data_read<E: backend::Elem, M: backend::ManagerRead>(
+        data: &Self::Data<M>,
+        address: usize,
+    ) -> E;
 
     /// Read elements from the region. `address` is in bytes.
-    fn data_read_all<E: backend::Elem, M: backend::Manager>(
+    fn data_read_all<E: backend::Elem, M: backend::ManagerRead>(
         data: &Self::Data<M>,
         address: usize,
         values: &mut [E],
     );
 
     /// Update an element in the region. `address` is in bytes.
-    fn data_write<E: backend::Elem, M: backend::Manager>(
+    fn data_write<E: backend::Elem, M: backend::ManagerWrite>(
         data: &mut Self::Data<M>,
         address: usize,
         value: E,
     );
 
     /// Update multiple elements in the region. `address` is in bytes.
-    fn data_write_all<E: backend::Elem, M: backend::Manager>(
+    fn data_write_all<E: backend::Elem, M: backend::ManagerWrite>(
         data: &mut Self::Data<M>,
         address: usize,
         values: &[E],
@@ -77,11 +80,14 @@ impl<const BYTES: usize> MainMemoryLayout for Sizes<BYTES> {
         space
     }
 
-    fn data_read<E: backend::Elem, M: backend::Manager>(data: &Self::Data<M>, address: usize) -> E {
+    fn data_read<E: backend::Elem, M: backend::ManagerRead>(
+        data: &Self::Data<M>,
+        address: usize,
+    ) -> E {
         data.read(address)
     }
 
-    fn data_read_all<E: backend::Elem, M: backend::Manager>(
+    fn data_read_all<E: backend::Elem, M: backend::ManagerRead>(
         data: &Self::Data<M>,
         address: usize,
         values: &mut [E],
@@ -89,7 +95,7 @@ impl<const BYTES: usize> MainMemoryLayout for Sizes<BYTES> {
         data.read_all(address, values);
     }
 
-    fn data_write<E: backend::Elem, M: backend::Manager>(
+    fn data_write<E: backend::Elem, M: backend::ManagerWrite>(
         data: &mut Self::Data<M>,
         address: usize,
         value: E,
@@ -97,7 +103,7 @@ impl<const BYTES: usize> MainMemoryLayout for Sizes<BYTES> {
         data.write(address, value);
     }
 
-    fn data_write_all<E: backend::Elem, M: backend::Manager>(
+    fn data_write_all<E: backend::Elem, M: backend::ManagerWrite>(
         data: &mut Self::Data<M>,
         address: usize,
         values: &[E],
@@ -134,14 +140,17 @@ pub struct MainMemory<L: MainMemoryLayout + ?Sized, M: backend::ManagerBase> {
     pub data: L::Data<M>,
 }
 
-impl<L: MainMemoryLayout, M: backend::Manager> MainMemory<L, M> {
+impl<L: MainMemoryLayout, M: backend::ManagerBase> MainMemory<L, M> {
     /// Bind the main memory state to the given allocated space.
     pub fn bind(space: backend::AllocatedOf<L, M>) -> Self {
         L::refl(space)
     }
 
     /// Reset to the initial state.
-    pub fn reset(&mut self) {
+    pub fn reset(&mut self)
+    where
+        M: backend::ManagerWrite,
+    {
         for i in 0..L::BYTES {
             L::data_write(&mut self.data, i, 0u8);
         }
