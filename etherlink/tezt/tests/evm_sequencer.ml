@@ -220,44 +220,41 @@ let register_all ?sequencer_rpc_port ?sequencer_private_rpc_port
   List.iter
     (fun (threshold_encryption, te_tags) ->
       List.iter
-        (fun kernel ->
-          List.iter
-            (fun (enable_dal, dal_tags) ->
-              register_test
-                ?sequencer_rpc_port
-                ?sequencer_private_rpc_port
-                ?commitment_period
-                ?challenge_window
-                ?genesis_timestamp
-                ?time_between_blocks
-                ?max_blueprints_lag
-                ?max_blueprints_ahead
-                ?max_blueprints_catchup
-                ?catchup_cooldown
-                ?delayed_inbox_timeout
-                ?delayed_inbox_min_levels
-                ?max_number_of_chunks
-                ?bootstrap_accounts
-                ?sequencer
-                ?sequencer_pool_address
-                ~kernel
-                ?da_fee
-                ?minimum_base_fee_per_gas
-                ?preimages_dir
-                ?maximum_allowed_ticks
-                ?maximum_gas_per_transaction
-                ?max_blueprint_lookahead_in_seconds
-                ?enable_fa_bridge
-                ?additional_uses
-                ~threshold_encryption
-                ?history_mode
-                ~enable_dal
-                ~title
-                ~tags:(te_tags @ dal_tags @ tags)
-                body
-                protocols)
-            dal_cases)
-        kernels)
+        (fun (enable_dal, dal_tags) ->
+          register_test_for_kernels
+            ?sequencer_rpc_port
+            ?sequencer_private_rpc_port
+            ?commitment_period
+            ?challenge_window
+            ?genesis_timestamp
+            ?time_between_blocks
+            ?max_blueprints_lag
+            ?max_blueprints_ahead
+            ?max_blueprints_catchup
+            ?catchup_cooldown
+            ?delayed_inbox_timeout
+            ?delayed_inbox_min_levels
+            ?max_number_of_chunks
+            ?bootstrap_accounts
+            ?sequencer
+            ?sequencer_pool_address
+            ~kernels
+            ?da_fee
+            ?minimum_base_fee_per_gas
+            ?preimages_dir
+            ?maximum_allowed_ticks
+            ?maximum_gas_per_transaction
+            ?max_blueprint_lookahead_in_seconds
+            ?enable_fa_bridge
+            ?additional_uses
+            ~threshold_encryption
+            ?history_mode
+            ~enable_dal
+            ~title
+            ~tags:(te_tags @ dal_tags @ tags)
+            body
+            protocols)
+        dal_cases)
     threshold_encryption_cases
 
 let register_upgrade_all ~title ~tags ~genesis_timestamp
