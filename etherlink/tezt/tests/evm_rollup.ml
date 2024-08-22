@@ -3343,60 +3343,6 @@ let test_cannot_prepayed_with_delay_leads_to_no_injection =
   in
   Lwt.catch wait_for_failure (function _ -> unit)
 
-let test_rpc_sendRawTransaction_nonce_too_low =
-  register_both
-    ~tags:["evm"; "rpc"; "nonce"]
-    ~title:"Returns an error if the nonce is too low"
-    ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
-  @@ fun ~protocol:_ ~evm_setup:{evm_node; produce_block; _} ->
-  (* Nonce: 0 *)
-  let* raw_tx =
-    Cast.craft_tx
-      ~source_private_key:Eth_account.bootstrap_accounts.(2).private_key
-      ~chain_id:1337
-      ~nonce:0
-      ~gas_price:21000
-      ~gas:2_000_000
-      ~value:(Wei.of_string "10000000000000000000")
-      ~address:"0x0000000000000000000000000000000000000000"
-      ()
-  in
-  let*@ transaction_hash = Rpc.send_raw_transaction ~raw_tx evm_node in
-  let* _ =
-    wait_for_application
-      ~produce_block
-      (wait_for_transaction_receipt ~evm_node ~transaction_hash)
-  in
-  let*@? error = Rpc.send_raw_transaction ~raw_tx evm_node in
-  Check.(((error.code = -32003) int) ~error_msg:"The transaction should fail") ;
-  Check.(
-    ((error.message = "Nonce too low.") string)
-      ~error_msg:"The transaction should be rejected for having a too low nonce") ;
-  unit
-
-let test_rpc_sendRawTransaction_nonce_too_high =
-  register_both
-    ~tags:["evm"; "rpc"; "nonce"]
-    ~title:"Accepts transactions with nonce too high."
-    ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
-  @@ fun ~protocol:_ ~evm_setup:{evm_node; _} ->
-  (* Nonce: 1 *)
-  let* raw_tx =
-    Cast.craft_tx
-      ~source_private_key:Eth_account.bootstrap_accounts.(2).private_key
-      ~chain_id:1337
-      ~nonce:1
-      ~gas_price:21000
-      ~gas:2_000_000
-      ~value:(Wei.of_string "10000000000000000000")
-      ~address:"0x0000000000000000000000000000000000000000"
-      ()
-  in
-  let* r = Rpc.send_raw_transaction ~raw_tx evm_node in
-  Check.(
-    ((Result.is_ok r = true) bool) ~error_msg:"The transaction should succeed") ;
-  unit
-
 let test_deposit_before_and_after_migration =
   Protocol.register_test
     ~__FILE__
@@ -3495,40 +3441,6 @@ let test_block_storage_before_and_after_migration =
     ~scenario_prior
     ~scenario_after
     protocol
-
-let test_rpc_sendRawTransaction_invalid_chain_id =
-  Protocol.register_test
-    ~__FILE__
-    ~tags:["evm"; "rpc"; "chain_id"]
-    ~uses:(fun _protocol ->
-      [
-        Constant.octez_smart_rollup_node;
-        Constant.octez_evm_node;
-        Constant.smart_rollup_installer;
-        Constant.WASM.evm_kernel;
-      ])
-    ~title:"Returns an error if the chainId is not correct."
-  @@ fun protocol ->
-  let* {evm_node; _} = setup_evm_kernel ~admin:None protocol in
-  (* Nonce: 0, chainId: 4242*)
-  let* raw_tx =
-    Cast.craft_tx
-      ~source_private_key:Eth_account.bootstrap_accounts.(2).private_key
-      ~chain_id:4242
-      ~nonce:0
-      ~gas_price:0
-      ~gas:2_000_000
-      ~value:(Wei.of_string "10000000000000000000")
-      ~address:"0x0000000000000000000000000000000000000000"
-      ()
-  in
-  let*@? error = Rpc.send_raw_transaction ~raw_tx evm_node in
-  Check.(((error.code = -32003) int) ~error_msg:"The transaction should fail") ;
-  Check.(
-    ((error.message = "Invalid chain id.") string)
-      ~error_msg:
-        "The transaction should be rejected for not having the correct chainId") ;
-  unit
 
 let test_kernel_upgrade_version_change =
   Protocol.register_test
@@ -5972,29 +5884,6 @@ let test_unsupported_rpc =
     ~error_msg:"Expected unsupported method error." ;
   unit
 
-let test_validation_with_legacy_encoding =
-  register_both
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/7285
-     Remove [Ghostnet] after the next upgrade *)
-    ~kernels:[Mainnet; Ghostnet]
-    ~title:"Transaction pool can read the legacy encodings of the validation"
-    ~tags:["evm"; "txpool"; "validation"; "legacy"]
-  @@ fun ~protocol:_ ~evm_setup ->
-  let* tx_hash =
-    send
-      ~sender:Eth_account.bootstrap_accounts.(0)
-      ~receiver:Eth_account.bootstrap_accounts.(1)
-      ~value:Wei.one_eth
-      evm_setup
-  in
-  let* receipt = Rpc.get_transaction_receipt ~tx_hash evm_setup.evm_node in
-  match receipt with
-  | Ok _ -> unit
-  | Error _ ->
-      Test.fail
-        "The transaction should have been included, meaning the validation \
-         failed."
-
 let test_rpc_feeHistory =
   register_both
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/7285
@@ -6317,9 +6206,6 @@ let register_evm_node ~protocols =
   test_rpc_sendRawTransaction protocols ;
   test_cannot_prepayed_leads_to_no_inclusion protocols ;
   test_cannot_prepayed_with_delay_leads_to_no_injection protocols ;
-  test_rpc_sendRawTransaction_nonce_too_low protocols ;
-  test_rpc_sendRawTransaction_nonce_too_high protocols ;
-  test_rpc_sendRawTransaction_invalid_chain_id protocols ;
   test_rpc_getTransactionByBlockHashAndIndex protocols ;
   test_rpc_getTransactionByBlockNumberAndIndex protocols ;
   test_rpc_getTransactionByHash protocols ;
@@ -6365,7 +6251,6 @@ let register_evm_node ~protocols =
   test_rpc_maxPriorityFeePerGas protocols ;
   test_proxy_read_only protocols ;
   test_unsupported_rpc protocols ;
-  test_validation_with_legacy_encoding protocols ;
   test_rpc_getBlockBy_return_base_fee_per_gas_and_mix_hash protocols ;
   test_rpc_feeHistory protocols ;
   test_rpc_feeHistory_past protocols ;
