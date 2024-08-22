@@ -482,8 +482,9 @@ const RS2_3_U5: u5 = u5::new(0b11);
 const FM_0: u32 = 0b0;
 const FM_8: u32 = 0b1000;
 
+/// Parse an uncompressed instruction from a u32.
 #[inline]
-const fn parse_uncompressed_instruction(instr: u32) -> Instr {
+pub const fn parse_uncompressed_instruction(instr: u32) -> Instr {
     use Instr::*;
     match opcode(instr) {
         // R-type instructions
@@ -1237,8 +1238,9 @@ const fn parse_compressed_instruction_inner(instr: u16) -> Instr {
     }
 }
 
+/// Parse a compressed instruction from a u16.
 #[inline(always)]
-fn parse_compressed_instruction(bytes: u16) -> Instr {
+pub fn parse_compressed_instruction(bytes: u16) -> Instr {
     COMPRESSED_JUMP_TABLE[bytes as usize]
 }
 
