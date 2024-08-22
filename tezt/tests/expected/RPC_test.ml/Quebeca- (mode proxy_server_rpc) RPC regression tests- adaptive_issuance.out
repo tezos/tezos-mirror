@@ -22,6 +22,9 @@
 ./octez-client rpc get /chains/main/blocks/head/context/total_frozen_stake
 "1000000000000"
 
+./octez-client rpc get /chains/main/blocks/head/context/total_currently_staked
+{ "delegates": "1000000016667", "delegators": "0", "overstaked": "0" }
+
 ./octez-client rpc get /chains/main/blocks/head/context/issuance/current_yearly_rate
 "210.260"
 

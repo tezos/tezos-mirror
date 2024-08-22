@@ -426,6 +426,10 @@ let test_adaptive_issuance ~contracts ?endpoint client =
   in
   let* _ =
     Client.RPC.call ?endpoint client ~hooks
+    @@ RPC.get_chain_block_context_total_currently_staked ()
+  in
+  let* _ =
+    Client.RPC.call ?endpoint client ~hooks
     @@ RPC.get_chain_block_context_issuance_current_yearly_rate ()
   in
   let* _ =
