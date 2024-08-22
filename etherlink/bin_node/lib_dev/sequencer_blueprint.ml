@@ -44,6 +44,17 @@ let maximum_usable_space_in_blueprint chunks_count =
 
 let maximum_chunks_per_l1_level = 512 * 1024 / 4096
 
+(* Number of unsigned chunks that can fit in a DAL slot of 128KB, considering
+   that each chunk is prefixed with a tag.
+
+   This constant is hardcoded for now, but it should be parametric in the future
+   over the size of a DAL slot.
+
+   TODO: https://gitlab.com/tezos/tezos/-/issues/7492
+*)
+let maximum_unsigned_chunks_per_dal_slot =
+  128 * 1024 / (max_unsigned_chunk_size + Message_format.tag_size)
+
 let encode_transaction raw =
   let open Rlp in
   Value (Bytes.of_string raw)

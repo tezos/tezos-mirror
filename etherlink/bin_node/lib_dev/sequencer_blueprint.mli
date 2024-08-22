@@ -42,6 +42,10 @@ val create_dal_payload : t list -> string
     for transactions in a blueprint composed of [chunks_count] chunks. *)
 val maximum_usable_space_in_blueprint : int -> int
 
-(* [maximum_chunks_per_l1_level] is the maximum number of chunks a L1 block can
+(* [maximum_chunks_per_l1_level] is the maximum number of chunks the inbox of a L1 block can
    hold at once. *)
 val maximum_chunks_per_l1_level : int
+
+(* [maximum_unsigned_chunks_per_dal_slot] is the maximum number of unsigned
+   chunks a DAL slot can hold at once. *)
+val maximum_unsigned_chunks_per_dal_slot : int

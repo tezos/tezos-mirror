@@ -111,10 +111,15 @@ module Worker = struct
       match (state self, chunks) with
       | ( {enable_dal = true; dal_last_used; _},
           Blueprints_publisher_types.Request.Blueprint
-            {chunks = [chunk]; inbox_payload = _} )
-        when use_dal_if_enabled && dal_last_used < level ->
+            {chunks; inbox_payload = _} )
+        when use_dal_if_enabled && dal_last_used < level
+             (* For the moment, the rollup node only uses a single slot for
+                publishement. As such we cannot send blueprints that wouldn't
+                fit in a slot. *)
+             && List.length chunks
+                < Sequencer_blueprint.maximum_unsigned_chunks_per_dal_slot ->
           (state self).dal_last_used <- level ;
-          let payload = Sequencer_blueprint.create_dal_payload [chunk] in
+          let payload = Sequencer_blueprint.create_dal_payload chunks in
           let*! () = Blueprint_events.blueprint_injected_on_DAL level in
           let () =
             Prometheus.Counter.inc_one Metrics.BlueprintChunkSent.on_dal
