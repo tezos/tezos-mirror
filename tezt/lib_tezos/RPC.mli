@@ -496,6 +496,7 @@ val get_chain_mempool_monitor_operations :
   ?refused:bool ->
   ?outdated:bool ->
   ?validation_passes:int list ->
+  ?sources:string list ->
   unit ->
   JSON.t t
 

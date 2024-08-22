@@ -123,6 +123,22 @@ module Revamped = struct
          ?unprocessed
          mempool)
 
+  (* Calls the [/mempool/monitor_operations] RPC.
+     The returned promise resolves with the list of streamed
+     operations when monitoring completes (usually upon flush). *)
+  let monitor_operations ?(sources = []) node =
+    let uri =
+      RPC_core.make_uri
+        (Node.as_rpc_endpoint node)
+        (RPC.get_chain_mempool_monitor_operations ~sources ())
+      |> Uri.to_string
+    in
+    let runnable = Curl.get_raw uri in
+    let* stdout = Runnable.run runnable in
+    String.split_on_char '\n' stdout
+    |> List.filter_map (JSON.parse_opt ~origin:"monitor_operations")
+    |> List.map JSON.as_list |> List.flatten |> return
+
   (** {2 Tests } *)
 
   (** This test injects some transfer operations and checks that the mempool does
@@ -3088,6 +3104,131 @@ module Revamped = struct
     in
     log_step 13 "Check that node1 validates op5 but refuses op6." ;
     check_mempool ~validated:[oph3; oph5] ~refused:[oph2; oph4; oph6] client1
+
+  (** This test injects manager operations for several sources and checks that
+      the [sources] filter of the [monitor_operations] RPC correctly
+      filters operations by sources. *)
+  let test_filter_monitor_operations_by_sources =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Filter monitor_operations by sources"
+      ~tags:[team; "mempool"; "rpc"; "monitor_operations"; "sources"]
+    @@ fun protocol ->
+    log_step 1 "Initialize a node and a client." ;
+    let* node, client =
+      Client.init_with_protocol
+        ~nodes_args:[Synchronisation_threshold 0]
+        ~protocol
+        `Client
+        ()
+    in
+    let bootstrap1, bootstrap2, bootstrap3, bootstrap4, bootstrap5 =
+      Constant.(bootstrap1, bootstrap2, bootstrap3, bootstrap4, bootstrap5)
+    in
+
+    log_step 2 "starting monitoring for %s operations" bootstrap1.alias ;
+    let monitoring =
+      monitor_operations ~sources:[bootstrap1.public_key_hash] node
+    in
+
+    log_step 3 "bake_for_and_wait" ;
+    let* () = Client.bake_for_and_wait ~node client in
+
+    log_step 4 "check that no operations were returned through the monitoring" ;
+    let* ops = monitoring in
+    let ophs = List.map JSON.(fun json -> json |-> "hash" |> as_string) ops in
+    Check.(
+      ([] = ophs) (list string) ~error_msg:"Expected operations %L, got %R") ;
+
+    log_step
+      5
+      "inject operations from %s, %s and %s"
+      bootstrap1.alias
+      bootstrap2.alias
+      bootstrap3.alias ;
+    let* (`OpHash oph1) =
+      Operation.Manager.(inject [make ~source:bootstrap1 (transfer ())]) client
+    in
+    let* (`OpHash oph2) =
+      Operation.Manager.(inject [make ~source:bootstrap2 (transfer ())] client)
+    in
+    let* (`OpHash _) =
+      Operation.Manager.(inject [make ~source:bootstrap3 (transfer ())]) client
+    in
+
+    log_step
+      6
+      "starting monitoring for %s, %s and %s operations"
+      bootstrap1.alias
+      bootstrap2.alias
+      bootstrap4.alias ;
+    let monitoring =
+      monitor_operations
+        ~sources:
+          [
+            bootstrap1.public_key_hash;
+            bootstrap2.public_key_hash;
+            bootstrap4.public_key_hash;
+          ]
+        node
+    in
+
+    log_step
+      7
+      "inject operations from %s and %s"
+      bootstrap4.alias
+      bootstrap5.alias ;
+    let* (`OpHash oph4) =
+      Operation.Manager.(inject [make ~source:bootstrap4 (transfer ())]) client
+    in
+    let* (`OpHash _) =
+      Operation.Manager.(inject [make ~source:bootstrap5 (transfer ())] client)
+    in
+
+    log_step 8 "bake_for_and_wait" ;
+    let* () = Client.bake_for_and_wait ~node client in
+
+    log_step
+      9
+      "check that only %s, %s and %s operations are returned through the \
+       monitoring"
+      bootstrap1.alias
+      bootstrap2.alias
+      bootstrap4.alias ;
+    let* ops = monitoring in
+    let ophs = List.map JSON.(fun json -> json |-> "hash" |> as_string) ops in
+    Check.(
+      ([oph2; oph1; oph4] = ophs)
+        (list string)
+        ~error_msg:"Expected operations %L, got %R") ;
+
+    log_step 10 "starting monitoring for %s operations" bootstrap1.alias ;
+    let monitoring =
+      monitor_operations ~sources:[bootstrap1.public_key_hash] node
+    in
+
+    log_step
+      11
+      "inject operations from %s and %s"
+      bootstrap2.alias
+      bootstrap3.alias ;
+    let* (`OpHash _) =
+      Operation.Manager.(inject [make ~source:bootstrap2 (transfer ())]) client
+    in
+    let* (`OpHash _) =
+      Operation.Manager.(inject [make ~source:bootstrap3 (transfer ())]) client
+    in
+
+    log_step 12 "bake_for_and_wait" ;
+    let* () = Client.bake_for_and_wait ~node client in
+
+    log_step 13 "check that no operations were returned through the monitoring" ;
+    let* ops = monitoring in
+    let ophs = List.map JSON.(fun json -> json |-> "hash" |> as_string) ops in
+    Check.(
+      ([] = ophs) (list string) ~error_msg:"Expected operations %L, got %R") ;
+
+    unit
 end
 
 let check_operation_is_in_validated_mempool ops oph =
@@ -4199,6 +4340,7 @@ let register ~protocols =
   Revamped.propagation_future_attestation protocols ;
   Revamped.test_mempool_config_operation_filtering protocols ;
   Revamped.test_filter_mempool_operations_by_hash protocols ;
+  Revamped.test_filter_monitor_operations_by_sources protocols ;
   forge_pre_filtered_operation protocols ;
   refetch_failed_operation protocols ;
   ban_operation_and_check_validated protocols ;
