@@ -5,8 +5,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** A chunk of a blueprint *)
+type chunk = [`External of string]
+
 (** A chunked blueprint, ready to be executed localy. *)
-type payload = [`External of string] list
+type payload = chunk list
 
 type t = {
   number : Ethereum_types.quantity;

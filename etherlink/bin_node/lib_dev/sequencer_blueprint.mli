@@ -33,9 +33,10 @@ val prepare :
 val create_inbox_payload :
   smart_rollup_address:string -> chunks:t list -> Blueprint_types.payload
 
-(** [create_dal_payload chunk] encodes the chunk into a message that can be
-    read from a DAL slot by the kernel. *)
-val create_dal_payload : t -> string
+(** [create_dal_payload chunks] encodes the chunks into a message that can be
+    read from a DAL slot by the kernel. The chunks are prefixed by a tag
+    and concatenated. *)
+val create_dal_payload : t list -> string
 
 (** [maximum_usable_size_in_blueprint chunks_count] returns the available space
     for transactions in a blueprint composed of [chunks_count] chunks. *)
