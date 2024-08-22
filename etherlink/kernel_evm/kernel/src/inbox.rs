@@ -9,7 +9,7 @@ use crate::blueprint_storage::store_sequencer_blueprint;
 use crate::bridge::Deposit;
 use crate::configuration::{fetch_limits, DalConfiguration, TezosContracts};
 use crate::dal::fetch_and_parse_sequencer_blueprint_from_dal;
-use crate::dal_slot_import_signal::{DalSlotImportSignal, UnsignedDalSlotImportSignal};
+use crate::dal_slot_import_signal::DalSlotImportSignals;
 use crate::delayed_inbox::DelayedInbox;
 use crate::parsing::{
     Input, InputResult, Parsable, ProxyInput, SequencerInput, SequencerParsingContext,
@@ -333,37 +333,39 @@ impl InputHandler for SequencerInput {
             Self::SequencerBlueprint(seq_blueprint) => {
                 handle_blueprint_chunk(host, seq_blueprint)
             }
-            Self::DalSlotImportSignal(DalSlotImportSignal {
-                signal:
-                    UnsignedDalSlotImportSignal {
-                        slot_index,
-                        published_level,
-                    },
+            Self::DalSlotImportSignals(DalSlotImportSignals {
+                signals,
                 signature: _,
             }) => {
-                log!(
-                    host,
-                    Debug,
-                    "Handling a signal for slot index {} and published_level {}",
-                    slot_index,
-                    published_level
-                );
+                log!(host, Debug, "Importing {} DAL signals", &signals.0.len());
                 let params = host.reveal_dal_parameters();
-                if let Some(Self::SequencerBlueprint(seq_blueprint)) =
-                    fetch_and_parse_sequencer_blueprint_from_dal(
-                        host,
-                        smart_rollup_address,
-                        parsing_context,
-                        &params,
-                        slot_index,
-                        published_level,
-                    )
-                {
-                    log!(host, Debug, "DAL slot is a blueprint chunk");
-                    handle_blueprint_chunk(host, seq_blueprint)
-                } else {
-                    Ok(())
+                for signal in signals.0.iter() {
+                    let published_level = signal.published_level;
+                    let slot_indices = &signal.slot_indices;
+                    for slot_index in slot_indices.0.iter() {
+                        log!(
+                            host,
+                            Debug,
+                            "Handling a signal for slot index {} and published_level {}",
+                            slot_index,
+                            published_level
+                        );
+                        if let Some(Self::SequencerBlueprint(seq_blueprint)) =
+                            fetch_and_parse_sequencer_blueprint_from_dal(
+                                host,
+                                smart_rollup_address,
+                                parsing_context,
+                                &params,
+                                *slot_index,
+                                published_level,
+                            )
+                        {
+                            log!(host, Debug, "DAL slot is a blueprint chunk");
+                            handle_blueprint_chunk(host, seq_blueprint)?;
+                        }
+                    }
                 }
+                Ok(())
             }
         }
     }

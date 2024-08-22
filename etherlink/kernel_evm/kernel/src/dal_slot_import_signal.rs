@@ -7,60 +7,99 @@ use tezos_crypto_rs::hash::UnknownSignature;
 use tezos_ethereum::rlp_helpers::{self, append_u32_le, decode_field_u32_le};
 
 #[derive(PartialEq, Debug, Clone)]
-pub struct UnsignedDalSlotImportSignal {
-    pub slot_index: u8,
-    pub published_level: u32,
+pub struct DalSlotIndicesList(pub Vec<u8>);
+
+impl Encodable for DalSlotIndicesList {
+    fn rlp_append(&self, stream: &mut rlp::RlpStream) {
+        stream.begin_list(self.0.len());
+        for slot in &self.0 {
+            stream.append(slot);
+        }
+    }
+}
+
+impl Decodable for DalSlotIndicesList {
+    fn decode(decoder: &rlp::Rlp) -> Result<Self, DecoderError> {
+        rlp_helpers::check_is_list(decoder)?;
+        let slot_indices: Vec<u8> = rlp_helpers::decode_list(decoder, "slot_indices")?;
+        Ok(DalSlotIndicesList(slot_indices))
+    }
 }
 
 #[derive(PartialEq, Debug, Clone)]
-pub struct DalSlotImportSignal {
-    pub signal: UnsignedDalSlotImportSignal,
+pub struct DalSlotIndicesOfLevel {
+    pub published_level: u32,
+    pub slot_indices: DalSlotIndicesList,
+}
+
+impl Encodable for DalSlotIndicesOfLevel {
+    fn rlp_append(&self, stream: &mut rlp::RlpStream) {
+        stream.begin_list(2);
+        append_u32_le(stream, &self.published_level);
+        stream.append(&self.slot_indices);
+    }
+}
+
+impl Decodable for DalSlotIndicesOfLevel {
+    fn decode(decoder: &rlp::Rlp) -> Result<Self, DecoderError> {
+        rlp_helpers::check_list(decoder, 2)?;
+        let mut it = decoder.iter();
+        let published_level: u32 =
+            decode_field_u32_le(&rlp_helpers::next(&mut it)?, "published_level")?;
+        let slot_indices =
+            rlp_helpers::decode_field(&rlp_helpers::next(&mut it)?, "slot_indices")?;
+        Ok(DalSlotIndicesOfLevel {
+            published_level,
+            slot_indices,
+        })
+    }
+}
+
+#[derive(PartialEq, Debug, Clone)]
+pub struct UnsignedDalSlotSignals(pub Vec<DalSlotIndicesOfLevel>);
+
+impl Encodable for UnsignedDalSlotSignals {
+    fn rlp_append(&self, stream: &mut rlp::RlpStream) {
+        stream.begin_list(self.0.len());
+        for slots_with_level in &self.0 {
+            stream.append(slots_with_level);
+        }
+    }
+}
+
+impl Decodable for UnsignedDalSlotSignals {
+    fn decode(decoder: &rlp::Rlp) -> Result<Self, DecoderError> {
+        rlp_helpers::check_is_list(decoder)?;
+        let levels_with_slots: Vec<DalSlotIndicesOfLevel> =
+            rlp_helpers::decode_list(decoder, "unsigned_dal_slots_signals")?;
+        Ok(UnsignedDalSlotSignals(levels_with_slots))
+    }
+}
+
+#[derive(PartialEq, Debug, Clone)]
+pub struct DalSlotImportSignals {
+    pub signals: UnsignedDalSlotSignals,
     pub signature: UnknownSignature,
 }
 
-impl From<&DalSlotImportSignal> for UnsignedDalSlotImportSignal {
-    fn from(val: &DalSlotImportSignal) -> UnsignedDalSlotImportSignal {
-        val.signal.clone()
-    }
-}
-
-impl Encodable for UnsignedDalSlotImportSignal {
+impl Encodable for DalSlotImportSignals {
     fn rlp_append(&self, stream: &mut rlp::RlpStream) {
         stream.begin_list(2);
-        let slot_index = self.slot_index;
-        let published_level = self.published_level;
-        stream.append(&slot_index);
-        append_u32_le(stream, &published_level);
-    }
-}
-
-impl Encodable for DalSlotImportSignal {
-    fn rlp_append(&self, stream: &mut rlp::RlpStream) {
-        stream.begin_list(3);
-        let slot_index = self.signal.slot_index;
-        let published_level = self.signal.published_level;
-        stream.append(&slot_index);
-        append_u32_le(stream, &published_level);
+        stream.append(&self.signals);
         stream.append(&self.signature.as_ref());
     }
 }
 
-impl Decodable for DalSlotImportSignal {
+impl Decodable for DalSlotImportSignals {
     fn decode(decoder: &rlp::Rlp) -> Result<Self, DecoderError> {
-        rlp_helpers::check_list(decoder, 3)?;
+        rlp_helpers::check_list(decoder, 2)?;
         let mut it = decoder.iter();
-        let slot_index =
-            rlp_helpers::decode_field(&rlp_helpers::next(&mut it)?, "slot_index")?;
-        let published_level =
-            decode_field_u32_le(&rlp_helpers::next(&mut it)?, "published_level")?;
-        let bytes: Vec<u8> =
+        let signals =
+            rlp_helpers::decode_field(&rlp_helpers::next(&mut it)?, "unsigned_signals")?;
+        let signature_bytes: Vec<u8> =
             rlp_helpers::decode_field(&rlp_helpers::next(&mut it)?, "signature")?;
-        let signature = UnknownSignature::try_from(bytes.as_slice())
+        let signature = UnknownSignature::try_from(signature_bytes.as_slice())
             .map_err(|_| DecoderError::Custom("Invalid signature encoding"))?;
-        let signal = UnsignedDalSlotImportSignal {
-            slot_index,
-            published_level,
-        };
-        Ok(Self { signal, signature })
+        Ok(DalSlotImportSignals { signals, signature })
     }
 }

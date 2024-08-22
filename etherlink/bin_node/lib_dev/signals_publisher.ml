@@ -212,8 +212,7 @@ module Worker = struct
                    ~cctxt:state.cctxt
                    ~sequencer_key:state.sequencer_key
                    ~smart_rollup_address:state.smart_rollup_address
-                   ~slot_index
-                   ~published_level
+                   ~slot_ids:[(slot_index, published_level)]
                in
                let*! () =
                  Signals_publisher_events.signal_signed
