@@ -9,7 +9,6 @@ use crate::block_in_progress::BlockInProgress;
 use crate::event::Event;
 use crate::simulation::SimulationResult;
 use anyhow::Context;
-use evm_execution::account_storage::EthereumAccount;
 use evm_execution::storage::blocks::add_new_block_hash;
 use evm_execution::trace::{
     CallTracerInput, StructLoggerInput, TracerInput, CALL_TRACER_CONFIG_PREFIX,
@@ -139,14 +138,8 @@ pub const SIMULATION_RESULT: RefPath = RefPath::assert_from(b"/evm/simulation_re
 /// Path where all indexes are stored.
 pub const EVM_INDEXES: RefPath = RefPath::assert_from(b"/evm/world_state/indexes");
 
-/// Path where Ethereum accounts are stored.
-const ACCOUNTS_INDEX: RefPath = RefPath::assert_from(b"/accounts");
-
 /// Subpath where blocks are indexed.
 const BLOCKS_INDEX: RefPath = RefPath::assert_from(b"/blocks");
-
-/// Subpath where transactions are indexed
-const TRANSACTIONS_INDEX: RefPath = RefPath::assert_from(b"/transactions");
 
 // Path to the number of seconds until delayed txs are timed out.
 const EVM_DELAYED_INBOX_TIMEOUT: RefPath =
@@ -404,12 +397,6 @@ pub fn store_transaction_receipt<Host: Runtime>(
     host: &mut Host,
     receipt: &TransactionReceipt,
 ) -> Result<u64, anyhow::Error> {
-    // For each transaction hash there exists a receipt and an object. As
-    // such the indexing must be done either with the objects or the
-    // receipts otherwise they would be indexed twice. We chose to index
-    // hashes using the receipts.
-    let mut transaction_hashes_index = init_transaction_hashes_index()?;
-    index_transaction_hash(host, &receipt.hash, &mut transaction_hashes_index)?;
     let receipt_path = receipt_path(&receipt.hash)?;
     let src: &[u8] = &receipt.rlp_bytes();
     log!(host, Benchmarking, "Storing receipt of size {}", src.len());
@@ -820,39 +807,10 @@ pub fn read_last_info_per_level_timestamp<Host: Runtime>(
     read_timestamp_path(host, &EVM_INFO_PER_LEVEL_TIMESTAMP.into())
 }
 
-/// Get the index of accounts.
-pub fn init_account_index() -> Result<IndexableStorage, StorageError> {
-    let path = concat(&EVM_INDEXES, &ACCOUNTS_INDEX)?;
-    IndexableStorage::new(&RefPath::from(&path)).map_err(StorageError::Storage)
-}
-
 /// Get the index of blocks.
 pub fn init_blocks_index() -> Result<IndexableStorage, StorageError> {
     let path = concat(&EVM_INDEXES, &BLOCKS_INDEX)?;
     IndexableStorage::new(&RefPath::from(&path)).map_err(StorageError::Storage)
-}
-
-/// Get the index of transactions
-pub fn init_transaction_hashes_index() -> Result<IndexableStorage, StorageError> {
-    let path = concat(&EVM_INDEXES, &TRANSACTIONS_INDEX)?;
-    IndexableStorage::new(&RefPath::from(&path)).map_err(StorageError::Storage)
-}
-
-pub fn index_account(
-    host: &mut impl Runtime,
-    address: &H160,
-    index: &mut IndexableStorage,
-) -> Result<(), Error> {
-    let account = EthereumAccount::from_address(address)?;
-    // A new account is created whether when it receives assets for the
-    // first time, or when it is created through a contract deployment, by
-    // construction it should be indexed at this specific times.
-    if account.indexed(host)? {
-        Ok(())
-    } else {
-        index.push_value(host, address.as_bytes())?;
-        account.set_indexed(host).map_err(Error::from)
-    }
 }
 
 fn read_b58_kt1<Host: Runtime>(host: &Host, path: &OwnedPath) -> Option<ContractKt1Hash> {
@@ -897,16 +855,6 @@ pub fn index_block(
 ) -> Result<(), Error> {
     blocks_index
         .push_value(host, block_hash.as_bytes())
-        .map_err(Error::from)
-}
-
-pub fn index_transaction_hash(
-    host: &mut impl Runtime,
-    transaction_hash: &[u8],
-    transaction_hashes_index: &mut IndexableStorage,
-) -> Result<(), Error> {
-    transaction_hashes_index
-        .push_value(host, transaction_hash)
         .map_err(Error::from)
 }
 

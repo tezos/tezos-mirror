@@ -24,7 +24,6 @@ use tezos_ethereum::transaction::{TransactionHash, TransactionType};
 use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_ethereum::tx_signature::TxSignature;
 use tezos_evm_logging::{log, Level::*};
-use tezos_indexable_storage::IndexableStorage;
 use tezos_smart_rollup::outbox::{OutboxMessage, OutboxQueue};
 use tezos_smart_rollup_host::path::{Path, RefPath};
 use tezos_smart_rollup_host::runtime::Runtime;
@@ -34,7 +33,6 @@ use crate::configuration::Limits;
 use crate::error::Error;
 use crate::fees::{tx_execution_gas_limit, FeeUpdates};
 use crate::inbox::{Transaction, TransactionContent};
-use crate::storage::index_account;
 use crate::CONFIG;
 
 // This implementation of `Transaction` is used to share the logic of
@@ -170,27 +168,6 @@ fn make_object_info(
         value: transaction.value(),
         signature: transaction.signature(),
     })
-}
-
-// From a receipt, indexes the caller, recipient and the new address if needs
-// be.
-fn index_new_accounts<Host: Runtime>(
-    host: &mut Host,
-    accounts_index: &mut IndexableStorage,
-    receipt: &TransactionReceiptInfo,
-) -> Result<(), Error> {
-    index_account(host, &receipt.caller, accounts_index)?;
-    if let Some(to) = receipt.to {
-        index_account(host, &to, accounts_index)?
-    };
-    match receipt
-        .execution_outcome
-        .as_ref()
-        .and_then(|o| o.new_address)
-    {
-        Some(to) => index_account(host, &to, accounts_index),
-        None => Ok(()),
-    }
 }
 
 fn account<Host: Runtime>(
@@ -559,7 +536,6 @@ pub fn handle_transaction_result<Host: Runtime>(
     transaction: &Transaction,
     index: u32,
     evm_account_storage: &mut EthereumAccountStorage,
-    accounts_index: &mut IndexableStorage,
     transaction_result: TransactionResult,
     pay_fees: bool,
     sequencer_pool_address: Option<H160>,
@@ -605,7 +581,6 @@ pub fn handle_transaction_result<Host: Runtime>(
         transaction.type_(),
     );
 
-    index_new_accounts(host, accounts_index, &receipt_info)?;
     Ok(ExecutionInfo {
         receipt_info,
         object_info,
@@ -622,7 +597,6 @@ pub fn apply_transaction<Host: Runtime>(
     transaction: &Transaction,
     index: u32,
     evm_account_storage: &mut EthereumAccountStorage,
-    accounts_index: &mut IndexableStorage,
     allocated_ticks: u64,
     retriable: bool,
     sequencer_pool_address: Option<H160>,
@@ -689,7 +663,6 @@ pub fn apply_transaction<Host: Runtime>(
                 transaction,
                 index,
                 evm_account_storage,
-                accounts_index,
                 tx_result,
                 true,
                 sequencer_pool_address,
@@ -706,7 +679,6 @@ pub fn apply_transaction<Host: Runtime>(
                 transaction,
                 index,
                 evm_account_storage,
-                accounts_index,
                 tx_result,
                 false,
                 sequencer_pool_address,
