@@ -29,19 +29,21 @@ local node = import './node-new.jsonnet';
 local p2p = import './p2p-new.jsonnet';
 local workers = import './workers-new.jsonnet';
 local rpc = import './rpc-new.jsonnet';
+local logs = import './logs-new.jsonnet';
 
 //Position variables
-local p2p_y = 39;
-local worker_y = 72;
-local rpc_y = 97;
-local misc_y = 114;
+local p2p_y = 47;
+local worker_y = 80;
+local rpc_y = 105;
+local misc_y = 122;
+local logs_y = 131;
 
 //###
 // Grafana main stuffs
 //##
-dashboard.new('Octez basic dashboard')
-+ dashboard.withDescription('A basic dashboard for Octez')
-+ dashboard.withTags(['tezos', 'octez'])
+dashboard.new('Octez with logs dashboard')
++ dashboard.withDescription('A dashboard for Octez including logs')
++ dashboard.withTags(['tezos', 'octez', 'logs'])
 + dashboard.time.withFrom('now-3h')
 + dashboard.withRefresh('20s')
 + dashboard.withVariables([base.nodeInstance])
@@ -49,7 +51,7 @@ dashboard.new('Octez basic dashboard')
 + dashboard.withPanels(
 
   //#######
-  grafonnet.util.grid.wrapPanels(panels=[panel.row.new('Node stats')], panelWidth=26, panelHeight=30, startY=1)
+  grafonnet.util.grid.wrapPanels(panels=[panel.row.new('Node stats')], panelWidth=26, panelHeight=45, startY=0)
   + [
     node.bootstrapStatus(h=3, w=2, x=0, y=1),
     node.syncStatus(h=3, w=2, x=2, y=1),
@@ -68,12 +70,13 @@ dashboard.new('Octez basic dashboard')
     p2p.privateConnections(h=3, w=2, x=2, y=19),
     node.headHistory(h=10, w=10, x=4, y=4),
     node.blocksValidationTime(h=8, w=10, x=4, y=14),
+    logs.nodelogs(h=21, w=10, x=14, y=0),
     node.headOperations(h=8, w=14, x=0, y=22),
+    node.invalidBlocksHistory(h=8, w=10, x=14, y=22),
     node.gasConsumedHistory(h=8, w=14, x=0, y=30),
-    node.invalidBlocksHistory(h=9, w=10, x=14, y=1),
-    node.roundHistory(h=9, w=10, x=14, y=10),
-    node.writtenBlockSize(h=10, w=10, x=14, y=19),
-    node.storeMergeTimeGraph(h=9, w=10, x=14, y=29),
+    node.roundHistory(h=8, w=10, x=14, y=30),
+    node.storeMergeTimeGraph(h=8, w=14, x=0, y=38),
+    node.writtenBlockSize(h=8, w=10, x=14, y=38),
   ]
 
   //#######
@@ -132,4 +135,16 @@ dashboard.new('Octez basic dashboard')
     node.gcOperations(h=8, w=12, x=0, y=misc_y),
     node.gcMajorHeap(h=8, w=12, x=12, y=misc_y),
   ]
+
+  //#######
+  + grafonnet.util.grid.wrapPanels(panels=[
+    panel.row.new('Logs'),
+  ], panelWidth=24, panelHeight=8, startY=logs_y)
+  + [
+    logs.nodelogs(h=10, w=8, x=0, y=logs_y),
+    logs.bakerlogs(h=10, w=8, x=8, y=logs_y),
+    logs.accuserlogs(h=10, w=8, x=16, y=logs_y),
+    logs.systemlogs(h=14, w=12, x=0, y=logs_y + 10),
+  ]
+
 )
