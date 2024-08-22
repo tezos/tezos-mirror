@@ -413,7 +413,7 @@ let test_delegates_on_registered_alpha ~contracts ?endpoint client =
   in
   unit
 
-let test_adaptive_issuance_on_oxford ~contracts ?endpoint client =
+let test_adaptive_issuance ~contracts ?endpoint client =
   Log.info "Test adaptive issuance parameters retrieval" ;
 
   let* _ =
@@ -649,7 +649,7 @@ let test_delegates _test_mode_tag _protocol ?endpoint client =
 (* Test the adaptive issuance RPC. *)
 let test_adaptive_issuance _test_mode_tag (_ : Protocol.t) ?endpoint client =
   let* contracts = get_contracts ?endpoint client in
-  test_adaptive_issuance_on_oxford ~contracts ?endpoint client
+  test_adaptive_issuance ~contracts ?endpoint client
 
 (* Test the votes RPC. *)
 let test_votes _test_mode_tag _protocol ?endpoint client =
