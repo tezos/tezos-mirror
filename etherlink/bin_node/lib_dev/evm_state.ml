@@ -239,12 +239,7 @@ let execute_and_inspect ?wasm_pvm_fallback ~data_dir ?wasm_entrypoint ~config
   return values
 
 type apply_result =
-  | Apply_success of {
-      evm_state : t;
-      level : quantity;
-      block_hash : block_hash;
-      number_of_transactions : int;
-    }
+  | Apply_success of {evm_state : t; block : Ethereum_types.block}
   | Apply_failure
 
 let apply_blueprint ?wasm_pvm_fallback ?log_file ?profile ~data_dir ~config
@@ -275,21 +270,9 @@ let apply_blueprint ?wasm_pvm_fallback ?log_file ?profile ~data_dir ~config
     return (Option.map Ethereum_types.block_from_rlp bytes)
   in
   match block with
-  | Some {number = Qty after_height; transactions; _}
+  | Some ({number = Qty after_height; _} as block)
     when Z.(equal (succ before_height) after_height) ->
-      let number_of_transactions =
-        match transactions with
-        | TxHash l -> List.length l
-        | TxFull l -> List.length l
-      in
-      return
-        (Apply_success
-           {
-             evm_state;
-             level = Qty after_height;
-             block_hash;
-             number_of_transactions;
-           })
+      return (Apply_success {evm_state; block})
   | _ -> return Apply_failure
 
 let clear_delayed_inbox evm_state =
