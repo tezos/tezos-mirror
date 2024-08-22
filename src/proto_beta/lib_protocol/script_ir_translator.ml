@@ -2374,14 +2374,17 @@ let rec parse_data :
                 _annot ) ->
               parse_ticket loc ticketer contents_type contents amount
           | Prim (_, D_Pair, _, _) ->
-              if legacy then
-                let*? ty = opened_ticket_type (location expr) t in
-                let+ ({destination; entrypoint = _}, (contents, amount)), ctxt =
-                  non_terminal_recursion ctxt ty expr
-                in
-                ((destination, contents, amount), ctxt)
-              else tzfail @@ unexpected expr [] Constant_namespace [D_Ticket]
-          | _ -> tzfail @@ unexpected expr [] Constant_namespace [D_Ticket]
+              (* TODO: https://gitlab.com/tezos/tezos/-/issues/6833
+
+                 In the future, this [D_Pair] constructor must
+                 be allowed only when the legacy flag is set to true. *)
+              let*? ty = opened_ticket_type (location expr) t in
+              let+ ({destination; entrypoint = _}, (contents, amount)), ctxt =
+                non_terminal_recursion ctxt ty expr
+              in
+              ((destination, contents, amount), ctxt)
+          | _ ->
+              tzfail @@ unexpected expr [] Constant_namespace [D_Ticket; D_Pair]
         in
         match Ticket_amount.of_n amount with
         | Some amount -> (
