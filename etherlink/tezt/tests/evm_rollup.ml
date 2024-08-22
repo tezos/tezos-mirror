@@ -3237,9 +3237,34 @@ let test_latest_kernel_migration protocols =
       in
       let*@ block_result = latest_block evm_setup.evm_node in
       let* config_result = config_setup evm_setup in
+      let* indexes =
+        Sc_rollup_node.RPC.call
+          evm_setup.sc_rollup_node
+          ~rpc_hooks:Tezos_regression.rpc_hooks
+        @@ Sc_rollup_rpc.get_global_block_durable_state_value
+             ~pvm_kind
+             ~operation:Sc_rollup_rpc.Subkeys
+             ~key:Durable_storage_path.indexes
+             ()
+      in
+      let indexes = List.sort compare indexes in
+      Check.((indexes = ["accounts"; "blocks"; "transactions"]) (list string))
+        ~error_msg:"Expected indexes to be %R, got %L" ;
       return {transfer_result; block_result; config_result}
     in
     let scenario_after ~evm_setup ~sanity_check =
+      let* indexes =
+        Sc_rollup_node.RPC.call
+          evm_setup.sc_rollup_node
+          ~rpc_hooks:Tezos_regression.rpc_hooks
+        @@ Sc_rollup_rpc.get_global_block_durable_state_value
+             ~pvm_kind
+             ~operation:Sc_rollup_rpc.Subkeys
+             ~key:Durable_storage_path.indexes
+             ()
+      in
+      Check.((indexes = ["blocks"]) (list string))
+        ~error_msg:"Expected indexes to be %R, got %L" ;
       let* () =
         ensure_transfer_result_integrity
           ~sender

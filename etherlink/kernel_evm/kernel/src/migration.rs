@@ -77,6 +77,17 @@ fn migrate_to<Host: Runtime>(
             // is available.
             Ok(MigrationStatus::Done)
         }
+        StorageVersion::V16 => {
+            // Allow path not found in case the migration is performed
+            // on a context with no blocks or no transactions.
+            allow_path_not_found(host.store_delete(&RefPath::assert_from(
+                b"/evm/world_state/indexes/accounts",
+            )))?;
+            allow_path_not_found(host.store_delete(&RefPath::assert_from(
+                b"/evm/world_state/indexes/transactions",
+            )))?;
+            Ok(MigrationStatus::Done)
+        }
     }
 }
 
