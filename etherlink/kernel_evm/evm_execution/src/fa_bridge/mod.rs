@@ -46,6 +46,7 @@ use crate::{
     account_storage::EthereumAccountStorage,
     handler::{CreateOutcome, EvmHandler, ExecutionOutcome},
     precompiles::{PrecompileBTreeMap, PrecompileOutcome, SYSTEM_ACCOUNT_ADDRESS},
+    trace::TracerInput,
     transaction::TransactionContext,
     withdrawal_counter::WithdrawalCounter,
     EthereumError,
@@ -124,6 +125,7 @@ pub fn execute_fa_deposit<'a, Host: Runtime>(
     caller: H160,
     deposit: &FaDeposit,
     allocated_ticks: u64,
+    tracer_input: Option<TracerInput>,
 ) -> Result<ExecutionOutcome, EthereumError> {
     log!(host, Info, "Going to execute a {}", deposit.display());
 
@@ -138,7 +140,7 @@ pub fn execute_fa_deposit<'a, Host: Runtime>(
         block.base_fee_per_gas(),
         // Warm-cold access only used for evaluation (for checking EVM compatibility), but not in production
         false,
-        None,
+        tracer_input,
     );
 
     handler.begin_initial_transaction(false, Some(FA_DEPOSIT_PROXY_GAS_LIMIT))?;

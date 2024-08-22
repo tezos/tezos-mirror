@@ -5912,6 +5912,76 @@ let test_trace_transaction_calltracer_precompiles =
     call_list ;
   unit
 
+let test_trace_transaction_calltracer_deposit =
+  register_all
+    ~kernels:[Latest]
+    ~time_between_blocks:Nothing
+    ~da_fee:arb_da_fee_for_delayed_inbox
+    ~tags:["evm"; "rpc"; "trace"; "call_trace"; "deposit"]
+    ~title:"debug_traceTransaction with calltracer can trace deposits"
+  @@ fun {
+           client;
+           l1_contracts;
+           sc_rollup_address;
+           sc_rollup_node;
+           sequencer;
+           proxy;
+           _;
+         }
+             _protocol ->
+  let endpoint = Evm_node.endpoint sequencer in
+  let amount = Tez.of_int 16 in
+  let depositor = Constant.bootstrap5 in
+  let receiver =
+    Eth_account.
+      {
+        address = "0x1074Fd1EC02cbeaa5A90450505cF3B48D834f3EB";
+        private_key =
+          "0xb7c548b5442f5b28236f0dcd619f65aaaafd952240908adcf9642d8e616587ee";
+      }
+  in
+  let* receiver_balance_prev =
+    Eth_cli.balance ~account:receiver.address ~endpoint
+  in
+  let* () =
+    send_deposit_to_delayed_inbox
+      ~amount
+      ~l1_contracts
+      ~depositor
+      ~receiver:receiver.address
+      ~sc_rollup_node
+      ~sc_rollup_address
+      client
+  in
+  let* () =
+    wait_for_delayed_inbox_add_tx_and_injected
+      ~sequencer
+      ~sc_rollup_node
+      ~client
+  in
+  let*@ block = Rpc.get_block_by_number ~block:"latest" sequencer in
+  let transaction_hash =
+    match block.transactions with
+    | Hash txs -> List.hd txs
+    | Full _ | Empty ->
+        failwith "Block should contain at least one simple transaction"
+  in
+  let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
+  let* receiver_balance_next =
+    Eth_cli.balance ~account:receiver.address ~endpoint
+  in
+  Check.((receiver_balance_next > receiver_balance_prev) Wei.typ)
+    ~error_msg:"Expected a bigger balance" ;
+  (* The following tracing should succeed. *)
+  let*@ _ =
+    Rpc.trace_transaction
+      ~tracer:"callTracer"
+      ~transaction_hash
+      ~tracer_config:[("withLog", `Bool false); ("onlyTopCall", `Bool false)]
+      sequencer
+  in
+  unit
+
 let test_miner =
   let sequencer_pool_address =
     String.lowercase_ascii "0x8aaD6553Cf769Aa7b89174bE824ED0e53768ed70"
@@ -6666,6 +6736,7 @@ let () =
   test_trace_transaction_calltracer_multiple_txs protocols ;
   test_trace_transaction_calltracer_on_simple_transfer protocols ;
   test_trace_transaction_calltracer_precompiles protocols ;
+  test_trace_transaction_calltracer_deposit protocols ;
   test_debug_print_store_schemas () ;
   test_man () ;
   test_describe_config () ;

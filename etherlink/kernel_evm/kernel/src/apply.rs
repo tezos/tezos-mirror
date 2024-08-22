@@ -6,13 +6,18 @@
 //
 // SPDX-License-Identifier: MIT
 
+use ethereum::Log;
 use evm_execution::account_storage::{EthereumAccount, EthereumAccountStorage};
 use evm_execution::fa_bridge::deposit::FaDeposit;
 use evm_execution::fa_bridge::execute_fa_deposit;
 use evm_execution::handler::{ExecutionOutcome, ExtendedExitReason, RouterInterface};
 use evm_execution::precompiles::PrecompileBTreeMap;
 use evm_execution::run_transaction;
-use evm_execution::trace::{get_tracer_configuration, TracerInput};
+use evm_execution::storage::tracer;
+use evm_execution::trace::TracerInput::CallTracer;
+use evm_execution::trace::{
+    get_tracer_configuration, CallTrace, CallTracerConfig, CallTracerInput, TracerInput,
+};
 use primitive_types::{H160, H256, U256};
 use tezos_ethereum::block::BlockConstants;
 use tezos_ethereum::transaction::{TransactionHash, TransactionType};
@@ -40,7 +45,9 @@ impl Transaction {
     fn to(&self) -> Option<H160> {
         match &self.content {
             TransactionContent::Deposit(Deposit { receiver, .. }) => Some(*receiver),
-            TransactionContent::FaDeposit(_) => Some(H160::zero()),
+            TransactionContent::FaDeposit(FaDeposit {
+                receiver, proxy, ..
+            }) => Some(proxy.unwrap_or(*receiver)),
             TransactionContent::Ethereum(transaction)
             | TransactionContent::EthereumDelayed(transaction) => transaction.to,
         }
@@ -412,13 +419,56 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
     }
 }
 
+fn trace_deposit<Host: Runtime>(
+    host: &mut Host,
+    amount: U256,
+    receiver: Option<H160>,
+    gas_used: u64,
+    logs: &[Log],
+    tracer_input: Option<TracerInput>,
+) {
+    if let Some(CallTracer(CallTracerInput {
+        transaction_hash,
+        config: CallTracerConfig { with_logs, .. },
+    })) = tracer_input
+    {
+        let mut call_trace = CallTrace::new_minimal_trace(
+            "CALL".into(),
+            H160::zero(),
+            amount,
+            gas_used,
+            vec![],
+            0,
+        );
+
+        call_trace.add_to(receiver);
+
+        if with_logs {
+            call_trace.add_logs(Some(logs.to_owned()))
+        }
+
+        let _ = tracer::store_call_trace(host, call_trace, &transaction_hash);
+    }
+}
+
 fn apply_deposit<Host: Runtime>(
     host: &mut Host,
     evm_account_storage: &mut EthereumAccountStorage,
     deposit: &Deposit,
+    transaction: &Transaction,
+    tracer_input: Option<TracerInput>,
 ) -> Result<ExecutionResult<TransactionResult>, Error> {
     let execution_outcome = execute_deposit(host, evm_account_storage, deposit, CONFIG)
         .map_err(Error::InvalidRunTransaction)?;
+
+    trace_deposit(
+        host,
+        transaction.value(),
+        transaction.to(),
+        execution_outcome.gas_used,
+        &execution_outcome.logs,
+        tracer_input,
+    );
 
     Ok(ExecutionResult::Valid(TransactionResult {
         caller: H160::zero(),
@@ -428,6 +478,7 @@ fn apply_deposit<Host: Runtime>(
     }))
 }
 
+#[allow(clippy::too_many_arguments)]
 fn apply_fa_deposit<Host: Runtime>(
     host: &mut Host,
     evm_account_storage: &mut EthereumAccountStorage,
@@ -435,6 +486,8 @@ fn apply_fa_deposit<Host: Runtime>(
     block_constants: &BlockConstants,
     precompiles: &PrecompileBTreeMap<Host>,
     allocated_ticks: u64,
+    transaction: &Transaction,
+    tracer_input: Option<TracerInput>,
 ) -> Result<ExecutionResult<TransactionResult>, Error> {
     let caller = H160::zero();
     let outcome = execute_fa_deposit(
@@ -446,6 +499,7 @@ fn apply_fa_deposit<Host: Runtime>(
         caller,
         fa_deposit,
         allocated_ticks,
+        tracer_input,
     )
     .map_err(Error::InvalidRunTransaction)?;
 
@@ -454,6 +508,15 @@ fn apply_fa_deposit<Host: Runtime>(
         Benchmarking,
         "Transaction status: OK_{}.",
         outcome.is_success()
+    );
+
+    trace_deposit(
+        host,
+        transaction.value(),
+        transaction.to(),
+        outcome.gas_used,
+        &outcome.logs,
+        tracer_input,
     );
 
     Ok(ExecutionResult::Valid(TransactionResult {
@@ -594,7 +657,13 @@ pub fn apply_transaction<Host: Runtime>(
         )?,
         TransactionContent::Deposit(deposit) => {
             log!(host, Benchmarking, "Transaction type: DEPOSIT");
-            apply_deposit(host, evm_account_storage, deposit)?
+            apply_deposit(
+                host,
+                evm_account_storage,
+                deposit,
+                transaction,
+                tracer_input,
+            )?
         }
         TransactionContent::FaDeposit(fa_deposit) => {
             log!(host, Benchmarking, "Transaction type: FA_DEPOSIT");
@@ -605,6 +674,8 @@ pub fn apply_transaction<Host: Runtime>(
                 block_constants,
                 precompiles,
                 allocated_ticks,
+                transaction,
+                tracer_input,
             )?
         }
     };
