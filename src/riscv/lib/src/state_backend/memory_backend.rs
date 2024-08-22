@@ -124,17 +124,21 @@ impl<L: Layout> backend::Backend for InMemoryBackend<L> {
         let mut manager = SliceManagerRO::new(self.borrow());
         L::allocate(&mut manager, placed)
     }
+}
 
-    fn read(&self, index: usize, buffer: &mut [u8]) {
-        let len = buffer.len();
-        assert!(index <= self.layout.size() - len);
-        buffer.copy_from_slice(&self.borrow()[index..index + len]);
+impl<L: Layout> backend::BackendFull for InMemoryBackend<L> {
+    fn region<E: backend::Elem, const LEN: usize>(
+        &self,
+        loc: &backend::Location<[E; LEN]>,
+    ) -> &[u8] {
+        &self.borrow()[loc.offset()..][..loc.size()]
     }
 
-    fn write(&mut self, index: usize, buffer: &[u8]) {
-        let len = buffer.len();
-        assert!(index <= self.layout.size() - len);
-        self.borrow_mut()[index..index + len].copy_from_slice(buffer);
+    fn region_mut<E: backend::Elem, const LEN: usize>(
+        &mut self,
+        loc: &backend::Location<[E; LEN]>,
+    ) -> &mut [u8] {
+        &mut self.borrow_mut()[loc.offset()..][..loc.size()]
     }
 }
 

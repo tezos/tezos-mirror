@@ -201,16 +201,19 @@ pub trait Backend: BackendManagement + Sized {
         &self,
         placed: PlacedOf<Self::Layout>,
     ) -> AllocatedOf<Self::Layout, Self::ManagerRO<'_>>;
+}
 
-    /// Read bytes from the backing storage.
-    fn read(&self, index: usize, buffer: &mut [u8]);
+/// Like [Backend], but with all its state accessible.
+pub trait BackendFull: Backend {
+    /// Obtain a reference to the storage that backs the given location.
+    fn region<E: Elem, const LEN: usize>(&self, loc: &Location<[E; LEN]>) -> &[u8];
 
-    /// Write bytes to the backing storage.
-    fn write(&mut self, index: usize, buffer: &[u8]);
+    /// Obtain a mutable reference to the storage that backs the given location.
+    fn region_mut<E: Elem, const LEN: usize>(&mut self, loc: &Location<[E; LEN]>) -> &mut [u8];
 }
 
 pub mod test_helpers {
-    use super::{Backend, Layout};
+    use super::{BackendFull, Layout};
     use std::fmt;
 
     /// Generate a test against all test backends.
@@ -231,7 +234,7 @@ pub mod test_helpers {
 
     /// This lets you construct backends for any layout.
     pub trait TestBackendFactory {
-        type Backend<L: Layout>: Backend<Layout = L> + Clone + fmt::Debug + Eq;
+        type Backend<L: Layout>: BackendFull<Layout = L> + Clone + fmt::Debug + Eq;
 
         /// Construct a backend for the given layout `L`.
         fn new<L: Layout>() -> Self::Backend<L>;
@@ -242,28 +245,43 @@ pub mod test_helpers {
 pub mod tests {
     use super::{test_helpers::TestBackendFactory, *};
     use crate::backend_test;
-    use rand::{Fill, Rng};
-    use std::{collections::VecDeque, marker::PhantomData};
+    use rand::Fill;
+    use std::marker::PhantomData;
 
     /// Fill the backend with random data.
-    pub fn randomise_backend<B: Backend>(backend: &mut B) {
-        let len = B::Layout::placed().size();
-        let mut rand_data = vec![0u8; len];
+    pub fn randomise_backend<B: BackendFull>(backend: &mut B) {
+        struct Randomiser<'a, B> {
+            backend: &'a mut B,
+        }
 
-        rand_data
-            .as_mut_slice()
-            .try_fill(&mut rand::thread_rng())
-            .unwrap();
+        impl<'a, B> ManagerBase for Randomiser<'a, B> {
+            type Region<E: Elem, const LEN: usize> = DummyRegion<E>;
 
-        backend.write(0, rand_data.as_slice());
-    }
+            type DynRegion<const LEN: usize> = DummyRegion<u8>;
+        }
 
-    /// Read the entire backend data.
-    pub fn read_backend<B: Backend>(backend: &B) -> Vec<u8> {
-        let len = B::Layout::placed().size();
-        let mut data = vec![0u8; len];
-        backend.read(0, data.as_mut_slice());
-        data
+        impl<'a, B: BackendFull> ManagerAlloc for Randomiser<'a, B> {
+            fn allocate_region<E: Elem, const LEN: usize>(
+                &mut self,
+                loc: Location<[E; LEN]>,
+            ) -> Self::Region<E, LEN> {
+                let region = self.backend.region_mut(&loc);
+                region.try_fill(&mut rand::thread_rng()).unwrap();
+                DummyRegion(PhantomData)
+            }
+
+            fn allocate_dyn_region<const LEN: usize>(
+                &mut self,
+                loc: Location<[u8; LEN]>,
+            ) -> Self::DynRegion<LEN> {
+                self.allocate_region(loc)
+            }
+        }
+
+        B::Layout::allocate(
+            &mut Randomiser { backend },
+            B::Layout::placed().into_location(),
+        );
     }
 
     /// Construct the manager for a given backend lifetime `'a`, a test backend
@@ -273,135 +291,6 @@ pub mod tests {
 
     /// Dummy region that does nothing
     struct DummyRegion<E>(PhantomData<E>);
-
-    /// A tracing [Manager] that only keeps track of a layout's locations.
-    struct TraceManager {
-        pub regions: VecDeque<(usize, usize)>,
-    }
-
-    impl TraceManager {
-        /// Trace the locations of `L`.
-        fn trace<L: Layout>(placed: L::Placed) -> VecDeque<(usize, usize)> {
-            let mut mgr = Self {
-                regions: VecDeque::new(),
-            };
-            L::allocate(&mut mgr, placed);
-            mgr.regions
-        }
-    }
-
-    impl ManagerBase for TraceManager {
-        type Region<E: Elem, const LEN: usize> = DummyRegion<E>;
-
-        type DynRegion<const LEN: usize> = DummyRegion<u8>;
-    }
-
-    impl ManagerAlloc for TraceManager {
-        fn allocate_region<E: Elem, const LEN: usize>(
-            &mut self,
-            loc: Location<[E; LEN]>,
-        ) -> Self::Region<E, LEN> {
-            self.regions.push_back((loc.offset(), loc.size()));
-            DummyRegion(PhantomData)
-        }
-
-        fn allocate_dyn_region<const LEN: usize>(
-            &mut self,
-            loc: Location<[u8; LEN]>,
-        ) -> Self::DynRegion<LEN> {
-            self.allocate_region::<u8, LEN>(loc)
-        }
-    }
-
-    // TODO: RV-157: Remove this implementation
-    impl ManagerRead for TraceManager {
-        fn region_read<E: Elem, const LEN: usize>(
-            _region: &Self::Region<E, LEN>,
-            _index: usize,
-        ) -> E {
-            unimplemented!()
-        }
-
-        fn region_read_all<E: Elem, const LEN: usize>(_region: &Self::Region<E, LEN>) -> Vec<E> {
-            unimplemented!()
-        }
-
-        fn region_read_some<E: Elem, const LEN: usize>(
-            _region: &Self::Region<E, LEN>,
-            _offset: usize,
-            _buffer: &mut [E],
-        ) {
-            unimplemented!()
-        }
-
-        fn dyn_region_read<E: Elem, const LEN: usize>(
-            _region: &Self::DynRegion<LEN>,
-            _address: usize,
-        ) -> E {
-            unimplemented!()
-        }
-
-        fn dyn_region_read_all<E: Elem, const LEN: usize>(
-            _region: &Self::DynRegion<LEN>,
-            _address: usize,
-            _values: &mut [E],
-        ) {
-            unimplemented!()
-        }
-    }
-
-    // TODO: RV-157: Remove this implementation
-    impl ManagerWrite for TraceManager {
-        fn region_write<E: Elem, const LEN: usize>(
-            _region: &mut Self::Region<E, LEN>,
-            _index: usize,
-            _value: E,
-        ) {
-            unimplemented!()
-        }
-
-        fn region_write_all<E: Elem, const LEN: usize>(
-            _region: &mut Self::Region<E, LEN>,
-            _value: &[E],
-        ) {
-            unimplemented!()
-        }
-
-        fn region_write_some<E: Elem, const LEN: usize>(
-            _region: &mut Self::Region<E, LEN>,
-            _index: usize,
-            _buffer: &[E],
-        ) {
-            unimplemented!()
-        }
-
-        fn dyn_region_write<E: Elem, const LEN: usize>(
-            _region: &mut Self::DynRegion<LEN>,
-            _address: usize,
-            _value: E,
-        ) {
-            unimplemented!()
-        }
-
-        fn dyn_region_write_all<E: Elem, const LEN: usize>(
-            _region: &mut Self::DynRegion<LEN>,
-            _address: usize,
-            _values: &[E],
-        ) {
-            unimplemented!()
-        }
-    }
-
-    // TODO: RV-157: Remove this implementation
-    impl ManagerReadWrite for TraceManager {
-        fn region_replace<E: Elem, const LEN: usize>(
-            _region: &mut Self::Region<E, LEN>,
-            _index: usize,
-            _value: E,
-        ) -> E {
-            unimplemented!()
-        }
-    }
 
     /// Run `f` twice against two different randomised backends and see if the
     /// resulting backend state is the same afterwards.
@@ -413,47 +302,13 @@ pub mod tests {
         randomise_backend(&mut backend1);
 
         let mut backend2 = crate::create_backend!(L, F);
-
-        // Ensure both backends start off sufficiently different.
-        let mut data = read_backend(&backend1);
-
-        let mut rng = rand::thread_rng();
-        for reff in data.iter_mut() {
-            let val = *reff;
-            *reff = loop {
-                let select: u8 = rng.gen();
-                if val != select {
-                    break select;
-                }
-            };
-        }
-
-        backend2.write(0, &data);
-
-        // Trace the location allocation process in order to find where in the
-        // backend storage we have placed regions.
-        let locs = TraceManager::trace::<L>(L::placed().into_location());
+        randomise_backend(&mut backend2);
 
         // Run the procedure against both backends.
         f(backend1.allocate(L::placed().into_location()));
         f(backend2.allocate(L::placed().into_location()));
 
-        // Loop over the locations that have regions allocated to them.
-        // If we were to compare the entire backend storage, we would also
-        // include regions that the states can't write to (e.g. padding in front
-        // of alignment).
-        for (offset, size) in locs {
-            let mut buffer1 = vec![0u8; size];
-            Backend::read(&backend1, offset, &mut buffer1);
-
-            let mut buffer2 = vec![0u8; size];
-            Backend::read(&backend2, offset, &mut buffer2);
-
-            assert_eq!(
-                buffer1, buffer2,
-                "Location {offset}+{size} is different: {buffer1:?} != {buffer2:?}"
-            );
-        }
+        assert_eq!(backend1, backend2);
     }
 
     /// Given a `StateLayout` and a [`TestBackendFactory`] type,
@@ -524,19 +379,21 @@ pub mod tests {
 
         let mut backend = create_backend!(ExampleLayout, F);
 
-        let placed = ExampleLayout::placed().into_location();
+        let (first_loc, second_loc) = ExampleLayout::placed().into_location();
+        let first_loc = first_loc.as_array();
 
-        let first_offset = placed.0.offset();
+        let first_offset = first_loc.offset();
         assert_eq!(first_offset, 0);
 
-        let second_offset = placed.1.offset();
+        let second_offset = second_loc.offset();
         assert_eq!(second_offset, 8);
 
         let first_value: u64 = rand::random();
         let second_value: [u32; 4] = rand::random();
 
         {
-            let mut instance = Example::bind(backend.allocate(placed));
+            let mut instance =
+                Example::bind(backend.allocate(ExampleLayout::placed().into_location()));
 
             instance.first.write(first_value);
             assert_eq!(instance.first.read(), first_value);
@@ -545,16 +402,17 @@ pub mod tests {
             assert_eq!(instance.second.read_all(), second_value);
         }
 
-        let mut first_value_read = 0u64;
-        backend.read(first_offset, unsafe {
-            &mut *(&mut first_value_read as *mut u64 as *mut [u8; 8])
-        });
-        assert_eq!(u64::from_le(first_value_read), first_value);
+        let first_value_read = u64::from_le_bytes(backend.region(&first_loc).try_into().unwrap());
+        assert_eq!(first_value_read, first_value);
 
-        let mut second_value_read = [0u32; 4];
-        backend.read(second_offset, unsafe {
-            &mut *(&mut second_value_read as *mut [u32; 4] as *mut [u8; 16])
-        });
-        assert_eq!(second_value_read.map(u32::from_le), second_value);
+        let second_value_read = unsafe {
+            backend
+                .region(&second_loc)
+                .as_ptr()
+                .cast::<[u32; 4]>()
+                .read()
+                .map(u32::from_le)
+        };
+        assert_eq!(second_value_read, second_value);
     });
 }
