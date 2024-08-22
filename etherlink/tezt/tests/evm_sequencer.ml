@@ -3634,6 +3634,7 @@ let test_proxy_node_can_forward_to_evm_endpoint =
     ~tags:["proxy"; "evm_node_endpoint"]
     ~title:"Proxy node can forward transactions to another EVM node"
   @@ fun {sequencer; proxy; sc_rollup_node; client; _} _protocol ->
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
   (* We restart the proxy node with a companion EVM node (the sequencer, in
      this case). It is expected that, in this configuration, it will forward
      its transactions to the sequencer, which means said transactions will be
