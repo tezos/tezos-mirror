@@ -46,7 +46,7 @@ let () =
 
 You can use
 ```
-devtool/patchs/apply_env_patch.sh devtools/protocol-print/add-hack-module.patch 3 10 11
+devtools/patchs/apply_env_patch.sh devtools/protocol-print/add-hack-module.patch 3 10 11
 ```
 to port this patch to different protocol environment versions (here 10 and 11).
 
