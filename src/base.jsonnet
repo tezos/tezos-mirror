@@ -36,11 +36,13 @@ local logs = panel.logs;
 
   node_instance_query: '{' + self.node_instance + '="$node_instance"}',
 
+  slot_index_instance_query: '{' + std.extVar('node_instance_label') + '="$node_instance", slot_index="$slot_index"}',
+
   // Prometheus query
-  prometheus(q, legendFormat=''):
+  prometheus(q, legendFormat='', namespace=self.namespace):
     local withLegendFormat = if legendFormat != ''
     then query.prometheus.withLegendFormat(legendFormat) else {};
-    grafonnet.query.prometheus.new('Prometheus', self.namespace + '_' + q + self.node_instance_query)
+    grafonnet.query.prometheus.new('Prometheus', namespace + '_' + q + self.node_instance_query)
     + withLegendFormat,
 
   // Stat panel helpers
