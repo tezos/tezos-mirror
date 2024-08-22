@@ -658,6 +658,7 @@ pub fn read_sequencer_inbox<Host: Runtime>(
             .maximum_allowed_ticks
             .saturating_sub(TICKS_FOR_BLUEPRINT_INTERCEPT),
         dal_configuration: dal,
+        buffer_transaction_chunks: None,
     };
     loop {
         // Checks there will be enough ticks to handle at least another chunk of

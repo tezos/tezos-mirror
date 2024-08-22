@@ -279,11 +279,20 @@ impl Parsable for ProxyInput {
     fn on_fa_deposit(_: &mut Self::Context) {}
 }
 
+pub struct BufferTransactionChunks {
+    pub total: u8,
+    pub accumulated: u8,
+    pub chunks: Vec<u8>,
+}
+
 pub struct SequencerParsingContext {
     pub sequencer: PublicKey,
     pub delayed_bridge: ContractKt1Hash,
     pub allocated_ticks: u64,
     pub dal_configuration: Option<DalConfiguration>,
+    // Delayed inbox transactions may come in chunks. If the buffer is
+    // [Some _] a chunked transaction is being parsed,
+    pub buffer_transaction_chunks: Option<BufferTransactionChunks>,
 }
 
 impl SequencerInput {
@@ -365,6 +374,83 @@ impl SequencerInput {
     }
 }
 
+mod delayed_chunked_transaction {
+
+    // This module implements the fairly simple logic of messaging protocol
+    // for delayed transactions that does not fit in a single inbox message.
+    //
+    // The protocol is the following:
+    //
+    // [NEW_CHUNK_TAG; <len>] => Message announcing the number of chunks. The
+    // <len> next messages will be the chunks.
+    // [CHUNK_TAG; <payload>] => Message containing one chunk.
+    //
+    // We consider that all messages are transmitted within a single
+    // L1 operation, but in several inbox messages.
+
+    use crate::parsing::BufferTransactionChunks;
+    use sha3::{Digest, Keccak256};
+    use tezos_ethereum::{
+        transaction::TransactionHash, tx_common::EthereumTransactionCommon,
+    };
+
+    pub const NEW_CHUNK_TAG: u8 = 0x0;
+    pub const CHUNK_TAG: u8 = 0x1;
+
+    pub fn parse_new_chunk(
+        bytes: &[u8],
+        buffer_transaction_chunks: &mut Option<BufferTransactionChunks>,
+    ) {
+        if let [len] = bytes {
+            // Overwrites any existing transaction chunks buffer. It's the
+            // responsibility of the contract to send correct values.
+            *buffer_transaction_chunks = Some(BufferTransactionChunks {
+                total: *len,
+                accumulated: 0,
+                chunks: vec![],
+            })
+        }
+    }
+
+    pub fn parse_chunk(
+        bytes: &[u8],
+        buffer_transaction_chunks_opt: &mut Option<BufferTransactionChunks>,
+    ) -> Option<(EthereumTransactionCommon, TransactionHash)> {
+        match buffer_transaction_chunks_opt {
+            None => {
+                // Again, it's the responsibility of the contract to respect
+                // the message protocol.
+                None
+            }
+            Some(buffer_transaction_chunks) => {
+                buffer_transaction_chunks.chunks.extend(bytes);
+                buffer_transaction_chunks.accumulated += 1;
+
+                if buffer_transaction_chunks.total
+                    == buffer_transaction_chunks.accumulated
+                {
+                    // Transaction is complete
+                    let res = match EthereumTransactionCommon::from_bytes(
+                        &buffer_transaction_chunks.chunks,
+                    ) {
+                        Ok(transaction) => {
+                            let tx_hash: TransactionHash =
+                                Keccak256::digest(&buffer_transaction_chunks.chunks)
+                                    .into();
+                            Some((transaction, tx_hash))
+                        }
+                        Err(_) => None,
+                    };
+                    *buffer_transaction_chunks_opt = None;
+                    res
+                } else {
+                    None
+                }
+            }
+        }
+    }
+}
+
 impl Parsable for SequencerInput {
     type Context = SequencerParsingContext;
 
@@ -398,8 +484,28 @@ impl Parsable for SequencerInput {
         if context.delayed_bridge.as_ref() != source.as_ref() {
             return InputResult::Unparsable;
         };
-        let tx = parsable!(EthereumTransactionCommon::from_bytes(bytes).ok());
-        let tx_hash: TransactionHash = Keccak256::digest(bytes).into();
+
+        let (tag, remaining) = parsable!(bytes.split_first());
+
+        let (tx, tx_hash) = parsable!(match *tag {
+            delayed_chunked_transaction::NEW_CHUNK_TAG => {
+                delayed_chunked_transaction::parse_new_chunk(
+                    remaining,
+                    &mut context.buffer_transaction_chunks,
+                );
+                None
+            }
+            delayed_chunked_transaction::CHUNK_TAG =>
+                delayed_chunked_transaction::parse_chunk(
+                    remaining,
+                    &mut context.buffer_transaction_chunks,
+                ),
+            _ => {
+                let tx = parsable!(EthereumTransactionCommon::from_bytes(bytes).ok());
+                let tx_hash: TransactionHash = Keccak256::digest(bytes).into();
+                Some((tx, tx_hash))
+            }
+        });
 
         InputResult::Input(Input::ModeSpecific(Self::DelayedInput(Box::new(
             Transaction {
