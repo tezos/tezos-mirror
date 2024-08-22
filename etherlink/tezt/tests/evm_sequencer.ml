@@ -2227,12 +2227,16 @@ let test_init_from_rollup_node_with_delayed_inbox =
 let check_applies_blueprint ~timeout sequencer_node observer_node levels_to_wait
     =
   let*@ current_head = Rpc.block_number sequencer_node in
-  let levels_to_wait = Int32.to_int current_head + levels_to_wait in
+  let targeted_level = Int32.to_int current_head + levels_to_wait in
 
-  let* _ =
-    Evm_node.wait_for_blueprint_applied ~timeout observer_node levels_to_wait
+  let* () =
+    repeat levels_to_wait @@ fun () ->
+    let*@ _ = Rpc.produce_block sequencer_node in
+    unit
   and* _ =
-    Evm_node.wait_for_blueprint_applied ~timeout sequencer_node levels_to_wait
+    Evm_node.wait_for_blueprint_applied ~timeout observer_node targeted_level
+  and* _ =
+    Evm_node.wait_for_blueprint_applied ~timeout sequencer_node targeted_level
   in
 
   let* () =
@@ -2245,15 +2249,13 @@ let check_applies_blueprint ~timeout sequencer_node observer_node levels_to_wait
   unit
 
 let test_observer_applies_blueprint =
-  let tbb = 3. in
+  let levels_to_wait = 3 in
+  let timeout = 30. in
   register_all
-    ~time_between_blocks:(Time_between_blocks tbb)
+    ~time_between_blocks:Nothing
     ~tags:["evm"; "observer"]
     ~title:"Can start an Observer node"
   @@ fun {sequencer = sequencer_node; observer = observer_node; _} _protocol ->
-  let levels_to_wait = 3 in
-  let timeout = tbb *. float_of_int levels_to_wait *. 2. in
-
   let* () =
     check_applies_blueprint ~timeout sequencer_node observer_node levels_to_wait
   in
