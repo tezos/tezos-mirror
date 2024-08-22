@@ -32,6 +32,7 @@ let tezt_etherlink =
         octez_crypto;
         tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
         tezt_cloud |> open_;
+        octez_test_helpers |> open_;
       ]
     ~release_status:Unreleased
 
