@@ -3660,7 +3660,6 @@ let test_fa_bridge_flag_after_migration_v14 ~kernel_from ~chain_id ~chain_id_hex
     ~flag_expected =
   let chain_name, kernel_wasm_const =
     match kernel_from with
-    | Kernel.Ghostnet -> ("ghostnet", Constant.WASM.ghostnet_evm_kernel)
     | Kernel.Mainnet -> ("mainnet", Constant.WASM.mainnet_evm_kernel)
     | _ -> failwith "Unsupported chain"
   in
@@ -6405,14 +6404,6 @@ let register_evm_node ~protocols =
   test_rpcs_can_be_disabled protocols ;
   test_simulation_out_of_funds protocols ;
   test_rpc_state_value_and_subkeys protocols ;
-  (* See etherlink/config/ghostnet.yaml for chain constants *)
-  test_fa_bridge_flag_after_migration_v14
-    ~kernel_from:Ghostnet
-    ~chain_id:128123
-    ~chain_id_hex:
-      "7bf4010000000000000000000000000000000000000000000000000000000000"
-    ~flag_expected:true
-    protocols ;
   (* See https://docs.etherlink.com/get-started/network-information for chain constants *)
   test_fa_bridge_flag_after_migration_v14
     ~kernel_from:Mainnet

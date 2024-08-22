@@ -2,22 +2,64 @@
 
 ## Version NEXT
 
-## Breaking Changes
+### Features
 
-## Features
+#### Stable
+
+- The kernel is able to trace calls for the `callTracer` configuration. (!14290)
+- Gas cost of XTZ withdrawals is increased to prevent abuses. (!14016)
+
+#### Experimental
+
+##### FA Bridge
+
+The FA Bridge complements the native bridge already available on both Mainnet
+Beta and Testnet, and allows users to deposit and withdraw FA 2.1 tokens.
+
+- Gas cost of FA withdrawals is increased to prevent abuses. (!14016)
+
+### Internal
+
+- Tick model is updated with regards to FA deposits and withdrawals. (!14016)
+- L1 proxy address is added as a field to the FA withdrawal event. (!14260)
+
+## Version af7909023768bc4aad3120bec7bea4a64a576047
+
+This kernel has been activated on Etherlink Testnet on block
+[4,899,480][af90-activation-testnet]. It requires the 3rd revision of the WASM
+PVM to work.
+
+[af90-activation-testnet]: https://testnet.explorer.etherlink.com/block/0x2d80703e04542bd3e465d028674e19d3888e057b764a8482ed3218cc175b55d0
+
+### Features
+
+#### Stable
+
+- Simulation now uses timestamp provided by the node. (!14186)
+
+#### Experimental
+
+##### FA Bridge
+
+The FA Bridge complements the native bridge already available on both Mainnet
+Beta and Testnet, and allows users to deposit and withdraw FA 2.1 tokens.
 
 - FA withdrawals are applied if FA bridge feature is enabled. (!13958)
 - Add FA withdrawal execution methods and FA bridge precompile. (!13941)
+- FA bridge enabled in Ghostnet. (!14342)
+
+##### DAL Integration
+
+Tezos Data-Availibility Layer (DAL) offers an increased bandwidth compared to
+L1 blocks, without sacrificing decentralization, and with reduced costs.
+
 - The list of DAL slot indices on which the sequencer may publish DAL slots can
   be configured at path `/evm/dal_slots`. (!13717)
 - A DAL feature flag is added to the configuration. If the path has a
-  value in `/evm/feature_flags/enable_dal`, the kernel is allowed to
-  import data from the DAL. (!13634)
-- Simulation now use timestamp provided by the node.
-- FA bridge enabled in Ghostnet. (!14342)
-- The kernel is able to trace calls for the `callTracer` configuration. (!14290)
+  value in `/evm/feature_flags/enable_dal`, the kernel is allowed to import
+  data from the DAL. (!13634)
 
-## Bug fixes
+### Bug fixes
 
 - Simulation with parameter `from` no longer return `OutOfFunds` if the
   value is greater than zero. (!14150)
@@ -26,13 +68,10 @@
   inbox, which could be an issue if an upgrade happen in the same block.
   (!14351)
 
-## Internal
+### Internal
 
-- L1 proxy address is added as a field to the FA withdrawal event. (!14260)
 - Forbids in the code module to overwrite the code storage of an
   account. Execution forbid this. (!14317)
-- Tick model is updated with regards to FA deposits and withdrawals. (!14016)
-- Gas cost of XTZ/FA withdrawals is increased to prevent abuses. (!14016)
 
 ## Version 4f4457e2527cb227a90bb1c56d3a83f39c0f78fd
 
@@ -47,7 +86,7 @@ repository, but is part of [`etherlink-mainnet-launch`][mainnet-branch] instead.
 [4f44-activation-testnet]: https://testnet-explorer.etherlink.com/block/0x54e37d7743b4a79e23640ab36fcd95cf9e54d9b95959cc6c7ed3abfaff93dc52
 [4f44-activation-mainnet]: https://explorer.etherlink.com/block/0x18027e1703da079fed2d8bea3395a7f365957194b7ed35eaba36e901217e6c6f
 
-## Features
+### Features
 
 - Blueprints provided by the sequencer must have increasing timestamps. (!13807)
 - Blueprints provided by the sequencer are accepted by the rollup node only
@@ -59,7 +98,7 @@ repository, but is part of [`etherlink-mainnet-launch`][mainnet-branch] instead.
 - Native token withdrawals emit event log in case of successful execution. (!14014)
 - Native token deposits emit EVM event log. (!14012)
 
-## Bug fixes
+### Bug fixes
 
 - Allow `eth_call` to return the contract bytecode on contract creation. (!13830)
 - Stack depth for smart contracts are temporarily limited to 256, instead of
@@ -73,7 +112,7 @@ repository, but is part of [`etherlink-mainnet-launch`][mainnet-branch] instead.
   equal or greater than the predecessor. (!13832)
 - Withdrawal counter is now revertable. (!14389)
 
-## Internal
+### Internal
 
 - Add FA deposit structure and helper methods for its parsing and formatting. (!13720)
 - Add FA deposit execution methods. (!13773)
