@@ -3110,7 +3110,7 @@ let tezos_protocol_environment_sigs =
                  Dune.(S (sf "v%d.in.ml" n));
                  Dune.(H [[S "glob_files"; S (sf "v%n/*.mli" n)]]);
                ]
-             ~promote:true
+             ~mode:Promote
              ~action:
                [
                  S "with-stdout-to";

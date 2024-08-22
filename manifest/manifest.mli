@@ -239,6 +239,8 @@ module Dune : sig
       Such stanzas are used at toplevel to include other dune files. *)
   val include_ : string -> s_expr
 
+  type target_mode = Default | Fallback | Promote
+
   (** Makes a rule stanza to generate targets.
 
       Example: [targets_rule ?deps targets ~action] results in:
@@ -248,11 +250,11 @@ module Dune : sig
         (deps <deps>)
         (action <action>))
 
-      Set the optional argument [~promote] to true to generate
-      a [(mode promote)] stanza.
+      Set the optional argument [~mode] to true to generate
+      a [(mode <MODE>)] stanza.
   *)
   val targets_rule :
-    ?promote:bool ->
+    ?mode:target_mode ->
     ?deps:s_expr list ->
     ?enabled_if:s_expr ->
     string list ->
@@ -261,7 +263,7 @@ module Dune : sig
 
   (** Same as [targets_rule] but for a single target *)
   val target_rule :
-    ?promote:bool ->
+    ?mode:target_mode ->
     ?deps:s_expr list ->
     ?enabled_if:s_expr ->
     string ->

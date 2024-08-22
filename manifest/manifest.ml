@@ -412,27 +412,32 @@ module Dune = struct
 
   let include_ name = [S "include"; S name]
 
-  let target_or_targets_rule ~promote ?deps ?enabled_if s ~action =
+  type target_mode = Default | Fallback | Promote
+
+  let target_or_targets_rule ?mode ?deps ?enabled_if s ~action =
     [
       S "rule";
       s;
-      (if promote then [S "mode"; S "promote"] else E);
+      (match mode with
+      | None | Some Default -> E
+      | Some Promote -> [S "mode"; S "promote"]
+      | Some Fallback -> [S "mode"; S "fallback"]);
       (match deps with None -> E | Some deps -> [S "deps"; G (of_list deps)]);
       [S "action"; action];
       (opt enabled_if @@ fun enabled_if -> [S "enabled_if"; enabled_if]);
     ]
 
-  let targets_rule ?(promote = false) ?deps ?enabled_if targets ~action =
+  let targets_rule ?mode ?deps ?enabled_if targets ~action =
     target_or_targets_rule
-      ~promote
+      ?mode
       ?deps
       ?enabled_if
       [S "targets"; G (of_atom_list targets)]
       ~action
 
-  let target_rule ?(promote = false) ?deps ?enabled_if target ~action =
+  let target_rule ?mode ?deps ?enabled_if target ~action =
     target_or_targets_rule
-      ~promote
+      ?mode
       ?deps
       ?enabled_if
       [S "target"; S target]
