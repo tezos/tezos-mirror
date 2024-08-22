@@ -679,14 +679,16 @@ let dispatch_private_request (rpc : Configuration.rpc)
               ~none:[error_of_fmt "missing params, please provide a path"]
               path
           in
-          let* value = Backend_rpc.Reader.read path in
+          let* state = Backend_rpc.Reader.get_state () in
+          let* value = Backend_rpc.Reader.read state path in
           rpc_ok value
         in
         build ~f module_ parameters
     | Method (Durable_state_subkeys.Method, module_) ->
         let f path =
           let open Lwt_result_syntax in
-          let* value = Backend_rpc.Reader.subkeys path in
+          let* state = Backend_rpc.Reader.get_state () in
+          let* value = Backend_rpc.Reader.subkeys state path in
           rpc_ok value
         in
         build_with_input ~f module_ parameters

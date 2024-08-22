@@ -43,23 +43,25 @@ module MakeBackend (Base : sig
   val ignore_block_param : bool
 end) : Services_backend_sig.Backend = struct
   module Reader = struct
-    let read ?block path =
+    type state = Block_id.t
+
+    let get_state ?block () =
       let open Lwt_result_syntax in
       let block = if Base.ignore_block_param then None else block in
-      let* block_id =
-        match block with
-        | Some Ethereum_types.Block_parameter.(Block_parameter Finalized) ->
-            return Block_id.Finalized
-        | Some (Block_parameter Latest) | None ->
-            let level : Rollup_services.Block_id.t =
-              if Base.finalized then Finalized else Head
-            in
-            return level
-        | Some _ ->
-            failwith
-              "The EVM node in proxy mode support state requests only on \
-               latest or finalized block."
-      in
+      match block with
+      | Some Ethereum_types.Block_parameter.(Block_parameter Finalized) ->
+          return Block_id.Finalized
+      | Some (Block_parameter Latest) | None ->
+          let level : Rollup_services.Block_id.t =
+            if Base.finalized then Finalized else Head
+          in
+          return level
+      | Some _ ->
+          failwith
+            "The EVM node in proxy mode support state requests only on latest \
+             or finalized block."
+
+    let read block_id path =
       call_service
         ~keep_alive:Base.keep_alive
         ~base:Base.base
@@ -68,27 +70,18 @@ end) : Services_backend_sig.Backend = struct
         {key = path}
         ()
 
-    let subkeys ?block path =
+    let subkeys block_id path =
       let open Lwt_result_syntax in
-      match block with
-      | Some param
-        when param <> Ethereum_types.Block_parameter.(Block_parameter Latest) ->
-          failwith
-            "The EVM node in proxy mode support state requests only on latest \
-             block."
-      | _ -> (
-          let* subkeys =
-            call_service
-              ~keep_alive:Base.keep_alive
-              ~base:Base.base
-              durable_state_subkeys
-              ((), Block_id.Head)
-              {key = path}
-              ()
-          in
-          match subkeys with
-          | Some subkeys -> return subkeys
-          | None -> return [])
+      let* subkeys =
+        call_service
+          ~keep_alive:Base.keep_alive
+          ~base:Base.base
+          durable_state_subkeys
+          ((), block_id)
+          {key = path}
+          ()
+      in
+      match subkeys with Some subkeys -> return subkeys | None -> return []
   end
 
   module TxEncoder = struct
@@ -136,19 +129,9 @@ end) : Services_backend_sig.Backend = struct
   end
 
   module SimulatorBackend = struct
-    type simulation_state = unit
+    include Reader
 
-    let simulation_state ?block () =
-      let open Lwt_result_syntax in
-      match block with
-      | Some param
-        when param <> Ethereum_types.Block_parameter.(Block_parameter Latest) ->
-          failwith
-            "The EVM node in proxy mode support state requests only on latest \
-             block."
-      | _ -> return_unit
-
-    let simulate_and_read _simulation_state ~input =
+    let simulate_and_read _state ~input =
       let open Lwt_result_syntax in
       let* json =
         call_service
@@ -165,25 +148,15 @@ end) : Services_backend_sig.Backend = struct
       match eval_result.insights with
       | [data] -> return data
       | _ -> failwith "Inconsistent simulation results"
-
-    let read () ~path =
-      call_service
-        ~keep_alive:Base.keep_alive
-        ~base:Base.base
-        durable_state_value
-        ((), Block_id.Head)
-        {key = path}
-        ()
   end
 
   let block_param_to_block_number
       (block_param : Ethereum_types.Block_parameter.extended) =
     let open Lwt_result_syntax in
     let read_from_block_parameter param =
+      let* state = Reader.get_state ~block:(Block_parameter param) () in
       let* value =
-        Reader.read
-          ~block:(Block_parameter param)
-          Durable_storage_path.Block.current_number
+        Reader.read state Durable_storage_path.Block.current_number
       in
       match value with
       | Some value ->
@@ -193,10 +166,9 @@ end) : Services_backend_sig.Backend = struct
     match block_param with
     | Block_parameter (Number n) -> return n
     | Block_hash {hash; _} -> (
+        let* state = Reader.get_state ~block:(Block_parameter Latest) () in
         let* value =
-          Reader.read
-            ~block:(Block_parameter Latest)
-            (Durable_storage_path.Block.by_hash hash)
+          Reader.read state (Durable_storage_path.Block.by_hash hash)
         in
         match value with
         | Some value ->
