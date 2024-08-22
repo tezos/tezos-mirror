@@ -1198,6 +1198,13 @@ val get_chain_block_context_total_supply :
 val get_chain_block_context_total_frozen_stake :
   ?chain:string -> ?block:string -> unit -> JSON.t t
 
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/total_frozen_stake]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val get_chain_block_context_total_currently_staked :
+  ?chain:string -> ?block:string -> unit -> JSON.t t
+
 (** RPC: [GET /chains/<chain>/blocks/<block>/context/issuance/current_yearly_rate]
 
     [chain] defaults to ["main"].
