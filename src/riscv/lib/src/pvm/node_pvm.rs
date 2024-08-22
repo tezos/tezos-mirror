@@ -194,7 +194,7 @@ impl NodePvm {
             )))
         } else {
             let mut backend = InMemoryBackend::<StateLayout>::new().0;
-            backend.write(0, bytes);
+            backend.borrow_mut().copy_from_slice(bytes);
             Ok(Self { backend })
         }
     }
