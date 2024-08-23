@@ -92,9 +92,12 @@ else
     if [ "$CI_COMMIT_REF_NAME" = "master" ]; then
       TARGETDIR="public/$PREFIX/master/$DISTRIBUTION"
     else
-      echo "Cannot create a repository for a protected branch that \
-        is not associated with a release tag or it's master"
-      exit 1
+      if [ -n "${CI_COMMIT_TAG}" ]; then
+        TARGETDIR="public/$PREFIX/${CI_COMMIT_TAG}/$DISTRIBUTION"
+      else
+        echo "Cannot create a repository for a protected branch that is not associated to a tag or master"
+        exit 1
+      fi
     fi
   fi
 fi
