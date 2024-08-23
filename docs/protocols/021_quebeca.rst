@@ -53,6 +53,9 @@ Adaptive Issuance
   compute baking rights. It now only considers the minimum in between
   blocks. (MR :gl:`!13945`)
 
+- Changed the protocol constant value of ``edge_of_staking_over_delegating``
+  from 2 to 3. (MR :gl:`!14555`)
+
 
 Gas improvements
 ----------------
