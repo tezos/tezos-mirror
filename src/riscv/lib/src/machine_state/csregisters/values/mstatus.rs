@@ -6,11 +6,11 @@ use super::CSRRepr;
 use crate::{
     bits::{Bits64, ConstantBits},
     machine_state::csregisters::{
-        effects::CSREffect,
+        effects::{CSREffect, XieEffect},
         xstatus::{ExtensionValue, MPPValue, MStatus, SPPValue, XLenValue},
     },
     state_backend::{
-        AllocatedOf, Atom, Cell, EnumCell, EnumCellLayout, ManagerBase, ManagerRead,
+        AllocatedOf, Atom, Cell, EffectCell, EnumCell, EnumCellLayout, ManagerBase, ManagerRead,
         ManagerReadWrite, ManagerWrite,
     },
     struct_layout,
@@ -23,8 +23,8 @@ pub struct MStatusValue<M: ManagerBase> {
     // Individual fields can be public since they are well typed and respect the WPRI, WARL, WLRL rules.
     // Except for fields which have side-effects. These ones have custom read/write/replace methods
     // to return side-effects to be accounted for
-    sie: Cell<bool, M>,
-    mie: Cell<bool, M>,
+    pub sie: EffectCell<bool, XieEffect, M>,
+    pub mie: EffectCell<bool, XieEffect, M>,
     pub spie: Cell<bool, M>,
     pub ube: Cell<bool, M>,
     pub mpie: Cell<bool, M>,
@@ -48,8 +48,8 @@ pub struct MStatusValue<M: ManagerBase> {
 impl<M: ManagerBase> MStatusValue<M> {
     pub fn bind(space: AllocatedOf<MStatusLayout, M>) -> Self {
         Self {
-            sie: space.sie,
-            mie: space.mie,
+            sie: EffectCell::bind(space.sie),
+            mie: EffectCell::bind(space.mie),
             spie: space.spie,
             ube: space.ube,
             mpie: space.mpie,
@@ -94,62 +94,6 @@ struct_layout!(
         mbe: Atom<bool>,
     }
 );
-
-// Impl block for mie & sie fields.
-// Required to return side-effects which should be handled with [`super::effects::handle_csr_effect`]
-impl<M: ManagerBase> MStatusValue<M> {
-    #[inline(always)]
-    pub fn mie_read(&self) -> bool
-    where
-        M: ManagerRead,
-    {
-        self.mie.read()
-    }
-
-    #[inline(always)]
-    pub fn mie_write(&mut self, value: bool) -> Option<CSREffect>
-    where
-        M: ManagerWrite,
-    {
-        self.mie.write(value);
-        Some(CSREffect::InvalidateTranslationCacheXIE)
-    }
-
-    #[inline(always)]
-    pub fn mie_replace(&mut self, value: bool) -> (bool, Option<CSREffect>)
-    where
-        M: ManagerReadWrite,
-    {
-        let old_value = self.mie.replace(value);
-        (old_value, Some(CSREffect::InvalidateTranslationCacheXIE))
-    }
-
-    #[inline(always)]
-    pub fn sie_read(&self) -> bool
-    where
-        M: ManagerRead,
-    {
-        self.sie.read()
-    }
-
-    #[inline(always)]
-    pub fn sie_write(&mut self, value: bool) -> Option<CSREffect>
-    where
-        M: ManagerWrite,
-    {
-        self.sie.write(value);
-        Some(CSREffect::InvalidateTranslationCacheXIE)
-    }
-
-    #[inline(always)]
-    pub fn sie_replace(&mut self, value: bool) -> (bool, Option<CSREffect>)
-    where
-        M: ManagerReadWrite,
-    {
-        let old_value = self.sie.replace(value);
-        (old_value, Some(CSREffect::InvalidateTranslationCacheXIE))
-    }
-}
 
 #[inline(always)]
 fn compute_sd(fs: ExtensionValue, xs: ExtensionValue) -> bool {
@@ -225,8 +169,8 @@ impl<M: ManagerBase> MStatusValue<M> {
         let value = MStatus::from_bits(value);
         let mstatus = self;
 
-        let effect_sie = mstatus.sie_write(value.sie());
-        let effect_mie = mstatus.mie_write(value.mie());
+        let effect_sie = mstatus.sie.write(value.sie());
+        let effect_mie = mstatus.mie.write(value.mie());
         debug_assert_eq!(effect_sie, Some(CSREffect::InvalidateTranslationCacheXIE));
         debug_assert_eq!(effect_mie, Some(CSREffect::InvalidateTranslationCacheXIE));
 
@@ -260,8 +204,8 @@ impl<M: ManagerBase> MStatusValue<M> {
         let value = MStatus::from_bits(value);
         let mstatus = self;
 
-        let (sie, effect_sie) = mstatus.sie_replace(value.sie());
-        let (mie, effect_mie) = mstatus.mie_replace(value.mie());
+        let (sie, effect_sie) = mstatus.sie.replace(value.sie());
+        let (mie, effect_mie) = mstatus.mie.replace(value.mie());
         debug_assert_eq!(effect_sie, Some(CSREffect::InvalidateTranslationCacheXIE));
         debug_assert_eq!(effect_mie, Some(CSREffect::InvalidateTranslationCacheXIE));
 

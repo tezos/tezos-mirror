@@ -26,7 +26,8 @@ macro_rules! create_effect_getter {
 }
 
 create_effect_getter!(NoEffect, None);
-create_effect_getter!(MipEffect, Some(CSREffect::InvalidateTranslationCacheXIP));
+create_effect_getter!(XieEffect, Some(CSREffect::InvalidateTranslationCacheXIE));
+create_effect_getter!(XipEffect, Some(CSREffect::InvalidateTranslationCacheXIP));
 
 #[inline(always)]
 pub fn handle_csr_effect(state: &mut CSRegisters<impl ManagerBase>, effect: Option<CSREffect>) {

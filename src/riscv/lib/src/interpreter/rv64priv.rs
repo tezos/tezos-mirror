@@ -35,7 +35,7 @@ where
         let prev_privilege = csrs.mstatus().mpp.read();
         // Set MIE to MPIE
         let prev_mie = csrs.mstatus().mpie.read();
-        let effect = csrs.mstatus_mut().mie_write(prev_mie);
+        let effect = csrs.mstatus_mut().mie.write(prev_mie);
         handle_csr_effect(csrs, effect);
         // set MPIE to 1
         csrs.mstatus_mut().mpie.write(true);
@@ -76,7 +76,7 @@ where
         let prev_privilege = csrs.mstatus().spp.read();
         // Set SIE to SPIE
         let prev_sie = csrs.mstatus().spie.read();
-        let effect = csrs.mstatus_mut().sie_write(prev_sie);
+        let effect = csrs.mstatus_mut().sie.write(prev_sie);
         handle_csr_effect(csrs, effect);
         // set SPIE to 1
         csrs.mstatus_mut().spie.write(true);

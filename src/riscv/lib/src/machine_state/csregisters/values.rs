@@ -5,13 +5,12 @@
 mod mstatus;
 
 use super::{
-    effects::{handle_csr_effect, CSREffect, MipEffect, NoEffect},
+    effects::{handle_csr_effect, NoEffect, XipEffect},
     root::RootCSRegister,
     CSRegisters,
 };
 use crate::{
     bits::Bits64,
-    state_backend::EffectGetter,
     state_backend::{AllocatedOf, EffectCell, EffectCellLayout},
     struct_layout,
 };
@@ -67,8 +66,6 @@ macro_rules! csregisters_boilerplate {
         where
             M: $crate::state_backend::ManagerBase,
         {
-            // pub mstatus: MStatusValue<M>,
-            // pub mip: MipValue<M>,
             $($vis $name: $cell_repr,)+
         }
 
@@ -122,7 +119,7 @@ macro_rules! csregisters_boilerplate {
 }
 
 type NoEffectCSR<M> = EffectCell<CSRRepr, NoEffect, M>;
-type MipEffectCSR<M> = EffectCell<CSRRepr, MipEffect, M>;
+type MipEffectCSR<M> = EffectCell<CSRRepr, XipEffect, M>;
 
 type EffectCSRLayout = EffectCellLayout<CSRRepr>;
 

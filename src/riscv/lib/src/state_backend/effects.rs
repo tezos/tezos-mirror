@@ -32,6 +32,7 @@ impl<T: Elem, EG: EffectGetter, M: ManagerBase> EffectCell<T, EG, M> {
         }
     }
 
+    #[inline(always)]
     pub fn read(&self) -> T
     where
         M: ManagerRead,
@@ -39,6 +40,8 @@ impl<T: Elem, EG: EffectGetter, M: ManagerBase> EffectCell<T, EG, M> {
         self.inner.read()
     }
 
+    #[inline(always)]
+    #[must_use = "CSR Effect must be handled. Use 'handle_csr_effect()'"]
     pub fn write(&mut self, value: T) -> Option<EG::Effect>
     where
         M: ManagerWrite,
@@ -47,6 +50,8 @@ impl<T: Elem, EG: EffectGetter, M: ManagerBase> EffectCell<T, EG, M> {
         EG::EFFECT
     }
 
+    #[inline(always)]
+    #[must_use = "CSR Effect must be handled. Use 'handle_csr_effect()'"]
     pub fn replace(&mut self, value: T) -> (T, Option<EG::Effect>)
     where
         M: ManagerReadWrite,

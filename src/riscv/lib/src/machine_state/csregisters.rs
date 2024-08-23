@@ -1056,9 +1056,10 @@ fn check_fs_access(csr: CSRegister, fs_field: ExtensionValue) -> Result<()> {
 pub fn access_checks(csr: CSRegister, hart_state: &HartState<impl ManagerRead>) -> Result<()> {
     let mode = hart_state.mode.read();
     check_privilege(csr, mode)?;
-    let tvm = hart_state.csregisters.mstatus().tvm.read();
+    let mstatus = hart_state.csregisters.mstatus();
+    let tvm = mstatus.tvm.read();
     check_satp_access(csr, tvm)?;
-    let fs = hart_state.csregisters.mstatus().fs.read();
+    let fs = mstatus.fs.read();
     check_fs_access(csr, fs)
 }
 
@@ -1242,14 +1243,14 @@ impl<M: backend::ManagerBase> CSRegisters<M> {
         match current_mode {
             Mode::User => Interrupt::SUPERVISOR_BIT_MASK | Interrupt::MACHINE_BIT_MASK,
             Mode::Supervisor => {
-                let ie_supervisor = match self.mstatus().sie_read() {
+                let ie_supervisor = match self.mstatus().sie.read() {
                     true => self.read(CSRegister::sie),
                     false => 0,
                 };
 
                 ie_supervisor | Interrupt::MACHINE_BIT_MASK
             }
-            Mode::Machine => match self.mstatus().mie_read() {
+            Mode::Machine => match self.mstatus().mie.read() {
                 true => self.read(CSRegister::mie),
                 false => 0,
             },
