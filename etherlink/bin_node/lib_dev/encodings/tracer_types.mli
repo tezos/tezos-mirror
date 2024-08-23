@@ -11,6 +11,7 @@ type error +=
   | Transaction_not_found of Ethereum_types.hash
   | Block_not_found of Ethereum_types.quantity
   | Trace_not_found
+  | Tracer_not_activated
 
 type tracer_config = {
   enable_return_data : bool;
