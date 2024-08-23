@@ -233,13 +233,16 @@ mod test {
     macro_rules! test_lrsc {
         ($name:ident, $lr: ident, $sc: ident, $align: expr, $t: ident) => {
             backend_test!($name, F, {
+                let mut backend = create_backend!(MachineStateLayout<T1K>, F);
+                let state = std::cell::RefCell::new(create_state!(MachineState, MachineStateLayout<T1K>, F, backend, T1K));
+
                 proptest!(|(
                     r1_addr in (DEVICES_ADDRESS_SPACE_LENGTH/$align..(DEVICES_ADDRESS_SPACE_LENGTH+1023_u64)/$align).prop_map(|x| x * $align),
                     r1_val in any::<u64>(),
                     imm in any::<i64>(),
                 )| {
-                    let mut backend = create_backend!(MachineStateLayout<T1K>, F);
-                    let mut state = create_state!(MachineState, MachineStateLayout<T1K>, F, backend, T1K);
+                    let mut state = state.borrow_mut();
+                    state.reset();
 
                     state.hart.xregisters.write(a0, r1_addr);
                     state.write_to_bus(0, a0, r1_val)?;
@@ -272,13 +275,16 @@ mod test {
     macro_rules! test_amo {
         ($instr: ident, $f: expr, $align: expr, $t: ident) => {
             backend_test!($instr, F, {
+                let mut backend = create_backend!(MachineStateLayout<T1K>, F);
+                let state = std::cell::RefCell::new(create_state!(MachineState, MachineStateLayout<T1K>, F, backend, T1K));
+
                 proptest!(|(
                     r1_addr in (DEVICES_ADDRESS_SPACE_LENGTH/$align..(DEVICES_ADDRESS_SPACE_LENGTH+1023_u64)/$align).prop_map(|x| x * $align),
                     r1_val in any::<u64>(),
                     r2_val in any::<u64>(),
                 )| {
-                    let mut backend = create_backend!(MachineStateLayout<T1K>, F);
-                    let mut state = create_state!(MachineState, MachineStateLayout<T1K>, F, backend, T1K);
+                    let mut state = state.borrow_mut();
+                    state.reset();
 
                     state.hart.xregisters.write(a0, r1_addr);
                     state.write_to_bus(0, a0, r1_val)?;
