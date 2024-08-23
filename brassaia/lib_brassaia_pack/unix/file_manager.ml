@@ -389,8 +389,8 @@ struct
       (Int64.of_int pl.volume_num);
     Control.set_payload control pl
 
-  let finish_constructing_rw config control ~make_dict ~make_suffix ~make_index
-      ~make_lower =
+  let finish_constructing_rw (config : Brassaia.config) control ~make_dict
+      ~make_suffix ~make_index ~make_lower =
     let open Result_syntax in
     let root = Brassaia_pack.Conf.root config in
     let use_fsync = Brassaia_pack.Conf.use_fsync config in

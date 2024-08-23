@@ -1,0 +1,15 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_duo_context_lib)
+ (public_name octez-shell-libs.duo-context-lib)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.base
+  octez-proto-libs.protocol-environment
+  octez-libs.tezos-context-brassaia
+  octez-libs.tezos-context)
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives))
