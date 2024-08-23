@@ -74,6 +74,7 @@ Beta.
 - Support ignoring the block parameter in RPCs in proxy node, always defaulting
   to the latest block instead. (!14557)
 - Add a debug command to print JSON schema of the configuration file. (!14531)
+- The `callTracer` configuration is now enabled for `debug_traceTransaction` for all transactions created from this point onward. (!14636)
 
 ### Bug fixes
 
