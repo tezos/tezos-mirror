@@ -155,6 +155,12 @@ let launch_ema_threshold client =
   Lwt.return
   @@ JSON.(json |-> "adaptive_issuance_launch_ema_threshold" |> as_int)
 
+let edge_of_staking_over_delegation client =
+  let* json =
+    Client.RPC.call client @@ RPC.get_chain_block_context_constants ()
+  in
+  Lwt.return @@ JSON.(json |-> "edge_of_staking_over_delegation" |> as_int)
+
 let init ?(overrides = default_overrides) protocol =
   let* sandbox_node = Node.init [Synchronisation_threshold 0; Private_mode] in
   let sandbox_endpoint = Client.Node sandbox_node in
@@ -494,6 +500,8 @@ let test_staking =
         :: default_overrides)
       protocol
   in
+
+  let* eosod = edge_of_staking_over_delegation client_1 in
 
   log_step 1 "Prepare second node for double baking" ;
   Log.info "Starting second node" ;
@@ -865,11 +873,14 @@ let test_staking =
         balances_dlgt := b_dlgt ;
         let* bu = Operation_receipt.get_block_metadata client_1 in
         let* bu = Operation_receipt.Balance_updates.from_result [bu] in
-
-        let amount_baker_share = 834 in
-        let amount_delegation = 7877 in
-        let amount_edge = 4 in
-        let amount_stakers = 4 in
+        let amount_baker_share, amount_delegation, amount_edge, amount_stakers =
+          match eosod with
+          | 2 -> (834, 7877, 4, 4)
+          | 3 -> (1194, 7514, 6, 5)
+          | _ ->
+              Log.error "Unexpected edge_of_staking_over_baking value: %d" eosod ;
+              (0, 0, 0, 0)
+        in
         (* check rewards *)
         check_balance_updates
           bu
@@ -1119,21 +1130,41 @@ let test_staking =
   let* bu = Operation_receipt.Balance_updates.from_result [bu] in
 
   (* check slashed and rewarded amounts *)
-  (* total amounts *)
-  let total_amount_rewarded = 1450001868 in
-  let total_amount_slashed = 8700011216 in
-
-  (* slashed stakers (including baker) unstake deposit *)
-  let amount_rewarded_from_unstake_stakers_deposits = 7142857 in
-  let amount_slashed_from_unstake_stakers_deposits = 42857145 in
-
-  (* slashed  stake *)
-  let amount_rewarded_from_stakers_deposits = 7178393 in
-  let amount_slashed_from_stakers_deposits = 43070362 in
-
-  (* slashing baker (bootstrap2) stake*)
-  let amount_rewarded_from_baker_deposits = 1435680618 in
-  let amount_slashed_from_baker_deposits = 8614083709 in
+  let ( (* total amounts *)
+        total_amount_rewarded,
+        total_amount_slashed,
+        (* slashed stakers (including baker) unstake deposit *)
+        amount_rewarded_from_unstake_stakers_deposits,
+        amount_slashed_from_unstake_stakers_deposits,
+        (* slashed  stake *)
+        amount_rewarded_from_stakers_deposits,
+        amount_slashed_from_stakers_deposits,
+        (* slashing baker (bootstrap2) stake*)
+        amount_rewarded_from_baker_deposits,
+        amount_slashed_from_baker_deposits ) =
+    match eosod with
+    | 2 ->
+        ( 1450001868,
+          8700011216,
+          7142857,
+          42857145,
+          7178393,
+          43070362,
+          1435680618,
+          8614083709 )
+    | 3 ->
+        ( 1450001926,
+          8700011565,
+          7142857,
+          42857146,
+          7178393,
+          43070363,
+          1435680676,
+          8614084056 )
+    | _ ->
+        Log.warn "Unexpected edge_of_staking_over_baking value: %d" eosod ;
+        (0, 0, 0, 0, 0, 0, 0, 0)
+  in
 
   assert_with_roundings
     ~__LOC__
