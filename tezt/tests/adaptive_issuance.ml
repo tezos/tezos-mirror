@@ -155,6 +155,12 @@ let launch_ema_threshold client =
   Lwt.return
   @@ JSON.(json |-> "adaptive_issuance_launch_ema_threshold" |> as_int)
 
+let edge_of_staking_over_delegation client =
+  let* json =
+    Client.RPC.call client @@ RPC.get_chain_block_context_constants ()
+  in
+  Lwt.return @@ JSON.(json |-> "edge_of_staking_over_delegation" |> as_int)
+
 let init ?(overrides = default_overrides) protocol =
   let* sandbox_node = Node.init [Synchronisation_threshold 0; Private_mode] in
   let sandbox_endpoint = Client.Node sandbox_node in
@@ -494,6 +500,8 @@ let test_staking =
         :: default_overrides)
       protocol
   in
+
+  let* eosod = edge_of_staking_over_delegation client_1 in
 
   log_step 1 "Prepare second node for double baking" ;
   Log.info "Starting second node" ;
@@ -865,11 +873,14 @@ let test_staking =
         balances_dlgt := b_dlgt ;
         let* bu = Operation_receipt.get_block_metadata client_1 in
         let* bu = Operation_receipt.Balance_updates.from_result [bu] in
-
-        let amount_baker_share = 834 in
-        let amount_delegation = 7877 in
-        let amount_edge = 4 in
-        let amount_stakers = 4 in
+        let amount_baker_share, amount_delegation, amount_edge, amount_stakers =
+          match eosod with
+          | 2 -> (834, 7877, 4, 4)
+          | 3 -> (1194, 7514, 6, 5)
+          | _ ->
+              Log.error "Unexpected edge_of_staking_over_baking value: %d" eosod ;
+              (0, 0, 0, 0)
+        in
         (* check rewards *)
         check_balance_updates
           bu
@@ -1131,7 +1142,12 @@ let test_staking =
   let reward_denominator = global_limit_of_staking_over_baking + 2 in
 
   (* slashed stakers (including baker) unstake deposit *)
-  let amount_slashed_from_unstake_stakers_deposits = 50_000_002 in
+  let amount_slashed_from_unstake_stakers_deposits =
+    match eosod with
+    | 2 -> 50_000_002
+    | 3 -> 50_000_003
+    | _ -> Test.fail "Unexpected edge_of_staking_over_baking value: %d" eosod
+  in
   let amount_rewarded_from_unstake_stakers_deposits =
     amount_slashed_from_unstake_stakers_deposits / reward_denominator
   in
@@ -1141,7 +1157,12 @@ let test_staking =
   in
 
   (* slashed stake *)
-  let amount_slashed_from_stakers_deposits = 50_248_756 in
+  let amount_slashed_from_stakers_deposits =
+    match eosod with
+    | 2 -> 50_248_756
+    | 3 -> 50_248_756
+    | _ -> Test.fail "Unexpected edge_of_staking_over_baking value: %d" eosod
+  in
   let amount_rewarded_from_stakers_deposits =
     amount_slashed_from_stakers_deposits / reward_denominator
   in
@@ -1150,7 +1171,12 @@ let test_staking =
   in
 
   (* slashing baker (bootstrap2) stake*)
-  let amount_slashed_from_baker_deposits = 10_049_764_326 in
+  let amount_slashed_from_baker_deposits =
+    match eosod with
+    | 2 -> 10_049_764_326
+    | 3 -> 10_049_764_732
+    | _ -> Test.fail "Unexpected edge_of_staking_over_baking value: %d" eosod
+  in
 
   let amount_rewarded_from_baker_deposits =
     amount_slashed_from_baker_deposits / reward_denominator
