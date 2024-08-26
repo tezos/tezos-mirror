@@ -40,15 +40,18 @@ slashed funds. The chosen value prevents adversarial delegates from
 abusing the slashing mechanism for profit at the expense of their
 stakers.
 
+:ref:`Participation rewards <adaptive_rewards_alpha>` are automatically shared
+between delegates and their stakers. Staker's rewards are proportional to their
+participation in the delegate's total staked at the time the rewards are given.
+This means that the staker gets rewards for staked tez as soon as they are staked,
+and stops receiving rewards as soon as the tez are unstaked, disregarding the
+fact that baking rights for the delegate are computed with some delays.
 *Delegates* :ref:`configure their staking
 policy <staking_policy_configuration_alpha>` by setting staking parameters
 which regulate whether they accept stakers (the default being to reject
 them), and if so, up to which fraction of their total staking balance.
 They can also configure which proportion of the staking rewards from other stakers is set
-to accrue to their own staked balance instead.
-As :ref:`participation rewards <adaptive_rewards_alpha>` are
-automatically shared between delegates and their
-stakers, delegates can use this parameter to collect an *edge* from the
+to accrue to their own staked balance instead, thereby collecting an *edge* from the
 rewards attributable to their stakers.
 
 Freezing and unfreezing of staked funds is controlled directly by delegates and
