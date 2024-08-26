@@ -605,18 +605,6 @@ let uint_as_hex_encoding =
   let json_encoding = conv int_to_json json_to_int json in
   splitted ~json:json_encoding ~binary:z
 
-let decode_value decode =
-  let open Result_syntax in
-  function
-  | Rlp.Value b -> decode b
-  | _ -> tzfail (error_of_fmt "Invalid RLP encoding for an expected value")
-
-let decode_list decode =
-  let open Result_syntax in
-  function
-  | Rlp.List l -> return (decode l)
-  | _ -> tzfail (error_of_fmt "Invalid RLP encoding for an expected list")
-
 module StructLogger = struct
   type opcode_log = {
     pc : uint53;
@@ -633,56 +621,47 @@ module StructLogger = struct
     error : string option;
   }
 
+  let decode_opcode op =
+    let open Result_syntax in
+    if Bytes.length op > 1 then
+      tzfail
+        (error_of_fmt "Invalid opcode encoding: %a" Hex.pp (Hex.of_bytes op))
+    else if Bytes.length op = 0 then return '\x00'
+    else return (Bytes.get op 0)
+
+  (** Necessary because Hex.t is not Ethereum_types.hex *)
+  let decode_hex_item =
+    Rlp.decode_value (fun b -> Result_syntax.return @@ Hex.of_bytes b)
+
   let opcode_rlp_decoder bytes =
     let open Result_syntax in
+    let open Ethereum_types in
     let* rlp = Rlp.decode bytes in
     match rlp with
     | Rlp.List
         [
-          Value pc;
-          Value op;
-          Value gas;
-          Value gas_cost;
-          Value depth;
+          pc;
+          op;
+          gas;
+          gas_cost;
+          depth;
           error;
           stack;
           return_data;
           raw_memory;
           storage;
         ] ->
-        let pc = Bytes.to_string pc |> Z.of_bits in
-        let* op =
-          if Bytes.length op > 1 then
-            tzfail
-              (error_of_fmt
-                 "Invalid opcode encoding: %a"
-                 Hex.pp
-                 (Hex.of_bytes op))
-          else if Bytes.length op = 0 then return '\x00'
-          else return (Bytes.get op 0)
-        in
-        let gas = Bytes.to_string gas |> Z.of_bits in
-        let gas_cost = Bytes.to_string gas_cost |> Z.of_bits in
-        let depth = Bytes.to_string depth |> Z.of_bits in
-        let* error =
-          Rlp.decode_option
-            (decode_value (fun e -> return @@ Bytes.to_string e))
-            error
-        in
-        let* return_data =
-          Rlp.decode_option
-            (decode_value (fun d -> return @@ Hex.of_bytes d))
-            return_data
-        in
+        let* pc = From_rlp.decode_z pc in
+        let* op = Rlp.decode_value decode_opcode op in
+        let* gas = From_rlp.decode_z gas in
+        let* gas_cost = From_rlp.decode_z gas_cost in
+        let* depth = From_rlp.decode_z depth in
+        let* error = Rlp.decode_option From_rlp.decode_string error in
+        let* return_data = Rlp.decode_option decode_hex_item return_data in
         let* stack =
-          Rlp.decode_option
-            (decode_list
-            @@ List.filter_map (function
-                   | Rlp.List _ -> None
-                   | Rlp.Value v -> Some (Hex.of_bytes v)))
-            stack
+          Rlp.decode_option (Rlp.decode_list decode_hex_item) stack
         in
-        let* raw_memory = Rlp.decode_option (decode_value return) raw_memory in
+        let* raw_memory = Rlp.decode_option Rlp.decode_as_bytes raw_memory in
         let mem_size =
           Option.map (fun m -> Bytes.length m |> Int32.of_int) raw_memory
         in
@@ -699,9 +678,7 @@ module StructLogger = struct
                 Some (Hex.of_bytes index, Hex.of_bytes value)
             | _ -> None
           in
-          Rlp.decode_option
-            (decode_list (List.filter_map parse_storage_index))
-            storage
+          Rlp.decode_option (Rlp.filter_decode_list parse_storage_index) storage
         in
         return
           {

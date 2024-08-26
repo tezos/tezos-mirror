@@ -276,8 +276,18 @@ let decode_value decode =
   | _ ->
       tzfail (Rlp_decoding_error "Invalid RLP encoding for an expected value")
 
+let decode_as_bytes = decode_value Result_syntax.return
+
 let decode_list decode_item l =
   let open Result_syntax in
   match l with
   | List items -> List.map_e decode_item items
+  | _ -> tzfail (Rlp_decoding_error "Invalid RLP encoding for a list of items")
+
+let filter_decode_list filter_decode l =
+  let open Result_syntax in
+  match l with
+  | List items ->
+      let l = List.filter_map filter_decode items in
+      return l
   | _ -> tzfail (Rlp_decoding_error "Invalid RLP encoding for a list of items")
