@@ -32,6 +32,7 @@ let tezt_etherlink =
         octez_crypto;
         tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
         tezt_cloud |> open_;
+        octez_test_helpers |> open_;
       ]
     ~release_status:Unreleased
 
@@ -184,7 +185,7 @@ let _octez_evm_node_tests =
 
 let _tezt_etherlink =
   tezt
-    ["evm_rollup"; "evm_sequencer"; "validate"]
+    ["evm_rollup"; "evm_sequencer"; "validate"; "dal_sequencer"]
     ~path:"etherlink/tezt/tests"
     ~opam:"tezt-etherlink"
     ~synopsis:"Tezt integration tests for Etherlink"
