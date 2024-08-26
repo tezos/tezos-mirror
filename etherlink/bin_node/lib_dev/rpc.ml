@@ -416,10 +416,12 @@ let main ~data_dir ~evm_node_endpoint ~(config : Configuration.t) =
     install_finalizer_rpc server_public_finalizer
   in
 
+  let*! next_blueprint_number = next_blueprint_number ctxt () in
+
   Blueprints_follower.start
     ~time_between_blocks
     ~evm_node_endpoint
-    ~get_next_blueprint_number:(next_blueprint_number ctxt)
+    ~next_blueprint_number
   @@ fun number blueprint ->
   let* () =
     when_ (Option.is_some blueprint.kernel_upgrade) @@ fun () ->

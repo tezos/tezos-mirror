@@ -16,7 +16,6 @@ type parameters = {
   on_new_blueprint : handler;
   time_between_blocks : Configuration.time_between_blocks;
   evm_node_endpoint : Uri.t;
-  get_next_blueprint_number : unit -> Ethereum_types.quantity Lwt.t;
 }
 
 type error += Timeout
@@ -51,10 +50,11 @@ let local_head_too_old ?remote_head ~evm_node_endpoint
     ( Z.Compare.(next_blueprint_number <= remote_head_number),
       Qty remote_head_number )
 
-let[@tailrec] rec go ?remote_head ~first_connection params =
-  let open Lwt_result_syntax in
-  let*! next_blueprint_number = params.get_next_blueprint_number () in
+let quantity_succ (Qty x) = Qty Z.(succ x)
 
+let[@tailrec] rec go ?remote_head ~next_blueprint_number ~first_connection
+    params =
+  let open Lwt_result_syntax in
   let* local_head_too_old, remote_head =
     local_head_too_old
       ?remote_head
@@ -69,7 +69,11 @@ let[@tailrec] rec go ?remote_head ~first_connection params =
         next_blueprint_number
     in
     let* () = params.on_new_blueprint next_blueprint_number blueprint in
-    (go [@tailcall]) ~remote_head ~first_connection params
+    (go [@tailcall])
+      ~next_blueprint_number:(quantity_succ next_blueprint_number)
+      ~remote_head
+      ~first_connection
+      params
   else
     let* () =
       when_ (not first_connection) @@ fun () ->
@@ -90,7 +94,8 @@ let[@tailrec] rec go ?remote_head ~first_connection params =
     match call_result with
     | Ok blueprints_stream ->
         (stream_loop [@tailcall]) next_blueprint_number params blueprints_stream
-    | Error _ -> (go [@tailcall]) ~first_connection:false params
+    | Error _ ->
+        (go [@tailcall]) ~next_blueprint_number ~first_connection:false params
 
 and[@tailrec] stream_loop (Qty next_blueprint_number) params stream =
   let open Lwt_result_syntax in
@@ -110,16 +115,16 @@ and[@tailrec] stream_loop (Qty next_blueprint_number) params stream =
         (Qty (Z.succ next_blueprint_number))
         params
         stream
-  | Ok None | Error [Timeout] -> (go [@tailcall]) ~first_connection:false params
+  | Ok None | Error [Timeout] ->
+      (go [@tailcall])
+        ~next_blueprint_number:(Qty next_blueprint_number)
+        ~first_connection:false
+        params
   | Error err -> fail err
 
-let start ~time_between_blocks ~evm_node_endpoint ~get_next_blueprint_number
+let start ~time_between_blocks ~evm_node_endpoint ~next_blueprint_number
     on_new_blueprint =
   go
+    ~next_blueprint_number
     ~first_connection:true
-    {
-      get_next_blueprint_number;
-      time_between_blocks;
-      evm_node_endpoint;
-      on_new_blueprint;
-    }
+    {time_between_blocks; evm_node_endpoint; on_new_blueprint}
