@@ -11,7 +11,12 @@
     "benchmarks/scenarios/solidity_by_example/bench_abi_decode.js",
     "benchmarks/scenarios/solidity_by_example/bench_abi_encode.js",
     "benchmarks/scenarios/solidity_by_example/bench_array.js",
-    {"script" : "benchmarks/scenarios/solidity_by_example/bench_assembly_error.js", "expect_false" : [3]},
+    {
+        "script": "benchmarks/scenarios/solidity_by_example/bench_assembly_error.js",
+        "expect_false": [
+            3
+        ]
+    },
     "benchmarks/scenarios/solidity_by_example/bench_assembly_loop.js",
     "benchmarks/scenarios/solidity_by_example/bench_assembly_variable.js",
     "benchmarks/scenarios/solidity_by_example/bench_bitwise_op.js",
@@ -35,7 +40,12 @@
     "benchmarks/scenarios/solidity_by_example/bench_bytecode_contract.js",
     "benchmarks/scenarios/solidity_by_example/bench_create2.js",
     "benchmarks/scenarios/solidity_by_example/bench_minimal_proxy.js",
-    {"script" : "benchmarks/scenarios/solidity_by_example/bench_upgradeable_proxy.js", "expect_false":[9]},
+    {
+        "script": "benchmarks/scenarios/solidity_by_example/bench_upgradeable_proxy.js",
+        "expect_false": [
+            9
+        ]
+    },
     "benchmarks/scenarios/solidity_by_example/bench_binary_exponentiation.js",
     "benchmarks/bench_erc1155.js",
     "benchmarks/bench_selfdestruct.js",
@@ -48,6 +58,7 @@
     "benchmarks/bench_ecmul.js",
     "benchmarks/bench_ecpairing.js",
     "benchmarks/bench_modexp.js",
+    "benchmarks/bench_imbricated_calls.js",
     "benchmarks/bench_linear_transfers.js --count 0",
     "benchmarks/bench_linear_transfers.js --count 5",
     "benchmarks/bench_linear_transfers.js --count 10",
