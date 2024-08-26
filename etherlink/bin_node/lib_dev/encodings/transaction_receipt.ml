@@ -46,7 +46,7 @@ let of_rlp_bytes block_hash bytes =
           Value status;
         ]) ->
       let hash = decode_hash hash in
-      let index = decode_number_le index in
+      let index = decode_number_be index in
       let block_number = decode_number_le block_number in
       let from = decode_address from in
       let to_ = if to_ = Bytes.empty then None else Some (decode_address to_) in
