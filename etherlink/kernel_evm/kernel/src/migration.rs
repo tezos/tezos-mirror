@@ -98,6 +98,7 @@ fn migrate_to<Host: Runtime>(
 // - update `migrate_to` pattern matching  with all the needed migration functions
 // - compile the kernel and run all the E2E migration tests to make sure all the
 //   data is still available from the EVM proxy-node.
+// - upgrade the failed_migration.wasm kernel, see tests/ressources/README.md
 //
 // /!\
 //     If the migration takes more than 999 reboots, we will lose the inbox
