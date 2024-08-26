@@ -246,10 +246,10 @@ overridden by the minimum issuance, as discussed below.
      - 50% and above
    * - Adaptive maximum issuance (approx.)
      - 10%
-     - 8.4%
-     - 3.9%
-     - 2%
-     - 1.2%
+     - 9.2%
+     - 5.6%
+     - 3%
+     - 1.5%
      - 1%
 
 The function that defines the adaptive maximum is:
@@ -261,7 +261,7 @@ The function that defines the adaptive maximum is:
       return 0.01
     elif r <= 0.05:
       return 0.1
-    y = (5115 - 17670 * r + 19437 * (r ** 2)) / (24149 + 178695 * r)
+    y = (1 + 9 * ((50 - 100 * r) / 42 ) ** 2 ) / 100
     if y > 0.1:
       return 0.1
     elif y < 0.01:
