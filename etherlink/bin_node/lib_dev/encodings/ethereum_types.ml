@@ -1021,3 +1021,25 @@ let hash_raw_tx raw_tx =
     Tezos_crypto.Hacl.Hash.Keccak_256.digest (String.to_bytes raw_tx)
   in
   Hash (Hex Hex.(of_bytes hash |> show))
+
+module From_rlp = struct
+  let decode_hex =
+    Rlp.decode_value (fun b ->
+        let open Result_syntax in
+        let* (`Hex s) = Result_syntax.return @@ Hex.of_bytes b in
+        return (Hex s))
+
+  let decode_string =
+    Rlp.decode_value (fun b -> Result_syntax.return @@ Bytes.to_string b)
+
+  let decode_address =
+    Rlp.decode_value (fun b -> Result_syntax.return @@ decode_address b)
+
+  let decode_z =
+    Rlp.decode_value (fun b ->
+        Result_syntax.return @@ Z.of_bits @@ Bytes.to_string b)
+
+  let decode_int =
+    Rlp.decode_value (fun b ->
+        Result_syntax.return @@ Z.to_int @@ Z.of_bits @@ Bytes.to_string b)
+end

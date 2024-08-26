@@ -268,3 +268,16 @@ let decode_result decode_value decode_error =
               "Inconsistent encoding for the result type: %a"
               pp
               rlp))
+
+let decode_value decode =
+  let open Result_syntax in
+  function
+  | Value b -> decode b
+  | _ ->
+      tzfail (Rlp_decoding_error "Invalid RLP encoding for an expected value")
+
+let decode_list decode_item l =
+  let open Result_syntax in
+  match l with
+  | List items -> List.map_e decode_item items
+  | _ -> tzfail (Rlp_decoding_error "Invalid RLP encoding for a list of items")

@@ -266,3 +266,15 @@ val transaction_log_body_from_rlp :
   Rlp.item -> address * hash list * hex * quantity
 
 val decode_hex : bytes -> hex
+
+module From_rlp : sig
+  val decode_address : Rlp.item -> address tzresult
+
+  val decode_string : Rlp.item -> string tzresult
+
+  val decode_int : Rlp.item -> int tzresult
+
+  val decode_z : Rlp.item -> Z.t tzresult
+
+  val decode_hex : Rlp.item -> hex tzresult
+end

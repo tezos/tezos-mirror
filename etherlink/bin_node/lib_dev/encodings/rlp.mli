@@ -71,5 +71,12 @@ val decode_result :
   item ->
   ('a, 'b) result tzresult
 
+(** [decode_value decode item] decodes an encapsulated value. *)
+val decode_value : (bytes -> 'a tzresult) -> item -> 'a tzresult
+
+(** [decode_list decode_item list_item] decodes a list using [decode_item] on 
+   each list element. *)
+val decode_list : (item -> 'a tzresult) -> item -> 'a list tzresult
+
 (** [pp ppf item] pretty-prints an item. *)
 val pp : Format.formatter -> item -> unit

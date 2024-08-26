@@ -825,34 +825,6 @@ module StructLogger = struct
     return {gas; failed; return_value; struct_logs}
 end
 
-let decode_list decode_item l =
-  let open Result_syntax in
-  match l with
-  | Rlp.List items ->
-      let l = List.map decode_item items in
-      tzall l
-  | _ -> tzfail (error_of_fmt "Invalid RLP encoding for a list of items")
-
-let decode_hex =
-  decode_value (fun b ->
-      let open Result_syntax in
-      let* (`Hex s) = Result_syntax.return @@ Hex.of_bytes b in
-      return (Ethereum_types.Hex s))
-
-let decode_string =
-  decode_value (fun b -> Result_syntax.return @@ Bytes.to_string b)
-
-let decode_address =
-  decode_value (fun b ->
-      Result_syntax.return @@ Ethereum_types.decode_address b)
-
-let decode_z =
-  decode_value (fun b -> Result_syntax.return @@ Z.of_bits @@ Bytes.to_string b)
-
-let decode_int =
-  decode_value (fun b ->
-      Result_syntax.return @@ Z.to_int @@ Z.of_bits @@ Bytes.to_string b)
-
 module CallTracer = struct
   type logs = {
     address : Ethereum_types.address;
@@ -975,16 +947,18 @@ module CallTracer = struct
 
   let decode_logs item =
     let open Result_syntax in
+    let open Ethereum_types in
     match item with
     | Rlp.List [address; topics; data] ->
-        let* address = decode_address address in
-        let* topics = decode_list decode_hex topics in
-        let* data = decode_hex data in
+        let* address = From_rlp.decode_address address in
+        let* topics = Rlp.decode_list From_rlp.decode_hex topics in
+        let* data = From_rlp.decode_hex data in
         return {address; topics; data}
     | _ -> tzfail (error_of_fmt "Invalid RLP encoding for the logs")
 
   let decode_call bytes =
     let open Result_syntax in
+    let open Ethereum_types in
     let* rlp = Rlp.decode bytes in
     match rlp with
     | Rlp.List
@@ -1001,23 +975,23 @@ module CallTracer = struct
           logs;
           depth;
         ] ->
-        let* type_ = decode_string type_ in
-        let* from = decode_address from in
-        let* to_ = Rlp.decode_option decode_address to_ in
-        let* value = decode_z value in
-        let* gas = Rlp.decode_option decode_z gas in
-        let* gas_used = decode_z gas_used in
-        let* input = decode_hex input in
-        let* output = Rlp.decode_option decode_hex output in
-        let* error = Rlp.decode_option decode_string error in
+        let* type_ = From_rlp.decode_string type_ in
+        let* from = From_rlp.decode_address from in
+        let* to_ = Rlp.decode_option From_rlp.decode_address to_ in
+        let* value = From_rlp.decode_z value in
+        let* gas = Rlp.decode_option From_rlp.decode_z gas in
+        let* gas_used = From_rlp.decode_z gas_used in
+        let* input = From_rlp.decode_hex input in
+        let* output = Rlp.decode_option From_rlp.decode_hex output in
+        let* error = Rlp.decode_option From_rlp.decode_string error in
         let error, revert_reason =
           match (output, error) with
           | Some output, Some err when err = "Reverted" ->
               revert_reason_decoding output
           | _ -> (error, None)
         in
-        let* logs = Rlp.decode_option (decode_list decode_logs) logs in
-        let* depth = decode_int depth in
+        let* logs = Rlp.decode_option (Rlp.decode_list decode_logs) logs in
+        let* depth = From_rlp.decode_int depth in
         return
           ( {
               type_;
