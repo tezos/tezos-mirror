@@ -1819,7 +1819,39 @@ let on_new_level t level =
       in
       Lwt.return {t with disconnection_state = Some disconnection_state}
 
+let ensure_enough_funds t i =
+  let producer = List.nth t.producers i in
+  match t.configuration.network with
+  | Sandbox -> (* Producer has enough money *) Lwt.return_unit
+  | Ghostnet ->
+      let* balance =
+        Client.RPC.call producer.client
+        @@ RPC.get_chain_block_context_contract_balance
+             ~id:producer.account.public_key_hash
+             ()
+      in
+      (* This is to prevent having to refund two producers at the same time and ensure it can produce at least one slot. *)
+      let random = Random.int 5_000_000 + 10_000 in
+      if balance < Tez.of_mutez_int random then
+        let* fundraiser =
+          Client.show_address ~alias:"fundraiser" t.bootstrap.client
+        in
+        let* _op_hash =
+          Operation.Manager.transfer
+            ~amount:10_000_000
+            ~dest:producer.account
+            ()
+          |> Operation.Manager.make ~source:fundraiser
+          |> Seq.return |> List.of_seq
+          |> Fun.flip
+               (Operation.Manager.inject ~dont_wait:true)
+               t.bootstrap.client
+        in
+        Lwt.return_unit
+      else Lwt.return_unit
+
 let produce_slot t level i =
+  let* () = ensure_enough_funds t i in
   let producer = List.nth t.producers i in
   let index = i mod t.parameters.number_of_slots in
   let content =
