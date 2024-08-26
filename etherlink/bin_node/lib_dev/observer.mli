@@ -14,11 +14,3 @@ val main :
   config:Configuration.t ->
   unit ->
   unit tzresult Lwt.t
-
-module Make (Ctxt : sig
-  val evm_node_endpoint : Uri.t
-
-  val keep_alive : bool
-
-  val smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t
-end) : Services_backend_sig.S
