@@ -222,6 +222,7 @@ let register_all ?sequencer_rpc_port ?sequencer_private_rpc_port
       List.iter
         (fun (enable_dal, dal_tags) ->
           register_test_for_kernels
+            ~__FILE__
             ?sequencer_rpc_port
             ?sequencer_private_rpc_port
             ?commitment_period
@@ -360,6 +361,7 @@ let test_remove_sequencer =
 
 let test_patch_state =
   register_test (* It's a node specific test. *)
+    ~__FILE__
     ~kernel:Kernel.Latest
     ~enable_dal:false
     ~tags:["evm"; "patch"; "state"]
