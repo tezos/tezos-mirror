@@ -300,6 +300,10 @@ oc.build-debian:
   artifacts:
     paths:
     - packages/$DISTRIBUTION/$RELEASE
+  retry:
+    max: 1
+    when:
+    - stuck_or_timeout_failure
   parallel:
     matrix:
     - RELEASE:
@@ -327,6 +331,10 @@ oc.build-debian-current_a:
   artifacts:
     paths:
     - packages/$DISTRIBUTION/$RELEASE
+  retry:
+    max: 1
+    when:
+    - stuck_or_timeout_failure
   parallel:
     matrix:
     - RELEASE:
@@ -354,6 +362,10 @@ oc.build-debian-current_b:
   artifacts:
     paths:
     - packages/$DISTRIBUTION/$RELEASE
+  retry:
+    max: 1
+    when:
+    - stuck_or_timeout_failure
   parallel:
     matrix:
     - RELEASE:
@@ -471,6 +483,10 @@ oc.build-ubuntu:
   artifacts:
     paths:
     - packages/$DISTRIBUTION/$RELEASE
+  retry:
+    max: 1
+    when:
+    - stuck_or_timeout_failure
   parallel:
     matrix:
     - RELEASE:
@@ -498,6 +514,10 @@ oc.build-ubuntu-current_a:
   artifacts:
     paths:
     - packages/$DISTRIBUTION/$RELEASE
+  retry:
+    max: 1
+    when:
+    - stuck_or_timeout_failure
   parallel:
     matrix:
     - RELEASE:
@@ -525,6 +545,10 @@ oc.build-ubuntu-current_b:
   artifacts:
     paths:
     - packages/$DISTRIBUTION/$RELEASE
+  retry:
+    max: 1
+    when:
+    - stuck_or_timeout_failure
   parallel:
     matrix:
     - RELEASE:
