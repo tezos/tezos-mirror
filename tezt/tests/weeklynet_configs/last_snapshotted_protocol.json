@@ -106,7 +106,7 @@
   "zk_rollup_min_pending_to_process": 10,
   "zk_rollup_max_ticket_payload_size": 2048,
   "global_limit_of_staking_over_baking": 5,
-  "edge_of_staking_over_delegation": 2,
+  "edge_of_staking_over_delegation": 3,
   "adaptive_issuance_launch_ema_threshold": 0,
   "adaptive_rewards_params": {
     "issuance_ratio_final_min": {
