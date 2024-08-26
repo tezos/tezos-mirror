@@ -246,10 +246,6 @@ let input_rlp_encoder ?hash config =
   | StructLogger -> struct_logger_input_rlp_encoder ?hash config
   | CallTracer -> call_tracer_input_rlp_encoder ?hash config
 
-let hex_encoding =
-  let open Data_encoding in
-  conv Hex.to_bytes_exn Hex.of_bytes bytes
-
 module Opcode = struct
   (* These two pattern matchings are generated
      https://ethereum.org/en/developers/docs/evm/opcodes/, with a combination of
@@ -611,11 +607,11 @@ module StructLogger = struct
     op : Opcode.t;
     gas : uint53;
     gas_cost : uint53;
-    memory : Hex.t list option;
+    memory : Ethereum_types.hex list option;
     mem_size : int32 option;
-    stack : Hex.t list option;
-    return_data : Hex.t option;
-    storage : (Hex.t * Hex.t) list option;
+    stack : Ethereum_types.hex list option;
+    return_data : Ethereum_types.hex option;
+    storage : (Ethereum_types.hex * Ethereum_types.hex) list option;
     depth : uint53;
     refund : uint53;
     error : string option;
@@ -628,10 +624,6 @@ module StructLogger = struct
         (error_of_fmt "Invalid opcode encoding: %a" Hex.pp (Hex.of_bytes op))
     else if Bytes.length op = 0 then return '\x00'
     else return (Bytes.get op 0)
-
-  (** Necessary because Hex.t is not Ethereum_types.hex *)
-  let decode_hex_item =
-    Rlp.decode_value (fun b -> Result_syntax.return @@ Hex.of_bytes b)
 
   let opcode_rlp_decoder bytes =
     let open Result_syntax in
@@ -657,9 +649,9 @@ module StructLogger = struct
         let* gas_cost = From_rlp.decode_z gas_cost in
         let* depth = From_rlp.decode_z depth in
         let* error = Rlp.decode_option From_rlp.decode_string error in
-        let* return_data = Rlp.decode_option decode_hex_item return_data in
+        let* return_data = Rlp.decode_option From_rlp.decode_hex return_data in
         let* stack =
-          Rlp.decode_option (Rlp.decode_list decode_hex_item) stack
+          Rlp.decode_option (Rlp.decode_list From_rlp.decode_hex) stack
         in
         let* raw_memory = Rlp.decode_option Rlp.decode_as_bytes raw_memory in
         let mem_size =
@@ -669,13 +661,13 @@ module StructLogger = struct
           Option.map_e
             (fun memory ->
               let* chunks = TzString.chunk_bytes 32 memory in
-              return @@ List.map Hex.of_string chunks)
+              return @@ List.map hex_encode_string chunks)
             raw_memory
         in
         let* storage =
           let parse_storage_index = function
             | Rlp.List [Value _; Value index; Value value] ->
-                Some (Hex.of_bytes index, Hex.of_bytes value)
+                Some (hex_of_bytes index, hex_of_bytes value)
             | _ -> None
           in
           Rlp.decode_option (Rlp.filter_decode_list parse_storage_index) storage
@@ -757,11 +749,17 @@ module StructLogger = struct
             (req "op" Opcode.encoding)
             (req "gas" uint53_encoding)
             (req "gasCost" uint53_encoding)
-            (req "memory" (option (list hex_encoding)))
+            (req "memory" (option (list Ethereum_types.hex_encoding_no0x)))
             (req "memSize" (option int32))
-            (req "stack" (option (list hex_encoding)))
-            (req "returnData" (option hex_encoding))
-            (req "storage" (option (list (tup2 hex_encoding hex_encoding))))
+            (req "stack" (option (list Ethereum_types.hex_encoding_no0x)))
+            (req "returnData" (option Ethereum_types.hex_encoding_no0x))
+            (req
+               "storage"
+               (option
+                  (list
+                     (tup2
+                        Ethereum_types.hex_encoding_no0x
+                        Ethereum_types.hex_encoding_no0x))))
             (req "depth" uint53_encoding))
          (obj2 (req "refund" uint53_encoding) (req "error" (option string))))
 
