@@ -57,7 +57,7 @@ The baking power of a delegate is defined as:
 
 .. code-block:: python
 
-  baking_power = total_staked_after_limits + 0.5 * total_delegated_after_limits
+  baking_power = total_staked_after_limits + (total_delegated_after_limits / 3)
 
 This page explains the relevant concepts and provides the detailed
 computations of ``total_staked_after_limits`` and
@@ -136,7 +136,7 @@ Delegated tez
 Non-staked tez owned by delegates and delegators are called
 **delegated tez**. They also contribute to the delegate's baking
 power, without being subject to slashing. However, delegated tez
-weigh half as much as staked tez for the purpose of computing the
+weigh a third as much as staked tez for the purpose of computing the
 baking power.
 
 Delegated tez of an account
@@ -257,7 +257,7 @@ needs to replay the block's balance updates on their own.
 In the Quebec protocol, to solve these problems, only the total
 delegated amounts **at the end of blocks** count when determining this
 minimum. This is known as the **per-block min-delegated
-feature**. This solution no longer penalizes baking rights when 
+feature**. This solution no longer penalizes baking rights when
 funds are transferred between two accounts delegated to the same
 baker. Moreover, it lets users easily retrieve via RPC the exact
 context that the minimum comes from, since it is guaranteed to
@@ -404,7 +404,7 @@ tez exceeds this quota, the baker is said to be **overstaked**, and we
 also call **overstaked** the excess of external staked tez over the
 allowed maximum. Any overstaked tez will count toward baking rights as
 delegated instead of staked (provided that the baker is not
-overdelegated too), so they will weigh half as much.
+overdelegated too), so they will weigh a third as much.
 
 .. code-block:: python
 
@@ -464,7 +464,7 @@ We finally have everything we need to compute the baking power
 
 .. code-block:: python
 
-  baking_power = total_staked_after_limits + 0.5 * total_delegated_after_limits
+  baking_power = total_staked_after_limits + (total_delegated_after_limits / 3)
 
 
 .. _minimal_baking_power_beta:
