@@ -336,7 +336,7 @@ let setup_sequencer ?sequencer_rpc_port ?sequencer_private_rpc_port
     }
 
 (* Register a single variant of a test but for all protocols. *)
-let register_test ?sequencer_rpc_port ?sequencer_private_rpc_port
+let register_test ~__FILE__ ?sequencer_rpc_port ?sequencer_private_rpc_port
     ?genesis_timestamp ?time_between_blocks ?max_blueprints_lag
     ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
     ?delayed_inbox_timeout ?delayed_inbox_min_levels ?max_number_of_chunks
@@ -416,11 +416,11 @@ let register_test ?sequencer_rpc_port ?sequencer_private_rpc_port
       ~tags
       protocols
 
-let register_test_for_kernels ?sequencer_rpc_port ?sequencer_private_rpc_port
-    ?genesis_timestamp ?time_between_blocks ?max_blueprints_lag
-    ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
-    ?delayed_inbox_timeout ?delayed_inbox_min_levels ?max_number_of_chunks
-    ?bootstrap_accounts ?sequencer ?sequencer_pool_address
+let register_test_for_kernels ~__FILE__ ?sequencer_rpc_port
+    ?sequencer_private_rpc_port ?genesis_timestamp ?time_between_blocks
+    ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
+    ?catchup_cooldown ?delayed_inbox_timeout ?delayed_inbox_min_levels
+    ?max_number_of_chunks ?bootstrap_accounts ?sequencer ?sequencer_pool_address
     ?(kernels = Kernel.all) ?da_fee ?minimum_base_fee_per_gas ?preimages_dir
     ?maximum_allowed_ticks ?maximum_gas_per_transaction
     ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge ?history_mode
@@ -429,6 +429,7 @@ let register_test_for_kernels ?sequencer_rpc_port ?sequencer_private_rpc_port
   List.iter
     (fun kernel ->
       register_test
+        ~__FILE__
         ?sequencer_rpc_port
         ?sequencer_private_rpc_port
         ?commitment_period

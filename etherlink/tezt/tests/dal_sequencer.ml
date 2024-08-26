@@ -24,7 +24,10 @@ open Setup
 open Rpc.Syntax
 
 let register_test =
-  register_test_for_kernels ~enable_dal:true ~threshold_encryption:false
+  register_test_for_kernels
+    ~__FILE__
+    ~enable_dal:true
+    ~threshold_encryption:false
 
 (* This test is similar to {Evm_sequencer.test_publish_blueprints} but it also checks
    that all 5 blueprints sent from the sequencer were published on the

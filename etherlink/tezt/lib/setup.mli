@@ -52,6 +52,7 @@ val run_new_observer_node :
     tests and starts the test. For each of the parameters, please refer to
     [Evm_node]. *)
 val register_test :
+  __FILE__:string ->
   ?sequencer_rpc_port:int ->
   ?sequencer_private_rpc_port:int ->
   ?genesis_timestamp:Client.timestamp ->
@@ -92,6 +93,7 @@ val register_test :
     tests and starts the test. For each of the parameters, please refer to
     [Evm_node]. The test is registered for each kernel. *)
 val register_test_for_kernels :
+  __FILE__:string ->
   ?sequencer_rpc_port:int ->
   ?sequencer_private_rpc_port:int ->
   ?genesis_timestamp:Client.timestamp ->
