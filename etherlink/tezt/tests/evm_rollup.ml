@@ -3237,9 +3237,34 @@ let test_latest_kernel_migration protocols =
       in
       let*@ block_result = latest_block evm_setup.evm_node in
       let* config_result = config_setup evm_setup in
+      let* indexes =
+        Sc_rollup_node.RPC.call
+          evm_setup.sc_rollup_node
+          ~rpc_hooks:Tezos_regression.rpc_hooks
+        @@ Sc_rollup_rpc.get_global_block_durable_state_value
+             ~pvm_kind
+             ~operation:Sc_rollup_rpc.Subkeys
+             ~key:Durable_storage_path.indexes
+             ()
+      in
+      let indexes = List.sort compare indexes in
+      Check.((indexes = ["accounts"; "blocks"; "transactions"]) (list string))
+        ~error_msg:"Expected indexes to be %R, got %L" ;
       return {transfer_result; block_result; config_result}
     in
     let scenario_after ~evm_setup ~sanity_check =
+      let* indexes =
+        Sc_rollup_node.RPC.call
+          evm_setup.sc_rollup_node
+          ~rpc_hooks:Tezos_regression.rpc_hooks
+        @@ Sc_rollup_rpc.get_global_block_durable_state_value
+             ~pvm_kind
+             ~operation:Sc_rollup_rpc.Subkeys
+             ~key:Durable_storage_path.indexes
+             ()
+      in
+      Check.((indexes = ["blocks"]) (list string))
+        ~error_msg:"Expected indexes to be %R, got %L" ;
       let* () =
         ensure_transfer_result_integrity
           ~sender
@@ -4005,36 +4030,6 @@ let test_rpc_getStorageAt =
     = Helpers.hex_256_of_int expected_value1)
       string)
     ~error_msg:"Expected %R, but got %L" ;
-  unit
-
-let test_accounts_double_indexing =
-  register_proxy
-    ~tags:["evm"; "accounts"; "index"]
-    ~title:"Accounts have a unique index"
-  @@ fun ~protocol:_ ~evm_setup:full_evm_setup ->
-  let check_accounts_length expected_length =
-    let* length =
-      Sc_rollup_node.RPC.call full_evm_setup.sc_rollup_node
-      @@ Sc_rollup_rpc.get_global_block_durable_state_value
-           ~pvm_kind:"wasm_2_0_0"
-           ~operation:Sc_rollup_rpc.Value
-           ~key:"/evm/world_state/indexes/accounts/length"
-           ()
-    in
-    let length = Option.map Helpers.hex_string_to_int length in
-    Check.((length = Some expected_length) (option int))
-      ~error_msg:"Expected %R accounts, got %L" ;
-    unit
-  in
-  let sender = Eth_account.bootstrap_accounts.(0) in
-  let receiver = Eth_account.bootstrap_accounts.(1) in
-  (* Send a first transaction, there must be 2 indexes. *)
-  let* _tx_hash = send ~sender ~receiver ~value:Wei.one_eth full_evm_setup in
-  let* () = check_accounts_length 2 in
-  (* After a second transaction with the same accounts, there still must
-     be 2 indexes. *)
-  let* _tx_hash = send ~sender ~receiver ~value:Wei.one_eth full_evm_setup in
-  let* () = check_accounts_length 2 in
   unit
 
 let test_originate_evm_kernel_and_dump_pvm_state =
@@ -6215,7 +6210,6 @@ let register_evm_node ~protocols =
   test_simulation_eip2200 protocols ;
   test_rpc_gasPrice protocols ;
   test_rpc_getStorageAt protocols ;
-  test_accounts_double_indexing protocols ;
   test_rpc_sendRawTransaction_with_consecutive_nonce protocols ;
   test_rpc_sendRawTransaction_not_included protocols ;
   test_originate_evm_kernel_and_dump_pvm_state protocols ;

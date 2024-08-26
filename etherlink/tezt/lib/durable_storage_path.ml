@@ -43,6 +43,8 @@ let kernel rst = sf "/kernel%s" rst
 
 let kernel_root_hash = evm "/kernel_root_hash"
 
+let indexes = world_state "/indexes"
+
 let eth_accounts = world_state "/eth_accounts"
 
 let eth_account addr = sf "%s/%s" eth_accounts (normalize addr)

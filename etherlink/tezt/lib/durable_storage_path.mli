@@ -39,6 +39,9 @@ val delayed_inbox : path
 (** [kernel_root_hash] is the path to the current kernel root hash. *)
 val kernel_root_hash : path
 
+(** [indexes] is the directory with all indexes category. *)
+val indexes : path
+
 (** [eth_accounts] is the path to ethereum accounts. *)
 val eth_accounts : path
 

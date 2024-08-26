@@ -133,9 +133,6 @@ const CODE_PATH: RefPath = RefPath::assert_from(b"/code");
 /// such 256 bit integer value in storage.
 const STORAGE_ROOT_PATH: RefPath = RefPath::assert_from(b"/storage");
 
-/// Flag indicating an account has already been indexed.
-const INDEXED_PATH: RefPath = RefPath::assert_from(b"/indexed");
-
 /// If a contract tries to read a value from storage and it has previously not written
 /// anything to this location or if it wrote the default value, then it gets this
 /// value back.
@@ -540,20 +537,6 @@ impl EthereumAccount {
         }
 
         Ok(())
-    }
-
-    pub fn indexed(&self, host: &impl Runtime) -> Result<bool, DurableStorageError> {
-        let path = concat(&self.path, &INDEXED_PATH)?;
-        Ok(host.store_has(&path)?.is_some())
-    }
-
-    pub fn set_indexed(
-        &self,
-        host: &mut impl Runtime,
-    ) -> Result<(), DurableStorageError> {
-        let path = concat(&self.path, &INDEXED_PATH)?;
-        host.store_write_all(&path, &[0_u8; 0])
-            .map_err(DurableStorageError::from)
     }
 }
 

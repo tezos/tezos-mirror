@@ -17,7 +17,6 @@ use crate::event::Event;
 use crate::internal_storage::InternalRuntime;
 use crate::safe_storage::{KernelRuntime, SafeStorage};
 use crate::storage;
-use crate::storage::init_account_index;
 use crate::upgrade;
 use crate::upgrade::KernelUpgrade;
 use crate::Configuration;
@@ -32,7 +31,6 @@ use primitive_types::{H160, H256, U256};
 use tezos_ethereum::block::BlockFees;
 use tezos_ethereum::transaction::TransactionHash;
 use tezos_evm_logging::{log, Level::*};
-use tezos_indexable_storage::IndexableStorage;
 use tezos_smart_rollup::outbox::OutboxQueue;
 use tezos_smart_rollup_host::path::{Path, RefPath};
 use tezos_smart_rollup_host::runtime::Runtime;
@@ -83,7 +81,6 @@ fn compute<Host: Runtime>(
     block_constants: &BlockConstants,
     precompiles: &PrecompileBTreeMap<Host>,
     evm_account_storage: &mut EthereumAccountStorage,
-    accounts_index: &mut IndexableStorage,
     is_first_block_of_reboot: bool,
     sequencer_pool_address: Option<H160>,
     limits: &Limits,
@@ -140,7 +137,6 @@ fn compute<Host: Runtime>(
             &transaction,
             block_in_progress.index,
             evm_account_storage,
-            accounts_index,
             allocated_ticks,
             retriable,
             sequencer_pool_address,
@@ -262,7 +258,6 @@ fn compute_bip<Host: KernelRuntime>(
     current_block_parent_hash: &mut H256,
     precompiles: &PrecompileBTreeMap<Host>,
     evm_account_storage: &mut EthereumAccountStorage,
-    accounts_index: &mut IndexableStorage,
     tick_counter: &mut TickCounter,
     first_block_of_reboot: &mut bool,
     sequencer_pool_address: Option<H160>,
@@ -281,7 +276,6 @@ fn compute_bip<Host: KernelRuntime>(
         &constants,
         precompiles,
         evm_account_storage,
-        accounts_index,
         *first_block_of_reboot,
         sequencer_pool_address,
         limits,
@@ -406,7 +400,6 @@ pub fn produce<Host: Runtime>(
         };
     let mut evm_account_storage =
         init_account_storage().context("Failed to initialize EVM account storage")?;
-    let mut accounts_index = init_account_index()?;
     let mut tick_counter = TickCounter::new(0u64);
     let mut first_block_of_reboot = true;
 
@@ -437,7 +430,6 @@ pub fn produce<Host: Runtime>(
                 &mut current_block_parent_hash,
                 &precompiles,
                 &mut evm_account_storage,
-                &mut accounts_index,
                 &mut tick_counter,
                 &mut first_block_of_reboot,
                 sequencer_pool_address,
@@ -521,7 +513,6 @@ pub fn produce<Host: Runtime>(
             &mut current_block_parent_hash,
             &precompiles,
             &mut evm_account_storage,
-            &mut accounts_index,
             &mut tick_counter,
             &mut first_block_of_reboot,
             sequencer_pool_address,
@@ -586,9 +577,9 @@ mod tests {
     use crate::inbox::TransactionContent;
     use crate::inbox::TransactionContent::Ethereum;
     use crate::inbox::TransactionContent::EthereumDelayed;
+    use crate::storage::init_blocks_index;
     use crate::storage::read_block_in_progress;
     use crate::storage::read_current_block;
-    use crate::storage::{init_blocks_index, init_transaction_hashes_index};
     use crate::storage::{read_transaction_receipt, read_transaction_receipt_status};
     use crate::tick_model;
     use crate::{retrieve_block_fees, retrieve_chain_id};
@@ -1184,106 +1175,7 @@ mod tests {
     }
 
     #[test]
-    //Test accounts are indexed at the end of the block production
-    fn test_accounts_are_indexed() {
-        let mut host = MockHost::default();
-        crate::storage::store_minimum_base_fee_per_gas(
-            &mut host,
-            DUMMY_BASE_FEE_PER_GAS.into(),
-        )
-        .unwrap();
-
-        let accounts_index = init_account_index().unwrap();
-
-        let tx = Transaction {
-            tx_hash: [0; TRANSACTION_HASH_SIZE],
-            content: Ethereum(dummy_eth_transaction_zero()),
-        };
-
-        let transactions = vec![tx];
-        store_blueprints(&mut host, vec![blueprint(transactions)]);
-
-        let indexed_accounts = accounts_index.length(&host).unwrap();
-
-        let sender = dummy_eth_caller();
-        println!("caller {sender:?}");
-        let mut evm_account_storage = init_account_storage().unwrap();
-        set_balance(
-            &mut host,
-            &mut evm_account_storage,
-            &sender,
-            U256::from(1_000_000_000_000_000_000u64),
-        );
-        produce(
-            &mut host,
-            DUMMY_CHAIN_ID,
-            dummy_block_fees(),
-            &mut Configuration::default(),
-            None,
-            None,
-        )
-        .expect("The block production failed.");
-
-        let indexed_accounts_after_produce = accounts_index.length(&host).unwrap();
-
-        // The sender and receiver have never been indexed yet, and are indexed
-        // whether the transaction succeeds or not.
-        assert_eq!(
-            indexed_accounts_after_produce,
-            indexed_accounts + 2,
-            "The new accounts haven't been indexed"
-        )
-    }
-
-    #[test]
-    //Test accounts are indexed at the end of the block production
-    fn test_accounts_are_indexed_once() {
-        let mut host = MockHost::default();
-
-        let accounts_index = init_account_index().unwrap();
-
-        let tx = Transaction {
-            tx_hash: [0; TRANSACTION_HASH_SIZE],
-            content: Ethereum(dummy_eth_transaction_zero()),
-        };
-
-        let transactions = vec![tx];
-        store_blueprints(&mut host, vec![blueprint(transactions.clone())]);
-
-        produce(
-            &mut host,
-            DUMMY_CHAIN_ID,
-            dummy_block_fees(),
-            &mut Configuration::default(),
-            None,
-            None,
-        )
-        .expect("The block production failed.");
-
-        let indexed_accounts = accounts_index.length(&host).unwrap();
-        // Next blueprint
-        store_blueprints(&mut host, vec![blueprint(transactions)]);
-        produce(
-            &mut host,
-            DUMMY_CHAIN_ID,
-            dummy_block_fees(),
-            &mut Configuration::default(),
-            None,
-            None,
-        )
-        .expect("The block production failed.");
-
-        let indexed_accounts_after_second_produce = accounts_index.length(&host).unwrap();
-
-        // The sender and receiver have never been indexed yet
-        assert_eq!(
-            indexed_accounts, indexed_accounts_after_second_produce,
-            "Accounts have been indexed twice"
-        )
-    }
-
-    #[test]
-    fn test_blocks_and_transactions_are_indexed() {
+    fn test_blocks_are_indexed() {
         let mut host = MockHost::default();
         crate::storage::store_minimum_base_fee_per_gas(
             &mut host,
@@ -1292,22 +1184,10 @@ mod tests {
         .unwrap();
 
         let blocks_index = init_blocks_index().unwrap();
-        let transaction_hashes_index = init_transaction_hashes_index().unwrap();
 
-        let tx_hash = [0; TRANSACTION_HASH_SIZE];
-
-        let tx = Transaction {
-            tx_hash,
-            content: Ethereum(dummy_eth_transaction_zero()),
-        };
-
-        let transactions = vec![tx];
-        store_blueprints(&mut host, vec![blueprint(transactions)]);
+        store_blueprints(&mut host, vec![blueprint(vec![])]);
 
         let number_of_blocks_indexed = blocks_index.length(&host).unwrap();
-        let number_of_transactions_indexed =
-            transaction_hashes_index.length(&host).unwrap();
-
         let sender = dummy_eth_caller();
         let mut evm_account_storage = init_account_storage().unwrap();
         set_balance(
@@ -1327,8 +1207,6 @@ mod tests {
         .expect("The block production failed.");
 
         let new_number_of_blocks_indexed = blocks_index.length(&host).unwrap();
-        let new_number_of_transactions_indexed =
-            transaction_hashes_index.length(&host).unwrap();
 
         let current_block_hash = storage::read_current_block(&mut host)
             .unwrap()
@@ -1337,22 +1215,10 @@ mod tests {
             .to_vec();
 
         assert_eq!(number_of_blocks_indexed + 1, new_number_of_blocks_indexed);
-        assert_eq!(
-            number_of_transactions_indexed + 1,
-            new_number_of_transactions_indexed
-        );
 
         assert_eq!(
             Ok(current_block_hash),
             blocks_index.get_value(&host, new_number_of_blocks_indexed - 1)
-        );
-
-        let last_indexed_transaction =
-            transaction_hashes_index.length(&host).unwrap() - 1;
-
-        assert_eq!(
-            Ok(tx_hash.to_vec()),
-            transaction_hashes_index.get_value(&host, last_indexed_transaction)
         );
     }
 
@@ -1379,7 +1245,6 @@ mod tests {
 
         let block_constants = first_block(&mut host);
         let precompiles = precompiles::precompile_set(false);
-        let mut accounts_index = init_account_index().unwrap();
 
         //provision sender account
         let sender = H160::from_str("af1276cbb260bb13deddb4209ae99ae6e497f446").unwrap();
@@ -1412,7 +1277,6 @@ mod tests {
             &block_constants,
             &precompiles,
             &mut evm_account_storage,
-            &mut accounts_index,
             true,
             None,
             &limits,
