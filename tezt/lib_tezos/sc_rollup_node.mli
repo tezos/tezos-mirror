@@ -32,7 +32,12 @@
 (** Smart contract rollup node states. *)
 type t
 
-type purpose = Operating | Batching | Cementing | Recovering
+type purpose =
+  | Operating
+  | Batching
+  | Cementing
+  | Recovering
+  | Executing_outbox
 
 type operation_kind =
   | Publish
@@ -284,6 +289,8 @@ type unsafe_pvm_patch = Increase_max_nb_ticks of int
 
 val patch_config_unsafe_pvm_patches : unsafe_pvm_patch list -> JSON.t -> JSON.t
 
+val patch_config_execute_outbox : JSON.t -> JSON.t
+
 val patch_durable_storage : t -> key:string -> value:string -> unit Lwt.t
 
 (** Wait until the sc node is ready.
@@ -338,6 +345,10 @@ val change_node_and_restart :
 (** Change the rollup mode. This does not terminate nor restart the
     node. Change will take effect when the node is run/restart. *)
 val change_node_mode : t -> mode -> t
+
+(** Change the rollup node operators. This does not terminate nor restart the
+    node. Change will take effect when the node is run/restart. *)
+val change_operators : t -> (purpose * string) list -> unit
 
 (** [dump_durable_storage ~sc_rollup_node ~dump ?string ()] writes to [dump] the current
     state of the WASM PVM from [sc_rollup_node]. *)

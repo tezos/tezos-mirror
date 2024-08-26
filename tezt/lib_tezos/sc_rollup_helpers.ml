@@ -337,6 +337,7 @@ let setup_rollup ~kind ?hooks ?alias ?(mode = Sc_rollup_node.Operator)
 let originate_forward_smart_contract ?(src = Constant.bootstrap1.alias) client
     protocol =
   (* Originate forwarder contract to send internal messages to rollup *)
+  Log.info "Originate forward contract" ;
   let* alias, contract_id =
     Client.originate_contract_at
       ~amount:Tez.zero
