@@ -38,6 +38,11 @@ local logs = panel.logs;
 
   slot_index_instance_query: '{' + std.extVar('node_instance_label') + '="$node_instance", slot_index="$slot_index"}',
 
+
+  pkh_instance_query: '{' + std.extVar('node_instance_label') + '="$node_instance", pkh="$pkh"}',
+
+  topic_instance_query: '{' + std.extVar('node_instance_label') + '="$node_instance", slot_index="$slot_index", pkh="$pkh"}',
+
   // Prometheus query
   prometheus(q, legendFormat='', namespace=self.namespace):
     local withLegendFormat = if legendFormat != ''
@@ -183,6 +188,24 @@ local logs = panel.logs;
       query='label_values(octez_version,' + std.extVar('node_instance_label') + ')',
     )
     + variableQuery.generalOptions.withLabel('Node Instance')
+    + variableQuery.refresh.onLoad()
+    + variableQuery.withDatasource('prometheus', 'Prometheus'),
+
+  slotIndex:
+    variableQuery.new(
+      name='slot_index',
+      query='label_values(dal_gs_count_peers_per_topic, slot_index)',
+    )
+    + variableQuery.generalOptions.withLabel('Slot index')
+    + variableQuery.refresh.onLoad()
+    + variableQuery.withDatasource('prometheus', 'Prometheus'),
+
+  pkh:
+    variableQuery.new(
+      name='pkh',
+      query='label_values(dal_gs_count_peers_per_topic, pkh)',
+    )
+    + variableQuery.generalOptions.withLabel('Pkh')
     + variableQuery.refresh.onLoad()
     + variableQuery.withDatasource('prometheus', 'Prometheus'),
 
