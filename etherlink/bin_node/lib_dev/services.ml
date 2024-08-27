@@ -471,11 +471,29 @@ let dispatch_request (rpc : Configuration.rpc) (config : Configuration.t)
                     in
                     rpc_error (Rpc_errors.transaction_rejected err None)
                 | Ok (Either.Left transaction_object) -> (
-                    let* tx_hash = Tx_pool.add transaction_object txn in
-                    match tx_hash with
-                    | Ok tx_hash -> rpc_ok tx_hash
-                    | Error reason ->
-                        rpc_error (Rpc_errors.transaction_rejected reason None))
+                    let* (Qty balance) =
+                      Backend_rpc.balance
+                        transaction_object.from
+                        (Block_parameter.Block_parameter Latest)
+                    in
+                    let total_cost =
+                      let (Qty gas) = transaction_object.gas in
+                      let (Qty gas_price) = transaction_object.gasPrice in
+                      let (Qty value) = transaction_object.value in
+                      Z.add (Z.mul gas gas_price) value
+                    in
+                    if total_cost > balance then
+                      rpc_error
+                        (Rpc_errors.transaction_rejected
+                           "Not enough funds"
+                           None)
+                    else
+                      let* tx_hash = Tx_pool.add transaction_object txn in
+                      match tx_hash with
+                      | Ok tx_hash -> rpc_ok tx_hash
+                      | Error reason ->
+                          rpc_error
+                            (Rpc_errors.transaction_rejected reason None))
                 | Ok (Either.Right _) ->
                     rpc_error
                       (Rpc_errors.internal_error

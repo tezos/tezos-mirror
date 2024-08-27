@@ -6151,6 +6151,53 @@ let test_tx_pool_replacing_transactions =
     ~error_msg:"Second transaction should have replaced the previous one" ;
   unit
 
+let test_da_fees_after_execution =
+  register_all
+    ~time_between_blocks:Nothing
+    ~tags:["evm"; "da_fees"; "foo"]
+    ~da_fee:(Wei.of_string "4_000_000_000_000")
+    ~title:"da fees test"
+  @@ fun {sequencer; _} _protocol ->
+  (* This is a non-regression test of the situation where the source of
+     a transaction is able to prepay for the gas, but after the transfer
+     is executed it cannot pay for the DA fees.
+
+     Because obviously DA fees are accounted AFTER the execution.
+  *)
+  let account =
+    Eth_account.
+      {
+        address = "0xA257edC8ad1D8f8f463aC0D947cc381000b3c863";
+        private_key =
+          "0xb80e5dd2ba9281e482589973600609bb0f10f6a075e6c733e4472d4dd2df238a";
+      }
+  in
+  let* _ =
+    send_transaction_to_sequencer
+      (Eth_cli.transaction_send
+         ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+         ~to_public_key:account.address
+         ~value:(Wei.of_eth_int 1)
+         ~endpoint:(Evm_node.endpoint sequencer))
+      sequencer
+  in
+
+  let* res =
+    Lwt.catch
+      (fun () ->
+        Eth_cli.transaction_send
+          ~source_private_key:account.private_key
+          ~to_public_key:"0x1074Fd1EC02cbeaa5A90450505cF3B48D834f3EB"
+          ~value:(Wei.of_eth_string "0.9999")
+          ~endpoint:(Evm_node.endpoint sequencer)
+          ())
+      (fun _exn -> Lwt.return "")
+  in
+
+  Check.((res = "") string) ~error_msg:"The transaction should have failed" ;
+
+  unit
+
 let protocols = Protocol.all
 
 let () =
@@ -6242,4 +6289,5 @@ let () =
   test_outbox_size_limit_resilience ~slow:true protocols ;
   test_outbox_size_limit_resilience ~slow:false protocols ;
   test_proxy_node_can_forward_to_evm_endpoint protocols ;
-  test_tx_pool_replacing_transactions protocols
+  test_tx_pool_replacing_transactions protocols ;
+  test_da_fees_after_execution protocols
