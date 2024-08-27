@@ -179,7 +179,7 @@ let create_inbox_payload ~smart_rollup_address ~chunks : Blueprint_types.payload
       |> prepare_message smart_rollup_address Message_format.Blueprint_chunk)
     chunks
 
-let create_dal_payload chunk =
+let create_dal_payload {unsigned_chunk; signature = _} =
   Message_format.(
     frame_dal_message Blueprint_chunk
-    @@ (chunk_to_rlp chunk |> Rlp.encode |> Bytes.to_string))
+    @@ (unsigned_chunk_to_rlp unsigned_chunk |> Rlp.encode |> Bytes.to_string))

@@ -356,7 +356,7 @@ impl InputHandler for SequencerInput {
                             )
                         {
                             log!(host, Debug, "DAL slot is a blueprint chunk");
-                            handle_blueprint_chunk(host, seq_blueprint.blueprint)?;
+                            handle_blueprint_chunk(host, seq_blueprint)?;
                         }
                     }
                 }

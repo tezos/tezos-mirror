@@ -295,7 +295,6 @@ pub struct SequencerParsingContext {
     pub buffer_transaction_chunks: Option<BufferTransactionChunks>,
 }
 
-#[allow(dead_code)]
 pub fn parse_unsigned_blueprint_chunk(
     bytes: &[u8],
 ) -> Option<UnsignedSequencerBlueprint> {
