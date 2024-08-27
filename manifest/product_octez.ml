@@ -2309,7 +2309,6 @@ let tezt_tezos =
       [
         tezt_wrapper |> open_ |> open_ ~m:"Base";
         tezt_performance_regression |> open_;
-        tezt_cloud |> open_;
         uri;
         hex;
         octez_crypto_dal;
