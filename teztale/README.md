@@ -9,15 +9,9 @@ It is splitted in 2 parts:
 - `octez-teztale-server` which aggregates and delivers data gathered by
   archiver(s)
 
-## Building
-
-```
-$ make build-deps teztale
-```
-
 ## Running
 
-### Aggregator (aka octez-teztale-server)
+### Server
 
 First, you need to write a configuration file. It is a json file
 folowing the schema:
@@ -78,9 +72,9 @@ octez-teztale-server ./config.json
 Run an octez node, with a RPC server open on localhost:8732 and do
 
 ```
-octez-teztale-archiver feed <teztale-server-endpoint-including-login:password>
+octez-teztale-archiver [--endpoint OCTEZ_NODE_URL:OCTEZ_NODE_RPC_PORT] feed ARCHIVER_LOGIN:ARCHIVER_PASSWORD@SERVER_URL:SERVER_PORT
+
 ```
 
 `octez-teztale-archiver` is an octez client, it thus accepts the same global
-options as the client (especially the `--endpoint` option to specify
-where to reach octez node RPC endpoint).
+options and default values as the client (especially the `--endpoint` option).
