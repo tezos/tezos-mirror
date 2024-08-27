@@ -83,6 +83,7 @@ let main ?kernel_path ~data_dir ~(config : Configuration.t) () =
   in
   let* ro_ctxt =
     Evm_ro_context.load
+      ~smart_rollup_address
       ~data_dir
       ~preimages:config.kernel_execution.preimages
       ?preimages_endpoint:config.kernel_execution.preimages_endpoint
@@ -95,7 +96,7 @@ let main ?kernel_path ~data_dir ~(config : Configuration.t) () =
     | None -> evm_node_endpoint
   in
   let observer_backend =
-    Evm_ro_context.ro_backend ro_ctxt config evm_node_endpoint
+    Evm_ro_context.ro_backend ro_ctxt config ~evm_node_endpoint
   in
 
   let* () =

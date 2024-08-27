@@ -15,9 +15,13 @@ type t = {
 }
 
 (** [load ~data_dir ~preimages ()] creates a new read-only handler on the
-    node’s context. You can have as many read-only handlers as you want
-    split over as many processes. *)
+    node’s context. You can have as many read-only handlers as you want split
+    over as many processes.
+
+    If [smart_rollup_address] is omitted, the argument is fetched from the
+    store. *)
 val load :
+  ?smart_rollup_address:Address.t ->
   data_dir:string ->
   preimages:string ->
   ?preimages_endpoint:Uri.t ->
@@ -36,7 +40,10 @@ val preload_kernel_from_level :
 val next_blueprint_number : t -> Ethereum_types.quantity tzresult Lwt.t
 
 val ro_backend :
-  t -> Configuration.t -> Uri.t -> (module Services_backend_sig.S)
+  ?evm_node_endpoint:Uri.t ->
+  t ->
+  Configuration.t ->
+  (module Services_backend_sig.S)
 
 val replay :
   t ->

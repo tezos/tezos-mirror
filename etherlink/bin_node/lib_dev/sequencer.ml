@@ -6,41 +6,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module MakeBackend (Ctxt : sig
-  val smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t
-end) : Services_backend_sig.Backend = struct
-  module Reader = Evm_context_based_reader
-  module SimulatorBackend = Evm_context_based_reader
-
-  module TxEncoder = struct
-    type transactions = (string * Ethereum_types.transaction_object) list
-
-    type messages = transactions
-
-    let encode_transactions ~smart_rollup_address:_ ~transactions:_ =
-      assert false
-  end
-
-  module Publisher = struct
-    type messages = TxEncoder.messages
-
-    let publish_messages ~timestamp:_ ~smart_rollup_address:_ ~messages:_ =
-      assert false
-  end
-
-  module Tracer = Tracer
-
-  let block_param_to_block_number = Evm_context.block_param_to_block_number
-
-  let smart_rollup_address =
-    Tezos_crypto.Hashed.Smart_rollup_address.to_string Ctxt.smart_rollup_address
-end
-
-module Make (Ctxt : sig
-  val smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t
-end) =
-  Services_backend_sig.Make (MakeBackend (Ctxt))
-
 let install_finalizer_seq server_public_finalizer server_private_finalizer =
   let open Lwt_syntax in
   Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
@@ -157,18 +122,20 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
       Blueprints_publisher.publish Z.zero genesis
     else return_unit
   in
-
-  let module Rollup_rpc =
-    Make
-      (struct
-        let smart_rollup_address = smart_rollup_address_typed
-      end)
-      (Evm_context)
+  let* ro_ctxt =
+    Evm_ro_context.load
+      ~smart_rollup_address:smart_rollup_address_typed
+      ~data_dir
+      ~preimages:configuration.kernel_execution.preimages
+      ?preimages_endpoint:configuration.kernel_execution.preimages_endpoint
+      ()
   in
+
+  let backend = Evm_ro_context.ro_backend ro_ctxt configuration in
   let* () =
     Tx_pool.start
       {
-        rollup_node = (module Rollup_rpc);
+        rollup_node = backend;
         smart_rollup_address;
         mode = Sequencer;
         tx_timeout_limit = configuration.tx_pool_timeout_limit;
@@ -212,20 +179,16 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
   let* finalizer_public_server =
     Rpc_server.start_public_server
       ~evm_services:
-        {
-          next_blueprint_number = Evm_context.next_blueprint_number;
-          find_blueprint = Evm_context.blueprint;
-          smart_rollup_address = smart_rollup_address_typed;
-          time_between_blocks = sequencer_config.time_between_blocks;
-        }
+        Evm_ro_context.(
+          evm_services_methods ro_ctxt sequencer_config.time_between_blocks)
       configuration
-      ((module Rollup_rpc), smart_rollup_address_typed)
+      (backend, smart_rollup_address_typed)
   in
   let* finalizer_private_server =
     Rpc_server.start_private_server
       ~block_production:`Single_node
       configuration
-      ((module Rollup_rpc), smart_rollup_address_typed)
+      (backend, smart_rollup_address_typed)
   in
   let (_ : Lwt_exit.clean_up_callback_id) =
     install_finalizer_seq finalizer_public_server finalizer_private_server
