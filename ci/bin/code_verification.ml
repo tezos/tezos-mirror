@@ -1122,6 +1122,15 @@ let jobs pipeline_type =
         ~before_script:(before_script ~source_version:true ~eval_opam:true [])
         ["./scripts/ci/test_liquidity_baking_scripts.sh"]
     in
+    let job_test_release_versions =
+      job
+        ~__POS__
+        ~image:Images.CI.prebuild
+        ~stage:Stages.test
+        ~name:"oc:scripts:release_script_values"
+        ~dependencies:dependencies_needs_start
+        ["scripts/ci/test_release_values.sh"]
+    in
     (* The set of installation test jobs *)
     let jobs_install_octez : tezos_job list =
       let compile_octez_rules =
@@ -1482,6 +1491,7 @@ let jobs pipeline_type =
         job_oc_script_test_release_versions;
         job_oc_script_b58_prefix;
         job_oc_test_liquidity_baking_scripts;
+        job_test_release_versions;
       ]
     in
     let jobs_debian =
