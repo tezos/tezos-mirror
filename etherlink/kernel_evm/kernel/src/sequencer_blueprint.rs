@@ -108,6 +108,29 @@ impl Encodable for SequencerBlueprint {
     }
 }
 
+impl Decodable for UnsignedSequencerBlueprint {
+    fn decode(decoder: &rlp::Rlp) -> Result<Self, DecoderError> {
+        if !decoder.is_list() {
+            return Err(DecoderError::RlpExpectedToBeList);
+        }
+        if decoder.item_count()? != 4 {
+            return Err(DecoderError::RlpIncorrectListLen);
+        }
+        let mut it = decoder.iter();
+        let chunk = rlp_helpers::decode_field(&rlp_helpers::next(&mut it)?, "chunk")?;
+        let number = decode_field_u256_le(&rlp_helpers::next(&mut it)?, "number")?;
+        let nb_chunks = decode_field_u16_le(&rlp_helpers::next(&mut it)?, "nb_chunks")?;
+        let chunk_index =
+            decode_field_u16_le(&rlp_helpers::next(&mut it)?, "chunk_index")?;
+        Ok(Self {
+            chunk,
+            number,
+            nb_chunks,
+            chunk_index,
+        })
+    }
+}
+
 impl Decodable for SequencerBlueprint {
     fn decode(decoder: &rlp::Rlp) -> Result<Self, DecoderError> {
         if !decoder.is_list() {
