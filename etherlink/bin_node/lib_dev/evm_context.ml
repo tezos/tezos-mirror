@@ -499,12 +499,15 @@ module State = struct
           on_success session
         in
         let* block_hash_opt =
-          let*! bytes =
-            Evm_state.inspect
-              evm_state
-              (Durable_storage_path.Indexes.block_by_number (Nth number))
-          in
-          return (Option.map decode_block_hash bytes)
+          if ctxt.block_storage_sqlite3 then
+            Evm_store.Blocks.find_hash_of_number conn (Qty number)
+          else
+            let*! bytes =
+              Evm_state.inspect
+                evm_state
+                (Durable_storage_path.Indexes.block_by_number (Nth number))
+            in
+            return (Option.map decode_block_hash bytes)
         in
         match block_hash_opt with
         | Some found_block_hash ->
