@@ -78,23 +78,32 @@ let encode_u16_le i =
   Bytes.set_uint16_le bytes 0 i ;
   bytes
 
-type t =
-  | Chunk of {
+type unsigned_chunk =
+  | Unsigned_chunk of {
       value : bytes;
       number : quantity;
       nb_chunks : int;
       chunk_index : int;
-      signature : Signature.t;
     }
+
+type chunk = {unsigned_chunk : unsigned_chunk; signature : Signature.t}
+
+type t = chunk
 
 let chunk_encoding =
   Data_encoding.(
     let bytes_hex = bytes' Hex in
     conv
-      (fun (Chunk {value; number; nb_chunks; chunk_index; signature}) ->
-        (value, number, nb_chunks, chunk_index, signature))
+      (fun {
+             unsigned_chunk =
+               Unsigned_chunk {value; number; nb_chunks; chunk_index};
+             signature;
+           } -> (value, number, nb_chunks, chunk_index, signature))
       (fun (value, number, nb_chunks, chunk_index, signature) ->
-        Chunk {value; number; nb_chunks; chunk_index; signature})
+        {
+          unsigned_chunk = Unsigned_chunk {value; number; nb_chunks; chunk_index};
+          signature;
+        })
       (obj5
          (req "value" bytes_hex)
          (req "number" quantity_encoding)
@@ -102,7 +111,8 @@ let chunk_encoding =
          (req "chunk_index" int31)
          (req "signature" Signature.encoding)))
 
-let unsigned_chunk_to_rlp (Chunk {value; number; nb_chunks; chunk_index; _}) =
+let unsigned_chunk_to_rlp
+    (Unsigned_chunk {value; number; nb_chunks; chunk_index}) =
   Rlp.(
     List
       [
@@ -112,7 +122,11 @@ let unsigned_chunk_to_rlp (Chunk {value; number; nb_chunks; chunk_index; _}) =
         Value (encode_u16_le chunk_index);
       ])
 
-let chunk_to_rlp (Chunk {value; number; nb_chunks; chunk_index; signature}) =
+let chunk_to_rlp
+    {
+      unsigned_chunk = Unsigned_chunk {value; number; nb_chunks; chunk_index};
+      signature;
+    } =
   Rlp.(
     List
       [
@@ -137,17 +151,17 @@ let prepare ~cctxt ~sequencer_key ~timestamp ~number ~parent_hash
   let nb_chunks = List.length chunks in
   let message_from_chunk nb_chunks chunk_index chunk =
     let value = Bytes.of_string chunk in
-    let (Chunk r as chunk_without_signature) =
-      Chunk {value; number; nb_chunks; chunk_index; signature = Signature.zero}
+    let unsigned_chunk =
+      Unsigned_chunk {value; number; nb_chunks; chunk_index}
     in
     (* Takes the blueprints fields and sign them. *)
     let rlp_unsigned_blueprint =
-      unsigned_chunk_to_rlp chunk_without_signature |> encode
+      unsigned_chunk_to_rlp unsigned_chunk |> encode
     in
     let+ signature =
       Client_keys.sign cctxt sequencer_key rlp_unsigned_blueprint
     in
-    Chunk {r with signature}
+    {unsigned_chunk; signature}
   in
   List.mapi_ep (message_from_chunk nb_chunks) chunks
 
