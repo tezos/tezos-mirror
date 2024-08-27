@@ -16,7 +16,7 @@ use crate::parsing::{
     MAX_SIZE_PER_CHUNK,
 };
 
-use crate::sequencer_blueprint::SequencerBlueprint;
+use crate::sequencer_blueprint::UnsignedSequencerBlueprint;
 use crate::storage::{
     chunked_hash_transaction_path, chunked_transaction_num_chunks,
     chunked_transaction_path, clear_events, create_chunked_transaction, read_l1_level,
@@ -294,15 +294,15 @@ impl InputHandler for ProxyInput {
 
 fn handle_blueprint_chunk<Host: Runtime>(
     host: &mut Host,
-    blueprint: SequencerBlueprint,
+    blueprint: UnsignedSequencerBlueprint,
 ) -> anyhow::Result<()> {
     log!(host, Benchmarking, "Handling a blueprint input");
     log!(
         host,
         Debug,
         "Storing chunk {} of sequencer blueprint number {}",
-        blueprint.blueprint.chunk_index,
-        blueprint.blueprint.number
+        blueprint.chunk_index,
+        blueprint.number
     );
     store_sequencer_blueprint(host, blueprint).map_err(Error::into)
 }
@@ -327,7 +327,7 @@ impl InputHandler for SequencerInput {
                 delayed_inbox.save_transaction(host, *tx, previous_timestamp, level)
             }
             Self::SequencerBlueprint(seq_blueprint) => {
-                handle_blueprint_chunk(host, seq_blueprint)
+                handle_blueprint_chunk(host, seq_blueprint.blueprint)
             }
             Self::DalSlotImportSignals(DalSlotImportSignals {
                 signals,
@@ -356,7 +356,7 @@ impl InputHandler for SequencerInput {
                             )
                         {
                             log!(host, Debug, "DAL slot is a blueprint chunk");
-                            handle_blueprint_chunk(host, seq_blueprint)?;
+                            handle_blueprint_chunk(host, seq_blueprint.blueprint)?;
                         }
                     }
                 }
