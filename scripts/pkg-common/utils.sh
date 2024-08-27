@@ -112,35 +112,25 @@ warnings() {
 
 getOctezVersion() {
 
-  if [ -n "${CI:-}" ]; then
-    . scripts/ci/octez-release.sh
+  . scripts/ci/octez-packages-version.sh
 
-    if [ -n "${gitlab_release_no_v:-}" ]; then
-      RET="$gitlab_release_no_v"
-    else
-      RET="0.0+$CI_COMMIT_SHORT_SHA"
-    fi
-
-  else
-
-    if ! version=$(dune exec src/lib_version/exe/octez_print_version.exe -- --json 2> /dev/null); then
-      echo "Cannot get version. Try eval \`opam env\`?" >&2
-      exit 1
-    fi
-    major=$(echo "$version" | jq -r .major)
-    minor=$(echo "$version" | jq -r .minor)
-    info=$(echo "$version" | jq -r .info)
-    short_hash=$(echo "$version" | jq -r .hash)
-
-    case $info in
-    *dev)
-      RET="$major.$minor$info+$short_hash"
-      ;;
-    *)
-      RET="$major.$minor$info"
-      ;;
-    esac
-  fi
+  case "$RELEASETYPE" in
+  ReleaseCandidate | TestReleaseCandidate | Release | TestRelease)
+    # rpm version do not accept '-' as a character
+    # https://rpm-software-management.github.io/rpm/manual/spec.html
+    RET=$(echo "$VERSION" | tr '-' '~')
+    ;;
+  SoftRelease)
+    RET=$(date +'%Y%m%d%H%M')+$(echo "$CI_COMMIT_TAG" | tr '-' '_')
+    ;;
+  Master | TestBranch)
+    RET=$(date +'%Y%m%d%H%M')+$CI_COMMIT_SHORT_SHA
+    ;;
+  *)
+    echo "Cannot create package for this branch"
+    exit 1
+    ;;
+  esac
 
   echo "$RET"
 

@@ -3,13 +3,6 @@
 distribution=$1
 release=$2
 
-# check if it's a real or a fake release or we are testing
-# the packages in a branch
-if [ -n "${CI_COMMIT_TAG:-}" ]; then
-  # shellcheck source=./scripts/ci/octez-release.sh
-  . ./scripts/ci/octez-release.sh
-fi
-
 # If it's a protected branch the value of $bucket will
 # be set accordingly but the CI.
 bucket="$GCP_LINUX_PACKAGES_BUCKET"
@@ -25,41 +18,30 @@ else
   PREFIX=
 fi
 
-# if it's a release tag, then it can be a RC release
-# or a final release. This can be on a protected branch or not.
-if [ -n "${gitlab_release_no_v:-}" ]; then
-  # It a release tag, this can be either final or release
-  # candidate
-  if [ -n "${gitlab_release_rc_version}" ]; then
-    # Release candidate
-    distribution="${PREFIX}RC/$distribution"
-  fi
-  # else we just that $distribution as it is
-else
-  # Not a release tag. This is strictly for testing.
-  if [ "${CI_COMMIT_REF_PROTECTED:-false}" = true ]; then
-    # this is not a release, but it's a protected branch.
-    # We allow this only for the master branch.
-    if [ "$CI_COMMIT_REF_NAME" = "master" ]; then
-      distribution="${PREFIX}master/$distribution"
-    else
-      if [ -n "${CI_COMMIT_TAG}" ]; then
-        distribution="${CI_COMMIT_TAG}/$distribution"
-      else
-        echo "Cannot test a repository for a protected branch that is not associated to a tag or master"
-        exit 1
-      fi
-    fi
-  else
-    # Not a release, not a protected branch
-    if [ "$CI_COMMIT_REF_NAME" = "RC" ]; then
-      echo "Cannot test a repository for a branch named 'RC'"
-      exit 1
-    else
-      distribution="${PREFIX}$CI_COMMIT_REF_NAME/$distribution"
-    fi
-  fi
-fi
+. scripts/ci/octez-packages-version.sh
+
+case "$RELEASETYPE" in
+ReleaseCandidate | TestReleaseCandidate)
+  distribution="${PREFIX}RC/${distribution}"
+  ;;
+Release | TestRelease)
+  # use $distribution as it is
+  : nop
+  ;;
+Master)
+  distribution="${PREFIX}master/${distribution}"
+  ;;
+SoftRelease)
+  distribution="${PREFIX}${CI_COMMIT_TAG}/${distribution}"
+  ;;
+TestBranch)
+  distribution="${PREFIX}${CI_COMMIT_REF_NAME}/${distribution}"
+  ;;
+*)
+  echo "Cannot test packages on this branch"
+  exit 1
+  ;;
+esac
 
 # For the upgrade script in the CI, we do not want debconf to ask questions
 export DEBIAN_FRONTEND=noninteractive
