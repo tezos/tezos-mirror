@@ -95,15 +95,18 @@ mod test {
     const OUT_OF_BOUNDS_OFFSET: i64 = 1024;
 
     backend_test!(test_cfsd_cfld, F, {
+        let mut backend = create_backend!(MachineStateLayout<T1K>, F);
+        let state = create_state!(MachineState, MachineStateLayout<T1K>, F, backend, T1K);
+        let state_cell = std::cell::RefCell::new(state);
+
         proptest!(|(
             base_addr in (DEVICES_ADDRESS_SPACE_LENGTH..(DEVICES_ADDRESS_SPACE_LENGTH+504_u64)),
             base_imm in (0..=64i64).prop_map(|x| x * 8), // multiples of 8 in the 0..512 range
             val in any::<f64>().prop_map(f64::to_bits),
             rs1 in (1_u8..31).prop_map(u5::new).prop_map(parse_xregister),
-        )|
-        {
-            let mut backend = create_backend!(MachineStateLayout<T1K>, F);
-            let mut state = create_state!(MachineState, MachineStateLayout<T1K>, F, backend, T1K);
+        )| {
+            let mut state = state_cell.borrow_mut();
+            state.reset();
 
             // Turn fs on
             let mstatus = MStatus::from_bits(0u64).with_fs(ExtensionValue::Dirty);
@@ -132,14 +135,17 @@ mod test {
     });
 
     backend_test!(test_cfsdsp_cfldsp, F, {
+        let mut backend = create_backend!(MachineStateLayout<T1K>, F);
+        let state = create_state!(MachineState, MachineStateLayout<T1K>, F, backend, T1K);
+        let state_cell = std::cell::RefCell::new(state);
+
         proptest!(|(
             base_addr in (DEVICES_ADDRESS_SPACE_LENGTH..(DEVICES_ADDRESS_SPACE_LENGTH+504_u64)),
             base_imm in (0..=64i64).prop_map(|x| x * 8), // multiples of 8 in the 0..512 range
             val in any::<f64>().prop_map(f64::to_bits),
-        )|
-        {
-            let mut backend = create_backend!(MachineStateLayout<T1K>, F);
-            let mut state = create_state!(MachineState, MachineStateLayout<T1K>, F, backend, T1K);
+        )| {
+            let mut state = state_cell.borrow_mut();
+            state.reset();
 
             // Turn fs on
             let mstatus = MStatus::from_bits(0u64).with_fs(ExtensionValue::Dirty);

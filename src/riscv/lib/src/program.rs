@@ -140,14 +140,14 @@ impl<'a, ML: MainMemoryLayout> Program<'a, ML> {
 mod tests {
     use crate::{
         kernel_loader::{self, Memory},
-        machine_state::bus::{main_memory::M1G, start_of_main_memory},
+        machine_state::bus::{main_memory::M1M, start_of_main_memory},
         program::Program,
     };
     use std::{cell::RefCell, collections::BTreeMap, fs, io::Cursor, marker::PhantomData};
 
     #[test]
     fn test_impl_memory_program() {
-        let mut program: Program<'_, M1G> = Program {
+        let mut program: Program<'_, M1M> = Program {
             _pd: PhantomData,
             entrypoint: 0,
             segments: BTreeMap::new(),
@@ -179,10 +179,10 @@ mod tests {
             fs::read(PATH).expect("Failed read dummy RISC-V kernel (try: make -C src/riscv build)");
 
         let mut buffer = Cursor::new(Vec::new());
-        kernel_loader::load_elf(&mut buffer, start_of_main_memory::<M1G>(), &contents).unwrap();
+        kernel_loader::load_elf(&mut buffer, start_of_main_memory::<M1M>(), &contents).unwrap();
         let buffer = buffer.into_inner();
 
-        let program = Program::<M1G>::from_elf(&contents).unwrap();
+        let program = Program::<M1M>::from_elf(&contents).unwrap();
         for (addr, segment) in program.segments {
             let addr = addr as usize;
             assert_eq!(&buffer[addr..addr + segment.len()], segment.as_ref());

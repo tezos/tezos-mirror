@@ -566,14 +566,18 @@ mod tests {
     use proptest::prelude::*;
 
     backend_test!(test_fmv_d, F, {
+        let mut backend = create_backend!(HartStateLayout, F);
+        let state = create_state!(HartState, HartStateLayout, F, backend);
+        let state_cell = std::cell::RefCell::new(state);
+
         proptest!(|(
             d in any::<f64>().prop_map(f64::to_bits),
             rs1 in (1_u8..31).prop_map(u5::new).prop_map(parse_xregister),
             rs1_f in (0_u8..31).prop_map(u5::new).prop_map(parse_fregister),
             rs2 in (1_u8..31).prop_map(u5::new).prop_map(parse_xregister),
         )| {
-            let mut backend = create_backend!(HartStateLayout, F);
-            let mut state = create_state!(HartState, HartStateLayout, F, backend);
+            let mut state = state_cell.borrow_mut();
+            state.reset(0);
 
             // Turn fs on
             let mstatus = MStatus::from_bits(0u64).with_fs(ExtensionValue::Dirty);
@@ -591,12 +595,15 @@ mod tests {
     });
 
     backend_test!(test_load_store, F, {
+        let mut backend = create_backend!(MachineStateLayout<T1K>, F);
+        let state = create_state!(MachineState, MachineStateLayout<T1K>, F, backend, T1K);
+        let state_cell = std::cell::RefCell::new(state);
+
         proptest!(|(
             val in any::<f64>().prop_map(f64::to_bits),
-        )|
-        {
-            let mut backend = create_backend!(MachineStateLayout<T1K>, F);
-            let mut state = create_state!(MachineState, MachineStateLayout<T1K>, F, backend, T1K);
+        )| {
+            let mut state = state_cell.borrow_mut();
+            state.reset();
 
             // Turn fs on
             let mstatus = MStatus::from_bits(0u64).with_fs(ExtensionValue::Dirty);
