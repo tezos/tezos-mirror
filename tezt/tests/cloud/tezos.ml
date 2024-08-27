@@ -81,6 +81,59 @@ module Sc_rollup_node = struct
   end
 end
 
+module Sc_rollup_helpers = struct
+  include Sc_rollup_helpers
+
+  module Agent = struct
+    let prepare_installer_kernel_with_arbitrary_file ~preimages_dir ?config
+        installee agent =
+      let* installee = Agent.copy agent ~source:installee in
+      let* smart_rollup_installer_path =
+        Agent.copy agent ~source:(Uses.path Constant.smart_rollup_installer)
+      in
+      let runner = Agent.runner agent in
+      prepare_installer_kernel_with_arbitrary_file
+        ~smart_rollup_installer_path
+        ~runner
+        ~boot_sector:`Filename
+        ~preimages_dir
+        ?config
+        installee
+
+    let prepare_installer_kernel ~preimages_dir ?config installee agent =
+      prepare_installer_kernel_with_arbitrary_file
+        ~preimages_dir
+        ?config
+        (Uses.path installee)
+        agent
+
+    let originate_sc_rollup ?hooks ?(burn_cap = Tez.(of_int 9999999)) ?whitelist
+        ?(alias = "rollup") ?(src = Constant.bootstrap1.alias) ~kind
+        ?(parameters_ty = "string") ~boot_sector client =
+      let boot_sector =
+        (* FIXME: This is not ideal. A better way would be to extend the
+           originate command so that it takes a filename as input and read its
+           content (actually maybe the feature already exists). *)
+        "file:" ^ boot_sector
+      in
+      let* sc_rollup =
+        Client.Sc_rollup.(
+          originate
+            ?hooks
+            ~burn_cap
+            ?whitelist
+            ~alias
+            ~src
+            ~kind
+            ~parameters_ty
+            ~boot_sector
+            client)
+      in
+      let* () = Lwt_unix.sleep 4. in
+      return sc_rollup
+  end
+end
+
 module Evm_node = struct
   include Tezt_etherlink.Evm_node
 

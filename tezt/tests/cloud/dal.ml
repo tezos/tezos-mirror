@@ -1056,7 +1056,6 @@ let init_observer cloud ~bootstrap ~slot_index i agent =
 
 let init_etherlink_operator_setup cloud is_sequencer name ~bootstrap ~dal_slots
     account agent =
-  let open Sc_rollup_helpers in
   let* node =
     Node.Agent.init
       ~name:(Format.asprintf "etherlink-%s-node" name)
@@ -1105,18 +1104,16 @@ let init_etherlink_operator_setup cloud is_sequencer name ~bootstrap ~dal_slots
   in
   let* remote_output_config = Agent.copy agent ~source:output_config in
   let* {output; _} =
-    prepare_installer_kernel
+    Sc_rollup_helpers.Agent.prepare_installer_kernel
       ~config:(`Path remote_output_config)
-      ~agent
       ~preimages_dir
       Constant.WASM.evm_kernel
+      agent
   in
   let pvm_kind = "wasm_2_0_0" in
   let l = Node.get_last_seen_level node in
   let* sc_rollup_address =
-    originate_sc_rollup
-      ~agent
-      ~keys:[]
+    Sc_rollup_helpers.Agent.originate_sc_rollup
       ~kind:pvm_kind
       ~boot_sector:output
       ~parameters_ty:Tezt_etherlink.Helpers.evm_type
@@ -1185,7 +1182,6 @@ let init_etherlink_operator_setup cloud is_sequencer name ~bootstrap ~dal_slots
   return operator
 
 let init_etherlink_producer_setup cloud operator name account ~bootstrap agent =
-  let open Sc_rollup_helpers in
   let* node =
     Node.Agent.init
       ~name:(Format.asprintf "etherlink-%s-node" name)
@@ -1225,11 +1221,11 @@ let init_etherlink_producer_setup cloud operator name account ~bootstrap agent =
   in
   let* remote_output_config = Agent.copy agent ~source:output_config in
   let* {output; _} =
-    prepare_installer_kernel
+    Sc_rollup_helpers.Agent.prepare_installer_kernel
       ~config:(`Path remote_output_config)
-      ~agent
       ~preimages_dir
       Constant.WASM.evm_kernel
+      agent
   in
   let* () =
     Sc_rollup_node.run
