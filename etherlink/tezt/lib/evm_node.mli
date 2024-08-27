@@ -180,6 +180,11 @@ val wait_for_ready : ?timeout:float -> t -> unit Lwt.t
     [evm_node] has applied a blueprint locally for level [level]. *)
 val wait_for_blueprint_applied : ?timeout:float -> t -> int -> unit Lwt.t
 
+(** [wait_for_predownload_kernel ?timeout evm_node ~root_hash] waits until
+    [evm_node] has download a kernel with [root_hash]. *)
+val wait_for_predownload_kernel :
+  ?timeout:float -> t -> root_hash:string -> unit Lwt.t
+
 (** [wait_for_blueprint_invalid ~timeout evm_node] waits until
     [evm_node] has seen an invalid blueprint. *)
 val wait_for_blueprint_invalid : ?timeout:float -> t -> unit Lwt.t

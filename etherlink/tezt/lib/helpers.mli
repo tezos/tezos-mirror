@@ -90,8 +90,9 @@ val force_kernel_upgrade :
   unit Lwt.t
 
 (** [upgrade ~sc_rollup_node ~sc_rollup_address ~admin ~admin_contract
-    ~client ~upgrade_to ~activation_timestamp ] prepares the
-    kernel upgrade payload and sends it to the layer 1. *)
+    ~client ~upgrade_to ~activation_timestamp ] prepares the kernel
+    upgrade payload and sends it to the layer 1. Returns the root hash
+    of the kernel preimages. *)
 val upgrade :
   sc_rollup_node:Sc_rollup_node.t ->
   sc_rollup_address:string ->
@@ -100,7 +101,7 @@ val upgrade :
   client:Client.t ->
   upgrade_to:Uses.t ->
   activation_timestamp:string ->
-  unit Lwt.t
+  string Lwt.t
 
 (** [check_block_consistency ~left ~right ?error_msg ~blocks ()]
     checks that the block hash of [left] and [right] are equal. Fails

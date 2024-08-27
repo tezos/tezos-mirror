@@ -304,6 +304,11 @@ let wait_for_blueprint_invalid ?timeout evm_node =
   wait_for_event ?timeout evm_node ~event:"blueprint_invalid.v0"
   @@ Fun.const (Some ())
 
+let wait_for_predownload_kernel ?timeout evm_node ~root_hash =
+  wait_for_event ?timeout evm_node ~event:"predownload_kernel.v0" @@ fun json ->
+  json |> JSON.as_string |> fun hash ->
+  if root_hash = hash then Some () else None
+
 let wait_for_pending_upgrade ?timeout evm_node =
   wait_for_event ?timeout evm_node ~event:"pending_upgrade.v0"
   @@ JSON.(

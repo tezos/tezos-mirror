@@ -446,6 +446,17 @@ module State = struct
         evm_state
         []
 
+  let background_preemptive_download ({preimages_endpoint; preimages; _} : t)
+      Evm_events.Upgrade.{hash; timestamp = _} =
+    match preimages_endpoint with
+    | None -> ()
+    | Some preimages_endpoint ->
+        Lwt.async @@ fun () ->
+        Misc.unwrap_error_monad @@ fun () ->
+        let (Hash (Hex root_hash)) = hash in
+        let root_hash = `Hex root_hash in
+        Kernel_download.download ~preimages ~preimages_endpoint ~root_hash ()
+
   let apply_evm_event_unsafe on_success ctxt conn evm_state event =
     let open Lwt_result_syntax in
     let open Ethereum_types in
@@ -454,6 +465,7 @@ module State = struct
     | Evm_events.Upgrade_event upgrade ->
         let on_success session =
           session.pending_upgrade <- Some upgrade ;
+          background_preemptive_download ctxt upgrade ;
           on_success session
         in
         let payload = Evm_events.Upgrade.to_bytes upgrade |> String.of_bytes in

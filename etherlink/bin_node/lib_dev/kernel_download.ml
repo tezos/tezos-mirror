@@ -86,7 +86,6 @@ let download ~preimages_endpoint ~preimages ~(root_hash : Hex.t)
     ?(num_download_retries = 1) () =
   let open Lwt_result_syntax in
   let rec go retrieved_hashes =
-    let open Lwt_result_syntax in
     match retrieved_hashes with
     | [] -> return_unit
     | hash :: hashes -> (

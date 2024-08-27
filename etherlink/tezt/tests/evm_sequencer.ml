@@ -1300,7 +1300,7 @@ let test_delayed_transaction_peeked =
   in
   (* Send an upgrade to the rollup node, but don't finalize the block, so the
      sequencer doesn't see the upgrade. *)
-  let* () =
+  let* _root_hash =
     upgrade
       ~sc_rollup_node
       ~sc_rollup_address
@@ -2374,7 +2374,7 @@ let test_self_upgrade_kernel =
          }
              _protocol ->
   (* Sends the upgrade to L1, but not to the sequencer. *)
-  let* () =
+  let* _root_hash =
     upgrade
       ~sc_rollup_node
       ~sc_rollup_address
@@ -2451,7 +2451,7 @@ let test_empty_block_on_upgrade =
       client
   in
   (* Send an upgrade. *)
-  let* () =
+  let* _root_hash =
     upgrade
       ~sc_rollup_node
       ~sc_rollup_address
@@ -2536,7 +2536,7 @@ let test_upgrade_kernel_auto_sync =
 
   (* Sends the upgrade to L1, but not to the sequencer. *)
   let _, to_use = Kernel.to_uses_and_tags to_ in
-  let* () =
+  let* _root_hash =
     upgrade
       ~sc_rollup_node
       ~sc_rollup_address
@@ -2663,7 +2663,7 @@ let test_legacy_deposits_dispatched_after_kernel_upgrade =
   in
 
   let _, to_use = Kernel.to_uses_and_tags to_ in
-  let* () =
+  let* _root_hash =
     upgrade
       ~sc_rollup_node
       ~sc_rollup_address
@@ -3019,7 +3019,7 @@ let test_force_kernel_upgrade_too_early =
   let activation_timestamp = "2020-01-11T00:00:00Z" in
   (* Sends the upgrade to L1 and sequencer. *)
   let _, to_use = Kernel.to_uses_and_tags to_ in
-  let* () =
+  let* _root_hash =
     upgrade
       ~sc_rollup_node
       ~sc_rollup_address
@@ -3083,7 +3083,7 @@ let test_force_kernel_upgrade =
   let activation_timestamp = "2020-01-09T00:00:00Z" in
   (* Sends the upgrade to L1 and sequencer. *)
   let _, to_use = Kernel.to_uses_and_tags to_ in
-  let* () =
+  let* _root_hash =
     upgrade
       ~sc_rollup_node
       ~sc_rollup_address
@@ -4294,6 +4294,11 @@ let test_reset =
   unit
 
 let test_preimages_endpoint =
+  (* Add a delay between first block and activation timestamp. *)
+  let genesis_timestamp =
+    Client.(At (Time.of_notation_exn "2020-01-01T00:00:00Z"))
+  in
+  let activation_timestamp = "2020-01-01T00:00:10Z" in
   register_all
     ~sequencer:Constant.bootstrap1
     ~time_between_blocks:Nothing
@@ -4301,6 +4306,7 @@ let test_preimages_endpoint =
     ~title:"Sequencer use remote server to get preimages"
     ~kernels:[Latest]
     ~additional_uses:[Constant.WASM.ghostnet_evm_kernel]
+    ~genesis_timestamp
   @@ fun {
            sc_rollup_node;
            l1_contracts;
@@ -4338,7 +4344,7 @@ let test_preimages_endpoint =
     Evm_node.init_from_rollup_node_data_dir new_sequencer sc_rollup_node
   in
   (* Sends an upgrade with new preimages. *)
-  let* () =
+  let* root_hash =
     upgrade
       ~sc_rollup_node
       ~sc_rollup_address
@@ -4346,7 +4352,7 @@ let test_preimages_endpoint =
       ~admin_contract:l1_contracts.admin
       ~client
       ~upgrade_to:Constant.WASM.ghostnet_evm_kernel
-      ~activation_timestamp:"0"
+      ~activation_timestamp
   in
   let* _ =
     repeat 2 (fun () ->
@@ -4371,8 +4377,12 @@ let test_preimages_endpoint =
       new_sequencer
   in
   (* Produce a block so the sequencer sees the event. *)
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
-  let* _ = produce_block new_sequencer in
+  let kernel_downloaded =
+    Evm_node.wait_for_predownload_kernel new_sequencer ~root_hash
+  in
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client
+  and* () = kernel_downloaded in
+  let*@ _ = produce_block ~timestamp:"2020-01-01T00:00:15Z" new_sequencer in
   Check.is_true
     !served
     ~error_msg:"The sequencer should have used the file server" ;
