@@ -24,6 +24,7 @@ type parameters = {
   smart_rollup_address : string option;
   fail_on_missing_blueprint : bool;
   store_perm : [`Read_only | `Read_write];
+  block_storage_sqlite3 : bool;
 }
 
 type session_state = {
@@ -44,6 +45,7 @@ type t = {
   store : Evm_store.t;
   session : session_state;
   fail_on_missing_blueprint : bool;
+  block_storage_sqlite3 : bool;
 }
 
 type store_info = {
@@ -648,6 +650,57 @@ module State = struct
         return_some kernel_upgrade
     | None -> return_none
 
+  let store_block_unsafe conn evm_state block =
+    let open Lwt_result_syntax in
+    (* Store the block itself. *)
+    let* () = Evm_store.Blocks.store conn block in
+    (* Store all transactions from the block. *)
+    let read path =
+      let*! res = Evm_state.inspect evm_state path in
+      return res
+    in
+    let* () =
+      match block.transactions with
+      | Ethereum_types.TxHash hashes ->
+          List.iter_es
+            (fun hash ->
+              let* receipt =
+                let* receipt_opt =
+                  Durable_storage.transaction_receipt read hash
+                in
+                match receipt_opt with
+                | Some receipt -> return receipt
+                | None ->
+                    failwith
+                      "Receipt missing for %a"
+                      Ethereum_types.pp_hash
+                      hash
+              in
+              let* object_ =
+                let* object_opt =
+                  Durable_storage.transaction_object read hash
+                in
+                match object_opt with
+                | Some object_ -> return object_
+                | None ->
+                    failwith "Object missing for %a" Ethereum_types.pp_hash hash
+              in
+              let info =
+                Transaction_info.of_receipt_and_object receipt object_
+              in
+              Evm_store.Transactions.store conn info)
+            hashes
+      | TxFull _ ->
+          (* Block must be read without the transactions objects. Even though
+             we could be resilient and store the objects, it doesn't make sense
+             at the moment in the code to deal this case. The node does not need
+             to read the full block on block processing. If for some reasons
+             the code reads the full block, simply store the transactions objects
+             and fetch the receipts here. *)
+          assert false
+    in
+    return_unit
+
   (** [apply_blueprint_store_unsafe ctxt payload delayed_transactions] applies
       the blueprint [payload] on the head of [ctxt], and commit the resulting
       state to Irmin and the node’s store.
@@ -696,6 +749,12 @@ module State = struct
           Evm_store.Blueprints.store
             conn
             {number = block.number; timestamp; payload}
+        in
+
+        let* () =
+          if ctxt.block_storage_sqlite3 then
+            store_block_unsafe conn evm_state block
+          else return_unit
         in
 
         let upgrade_candidate = check_pending_upgrade ctxt timestamp in
@@ -825,8 +884,9 @@ module State = struct
       (preload_kernel_from_level ctxt)
       (earliest_level @ activation_levels)
 
-  let init ?kernel_path ~fail_on_missing_blueprint ~data_dir ~preimages
-      ~preimages_endpoint ?smart_rollup_address ~store_perm () =
+  let init ?kernel_path ~block_storage_sqlite3 ~fail_on_missing_blueprint
+      ~data_dir ~preimages ~preimages_endpoint ?smart_rollup_address ~store_perm
+      () =
     let open Lwt_result_syntax in
     let*! () =
       Lwt_utils_unix.create_dir (Evm_state.kernel_logs_directory ~data_dir)
@@ -928,6 +988,7 @@ module State = struct
           };
         store;
         fail_on_missing_blueprint;
+        block_storage_sqlite3;
       }
     in
 
@@ -1211,6 +1272,7 @@ module Handlers = struct
         smart_rollup_address : string option;
         fail_on_missing_blueprint;
         store_perm;
+        block_storage_sqlite3;
       } =
     let open Lwt_result_syntax in
     let* ctxt, status =
@@ -1222,6 +1284,7 @@ module Handlers = struct
         ?smart_rollup_address
         ~fail_on_missing_blueprint
         ~store_perm
+        ~block_storage_sqlite3
         ()
     in
     Lwt.wakeup execution_config_waker @@ (ctxt.data_dir, pvm_config ctxt) ;
@@ -1444,7 +1507,8 @@ let export_store ~data_dir ~output_db_file =
   return {rollup_address; current_number}
 
 let start ?kernel_path ~data_dir ~preimages ~preimages_endpoint
-    ?smart_rollup_address ~fail_on_missing_blueprint ~store_perm () =
+    ?smart_rollup_address ~fail_on_missing_blueprint ~store_perm
+    ~block_storage_sqlite3 () =
   let open Lwt_result_syntax in
   let* () = lock_data_dir ~data_dir in
   let* worker =
@@ -1459,6 +1523,7 @@ let start ?kernel_path ~data_dir ~preimages ~preimages_endpoint
         smart_rollup_address;
         fail_on_missing_blueprint;
         store_perm;
+        block_storage_sqlite3;
       }
       (module Handlers)
   in
@@ -1667,6 +1732,7 @@ let init_from_rollup_node ~omit_delayed_tx_events ~data_dir
       ~smart_rollup_address
       ~fail_on_missing_blueprint:false
       ~store_perm:`Read_write
+      ~block_storage_sqlite3:false
       ()
   in
   let* () =

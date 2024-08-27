@@ -42,6 +42,8 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
       ~smart_rollup_address
       ~fail_on_missing_blueprint:true
       ~store_perm:`Read_write
+      ~block_storage_sqlite3:
+        configuration.experimental_features.block_storage_sqlite3
       ()
   in
   let*! (Qty next_blueprint_number) = Evm_context.next_blueprint_number () in
