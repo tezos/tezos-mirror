@@ -55,33 +55,41 @@ Example:
 - Bump the storage version:
 ```
 diff --git a/etherlink/kernel_evm/kernel/src/storage.rs b/etherlink/kernel_evm/kernel/src/storage.rs
-index 560c736546..a230a84234 100644
+index 81eb488168..f8c555abbd 100644
 --- a/etherlink/kernel_evm/kernel/src/storage.rs
 +++ b/etherlink/kernel_evm/kernel/src/storage.rs
-@@ -31,7 +31,7 @@ use tezos_ethereum::wei::Wei;
-
- use primitive_types::{H160, H256, U256};
-
--pub const STORAGE_VERSION: u64 = 8;
-+pub const STORAGE_VERSION: u64 = 9;
- pub const STORAGE_VERSION_PATH: RefPath = RefPath::assert_from(b"/evm/storage_version");
-
- const KERNEL_VERSION_PATH: RefPath = RefPath::assert_from(b"/evm/kernel_version");
+@@ -47,6 +47,7 @@ pub enum StorageVersion {
+     V14,
+     V15,
+     V16,
++    V17,
+ }
+ 
+ impl From<StorageVersion> for u64 {
+@@ -61,7 +62,7 @@ impl StorageVersion {
+     }
+ }
+ 
+-pub const STORAGE_VERSION: StorageVersion = StorageVersion::V16;
++pub const STORAGE_VERSION: StorageVersion = StorageVersion::V17;
+ 
+ pub const PRIVATE_FLAG_PATH: RefPath = RefPath::assert_from(b"/evm/remove_whitelist");
 ```
 - Fail during the migration:
 ```
 diff --git a/etherlink/kernel_evm/kernel/src/migration.rs b/etherlink/kernel_evm/kernel/src/migration.rs
-index a7473e084e..faccb18ff9 100644
+index 2359d71249..b6829cc2dc 100644
 --- a/etherlink/kernel_evm/kernel/src/migration.rs
 +++ b/etherlink/kernel_evm/kernel/src/migration.rs
-@@ -45,6 +45,7 @@ fn migration<Host: Runtime>(host: &mut Host) -> anyhow::Result<MigrationStatus>
-     let current_version = read_storage_version(host)?;
-     if STORAGE_VERSION == current_version + 1 {
-         // MIGRATION CODE - START
-+        anyhow::bail!("Erreur");
-         allow_path_not_found(
-             host.store_delete(&RefPath::assert_from(b"/evm/blueprints/last")),
-         )?;
+@@ -82,6 +82,9 @@ fn migrate_to<Host: Runtime>(
+             // for tracing.
+             Ok(MigrationStatus::Done)
+         }
++        StorageVersion::V17 => {
++            anyhow::bail!("FAILED_MIGRATION")
++        }
+     }
+ }
 ```
 - Compile the kernel and moves it to `failed_migration.wasm`:
 ```
