@@ -168,6 +168,18 @@ module Blocks : sig
   val clear_after : conn -> Ethereum_types.quantity -> unit tzresult Lwt.t
 end
 
+module Transactions : sig
+  val store : conn -> Transaction_info.t -> unit tzresult Lwt.t
+
+  val find_receipt :
+    conn -> Ethereum_types.hash -> Transaction_receipt.t option tzresult Lwt.t
+
+  val find_object :
+    conn ->
+    Ethereum_types.hash ->
+    Ethereum_types.transaction_object option tzresult Lwt.t
+end
+
 module L1_l2_levels_relationships : sig
   type t = {
     l1_level : int32;

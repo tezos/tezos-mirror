@@ -95,6 +95,12 @@ module Q = struct
       ~decode:(fun x -> Ok (Qty Z.(of_int x)))
       int
 
+  let quantity =
+    custom
+      ~encode:(fun (Qty x) -> Ok Z.(to_bits x))
+      ~decode:(fun x -> Ok (Qty Z.(of_bits x)))
+      string
+
   let payload =
     custom
       ~encode:(fun payload ->
@@ -134,6 +140,17 @@ module Q = struct
       ~decode:(fun hash ->
         let (`Hex hash) = Hex.of_string hash in
         Ok (Hash (Hex hash)))
+      string
+
+  let address =
+    let open Ethereum_types in
+    custom
+      ~encode:(fun (Address (Hex address)) ->
+        Result.of_option ~error:"not a valid address"
+        @@ Hex.to_string (`Hex address))
+      ~decode:(fun address ->
+        let (`Hex address) = Hex.of_string address in
+        Ok (Address (Hex address)))
       string
 
   let block_hash =
@@ -265,7 +282,7 @@ module Q = struct
       You can review the result at
       [etherlink/tezt/tests/expected/evm_sequencer.ml/EVM Node- debug print store schemas.out].
     *)
-    let version = 10
+    let version = 11
 
     let all : Evm_node_migrations.migration list =
       Evm_node_migrations.migrations version
@@ -430,6 +447,76 @@ module Q = struct
       @@ {eos|SELECT level FROM blocks WHERE hash = ?|eos}
 
     let clear_after = (level ->. unit) @@ {|DELETE FROM blocks WHERE level > ?|}
+  end
+
+  module Transactions = struct
+    let receipt_fields =
+      custom
+        ~encode:(fun payload ->
+          Ok
+            (Data_encoding.Binary.to_string_exn
+               Transaction_info.receipt_fields_encoding
+               payload))
+        ~decode:(fun bytes ->
+          Option.to_result ~none:"Not a valid receipt fields payload"
+          @@ Data_encoding.Binary.of_string_opt
+               Transaction_info.receipt_fields_encoding
+               bytes)
+        string
+
+    let object_fields =
+      custom
+        ~encode:(fun payload ->
+          Ok
+            (Data_encoding.Binary.to_string_exn
+               Transaction_info.object_fields_encoding
+               payload))
+        ~decode:(fun bytes ->
+          Option.to_result ~none:"Not a valid object fields payload"
+          @@ Data_encoding.Binary.of_string_opt
+               Transaction_info.object_fields_encoding
+               bytes)
+        string
+
+    let insert =
+      t8
+        block_hash
+        level
+        quantity
+        root_hash
+        address
+        (option address)
+        receipt_fields
+        object_fields
+      ->. unit
+      @@ {eos|INSERT INTO transactions (block_hash, block_number, index_, hash, from_, to_, receipt_fields, object_fields) VALUES (?, ?, ?, ?, ?, ?, ?, ?)|eos}
+
+    let select_receipt =
+      root_hash
+      ->? t7
+            block_hash
+            level
+            quantity
+            root_hash
+            address
+            (option address)
+            receipt_fields
+      @@ {eos|SELECT block_hash, block_number, index_, hash, from_, to_, receipt_fields FROM transactions WHERE hash = ?|eos}
+
+    let select_object =
+      root_hash
+      ->? t7
+            block_hash
+            level
+            quantity
+            root_hash
+            address
+            (option address)
+            object_fields
+      @@ {eos|SELECT block_hash, block_number, index_, hash, from_, to_, object_fields FROM transactions WHERE hash = ?|eos}
+
+    let clear_after =
+      (level ->. unit) @@ {|DELETE FROM transactions WHERE block_number > ?|}
   end
 end
 
@@ -767,6 +854,109 @@ module Blocks = struct
     with_connection store @@ fun conn -> Db.exec conn Q.Blocks.clear_after level
 end
 
+module Transactions = struct
+  let store store
+      ({
+         block_hash;
+         block_number;
+         index;
+         from;
+         hash;
+         to_;
+         receipt_fields;
+         object_fields;
+       } :
+        Transaction_info.t) =
+    with_connection store @@ fun conn ->
+    Db.exec
+      conn
+      Q.Transactions.insert
+      ( block_hash,
+        block_number,
+        index,
+        hash,
+        from,
+        to_,
+        receipt_fields,
+        object_fields )
+
+  let find_receipt store hash =
+    let open Lwt_result_syntax in
+    with_connection store @@ fun conn ->
+    let+ receipt = Db.find_opt conn Q.Transactions.select_receipt hash in
+    Option.map
+      (fun ( block_hash,
+             block_number,
+             index,
+             hash,
+             from,
+             to_,
+             Transaction_info.
+               {
+                 cumulative_gas_used;
+                 effective_gas_price;
+                 gas_used;
+                 logs;
+                 logs_bloom;
+                 type_;
+                 status;
+                 contract_address;
+               } ) ->
+        Transaction_receipt.
+          {
+            transactionHash = hash;
+            transactionIndex = index;
+            blockHash = block_hash;
+            blockNumber = block_number;
+            from;
+            to_;
+            cumulativeGasUsed = cumulative_gas_used;
+            effectiveGasPrice = effective_gas_price;
+            gasUsed = gas_used;
+            logs;
+            logsBloom = logs_bloom;
+            type_;
+            status;
+            contractAddress = contract_address;
+          })
+      receipt
+
+  let find_object store hash =
+    let open Lwt_result_syntax in
+    with_connection store @@ fun conn ->
+    let+ object_ = Db.find_opt conn Q.Transactions.select_object hash in
+    Option.map
+      (fun ( block_hash,
+             block_number,
+             index,
+             hash,
+             from,
+             to_,
+             Transaction_info.{gas; gas_price; input; nonce; value; v; r; s} ) ->
+        Ethereum_types.
+          {
+            blockHash = Some block_hash;
+            blockNumber = Some block_number;
+            from;
+            gas;
+            gasPrice = gas_price;
+            hash;
+            input;
+            nonce;
+            to_;
+            transactionIndex = Some index;
+            value;
+            v;
+            r;
+            s;
+          })
+      object_
+
+  let clear_after store level =
+    with_connection store @@ fun conn ->
+    Db.exec conn Q.Transactions.clear_after level
+end
+
 let reset store ~l2_level =
   let open Lwt_result_syntax in
   let* () = Blueprints.clear_after store l2_level in
@@ -775,6 +965,7 @@ let reset store ~l2_level =
   let* () = Kernel_upgrades.clear_after store l2_level in
   let* () = Delayed_transactions.clear_after store l2_level in
   let* () = Blocks.clear_after store l2_level in
+  let* () = Transactions.clear_after store l2_level in
   return_unit
 
 (* Error registration *)
