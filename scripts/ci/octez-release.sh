@@ -20,7 +20,7 @@ octez_source_content="$script_inputs_dir/octez-source-content"
 
 # Full octez release tag
 # octez-vX.Y, octez-vX.Y-rcZ or octez-vX.Y-betaZ
-gitlab_release=$(echo "${CI_COMMIT_TAG}" | grep -oE '^octez-v([0-9]+)\.([0-9]+)$' || :)
+gitlab_release=$(echo "${CI_COMMIT_TAG}" | grep -oE '^octez-v([0-9]+)\.([0-9]+)(-(rc|beta)([0-9]+))?$' || :)
 
 # Strips the leading 'octez-v'
 # X.Y, X.Y-rcZ or X.Y-betaZ
