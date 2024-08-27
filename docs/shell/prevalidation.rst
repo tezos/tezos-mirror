@@ -21,7 +21,7 @@ may become obsolete.
 
 The classification maintained by the prevalidator ensures a strong and usefull
 property: the mempool's validated operations are
-:ref:`co-validable<co-validable_operations>`. Any subset of these operations can
+:ref:`co-validable<co-valid_operations>`. Any subset of these operations can
 be included in the next block in any order, with confidence that they can be
 applied to the current ledger without causing errors.
 
