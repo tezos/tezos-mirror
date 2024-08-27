@@ -259,6 +259,8 @@ The paths or method of the following RPCs have been updated:
 - ``GET /slot/pages/<c>`` is now ``GET /levels/<l>/slots/<i>/pages`` (MR :gl:`!12880`),
 - ``GET /commitments/<c>/headers`` is now ``GET /levels/<l>/slots/<i>/status`` (MR :gl:`!13055`).
 
+A new RPC ``GET /health`` has been added to check the status on the node (MR :gl:`!14670`).
+
 Miscellaneous
 -------------
 
