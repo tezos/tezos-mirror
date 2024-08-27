@@ -448,27 +448,3 @@ val man : ?path:string -> ?hooks:Process_hooks.t -> unit -> unit Lwt.t
 
 val describe_config :
   ?path:string -> ?hooks:Process_hooks.t -> unit -> unit Lwt.t
-
-module Agent : sig
-  val create :
-    ?path:string ->
-    ?name:string ->
-    ?data_dir:string ->
-    ?mode:mode ->
-    string ->
-    Agent.t ->
-    t Lwt.t
-
-  val init :
-    ?patch_config:(JSON.t -> JSON.t) ->
-    ?name:string ->
-    ?mode:mode ->
-    ?data_dir:string ->
-    string ->
-    Agent.t ->
-    t Lwt.t
-
-  val rpc_port : t -> int
-
-  val name : t -> string
-end

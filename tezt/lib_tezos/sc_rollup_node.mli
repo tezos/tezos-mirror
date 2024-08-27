@@ -365,15 +365,3 @@ val import_snapshot :
 val as_rpc_endpoint : t -> Endpoint.t
 
 module RPC : RPC_core.CALLERS with type uri_provider := t
-
-module Agent : sig
-  val create :
-    ?path:string ->
-    ?name:string ->
-    ?default_operator:string ->
-    base_dir:string ->
-    Agent.t ->
-    mode ->
-    Node.t ->
-    t Lwt.t
-end

@@ -1260,28 +1260,3 @@ let supports_threshold_encryption evm_node =
     | Proxy _ -> Test.fail "cannot start a RPC node from a proxy node"
   in
   from_node evm_node.persistent_state.mode
-
-module Agent = struct
-  (* Use for compatibility with `tezt-cloud`. *)
-  let create ?(path = Uses.path Constant.octez_evm_node) ?name ?data_dir ?mode
-      endpoint agent =
-    let* path = Agent.copy agent ~source:path in
-    let runner = Agent.runner agent in
-    let rpc_port = Agent.next_available_port agent in
-    create ?name ~path ~runner ?data_dir ~rpc_port ?mode endpoint |> Lwt.return
-
-  let init ?patch_config ?name ?mode ?data_dir rollup_node agent =
-    let* evm_node = create ?name ?mode ?data_dir rollup_node agent in
-    let* () = Process.check @@ spawn_init_config evm_node in
-    let* () =
-      match patch_config with
-      | Some patch_config -> Config_file.update evm_node patch_config
-      | None -> unit
-    in
-    let* () = run evm_node in
-    return evm_node
-
-  let rpc_port evm_node = evm_node.persistent_state.rpc_port
-
-  let name evm_node = evm_node.name
-end

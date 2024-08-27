@@ -667,22 +667,3 @@ module RPC : sig
 
   include module type of RPC
 end
-
-module Agent : sig
-  (* Function below are similar to their counter-part in the main module of this
-     file except it takes an agent in parameter. This is to avoid silly mistakes
-     when using agents with Tezt cloud.
-
-     In the future, we could decide to merge the two by having an agent
-     corresponding to localhost.
-  *)
-
-  val create : ?path:string -> ?name:string -> Agent.t -> t Lwt.t
-
-  val init :
-    ?arguments:argument list ->
-    ?path:string ->
-    ?name:string ->
-    Agent.t ->
-    t Lwt.t
-end

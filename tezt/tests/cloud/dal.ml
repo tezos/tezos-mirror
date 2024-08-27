@@ -7,6 +7,7 @@
 
 module Cryptobox = Dal_common.Cryptobox
 module Helpers = Dal_common.Helpers
+open Tezos
 
 module Disconnect = struct
   module IMap = Map.Make (Int)
@@ -803,7 +804,7 @@ let add_etherlink_source cloud agent ~job_name node sc_rollup_node evm_node =
     Cloud.
       {
         agent;
-        port = Tezt_etherlink.Evm_node.Agent.rpc_port evm_node;
+        port = Tezos.Evm_node.rpc_port evm_node;
         app_name =
           Format.asprintf
             "%s:%s"
@@ -1056,7 +1057,6 @@ let init_observer cloud ~bootstrap ~slot_index i agent =
 let init_etherlink_operator_setup cloud is_sequencer name ~bootstrap ~dal_slots
     account agent =
   let open Sc_rollup_helpers in
-  let open Tezt_etherlink in
   let* node =
     Node.Agent.init
       ~name:(Format.asprintf "etherlink-%s-node" name)
@@ -1081,7 +1081,7 @@ let init_etherlink_operator_setup cloud is_sequencer name ~bootstrap ~dal_slots
   let output_config = Temp.file "config.yaml" in
   let bootstrap_accounts =
     Tezt_etherlink.Eth_account.bootstrap_accounts |> Array.to_list
-    |> List.map (fun account -> account.Eth_account.address)
+    |> List.map (fun account -> account.Tezt_etherlink.Eth_account.address)
   in
   let*! () =
     let sequencer = if is_sequencer then Some account.public_key else None in
@@ -1119,7 +1119,7 @@ let init_etherlink_operator_setup cloud is_sequencer name ~bootstrap ~dal_slots
       ~keys:[]
       ~kind:pvm_kind
       ~boot_sector:output
-      ~parameters_ty:Helpers.evm_type
+      ~parameters_ty:Tezt_etherlink.Helpers.evm_type
       ~src:account.alias
       client
   in
@@ -1156,7 +1156,7 @@ let init_etherlink_operator_setup cloud is_sequencer name ~bootstrap ~dal_slots
     else Evm_node.Proxy {finalized_view = false}
   in
   let* evm_node =
-    Evm_node.Agent.init
+    Tezos.Evm_node.Agent.init
       ~name:(Format.asprintf "etherlink-%s-evm-node" name)
       ~mode
       endpoint
@@ -1186,7 +1186,6 @@ let init_etherlink_operator_setup cloud is_sequencer name ~bootstrap ~dal_slots
 
 let init_etherlink_producer_setup cloud operator name account ~bootstrap agent =
   let open Sc_rollup_helpers in
-  let open Tezt_etherlink in
   let* node =
     Node.Agent.init
       ~name:(Format.asprintf "etherlink-%s-node" name)
@@ -1201,7 +1200,7 @@ let init_etherlink_producer_setup cloud operator name account ~bootstrap agent =
   let output_config = Temp.file "config.yaml" in
   let bootstrap_accounts =
     Tezt_etherlink.Eth_account.bootstrap_accounts |> Array.to_list
-    |> List.map (fun account -> account.Eth_account.address)
+    |> List.map (fun account -> account.Tezt_etherlink.Eth_account.address)
   in
   let*! () =
     let sequencer =

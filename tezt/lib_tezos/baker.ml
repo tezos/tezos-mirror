@@ -468,21 +468,3 @@ let log_shortened_events baker =
     | _ -> Log.info "%s %s" prefix (encode_readable event.value)
   in
   on_event baker handler
-
-module Agent = struct
-  let init ?name ~delegate ~protocol
-      ?(path = Uses.path (Protocol.baker protocol)) ~client dal_node node agent
-      =
-    let* path = Agent.copy agent ~source:path in
-    let runner = Agent.runner agent in
-    init
-      ?name
-      ~event_level:`Notice
-      ~runner
-      ~path
-      ~delegates:[delegate]
-      ~protocol
-      ~dal_node
-      node
-      client
-end

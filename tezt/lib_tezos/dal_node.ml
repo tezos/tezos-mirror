@@ -373,20 +373,6 @@ let point_str node =
   let addr, port = point node in
   addr ^ ":" ^ port
 
-module Agent = struct
-  let create ?(path = Uses.path Constant.octez_dal_node |> Filename.basename)
-      ?name ~node agent =
-    let* path = Agent.copy agent ~source:path in
-    let runner = Agent.runner agent in
-    let rpc_port = Agent.next_available_port agent in
-    let net_port = Agent.next_available_port agent in
-    let metrics_port = Agent.next_available_port agent in
-    let metrics_addr = Format.asprintf "0.0.0.0:%d" metrics_port in
-    let listen_addr = Format.asprintf "0.0.0.0:%d" net_port in
-    create ?name ~path ~runner ~rpc_port ~metrics_addr ~listen_addr ~node ()
-    |> Lwt.return
-end
-
 let load_last_finalized_processed_level dal_node =
   let open Tezos_stdlib_unix in
   let aux () =
