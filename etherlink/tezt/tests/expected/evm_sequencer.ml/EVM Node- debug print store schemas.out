@@ -36,4 +36,10 @@ CREATE TABLE metadata (
 CREATE UNIQUE INDEX unapplied_upgrade
 ON kernel_upgrades (
   COALESCE(applied_before, -1)
+);
+
+CREATE TABLE blocks (
+  level serial PRIMARY KEY,
+  hash VARCHAR(32) NOT NULL,
+  block BLOB NOT NULL
 )

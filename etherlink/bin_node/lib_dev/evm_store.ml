@@ -136,6 +136,30 @@ module Q = struct
         Ok (Hash (Hex hash)))
       string
 
+  let block_hash =
+    let open Ethereum_types in
+    custom
+      ~encode:(fun (Block_hash (Hex hash)) ->
+        Result.of_option ~error:"not a valid hash" @@ Hex.to_string (`Hex hash))
+      ~decode:(fun hash ->
+        let (`Hex hash) = Hex.of_string hash in
+        Ok (Block_hash (Hex hash)))
+      string
+
+  let block =
+    custom
+      ~encode:(fun payload ->
+        Ok
+          (Data_encoding.Binary.to_string_exn
+             Ethereum_types.block_encoding
+             payload))
+      ~decode:(fun bytes ->
+        Option.to_result ~none:"Not a valid block payload"
+        @@ Data_encoding.Binary.of_string_opt
+             Ethereum_types.block_encoding
+             bytes)
+      string
+
   let timestamp =
     custom
       ~encode:(fun t -> Ok (Time.Protocol.to_seconds t))
@@ -241,7 +265,7 @@ module Q = struct
       You can review the result at
       [etherlink/tezt/tests/expected/evm_sequencer.ml/EVM Node- debug print store schemas.out].
     *)
-    let version = 9
+    let version = 10
 
     let all : Evm_node_migrations.migration list =
       Evm_node_migrations.migrations version
@@ -383,6 +407,29 @@ module Q = struct
     let get =
       (unit ->! smart_rollup_address)
       @@ {|SELECT smart_rollup_address from metadata|}
+  end
+
+  module Blocks = struct
+    let insert =
+      (t3 level block_hash block ->. unit)
+      @@ {eos|INSERT INTO blocks (level, hash, block) VALUES (?, ?, ?)|eos}
+
+    let select_with_level =
+      (level ->? block) @@ {eos|SELECT block FROM blocks WHERE level = ?|eos}
+
+    let select_with_hash =
+      (block_hash ->? block)
+      @@ {eos|SELECT block FROM blocks WHERE hash = ?|eos}
+
+    let select_hash_of_number =
+      (level ->? block_hash)
+      @@ {eos|SELECT hash FROM blocks WHERE level = ?|eos}
+
+    let select_number_of_hash =
+      (block_hash ->? level)
+      @@ {eos|SELECT level FROM blocks WHERE hash = ?|eos}
+
+    let clear_after = (level ->. unit) @@ {|DELETE FROM blocks WHERE level > ?|}
   end
 end
 
@@ -695,6 +742,31 @@ module Metadata = struct
     with_connection store @@ fun conn -> Db.find_opt conn Q.Metadata.get ()
 end
 
+module Blocks = struct
+  let store store (block : Ethereum_types.block) =
+    with_connection store @@ fun conn ->
+    Db.exec conn Q.Blocks.insert (block.number, block.hash, block)
+
+  let find_with_level store level =
+    with_connection store @@ fun conn ->
+    Db.find_opt conn Q.Blocks.select_with_level level
+
+  let find_with_hash store hash =
+    with_connection store @@ fun conn ->
+    Db.find_opt conn Q.Blocks.select_with_hash hash
+
+  let find_hash_of_number store level =
+    with_connection store @@ fun conn ->
+    Db.find_opt conn Q.Blocks.select_hash_of_number level
+
+  let find_number_of_hash store hash =
+    with_connection store @@ fun conn ->
+    Db.find_opt conn Q.Blocks.select_number_of_hash hash
+
+  let clear_after store level =
+    with_connection store @@ fun conn -> Db.exec conn Q.Blocks.clear_after level
+end
+
 let reset store ~l2_level =
   let open Lwt_result_syntax in
   let* () = Blueprints.clear_after store l2_level in
@@ -702,6 +774,7 @@ let reset store ~l2_level =
   let* () = L1_l2_levels_relationships.clear_after store l2_level in
   let* () = Kernel_upgrades.clear_after store l2_level in
   let* () = Delayed_transactions.clear_after store l2_level in
+  let* () = Blocks.clear_after store l2_level in
   return_unit
 
 (* Error registration *)

@@ -142,6 +142,32 @@ module Delayed_transactions : sig
   val clear_after : conn -> Ethereum_types.quantity -> unit tzresult Lwt.t
 end
 
+module Blocks : sig
+  val store : conn -> Ethereum_types.block -> unit tzresult Lwt.t
+
+  val find_with_level :
+    conn ->
+    Ethereum_types.quantity ->
+    Ethereum_types.block option tzresult Lwt.t
+
+  val find_with_hash :
+    conn ->
+    Ethereum_types.block_hash ->
+    Ethereum_types.block option tzresult Lwt.t
+
+  val find_hash_of_number :
+    conn ->
+    Ethereum_types.quantity ->
+    Ethereum_types.block_hash option tzresult Lwt.t
+
+  val find_number_of_hash :
+    conn ->
+    Ethereum_types.block_hash ->
+    Ethereum_types.quantity option tzresult Lwt.t
+
+  val clear_after : conn -> Ethereum_types.quantity -> unit tzresult Lwt.t
+end
+
 module L1_l2_levels_relationships : sig
   type t = {
     l1_level : int32;
