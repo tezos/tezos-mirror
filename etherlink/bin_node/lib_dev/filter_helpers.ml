@@ -66,10 +66,10 @@ let height_from_param (module Rollup_node_rpc : Services_backend_sig.S) from to_
   match (from, to_) with
   | Number h1, Number h2 -> return (h1, h2)
   | Number h1, _ ->
-      let+ h2 = Rollup_node_rpc.current_block_number () in
+      let+ h2 = Rollup_node_rpc.Block_storage.current_block_number () in
       (h1, h2)
   | _, _ ->
-      let+ h = Rollup_node_rpc.current_block_number () in
+      let+ h = Rollup_node_rpc.Block_storage.current_block_number () in
       (h, h)
 
 let valid_range log_filter_config (Qty from) (Qty to_) =
@@ -91,7 +91,9 @@ let validate_range log_filter_config
       tzfail Incompatible_block_params
   | {block_hash = Some block_hash; _} ->
       let* block =
-        Rollup_node_rpc.block_by_hash ~full_transaction_object:false block_hash
+        Rollup_node_rpc.Block_storage.block_by_hash
+          ~full_transaction_object:false
+          block_hash
       in
       return (block.number, block.number)
   | {from_block; to_block; _} ->
@@ -194,7 +196,7 @@ let filter_one_tx (module Rollup_node_rpc : Services_backend_sig.S) :
     valid_filter -> hash -> Filter.changes list option tzresult Lwt.t =
  fun filter tx_hash ->
   let open Lwt_result_syntax in
-  let* receipt = Rollup_node_rpc.transaction_receipt tx_hash in
+  let* receipt = Rollup_node_rpc.Block_storage.transaction_receipt tx_hash in
   match receipt with
   | Some receipt ->
       if Ethbloom.contains_bloom (hex_to_bytes receipt.logsBloom) filter.bloom
@@ -208,7 +210,9 @@ let filter_one_block (module Rollup_node_rpc : Services_backend_sig.S) :
  fun filter block_number ->
   let open Lwt_result_syntax in
   let* block =
-    Rollup_node_rpc.nth_block ~full_transaction_object:false block_number
+    Rollup_node_rpc.Block_storage.nth_block
+      ~full_transaction_object:false
+      block_number
   in
   let indexed_transaction_hashes =
     match block.transactions with

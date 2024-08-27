@@ -322,6 +322,45 @@ module Make (Reader : READER) = struct
     let* read = read_with_state ~block () in
     code read address
 
+  let chain_id () =
+    let open Lwt_result_syntax in
+    let* read = read_with_state () in
+    chain_id read
+
+  let base_fee_per_gas () =
+    let open Lwt_result_syntax in
+    let* read = read_with_state () in
+    base_fee_per_gas read
+
+  let kernel_version () =
+    let open Lwt_result_syntax in
+    let* read = read_with_state () in
+    kernel_version read
+
+  let kernel_root_hash () =
+    let open Lwt_result_syntax in
+    let* read = read_with_state () in
+    kernel_root_hash read
+
+  let storage_at address pos block =
+    let open Lwt_result_syntax in
+    let* read = read_with_state ~block () in
+    storage_at read address pos
+
+  let coinbase () =
+    let open Lwt_result_syntax in
+    let* read = read_with_state () in
+    coinbase read
+end
+
+module Make_block_storage (Reader : READER) = struct
+  let read = Reader.read
+
+  let read_with_state () =
+    let open Lwt_result_syntax in
+    let* state = Reader.get_state () in
+    return (Reader.read state)
+
   let transaction_receipt tx_hash =
     let open Lwt_result_syntax in
     let* read = read_with_state () in
@@ -361,34 +400,4 @@ module Make (Reader : READER) = struct
     let open Lwt_result_syntax in
     let* read = read_with_state () in
     transaction_object read tx_hash
-
-  let chain_id () =
-    let open Lwt_result_syntax in
-    let* read = read_with_state () in
-    chain_id read
-
-  let base_fee_per_gas () =
-    let open Lwt_result_syntax in
-    let* read = read_with_state () in
-    base_fee_per_gas read
-
-  let kernel_version () =
-    let open Lwt_result_syntax in
-    let* read = read_with_state () in
-    kernel_version read
-
-  let kernel_root_hash () =
-    let open Lwt_result_syntax in
-    let* read = read_with_state () in
-    kernel_root_hash read
-
-  let storage_at address pos block =
-    let open Lwt_result_syntax in
-    let* read = read_with_state ~block () in
-    storage_at read address pos
-
-  let coinbase () =
-    let open Lwt_result_syntax in
-    let* read = read_with_state () in
-    coinbase read
 end
