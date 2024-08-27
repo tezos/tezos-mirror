@@ -5,7 +5,6 @@
 use crate::sequencer_blueprint::UnsignedSequencerBlueprint;
 use rlp::{DecoderError, PayloadInfo};
 use tezos_evm_logging::{log, Level::*};
-use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_host::dal_parameters::RollupDalParameters;
 
 use tezos_smart_rollup_host::runtime::Runtime;
@@ -63,7 +62,6 @@ fn rlp_length(data: &[u8]) -> Result<usize, DecoderError> {
 
 pub fn fetch_and_parse_sequencer_blueprint_from_dal<Host: Runtime>(
     host: &mut Host,
-    _sequencer: &PublicKey,
     params: &RollupDalParameters,
     slot_index: u8,
     published_level: u32,
