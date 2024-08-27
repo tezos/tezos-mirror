@@ -36,6 +36,23 @@ type 'rpc service =
     ; input : 'input
     ; output : 'output >
 
+let health :
+    < meth : [`GET]
+    ; input : unit
+    ; output : Types.Health.t
+    ; prefix : unit
+    ; params : unit
+    ; query : unit >
+    service =
+  Tezos_rpc.Service.get_service
+    ~description:
+      "Performs health checks on the DAL node, evaluating key components of \
+       the DAL node. Returns a health status indicating whether the DAL node \
+       is 'Up', 'Down', or 'Degraded' based on the results of these checks."
+    ~query:Tezos_rpc.Query.empty
+    ~output:Types.Health.encoding
+    Tezos_rpc.Path.(open_root / "health")
+
 let post_slot :
     < meth : [`POST]
     ; input : string

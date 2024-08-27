@@ -625,3 +625,30 @@ module Version = struct
       (fun network_version -> {network_version})
       (obj1 (req "network_version" network_version_encoding))
 end
+
+module Health = struct
+  type status = Up | Degraded | Down | Ok | Ko
+
+  let status_encoding =
+    Data_encoding.string_enum
+      [
+        ("up", Up);
+        ("degraded", Degraded);
+        ("down", Down);
+        ("ok", Ok);
+        ("ko", Ko);
+      ]
+
+  type t = {status : status; checks : (string * status) list}
+
+  let checks_encoding =
+    let open Data_encoding in
+    list (obj2 (req "name" string) (req "status" status_encoding))
+
+  let encoding =
+    let open Data_encoding in
+    conv
+      (fun {status; checks} -> (status, checks))
+      (fun (status, checks) -> {status; checks})
+      (obj2 (req "status" status_encoding) (req "checks" checks_encoding))
+end

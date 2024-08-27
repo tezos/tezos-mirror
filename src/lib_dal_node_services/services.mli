@@ -38,6 +38,18 @@ type 'rpc service =
     ; input : 'input
     ; output : 'output >
 
+(* This RPC aims to be used by a user to check whether its DAL node
+   behaves as expected. It does not aim to provide a clear diagnostic,
+   this is left to another RPC (not implemented yet). *)
+val health :
+  < meth : [`GET]
+  ; input : unit
+  ; output : Types.Health.t
+  ; prefix : unit
+  ; params : unit
+  ; query : unit >
+  service
+
 (** This RPC should be used by a slot producer. It allows to produce a
     commitment, a commitment proof and the shards from a slot. A
     padding is added if the slot is not of the expected size
