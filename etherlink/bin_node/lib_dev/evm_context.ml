@@ -1369,7 +1369,10 @@ module Handlers = struct
           | Number number -> return number
           | Hash hash -> (
               let* number =
-                State.block_number_of_hash ctxt.session.evm_state hash
+                if ctxt.block_storage_sqlite3 then
+                  Evm_store.use ctxt.store @@ fun conn ->
+                  Evm_store.Blocks.find_number_of_hash conn hash
+                else State.block_number_of_hash ctxt.session.evm_state hash
               in
               match number with
               | Some number -> return number
