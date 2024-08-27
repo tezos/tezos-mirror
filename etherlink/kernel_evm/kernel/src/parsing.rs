@@ -295,6 +295,29 @@ pub struct SequencerParsingContext {
     pub buffer_transaction_chunks: Option<BufferTransactionChunks>,
 }
 
+pub fn parse_blueprint_chunk(
+    bytes: &[u8],
+    sequencer: &PublicKey,
+) -> Option<SequencerBlueprint> {
+    // Parse the sequencer blueprint
+    let seq_blueprint: SequencerBlueprint =
+        parsable!(FromRlpBytes::from_rlp_bytes(bytes).ok());
+
+    // Creates and encodes the unsigned blueprint:
+    let unsigned_seq_blueprint: UnsignedSequencerBlueprint = (&seq_blueprint).into();
+    if MAXIMUM_NUMBER_OF_CHUNKS < unsigned_seq_blueprint.nb_chunks {
+        return None;
+    }
+
+    let bytes = unsigned_seq_blueprint.rlp_bytes().to_vec();
+
+    let correctly_signed = sequencer
+        .verify_signature(&seq_blueprint.signature.clone().into(), &bytes)
+        .unwrap_or(false);
+
+    correctly_signed.then_some(seq_blueprint)
+}
+
 impl SequencerInput {
     fn parse_sequencer_blueprint_input(
         bytes: &[u8],
@@ -307,23 +330,7 @@ impl SequencerInput {
             .allocated_ticks
             .saturating_sub(TICKS_FOR_BLUEPRINT_CHUNK_SIGNATURE);
 
-        // Parse the sequencer blueprint
-        let seq_blueprint: SequencerBlueprint =
-            parsable!(FromRlpBytes::from_rlp_bytes(bytes).ok());
-
-        // Creates and encodes the unsigned blueprint:
-        let unsigned_seq_blueprint: UnsignedSequencerBlueprint = (&seq_blueprint).into();
-        if MAXIMUM_NUMBER_OF_CHUNKS < unsigned_seq_blueprint.nb_chunks {
-            return InputResult::Unparsable;
-        }
-        let bytes = unsigned_seq_blueprint.rlp_bytes().to_vec();
-
-        let correctly_signed = context
-            .sequencer
-            .verify_signature(&seq_blueprint.signature.clone().into(), &bytes)
-            .unwrap_or(false);
-
-        if correctly_signed {
+        if let Some(seq_blueprint) = parse_blueprint_chunk(bytes, &context.sequencer) {
             InputResult::Input(Input::ModeSpecific(Self::SequencerBlueprint(
                 seq_blueprint,
             )))

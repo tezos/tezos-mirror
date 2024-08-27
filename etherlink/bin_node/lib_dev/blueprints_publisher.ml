@@ -102,29 +102,24 @@ module Worker = struct
   let publish self chunks level ~use_dal_if_enabled =
     let open Lwt_result_syntax in
     let rollup_node_endpoint = rollup_node_endpoint self in
-    let payload =
-      match chunks with
-      | Blueprints_publisher_types.Request.Blueprint {chunks = _; inbox_payload}
-        ->
-          inbox_payload
-      | Inbox payload -> payload
-    in
     (* We do not check if we succeed or not: this will be done when new L2
        heads come from the rollup node. *)
     witness_level self level ;
     let*! res =
       (* We do not check if we succeed or not: this will be done when new L2
          heads come from the rollup node. *)
-      match (state self, payload) with
+      match (state self, chunks) with
       | ( {
             enable_dal = true;
             dal_slots = Some (slot_index :: _);
             dal_last_used;
             _;
           },
-          [`External payload] )
+          Blueprints_publisher_types.Request.Blueprint
+            {chunks = [chunk]; inbox_payload = _} )
         when use_dal_if_enabled && dal_last_used < level ->
           (state self).dal_last_used <- level ;
+          let payload = Sequencer_blueprint.create_dal_payload chunk in
           let*! () = Blueprint_events.blueprint_injected_on_DAL level in
           let () =
             Prometheus.Counter.inc_one Metrics.BlueprintChunkSent.on_dal
@@ -137,6 +132,13 @@ module Worker = struct
           in
           Signals_publisher.track ~injection_id ~level ~slot_index
       | _ ->
+          let payload =
+            match chunks with
+            | Blueprints_publisher_types.Request.Blueprint
+                {chunks = _; inbox_payload} ->
+                inbox_payload
+            | Inbox payload -> payload
+          in
           let*! () = Blueprint_events.blueprint_injected_on_inbox level in
           let () =
             Prometheus.Counter.inc_one Metrics.BlueprintChunkSent.on_inbox

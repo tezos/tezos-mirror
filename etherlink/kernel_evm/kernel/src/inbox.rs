@@ -39,7 +39,6 @@ use tezos_ethereum::transaction::{
 use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_encoding::public_key::PublicKey;
-use tezos_smart_rollup_host::metadata::RAW_ROLLUP_ADDRESS_SIZE;
 use tezos_smart_rollup_host::runtime::Runtime;
 
 #[allow(clippy::large_enum_variant)]
@@ -220,7 +219,6 @@ where
         host: &mut Host,
         input: Self,
         inbox_content: &mut Self::Inbox,
-        smart_rollup_address: [u8; RAW_ROLLUP_ADDRESS_SIZE],
         parsing_context: &mut Self::Context,
     ) -> anyhow::Result<()>;
 
@@ -246,7 +244,6 @@ impl InputHandler for ProxyInput {
         host: &mut Host,
         input: Self,
         inbox_content: &mut Self::Inbox,
-        _smart_rollup_address: [u8; RAW_ROLLUP_ADDRESS_SIZE],
         _parsing_context: &mut (),
     ) -> anyhow::Result<()> {
         match input {
@@ -320,7 +317,6 @@ impl InputHandler for SequencerInput {
         host: &mut Host,
         input: Self,
         delayed_inbox: &mut Self::Inbox,
-        smart_rollup_address: [u8; RAW_ROLLUP_ADDRESS_SIZE],
         parsing_context: &mut SequencerParsingContext,
     ) -> anyhow::Result<()> {
         match input {
@@ -350,11 +346,10 @@ impl InputHandler for SequencerInput {
                             slot_index,
                             published_level
                         );
-                        if let Some(Self::SequencerBlueprint(seq_blueprint)) =
+                        if let Some(seq_blueprint) =
                             fetch_and_parse_sequencer_blueprint_from_dal(
                                 host,
-                                smart_rollup_address,
-                                parsing_context,
+                                &parsing_context.sequencer,
                                 &params,
                                 *slot_index,
                                 published_level,
@@ -491,17 +486,12 @@ pub fn handle_input<Mode: Parsable + InputHandler>(
     host: &mut impl Runtime,
     input: Input<Mode>,
     inbox_content: &mut Mode::Inbox,
-    smart_rollup_address: [u8; RAW_ROLLUP_ADDRESS_SIZE],
     parsing_context: &mut Mode::Context,
 ) -> anyhow::Result<()> {
     match input {
-        Input::ModeSpecific(input) => Mode::handle_input(
-            host,
-            input,
-            inbox_content,
-            smart_rollup_address,
-            parsing_context,
-        )?,
+        Input::ModeSpecific(input) => {
+            Mode::handle_input(host, input, inbox_content, parsing_context)?
+        }
         Input::Upgrade(kernel_upgrade) => store_kernel_upgrade(host, &kernel_upgrade)?,
         Input::SequencerUpgrade(sequencer_upgrade) => {
             store_sequencer_upgrade(host, sequencer_upgrade)?
@@ -567,7 +557,7 @@ fn read_and_dispatch_input<Host: Runtime, Mode: Parsable + InputHandler>(
             Ok(ReadStatus::FinishedIgnore)
         }
         InputResult::Input(input) => {
-            handle_input(host, input, res, smart_rollup_address, parsing_context)?;
+            handle_input(host, input, res, parsing_context)?;
             Ok(ReadStatus::Ongoing)
         }
     }

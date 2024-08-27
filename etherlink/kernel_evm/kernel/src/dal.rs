@@ -2,13 +2,11 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::parsing::{
-    Input::ModeSpecific, InputResult::Input, SequencerInput, SequencerParsingContext,
-};
+use crate::sequencer_blueprint::SequencerBlueprint;
 use rlp::{DecoderError, PayloadInfo};
 use tezos_evm_logging::{log, Level::*};
+use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_host::dal_parameters::RollupDalParameters;
-use tezos_smart_rollup_host::metadata::RAW_ROLLUP_ADDRESS_SIZE;
 
 use tezos_smart_rollup_host::runtime::Runtime;
 
@@ -61,12 +59,11 @@ fn rlp_length(data: &[u8]) -> Result<usize, DecoderError> {
 
 pub fn fetch_and_parse_sequencer_blueprint_from_dal<Host: Runtime>(
     host: &mut Host,
-    smart_rollup_address: [u8; RAW_ROLLUP_ADDRESS_SIZE],
-    parsing_context: &mut SequencerParsingContext,
+    sequencer: &PublicKey,
     params: &RollupDalParameters,
     slot_index: u8,
     published_level: u32,
-) -> Option<SequencerInput> {
+) -> Option<SequencerBlueprint> {
     if let Some(slot) = import_dal_slot(host, params, published_level, slot_index) {
         log!(
             host,
@@ -82,21 +79,15 @@ pub fn fetch_and_parse_sequencer_blueprint_from_dal<Host: Runtime>(
 
         // The expected format is:
 
-        // 0 (1B) / rollup_address (RAW_ROLLUP_ADDRESS_SIZE B) / blueprint tag (1B) / blueprint chunk (variable) / padding
+        // blueprint chunk (variable) / padding
 
         // To remove the padding we need to measure the length of
-        // the RLP-encoded blueprint chunk which starts at
-        // position 2 + RAW_ROLLUP_ADDRESS_SIZE
-        if let Result::Ok(chunk_length) = rlp_length(&slot[2 + RAW_ROLLUP_ADDRESS_SIZE..])
-        {
+        // the RLP-encoded blueprint chunk
+        if let Result::Ok(chunk_length) = rlp_length(&slot) {
             // Padding removal
-            let slot = &slot[0..2 + RAW_ROLLUP_ADDRESS_SIZE + chunk_length];
-            let res = crate::parsing::InputResult::parse_external(
-                slot,
-                &smart_rollup_address,
-                parsing_context,
-            );
-            if let Input(ModeSpecific(chunk)) = res {
+            let slot = &slot[0..chunk_length];
+            let res = crate::parsing::parse_blueprint_chunk(slot, sequencer);
+            if let Some(chunk) = res {
                 log!(
                     host,
                     Info,

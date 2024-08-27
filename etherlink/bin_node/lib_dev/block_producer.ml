@@ -156,7 +156,9 @@ let produce_block_with_transactions ~sequencer_key ~cctxt ~timestamp
       ~number:head_info.next_blueprint_number
   in
   let blueprint_payload =
-    Sequencer_blueprint.create ~smart_rollup_address ~chunks:blueprint_chunks
+    Sequencer_blueprint.create_inbox_payload
+      ~smart_rollup_address
+      ~chunks:blueprint_chunks
   in
   let* () =
     Evm_context.apply_blueprint timestamp blueprint_payload delayed_transactions

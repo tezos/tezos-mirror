@@ -1082,7 +1082,7 @@ let make_dev_messages ~kind ~smart_rollup_address data =
             ~delayed_transactions:[]
         in
         let blueprint_payload =
-          Sequencer_blueprint.create
+          Sequencer_blueprint.create_inbox_payload
             ~smart_rollup_address
             ~chunks:blueprint_chunks
         in
