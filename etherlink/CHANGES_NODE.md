@@ -76,8 +76,8 @@
 - Improves the error message in case of unknown block in RPCs. (!14150)
 - Produces an empty block in case the produced one will trigger a
   kernel upgrade. (!14207)
-- `eth_getTransactionReceipt` always returns the expected index for blocks with
-  more than 256 transactions. (!14645)
+- Currently decode transaction indices in RPC results of
+  `eth_getTransactionReceipt` and `eth_getBlockByNumber`. (!14645 !14671)
 
 ### Experimental
 
