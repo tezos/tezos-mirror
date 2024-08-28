@@ -300,7 +300,7 @@ async function analyze_profiler_output(path) {
     results.interpreter_init_ticks = await get_ticks(path, /interpreter\(init\)/);
     results.interpreter_decode_ticks = await get_ticks(path, /interpreter\(decode\)/);
     results.stage_one_ticks = await get_ticks(path, "stage_one.*fetch_blueprints");
-    results.block_finalize = await get_ticks(path, "store_current_block");
+    results.block_finalize = await get_ticks(path, "finalize_and_store");
     results.logs_to_bloom = await get_ticks(path, "logs_to_bloom");
     results.block_in_progress_store_ticks = await get_ticks(path, "store_block_in_progress");
     results.block_in_progress_read_ticks = await get_ticks(path, "read_block_in_progress");
