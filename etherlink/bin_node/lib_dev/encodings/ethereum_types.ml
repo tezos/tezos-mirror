@@ -358,8 +358,11 @@ type transaction_object = {
 }
 
 let transaction_object_from_rlp_item block_hash rlp_item =
-  let decode_optional_number bytes =
+  let decode_optional_number_le bytes =
     if block_hash == None then None else Some (decode_number_le bytes)
+  in
+  let decode_optional_number_be bytes =
+    if block_hash == None then None else Some (decode_number_be bytes)
   in
 
   match rlp_item with
@@ -379,7 +382,7 @@ let transaction_object_from_rlp_item block_hash rlp_item =
         Value r;
         Value s;
       ] ->
-      let block_number = decode_optional_number block_number in
+      let block_number = decode_optional_number_le block_number in
       let from = decode_address from in
       let gas = decode_number_le gas_used in
       let gas_price = decode_number_le gas_price in
@@ -387,7 +390,7 @@ let transaction_object_from_rlp_item block_hash rlp_item =
       let input = decode_hash input in
       let nonce = decode_number_le nonce in
       let to_ = if to_ = Bytes.empty then None else Some (decode_address to_) in
-      let index = decode_optional_number index in
+      let index = decode_optional_number_be index in
       let value = decode_number_le value in
       (* The signature is taken from the raw transaction, that is encoded in big
          endian. *)
