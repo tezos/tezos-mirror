@@ -10,6 +10,10 @@ use tezos_smart_rollup_host::dal_parameters::RollupDalParameters;
 
 use tezos_smart_rollup_host::runtime::Runtime;
 
+const TAG_SIZE: usize = 1;
+
+const DAL_BLUEPRINT_INPUT_TAG: u8 = 0_u8;
+
 // Import all the pages of a DAL slot and concatenate them.
 fn import_dal_slot<Host: Runtime>(
     host: &mut Host,
@@ -79,13 +83,17 @@ pub fn fetch_and_parse_sequencer_blueprint_from_dal<Host: Runtime>(
 
         // The expected format is:
 
-        // blueprint chunk (variable) / padding
+        // blueprint tag (1 byte) / blueprint chunk (variable) / padding
+
+        if slot[0] != DAL_BLUEPRINT_INPUT_TAG {
+            return None;
+        }
 
         // To remove the padding we need to measure the length of
         // the RLP-encoded blueprint chunk
-        if let Result::Ok(chunk_length) = rlp_length(&slot) {
+        if let Result::Ok(chunk_length) = rlp_length(&slot[TAG_SIZE..]) {
             // Padding removal
-            let slot = &slot[0..chunk_length];
+            let slot = &slot[TAG_SIZE..chunk_length + TAG_SIZE];
             let res = crate::parsing::parse_blueprint_chunk(slot, sequencer);
             if let Some(chunk) = res {
                 log!(

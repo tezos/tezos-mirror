@@ -166,4 +166,6 @@ let create_inbox_payload ~smart_rollup_address ~chunks : Blueprint_types.payload
     chunks
 
 let create_dal_payload chunk =
-  chunk_to_rlp chunk |> Rlp.encode |> Bytes.to_string
+  Message_format.(
+    frame_dal_message Blueprint_chunk
+    @@ (chunk_to_rlp chunk |> Rlp.encode |> Bytes.to_string))

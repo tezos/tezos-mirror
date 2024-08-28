@@ -37,3 +37,9 @@ let message_kind_tag = function
 
 let frame_message smart_rollup_address kind bytes =
   framing_protocol ^ smart_rollup_address ^ message_kind_tag kind ^ bytes
+
+type dal_message_kind = Blueprint_chunk
+
+let dal_message_kind_tag = function Blueprint_chunk -> "\000"
+
+let frame_dal_message kind bytes = dal_message_kind_tag kind ^ bytes
