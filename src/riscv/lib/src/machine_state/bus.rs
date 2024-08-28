@@ -90,7 +90,7 @@ pub struct Bus<ML: main_memory::MainMemoryLayout, M: backend::ManagerBase> {
     memory: main_memory::MainMemory<ML, M>,
 }
 
-impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> Bus<ML, M> {
+impl<ML: main_memory::MainMemoryLayout, M: backend::ManagerBase> Bus<ML, M> {
     /// Bind the Bus state to the allocated space.
     pub fn bind(space: backend::AllocatedOf<BusLayout<ML>, M>) -> Self {
         Self {
@@ -100,7 +100,10 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> Bus<ML, M> {
     }
 
     /// Reset the bus state.
-    pub fn reset(&mut self) {
+    pub fn reset(&mut self)
+    where
+        M: backend::ManagerWrite,
+    {
         self.devices.reset();
         self.memory.reset();
     }
