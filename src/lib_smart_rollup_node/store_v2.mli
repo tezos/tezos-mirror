@@ -139,3 +139,7 @@ include Store_sig.S with type 'a store := 'a store
 
 (** [is_gc_finished t] returns [true] if there is no GC running. *)
 val is_gc_finished : 'a t -> bool
+
+(** [cancel_gc t] stops any currently ongoing GC. It returns [true] if a GC was
+    canceled. *)
+val cancel_gc : 'a t -> bool Lwt.t

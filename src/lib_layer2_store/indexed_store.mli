@@ -116,6 +116,10 @@ module type INDEXABLE_STORE = sig
 
   (** [is_gc_finished t] returns [true] if there is no GC running. *)
   val is_gc_finished : 'a t -> bool
+
+  (** [cancel_gc t] stops the currently ongoing GC if any. It returns [true] if
+      a GC was canceled. *)
+  val cancel_gc : 'a t -> bool Lwt.t
 end
 
 (** An index store mapping keys to values. Keys are associated to optional
@@ -198,6 +202,10 @@ module type INDEXED_FILE = sig
 
   (** [is_gc_finished t] returns [true] if there is no GC running. *)
   val is_gc_finished : 'a t -> bool
+
+  (** [cancel_gc t] stops the currently ongoing GC if any. It returns [true] if
+      a GC was canceled. *)
+  val cancel_gc : 'a t -> bool Lwt.t
 end
 
 (** Same as {!INDEXED_FILE} but where headers are extracted from values. *)
