@@ -93,10 +93,9 @@ module Admin_directory = Make_directory (struct
 
   type context = Node_context.rw
 
-  type subcontext = Node_context.ro
+  type subcontext = Node_context.rw
 
-  let context_of_prefix node_ctxt () =
-    Lwt_result.return (Node_context.readonly node_ctxt)
+  let context_of_prefix node_ctxt () = Lwt_result.return node_ctxt
 end)
 
 let () =
@@ -606,6 +605,13 @@ let () =
 let () =
   Admin_directory.register0 Rollup_node_services.Admin.clear_injector_queues
   @@ fun _node_ctxt tag () -> Injector.clear_queues ?tag ()
+
+let () =
+  Admin_directory.register0 Rollup_node_services.Admin.cancel_gc
+  @@ fun node_ctxt () () ->
+  let open Lwt_result_syntax in
+  let*! canceled = Node_context.cancel_gc node_ctxt in
+  return canceled
 
 let add_describe dir =
   Tezos_rpc.Directory.register_describe_directory_service

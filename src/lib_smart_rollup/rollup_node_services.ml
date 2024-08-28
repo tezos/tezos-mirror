@@ -915,4 +915,11 @@ module Admin = struct
       ~query:Query.operation_tag_query
       ~output:Data_encoding.unit
       (path / "injector" / "queues")
+
+  let cancel_gc =
+    Tezos_rpc.Service.get_service
+      ~description:"Cancel any ongoing GC"
+      ~query:Tezos_rpc.Query.empty
+      ~output:Data_encoding.bool
+      (path / "cancel_gc")
 end
