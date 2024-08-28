@@ -66,7 +66,7 @@ let find_irmin_hash_from_number ctxt number =
 let find_irmin_hash ctxt (block : Ethereum_types.Block_parameter.extended) =
   let open Lwt_result_syntax in
   match block with
-  | Block_parameter Latest -> find_latest_hash ctxt
+  | Block_parameter (Latest | Pending) -> find_latest_hash ctxt
   | Block_parameter Earliest -> (
       let* res = Evm_store.(use ctxt.store Context_hashes.find_earliest) in
       match res with
@@ -77,8 +77,6 @@ let find_irmin_hash ctxt (block : Ethereum_types.Block_parameter.extended) =
       match res with
       | Some (_, hash) -> return hash
       | None -> failwith "No state available")
-  | Block_parameter Pending ->
-      failwith "Block parameter pending is not supported"
   | Block_parameter (Number number) -> (
       let* res =
         Evm_store.(
