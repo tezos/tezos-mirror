@@ -12,7 +12,8 @@
                   -- --file test_octez_node_version.ml
     Subject: Test versions
 *)
-let all_products : Tezos_version_parser.product array = [|Octez; Etherlink|]
+let all_products : Tezos_version_parser.product array =
+  [|Octez; Octez_evm_node|]
 
 (* Values of Beta x, Beta_dev x, RC x or RC_dev x in additional_info are
    ignored. *)

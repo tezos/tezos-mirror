@@ -2142,10 +2142,10 @@ let _octez_webassembly_test =
     ~dune:Dune.[[S "include_subdirs"; S "no"]]
     ~deps:[octez_webassembly_interpreter |> open_; alcotezt]
 
-let _etherlink_print_version_exe =
+let _octez_evm_node_print_version_exe =
   public_exe
-    "etherlink-version"
-    ~internal_name:"etherlink_print_version"
+    "octez-evm-node-version"
+    ~internal_name:"octez_evm_node_print_version"
     ~path:"src/lib_version/exe"
     ~opam:"octez-version"
     ~deps:
@@ -2155,7 +2155,7 @@ let _etherlink_print_version_exe =
         octez_base_unix;
         octez_print_version |> open_;
       ]
-    ~modules:["etherlink_print_version"]
+    ~modules:["octez_evm_node_print_version"]
     ~bisect_ppx:No
 
 let _octez_version_tests =

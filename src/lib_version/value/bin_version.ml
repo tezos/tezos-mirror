@@ -40,7 +40,8 @@ let octez_version_string = version_string Current_git_info.octez_version
 let octez_simple_version_string =
   simple_version_string Current_git_info.octez_version
 
-let etherlink_version_string = version_string Current_git_info.etherlink_version
+let octez_evm_node_version_string =
+  version_string Current_git_info.octez_evm_node_version
 
-let etherlink_simple_version_string =
-  simple_version_string Current_git_info.etherlink_version
+let octez_evm_node_simple_version_string =
+  simple_version_string Current_git_info.octez_evm_node_version

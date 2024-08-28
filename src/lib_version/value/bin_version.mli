@@ -38,8 +38,8 @@ val octez_version_string : string
 (** [simple_version_string] applied to the Version of Octez. *)
 val octez_simple_version_string : string
 
-(** [version_string] applied to the Version of Etherlink. *)
-val etherlink_version_string : string
+(** [version_string] applied to the Version of the Octez EVM node. *)
+val octez_evm_node_version_string : string
 
-(** [simple_version_string] applied to the Version of Etherlink. *)
-val etherlink_simple_version_string : string
+(** [simple_version_string] applied to the Version of Octez EVM node. *)
+val octez_evm_node_simple_version_string : string

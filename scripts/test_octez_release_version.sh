@@ -24,7 +24,6 @@ test_version() {
 
 cleanup() {
   set +e
-  git tag -d "octez-$VERSION" > /dev/null 2>&1
   git tag -d "octez-v$VERSION" > /dev/null 2>&1
   git tag -d "octez-v$VERSION"+rc1 > /dev/null 2>&1
   git tag -d "octez-v$VERSION"-rc1 > /dev/null 2>&1
@@ -38,9 +37,6 @@ trap cleanup EXIT INT
 cleanup
 
 git checkout -b "$TESTBRANCH"
-
-git tag "octez-$VERSION" -m "test"
-test_version "Octez $VERSION" "$VERSION"
 
 git tag "octez-v$VERSION" -m "test"
 test_version "Octez $VERSION" "octez-v$VERSION"

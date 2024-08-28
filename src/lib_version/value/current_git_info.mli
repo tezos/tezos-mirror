@@ -33,6 +33,6 @@ val committer_date : string
     it uses either the git tag or a default version *)
 val octez_version : Tezos_version.Version.t
 
-(** Current version of Etherlink.
+(** Current version of the Octez EVM node.
     it uses either the git tag or a default version *)
-val etherlink_version : Tezos_version.Version.t
+val octez_evm_node_version : Tezos_version.Version.t

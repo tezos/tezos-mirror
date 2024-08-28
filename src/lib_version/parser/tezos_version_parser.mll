@@ -27,11 +27,11 @@
     | RC_dev of int
     | Release [@@deriving show]
 
-  type product = Octez | Etherlink
+  type product = Octez | Octez_evm_node
 
   let pp_product ppf = function
   | Octez -> Format.fprintf ppf "Octez"
-  | Etherlink -> Format.fprintf ppf "Etherlink"
+  | Octez_evm_node -> Format.fprintf ppf "Octez_evm_node"
 
   type t = {
     product: product;
@@ -49,10 +49,10 @@ let num = ['0'-'9']+
 let hexa = ['0'-'9' 'A'-'F' 'a'-'f']+
 
 rule version_tag = parse
-  | ("octez" | "etherlink" as product) "-" 'v'? (num as major) '.' (num as minor) ".0"?
+  | ("octez" | "octez-evm-node" as product) "-" 'v'? (num as major) '.' (num as minor) ".0"?
       {
         let product = match product with 
-          | "etherlink" -> Etherlink
+          | "octez-evm-node" -> Octez_evm_node
           | "octez" -> Octez
           | _ -> (* this case cannot happen, see pattern above *)  
                  assert false
@@ -81,10 +81,10 @@ and extra = parse
       { Dev }
 
 and version_commit = parse 
-  | ("octez" | "etherlink" as product) "-" 'v'? (num as major) '.' (num as minor) ".0"?
+  | ("octez" | "octez-evm-node" as product) "-" 'v'? (num as major) '.' (num as minor) ".0"?
       {
         let product = match product with 
-          | "etherlink" -> Etherlink
+          | "octez-evm-node" -> Octez_evm_node
           | "octez" -> Octez
           | _ -> (* this case cannot happen, see pattern above *)  
                  assert false
