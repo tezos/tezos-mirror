@@ -38,10 +38,11 @@ local logs = panel.logs;
 
   slot_index_instance_query: '{' + std.extVar('node_instance_label') + '="$node_instance", slot_index="$slot_index"}',
 
-
   pkh_instance_query: '{' + std.extVar('node_instance_label') + '="$node_instance", pkh="$pkh"}',
 
   topic_instance_query: '{' + std.extVar('node_instance_label') + '="$node_instance", slot_index="$slot_index", pkh="$pkh"}',
+
+  peer_instance_query: '{' + std.extVar('node_instance_label') + '="$node_instance", peer="$peer"}',
 
   // Prometheus query
   prometheus(q, legendFormat='', namespace=self.namespace):
@@ -216,6 +217,15 @@ local logs = panel.logs;
       query='label_values(dal_gs_count_peers_per_topic, pkh)',
     )
     + variableQuery.generalOptions.withLabel('Pkh')
+    + variableQuery.refresh.onLoad()
+    + variableQuery.withDatasource('prometheus', 'Prometheus'),
+
+  peer:
+    variableQuery.new(
+      name='peer',
+      query='label_values(dal_gs_scores_of_peers, peer)',
+    )
+    + variableQuery.generalOptions.withLabel('Peer')
     + variableQuery.refresh.onLoad()
     + variableQuery.withDatasource('prometheus', 'Prometheus'),
 
