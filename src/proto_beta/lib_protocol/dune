@@ -314,7 +314,7 @@
  (action
   (write-file
    %{targets}
-   "\nlet hash = Tezos_crypto.Hashed.Protocol_hash.of_b58check_exn \"Pryvov7W58MarviENnpHhtywmQbLZYg4pWpzNLdBHMSQnUuujVY\"\nlet name = Tezos_protocol_environment_beta.Name.name\ninclude Tezos_raw_protocol_beta\ninclude Tezos_raw_protocol_beta.Main\n")))
+   "\nlet hash = Tezos_crypto.Hashed.Protocol_hash.of_b58check_exn \"PtBetaaEZxGcn9JDpkpAZ6E92Kh7bQb5FDoTCeYhmkfcwNehZcT\"\nlet name = Tezos_protocol_environment_beta.Name.name\ninclude Tezos_raw_protocol_beta\ninclude Tezos_raw_protocol_beta.Main\n")))
 
 (rule
  (targets tezos_protocol_beta.ml)
