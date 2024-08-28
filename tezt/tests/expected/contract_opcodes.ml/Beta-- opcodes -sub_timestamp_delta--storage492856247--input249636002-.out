@@ -1,5 +1,5 @@
 
-./octez-client --protocol PtBetaaEZxGcn9JDpkpAZ6E92Kh7bQb5FDoTCeYhmkfcwNehZcT --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/sub_timestamp_delta.tz on storage 111 and input '(Pair 100 100)' --level 1 --trace-stack
+./octez-client --protocol Pt1vxQvxfksQW13WBfDWc9CF87mw982NKAjGhixUAtVM5mBw2m1 --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/sub_timestamp_delta.tz on storage 111 and input '(Pair 100 100)' --level 1 --trace-stack
 storage
   "1970-01-01T00:00:00Z"
 emitted operations

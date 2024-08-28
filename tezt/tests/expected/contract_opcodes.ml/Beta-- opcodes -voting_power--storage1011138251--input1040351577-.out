@@ -1,5 +1,5 @@
 
-./octez-client --protocol PtBetaaEZxGcn9JDpkpAZ6E92Kh7bQb5FDoTCeYhmkfcwNehZcT --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/voting_power.tz on storage '(Pair 0 0)' and input '"edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"' --level 1 --trace-stack
+./octez-client --protocol Pt1vxQvxfksQW13WBfDWc9CF87mw982NKAjGhixUAtVM5mBw2m1 --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/voting_power.tz on storage '(Pair 0 0)' and input '"edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"' --level 1 --trace-stack
 storage
   (Pair 4000000000000 20000000000000)
 emitted operations

@@ -1,5 +1,5 @@
 
-./octez-client --protocol PtBetaaEZxGcn9JDpkpAZ6E92Kh7bQb5FDoTCeYhmkfcwNehZcT --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/comb-set.tz on storage '(Pair 1 4 2 Unit)' and input Unit --level 1 --trace-stack
+./octez-client --protocol Pt1vxQvxfksQW13WBfDWc9CF87mw982NKAjGhixUAtVM5mBw2m1 --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/comb-set.tz on storage '(Pair 1 4 2 Unit)' and input Unit --level 1 --trace-stack
 storage
   (Pair 2 12 8 Unit)
 emitted operations

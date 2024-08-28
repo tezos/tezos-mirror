@@ -1,5 +1,5 @@
 
-./octez-client --protocol PtBetaaEZxGcn9JDpkpAZ6E92Kh7bQb5FDoTCeYhmkfcwNehZcT --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/big_map_mem_string.tz on storage '(Pair { Elt "bar" 4 ; Elt "foo" 11 } None)' and input '"foo"' --level 1 --trace-stack
+./octez-client --protocol Pt1vxQvxfksQW13WBfDWc9CF87mw982NKAjGhixUAtVM5mBw2m1 --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/big_map_mem_string.tz on storage '(Pair { Elt "bar" 4 ; Elt "foo" 11 } None)' and input '"foo"' --level 1 --trace-stack
 storage
   (Pair 4 (Some True))
 emitted operations

@@ -1,5 +1,5 @@
 
-./octez-client --protocol PtBetaaEZxGcn9JDpkpAZ6E92Kh7bQb5FDoTCeYhmkfcwNehZcT --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/ediv_mutez.tz on storage '(Left None)' and input '(Pair 10 (Right 3))' --level 1 --trace-stack
+./octez-client --protocol Pt1vxQvxfksQW13WBfDWc9CF87mw982NKAjGhixUAtVM5mBw2m1 --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/ediv_mutez.tz on storage '(Left None)' and input '(Pair 10 (Right 3))' --level 1 --trace-stack
 storage
   (Right (Some (Pair 3 1)))
 emitted operations

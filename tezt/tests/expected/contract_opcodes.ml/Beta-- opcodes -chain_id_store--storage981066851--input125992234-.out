@@ -1,5 +1,5 @@
 
-./octez-client --protocol PtBetaaEZxGcn9JDpkpAZ6E92Kh7bQb5FDoTCeYhmkfcwNehZcT --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/chain_id_store.tz on storage '(Some "NetXynUjJNZm7wi")' and input Unit --level 1 --trace-stack
+./octez-client --protocol Pt1vxQvxfksQW13WBfDWc9CF87mw982NKAjGhixUAtVM5mBw2m1 --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/chain_id_store.tz on storage '(Some "NetXynUjJNZm7wi")' and input Unit --level 1 --trace-stack
 storage
   (Some "NetXynUjJNZm7wi")
 emitted operations
