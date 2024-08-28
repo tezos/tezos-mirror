@@ -447,8 +447,9 @@ let on_normal_transaction state transaction_object tx_raw =
 
 (** Checks that [balance] is enough to pay up to the maximum [gas_limit]
     the sender defined parametrized by the [gas_price]. *)
-let can_prepay ~balance ~gas_price ~gas_limit =
-  balance >= Z.(gas_limit * gas_price)
+let can_prepay ~balance ~gas_price ~gas_limit ~value:Ethereum_types.(Qty value)
+    =
+  balance >= Z.((gas_limit * gas_price) + value)
 
 (** Checks that the transaction can be payed given the [gas_price] that was set
     and the current [base_fee_per_gas]. *)
@@ -506,9 +507,21 @@ let pop_transactions state ~maximum_cumulative_size =
            (fun pool (pkey, balance, current_nonce) ->
              Pool.remove
                pkey
-               (fun nonce {gas_limit; gas_price; inclusion_timestamp; _} ->
+               (fun nonce
+                    {
+                      gas_limit;
+                      gas_price;
+                      inclusion_timestamp;
+                      transaction_object;
+                      _;
+                    } ->
                  nonce < current_nonce
-                 || (not (can_prepay ~balance ~gas_price ~gas_limit))
+                 || (not
+                       (can_prepay
+                          ~value:transaction_object.value
+                          ~balance
+                          ~gas_price
+                          ~gas_limit))
                  || transaction_timed_out
                       ~current_timestamp
                       ~inclusion_timestamp
