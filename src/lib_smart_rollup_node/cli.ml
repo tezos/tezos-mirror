@@ -493,6 +493,14 @@ let compact : (bool, Client_context.full) Tezos_clic.arg =
     ~doc:"Produce a compact snapshot with a single commit for the context."
     ()
 
+let rollup_node_endpoint_arg =
+  Tezos_clic.arg
+    ~long:"rollup-node-endpoint"
+    ~placeholder:"uri"
+    ~doc:(Format.sprintf "The address of the running rollup node.")
+    (Tezos_clic.parameter (fun (_cctxt : Client_context.full) s ->
+         Lwt.return_ok (Uri.of_string s)))
+
 let string_list =
   Tezos_clic.parameter (fun (_cctxt : Client_context.full) s ->
       let list = String.split ',' s in
