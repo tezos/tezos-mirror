@@ -59,7 +59,7 @@ pub enum PvmError {
     SerializationError(String),
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NodePvm {
     backend: InMemoryBackend<StateLayout>,
 }

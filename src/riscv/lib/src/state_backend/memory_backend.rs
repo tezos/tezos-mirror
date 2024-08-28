@@ -70,6 +70,36 @@ impl<T> Clone for InMemoryBackend<T> {
     }
 }
 
+impl<L> std::fmt::Debug for InMemoryBackend<L> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("InMemoryBackend")
+            .field("backing_storage", &self.backing_storage)
+            .field("layout", &self.layout)
+            .field("_pd", &self._pd)
+            .finish()
+    }
+}
+
+impl<L> PartialEq for InMemoryBackend<L> {
+    fn eq(&self, other: &Self) -> bool {
+        if self.backing_storage == other.backing_storage {
+            return true;
+        }
+
+        if self.layout != other.layout {
+            return false;
+        }
+
+        let slice = unsafe { std::slice::from_raw_parts(self.backing_storage, self.layout.size()) };
+        let other_slice =
+            unsafe { std::slice::from_raw_parts(other.backing_storage, other.layout.size()) };
+
+        slice.eq(other_slice)
+    }
+}
+
+impl<L> Eq for InMemoryBackend<L> {}
+
 impl<L: Layout> backend::BackendManagement for InMemoryBackend<L> {
     type Manager<'backend> = SliceManager<'backend>;
 

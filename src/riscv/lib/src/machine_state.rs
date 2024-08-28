@@ -867,7 +867,6 @@ mod tests {
             instruction::{CIBTypeArgs, ITypeArgs, Instr, SBTypeArgs},
             parse_block,
         },
-        state_backend::tests::read_backend,
         traps::{EnvironException, Exception, Interrupt, TrapContext},
     };
     use crate::{bits::u64, machine_state::bus::main_memory::M1K};
@@ -1252,7 +1251,7 @@ mod tests {
 
         // The two backends should have the same state.
         assert_eq!(result, alt_result);
-        assert_eq!(read_backend(&backend), read_backend(&alt_backend));
+        assert_eq!(backend, alt_backend);
     });
 
     // Test that the machine state does not behave differently when potential ephermeral state is
@@ -1460,6 +1459,6 @@ mod tests {
         // Both backends should have transitioned to the same state.
         assert_eq!(result, 1);
         assert_eq!(result, alt_result);
-        assert_eq!(read_backend(&backend), read_backend(&alt_backend));
+        assert_eq!(backend, alt_backend);
     });
 }

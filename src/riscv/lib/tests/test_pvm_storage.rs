@@ -82,7 +82,7 @@ fn test_pvm_storage() {
     let mut repo = PvmStorage::load(tmp_dir.path()).unwrap();
     let id = repo.commit(&empty).unwrap();
     let checked_out_empty = repo.checkout(&id).unwrap();
-    assert_eq!(empty.to_bytes(), checked_out_empty.to_bytes());
+    assert_eq!(empty, checked_out_empty);
     let id2 = repo.commit(&empty).unwrap();
     assert_eq!(id, id2);
     repo.close()

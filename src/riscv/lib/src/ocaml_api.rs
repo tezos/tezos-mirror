@@ -72,7 +72,7 @@ pub fn octez_riscv_storage_id_equal(id1: Pointer<Id>, id2: Pointer<Id>) -> bool 
 #[ocaml::func]
 #[ocaml::sig("state -> state -> bool")]
 pub fn octez_riscv_storage_state_equal(state1: Pointer<State>, state2: Pointer<State>) -> bool {
-    state1.as_ref().0.to_bytes() == state2.as_ref().0.to_bytes()
+    state1.as_ref().0 == state2.as_ref().0
 }
 
 #[ocaml::func]
