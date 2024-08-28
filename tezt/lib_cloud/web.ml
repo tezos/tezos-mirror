@@ -20,19 +20,37 @@ let configuration ~agents =
   let str =
     agents
     |> List.map (fun agent ->
-           let configuration = Agent.configuration agent in
+           let Configuration.
+                 {
+                   machine_type;
+                   docker_image;
+                   max_run_duration;
+                   binaries_path;
+                   os;
+                 } =
+             Agent.configuration agent
+           in
            Format.asprintf
              {|
 ## %s
 
 - **Machine type**: %s
 - **Docker_image**: %a
+- **Max_run_duration**: %s
+- **Binaries_path**: %s
+- **OS**: %s
 
            |}
              (Agent.name agent)
-             configuration.machine_type
+             machine_type
              pp_docker_image
-             configuration.docker_image)
+             docker_image
+             (Option.fold
+                ~none:"no limit"
+                ~some:(fun time -> string_of_int time ^ "s")
+                max_run_duration)
+             binaries_path
+             os)
     |> String.concat "\n"
   in
   Format.asprintf "# Configurations@.%s\n" str
