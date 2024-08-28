@@ -23,6 +23,8 @@ else
 fi
 TESTS=${*:-version}
 
+REQUIRED_EXECUTABLES="${REQUIRED_EXECUTABLES:-"octez-client octez-node"}"
+
 test_version() {
   echo "Testing version of binaries in Docker image"
 
@@ -31,7 +33,7 @@ test_version() {
   echo "Found the following executables in the Docker image:"
   echo "$binaries"
 
-  for bin in octez-client octez-node; do
+  for bin in $REQUIRED_EXECUTABLES; do
     if ! echo "$binaries" | grep -q "^${bin}$"; then
       echo "Could not find binary $bin in Docker image."
       exit 1

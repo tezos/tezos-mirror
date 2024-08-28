@@ -42,7 +42,7 @@ OCTEZ_EXECUTABLES="$(cat $EXECUTABLE_FILES)"
 # auth gitlab or dockerhub registry
 # notice the different namespace for gitlab and that we remove the `-`
 # Test bare image
-./scripts/ci/docker_smoke_test.sh "${DOCKER_IMAGE_NAME}bare:${DOCKER_IMAGE_TAG}" "${CI_COMMIT_SHORT_SHA}" version
+REQUIRED_EXECUTABLES="$OCTEZ_EXECUTABLES" ./scripts/ci/docker_smoke_test.sh "${DOCKER_IMAGE_NAME}bare:${DOCKER_IMAGE_TAG}" "${CI_COMMIT_SHORT_SHA}" version
 
 # Push minimal, bare and debug images
 ./scripts/ci/docker_push_all.sh

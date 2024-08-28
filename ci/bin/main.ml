@@ -72,7 +72,9 @@ let () =
   (* Matches Octez beta release tags, e.g. [octez-v1.2.3-beta5]. *)
   let octez_beta_release_tag_re = "/^octez-v\\d+\\.\\d+\\-beta\\d*$/" in
   (* Matches Etherlink release tags, e.g. [etherlink-v1.2.3] or [etherlink-v1.2.3-rc4]. *)
-  let etherlink_release_tag_re = "/^etherlink-v\\d+\\.\\d+(?:\\-rc\\d+)?$/" in
+  let octez_evm_node_release_tag_re =
+    "/^octez-evm-node-v\\d+\\.\\d+(?:\\-rc\\d+)?$/"
+  in
   let open Rules in
   let open Pipeline in
   (* Matches either Octez release tags or Octez beta release tags,
@@ -86,7 +88,7 @@ let () =
     If.(
       Predefined_vars.ci_commit_tag != null
       && (not has_any_octez_release_tag)
-      && not (has_tag_match etherlink_release_tag_re))
+      && not (has_tag_match octez_evm_node_release_tag_re))
   in
   register
     "before_merging"
@@ -126,9 +128,9 @@ let () =
   (* To test this type of release, push a tag to a fork of [tezos/tezos]
      e.g. [nomadic-labs/tezos] project. *)
   register
-    "etherlink_release_tag"
-    If.(push && has_tag_match etherlink_release_tag_re)
-    ~jobs:(Release_tag.etherlink_jobs ()) ;
+    "octez_evm_node_release_tag"
+    If.(push && has_tag_match octez_evm_node_release_tag_re)
+    ~jobs:(Release_tag.octez_evm_node_jobs ()) ;
   register
     "non_release_tag"
     If.(on_tezos_namespace && push && has_non_release_tag)

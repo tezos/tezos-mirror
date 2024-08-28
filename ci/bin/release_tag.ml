@@ -156,27 +156,66 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
   | _ -> []
 
 (** Create an etherlink release tag pipeline of type {!release_tag_pipeline_type}. *)
-let etherlink_jobs () =
-  let job_produce_docker_artifacts : Tezos_ci.tezos_job =
-    job_docker_authenticated
+let octez_evm_node_jobs ?(test = false) () =
+  let job_docker_amd64 =
+    job_docker_build
       ~__POS__
-      ~stage:Stages.prepare_release
-      ~name:"docker:prepare-etherlink-release"
-      ~artifacts:
-        (Gitlab_ci.Util.artifacts
-           ~expire_in:(Duration (Hours 1))
-           ["kernels.tar.gz"])
-      ["./scripts/ci/docker_prepare_etherlink_release.sh"]
+      ~arch:Amd64
+      (if test then Test else Octez_evm_node_release)
   in
+  let job_docker_arm64 =
+    job_docker_build
+      ~__POS__
+      ~arch:Arm64
+      (if test then Test else Octez_evm_node_release)
+  in
+  let job_docker_merge =
+    job_docker_merge_manifests
+      ~__POS__
+      ~ci_docker_hub:(not test)
+      ~job_docker_amd64
+      ~job_docker_arm64
+  in
+  let job_static_x86_64_release =
+    job_build_static_binaries
+      ~__POS__
+      ~arch:Amd64
+      ~executable_files:"script-inputs/octez-evm-node-executable"
+      ~release:true
+      ~version_executable:"octez-evm-node"
+      ()
+  in
+  let job_static_arm64_release =
+    job_build_static_binaries
+      ~__POS__
+      ~arch:Arm64
+      ~executable_files:"script-inputs/octez-evm-node-executable"
+      ~release:true
+      ~version_executable:"octez-evm-node"
+      ()
+  in
+
   let job_gitlab_release : Tezos_ci.tezos_job =
+    let dependencies =
+      Dependent
+        [
+          Artifacts job_static_x86_64_release; Artifacts job_static_arm64_release;
+        ]
+    in
     job
       ~__POS__
       ~image:Images.ci_release
-      ~stage:Stages.publish_package_gitlab
+      ~stage:Stages.publish_release_gitlab
       ~interruptible:false
-      ~dependencies:(Dependent [Job job_produce_docker_artifacts])
-      ~artifacts:(Gitlab_ci.Util.artifacts ~expire_in:Never ["kernels.tar.gz"])
-      ~name:"gitlab:etherlink-release"
-      ["./scripts/ci/create_gitlab_etherlink_release.sh"]
+      ~dependencies
+      ~name:"gitlab:octez-evm-node-release"
+      ["./scripts/ci/create_gitlab_octez_evm_node_release.sh"]
   in
-  [job_produce_docker_artifacts; job_gitlab_release]
+  [
+    job_static_arm64_release;
+    job_static_x86_64_release;
+    job_docker_amd64;
+    job_docker_arm64;
+    job_docker_merge;
+    job_gitlab_release;
+  ]
