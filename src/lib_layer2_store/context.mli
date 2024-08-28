@@ -108,6 +108,10 @@ val commit : ?message:string -> [`Read | `Write] t -> hash Lwt.t
     if a GC is running for [index]. *)
 val is_gc_finished : [`Read | `Write] t -> bool
 
+(** [cancel_gc index] stops the Irmin GC if it is currently running for
+    [index]. It returns [true] if a GC was canceled. *)
+val cancel_gc : [`Read | `Write] t -> bool
+
 (** [split ctxt] creates a new suffix file, also called "chunk", into the context's
     file hierarchy. This split function is expected to be called after
     committing a commit that will be a future candidate for a GC target.  *)

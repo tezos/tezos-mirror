@@ -45,6 +45,8 @@ let commit ?message:_ repo state =
 
 let is_gc_finished _repo = true
 
+let cancel_gc _repo = false
+
 let split _repo = ()
 
 let gc _repo ?callback:_ _key = Lwt.return_unit

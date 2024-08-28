@@ -123,6 +123,10 @@ val gc :
     if a GC is running for [index]. *)
 val is_gc_finished : [> `Write] index -> bool
 
+(** [cancel_gc index] stops the Irmin GC if it is currently running for
+    [index]. It returns [true] if a GC was canceled. *)
+val cancel_gc : [> `Write] index -> bool
+
 (** [wait_gc_completion index] will return a blocking thread if a
     GC run is currently ongoing. *)
 val wait_gc_completion : [> `Write] index -> unit Lwt.t
