@@ -394,7 +394,10 @@ let register_test ~__FILE__ ?sequencer_rpc_port ?sequencer_private_rpc_port
   in
   let tags =
     (if threshold_encryption then ["threshold_encryption"] else [])
-    @ (if enable_dal then ["dal"] else [])
+    (* DAL tests require additional memory because an extra daemon
+       (the DAL node) runs and it loads the full DAL SRS which takes
+       non-negligible memory. *)
+    @ (if enable_dal then ["dal"; Tag.memory_3k] else [])
     @ tags
   in
   let title =
