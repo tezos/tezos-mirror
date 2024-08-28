@@ -36,6 +36,8 @@ type config = {
   reexec : int64;
 }
 
+val tracer_version_activation : tracer_kind -> int
+
 val default_config : config
 
 val config_encoding : config Data_encoding.t

@@ -87,6 +87,8 @@ let tracer_config_encoding =
 
 type tracer_kind = StructLogger | CallTracer
 
+let tracer_version_activation = function StructLogger -> 14 | CallTracer -> 16
+
 (* TODO: (#7212) make it return an error so that we can return an understadable
    error to the user. *)
 let tracer_kind_encoding =
