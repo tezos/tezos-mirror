@@ -881,7 +881,7 @@ let suite =
     Alcotest_lwt.test_case "add" `Quick test_add;
     Alcotest_lwt.test_case "remove" `Quick test_remove;
     Alcotest_lwt.test_case "update" `Quick test_update;
-    Alcotest_lwt.test_case "clear" `Quick test_clear;
+    Alcotest_lwt.test_case "clear" `Slow test_clear;
     Alcotest_lwt.test_case "minimal_reads" `Quick test_minimal_reads;
     Alcotest_lwt.test_case "fold" `Quick test_fold_force;
     Alcotest_lwt.test_case "Broken.hashes" `Quick Broken.test_hashes;
