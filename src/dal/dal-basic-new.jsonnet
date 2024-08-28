@@ -41,7 +41,7 @@ dashboard.new('Octez DAL Node Dashboard')
 + dashboard.withTags(['tezos', 'octez', 'dal'])
 + dashboard.time.withFrom('now-3h')
 + dashboard.withRefresh('20s')
-+ dashboard.withVariables([base.nodeInstance, base.slotIndex, base.pkh])
++ dashboard.withVariables([base.nodeInstanceDal, base.slotIndex, base.pkh])
 
 + dashboard.withPanels(
 

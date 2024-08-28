@@ -191,6 +191,16 @@ local logs = panel.logs;
     + variableQuery.refresh.onLoad()
     + variableQuery.withDatasource('prometheus', 'Prometheus'),
 
+  // To be removed once the DAL-node expose octez-version metric
+  nodeInstanceDal:
+    variableQuery.new(
+      name='node_instance',
+      query='label_values(dal_node_new_layer1_head,' + std.extVar('node_instance_label') + ')',
+    )
+    + variableQuery.generalOptions.withLabel('Node Instance')
+    + variableQuery.refresh.onLoad()
+    + variableQuery.withDatasource('prometheus', 'Prometheus'),
+
   slotIndex:
     variableQuery.new(
       name='slot_index',
