@@ -147,6 +147,8 @@ val config_filename : data_dir:string -> string
     are overwritten. *)
 val save : force:bool -> data_dir:string -> t -> unit tzresult Lwt.t
 
+val load_file : data_dir:string -> string -> t tzresult Lwt.t
+
 (** [load ~data_dir] loads a proxy configuration stored in [data_dir]. *)
 val load : data_dir:string -> t tzresult Lwt.t
 
