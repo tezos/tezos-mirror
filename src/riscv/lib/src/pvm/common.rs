@@ -12,7 +12,7 @@ use std::{
     convert::Infallible,
     fmt,
     io::{stdout, Write},
-    ops::RangeBounds,
+    ops::Bound,
 };
 
 /// PVM configuration
@@ -158,19 +158,9 @@ impl<ML: main_memory::MainMemoryLayout, M: state_backend::Manager> Pvm<ML, M> {
     /// the execution environment will still retire an instruction, just not itself.
     /// (a possible case: the privilege mode access violation is treated in EE,
     /// but a page fault is not)
-
-    // Trampoline style function for [eval_range]
-    pub fn eval_range_while<F>(
-        &mut self,
-        hooks: &mut PvmHooks<'_>,
-        step_bounds: &impl RangeBounds<usize>,
-        should_continue: F,
-    ) -> usize
-    where
-        F: FnMut(&machine_state::MachineState<ML, M>) -> bool,
-    {
+    pub fn eval_max(&mut self, hooks: &mut PvmHooks<'_>, step_bounds: Bound<usize>) -> usize {
         self.machine_state
-            .step_range_handle::<Infallible>(step_bounds, should_continue, |machine_state, exc| {
+            .step_max_handle::<Infallible>(step_bounds, |machine_state, exc| {
                 Ok(sbi::handle_call(
                     &mut self.status,
                     machine_state,

@@ -18,7 +18,7 @@ use crate::{
 };
 use derive_more::{Error, From};
 use posix::{PosixState, PosixStateLayout};
-use std::{collections::BTreeMap, ops::RangeBounds};
+use std::{collections::BTreeMap, ops::Bound};
 
 #[derive(Clone, Debug)]
 pub enum TestStepperResult {
@@ -174,20 +174,14 @@ impl<'a, ML: MainMemoryLayout> Stepper for TestStepper<'a, ML> {
 
     type StepResult = TestStepperResult;
 
-    fn step_range_while<B, F>(&mut self, steps: B, mut should_continue: F) -> Self::StepResult
-    where
-        B: RangeBounds<usize>,
-        F: FnMut(&MachineState<Self::MainMemoryLayout, Self::Manager>) -> bool,
-    {
-        let result = self.machine_state.step_range_handle(
-            &steps,
-            &mut should_continue,
-            |machine_state, exc| {
+    fn step_max(&mut self, steps: Bound<usize>) -> Self::StepResult {
+        let result = self
+            .machine_state
+            .step_max_handle(steps, |machine_state, exc| {
                 self.posix_state
                     .handle_call(machine_state, exc)
                     .map_err(|message| (exc, message))
-            },
-        );
+            });
         self.handle_step_result(result)
     }
 }

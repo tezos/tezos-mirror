@@ -6,7 +6,7 @@ use crate::{
     machine_state::{bus::main_memory::MainMemoryLayout, MachineState},
     state_backend::Manager,
 };
-use std::ops::{AddAssign, RangeBounds};
+use std::ops::{AddAssign, Bound};
 
 pub mod pvm;
 pub mod test;
@@ -83,17 +83,6 @@ pub trait Stepper {
     /// Result of one or more steps
     type StepResult: StepResult;
 
-    /// Run as many steps such that they satisfy the given range bound.
-    /// The `should_continue` predicate lets you control when to stop within
-    /// that range.
-    fn step_range_while<B, F>(&mut self, steps: B, should_continue: F) -> Self::StepResult
-    where
-        B: RangeBounds<usize>,
-        F: FnMut(&MachineState<Self::MainMemoryLayout, Self::Manager>) -> bool;
-
-    /// Alias for [`Self::step_range_while`] that tries to run as many steps as
-    /// possible but not more than `max`.
-    fn step_max(&mut self, max: usize) -> Self::StepResult {
-        self.step_range_while(..=max, |_| true)
-    }
+    /// Run as many steps as possible but not more than `max`.
+    fn step_max(&mut self, max: Bound<usize>) -> Self::StepResult;
 }

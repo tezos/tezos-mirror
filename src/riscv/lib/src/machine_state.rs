@@ -26,7 +26,7 @@ use crate::{
     },
     parser::{instruction::Instr, Parser},
     program::Program,
-    range_utils::{range_bounds_saturating_sub, range_max, range_min},
+    range_utils::{bound_saturating_sub, less_than_bound},
     state_backend::{self as backend},
     traps::{EnvironException, Exception, Interrupt, TrapContext},
 };
@@ -38,7 +38,7 @@ use address_translation::{
 use csregisters::{values::CSRValue, CSRRepr};
 use mode::Mode;
 use once_cell::sync::Lazy;
-use std::{cmp, ops::RangeBounds};
+use std::ops::Bound;
 
 /// Initialise the parser - requires runtime setup for
 /// jump tables.
@@ -684,67 +684,44 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
         Ok(())
     }
 
-    /// Perform many steps such that the range bounds for the number of
-    /// performed steps are satisfied. The given predicate `should_continue`
-    /// allows the caller to stop within the given step range. Returns the
-    /// number of retired instructions.
-    ///
-    /// See `octez_risc_v_pvm::state::Pvm`
+    /// Perform as many steps as the given `max_steps` bound allows. Returns the number of retired
+    /// instructions.
     #[inline]
-    pub fn step_range<F>(
-        &mut self,
-        steps: &impl RangeBounds<usize>,
-        mut should_continue: F,
-    ) -> StepManyResult<EnvironException>
-    where
-        F: FnMut(&Self) -> bool,
-    {
-        let mut steps_done = 0;
+    pub fn step_max(&mut self, max_steps: Bound<usize>) -> StepManyResult<EnvironException> {
+        let mut steps = 0;
 
-        let min_steps = range_min(steps);
-        let max_steps = range_max(steps);
-
-        let (min_steps, max_steps) = (
-            cmp::min(min_steps, max_steps),
-            cmp::max(min_steps, max_steps),
-        );
-
-        while steps_done < min_steps || (steps_done < max_steps && should_continue(self)) {
+        while less_than_bound(steps, max_steps) {
             match self.step() {
                 Ok(_) => {}
                 Err(e) => {
                     return StepManyResult {
-                        steps: steps_done,
+                        steps,
                         error: Some(e),
                     }
                 }
             };
-            steps_done += 1;
+
+            steps += 1;
         }
 
-        StepManyResult {
-            steps: steps_done,
-            error: None,
-        }
+        StepManyResult { steps, error: None }
     }
 
-    /// Similar to [step_range] but lets the user handle environment exceptions
-    /// inside the inner step loop.
+    /// Similar to [`Self::step_max`] but lets the user handle environment exceptions inside the
+    /// inner step loop.
     #[inline]
-    pub fn step_range_handle<E>(
+    pub fn step_max_handle<E>(
         &mut self,
-        step_bounds: &impl RangeBounds<usize>,
-        mut should_continue: impl FnMut(&Self) -> bool,
+        mut step_bounds: Bound<usize>,
         mut handle: impl FnMut(&mut Self, EnvironException) -> Result<bool, E>,
     ) -> StepManyResult<E> {
         let mut steps = 0usize;
-        let mut step_bounds = range_bounds_saturating_sub(step_bounds, 0);
 
         let error = loop {
-            let result = self.step_range(&step_bounds, &mut should_continue);
+            let result = self.step_max(step_bounds);
 
             steps = steps.saturating_add(result.steps);
-            step_bounds = range_bounds_saturating_sub(&step_bounds, result.steps);
+            step_bounds = bound_saturating_sub(step_bounds, result.steps);
 
             match result.error {
                 Some(cause) => {
@@ -752,7 +729,7 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
                     // We don't have to check against `max_steps` because running the
                     // instruction that triggered the exception meant that `max_steps > 0`.
                     steps = steps.saturating_add(1);
-                    step_bounds = range_bounds_saturating_sub(&step_bounds, 1);
+                    step_bounds = bound_saturating_sub(step_bounds, 1);
 
                     match handle(self, cause) {
                         Ok(may_continue) => {

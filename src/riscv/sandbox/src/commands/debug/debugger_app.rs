@@ -13,14 +13,17 @@ use octez_riscv::{
         bus::{main_memory::MainMemoryLayout, Address},
         csregisters::satp::{Satp, SvLength, TranslationAlgorithm},
         mode::Mode,
-        AccessType,
+        AccessType, MachineState,
     },
     program::Program,
     pvm::PvmHooks,
     stepper::{pvm::PvmStepper, test::TestStepper, StepResult, Stepper, StepperStatus},
 };
 use ratatui::{prelude::*, style::palette::tailwind, widgets::*};
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::{
+    collections::{BTreeMap, HashMap, HashSet},
+    ops::Bound,
+};
 use tezos_smart_rollup::utils::inbox::Inbox;
 
 mod render;
@@ -34,7 +37,6 @@ const ORANGE: Color = tailwind::ORANGE.c500;
 const GRAY: Color = tailwind::GRAY.c500;
 const SELECTED_STYLE_FG: Color = BLUE;
 const NEXT_STYLE_FG: Color = GREEN;
-const MAX_STEPS: usize = 1_000_000;
 const PC_CONTEXT: u64 = 12;
 
 #[derive(Debug, Clone)]
@@ -282,38 +284,61 @@ where
     }
 
     fn step(&mut self, max_steps: usize) {
-        let result = self.stepper.step_max(max_steps).to_stepper_status();
+        let result = self
+            .stepper
+            .step_max(Bound::Included(max_steps))
+            .to_stepper_status();
         self.update_after_step(result);
     }
 
     fn step_until_breakpoint(&mut self) {
         // perform at least a step to progress if already on a breakpoint
-        let result = self
+        let mut result = self
             .stepper
-            .step_range_while(1..=MAX_STEPS, |m| {
-                let raw_pc = m.hart.pc.read();
-                let pc = m
-                    .translate_without_cache(raw_pc, AccessType::Instruction)
-                    .unwrap_or(raw_pc);
-                !self.program.breakpoints.contains(&pc)
-            })
+            .step_max(Bound::Included(1))
             .to_stepper_status();
+
+        let should_continue = |machine: &MachineState<_, _>| {
+            let raw_pc = machine.hart.pc.read();
+            let pc = machine
+                .translate_without_cache(raw_pc, AccessType::Instruction)
+                .unwrap_or(raw_pc);
+            !self.program.breakpoints.contains(&pc)
+        };
+
+        while should_continue(self.stepper.machine_state()) {
+            result += self
+                .stepper
+                .step_max(Bound::Included(1))
+                .to_stepper_status();
+        }
+
         self.update_after_step(result);
     }
 
     fn step_until_next_symbol(&mut self) {
         // perform at least a step to progress if already on a breakpoint/symbol
-        let result = self
+        let mut result = self
             .stepper
-            .step_range_while(1..=MAX_STEPS, |m| {
-                let raw_pc = m.hart.pc.read();
-                let pc = m
-                    .translate_without_cache(raw_pc, AccessType::Instruction)
-                    .unwrap_or(raw_pc);
-
-                !(self.program.breakpoints.contains(&pc) || self.program.symbols.contains_key(&pc))
-            })
+            .step_max(Bound::Included(1))
             .to_stepper_status();
+
+        let should_continue = |machine: &MachineState<_, _>| {
+            let raw_pc = machine.hart.pc.read();
+            let pc = machine
+                .translate_without_cache(raw_pc, AccessType::Instruction)
+                .unwrap_or(raw_pc);
+
+            !(self.program.breakpoints.contains(&pc) || self.program.symbols.contains_key(&pc))
+        };
+
+        while should_continue(self.stepper.machine_state()) {
+            result += self
+                .stepper
+                .step_max(Bound::Included(1))
+                .to_stepper_status();
+        }
+
         self.update_after_step(result);
     }
 }

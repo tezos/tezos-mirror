@@ -12,13 +12,13 @@ use crate::{
     },
     program::Program,
     pvm::{Pvm, PvmHooks, PvmLayout, PvmStatus},
-    range_utils,
+    range_utils::bound_saturating_sub,
     state_backend::{
         memory_backend::{InMemoryBackend, SliceManager},
         Backend, Layout,
     },
 };
-use std::ops::RangeBounds;
+use std::ops::Bound;
 use tezos_smart_rollup_utils::inbox::Inbox;
 
 /// Error during PVM stepping
@@ -73,18 +73,11 @@ impl<'backend, 'hooks, ML: MainMemoryLayout> PvmStepper<'backend, 'hooks, ML> {
         })
     }
 
-    /// Non-continuing variant of [`Stepper::step_range_while`]
-    fn step_range_while_once<B, F>(&mut self, steps: &B, should_continue: F) -> StepperStatus
-    where
-        B: RangeBounds<usize>,
-        F: FnMut(&MachineState<ML, SliceManager<'backend>>) -> bool,
-    {
+    /// Non-continuing variant of [`Stepper::step_max`]
+    fn step_max_once(&mut self, steps: Bound<usize>) -> StepperStatus {
         match self.pvm.status() {
             PvmStatus::Evaluating => {
-                let steps = self
-                    .pvm
-                    .eval_range_while(&mut self.hooks, steps, should_continue);
-
+                let steps = self.pvm.eval_max(&mut self.hooks, steps);
                 StepperStatus::Running { steps }
             }
 
@@ -147,19 +140,14 @@ impl<'backend, 'hooks, ML: MainMemoryLayout> Stepper for PvmStepper<'backend, 'h
 
     type StepResult = StepperStatus;
 
-    fn step_range_while<B, F>(&mut self, steps: B, mut should_continue: F) -> Self::StepResult
-    where
-        B: RangeBounds<usize>,
-        F: FnMut(&MachineState<Self::MainMemoryLayout, Self::Manager>) -> bool,
-    {
+    fn step_max(&mut self, mut step_bounds: Bound<usize>) -> Self::StepResult {
         let mut total_steps = 0usize;
-        let mut step_bounds = range_utils::range_bounds_saturating_sub(&steps, 0);
 
         loop {
-            match self.step_range_while_once(&step_bounds, &mut should_continue) {
+            match self.step_max_once(step_bounds) {
                 StepperStatus::Running { steps } => {
                     total_steps = total_steps.saturating_add(steps);
-                    step_bounds = range_utils::range_bounds_saturating_sub(&step_bounds, steps);
+                    step_bounds = bound_saturating_sub(step_bounds, steps);
 
                     if steps < 1 {
                         // Break if no progress has been made.
