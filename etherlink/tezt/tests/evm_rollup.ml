@@ -4356,6 +4356,9 @@ let test_l2_nested_create =
 
 let test_block_hash_regression =
   Protocol.register_regression_test
+  (* The test runs only on alpha, as the test with other protocols is marked
+     as slow, there is a risk that regression is not updated. *)
+    ~supports:Protocol.(From_protocol (number Alpha))
     ~__FILE__
     ~tags:["evm"; "block"; "hash"; "regression"]
     ~uses:(fun _protocol ->
