@@ -1117,31 +1117,3 @@ module RPC = struct
   include RPC_callers
   include RPC
 end
-
-module Agent = struct
-  let create ?(path = Uses.path Constant.octez_node) ?name agent =
-    let* path = Agent.copy agent ~source:path in
-    let runner = Agent.runner agent in
-    let rpc_port = Agent.next_available_port agent in
-    let net_port = Agent.next_available_port agent in
-    let metrics_port = Agent.next_available_port agent in
-    create ?name ~path ~runner ~rpc_port ~net_port ~metrics_port []
-    |> Lwt.return
-
-  let init ?(arguments = []) ?(path = Uses.path Constant.octez_node) ?name agent
-      =
-    let runner = Agent.runner agent in
-    let* path = Agent.copy agent ~source:path in
-    let rpc_port = Agent.next_available_port agent in
-    let net_port = Agent.next_available_port agent in
-    let metrics_port = Agent.next_available_port agent in
-    init
-      ?name
-      ~path
-      ~runner
-      ~rpc_port
-      ~net_port
-      ~metrics_port
-      ~event_level:`Notice
-      arguments
-end

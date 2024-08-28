@@ -195,18 +195,6 @@ val runner : t -> Runner.t option
 
 val point_str : t -> string
 
-module Agent : sig
-  (* Function below are similar to their counter-part in the main module of this
-     file except it takes an agent in parameter. This is to avoid silly mistakes
-     when using agents with Tezt cloud.
-
-     In the future, we could decide to merge the two by having an agent
-     corresponding to localhost.
-  *)
-
-  val create : ?path:string -> ?name:string -> node:Node.t -> Agent.t -> t Lwt.t
-end
-
 (** Load and return the current value of the last finalized level processed by
     the crawler and stored in store/last_processed_level KVS file. The function
     returns [None] in case of error (e.g. file not found, file locked, ...). *)

@@ -127,15 +127,10 @@ type installer_result = {
    it by using the 'reveal_installer' kernel. This leverages the reveal
    preimage+DAC mechanism to install the tx kernel.
 *)
-let prepare_installer_kernel_with_arbitrary_file ?agent ?runner ~preimages_dir
-    ?config installee =
+let prepare_installer_kernel_with_arbitrary_file ?smart_rollup_installer_path
+    ?runner ?(boot_sector = `Content) ~preimages_dir ?config installee =
   let open Tezt.Base in
   let open Lwt.Syntax in
-  let* installee =
-    match agent with
-    | None -> Lwt.return installee
-    | Some agent -> Agent.copy agent ~source:installee
-  in
   let installer =
     installee |> Filename.basename |> Filename.remove_extension |> fun base ->
     base ^ "-installer.hex"
@@ -170,22 +165,15 @@ let prepare_installer_kernel_with_arbitrary_file ?agent ?runner ~preimages_dir
     | None -> []
   in
   let* process =
-    let* f =
-      match agent with
-      | None ->
-          Lwt.return
-            (Process.spawn
-               ?runner
-               ~name:installer
-               (project_root // Uses.path Constant.smart_rollup_installer))
-      | Some agent ->
-          let runner = Agent.runner agent in
-          let* path =
-            Agent.copy agent ~source:(Uses.path Constant.smart_rollup_installer)
-          in
-          Lwt.return (Process.spawn ~runner ~name:installer path)
+    let smart_rollup_installer_path =
+      match smart_rollup_installer_path with
+      | None -> project_root // Uses.path Constant.smart_rollup_installer
+      | Some path -> path
     in
-    f
+    Process.spawn
+      ?runner
+      ~name:installer
+      smart_rollup_installer_path
       ([
          "get-reveal-installer";
          "--upgrade-to";
@@ -208,14 +196,17 @@ let prepare_installer_kernel_with_arbitrary_file ?agent ?runner ~preimages_dir
     | Some root_hash -> root_hash
     | None -> Test.fail "Failed to parse the root hash"
   in
-  (* FIXME: This is hackish. We should provide a better fix. *)
-  match agent with
-  | None -> {output; boot_sector = read_file output; root_hash}
-  | Some _ -> {output; boot_sector = output; root_hash}
+  {
+    output;
+    boot_sector =
+      (match boot_sector with
+      | `Content -> read_file output
+      | `Filename -> output);
+    root_hash;
+  }
 
-let prepare_installer_kernel ?agent ?runner ~preimages_dir ?config installee =
+let prepare_installer_kernel ?runner ~preimages_dir ?config installee =
   prepare_installer_kernel_with_arbitrary_file
-    ?agent
     ?runner
     ~preimages_dir
     ?config
@@ -285,19 +276,10 @@ let setup_l1 ?timestamp ?bootstrap_smart_rollups ?bootstrap_contracts
 (** This helper injects an SC rollup origination via octez-client. Then it
     bakes to include the origination in a block. It returns the address of the
     originated rollup *)
-let originate_sc_rollup ?agent ?keys ?hooks ?(burn_cap = Tez.(of_int 9999999))
+let originate_sc_rollup ?keys ?hooks ?(burn_cap = Tez.(of_int 9999999))
     ?whitelist ?(alias = "rollup") ?(src = Constant.bootstrap1.alias) ~kind
     ?(parameters_ty = "string") ?(boot_sector = default_boot_sector_of ~kind)
     client =
-  let boot_sector =
-    match agent with
-    | None -> boot_sector
-    | Some _agent ->
-        (* FIXME: This is not ideal. A better way would be to extend the
-           originate command so that it takes a filename as input and read its
-           content (actually maybe the feature already exists). *)
-        "file:" ^ boot_sector
-  in
   let* sc_rollup =
     Client.Sc_rollup.(
       originate
@@ -311,13 +293,7 @@ let originate_sc_rollup ?agent ?keys ?hooks ?(burn_cap = Tez.(of_int 9999999))
         ~boot_sector
         client)
   in
-  let* () =
-    match agent with
-    | None -> Client.bake_for_and_wait ?keys client
-    | Some _ ->
-        (* FIXME: We should probably wait on a level. *)
-        Lwt_unix.sleep 0.
-  in
+  let* () = Client.bake_for_and_wait ?keys client in
   return sc_rollup
 
 (* Configuration of a rollup node

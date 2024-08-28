@@ -749,25 +749,3 @@ module RPC = struct
 
   include RPC_callers
 end
-
-module Agent = struct
-  let create ?(path = Uses.path Constant.octez_smart_rollup_node) ?name
-      ?default_operator ~base_dir agent mode l1_node =
-    let* path = Agent.copy agent ~source:path in
-    let runner = Agent.runner agent in
-    let rpc_port = Agent.next_available_port agent in
-    let metrics_port = Agent.next_available_port agent in
-    let metrics_addr = "0.0.0.0" in
-    create
-      ?name
-      ?default_operator
-      ~path
-      ~runner
-      ~rpc_port
-      ~metrics_addr
-      ~metrics_port
-      ~base_dir
-      mode
-      l1_node
-    |> Lwt.return
-end
