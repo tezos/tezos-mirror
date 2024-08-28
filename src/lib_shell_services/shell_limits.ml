@@ -247,7 +247,7 @@ let chain_validator_limits_encoding =
 
 let default_disable_context_pruning = false
 
-let default_storage_maintenance_delay = Storage_maintenance.Disabled
+let default_storage_maintenance_delay = Storage_maintenance.Auto
 
 type limits = {
   block_validator_limits : block_validator_limits;
@@ -267,7 +267,7 @@ let default_limits =
     chain_validator_limits = default_chain_validator_limits;
     history_mode = None;
     disable_context_pruning = Some false;
-    storage_maintenance_delay = Some Disabled;
+    storage_maintenance_delay = Some Auto;
   }
 
 let limits_encoding =

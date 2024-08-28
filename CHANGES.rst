@@ -97,6 +97,11 @@ Node
   when answering heavy RPCs. This can be enabled using
   ``--external-rpc-addr`` (MR :gl:`!9490`)
 
+- Introduced ``--storage-maintenance-delay`` to allow delaying the
+  storage maintenance. It is set to ``auto`` by default, to
+  automatically trigger the maintenance whenever it is the most
+  suitable. (MR :gl:`!14503`)
+
 Client
 ------
 

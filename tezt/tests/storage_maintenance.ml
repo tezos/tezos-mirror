@@ -52,7 +52,13 @@ let test_context_pruning_call =
   in
   (* As the context pruning is enabled by default,we specify nothing
      on the command line. *)
-  let* node2 = Node.init ~name:"with_gc" Node.[Synchronisation_threshold 0] in
+  let* node2 =
+    Node.init
+      ~name:"with_gc"
+      (* Disable the storage maintenance delay to have a deterministic
+         behavior. *)
+      Node.[Synchronisation_threshold 0; Storage_maintenance_delay "disabled"]
+  in
   let* () = Client.Admin.connect_address ~peer:node2 client in
   let* (_ : int) = Node.wait_for_level node2 1 in
   let blocks_per_cycle = 8 in
@@ -154,7 +160,11 @@ let test_custom_maintenance_delay =
         ]
   in
   let* regular_node =
-    Node.init ~name:"regular_node" Node.[Synchronisation_threshold 0]
+    Node.init
+      ~name:"regular_node"
+      (* Disable the storage maintenance delay to have a deterministic
+         behavior. *)
+      Node.[Synchronisation_threshold 0; Storage_maintenance_delay "disabled"]
   in
   let* client = Client.init ~endpoint:(Node delayed_node) () in
   let* () = Client.Admin.connect_address ~peer:regular_node client in
@@ -316,7 +326,9 @@ let test_auto_maintenance_delay =
     Node.init
       ~name:"delayed_node"
       ~event_sections_levels:[("node.store", `Info)]
-      Node.[Synchronisation_threshold 0; Storage_maintenance_delay "auto"]
+      (* No need to set the storage maintenance flag, it is expected
+         to be set to "auto", by default, by the node. *)
+      Node.[Synchronisation_threshold 0]
   in
   let* client = Client.init ~endpoint:(Node delayed_node) () in
   let* () =
