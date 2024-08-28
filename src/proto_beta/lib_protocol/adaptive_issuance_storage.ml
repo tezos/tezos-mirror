@@ -155,14 +155,14 @@ let dyn_max ~stake_ratio =
     if Compare.Q.(stake_ratio <= Q.(5 // 100)) then Q.(10 // 100)
     else if Compare.Q.(stake_ratio >= Q.(50 // 100)) then Q.(1 // 100)
     else
-      (* (5115 - 17670 * x + 19437 * (x ^ 2)) / (24149 + 178695 * x) *)
-      let q5115 = Q.of_int 5115 in
-      let q17670 = Q.of_int 17670 in
-      let q19437 = Q.of_int 19437 in
-      let q24149 = Q.of_int 24149 in
-      let q178695 = Q.of_int 178695 in
+      (* (1 + 9 * ((50 - 100 * x) / 42 ) ^ 2 ) / 100 *)
+      let q9 = Q.of_int 9 in
+      let q50 = Q.of_int 50 in
+      let q100 = Q.of_int 100 in
+      let q42 = Q.of_int 42 in
       let x = stake_ratio in
-      Q.((q5115 - (q17670 * x) + (q19437 * x * x)) / (q24149 + (q178695 * x)))
+      let to_square = Q.((q50 - (q100 * x)) / q42) in
+      Q.((one + (q9 * to_square * to_square)) / q100)
   in
   if Compare.Q.(r <= Q.(1 // 100)) then Q.(1 // 100)
   else if Compare.Q.(r >= Q.(10 // 100)) then Q.(10 // 100)
