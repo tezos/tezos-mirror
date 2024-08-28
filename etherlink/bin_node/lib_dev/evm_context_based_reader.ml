@@ -21,8 +21,9 @@ let subkeys state path =
   let*! res = Evm_state.subkeys state path in
   return res
 
-let simulate_and_read state ~input =
+let simulate_and_read ?state_override state ~input =
   let open Lwt_result_syntax in
+  let*! state = State_override.update_accounts state_override state in
   let* raw_insights = Evm_context.execute_and_inspect state input in
   match raw_insights with
   | [Some bytes] -> return bytes

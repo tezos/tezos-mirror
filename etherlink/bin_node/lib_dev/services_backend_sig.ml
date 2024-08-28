@@ -108,11 +108,13 @@ module type S = sig
       latest root hash that was applied during an upgrade). *)
   val kernel_root_hash : unit -> string option tzresult Lwt.t
 
-  (** [simulate_call call_info block_param] simulates a call on context
-      [block_param] and returns the result. *)
+  (** [simulate_call call_info block_param state_override] simulates a call on
+      context [block_param] (optionally updated with [state_override]) and
+      returns the result. *)
   val simulate_call :
     Ethereum_types.call ->
     Ethereum_types.Block_parameter.extended ->
+    Ethereum_types.state_override ->
     Simulation.call_result Simulation.simulation_result tzresult Lwt.t
 
   (** [estimate_gas call_info] asks the rollup to simulate a call, and

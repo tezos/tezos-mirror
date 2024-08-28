@@ -555,11 +555,46 @@ end
 module Eth_call = struct
   open Ethereum_types
 
-  type input = call * Block_parameter.extended
+  type input = call * Block_parameter.extended * state_override
 
   type output = hash
 
-  let input_encoding = encoding_with_optional_extended_block_param call_encoding
+  let default_block = Ethereum_types.Block_parameter.(Block_parameter Latest)
+
+  let default_state_override = AddressMap.empty
+
+  let input_encoding =
+    let open Data_encoding in
+    union
+      [
+        case
+          ~title:"Only call"
+          (Tag 0)
+          (tup1 call_encoding)
+          (fun (c, _, _) -> Some c)
+          (fun c -> (c, default_block, default_state_override));
+        case
+          ~title:"Call and block param"
+          (Tag 1)
+          (tup2 call_encoding Block_parameter.extended_encoding)
+          (fun (c, b, _) -> Some (c, b))
+          (fun (c, b) -> (c, b, default_state_override));
+        case
+          ~title:"Call and state override"
+          (Tag 2)
+          (tup2 call_encoding state_override_encoding)
+          (fun (c, _, s) -> Some (c, s))
+          (fun (c, s) -> (c, default_block, s));
+        case
+          ~title:"Call, block param and state override"
+          (Tag 3)
+          (tup3
+             call_encoding
+             Block_parameter.extended_encoding
+             state_override_encoding)
+          (fun (c, b, s) -> Some (c, b, s))
+          (fun (c, b, s) -> (c, b, s));
+      ]
 
   let output_encoding = hash_encoding
 

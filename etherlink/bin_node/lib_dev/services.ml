@@ -607,8 +607,10 @@ let dispatch_request (rpc : Configuration.rpc) (config : Configuration.t)
               in
               build_with_input ~f module_ parameters
         | Eth_call.Method ->
-            let f (call, block_param) =
-              let* call_result = Backend_rpc.simulate_call call block_param in
+            let f (call, block_param, state_override) =
+              let* call_result =
+                Backend_rpc.simulate_call call block_param state_override
+              in
               match call_result with
               | Ok (Ok {value = Some value; gas_used = _}) -> rpc_ok value
               | Ok (Ok {value = None; gas_used = _}) ->
