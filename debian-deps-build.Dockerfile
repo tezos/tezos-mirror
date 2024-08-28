@@ -45,6 +45,7 @@ RUN opam init --bare --disable-sandboxing
 COPY scripts/version.sh /tmp/
 COPY --link scripts/install_build_deps.sh /root/tezos/scripts/
 COPY --link scripts/install_build_deps.rust.sh /root/tezos/scripts/
+COPY --link scripts/install_dal_trusted_setup.sh /root/tezos/scripts/
 COPY --link scripts/version.sh /root/tezos/scripts/
 COPY --link Makefile /root/tezos/
 COPY --link opam/virtual/octez-deps.opam.locked /root/tezos/opam/virtual/
@@ -55,4 +56,5 @@ WORKDIR /root/tezos
 RUN . /tmp/version.sh && \
     eval $(opam env) && \
     . "/root/.cargo/env" && \
-    make build-deps
+    make build-deps && \
+    scripts/install_dal_trusted_setup.sh

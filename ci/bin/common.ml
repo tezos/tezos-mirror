@@ -914,6 +914,7 @@ let job_build_bin_package ?dependencies ?rules ~__POS__ ~name
     ~arch
     ~image
     ~stage
+    ~retry:Gitlab_ci.Types.{max = 1; when_ = [Stuck_or_timeout_failure]}
     ~variables:
       [
         ("TARGET", target_string);
