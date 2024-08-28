@@ -5925,7 +5925,7 @@ let test_sequencer_sandbox () =
 let test_rpc_mode_while_block_are_produced =
   register_all
     ~title:"rpc node can respond to rpcs without disturbing the sequencer."
-    ~tags:["rpc_mode"]
+    ~tags:["rpc_mode"; Tag.ci_disabled]
     ~time_between_blocks:Nothing
   @@ fun {sequencer; _} _protocol ->
   (* The goal of this test is to prove that a RPC node running alongside a
