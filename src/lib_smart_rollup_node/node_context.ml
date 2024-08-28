@@ -1076,6 +1076,12 @@ let gc ?(wait_finished = false) ?(force = false) node_ctxt ~(level : int32) =
             return_unit))
   | _ -> return_unit
 
+let cancel_gc node_ctxt =
+  let open Lwt_syntax in
+  let canceled_context_gc = Context.cancel_gc node_ctxt.context in
+  let+ canceled_store_gc = Store.cancel_gc node_ctxt.store in
+  canceled_context_gc || canceled_store_gc
+
 let check_level_available node_ctxt accessed_level =
   let open Lwt_result_syntax in
   let* {first_available_level; _} = get_gc_levels node_ctxt in
