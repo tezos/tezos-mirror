@@ -36,11 +36,19 @@ local logs = panel.logs;
 
   node_instance_query: '{' + self.node_instance + '="$node_instance"}',
 
+  slot_index_instance_query: '{' + std.extVar('node_instance_label') + '="$node_instance", slot_index="$slot_index"}',
+
+  pkh_instance_query: '{' + std.extVar('node_instance_label') + '="$node_instance", pkh="$pkh"}',
+
+  topic_instance_query: '{' + std.extVar('node_instance_label') + '="$node_instance", slot_index="$slot_index", pkh="$pkh"}',
+
+  peer_instance_query: '{' + std.extVar('node_instance_label') + '="$node_instance", peer="$peer"}',
+
   // Prometheus query
-  prometheus(q, legendFormat=''):
+  prometheus(q, legendFormat='', namespace=self.namespace):
     local withLegendFormat = if legendFormat != ''
     then query.prometheus.withLegendFormat(legendFormat) else {};
-    grafonnet.query.prometheus.new('Prometheus', self.namespace + '_' + q + self.node_instance_query)
+    grafonnet.query.prometheus.new('Prometheus', namespace + '_' + q + self.node_instance_query)
     + withLegendFormat,
 
   // Stat panel helpers
@@ -181,6 +189,43 @@ local logs = panel.logs;
       query='label_values(octez_version,' + std.extVar('node_instance_label') + ')',
     )
     + variableQuery.generalOptions.withLabel('Node Instance')
+    + variableQuery.refresh.onLoad()
+    + variableQuery.withDatasource('prometheus', 'Prometheus'),
+
+  // To be removed once the DAL-node expose octez-version metric
+  nodeInstanceDal:
+    variableQuery.new(
+      name='node_instance',
+      query='label_values(dal_node_new_layer1_head,' + std.extVar('node_instance_label') + ')',
+    )
+    + variableQuery.generalOptions.withLabel('Node Instance')
+    + variableQuery.refresh.onLoad()
+    + variableQuery.withDatasource('prometheus', 'Prometheus'),
+
+  slotIndex:
+    variableQuery.new(
+      name='slot_index',
+      query='label_values(dal_gs_count_peers_per_topic, slot_index)',
+    )
+    + variableQuery.generalOptions.withLabel('Slot index')
+    + variableQuery.refresh.onLoad()
+    + variableQuery.withDatasource('prometheus', 'Prometheus'),
+
+  pkh:
+    variableQuery.new(
+      name='pkh',
+      query='label_values(dal_gs_count_peers_per_topic, pkh)',
+    )
+    + variableQuery.generalOptions.withLabel('Pkh')
+    + variableQuery.refresh.onLoad()
+    + variableQuery.withDatasource('prometheus', 'Prometheus'),
+
+  peer:
+    variableQuery.new(
+      name='peer',
+      query='label_values(dal_gs_scores_of_peers, peer)',
+    )
+    + variableQuery.generalOptions.withLabel('Peer')
     + variableQuery.refresh.onLoad()
     + variableQuery.withDatasource('prometheus', 'Prometheus'),
 

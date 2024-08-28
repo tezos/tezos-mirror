@@ -55,4 +55,11 @@ octez-with-logs-new:
 		--ext-str storage_mode="$(STORAGE_MODE)" \
 		> output/$@.json
 
-new: octez-compact-new octez-basic-new octez-full-new octez-with-logs-new
+dal-basic-new:
+	jsonnet \
+		-J vendor src/dal/dal-basic-new.jsonnet \
+		--ext-str node_instance_label="$(NODE_INSTANCE_LABEL)" \
+		> output/$@.json
+
+
+new: octez-compact-new octez-basic-new octez-full-new octez-with-logs-new dal-basic-new
