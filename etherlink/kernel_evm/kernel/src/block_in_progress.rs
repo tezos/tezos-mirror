@@ -6,6 +6,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::apply::{TransactionObjectInfo, TransactionReceiptInfo};
+use crate::block_storage;
 use crate::error::Error;
 use crate::error::TransferError::CumulativeGasUsedOverflow;
 use crate::gas_price::base_fee_per_gas;
@@ -320,6 +321,7 @@ impl BlockInProgress {
         }
     }
 
+    #[cfg_attr(feature = "benchmark", inline(never))]
     pub fn finalize_and_store<Host: KernelRuntime>(
         self,
         host: &mut Host,
@@ -343,7 +345,7 @@ impl BlockInProgress {
             block_constants,
             base_fee_per_gas,
         );
-        storage::store_current_block(host, &new_block)
+        block_storage::store_current(host, &new_block)
             .context("Failed to store the current block")?;
         Ok(new_block)
     }

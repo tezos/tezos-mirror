@@ -9,7 +9,6 @@ use crate::block_in_progress::BlockInProgress;
 use crate::event::Event;
 use crate::simulation::SimulationResult;
 use anyhow::Context;
-use evm_execution::storage::blocks::add_new_block_hash;
 use evm_execution::trace::{
     CallTracerInput, StructLoggerInput, TracerInput, CALL_TRACER_CONFIG_PREFIX,
 };
@@ -26,7 +25,6 @@ use tezos_smart_rollup_host::runtime::{Runtime, ValueType};
 
 use crate::error::{Error, StorageError};
 use rlp::{Decodable, Encodable, Rlp};
-use tezos_ethereum::block::L2Block;
 use tezos_ethereum::rlp_helpers::{FromRlpBytes, VersionedEncoding};
 use tezos_ethereum::transaction::{
     TransactionHash, TransactionObject, TransactionReceipt,
@@ -86,12 +84,6 @@ pub const MAXIMUM_GAS_PER_TRANSACTION: RefPath =
 const EVM_BLOCK_IN_PROGRESS: RefPath =
     RefPath::assert_from(b"/evm/world_state/blocks/in_progress");
 
-const EVM_CURRENT_BLOCK: RefPath =
-    RefPath::assert_from(b"/evm/world_state/blocks/current");
-pub const EVM_BLOCKS: RefPath = RefPath::assert_from(b"/evm/world_state/blocks");
-const BLOCK_NUMBER: RefPath = RefPath::assert_from(b"/number");
-const BLOCK_HASH: RefPath = RefPath::assert_from(b"/hash");
-
 const EVENTS: RefPath = RefPath::assert_from(b"/evm/events");
 
 pub const EVM_TRANSACTIONS_RECEIPTS: RefPath =
@@ -135,12 +127,6 @@ const EVM_INFO_PER_LEVEL_STATS_TOTAL: RefPath =
     RefPath::assert_from(b"/evm/info_per_level/stats/total");
 
 pub const SIMULATION_RESULT: RefPath = RefPath::assert_from(b"/evm/simulation_result");
-
-/// Path where all indexes are stored.
-pub const EVM_INDEXES: RefPath = RefPath::assert_from(b"/evm/world_state/indexes");
-
-/// Subpath where blocks are indexed.
-const BLOCKS_INDEX: RefPath = RefPath::assert_from(b"/blocks");
 
 // Path to the number of seconds until delayed txs are timed out.
 const EVM_DELAYED_INBOX_TIMEOUT: RefPath =
@@ -236,13 +222,6 @@ fn write_u64(host: &mut impl Runtime, path: &impl Path, value: u64) -> Result<()
     Ok(())
 }
 
-pub fn block_path(hash: H256) -> Result<OwnedPath, Error> {
-    let hash = hex::encode(hash);
-    let raw_hash_path: Vec<u8> = format!("/{}", &hash).into();
-    let hash_path = OwnedPath::try_from(raw_hash_path)?;
-    concat(&EVM_BLOCKS, &hash_path).map_err(Error::from)
-}
-
 pub fn receipt_path(receipt_hash: &TransactionHash) -> Result<OwnedPath, Error> {
     let hash = hex::encode(receipt_hash);
     let raw_receipt_path: Vec<u8> = format!("/{}", &hash).into();
@@ -255,20 +234,6 @@ pub fn object_path(object_hash: &TransactionHash) -> Result<OwnedPath, Error> {
     let raw_object_path: Vec<u8> = format!("/{}", &hash).into();
     let object_path = OwnedPath::try_from(raw_object_path)?;
     concat(&EVM_TRANSACTIONS_OBJECTS, &object_path).map_err(Error::from)
-}
-
-pub fn read_current_block_number<Host: Runtime>(host: &Host) -> Result<U256, Error> {
-    let path = concat(&EVM_CURRENT_BLOCK, &BLOCK_NUMBER)?;
-    let mut buffer = [0_u8; 8];
-    store_read_slice(host, &path, &mut buffer, 8)?;
-    Ok(U256::from_little_endian(&buffer))
-}
-
-pub fn read_current_block_hash<Host: Runtime>(host: &Host) -> Result<H256, Error> {
-    let path = concat(&EVM_CURRENT_BLOCK, &BLOCK_HASH)?;
-    let mut buffer = [0_u8; 32];
-    store_read_slice(host, &path, &mut buffer, 32)?;
-    Ok(H256::from_slice(&buffer))
 }
 
 pub fn store_rlp<T: Encodable, Host: Runtime>(
@@ -300,98 +265,6 @@ pub fn read_optional_rlp<T: Decodable>(
         Ok(Some(elt))
     } else {
         Ok(None)
-    }
-}
-
-pub fn read_current_block<Host: Runtime>(host: &mut Host) -> Result<L2Block, Error> {
-    let hash = read_current_block_hash(host)?;
-    let block_path = block_path(hash)?;
-    let bytes = &host.store_read_all(&block_path)?;
-    let block_from_bytes = L2Block::from_bytes(bytes)?;
-    Ok(block_from_bytes)
-}
-
-fn store_current_block_number_and_hash<Host: Runtime>(
-    host: &mut Host,
-    block_path: &OwnedPath,
-    block_number: U256,
-    block_hash: H256,
-) -> Result<(), Error> {
-    let number_path = concat(block_path, &BLOCK_NUMBER)?;
-    let hash_path = concat(block_path, &BLOCK_HASH)?;
-    let mut le_block_number: [u8; 32] = [0; 32];
-    block_number.to_little_endian(&mut le_block_number);
-    host.store_write(&number_path, &le_block_number, 0)?;
-    host.store_write(&hash_path, block_hash.as_bytes(), 0)
-        .map_err(Error::from)
-}
-
-fn store_block<Host: Runtime>(
-    host: &mut Host,
-    block: &L2Block,
-    block_path: &OwnedPath,
-) -> Result<(), Error> {
-    let mut index = init_blocks_index()?;
-    index_block(host, &block.hash, &mut index)?;
-    let bytes = block.to_bytes();
-    host.store_write_all(block_path, &bytes)
-        .map_err(Error::from)
-}
-
-pub fn store_block_by_hash<Host: Runtime>(
-    host: &mut Host,
-    block: &L2Block,
-) -> Result<(), Error> {
-    let block_path = block_path(block.hash)?;
-    store_block(host, block, &block_path)
-}
-
-fn store_current_block_nodebug<Host: Runtime>(
-    host: &mut Host,
-    block: &L2Block,
-) -> Result<(), Error> {
-    let current_block_path = OwnedPath::from(EVM_CURRENT_BLOCK);
-    // We only need to store current block's number and hash so we avoid the storage of duplicate informations.
-    store_current_block_number_and_hash(
-        host,
-        &current_block_path,
-        block.number,
-        block.hash,
-    )?;
-    // We store the current block hash so the BLOCKHASH opcode can retrieve the block hash
-    // by its number and return it in the execution flow.
-    // The routine to clean the outdated hashes (see BLOCKHASH's spec.) is within [add_new_block_hash].
-    add_new_block_hash(host, block.number, block.hash)
-        .map_err(|_| Error::Storage(StorageError::BlockHashStorageFailed))?;
-    // When storing the current block's infos we need to store it under the [evm/blocks/<block_hash>]
-    store_block_by_hash(host, block)
-}
-
-// DO NOT RENAME: function name is used during benchmark
-// Never inlined when the kernel is compiled for benchmarks, to ensure the
-// function is visible in the profiling results.
-#[cfg_attr(feature = "benchmark", inline(never))]
-pub fn store_current_block<Host: Runtime>(
-    host: &mut Host,
-    block: &L2Block,
-) -> Result<(), Error> {
-    match store_current_block_nodebug(host, block) {
-        Ok(()) => {
-            log!(
-                host,
-                Info,
-                "Storing block {} at {} containing {} transaction(s) for {} gas used.",
-                block.number,
-                block.timestamp,
-                block.transactions.len(),
-                U256::to_string(&block.gas_used)
-            );
-            Ok(())
-        }
-        Err(e) => {
-            log!(host, Error, "Block storing failed: {:?}", e);
-            Err(e)
-        }
     }
 }
 
@@ -822,12 +695,6 @@ pub fn read_last_info_per_level_timestamp<Host: Runtime>(
     read_timestamp_path(host, &EVM_INFO_PER_LEVEL_TIMESTAMP.into())
 }
 
-/// Get the index of blocks.
-pub fn init_blocks_index() -> Result<IndexableStorage, StorageError> {
-    let path = concat(&EVM_INDEXES, &BLOCKS_INDEX)?;
-    IndexableStorage::new(&RefPath::from(&path)).map_err(StorageError::Storage)
-}
-
 fn read_b58_kt1<Host: Runtime>(host: &Host, path: &OwnedPath) -> Option<ContractKt1Hash> {
     let mut buffer = [0; 36];
     store_read_slice(host, path, &mut buffer, 36).ok()?;
@@ -861,16 +728,6 @@ pub fn read_maximum_allowed_ticks<Host: Runtime>(host: &mut Host) -> Option<u64>
 
 pub fn read_maximum_gas_per_transaction<Host: Runtime>(host: &mut Host) -> Option<u64> {
     read_u64(host, &MAXIMUM_GAS_PER_TRANSACTION).ok()
-}
-
-pub fn index_block(
-    host: &mut impl Runtime,
-    block_hash: &H256,
-    blocks_index: &mut IndexableStorage,
-) -> Result<(), Error> {
-    blocks_index
-        .push_value(host, block_hash.as_bytes())
-        .map_err(Error::from)
 }
 
 pub fn store_storage_version<Host: Runtime>(
@@ -1156,18 +1013,6 @@ mod internal_for_tests {
         let bytes = host.store_read_all(&receipt_path)?;
         let receipt = TransactionReceipt::from_rlp_bytes(&bytes)?;
         Ok(receipt)
-    }
-
-    pub fn store_current_block_number<Host: Runtime>(
-        host: &mut Host,
-        block_number: U256,
-    ) -> Result<(), Error> {
-        let current_block_path = OwnedPath::from(EVM_CURRENT_BLOCK);
-        let number_path = concat(&current_block_path, &BLOCK_NUMBER)?;
-        let mut le_block_number: [u8; 32] = [0; 32];
-        block_number.to_little_endian(&mut le_block_number);
-        host.store_write(&number_path, &le_block_number, 0)
-            .map_err(Error::from)
     }
 }
 

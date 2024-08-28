@@ -8,6 +8,7 @@
 use crate::apply::{
     apply_transaction, ExecutionInfo, ExecutionResult, WITHDRAWAL_OUTBOX_QUEUE,
 };
+use crate::block_storage;
 use crate::blueprint_storage::{drop_blueprint, read_next_blueprint};
 use crate::configuration::ConfigurationMode;
 use crate::configuration::Limits;
@@ -355,8 +356,8 @@ fn promote_block<Host: Runtime>(
     safe_host.promote_trace()?;
     drop_blueprint(safe_host.host, number)?;
 
-    let number = storage::read_current_block_number(safe_host.host)?;
-    let hash = storage::read_current_block_hash(safe_host.host)?;
+    let number = block_storage::read_current_number(safe_host.host)?;
+    let hash = block_storage::read_current_hash(safe_host.host)?;
 
     Event::BlueprintApplied { number, hash }.store(safe_host.host)?;
 
@@ -394,7 +395,7 @@ pub fn produce<Host: Runtime>(
     let coinbase = sequencer_pool_address.unwrap_or_default();
 
     let (mut current_block_number, mut current_block_parent_hash) =
-        match storage::read_current_block(host) {
+        match block_storage::read_current(host) {
             Ok(block) => (block.number + 1, block.hash),
             Err(_) => (U256::zero(), GENESIS_PARENT_HASH),
         };
@@ -569,6 +570,7 @@ pub fn produce<Host: Runtime>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::block_storage;
     use crate::blueprint::Blueprint;
     use crate::blueprint_storage::store_inbox_blueprint;
     use crate::blueprint_storage::store_inbox_blueprint_by_number;
@@ -577,9 +579,7 @@ mod tests {
     use crate::inbox::TransactionContent;
     use crate::inbox::TransactionContent::Ethereum;
     use crate::inbox::TransactionContent::EthereumDelayed;
-    use crate::storage::init_blocks_index;
     use crate::storage::read_block_in_progress;
-    use crate::storage::read_current_block;
     use crate::storage::{read_transaction_receipt, read_transaction_receipt_status};
     use crate::tick_model;
     use crate::{retrieve_block_fees, retrieve_chain_id};
@@ -810,7 +810,7 @@ mod tests {
     }
 
     fn assert_current_block_reading_validity<Host: Runtime>(host: &mut Host) {
-        match storage::read_current_block(host) {
+        match block_storage::read_current(host) {
             Ok(_) => (),
             Err(e) => {
                 panic!("Block reading failed: {:?}\n", e)
@@ -1183,7 +1183,8 @@ mod tests {
         )
         .unwrap();
 
-        let blocks_index = init_blocks_index().unwrap();
+        let blocks_index =
+            block_storage::internal_for_tests::init_blocks_index().unwrap();
 
         store_blueprints(&mut host, vec![blueprint(vec![])]);
 
@@ -1208,7 +1209,7 @@ mod tests {
 
         let new_number_of_blocks_indexed = blocks_index.length(&host).unwrap();
 
-        let current_block_hash = storage::read_current_block(&mut host)
+        let current_block_hash = block_storage::read_current(&mut host)
             .unwrap()
             .hash
             .as_bytes()
@@ -1384,7 +1385,7 @@ mod tests {
     }
 
     fn check_current_block_number<Host: Runtime>(host: &mut Host, nb: usize) {
-        let current_nb = storage::read_current_block_number(host)
+        let current_nb = block_storage::read_current_number(host)
             .expect("Should have manage to check block number");
         assert_eq!(current_nb, U256::from(nb), "Incorrect block number");
     }
@@ -1513,7 +1514,7 @@ mod tests {
 
         // sanity check: no current block
         assert!(
-            storage::read_current_block_number(&host).is_err(),
+            block_storage::read_current_number(&host).is_err(),
             "Should not have found current block number"
         );
 
@@ -1579,7 +1580,7 @@ mod tests {
 
         // test no new block
         assert!(
-            storage::read_current_block_number(&host).is_err(),
+            block_storage::read_current_number(&host).is_err(),
             "Should not have found current block number"
         );
 
@@ -1600,7 +1601,7 @@ mod tests {
 
         // sanity check: no current block
         assert!(
-            storage::read_current_block_number(&host).is_err(),
+            block_storage::read_current_number(&host).is_err(),
             "Should not have found current block number"
         );
         //provision sender account
@@ -1664,7 +1665,7 @@ mod tests {
 
         // test no new block
         assert_eq!(
-            storage::read_current_block_number(&host)
+            block_storage::read_current_number(&host)
                 .expect("should have found a block number"),
             U256::zero(),
             "There should have been one block registered"
@@ -1820,7 +1821,7 @@ mod tests {
         };
         // sanity check: no current block
         assert!(
-            storage::read_current_block_number(&host).is_err(),
+            block_storage::read_current_number(&host).is_err(),
             "Should not have found current block number"
         );
         produce(
@@ -1834,7 +1835,7 @@ mod tests {
         .expect("Should have produced");
 
         assert!(
-            storage::read_current_block_number(&host).is_ok(),
+            block_storage::read_current_number(&host).is_ok(),
             "Should have found a block"
         );
 
@@ -1854,7 +1855,8 @@ mod tests {
         )
         .expect("Should have produced");
 
-        let block = read_current_block(&mut host).expect("Should have found a block");
+        let block =
+            block_storage::read_current(&mut host).expect("Should have found a block");
         let failed_loop_hash = block
             .transactions
             .first()

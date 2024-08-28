@@ -42,6 +42,7 @@ use tezos_smart_rollup_host::runtime::{Runtime, ValueType};
 mod apply;
 mod block;
 mod block_in_progress;
+mod block_storage;
 mod blueprint;
 mod blueprint_storage;
 mod bridge;
@@ -355,6 +356,7 @@ pub fn kernel_loop<Host: Runtime>(host: &mut Host) {
 mod tests {
     use std::str::FromStr;
 
+    use crate::block_storage;
     use crate::blueprint_storage::store_inbox_blueprint_by_number;
     use crate::configuration::{Configuration, Limits};
     use crate::fees;
@@ -518,7 +520,7 @@ mod tests {
 
         // sanity check: no current block
         assert!(
-            storage::read_current_block_number(&host).is_err(),
+            block_storage::read_current_number(&host).is_err(),
             "Should not have found current block number"
         );
 
@@ -597,7 +599,7 @@ mod tests {
 
         // test there is a new block
         assert_eq!(
-            storage::read_current_block_number(&host)
+            block_storage::read_current_number(&host)
                 .expect("should have found a block number"),
             U256::zero(),
             "There should have been a block registered"
