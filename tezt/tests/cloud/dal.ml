@@ -250,6 +250,7 @@ end
 
 module Teztale = struct
   type t = {
+    agent : Agent.t;
     server : Teztale.Server.t;
     address : string;
     mutable archivers : Teztale.Archiver.t list;
@@ -263,13 +264,35 @@ module Teztale = struct
       ?(path =
         Uses.(path (make ~tag:"codec" ~path:"./octez-teztale-server" ()))) agent
       =
-    let* server = Teztale.Server.run ~path agent () in
+    let public_directory = "/tmp/teztale/public" in
+    let* () = create_dir public_directory in
+    let aliases_filename =
+      Filename.concat public_directory "delegates-aliases.json"
+    in
+    write_file aliases_filename ~contents:"[]" ;
+    let* _ =
+      Agent.copy ~source:aliases_filename ~destination:aliases_filename agent
+    in
+    let* _ =
+      Agent.copy
+        ~source:"tezt/lib_cloud/teztale-visualisation/index.html"
+        ~destination:(Format.asprintf "%s/index.html" public_directory)
+        agent
+    in
+    let* _ =
+      Agent.copy
+        ~is_directory:true
+        ~source:"tezt/lib_cloud/teztale-visualisation/assets"
+        ~destination:public_directory
+        agent
+    in
+    let* server = Teztale.Server.run ~path ~public_directory agent () in
     let address =
       match Agent.point agent with
       | None -> "127.0.0.1"
       | Some point -> fst point
     in
-    Lwt.return {server; address; archivers = []}
+    Lwt.return {agent; server; address; archivers = []}
 
   let wait_server t = Teztale.Server.wait_for_readiness t.server
 
@@ -291,6 +314,23 @@ module Teztale = struct
     in
     let* archiver = Teztale.Archiver.run agent ~path user feed ~node_port in
     t.archivers <- archiver :: t.archivers ;
+    Lwt.return_unit
+
+  let update_alias t ~address ~alias =
+    let dir = Option.get t.server.conf.public_directory in
+    let filename = Filename.concat dir "delegates-aliases.json" in
+    let aliases =
+      match JSON.parse_file filename |> JSON.unannotate with
+      | exception _ -> []
+      | `A aliases -> aliases
+      | _ -> assert false
+    in
+    let update = `O [("alias", `String alias); ("address", `String address)] in
+    let aliases = update :: aliases in
+    JSON.encode_to_file_u filename (`A aliases) ;
+    let* _ =
+      Agent.copy ~refresh:true ~source:filename ~destination:filename t.agent
+    in
     Lwt.return_unit
 end
 
@@ -1082,7 +1122,15 @@ let init_teztale cloud agent =
     let* teztale = Teztale.run_server agent in
     let* () = Teztale.wait_server teztale in
     let* () =
-      Cloud.add_service cloud ("teztale", teztale.server.conf.interface.port)
+      let domain =
+        match Env.mode with
+        | `Host | `Cloud ->
+            Agent.point agent |> Option.fold ~none:"localhost" ~some:fst
+        | `Orchestrator | `Localhost -> "localhost"
+      in
+      let port = teztale.server.conf.interface.port in
+      let url = sf "http://%s:%d" domain port in
+      Cloud.add_service cloud ~name:"teztale" ~url
     in
     Lwt.return_some teztale
   else Lwt.return_none
@@ -1397,6 +1445,22 @@ let init_baker cloud (configuration : configuration) ~bootstrap teztale account
     let* () = Dal_node.run ~event_level:`Notice dal_node in
     Lwt.return dal_node
   in
+  let* () =
+    match teztale with
+    | None -> Lwt.return_unit
+    | Some teztale ->
+        let* () =
+          Teztale.add_archiver
+            teztale
+            agent
+            ~node_name:(Node.name node)
+            ~node_port:(Node.rpc_port node)
+        in
+        Teztale.update_alias
+          teztale
+          ~address:account.Account.public_key_hash
+          ~alias:account.Account.alias
+  in
   let* client = Client.Agent.create agent in
   let* () =
     Client.import_secret_key
@@ -1421,16 +1485,6 @@ let init_baker cloud (configuration : configuration) ~bootstrap teztale account
       ~job_name:(Format.asprintf "baker-%d" i)
       node
       dal_node
-  in
-  let* () =
-    match teztale with
-    | None -> Lwt.return_unit
-    | Some teztale ->
-        Teztale.add_archiver
-          teztale
-          agent
-          ~node_name:(Node.name node)
-          ~node_port:(Node.rpc_port node)
   in
   Lwt.return {node; dal_node; baker; account; stake}
 
@@ -1487,6 +1541,15 @@ let init_producer cloud configuration ~bootstrap teztale ~number_of_slots
       ~job_name:(Format.asprintf "producer-%d" i)
       node
       dal_node
+  in
+  let* () =
+    match teztale with
+    | None -> Lwt.return_unit
+    | Some teztale ->
+        Teztale.update_alias
+          teztale
+          ~address:account.Account.public_key_hash
+          ~alias:account.Account.alias
   in
   (* We do not wait on the promise because loading the SRS takes some time.
      Instead we will publish commitments only once this promise is fulfilled. *)
