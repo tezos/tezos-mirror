@@ -1002,6 +1002,7 @@ let test_rpc_getTransactionCount =
 
 let test_rpc_blockNumber =
   register_both
+    ~time_between_blocks:Nothing
     ~tags:["evm"; "rpc"; "block_number"]
     ~title:"RPC method eth_blockNumber"
   @@ fun ~protocol:_ ~evm_setup:{evm_node; produce_block; _} ->
