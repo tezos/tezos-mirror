@@ -17,7 +17,7 @@ use octez_riscv::{
         },
         registers,
     },
-    stepper::{StepResult, Stepper, StepperStatus},
+    stepper::{Stepper, StepperStatus},
 };
 use ratatui::{
     prelude::*,
@@ -480,7 +480,7 @@ where
             "   Mode: ".into(),
             format!("{:?}", self.stepper.machine_state().hart.mode.read()).fg(BLUE),
         ]);
-        let status_text = match self.state.result.to_stepper_status() {
+        let status_text = match &self.state.result {
             StepperStatus::Running { steps } => vec![
                 Line::from(vec!["   Running".bold().fg(GREEN)]),
                 Line::from(vec![format!("   Steps executed: {}", steps).into()]),
@@ -493,7 +493,7 @@ where
                 success,
                 steps,
             } => {
-                let color = if success { YELLOW } else { RED };
+                let color = if *success { YELLOW } else { RED };
                 vec![
                     Line::from(vec![format!("   Exited with: {}", status).bold().fg(color)]),
                     Line::from(vec![format!("   Steps executed: {}", steps).into()]),

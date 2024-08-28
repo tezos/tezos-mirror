@@ -6,7 +6,7 @@ use crate::{
     machine_state::{bus::main_memory::MainMemoryLayout, MachineState},
     state_backend::Manager,
 };
-use std::ops::RangeBounds;
+use std::ops::{AddAssign, RangeBounds};
 
 pub mod pvm;
 pub mod test;
@@ -35,6 +35,24 @@ pub enum StepperStatus {
 impl Default for StepperStatus {
     fn default() -> Self {
         Self::Running { steps: 0 }
+    }
+}
+
+impl AddAssign for StepperStatus {
+    fn add_assign(&mut self, mut rhs: Self) {
+        match self {
+            StepperStatus::Running { steps: prev_steps } => match &mut rhs {
+                StepperStatus::Running { steps }
+                | StepperStatus::Exited { steps, .. }
+                | StepperStatus::Errored { steps, .. } => {
+                    *steps = steps.saturating_add(*prev_steps);
+                }
+            },
+
+            StepperStatus::Exited { .. } | StepperStatus::Errored { .. } => return,
+        }
+
+        *self = rhs;
     }
 }
 
