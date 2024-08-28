@@ -196,12 +196,12 @@ pub fn store_read_slice<Host: Runtime, T: Path>(
 }
 
 /// Read a single unsigned 256 bit value from storage at the path given.
-fn read_u256(host: &impl Runtime, path: &OwnedPath) -> Result<U256, Error> {
+pub fn read_u256_le(host: &impl Runtime, path: &OwnedPath) -> Result<U256, Error> {
     let bytes = host.store_read(path, 0, WORD_SIZE)?;
     Ok(Wei::from_little_endian(&bytes))
 }
 
-pub fn write_u256(
+pub fn write_u256_le(
     host: &mut impl Runtime,
     path: &OwnedPath,
     value: U256,
@@ -634,26 +634,26 @@ pub fn store_chain_id<Host: Runtime>(
     host: &mut Host,
     chain_id: U256,
 ) -> Result<(), Error> {
-    write_u256(host, &EVM_CHAIN_ID.into(), chain_id)
+    write_u256_le(host, &EVM_CHAIN_ID.into(), chain_id)
 }
 
 pub fn read_chain_id<Host: Runtime>(host: &Host) -> Result<U256, Error> {
-    read_u256(host, &EVM_CHAIN_ID.into())
+    read_u256_le(host, &EVM_CHAIN_ID.into())
 }
 
 pub fn store_base_fee_per_gas<Host: Runtime>(
     host: &mut Host,
     base_fee_per_gas: U256,
 ) -> Result<(), Error> {
-    write_u256(host, &EVM_BASE_FEE_PER_GAS.into(), base_fee_per_gas)
+    write_u256_le(host, &EVM_BASE_FEE_PER_GAS.into(), base_fee_per_gas)
 }
 
 pub fn read_base_fee_per_gas<Host: Runtime>(host: &mut Host) -> Result<U256, Error> {
-    read_u256(host, &EVM_BASE_FEE_PER_GAS.into())
+    read_u256_le(host, &EVM_BASE_FEE_PER_GAS.into())
 }
 
 pub fn read_minimum_base_fee_per_gas<Host: Runtime>(host: &Host) -> Result<U256, Error> {
-    read_u256(host, &EVM_MINIMUM_BASE_FEE_PER_GAS.into())
+    read_u256_le(host, &EVM_MINIMUM_BASE_FEE_PER_GAS.into())
 }
 
 pub fn read_tick_backlog(host: &impl Runtime) -> Result<u64, Error> {
@@ -681,18 +681,18 @@ pub fn store_minimum_base_fee_per_gas<Host: Runtime>(
     host: &mut Host,
     price: U256,
 ) -> Result<(), Error> {
-    write_u256(host, &EVM_MINIMUM_BASE_FEE_PER_GAS.into(), price)
+    write_u256_le(host, &EVM_MINIMUM_BASE_FEE_PER_GAS.into(), price)
 }
 
 pub fn store_da_fee(
     host: &mut impl Runtime,
     base_fee_per_gas: U256,
 ) -> Result<(), Error> {
-    write_u256(host, &EVM_DA_FEE.into(), base_fee_per_gas)
+    write_u256_le(host, &EVM_DA_FEE.into(), base_fee_per_gas)
 }
 
 pub fn read_da_fee(host: &impl Runtime) -> Result<U256, Error> {
-    read_u256(host, &EVM_DA_FEE.into())
+    read_u256_le(host, &EVM_DA_FEE.into())
 }
 
 pub fn update_burned_fees(
@@ -700,15 +700,15 @@ pub fn update_burned_fees(
     burned_fee: U256,
 ) -> Result<(), Error> {
     let path = &EVM_BURNED_FEES.into();
-    let current = read_u256(host, path).unwrap_or_else(|_| U256::zero());
+    let current = read_u256_le(host, path).unwrap_or_else(|_| U256::zero());
     let new = current.saturating_add(burned_fee);
-    write_u256(host, path, new)
+    write_u256_le(host, path, new)
 }
 
 #[cfg(test)]
 pub fn read_burned_fees(host: &mut impl Runtime) -> U256 {
     let path = &EVM_BURNED_FEES.into();
-    read_u256(host, path).unwrap_or_else(|_| U256::zero())
+    read_u256_le(host, path).unwrap_or_else(|_| U256::zero())
 }
 
 pub fn read_sequencer_pool_address(host: &impl Runtime) -> Option<H160> {
