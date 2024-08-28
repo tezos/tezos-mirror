@@ -271,11 +271,7 @@ module Make (Base : sig
 
   val keep_alive : bool
 end) =
-struct
-  include Services_backend_sig.Make (MakeBackend (Base)) (Base.Executor)
-
-  let current_block_number () = Lwt_result.return Base.ctxt.current_block_number
-end
+  Services_backend_sig.Make (MakeBackend (Base)) (Base.Executor)
 
 let install_finalizer_rpc server_public_finalizer =
   let open Lwt_syntax in
