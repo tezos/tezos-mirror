@@ -50,13 +50,13 @@ IO_CACHE_DIR=${IO_CACHE_DIR-""}
 # [IO_DATA_DIR] and [IO_CACHE_DIR], are defined.
 if [ -n "$IO_BENCH" ]; then
   if [ -n "$IO_DATA_DIR" ] && [ -n "$IO_CACHE_DIR" ]; then
-    extra_param="--io-only --io-cache-dir ${IO_CACHE_DIR} --io-data-dir ${IO_DATA_DIR}"
+    extra_param=(--io-only --io-cache-dir "${IO_CACHE_DIR}" --io-data-dir "${IO_DATA_DIR}")
   else
     dated_log "Either IO_DATA_DIR or IO_CACHE_DIR is not set for the IO benchmarks. Exiting."
     exit 1
   fi
 else
-  extra_param=""
+  extra_param=()
 fi
 
 dated_log() {
@@ -70,6 +70,8 @@ dated_log "Starting benchmarks processes"
 cd /data/tezos-benchmarks/tezos
 rm -rf _opam
 dated_log "Pulling repository."
+git fetch origin
+git checkout master
 git pull
 HEADCOMMIT=$(git describe --always --dirty --long)
 dated_log "HEAD is $HEADCOMMIT"
@@ -98,6 +100,7 @@ eval "$(opam env)"
 
 # Build Tezos
 dated_log "Make"
+make clean
 # BLST_PORTABLE=y is needed to benchmark BLS instructions
 BLST_PORTABLE=y make
 
@@ -108,7 +111,7 @@ dated_log "Install DAL trusted setup"
 
 # Run benchmarks.
 dated_log "Running benchmarks"
-time dune exec tezt/snoop/main.exe -- --verbose "$extra_param"
+time dune exec tezt/snoop/main.exe -- --verbose "${extra_param[@]}"
 dated_log "End of benchmarks run"
 
 # Move results from tezos to their dedicated directory.
