@@ -12,8 +12,7 @@ use crate::error::TransferError::CumulativeGasUsedOverflow;
 use crate::gas_price::base_fee_per_gas;
 use crate::inbox::Transaction;
 use crate::safe_storage::KernelRuntime;
-use crate::storage;
-use crate::storage::{EVM_TRANSACTIONS_OBJECTS, EVM_TRANSACTIONS_RECEIPTS};
+use crate::storage::{self, object_path, receipt_path};
 use crate::tick_model;
 use anyhow::Context;
 use evm_execution::account_storage::EVM_ACCOUNTS_PATH;
@@ -29,7 +28,7 @@ use tezos_ethereum::transaction::{
 use tezos_ethereum::Bloom;
 use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
-use tezos_smart_rollup_host::path::RefPath;
+use tezos_smart_rollup_host::path::{concat, RefPath};
 use tezos_smart_rollup_host::runtime::Runtime;
 
 #[derive(Debug, PartialEq, Clone)]
@@ -321,16 +320,69 @@ impl BlockInProgress {
         }
     }
 
+    const RECEIPTS: RefPath<'static> = RefPath::assert_from(b"/receipts");
+    const RECEIPTS_PREVIOUS_ROOT: RefPath<'static> =
+        RefPath::assert_from(b"/receipts/previous_root");
+
+    fn receipts_root(
+        &self,
+        host: &mut impl KernelRuntime,
+        previous_receipts_root: Vec<u8>,
+    ) -> anyhow::Result<Vec<u8>> {
+        if self.valid_txs.is_empty() {
+            Ok(previous_receipts_root)
+        } else {
+            for hash in &self.valid_txs {
+                let receipt_path = receipt_path(hash)?;
+                let new_receipt_path = concat(&Self::RECEIPTS, &receipt_path)?;
+                host.store_copy(&receipt_path, &new_receipt_path)?;
+            }
+            host.store_write_all(&Self::RECEIPTS_PREVIOUS_ROOT, &previous_receipts_root)?;
+            let receipts_root = Self::safe_store_get_hash(host, &Self::RECEIPTS)?;
+            host.store_delete(&Self::RECEIPTS)?;
+            Ok(receipts_root)
+        }
+    }
+
+    const OBJECTS: RefPath<'static> = RefPath::assert_from(b"/objects");
+    const OBJECTS_PREVIOUS_ROOT: RefPath<'static> =
+        RefPath::assert_from(b"/objects/previous_root");
+
+    fn transactions_root(
+        &self,
+        host: &mut impl KernelRuntime,
+        previous_transactions_root: Vec<u8>,
+    ) -> anyhow::Result<Vec<u8>> {
+        if self.valid_txs.is_empty() {
+            Ok(previous_transactions_root)
+        } else {
+            for hash in &self.valid_txs {
+                let object_path = object_path(hash)?;
+                let new_object_path = concat(&Self::OBJECTS, &object_path)?;
+                host.store_copy(&object_path, &new_object_path)?;
+            }
+            host.store_write_all(
+                &Self::OBJECTS_PREVIOUS_ROOT,
+                &previous_transactions_root,
+            )?;
+            let objects_root = Self::safe_store_get_hash(host, &Self::OBJECTS)?;
+            host.store_delete(&Self::OBJECTS)?;
+            Ok(objects_root)
+        }
+    }
+
     #[cfg_attr(feature = "benchmark", inline(never))]
     pub fn finalize_and_store<Host: KernelRuntime>(
         self,
         host: &mut Host,
         block_constants: &BlockConstants,
+        previous_receipts_root: Vec<u8>,
+        previous_transactions_root: Vec<u8>,
     ) -> Result<L2Block, anyhow::Error> {
         let state_root = Self::safe_store_get_hash(host, &EVM_ACCOUNTS_PATH)?;
-        let receipts_root = Self::safe_store_get_hash(host, &EVM_TRANSACTIONS_RECEIPTS)?;
+        let receipts_root = self.receipts_root(host, previous_receipts_root)?;
         let transactions_root =
-            Self::safe_store_get_hash(host, &EVM_TRANSACTIONS_OBJECTS)?;
+            self.transactions_root(host, previous_transactions_root)?;
         let base_fee_per_gas = base_fee_per_gas(host, self.timestamp);
         let new_block = L2Block::new(
             self.number,

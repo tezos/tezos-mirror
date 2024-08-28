@@ -257,6 +257,8 @@ fn compute_bip<Host: KernelRuntime>(
     mut block_in_progress: BlockInProgress,
     current_block_number: &mut U256,
     current_block_parent_hash: &mut H256,
+    previous_receipts_root: &mut Vec<u8>,
+    previous_transactions_root: &mut Vec<u8>,
     precompiles: &PrecompileBTreeMap<Host>,
     evm_account_storage: &mut EthereumAccountStorage,
     tick_counter: &mut TickCounter,
@@ -300,10 +302,17 @@ fn compute_bip<Host: KernelRuntime>(
             *tick_counter =
                 TickCounter::finalize(block_in_progress.estimated_ticks_in_run);
             let new_block = block_in_progress
-                .finalize_and_store(host, &constants)
+                .finalize_and_store(
+                    host,
+                    &constants,
+                    previous_receipts_root.clone(),
+                    previous_transactions_root.clone(),
+                )
                 .context("Failed to finalize the block in progress")?;
             *current_block_number = new_block.number + 1;
             *current_block_parent_hash = new_block.hash;
+            *previous_receipts_root = new_block.receipts_root;
+            *previous_transactions_root = new_block.transactions_root;
 
             *first_block_of_reboot = false;
         }
@@ -394,11 +403,20 @@ pub fn produce<Host: Runtime>(
     // in blocks is set to the pool address.
     let coinbase = sequencer_pool_address.unwrap_or_default();
 
-    let (mut current_block_number, mut current_block_parent_hash) =
-        match block_storage::read_current(host) {
-            Ok(block) => (block.number + 1, block.hash),
-            Err(_) => (U256::zero(), GENESIS_PARENT_HASH),
-        };
+    let (
+        mut current_block_number,
+        mut current_block_parent_hash,
+        mut previous_receipts_root,
+        mut previous_transactions_root,
+    ) = match block_storage::read_current(host) {
+        Ok(block) => (
+            block.number + 1,
+            block.hash,
+            block.receipts_root,
+            block.transactions_root,
+        ),
+        Err(_) => (U256::zero(), GENESIS_PARENT_HASH, vec![0; 32], vec![0; 32]),
+    };
     let mut evm_account_storage =
         init_account_storage().context("Failed to initialize EVM account storage")?;
     let mut tick_counter = TickCounter::new(0u64);
@@ -429,6 +447,8 @@ pub fn produce<Host: Runtime>(
                 block_in_progress,
                 &mut current_block_number,
                 &mut current_block_parent_hash,
+                &mut previous_receipts_root,
+                &mut previous_transactions_root,
                 &precompiles,
                 &mut evm_account_storage,
                 &mut tick_counter,
@@ -512,6 +532,8 @@ pub fn produce<Host: Runtime>(
             *block_in_progress,
             &mut current_block_number,
             &mut current_block_parent_hash,
+            &mut previous_receipts_root,
+            &mut previous_transactions_root,
             &precompiles,
             &mut evm_account_storage,
             &mut tick_counter,

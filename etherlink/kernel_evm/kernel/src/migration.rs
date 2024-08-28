@@ -90,6 +90,11 @@ fn migrate_to<Host: Runtime>(
             // for tracing.
             Ok(MigrationStatus::Done)
         }
+        StorageVersion::V17 => {
+            // Starting version 17 the kernel no longer needs all transactions
+            // in its storage to produce the receipts and transactions root.
+            Ok(MigrationStatus::Done)
+        }
     }
 }
 
