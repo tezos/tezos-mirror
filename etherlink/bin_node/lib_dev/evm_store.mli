@@ -29,6 +29,9 @@ val init :
 (** [use store k] executes [k] with a fresh connection to [store]. *)
 val use : t -> (conn -> 'a tzresult Lwt.t) -> 'a tzresult Lwt.t
 
+(** name of the sqlite file *)
+val sqlite_file_name : string
+
 (** Run VACUUM sqlite request *)
 val vacuum : conn:conn -> output_db_file:string -> unit tzresult Lwt.t
 

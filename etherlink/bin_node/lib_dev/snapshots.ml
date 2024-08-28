@@ -91,8 +91,11 @@ let export ?dest ?filename ~compression ~data_dir () =
         []
     in
     let files = evm_context_files in
-    (* TODO: add store.sql *)
-    (* TODO: add wasm_2_0_0 *)
+    (* Export SQLite database *)
+    Lwt_utils_unix.with_tempdir "evm_node_sqlite_export_" @@ fun tmp_dir ->
+    let output_db_file = Filename.concat tmp_dir Evm_store.sqlite_file_name in
+    let* () = Evm_context.vacuum ~data_dir ~output_db_file in
+    let files = (output_db_file, Evm_store.sqlite_file_name) :: files in
     let writer =
       match compression with
       | On_the_fly -> gzip_writer

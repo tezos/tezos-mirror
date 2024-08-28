@@ -477,9 +477,11 @@ let vacuum ~conn ~output_db_file =
   with_connection conn @@ fun conn ->
   Db.exec conn Q.vacuum_request output_db_file
 
+let sqlite_file_name = "store.sqlite"
+
 let init ~data_dir ~perm () =
   let open Lwt_result_syntax in
-  let path = data_dir // "store.sqlite" in
+  let path = data_dir // sqlite_file_name in
   let*! exists = Lwt_unix.file_exists path in
   let write_perm =
     match perm with `Read_only -> false | `Read_write -> true
