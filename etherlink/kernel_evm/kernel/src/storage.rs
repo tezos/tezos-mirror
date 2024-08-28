@@ -195,6 +195,20 @@ pub fn store_read_slice<Host: Runtime, T: Path>(
     }
 }
 
+pub fn read_h256(host: &impl Runtime, path: &impl Path) -> anyhow::Result<H256> {
+    let mut buffer = [0_u8; 32];
+    store_read_slice(host, path, &mut buffer, 32)?;
+    Ok(H256::from_slice(&buffer))
+}
+
+pub fn write_h256(
+    host: &mut impl Runtime,
+    path: &impl Path,
+    hash: H256,
+) -> anyhow::Result<()> {
+    Ok(host.store_write_all(path, hash.as_bytes())?)
+}
+
 /// Read a single unsigned 256 bit value from storage at the path given.
 pub fn read_u256_le(host: &impl Runtime, path: &OwnedPath) -> Result<U256, Error> {
     let bytes = host.store_read(path, 0, WORD_SIZE)?;
