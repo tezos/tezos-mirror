@@ -50,8 +50,10 @@ let login_encoding =
   let open Data_encoding in
   obj2 (req "login" string) (req "password" string)
 
-let opt_with_transactions_encoding : opt_with_transactions Data_encoding.t =
-  Data_encoding.string_enum [("NONE", NONE); ("SAFE", SAFE); ("FULL", FULL)]
+let opt_with_transactions_encoding :
+    opt_with_transactions option Data_encoding.t =
+  Data_encoding.option
+    (Data_encoding.string_enum [("NONE", NONE); ("SAFE", SAFE); ("FULL", FULL)])
 
 let encoding =
   let open Data_encoding in
@@ -73,7 +75,7 @@ let encoding =
         admins,
         users,
         max_batch_size,
-        with_transaction,
+        Some with_transaction,
         with_metrics,
         verbosity ))
     (fun ( db_uri,
@@ -85,6 +87,17 @@ let encoding =
            with_transaction,
            with_metrics,
            verbosity ) ->
+      let with_transaction =
+        (* By default, if the database uses sqlite, we want to use the
+           transaction mode in "FULL" since it is faster. For
+           Postgresql we don't want to use it by default. If the value
+           is specified by the administrator we take this one
+           instead. *)
+        match with_transaction with
+        | None ->
+            if String.starts_with ~prefix:"sqlite" db_uri then FULL else NONE
+        | Some x -> x
+      in
       {
         db_uri;
         network_interfaces;
@@ -113,6 +126,6 @@ let encoding =
        (req "admins" (list login_encoding))
        (req "users" (list login_encoding))
        (dft "max_batch_size" int32 0l)
-       (dft "with_transaction" opt_with_transactions_encoding NONE)
+       (dft "with_transaction" opt_with_transactions_encoding None)
        (dft "with_metrics" bool false)
        (dft "verbosity" Log.level_encoding ERROR))
