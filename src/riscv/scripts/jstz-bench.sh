@@ -8,9 +8,10 @@
 
 set -e
 
-USAGE="Usage: -t <num_transfers> [ -s: static inbox ] [ -p: profile with samply ] [ -n: run natively ]"
+USAGE="Usage: -t <num_transfers> [ -s: static inbox ] [ -p: profile with samply ] [ -n: run natively ] [ -i <num_iterations>: number of runs ]"
 DEFAULT_ROLLUP_ADDRESS="sr163Lv22CdE8QagCwf48PWDTquk6isQwv57"
 
+ITERATIONS="1"
 TX=""
 STATIC_INBOX=""
 SANDBOX_BIN="riscv-sandbox"
@@ -22,8 +23,11 @@ CURR=$(pwd)
 RISCV_DIR=$(dirname "$0")/..
 cd "$RISCV_DIR"
 
-while getopts "st:pn" OPTION; do
+while getopts "i:t:spn" OPTION; do
   case "$OPTION" in
+  i)
+    ITERATIONS="$OPTARG"
+    ;;
   t)
     TX="$OPTARG"
     ;;
@@ -92,7 +96,7 @@ run_jstz_riscv() {
 }
 
 ##########
-# native #
+# Native #
 ##########
 build_jstz_native() {
   INBOX_FILE=$INBOX_FILE make -C jstz build-kernel-native &> /dev/null
@@ -103,31 +107,46 @@ run_jstz_native() {
     --timings > "$LOG" 2> /dev/null
 }
 
-#################
-# Build and run #
-#################
+#########
+# Build #
+#########
 echo "[INFO]: building jstz"
 
 if [ -z "$NATIVE" ]; then
   build_jstz_riscv
-  echo "[INFO]: running $TX transfers (riscv)"
-  run_jstz_riscv
+  echo "[INFO]: running $TX transfers (riscv) "
 else
   build_jstz_native
-  echo "[INFO]: running $TX transfers ($NATIVE)"
-  run_jstz_native
+  echo "[INFO]: running $TX transfers ($NATIVE) "
 fi
 
-if [ -n "$PROFILING_WRAPPER" ]; then
+#################
+# Run & Collect #
+#################
+run_jstz() {
+  echo "[INFO]: Run $1 / $ITERATIONS"
+  if [ -z "$NATIVE" ]; then
+    run_jstz_riscv
+  else
+    run_jstz_native
+  fi
   echo "[INFO]: Samply data saved to: $SAMPLY_OUT"
-fi
+}
 
-echo "[INFO]: collecting results"
-echo -e "\033[1m"
-./jstz/inbox-bench results --inbox-file "$INBOX_FILE" --log-file "$LOG"
-echo -e "\033[0m"
+collect() {
+  echo -e "\033[1m"
+  ./jstz/inbox-bench results --inbox-file "$INBOX_FILE" --log-file "$LOG"
+  echo -e "\033[0m"
+}
 
+for i in $(seq "$ITERATIONS"); do
+  run_jstz "$i"
+  collect
+done
+
+# This loads the profile of the last run
 if [ -n "$PROFILING_WRAPPER" ]; then
+  echo "[INFO]: collecting results"
   samply load $SAMPLY_OUT
 fi
 
