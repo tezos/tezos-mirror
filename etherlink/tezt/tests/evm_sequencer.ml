@@ -5180,7 +5180,8 @@ let test_trace_transaction_calltracer_multiple_txs =
     ~title:
       "debug_traceTransaction handles blocks containing several transactions"
     ~da_fee:Wei.zero
-  @@ fun {sc_rollup_node; sequencer; client; proxy; _} _protocol ->
+    ~time_between_blocks:Nothing
+  @@ fun {sequencer; _} _protocol ->
   let endpoint = Evm_node.endpoint sequencer in
   let sender_0 = Eth_account.bootstrap_accounts.(0) in
   let sender_1 = Eth_account.bootstrap_accounts.(1) in
@@ -5196,11 +5197,6 @@ let test_trace_transaction_calltracer_multiple_txs =
           ~bin:call_types.bin)
       sequencer
   in
-  let* () =
-    repeat 2 (fun () ->
-        next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client)
-  in
-  let* () = bake_until_sync ~sequencer ~sc_rollup_node ~proxy ~client () in
   let* raw_tx_0 =
     Cast.craft_tx
       ~chain_id:1337
@@ -5231,16 +5227,9 @@ let test_trace_transaction_calltracer_multiple_txs =
   let*@ transaction_hash_1 =
     Rpc.send_raw_transaction ~raw_tx:raw_tx_1 sequencer
   in
-  (* The transaction pool contains the two transactions above. *)
-  let*@ txpool_pending, _ = Rpc.txpool_content sequencer in
-  Check.((List.length txpool_pending = 2) int)
-    ~error_msg:
-      "Expected number of addresses with pending transaction to be %R, got %L." ;
-  let* () =
-    repeat 2 (fun () ->
-        next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client)
-  in
-  let* () = bake_until_sync ~sequencer ~sc_rollup_node ~proxy ~client () in
+  let*@ size = produce_block sequencer in
+  Check.((size = 2) int)
+    ~error_msg:"Expected 2 transactions in the block, got %L" ;
   let*@ _ =
     Rpc.trace_transaction
       ~tracer:"callTracer"
