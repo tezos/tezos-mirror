@@ -1183,7 +1183,7 @@ let init_ghostnet cloud (configuration : configuration) agent =
     match etherlink_rollup_operator_key with key :: _ -> Some key | [] -> None
   in
   let* () =
-    if List.length producer_accounts > 0 then
+    if List.length accounts_to_fund > 0 then
       let () = toplog "Injecting the batch" in
       let* _op_hash =
         accounts_to_fund
@@ -1199,7 +1199,7 @@ let init_ghostnet cloud (configuration : configuration) agent =
       unit
     else
       let () =
-        toplog "Skipping batch injection because there are no producers"
+        toplog "Skipping batch injection because there is no account to fund"
       in
       unit
   in
