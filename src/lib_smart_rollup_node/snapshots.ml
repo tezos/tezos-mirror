@@ -568,9 +568,7 @@ let with_modify_data_dir cctxt ~data_dir ~apply_unsafe_patches
 let reconstruct_context_from_first_available_level
     (node_ctxt : _ Node_context.t) ~(head : Sc_rollup_block.t) =
   let open Lwt_result_syntax in
-  let* {first_available_level = first_level; _} =
-    Node_context.get_gc_levels node_ctxt
-  in
+  let* first_level = Node_context.first_available_level node_ctxt in
   let total = Int32.sub head.header.level first_level in
   let progress_bar =
     Progress_bar.progress_bar

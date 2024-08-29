@@ -293,6 +293,7 @@ type 'a store = {
   protocols : 'a Protocols.t;
   irmin_store : 'a Irmin_store.t;
   gc_levels : 'a Gc_levels.t;
+  successful_gc_levels : 'a Gc_levels.t;
   last_context_split_level : 'a Last_context_split.t;
   history_mode : 'a History_mode.t;
 }
@@ -318,6 +319,7 @@ let readonly
        protocols;
        irmin_store;
        gc_levels;
+       successful_gc_levels;
        last_context_split_level;
        history_mode;
      } :
@@ -337,6 +339,7 @@ let readonly
     protocols = Protocols.readonly protocols;
     irmin_store = Irmin_store.readonly irmin_store;
     gc_levels = Gc_levels.readonly gc_levels;
+    successful_gc_levels = Gc_levels.readonly successful_gc_levels;
     last_context_split_level =
       Last_context_split.readonly last_context_split_level;
     history_mode = History_mode.readonly history_mode;
@@ -357,6 +360,7 @@ let close
        protocols = _;
        irmin_store;
        gc_levels = _;
+       successful_gc_levels = _;
        last_context_split_level = _;
        history_mode = _;
      } :
@@ -412,6 +416,9 @@ let load (type a) (mode : a mode) ~index_buffer_size ~l2_blocks_cache_size
   in
   let* protocols = Protocols.load mode ~path:(path "protocols") in
   let* gc_levels = Gc_levels.load mode ~path:(path "gc_levels") in
+  let* successful_gc_levels =
+    Gc_levels.load mode ~path:(path "successful_gc_levels")
+  in
   let* last_context_split_level =
     Last_context_split.load mode ~path:(path "last_context_split_level")
   in
@@ -431,6 +438,7 @@ let load (type a) (mode : a mode) ~index_buffer_size ~l2_blocks_cache_size
     protocols;
     irmin_store;
     gc_levels;
+    successful_gc_levels;
     last_context_split_level;
     history_mode;
   }
@@ -527,6 +535,7 @@ let gc
        irmin_store = _;
        protocols = _;
        gc_levels = _;
+       successful_gc_levels = _;
        last_context_split_level = _;
        history_mode = _;
      } :
@@ -560,6 +569,7 @@ let wait_gc_completion
        irmin_store = _;
        protocols = _;
        gc_levels = _;
+       successful_gc_levels = _;
        last_context_split_level = _;
        history_mode = _;
      } :
@@ -590,6 +600,7 @@ let is_gc_finished
        irmin_store = _;
        protocols = _;
        gc_levels = _;
+       successful_gc_levels = _;
        last_context_split_level = _;
        history_mode = _;
      } :
@@ -617,6 +628,7 @@ let cancel_gc
        irmin_store = _;
        protocols = _;
        gc_levels = _;
+       successful_gc_levels = _;
        last_context_split_level = _;
        history_mode = _;
      } :

@@ -567,9 +567,17 @@ val gc :
     canceled. *)
 val cancel_gc : rw -> bool Lwt.t
 
-(** [get_gc_levels node_ctxt] returns information about the garbage collected
-    levels. *)
-val get_gc_levels : _ t -> Store.Gc_levels.levels tzresult Lwt.t
+(** [get_gc_info node_ctxt step] returns information about the garbage
+    collected levels. If [step] is [`Started], it returns information for the
+    last started GC and if it's [`Successful], it returns information for the
+    last successful GC. *)
+val get_gc_info :
+  _ t ->
+  [`Started | `Successful] ->
+  Store.Gc_levels.levels option tzresult Lwt.t
+
+(** The first non garbage collected level available in the node. *)
+val first_available_level : _ t -> int32 tzresult Lwt.t
 
 (** [check_level_available node_ctxt level] resolves with an error if the
     [level] is before the first non garbage collected level. *)

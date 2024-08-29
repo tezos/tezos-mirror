@@ -86,9 +86,10 @@ type message_status =
     }
 
 type gc_info = {
-  last_gc_level : int32;
   first_available_level : int32;
+  last_gc_started_at : int32 option;
   last_context_split_level : int32 option;
+  last_successful_gc_target : int32 option;
 }
 
 type sync_result =
@@ -358,14 +359,48 @@ module Encodings = struct
 
   let gc_info : gc_info Data_encoding.t =
     conv
-      (fun {last_gc_level; first_available_level; last_context_split_level} ->
-        (last_gc_level, first_available_level, last_context_split_level))
-      (fun (last_gc_level, first_available_level, last_context_split_level) ->
-        {last_gc_level; first_available_level; last_context_split_level})
-    @@ obj3
-         (req "last_gc_level" int32)
-         (req "first_available_level" int32)
-         (opt "last_context_split_level" int32)
+      (fun {
+             first_available_level;
+             last_gc_started_at;
+             last_context_split_level;
+             last_successful_gc_target;
+           } ->
+        ( first_available_level,
+          last_gc_started_at,
+          last_context_split_level,
+          last_successful_gc_target ))
+      (fun ( first_available_level,
+             last_gc_started_at,
+             last_context_split_level,
+             last_successful_gc_target ) ->
+        {
+          first_available_level;
+          last_gc_started_at;
+          last_context_split_level;
+          last_successful_gc_target;
+        })
+    @@ obj4
+         (req
+            "first_available_level"
+            int32
+            ~description:
+              "First level where data is guaranteed to be available in the \
+               rollup node.")
+         (opt
+            "last_gc_level"
+            int32
+            ~description:"The level at which the last GC was triggered.")
+         (opt
+            "last_context_split_level"
+            int32
+            ~description:
+              "The level at which the context was split for the last time. \
+               Commits before this level are in other chunks.")
+         (opt
+            "last_successful_gc_target"
+            int32
+            ~description:
+              "The level which was the target of the last successful GC.")
 
   let ocaml_gc_stat_encoding =
     let open Gc in

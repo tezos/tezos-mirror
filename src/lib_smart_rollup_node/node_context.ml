@@ -973,30 +973,45 @@ let save_slot_status {store; _} current_block_hash slot_index status =
     ~secondary_key:slot_index
     status
 
-let get_gc_levels node_ctxt =
+let get_gc_info_aux node_ctxt step =
+  let store =
+    match step with
+    | `Started -> node_ctxt.store.gc_levels
+    | `Successful -> node_ctxt.store.successful_gc_levels
+  in
+  Store.Gc_levels.read store
+
+let get_gc_info node_ctxt step =
   let open Lwt_result_syntax in
-  let+ gc_levels = Store.Gc_levels.read node_ctxt.store.gc_levels in
+  let* gc_levels = get_gc_info_aux node_ctxt step in
+  match (gc_levels, step) with
+  | Some _, _ -> return gc_levels
+  | None, `Successful ->
+      (* The successful GC information might be missing during the transition,
+         so we fallback to the started info for now. *)
+      get_gc_info_aux node_ctxt `Started
+  | None, `Started -> return_none
+
+let first_available_level node_ctxt =
+  let open Lwt_result_syntax in
+  let+ gc_levels = get_gc_info node_ctxt `Started in
   match gc_levels with
-  | Some gc_levels -> gc_levels
-  | None ->
-      {
-        last_gc_level = node_ctxt.genesis_info.level;
-        first_available_level = node_ctxt.genesis_info.level;
-      }
+  | Some {first_available_level; _} -> first_available_level
+  | None -> node_ctxt.genesis_info.level
 
 let get_last_context_split_level node_ctxt =
   Store.Last_context_split.read node_ctxt.store.last_context_split_level
 
-let save_gc_info node_ctxt ~at_level ~gc_level =
+let save_gc_info node_ctxt step ~at_level ~gc_level =
   let open Lwt_syntax in
-  (* Note: Setting the `first_available_level` before GC succeeds simplifies the
-     code. However, it may be temporarily inaccurate if the GC run spans over
-     several levels or if it fails. This is not foreseen to cause any issues,
-     but if greater accuracy is needed, the `first_available_level` can be set
-     after the GC finishes via a callback. *)
+  let store =
+    match step with
+    | `Started -> node_ctxt.store.gc_levels
+    | `Successful -> node_ctxt.store.successful_gc_levels
+  in
   let* res =
     Store.Gc_levels.write
-      node_ctxt.store.gc_levels
+      store
       {last_gc_level = at_level; first_available_level = gc_level}
   in
   match res with
@@ -1006,7 +1021,7 @@ let save_gc_info node_ctxt ~at_level ~gc_level =
 let save_context_split_level node_ctxt level =
   Store.Last_context_split.write node_ctxt.store.last_context_split_level level
 
-let get_gc_level node_ctxt =
+let candidate_gc_level node_ctxt =
   let open Lwt_result_syntax in
   let* history_mode = Store.History_mode.read node_ctxt.store.history_mode in
   let history_mode =
@@ -1025,14 +1040,20 @@ let gc ?(wait_finished = false) ?(force = false) node_ctxt ~(level : int32) =
   let open Lwt_result_syntax in
   (* [gc_level] is the level corresponding to the hash on which GC will be
      called. *)
-  let* gc_level = get_gc_level node_ctxt in
+  let* gc_level = candidate_gc_level node_ctxt in
   let frequency = node_ctxt.config.gc_parameters.frequency_in_blocks in
-  let* {last_gc_level; first_available_level; _} = get_gc_levels node_ctxt in
+  let* gc_info = get_gc_info node_ctxt `Successful in
+  let last_gc_at, last_gc_target =
+    match gc_info with
+    | Some {last_gc_level; first_available_level} ->
+        (last_gc_level, first_available_level)
+    | None -> (node_ctxt.genesis_info.level, node_ctxt.genesis_info.level)
+  in
   match gc_level with
   | None -> return_unit
   | Some gc_level
-    when gc_level > first_available_level
-         && (force || Int32.(sub level last_gc_level >= frequency))
+    when gc_level > last_gc_target
+         && (force || Int32.(sub level last_gc_at >= frequency))
          && Context.is_gc_finished node_ctxt.context
          && Store.is_gc_finished node_ctxt.store -> (
       let* hash = hash_of_level node_ctxt gc_level in
@@ -1051,7 +1072,9 @@ let gc ?(wait_finished = false) ?(force = false) node_ctxt ~(level : int32) =
               ~filename:(gc_lockfile_path ~data_dir:node_ctxt.data_dir)
           in
           let*! () = Event.calling_gc ~gc_level ~head_level:level in
-          let*! () = save_gc_info node_ctxt ~at_level:level ~gc_level in
+          let*! () =
+            save_gc_info node_ctxt `Started ~at_level:level ~gc_level
+          in
           Metrics.wrap (fun () ->
               Metrics.GC.set_oldest_available_level gc_level) ;
           (* Start both node and context gc asynchronously *)
@@ -1067,6 +1090,9 @@ let gc ?(wait_finished = false) ?(force = false) node_ctxt ~(level : int32) =
                     let stop_timestamp = Time.System.now () in
                     Metrics.GC.set_process_time
                     @@ Ptime.diff stop_timestamp start_timestamp) ;
+                let*! () =
+                  save_gc_info node_ctxt `Successful ~at_level:level ~gc_level
+                in
                 Event.gc_finished ~gc_level ~head_level:level)
               (fun () -> Lwt_lock_file.unlock gc_lockfile)
           in
@@ -1086,7 +1112,9 @@ let cancel_gc node_ctxt =
 
 let check_level_available node_ctxt accessed_level =
   let open Lwt_result_syntax in
-  let* {first_available_level; _} = get_gc_levels node_ctxt in
+  (* accessed_level is potentially unavailable if a GC was started after this
+     level *)
+  let* first_available_level = first_available_level node_ctxt in
   fail_when
     (accessed_level < first_available_level)
     (Rollup_node_errors.Access_below_first_available_level
