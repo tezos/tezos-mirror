@@ -987,7 +987,8 @@ let add_source cloud agent ~job_name node dal_node =
     ~job_name
     [node_metric_target; dal_node_metric_target]
 
-let add_etherlink_source cloud agent ~job_name node sc_rollup_node evm_node =
+let add_etherlink_source cloud agent ~job_name ?dal_node node sc_rollup_node
+    evm_node =
   let agent_name = Agent.name agent in
   let node_metric_target =
     Cloud.
@@ -1022,10 +1023,25 @@ let add_etherlink_source cloud agent ~job_name node sc_rollup_node evm_node =
             (Tezt_etherlink.Evm_node.name evm_node);
       }
   in
+  let dal_node_metric_target =
+    match dal_node with
+    | None -> []
+    | Some dal_node ->
+        [
+          Cloud.
+            {
+              agent;
+              port = Dal_node.metrics_port dal_node;
+              app_name =
+                Format.asprintf "%s:%s" agent_name (Dal_node.name dal_node);
+            };
+        ]
+  in
   Cloud.add_prometheus_source
     cloud
     ~job_name
-    [node_metric_target; sc_rollup_metric_target; evm_node_metric_target]
+    ([node_metric_target; sc_rollup_metric_target; evm_node_metric_target]
+    @ dal_node_metric_target)
 
 let init_teztale agent node =
   if Cli.teztale then
@@ -1631,6 +1647,7 @@ let init_etherlink_operator_setup cloud configuration name ~bootstrap ~dal_slots
       cloud
       agent
       ~job_name:(Format.asprintf "etherlink-%s" name)
+      ?dal_node
       node
       sc_rollup_node
       evm_node
