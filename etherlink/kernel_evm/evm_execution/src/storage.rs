@@ -162,7 +162,7 @@ pub mod blocks {
 
     // Ref. https://www.evm.codes/#40?fork=shanghai
     // (opcode 0x40: BLOCKHASH)
-    const BLOCKS_STORED: usize = 256;
+    pub const BLOCKS_STORED: usize = 256;
 
     /// Get block hash by block number.
     pub fn get_block_hash(
