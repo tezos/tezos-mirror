@@ -197,7 +197,12 @@ module Node = struct
                 unit
             in
             toplog "Launching the node." ;
-            let* () = Node.run node (Force_history_mode_switch :: arguments) in
+            let* () =
+              Node.run
+                node
+                (Force_history_mode_switch :: Synchronisation_threshold 1
+               :: arguments)
+            in
             toplog "Waiting for the node to be ready." ;
             let* () = wait_for_ready node in
             toplog "Node is ready." ;
