@@ -37,7 +37,7 @@ let get ?runner ?args url = get0 ?runner ?args url (parse url)
 let get_raw ?runner ?args url =
   get0 ?runner ?args url Process.check_and_read_stdout
 
-let post0 ?runner ?(args = []) url data format =
+let post_put meth ?runner ?(args = []) url data format =
   let process =
     Process.spawn
       ?runner
@@ -45,7 +45,7 @@ let post0 ?runner ?(args = []) url data format =
       (args
       @ [
           "-X";
-          "POST";
+          meth;
           "-H";
           "Content-Type: application/json";
           "-s";
@@ -56,7 +56,14 @@ let post0 ?runner ?(args = []) url data format =
   in
   Runnable.{value = process; run = format}
 
-let post ?runner ?args url data = post0 ?runner ?args url data (parse url)
+let post ?runner ?args url data =
+  post_put "POST" ?runner ?args url data (parse url)
 
 let post_raw ?runner ?args url data =
-  post0 ?runner ?args url data Process.check_and_read_stdout
+  post_put "POST" ?runner ?args url data Process.check_and_read_stdout
+
+let put ?runner ?args url data =
+  post_put "PUT" ?runner ?args url data (parse url)
+
+let put_raw ?runner ?args url data =
+  post_put "PUT" ?runner ?args url data Process.check_and_read_stdout
