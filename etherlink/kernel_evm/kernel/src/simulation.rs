@@ -8,6 +8,7 @@
 // Module containing most Simulation related code, in one place, to be deleted
 // when the proxy node simulates directly
 
+use crate::block_storage;
 use crate::configuration::fetch_limits;
 use crate::fees::{simulation_add_gas_for_fees, tx_execution_gas_limit};
 use crate::storage::{read_sequencer_pool_address, read_tracer_input};
@@ -395,7 +396,7 @@ impl Evaluation {
             }
         }
 
-        let constants = match storage::read_current_block(host) {
+        let constants = match block_storage::read_current(host) {
             Ok(block) => {
                 // Timestamp is taken from the simulation caller if provided.
                 // If the timestamp is missing, because of an older evm-node,
@@ -510,7 +511,7 @@ impl TxValidation {
         let block_fees = retrieve_block_fees(host)?;
         let coinbase = read_sequencer_pool_address(host).unwrap_or_default();
 
-        let current_constants = match storage::read_current_block(host) {
+        let current_constants = match block_storage::read_current(host) {
             Ok(block) => {
                 BlockConstants {
                     number: block.number + 1,

@@ -4,14 +4,14 @@
 // SPDX-License-Identifier: MIT
 
 use crate::block::GENESIS_PARENT_HASH;
+use crate::block_storage;
 use crate::blueprint::Blueprint;
 use crate::configuration::{Configuration, ConfigurationMode};
 use crate::error::{Error, StorageError};
 use crate::inbox::{Transaction, TransactionContent};
 use crate::sequencer_blueprint::{BlueprintWithDelayedHashes, SequencerBlueprint};
 use crate::storage::{
-    self, read_current_block_number, read_last_info_per_level_timestamp, read_rlp,
-    store_read_slice, store_rlp,
+    read_last_info_per_level_timestamp, read_rlp, store_read_slice, store_rlp,
 };
 use crate::{delayed_inbox, DelayedInbox};
 use primitive_types::U256;
@@ -153,18 +153,20 @@ pub fn store_inbox_blueprint_by_number<Host: Runtime>(
 pub fn store_inbox_blueprint<Host: Runtime>(
     host: &mut Host,
     blueprint: Blueprint,
-) -> Result<(), Error> {
+) -> anyhow::Result<()> {
     let number = read_next_blueprint_number(host)?;
-    store_inbox_blueprint_by_number(host, blueprint, number)
+    Ok(store_inbox_blueprint_by_number(host, blueprint, number)?)
 }
 
 #[inline(always)]
-pub fn read_next_blueprint_number<Host: Runtime>(host: &Host) -> Result<U256, Error> {
-    match read_current_block_number(host) {
-        Err(Error::Storage(StorageError::Runtime(RuntimeError::HostErr(
-            tezos_smart_rollup_host::Error::StoreNotAValue,
-        )))) => Ok(U256::zero()),
-        Err(err) => Err(err),
+pub fn read_next_blueprint_number<Host: Runtime>(host: &Host) -> anyhow::Result<U256> {
+    match block_storage::read_current_number(host) {
+        Err(err) => match err.downcast_ref() {
+            Some(Error::Storage(StorageError::Runtime(RuntimeError::PathNotFound))) => {
+                Ok(U256::zero())
+            }
+            _ => Err(err),
+        },
         Ok(block_number) => Ok(block_number.saturating_add(U256::one())),
     }
 }
@@ -274,7 +276,7 @@ fn parse_and_validate_blueprint<Host: Runtime>(
     match rlp::decode::<BlueprintWithDelayedHashes>(bytes) {
         Err(e) => Ok((BlueprintValidity::DecoderError(e), bytes.len())),
         Ok(blueprint_with_hashes) => {
-            let head = storage::read_current_block(host);
+            let head = block_storage::read_current(host);
             let (head_hash, head_timestamp) = match head {
                 Ok(block) => (block.hash, block.timestamp),
                 Err(_) => (GENESIS_PARENT_HASH, Timestamp::from(0)),

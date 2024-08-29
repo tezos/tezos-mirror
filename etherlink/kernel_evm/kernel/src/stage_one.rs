@@ -63,7 +63,7 @@ fn fetch_delayed_transactions<Host: Runtime>(
             timed_out.len()
         );
 
-        let timestamp = match crate::storage::read_current_block(host) {
+        let timestamp = match crate::block_storage::read_current(host) {
             Result::Ok(L2Block {
                 timestamp: head_timestamp,
                 ..
@@ -181,8 +181,8 @@ mod tests {
     use tezos_smart_rollup_mock::{MockHost, TransferMetadata};
 
     use crate::{
+        block_storage::internal_for_tests::store_current_number,
         blueprint_storage::read_next_blueprint, parsing::RollupType,
-        storage::store_current_block_number,
     };
 
     use super::*;
@@ -392,7 +392,7 @@ mod tests {
         fetch_blueprints(&mut host, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
 
         // The dummy chunk in the inbox is registered at block 10
-        store_current_block_number(&mut host, U256::from(9)).unwrap();
+        store_current_number(&mut host, U256::from(9)).unwrap();
         if read_next_blueprint(&mut host, &mut conf)
             .expect("Blueprint reading shouldn't fail")
             .0
@@ -463,7 +463,7 @@ mod tests {
         };
 
         // The dummy chunk in the inbox is registered at block 10
-        store_current_block_number(&mut host, U256::from(9)).unwrap();
+        store_current_number(&mut host, U256::from(9)).unwrap();
         if read_next_blueprint(&mut host, &mut conf)
             .expect("Blueprint reading shouldn't fail")
             .0
