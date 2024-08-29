@@ -998,8 +998,8 @@ let job_build_homebrew ?rules ~__POS__ ~name ?(stage = Stages.build)
       (* These packages are needed on Linux. For macOS, Homebrew will
          make those available locally. *)
       "apt install -y autoconf cmake libev-dev libffi-dev libgmp-dev \
-       libprotobuf-dev libsqlite3-dev protobuf-compiler libhidapi-dev \
-       pkg-config zlib1g-dev";
+       libprotobuf-dev libsqlite3-dev postgresql-dev protobuf-compiler \
+       libhidapi-dev pkg-config zlib1g-dev";
       "brew install -v scripts/packaging/Formula/octez.rb";
     ]
   |> enable_networked_cargo
@@ -1050,6 +1050,7 @@ let job_build_dynamic_binaries ?rules ~__POS__ ~arch ?(release = false)
       (* TODO: [paths] can be refined based on [release] *)
       [
         "octez-*";
+        "octez-teztale-*";
         "src/proto_*/parameters/*.json";
         "_build/default/src/lib_protocol_compiler/bin/main_native.exe";
         "_build/default/tezt/tests/main.exe";

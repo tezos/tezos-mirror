@@ -548,7 +548,7 @@ module Loops (Archiver : Archiver.S) = struct
         Lwt.return_unit
 
   let blocks_loop cctx =
-    Lwt.Infix.(reception_blocks_loop cctx <&> validation_blocks_loop cctx)
+    Lwt.join [reception_blocks_loop cctx; validation_blocks_loop cctx]
 end
 
 module Json_loops = Loops (Json_archiver)

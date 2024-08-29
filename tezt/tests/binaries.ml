@@ -94,6 +94,15 @@ let test_released_versions () =
    that they report the same version value as the Octez node. *)
 let test_experimental_versions () =
   let executables = read_executable_list Constant.experimental_executables in
+  (* Teztale have their own version number, so we do not compare them to octez version value *)
+  let executables =
+    List.filter
+      (fun s ->
+        match Uses.tag s with
+        | "teztale_archiver" | "teztale_server" -> false
+        | _ -> true)
+      executables
+  in
   Test.register
     ~__FILE__
     ~title:"Experimental binaries: report consistent version"

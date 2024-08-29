@@ -61,7 +61,11 @@ RUN apk --no-cache add \
     # Used by 'scripts/install_dal_trusted_setup.sh' below
     curl \
     sudo \
-    sqlite-libs
+    sqlite-libs \
+    # Used by teztale
+    openssl-libs-static \
+    sqlite-dev \
+    postgresql-dev
 
 # Install dal SRS setup (need curl)
 COPY scripts/install_dal_trusted_setup.sh scripts/version.sh /tmp/

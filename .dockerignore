@@ -39,6 +39,8 @@ octez-smart-rollup-node*
 octez-smart-rollup-client-*
 octez-injector-server
 octogram
+octez-teztale-archiver
+octez-teztale-server
 
 scripts/opam-test-all.sh.DONE
 scripts/create_genesis/src
