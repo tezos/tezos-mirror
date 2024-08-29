@@ -719,11 +719,16 @@ pub fn read_sequencer_inbox<Host: Runtime>(
 mod tests {
     use super::*;
     use crate::configuration::TezosContracts;
+    use crate::dal_slot_import_signal::{
+        DalSlotIndicesList, DalSlotIndicesOfLevel, UnsignedDalSlotSignals,
+    };
     use crate::inbox::TransactionContent::Ethereum;
     use crate::parsing::RollupType;
     use crate::storage::*;
+    use std::fmt::Write;
     use tezos_crypto_rs::hash::HashTrait;
     use tezos_crypto_rs::hash::SmartRollupHash;
+    use tezos_crypto_rs::hash::UnknownSignature;
     use tezos_data_encoding::types::Bytes;
     use tezos_ethereum::transaction::TRANSACTION_HASH_SIZE;
     use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
@@ -1244,5 +1249,53 @@ mod tests {
         )
         .unwrap();
         assert!(inbox_content.is_none());
+    }
+
+    fn bytes_to_hex(bytes: &[u8]) -> String {
+        bytes.iter().fold(String::new(), |mut acc, &b| {
+            write!(acc, "{:02x}", b).expect("Failed to write to string");
+            acc
+        })
+    }
+
+    #[test]
+    fn rlp_encode_decode_dal_slot_signals_with_signature() {
+        let signal_1 = DalSlotIndicesOfLevel {
+            published_level: 100,
+            slot_indices: DalSlotIndicesList(vec![1, 2, 3]),
+        };
+        let signal_2 = DalSlotIndicesOfLevel {
+            published_level: 200,
+            slot_indices: DalSlotIndicesList(vec![4, 2, 6]),
+        };
+        let signal_3 = DalSlotIndicesOfLevel {
+            published_level: 100,
+            slot_indices: DalSlotIndicesList(vec![10, 2, 5]),
+        };
+
+        let signals = UnsignedDalSlotSignals(vec![signal_1, signal_2, signal_3]);
+
+        let signature = UnknownSignature::from_base58_check(
+            "sigdGBG68q2vskMuac4AzyNb1xCJTfuU8MiMbQtmZLUCYydYrtTd5Lessn1EFLTDJzjXoYxRasZxXbx6tHnirbEJtikcMHt3"
+        ).expect("signature decoding should work");
+
+        let dal_slot_signal_list = DalSlotImportSignals { signals, signature };
+
+        println!("Initial dal_slot_signal_list: {:?}", dal_slot_signal_list);
+
+        // Encode the structure
+        let encoded = rlp::encode(&dal_slot_signal_list);
+        let encoded_hex = bytes_to_hex(&encoded);
+
+        println!("Encoded DAL slot signal (hex): {}", encoded_hex);
+
+        // Decode the structure
+        let decoded: DalSlotImportSignals =
+            rlp::decode(&encoded).expect("RLP decoding should succeed.");
+
+        println!("Decoded dal_slot_signal_list: {:?}", decoded);
+
+        // Ensure that the encoded and decoded structures match
+        assert_eq!(dal_slot_signal_list, decoded);
     }
 }
