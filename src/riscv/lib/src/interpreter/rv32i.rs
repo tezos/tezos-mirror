@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2023-2024 TriliTech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
 
@@ -10,6 +10,7 @@ use crate::{
     machine_state::{
         bus::{main_memory::MainMemoryLayout, Address},
         hart_state::HartState,
+        instruction_cache::InstructionCacheLayout,
         mode::Mode,
         registers::{XRegister, XRegisters},
         MachineState,
@@ -353,9 +354,10 @@ where
     }
 }
 
-impl<ML, M> MachineState<ML, M>
+impl<ML, ICL, M> MachineState<ML, ICL, M>
 where
     ML: MainMemoryLayout,
+    ICL: InstructionCacheLayout,
     M: backend::ManagerBase,
 {
     /// `FENCE` I-Type instruction
@@ -379,6 +381,7 @@ mod tests {
                 CSRRepr, CSRegister,
             },
             hart_state::{HartState, HartStateLayout},
+            instruction_cache::TestInstructionCacheLayout,
             mode::Mode,
             registers::{
                 a0, a1, a2, a3, a4, fa0, t0, t1, t2, t3, t4, t5, t6, XRegisters, XRegistersLayout,
@@ -683,16 +686,16 @@ mod tests {
     });
 
     backend_test!(test_ebreak, F, {
-        let mut backend = create_backend!(MachineStateLayout<T1K>, F);
-        let state = create_state!(MachineState, MachineStateLayout<T1K>, F, backend, T1K);
+        let mut backend = create_backend!(MachineStateLayout<T1K, TestInstructionCacheLayout>, F);
+        let state = create_state!(MachineState, MachineStateLayout<T1K, TestInstructionCacheLayout>, F, backend, T1K, TestInstructionCacheLayout);
 
         let ret_val = state.hart.run_ebreak();
         assert_eq!(ret_val, Exception::Breakpoint);
     });
 
     backend_test!(test_fence, F, {
-        let mut backend = create_backend!(MachineStateLayout<T1K>, F);
-        let state = create_state!(MachineState, MachineStateLayout<T1K>, F, backend, T1K);
+        let mut backend = create_backend!(MachineStateLayout<T1K, TestInstructionCacheLayout>, F);
+        let state = create_state!(MachineState, MachineStateLayout<T1K, TestInstructionCacheLayout>, F, backend, T1K, TestInstructionCacheLayout);
         let state_cell = std::cell::RefCell::new(state);
 
         proptest!(|(

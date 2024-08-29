@@ -8,6 +8,7 @@ use super::{
         satp::{Satp, SvLength, TranslationAlgorithm},
         CSRRepr, CSRegister,
     },
+    instruction_cache,
     mode::Mode,
     MachineState,
 };
@@ -189,7 +190,12 @@ where
     p_addr.ok_or(access_type.exception(v_addr))
 }
 
-impl<ML: main_memory::MainMemoryLayout, M: backend::ManagerBase> MachineState<ML, M> {
+impl<
+        ML: main_memory::MainMemoryLayout,
+        ICL: instruction_cache::InstructionCacheLayout,
+        M: backend::ManagerBase,
+    > MachineState<ML, ICL, M>
+{
     /// Get the effective hart mode when addressing memory.
     /// Section P:M-ISA-1.6.3
     /// The MPRV (Modify PRiVilege) bit modifies the effective privilege mode, i.e.,

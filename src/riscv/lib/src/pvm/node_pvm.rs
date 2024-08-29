@@ -4,7 +4,9 @@
 // SPDX-License-Identifier: MIT
 
 use crate::{
-    machine_state::{bus::main_memory::M100M, mode::Mode},
+    machine_state::{
+        bus::main_memory::M100M, instruction_cache::DefaultInstructionCacheLayout, mode::Mode,
+    },
     program::Program,
     pvm::common::{Pvm, PvmHooks, PvmLayout, PvmStatus},
     state_backend::{
@@ -18,7 +20,7 @@ use std::{ops::Bound, path::Path};
 use thiserror::Error;
 
 pub type StateLayout = (
-    PvmLayout<M100M>,
+    PvmLayout<M100M, DefaultInstructionCacheLayout>,
     state_backend::Atom<bool>,
     state_backend::Atom<u32>,
     state_backend::Atom<u64>,
@@ -26,7 +28,7 @@ pub type StateLayout = (
 );
 
 pub struct State<M: state_backend::ManagerBase> {
-    pvm: Pvm<M100M, M>,
+    pvm: Pvm<M100M, DefaultInstructionCacheLayout, M>,
     level_is_set: state_backend::Cell<bool, M>,
     level: state_backend::Cell<u32, M>,
     message_counter: state_backend::Cell<u64, M>,
@@ -36,7 +38,7 @@ pub struct State<M: state_backend::ManagerBase> {
 impl<M: state_backend::ManagerBase> State<M> {
     pub fn bind(space: state_backend::AllocatedOf<StateLayout, M>) -> Self {
         Self {
-            pvm: Pvm::<M100M, M>::bind(space.0),
+            pvm: Pvm::<M100M, _, M>::bind(space.0),
             level_is_set: space.1,
             level: space.2,
             message_counter: space.3,

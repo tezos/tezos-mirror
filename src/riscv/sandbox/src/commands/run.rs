@@ -8,7 +8,7 @@ use crate::{
     posix_exit_mode,
 };
 use octez_riscv::{
-    machine_state::bus::main_memory::M1G,
+    machine_state::{bus::main_memory::M1G, instruction_cache::DefaultInstructionCacheLayout},
     pvm::PvmHooks,
     stepper::{pvm::PvmStepper, test::TestStepper, StepResult, Stepper, StepperStatus},
 };
@@ -94,8 +94,8 @@ fn run_pvm<R>(
         let _written = console.write(&[c]).unwrap();
     });
 
-    let mut backend = PvmStepper::<'_, '_, M1G>::create_backend();
-    let stepper = PvmStepper::new(
+    let mut backend = PvmStepper::<'_, '_, M1G, DefaultInstructionCacheLayout>::create_backend();
+    let stepper = PvmStepper::<'_, '_, M1G, DefaultInstructionCacheLayout>::new(
         &mut backend,
         program,
         initrd,

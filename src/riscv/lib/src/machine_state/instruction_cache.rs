@@ -33,24 +33,21 @@
 //! translation changes - as the upper address may no longer point
 //! to the same relative physical address.
 
-/// The number of entries in the instruction cache.
-pub const CACHE_BITS: usize = 21;
-pub const CACHE_SIZE: usize = 1 << CACHE_BITS;
-pub const CACHE_MASK: usize = CACHE_SIZE - 1;
-
 use crate::cache_utils::FenceCounter;
 use crate::machine_state::address_translation::PAGE_SIZE;
 use crate::machine_state::bus::Address;
 use crate::parser::instruction::Instr;
 use crate::parser::{is_compressed, parse};
 use crate::state_backend::{
-    AllocatedOf, Atom, Cell, CellRead, CellWrite, Elem, LazyCell, ManagerBase, ManagerRead,
-    ManagerReadWrite, ManagerWrite, Many, Ref,
+    self, AllocatedOf, Atom, Cell, CellRead, CellWrite, Choreographer, Elem, Layout, LazyCell,
+    ManagerAlloc, ManagerBase, ManagerRead, ManagerReadWrite, ManagerWrite, Many, Placed, Ref,
 };
 use std::convert::Infallible;
 
+/// The layout of an entry in the instruction cache.
 pub type CachedLayout = (Atom<FenceCounter>, Atom<u64>, Atom<Unparsed>);
 
+/// An entry in the instruction cache - containing both the physical address & instruction.
 pub struct Cached<M: ManagerBase> {
     fence_counter: Cell<FenceCounter, M>,
     phys_addr: Cell<Address, M>,
@@ -97,6 +94,10 @@ impl<M: ManagerBase> Cached<M> {
     }
 }
 
+/// Unparsed instruction used for storing cached instructions in the state.
+///
+/// Compressed instructions are represented as the lower-16 bits of the u32, with upper-16 bits
+/// set to zero.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct Unparsed(u32);
@@ -143,17 +144,116 @@ impl From<(Instr, Unparsed)> for Unparsed {
     }
 }
 
-pub type InstructionCacheLayout = (Atom<FenceCounter>, Many<CachedLayout, CACHE_SIZE>);
+/// Configuration object for the size of the instruction cache.
+///
+/// *NB* you should ensure `SIZE == 1 << BITS`, otherwise a compilation error will occur:
+///
+/// The following fails to compile:
+/// ```compile_fail
+/// # use octez_riscv::machine_state::instruction_cache::Sizes;
+/// pub type SizesX = Sizes<15, { 1 << 16 }>;
+/// println!("{}", SizesX::CACHE_SIZE);
+/// ```
+///
+/// But the following would succeed:
+/// ```no_run
+/// # use octez_riscv::machine_state::instruction_cache::Sizes;
+/// pub type SizesY = Sizes<15, { 1 << 15 }>;
+/// println!("{}", SizesY::CACHE_SIZE);
+/// ```
+pub enum Sizes<const BITS: usize, const SIZE: usize> {}
 
-pub struct InstructionCache<M: ManagerBase> {
-    fence_counter: Cell<FenceCounter, M>,
-    entries: Box<[Cached<M>; CACHE_SIZE]>,
+impl<const BITS: usize, const SIZE: usize> Sizes<BITS, SIZE> {
+    pub const CACHE_SIZE: usize = if 1 << BITS == SIZE {
+        SIZE
+    } else {
+        panic!("BITS parameter does not match SIZE parameter");
+    };
+
+    const CACHE_MASK: usize = {
+        Self::fence_counter_wrapping_protection();
+        Self::CACHE_SIZE - 1
+    };
+
+    // We know that phys_addr here is always u16-aligned.
+    // Therefore, we can safely halve the number of buckets we
+    // look at.
+    #[inline(always)]
+    const fn cache_index(phys_addr: Address) -> usize {
+        (phys_addr >> 1) as usize & Self::CACHE_MASK
+    }
+
+    /// Assert that the fence counter would not wrap before every cache entry has been invalidated
+    /// _at least_ once.
+    const fn fence_counter_wrapping_protection() {
+        let invalidation_count_until_wrapping = FenceCounter::MAX.0 as usize;
+        let cache_entries = Self::CACHE_SIZE;
+
+        assert!(
+            invalidation_count_until_wrapping > cache_entries,
+            "The fence counter does a full cycle before all cache entries could be invalidated!"
+        );
+    }
 }
 
-impl<M: ManagerBase> InstructionCache<M> {
-    /// Bind the instruction cache to the allocated storage.
-    pub fn bind(space: AllocatedOf<InstructionCacheLayout, M>) -> Self {
-        Self {
+/// The default instruction cache layout used in the sandbox/rollup node when running kernels.
+pub type DefaultInstructionCacheLayout = Sizes<16, 65536>;
+
+/// The instruction cache layout recommended for use in tests.
+pub type TestInstructionCacheLayout = Sizes<12, 4096>;
+
+/// Trait for capturing the different possible layouts of the instruction cache (i.e.
+/// controlling the number of cache entries present).
+pub trait InstructionCacheLayout: state_backend::Layout {
+    type Entries<M: ManagerBase>;
+
+    fn refl<M: state_backend::ManagerBase>(
+        space: state_backend::AllocatedOf<Self, M>,
+    ) -> InstructionCache<Self, M>
+    where
+        Self: Sized;
+
+    fn entry<M: ManagerBase>(entries: &Self::Entries<M>, phys_addr: Address) -> &Cached<M>;
+
+    fn entry_mut<M: ManagerBase>(
+        entries: &mut Self::Entries<M>,
+        phys_addr: Address,
+    ) -> &mut Cached<M>;
+
+    fn entries_reset<M: ManagerWrite>(entries: &mut Self::Entries<M>);
+
+    fn struct_ref<M: ManagerBase>(
+        cache: &InstructionCache<Self, M>,
+    ) -> AllocatedOf<Self, Ref<'_, M>>
+    where
+        Self: Sized;
+}
+
+type SizesLayout<const SIZE: usize> = (Atom<FenceCounter>, Many<CachedLayout, SIZE>);
+
+impl<const BITS: usize, const SIZE: usize> Layout for Sizes<BITS, SIZE> {
+    type Placed = <SizesLayout<SIZE> as Layout>::Placed;
+
+    fn place_with(alloc: &mut Choreographer) -> Self::Placed {
+        SizesLayout::<SIZE>::place_with(alloc)
+    }
+
+    fn placed() -> Placed<Self::Placed> {
+        SizesLayout::<SIZE>::placed()
+    }
+
+    type Allocated<M: ManagerBase> = <SizesLayout<SIZE> as Layout>::Allocated<M>;
+
+    fn allocate<M: ManagerAlloc>(backend: &mut M, placed: Self::Placed) -> Self::Allocated<M> {
+        SizesLayout::<SIZE>::allocate(backend, placed)
+    }
+}
+
+impl<const BITS: usize, const SIZE: usize> InstructionCacheLayout for Sizes<BITS, SIZE> {
+    type Entries<M: ManagerBase> = Box<[Cached<M>; SIZE]>;
+
+    fn refl<M: ManagerBase>(space: AllocatedOf<Self, M>) -> InstructionCache<Self, M> {
+        InstructionCache {
             fence_counter: space.0,
             entries: space
                 .1
@@ -167,13 +267,53 @@ impl<M: ManagerBase> InstructionCache<M> {
         }
     }
 
+    fn entry<M: ManagerBase>(entries: &Self::Entries<M>, phys_addr: Address) -> &Cached<M> {
+        &entries[Self::cache_index(phys_addr)]
+    }
+
+    fn entry_mut<M: ManagerBase>(
+        entries: &mut Self::Entries<M>,
+        phys_addr: Address,
+    ) -> &mut Cached<M> {
+        &mut entries[Self::cache_index(phys_addr)]
+    }
+
+    fn entries_reset<M: ManagerWrite>(entries: &mut Self::Entries<M>) {
+        entries.iter_mut().for_each(Cached::reset)
+    }
+
+    fn struct_ref<M: ManagerBase>(
+        cache: &InstructionCache<Self, M>,
+    ) -> AllocatedOf<Self, Ref<'_, M>> {
+        (
+            cache.fence_counter.struct_ref(),
+            cache.entries.iter().map(Cached::struct_ref).collect(),
+        )
+    }
+}
+
+/// Instruction Cache caches instructions by physical address, allowing them to be
+/// fetched directly rather than going through the *fetch memory/parse* cycle.
+///
+/// The number of cache entries is controlled by the `ICL` layout parameter.
+pub struct InstructionCache<ICL: InstructionCacheLayout, M: ManagerBase> {
+    fence_counter: Cell<FenceCounter, M>,
+    entries: ICL::Entries<M>,
+}
+
+impl<ICL: InstructionCacheLayout, M: ManagerBase> InstructionCache<ICL, M> {
+    /// Bind the instruction cache to the given allocated state.
+    pub fn bind(space: AllocatedOf<ICL, M>) -> InstructionCache<ICL, M> {
+        ICL::refl(space)
+    }
+
     /// Reset the underlying storage.
     pub fn reset(&mut self)
     where
         M: ManagerWrite,
     {
         self.fence_counter.write(FenceCounter::INITIAL);
-        self.entries.iter_mut().for_each(Cached::reset);
+        ICL::entries_reset(&mut self.entries);
     }
 
     /// Invalidate the instruction cache, subsequent fetches will return `None`.
@@ -186,15 +326,12 @@ impl<M: ManagerBase> InstructionCache<M> {
 
         // Ensure that every entry is invalidated at least once
         // before the counter wraps.
-        self.entries[counter.0 as usize & CACHE_MASK].invalidate();
+        ICL::entry_mut(&mut self.entries, counter.0 as Address).invalidate();
     }
 
     /// Obatin a structure with references to the bound regions of this type.
-    pub fn struct_ref(&self) -> AllocatedOf<InstructionCacheLayout, Ref<'_, M>> {
-        (
-            self.fence_counter.struct_ref(),
-            self.entries.iter().map(Cached::struct_ref).collect(),
-        )
+    pub fn struct_ref(&self) -> AllocatedOf<ICL, Ref<'_, M>> {
+        ICL::struct_ref(self)
     }
 
     /// Fetch the cached instruction at the given address, if an entry exists.
@@ -207,8 +344,7 @@ impl<M: ManagerBase> InstructionCache<M> {
             return None;
         }
 
-        let index = cache_index(phys_addr);
-        let cached = &self.entries[index];
+        let cached = ICL::entry(&self.entries, phys_addr);
 
         if cached.fence_counter.read() == self.fence_counter.read()
             && cached.phys_addr.read() == phys_addr
@@ -238,23 +374,13 @@ impl<M: ManagerBase> InstructionCache<M> {
             return;
         }
 
-        let index = cache_index(phys_addr);
-
         let fence_counter = self.fence_counter.read();
 
-        let cached = &mut self.entries[index];
+        let cached = ICL::entry_mut(&mut self.entries, phys_addr);
         cached.instr.write((instr, unparsed));
         cached.phys_addr.write(phys_addr);
         cached.fence_counter.write(fence_counter);
     }
-}
-
-// We know that phys_addr here is always u16-aligned.
-// Therefore, we can safely halve the number of buckets we
-// look at.
-#[inline(always)]
-const fn cache_index(phys_addr: Address) -> usize {
-    (phys_addr >> 1) as usize & CACHE_MASK
 }
 
 /// An uncompressed instruction is not cacheable, if it crosses
@@ -263,7 +389,7 @@ const fn cache_index(phys_addr: Address) -> usize {
 const fn cacheable(phys_addr: Address, raw: u32) -> bool {
     const END_OF_PAGE: Address = PAGE_SIZE - 2;
 
-    is_compressed(raw) || phys_addr % PAGE_SIZE != END_OF_PAGE
+    is_compressed(raw as u16) || phys_addr % PAGE_SIZE != END_OF_PAGE
 }
 
 #[cfg(test)]
@@ -275,24 +401,19 @@ mod tests {
         parser::instruction::{CIBTypeArgs, SBTypeArgs},
     };
 
-    #[test]
-    fn test_fence_counter_wrapping_protection() {
-        let invalidation_count_until_wrapping = FenceCounter::MAX.0 as usize;
-        let cache_entries = CACHE_SIZE;
-
-        assert!(
-            invalidation_count_until_wrapping > cache_entries,
-            "The fence counter does a full cycle before all cache entries could be invalidated!"
-        );
-    }
-
     // Ensure that the initialised values for the instruction cache (ie phys_addr = 0)
     // are not actually returned from the cache. This would result in an incorrect
     // `UnknownInstr` being executed, rather than an `OutOfBounds` error (for reading from
-    // devies).
+    // devices).
     backend_test!(test_fetch_before_cache_misses, F, {
-        let mut backend = create_backend!(InstructionCacheLayout, F);
-        let state = create_state!(InstructionCache, InstructionCacheLayout, F, backend);
+        let mut backend = create_backend!(TestInstructionCacheLayout, F);
+        let state = create_state!(
+            InstructionCache,
+            TestInstructionCacheLayout,
+            F,
+            backend,
+            TestInstructionCacheLayout
+        );
 
         let init_addr = state.entries[0].phys_addr.read();
         let fetched = state.fetch_instr(init_addr);
@@ -306,8 +427,14 @@ mod tests {
     // we do not invalidate the instruction cache, although the physical address of
     // the second half of the instruction does actually change!
     backend_test!(test_never_cache_across_page_boundaries, F, {
-        let mut backend = create_backend!(InstructionCacheLayout, F);
-        let mut state = create_state!(InstructionCache, InstructionCacheLayout, F, backend);
+        let mut backend = create_backend!(TestInstructionCacheLayout, F);
+        let mut state = create_state!(
+            InstructionCache,
+            TestInstructionCacheLayout,
+            F,
+            backend,
+            TestInstructionCacheLayout
+        );
 
         let compressed_bytes = 0x4505;
         let compressed = Instr::CLi(CIBTypeArgs { rd_rs1: a0, imm: 1 });
@@ -335,7 +462,7 @@ mod tests {
     // - on rebind the cached instructions are still present
     // - able to cache possibly overlapping instructions
     backend_test!(test_rebind, F, {
-        let mut backend = create_backend!(InstructionCacheLayout, F);
+        let mut backend = create_backend!(TestInstructionCacheLayout, F);
 
         let compressed_bytes = 0x4505;
         let compressed = Instr::CLi(CIBTypeArgs { rd_rs1: a0, imm: 1 });
@@ -351,7 +478,13 @@ mod tests {
         let phys_addr_compressed = 8;
 
         {
-            let mut state = create_state!(InstructionCache, InstructionCacheLayout, F, backend);
+            let mut state = create_state!(
+                InstructionCache,
+                TestInstructionCacheLayout,
+                F,
+                backend,
+                TestInstructionCacheLayout
+            );
 
             state.cache_instr(phys_addr_compressed, compressed_bytes, compressed);
             assert_eq!(Some(compressed), state.fetch_instr(phys_addr_compressed));
@@ -365,7 +498,13 @@ mod tests {
 
         // Rebind state
         {
-            let state = create_state!(InstructionCache, InstructionCacheLayout, F, backend);
+            let state = create_state!(
+                InstructionCache,
+                TestInstructionCacheLayout,
+                F,
+                backend,
+                TestInstructionCacheLayout
+            );
 
             assert_eq!(Some(compressed), state.fetch_instr(phys_addr_compressed));
             assert_eq!(

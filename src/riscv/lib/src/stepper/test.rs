@@ -7,7 +7,10 @@ mod posix;
 use super::{StepResult, Stepper, StepperStatus};
 use crate::{
     kernel_loader,
-    machine_state::bus::main_memory::{MainMemoryLayout, M1G},
+    machine_state::{
+        bus::main_memory::{MainMemoryLayout, M1G},
+        instruction_cache::{InstructionCacheLayout, TestInstructionCacheLayout},
+    },
     machine_state::{mode, MachineError, MachineState, MachineStateLayout, StepManyResult},
     program::Program,
     state_backend::{
@@ -71,10 +74,15 @@ pub enum TestStepperError {
     MachineError(MachineError),
 }
 
-pub type TestStepperLayout<ML = M1G> = (PosixStateLayout, MachineStateLayout<ML>);
+pub type TestStepperLayout<ML = M1G, ICL = TestInstructionCacheLayout> =
+    (PosixStateLayout, MachineStateLayout<ML, ICL>);
 
-pub struct TestStepper<'a, ML: MainMemoryLayout = M1G> {
-    machine_state: MachineState<ML, SliceManager<'a>>,
+pub struct TestStepper<
+    'a,
+    ML: MainMemoryLayout = M1G,
+    ICL: InstructionCacheLayout = TestInstructionCacheLayout,
+> {
+    machine_state: MachineState<ML, ICL, SliceManager<'a>>,
     posix_state: PosixState<SliceManager<'a>>,
 }
 
@@ -162,13 +170,17 @@ impl<'a, ML: MainMemoryLayout> TestStepper<'a, ML> {
     }
 }
 
-impl<'a, ML: MainMemoryLayout> Stepper for TestStepper<'a, ML> {
+impl<'a, ML: MainMemoryLayout> Stepper for TestStepper<'a, ML, TestInstructionCacheLayout> {
     type MainMemoryLayout = ML;
+
+    type InstructionCacheLayout = TestInstructionCacheLayout;
 
     type Manager = SliceManager<'a>;
 
     #[inline(always)]
-    fn machine_state(&self) -> &MachineState<Self::MainMemoryLayout, Self::Manager> {
+    fn machine_state(
+        &self,
+    ) -> &MachineState<Self::MainMemoryLayout, Self::InstructionCacheLayout, Self::Manager> {
         &self.machine_state
     }
 

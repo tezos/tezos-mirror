@@ -10,6 +10,7 @@
 use crate::{
     machine_state::{
         bus::main_memory::MainMemoryLayout,
+        instruction_cache::InstructionCacheLayout,
         registers::{sp, FRegister, XRegister},
         MachineState,
     },
@@ -17,9 +18,10 @@ use crate::{
     traps::Exception,
 };
 
-impl<ML, M> MachineState<ML, M>
+impl<ML, ICL, M> MachineState<ML, ICL, M>
 where
     ML: MainMemoryLayout,
+    ICL: InstructionCacheLayout,
     M: backend::ManagerReadWrite,
 {
     /// `C.FLD` CL-type compressed instruction
@@ -83,6 +85,7 @@ mod test {
                 xstatus::{ExtensionValue, MStatus},
                 CSRegister,
             },
+            instruction_cache::TestInstructionCacheLayout,
             registers::{fa2, fa3, parse_xregister, sp},
             MachineState, MachineStateLayout,
         },
@@ -95,8 +98,8 @@ mod test {
     const OUT_OF_BOUNDS_OFFSET: i64 = 1024;
 
     backend_test!(test_cfsd_cfld, F, {
-        let mut backend = create_backend!(MachineStateLayout<T1K>, F);
-        let state = create_state!(MachineState, MachineStateLayout<T1K>, F, backend, T1K);
+        let mut backend = create_backend!(MachineStateLayout<T1K, TestInstructionCacheLayout>, F);
+        let state = create_state!(MachineState, MachineStateLayout<T1K, TestInstructionCacheLayout>, F, backend, T1K, TestInstructionCacheLayout);
         let state_cell = std::cell::RefCell::new(state);
 
         proptest!(|(
@@ -135,8 +138,8 @@ mod test {
     });
 
     backend_test!(test_cfsdsp_cfldsp, F, {
-        let mut backend = create_backend!(MachineStateLayout<T1K>, F);
-        let state = create_state!(MachineState, MachineStateLayout<T1K>, F, backend, T1K);
+        let mut backend = create_backend!(MachineStateLayout<T1K, TestInstructionCacheLayout>, F);
+        let state = create_state!(MachineState, MachineStateLayout<T1K, TestInstructionCacheLayout>, F, backend, T1K, TestInstructionCacheLayout);
         let state_cell = std::cell::RefCell::new(state);
 
         proptest!(|(

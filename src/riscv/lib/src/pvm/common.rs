@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::{
-    machine_state::{self, bus::main_memory},
+    machine_state::{self, bus::main_memory, instruction_cache},
     pvm::sbi,
     state_backend::{self, EnumCell, EnumCellLayout},
     traps::EnvironException,
@@ -42,9 +42,9 @@ impl<'a> Default for PvmHooks<'a> {
 }
 
 /// PVM state layout
-pub type PvmLayout<ML> = (
+pub type PvmLayout<ML, ICL> = (
     state_backend::Atom<u64>,
-    machine_state::MachineStateLayout<ML>,
+    machine_state::MachineStateLayout<ML, ICL>,
     EnumCellLayout<u8>,
 );
 
@@ -102,15 +102,24 @@ impl From<PvmStatus> for u8 {
 const INITIAL_VERSION: u64 = 0;
 
 /// Proof-generating virtual machine
-pub struct Pvm<ML: main_memory::MainMemoryLayout, M: state_backend::ManagerBase> {
+pub struct Pvm<
+    ML: main_memory::MainMemoryLayout,
+    ICL: instruction_cache::InstructionCacheLayout,
+    M: state_backend::ManagerBase,
+> {
     version: state_backend::Cell<u64, M>,
-    pub(crate) machine_state: machine_state::MachineState<ML, M>,
+    pub(crate) machine_state: machine_state::MachineState<ML, ICL, M>,
     status: EnumCell<PvmStatus, u8, M>,
 }
 
-impl<ML: main_memory::MainMemoryLayout, M: state_backend::ManagerBase> Pvm<ML, M> {
+impl<
+        ML: main_memory::MainMemoryLayout,
+        ICL: instruction_cache::InstructionCacheLayout,
+        M: state_backend::ManagerBase,
+    > Pvm<ML, ICL, M>
+{
     /// Bind the PVM to the given allocated region.
-    pub fn bind(space: state_backend::AllocatedOf<PvmLayout<ML>, M>) -> Self {
+    pub fn bind(space: state_backend::AllocatedOf<PvmLayout<ML, ICL>, M>) -> Self {
         Self {
             version: space.0,
             machine_state: machine_state::MachineState::bind(space.1),
@@ -121,7 +130,7 @@ impl<ML: main_memory::MainMemoryLayout, M: state_backend::ManagerBase> Pvm<ML, M
     /// Obtain a structure with references to the bound regions of this type.
     pub fn struct_ref(
         &self,
-    ) -> state_backend::AllocatedOf<PvmLayout<ML>, state_backend::Ref<'_, M>> {
+    ) -> state_backend::AllocatedOf<PvmLayout<ML, ICL>, state_backend::Ref<'_, M>> {
         (
             self.version.struct_ref(),
             self.machine_state.struct_ref(),
@@ -248,6 +257,7 @@ mod tests {
                 main_memory::{M1K, M1M},
                 start_of_main_memory, AddressableRead,
             },
+            instruction_cache::TestInstructionCacheLayout,
             registers::{a0, a1, a2, a3, a6, a7},
         },
         state_backend::{
@@ -265,12 +275,12 @@ mod tests {
     #[test]
     fn test_read_input() {
         type ML = M1M;
-        type L = PvmLayout<ML>;
+        type L = PvmLayout<ML, TestInstructionCacheLayout>;
 
         // Setup PVM
         let (mut backend, placed) = InMemoryBackend::<L>::new();
         let space = backend.allocate(placed);
-        let mut pvm = Pvm::<ML, _>::bind(space);
+        let mut pvm = Pvm::<ML, TestInstructionCacheLayout, _>::bind(space);
         pvm.reset();
 
         let level_addr = start_of_main_memory::<ML>();
@@ -347,7 +357,7 @@ mod tests {
     #[test]
     fn test_write_debug() {
         type ML = M1M;
-        type L = PvmLayout<ML>;
+        type L = PvmLayout<ML, TestInstructionCacheLayout>;
 
         let mut buffer = Vec::new();
         let mut hooks = PvmHooks::new(|c| buffer.push(c));
@@ -355,7 +365,7 @@ mod tests {
         // Setup PVM
         let (mut backend, placed) = InMemoryBackend::<L>::new();
         let space = backend.allocate(placed);
-        let mut pvm = Pvm::<ML, _>::bind(space);
+        let mut pvm = Pvm::<ML, TestInstructionCacheLayout, _>::bind(space);
         pvm.reset();
 
         // Prepare subsequent ECALLs to use the SBI_CONSOLE_PUTCHAR extension
@@ -384,12 +394,16 @@ mod tests {
     }
 
     backend_test!(test_reset, F, {
-        test_determinism::<F, PvmLayout<M1K>, _>(|mut space| {
+        test_determinism::<F, PvmLayout<M1K, TestInstructionCacheLayout>, _>(|mut space| {
             // The [Pvm] type won't bind unless the version cell is set to its initial value.
             // TODO: RV-46 might change this constraint in the future.
             space.0.write(INITIAL_VERSION);
 
-            let mut machine_state: Pvm<M1K, ManagerFor<'_, F, PvmLayout<M1K>>> = Pvm::bind(space);
+            let mut machine_state: Pvm<
+                M1K,
+                TestInstructionCacheLayout,
+                ManagerFor<'_, F, PvmLayout<M1K, TestInstructionCacheLayout>>,
+            > = Pvm::bind(space);
             machine_state.reset();
         });
     });

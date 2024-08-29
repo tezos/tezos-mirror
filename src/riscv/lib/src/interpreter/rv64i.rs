@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2023-2024 TriliTech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
 
@@ -9,6 +9,7 @@
 use crate::{
     machine_state::{
         bus::main_memory::MainMemoryLayout,
+        instruction_cache::InstructionCacheLayout,
         registers::{XRegister, XRegisters},
         MachineState,
     },
@@ -231,9 +232,10 @@ where
     }
 }
 
-impl<ML, M> MachineState<ML, M>
+impl<ML, ICL, M> MachineState<ML, ICL, M>
 where
     ML: MainMemoryLayout,
+    ICL: InstructionCacheLayout,
     M: backend::ManagerReadWrite,
 {
     /// `LD` I-type instruction
@@ -355,6 +357,7 @@ mod tests {
         machine_state::{
             bus::{devices::DEVICES_ADDRESS_SPACE_LENGTH, main_memory::tests::T1K},
             hart_state::{HartState, HartStateLayout},
+            instruction_cache::TestInstructionCacheLayout,
             registers::{a0, a1, a2, a3, a4, t0, t1, t2, t3, t4},
             MachineState, MachineStateLayout,
         },
@@ -755,8 +758,8 @@ mod tests {
     });
 
     backend_test!(test_load_store, F, {
-        let mut backend = create_backend!(MachineStateLayout<T1K>, F);
-        let state = create_state!(MachineState, MachineStateLayout<T1K>, F, backend, T1K);
+        let mut backend = create_backend!(MachineStateLayout<T1K, TestInstructionCacheLayout>, F);
+        let state = create_state!(MachineState, MachineStateLayout<T1K, TestInstructionCacheLayout>, F, backend, T1K, TestInstructionCacheLayout);
         let state_cell = std::cell::RefCell::new(state);
 
         proptest!(|(

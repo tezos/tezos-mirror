@@ -5,7 +5,10 @@
 //! Core logic for atomic instructions
 
 use crate::{
-    machine_state::{bus::main_memory::MainMemoryLayout, registers::XRegister, MachineState},
+    machine_state::{
+        bus::main_memory::MainMemoryLayout, instruction_cache::InstructionCacheLayout,
+        registers::XRegister, MachineState,
+    },
     state_backend as backend,
     traps::Exception,
 };
@@ -14,9 +17,10 @@ use std::mem;
 pub const SC_SUCCESS: u64 = 0;
 pub const SC_FAILURE: u64 = 1;
 
-impl<ML, M> MachineState<ML, M>
+impl<ML, ICL, M> MachineState<ML, ICL, M>
 where
     ML: MainMemoryLayout,
+    ICL: InstructionCacheLayout,
     M: backend::ManagerReadWrite,
 {
     /// Loads a word or a double from the address in `rs1`, places the

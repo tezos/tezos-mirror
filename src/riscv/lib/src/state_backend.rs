@@ -331,13 +331,13 @@ pub mod tests {
     #[macro_export]
     macro_rules! create_state {
         // For an extra generic in the state (MachineState for example)
-        ($State:tt, $StateLayout:ty, $Factory:ty, $backend:ident, $ExtraGeneric:ty) => {
+        ($State:tt, $StateLayout:ty, $Factory:ty, $backend:ident $(, $ExtraGenerics:ty)*) => {
             {
                 use $crate::state_backend::{Backend, BackendManagement, Layout};
                 let loc = <$StateLayout>::placed().into_location();
                 let new_state =
                     $State::<
-                        $ExtraGeneric,
+                        $($ExtraGenerics,)*
                         <<$Factory as $crate::state_backend::test_helpers::TestBackendFactory>::Backend<$StateLayout> as BackendManagement>::Manager<'_>
                     >::bind(
                         $backend.allocate(loc),

@@ -5,13 +5,17 @@
 //! Implementation of Zifencei extension for RISC-V
 
 use crate::{
-    machine_state::{bus::main_memory, AccessType, MachineState},
+    machine_state::{
+        bus::main_memory::MainMemoryLayout, instruction_cache::InstructionCacheLayout, AccessType,
+        MachineState,
+    },
     state_backend,
 };
 
-impl<ML, M> MachineState<ML, M>
+impl<ML, ICL, M> MachineState<ML, ICL, M>
 where
-    ML: main_memory::MainMemoryLayout,
+    ML: MainMemoryLayout,
+    ICL: InstructionCacheLayout,
     M: state_backend::ManagerReadWrite,
 {
     /// Execute a `fence.i` instruction.

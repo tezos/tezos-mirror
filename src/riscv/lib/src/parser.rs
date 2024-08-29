@@ -1258,7 +1258,7 @@ pub fn parse<E>(bytes: u16, more: impl FnOnce() -> Result<u16, E>) -> Result<Ins
 
 /// Whether the given bytes correspond to a compressed instruction.
 #[inline]
-pub const fn is_compressed(bytes: u32) -> bool {
+pub const fn is_compressed(bytes: u16) -> bool {
     bytes & 0b11 != 0b11
 }
 
