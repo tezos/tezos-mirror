@@ -41,14 +41,14 @@ make -C src/riscv all
 
 # Tasks for the Author
 
-- [ ] All Linear issues that relate to this MR were linked using magic words (e.g. part of, relates to, closes)
-- [ ] There is no dead code and other spurious artefacts in my changes
-- [ ] All newly introduced public functions, methods and types are documented
-- [ ] Documentation of changed functions, methods and types is up-to-date
-- [ ] There are tests which cover bugs which have been fixed, if any
-- [ ] Reasonable effort has been made towards making CI pass
-- [ ] Performance has been benchmarked and populated in the table above
-- [ ] All the above was completed before assigning this MR to reviewers
+- [ ] Link all Linear issues related to this MR using magic words (e.g. part of, relates to, closes).
+- [ ] Eliminate dead code and other spurious artefacts introduced in your changes.
+- [ ] Document new public functions, methods and types.
+- [ ] Make sure the documentation for updated functions, methods, and types is correct.
+- [ ] Add tests for bugs that have been fixed.
+- [ ] Put in reasonable effort to ensure that CI will pass.
+- [ ] Benchmark performance and populate the table above if needed.
+- [ ] Complete all of the above before assigning this MR to reviewers.
 
 /label ~riscv
 /draft
