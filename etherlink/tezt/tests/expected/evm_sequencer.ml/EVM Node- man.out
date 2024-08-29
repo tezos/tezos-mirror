@@ -406,6 +406,11 @@ Miscellaneous commands:
     -f --force: Overwrites the configuration file when it exists.
     --dal-slots <slot indices>: The DAL slots indices on which the sequencer is allowed to send blueprints.
   
+  check config [--data-dir <data-dir>] [--config-file <path>]
+    Read and validate configuration files. By default, look for config.json in the data-dir. If --filename is used, check this config file instead.
+    --data-dir <data-dir>: The path to the EVM node data directory
+    --config-file <path>: Path to a configuration file.
+  
   describe config
     Prints the JSON schema of the configuration file to the standard output.
   

@@ -892,11 +892,13 @@ let save ~force ~data_dir config =
     let*! () = Lwt_utils_unix.create_dir data_dir in
     Lwt_utils_unix.Json.write_file config_file json
 
-let load ~data_dir =
+let load_file ~data_dir path =
   let open Lwt_result_syntax in
-  let+ json = Lwt_utils_unix.Json.read_file (config_filename ~data_dir) in
+  let+ json = Lwt_utils_unix.Json.read_file path in
   let config = Data_encoding.Json.destruct (encoding data_dir) json in
   config
+
+let load ~data_dir = load_file ~data_dir (config_filename ~data_dir)
 
 let error_missing_config ~name = [error_of_fmt "missing %s config" name]
 

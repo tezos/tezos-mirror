@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Features
+
+- Add a new command `check config [--data-dir <data-dir>] [--config-file
+  <path>]` to assess the correctness of a configuration file (either
+  `<data-dir>/config.json` or `path`). (!14690)
+
 ## Version 0.1 (2024-08-28)
 
 This release concludes two months of development since the freeze of the

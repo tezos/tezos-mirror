@@ -278,6 +278,13 @@ let data_dir_arg =
     ~default
     Params.string
 
+let config_path_arg =
+  Tezos_clic.arg
+    ~long:"config-file"
+    ~placeholder:"path"
+    ~doc:"Path to a configuration file."
+    Params.string
+
 let rollup_address_arg =
   let open Lwt_result_syntax in
   let open Tezos_clic in
@@ -1543,6 +1550,25 @@ mode.|}
       in
       Configuration.save ~force ~data_dir config)
 
+let check_config_command =
+  let open Tezos_clic in
+  let open Lwt_result_syntax in
+  command
+    ~desc:
+      "Read and validate configuration files. By default, look for config.json \
+       in the data-dir. If --filename is used, check this config file instead."
+    (args2 data_dir_arg config_path_arg)
+    (prefixes ["check"; "config"] @@ stop)
+    (fun (data_dir, config_path) () ->
+      let* _config =
+        match config_path with
+        | Some config_path ->
+            load_file ~data_dir:Configuration.default_data_dir config_path
+        | None -> load ~data_dir
+      in
+      Format.printf "Configuration has been parsed successfully.\n" ;
+      return_unit)
+
 let config_key_arg ~name ~placeholder =
   let open Lwt_result_syntax in
   let long = String.mapi (fun _ c -> if c = '_' then '-' else c) name in
@@ -2259,6 +2285,7 @@ let commands =
     replay_command;
     patch_kernel_command;
     init_config_command;
+    check_config_command;
     describe_config_command;
     make_kernel_config_command;
     patch_state_command;
