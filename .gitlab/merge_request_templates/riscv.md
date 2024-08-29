@@ -56,10 +56,6 @@ make -C src/riscv all
 /draft
 /assign me
 
-<details>
-
-<summary>Click to reveal GitLab Commands</summary>
-
 <!--
     Once the MR is ready, run the following GitLab commands.
 -->
@@ -82,5 +78,3 @@ make -C src/riscv all
 
 /ready
 ```
-
-</details>
