@@ -26,6 +26,18 @@ let read_value ?default state path =
       | Some d -> return d
       | None -> tzfail Tracer_types.Trace_not_found)
 
+let check_tracer_activation ~state ~version =
+  let open Lwt_result_syntax in
+  let* storage_version =
+    let read key =
+      let*! res = Evm_state.inspect state key in
+      return res
+    in
+    Durable_storage.storage_version read
+  in
+  if storage_version < version then tzfail Tracer_types.Tracer_not_activated
+  else return_unit
+
 module StructLoggerRead = struct
   let read_logs_length state transaction_hash =
     let open Lwt_result_syntax in
@@ -265,6 +277,11 @@ let trace_transaction (module Exe : Evm_execution.S) ~block_number
   let*! () = Tracer_event.tracer_input (Tracer_types.config_to_string config) in
   let input = Tracer_types.input_rlp_encoder ~hash:transaction_hash config in
   let set_input state =
+    let* () =
+      check_tracer_activation
+        ~state
+        ~version:Tracer_types.(tracer_version_activation config.tracer)
+    in
     let*! state =
       Evm_state.modify ~key:Durable_storage_path.Trace.input ~value:input state
     in
@@ -289,6 +306,11 @@ let trace_call (module Exe : Evm_execution.S) ~call ~block ~config =
   let open Lwt_result_syntax in
   let config_rlp = Tracer_types.input_rlp_encoder config in
   let set_config state =
+    let* () =
+      check_tracer_activation
+        ~state
+        ~version:Tracer_types.(tracer_version_activation config.tracer)
+    in
     let*! state =
       Evm_state.modify
         ~key:Durable_storage_path.Trace.input

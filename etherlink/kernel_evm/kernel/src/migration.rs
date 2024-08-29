@@ -86,6 +86,8 @@ fn migrate_to<Host: Runtime>(
             allow_path_not_found(host.store_delete(&RefPath::assert_from(
                 b"/evm/world_state/indexes/transactions",
             )))?;
+            // Starting version 16, the `callTracer` configuration is available
+            // for tracing.
             Ok(MigrationStatus::Done)
         }
     }

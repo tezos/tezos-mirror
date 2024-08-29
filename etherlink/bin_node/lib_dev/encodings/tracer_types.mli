@@ -11,6 +11,7 @@ type error +=
   | Transaction_not_found of Ethereum_types.hash
   | Block_not_found of Ethereum_types.quantity
   | Trace_not_found
+  | Tracer_not_activated
 
 type tracer_config = {
   enable_return_data : bool;
@@ -35,6 +36,8 @@ type config = {
   timeout : Time.System.Span.t;
   reexec : int64;
 }
+
+val tracer_version_activation : tracer_kind -> int
 
 val default_config : config
 

@@ -18,6 +18,7 @@ type error +=
   | Transaction_not_found of Ethereum_types.hash
   | Block_not_found of Ethereum_types.quantity
   | Trace_not_found
+  | Tracer_not_activated
 
 type tracer_config = {
   (* StructLogger flags *)
@@ -86,6 +87,8 @@ let tracer_config_encoding =
        (dft "limit" int31 5))
 
 type tracer_kind = StructLogger | CallTracer
+
+let tracer_version_activation = function StructLogger -> 14 | CallTracer -> 16
 
 (* TODO: (#7212) make it return an error so that we can return an understadable
    error to the user. *)
