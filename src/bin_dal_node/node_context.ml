@@ -41,12 +41,11 @@ type t = {
   transport_layer : Gossipsub.Transport_layer.t;
   mutable profile_ctxt : Profile_manager.t;
   metrics_server : Metrics.t;
-  last_processed_level_store : Last_processed_level.t;
 }
 
 let init config profile_ctxt cryptobox shards_proofs_precomputation
     proto_parameters proto_plugins store gs_worker transport_layer cctxt
-    metrics_server last_processed_level_store =
+    metrics_server =
   let neighbors_cctxts =
     List.map
       (fun Configuration_file.{addr; port} ->
@@ -73,7 +72,6 @@ let init config profile_ctxt cryptobox shards_proofs_precomputation
     transport_layer;
     profile_ctxt;
     metrics_server;
-    last_processed_level_store;
   }
 
 let may_reconstruct ~reconstruct slot_id t =
@@ -160,8 +158,6 @@ let get_cryptobox ctxt = ctxt.cryptobox
 let get_proto_parameters ctxt = ctxt.proto_parameters
 
 let get_shards_proofs_precomputation ctxt = ctxt.shards_proofs_precomputation
-
-let get_last_processed_level_store ctxt = ctxt.last_processed_level_store
 
 let get_store ctxt = ctxt.store
 

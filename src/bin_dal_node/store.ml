@@ -404,6 +404,22 @@ module Commitment_indexed_cache =
         let hash = Hashtbl.hash
       end)
 
+module Last_processed_level = Single_value_store.Make (struct
+  type t = int32
+
+  let name = "last_processed_level"
+
+  let encoding = Data_encoding.int32
+end)
+
+module First_seen_level = Single_value_store.Make (struct
+  type t = int32
+
+  let name = "first_seen_level"
+
+  let encoding = Data_encoding.int32
+end)
+
 (** Store context *)
 type t = {
   slot_header_statuses : Statuses.t;
@@ -415,6 +431,8 @@ type t = {
     Commitment_indexed_cache.t;
       (* The length of the array is the number of shards per slot *)
   finalized_commitments : Slot_id_cache.t;
+  last_processed_level : Last_processed_level.t;
+  first_seen_level : First_seen_level.t;
 }
 
 let cache_entry node_store commitment slot shares shard_proofs =
@@ -566,6 +584,8 @@ let init config =
   let* shards = Shards.init base_dir Stores_dirs.shard in
   let* slots = Slots.init base_dir Stores_dirs.slot in
   let* skip_list_cells = init_skip_list_cells_store base_dir in
+  let* last_processed_level = Last_processed_level.init ~root_dir:base_dir in
+  let* first_seen_level = First_seen_level.init ~root_dir:base_dir in
   let*! () = Event.(emit store_is_ready ()) in
   return
     {
@@ -576,6 +596,8 @@ let init config =
       cache = Commitment_indexed_cache.create Constants.cache_size;
       finalized_commitments =
         Slot_id_cache.create ~capacity:Constants.slot_id_cache_size;
+      last_processed_level;
+      first_seen_level;
     }
 
 let add_slot_headers ~number_of_slots ~block_level slot_headers t =

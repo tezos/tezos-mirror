@@ -127,6 +127,10 @@ module Commitment_indexed_cache : sig
   val find_opt : 'a t -> commitment -> 'a option
 end
 
+module Last_processed_level : Single_value_store.S with type value = int32
+
+module First_seen_level : Single_value_store.S with type value = int32
+
 type t = private {
   slot_header_statuses : Statuses.t;  (** Statuses store *)
   shards : Shards.t;  (** Shards store *)
@@ -140,6 +144,9 @@ type t = private {
       (** Cache of commitments indexed by level and then by slot id. The maximum
           number of levels is given by {!Constants.slot_id_cache_size}. No more
           than [number_of_slots] commitments can be stored per level. *)
+  last_processed_level : Last_processed_level.t;
+      (** Last processed level store *)
+  first_seen_level : First_seen_level.t;  (** First seen level store *)
 }
 
 (** [cache_entry store commitment entry] adds or replace an entry to
