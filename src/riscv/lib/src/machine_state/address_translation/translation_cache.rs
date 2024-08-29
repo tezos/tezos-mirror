@@ -36,8 +36,9 @@
 use super::{AccessType, PAGE_OFFSET_WIDTH};
 use crate::{
     bits::ones,
+    cache_utils::FenceCounter,
     machine_state::{bus::Address, csregisters::CSRRepr, mode::Mode},
-    state_backend::{AllocatedOf, Atom, Cell, Elem, Manager, ManagerBase, Many},
+    state_backend::{AllocatedOf, Atom, Cell, Manager, ManagerBase, Many},
 };
 use strum::EnumCount;
 
@@ -51,47 +52,6 @@ const PAGE_MASK: u64 = !OFFSET_MASK;
 #[inline(always)]
 const fn virtual_page_index(virt_page: u64) -> usize {
     ((virt_page >> PAGE_OFFSET_WIDTH) as usize) & PAGES_MASK
-}
-
-/// Integer to keep track of the fence counter
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub struct FenceCounter(u32);
-
-impl FenceCounter {
-    /// Initial fence counter
-    const INITIAL: Self = Self(0);
-
-    /// Maximum fence counter value
-    #[cfg(test)]
-    const MAX: Self = Self(u32::MAX);
-
-    /// Increment the fence counter.
-    #[inline]
-    fn next(self) -> Self {
-        Self(self.0.wrapping_add(1))
-    }
-}
-
-impl Elem for FenceCounter {
-    #[inline(always)]
-    fn store(&mut self, source: &Self) {
-        self.0.store(&source.0);
-    }
-
-    #[inline(always)]
-    fn to_stored_in_place(&mut self) {
-        self.0.to_stored_in_place();
-    }
-
-    #[inline(always)]
-    fn from_stored_in_place(&mut self) {
-        self.0.from_stored_in_place();
-    }
-
-    #[inline(always)]
-    fn from_stored(source: &Self) -> Self {
-        Self(u32::from_stored(&source.0))
-    }
 }
 
 /// Layout of a cached address translation item

@@ -4,6 +4,7 @@
 // SPDX-License-Identifier: MIT
 
 pub mod bits;
+mod cache_utils;
 pub mod devicetree;
 mod interpreter;
 pub mod kernel_loader;
