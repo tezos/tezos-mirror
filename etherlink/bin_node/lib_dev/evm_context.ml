@@ -643,8 +643,7 @@ module State = struct
           level = Qty blueprint_number;
           block_hash = current_block_hash;
           number_of_transactions;
-        }
-      when Z.equal blueprint_number next ->
+        } ->
         Metrics.set_block
           ~time_processed:!time_processed
           ~transactions:number_of_transactions ;
@@ -686,7 +685,6 @@ module State = struct
             current_block_hash,
             kernel_upgrade,
             delayed_transactions )
-    | Apply_success _ (* Produced a block, but not of the expected height *)
     | Apply_failure (* Did not produce a block *) ->
         let*! () = Blueprint_events.invalid_blueprint_produced next in
         tzfail (Cannot_apply_blueprint {local_state_level = Z.pred next})
