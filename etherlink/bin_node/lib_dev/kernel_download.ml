@@ -5,6 +5,28 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Reveal_hash = Tezos_raw_protocol_alpha.Sc_rollup_reveal_hash
+
+type error += Invalid_preimage_for_hash of Hex.t * string
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"evm_node_dev_invalid_preimage"
+    ~title:"Preimage has not the expected hash"
+    ~description:
+      "The EVM node could not apply a blueprint on top of its local EVM state."
+    ~pp:(fun ppf (hash, _preimage) ->
+      Format.fprintf
+        ppf
+        "The preimage received for %s doesn't return the same hash"
+        hash)
+    Data_encoding.(obj2 (req "expected_hash" string) (req "preimage" string))
+    (function
+      | Invalid_preimage_for_hash (`Hex hash, preimage) -> Some (hash, preimage)
+      | _ -> None)
+    (fun (hash, preimage) -> Invalid_preimage_for_hash (`Hex hash, preimage))
+
 type preimages = Contents of bytes | Hashes of string list
 
 let preimages_encoding =
@@ -21,29 +43,58 @@ let preimages_encoding =
         case
           ~title:"hashes"
           (Tag 1)
-          (list Tezos_raw_protocol_alpha.Sc_rollup_reveal_hash.encoding)
+          (list Reveal_hash.encoding)
           (function Hashes _hashes -> assert false | _ -> None)
-          (fun hashes ->
-            Hashes
-              (List.map
-                 Tezos_raw_protocol_alpha.Sc_rollup_reveal_hash.to_hex
-                 hashes));
+          (fun hashes -> Hashes (List.map Reveal_hash.to_hex hashes));
       ])
 
-let download ~preimages_endpoint ~preimages ~(root_hash : Hex.t) =
+let check_preimage (`Hex hash) preimage =
+  let computed_hash =
+    Reveal_hash.hash_string ~scheme:Reveal_hash.Blake2B [preimage]
+    |> Reveal_hash.to_hex
+  in
+  hash = computed_hash
+
+let delete_preimage preimages (`Hex hash) =
+  Lwt_unix.unlink (Filename.concat preimages hash)
+
+let rec reveal_and_check ~preimages_endpoint ~preimages ~num_download_retries
+    hash =
   let open Lwt_result_syntax in
-  (* value found in `commands.ml`, should we make it configurable? *)
-  let num_retries = 3 in
+  let*! preimage =
+    Commands.reveal_preimage
+      ~preimages_endpoint
+      ~preimages
+      0
+      (* Retrying makes sense only when the preimage is fed through stdin, this
+         wouldn't make sense in our case. *)
+      hash
+  in
+  if not (check_preimage hash preimage) then
+    if num_download_retries <= 0 then
+      tzfail (Invalid_preimage_for_hash (hash, preimage))
+    else
+      let*! () = delete_preimage preimages hash in
+      reveal_and_check
+        ~preimages_endpoint
+        ~preimages
+        ~num_download_retries:(pred num_download_retries)
+        hash
+  else return preimage
+
+let download ~preimages_endpoint ~preimages ~(root_hash : Hex.t)
+    ?(num_download_retries = 1) () =
+  let open Lwt_result_syntax in
   let rec go retrieved_hashes =
     let open Lwt_result_syntax in
     match retrieved_hashes with
     | [] -> return_unit
     | hash :: hashes -> (
-        let*! preimage =
-          Commands.reveal_preimage
+        let* preimage =
+          reveal_and_check
             ~preimages_endpoint
             ~preimages
-            num_retries
+            ~num_download_retries
             hash
         in
         match

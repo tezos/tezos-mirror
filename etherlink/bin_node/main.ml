@@ -579,6 +579,16 @@ let dal_slots_arg =
          s |> String.split ',' |> List.map int_of_string
          |> Lwt_result_syntax.return))
 
+let num_download_retries =
+  Tezos_clic.arg
+    ~doc:
+      "Number of times a revealed preimage can be redownloaded in case the it \
+       doesn't pass the sanity check. It can be useful if the download is \
+       corrupted for some reason."
+    ~long:"retry"
+    ~placeholder:"1"
+    Params.int
+
 let common_config_args =
   Tezos_clic.args18
     data_dir_arg
@@ -2168,7 +2178,11 @@ let preemptive_kernel_download_command =
   let open Tezos_clic in
   command
     ~desc:"Transforms the JSON list of instructions to a RLP list"
-    (args3 data_dir_arg preimages_arg preimages_endpoint_arg)
+    (args4
+       data_dir_arg
+       preimages_arg
+       preimages_endpoint_arg
+       num_download_retries)
     (prefixes ["download"; "kernel"; "with"; "root"; "hash"]
     @@ param
          ~name:"root hash"
@@ -2176,7 +2190,9 @@ let preemptive_kernel_download_command =
          (Tezos_clic.parameter (fun _ str ->
               Lwt_result_syntax.return @@ `Hex str))
     @@ stop)
-    (fun (data_dir, preimages, preimages_endpoint) root_hash () ->
+    (fun (data_dir, preimages, preimages_endpoint, num_download_retries)
+         root_hash
+         () ->
       let open Lwt_result_syntax in
       let* configuration =
         Cli.create_or_read_config
@@ -2199,9 +2215,11 @@ let preemptive_kernel_download_command =
       in
       let*! () = Lwt_utils_unix.create_dir preimages in
       Evm_node_lib_dev.Kernel_download.download
+        ~root_hash
         ~preimages
         ~preimages_endpoint
-        ~root_hash)
+        ?num_download_retries
+        ())
 
 let debug_print_store_schemas_command =
   let open Tezos_clic in

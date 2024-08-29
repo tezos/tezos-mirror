@@ -461,12 +461,13 @@ Miscellaneous commands:
   
   download kernel with root hash <root hash> [--data-dir <data-dir>]
       [--preimages-dir <_evm_installer_preimages>]
-      [--preimages-endpoint <url>]
+      [--preimages-endpoint <url>] [--retry <1>]
     Transforms the JSON list of instructions to a RLP list
     <root hash>: root hash of the kernel to download
     --data-dir <data-dir>: The path to the EVM node data directory
     --preimages-dir <_evm_installer_preimages>: Path to the preimages directory
     --preimages-endpoint <url>: The address of a service which provides pre-images for the rollup. Missing pre-images will be downloaded remotely if they are not already present on disk.
+    --retry <1>: Number of times a revealed preimage can be redownloaded in case the it doesn't pass the sanity check. It can be useful if the download is corrupted for some reason.
   
   debug print store schemas
     Print SQL statements describing the tables created in the store
