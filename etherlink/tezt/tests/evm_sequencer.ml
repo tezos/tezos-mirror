@@ -1692,7 +1692,7 @@ let test_init_from_rollup_node_with_delayed_inbox =
       client
   in
 
-  (* start a new sequnecer *)
+  (* start a new sequencer *)
   let evm_node' =
     Evm_node.create
       ~mode:(Evm_node.mode sequencer)
@@ -2243,7 +2243,7 @@ let test_observer_timeout_when_necessary =
   in
 
   (* After enough time, the observer considers its connection with the
-     sequnecer is stalled and tries to reconnect. *)
+     sequencer is stalled and tries to reconnect. *)
   let* () = Evm_node.wait_for_retrying_connect observer in
 
   (* We produce a block, and verify that the observer nodes correctly applies
@@ -4431,15 +4431,16 @@ let test_trace_transaction =
     match (trace_result, trace_result_rpc) with
     | Ok t, Ok t' -> assert (JSON.equal t t')
     | Error _, _ ->
-        Test.fail "Trace transaction shouldn't have failed (sequnecer)"
+        Test.fail "Trace transaction shouldn't have failed (sequencer)"
     | _, Error _ -> Test.fail "Trace transaction shouldn't have failed (rpc)"
   in
   register_all
     ~kernels:Kernel.[Latest; Ghostnet]
       (* Re-enable on [Mainnet] when the next upgrade happens. *)
-    ~tags:["evm"; "rpc"; "trace"]
+    ~tags:["evm"; "rpc"; "run"; "trace"]
     ~title:"Sequencer can run debug_traceTransaction"
-  @@ fun {sc_rollup_node; sequencer; client; proxy; _} _protocol ->
+    ~time_between_blocks:Nothing
+  @@ fun {sequencer; _} _protocol ->
   (* Start a RPC node, as we also want to test that the sequencer and its RPC
      node return the same thing. *)
   let* rpc_node = run_new_rpc_endpoint sequencer in
@@ -4454,12 +4455,7 @@ let test_trace_transaction =
          ~endpoint:(Evm_node.endpoint sequencer))
       sequencer
   in
-  (* Block few levels to ensure we are replaying on an old block. *)
-  let* () =
-    repeat 2 (fun () ->
-        next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client)
-  in
-  let* () = bake_until_sync ~sequencer ~sc_rollup_node ~proxy ~client () in
+  let* _ = produce_block sequencer in
   (* Check tracing without options works *)
   let* trace_result = Rpc.trace_transaction ~transaction_hash sequencer in
   let* trace_result_rpc = Rpc.trace_transaction ~transaction_hash rpc_node in
@@ -4520,8 +4516,9 @@ let test_trace_transaction_on_invalid_transaction =
     ~kernels:Kernel.all
     ~tags:["evm"; "rpc"; "trace"; "fail"]
     ~title:"debug_traceTransaction fails on invalid transactions"
-  @@ fun {sc_rollup_node; sequencer; client; proxy; _} _protocol ->
-  let* () = bake_until_sync ~sequencer ~sc_rollup_node ~proxy ~client () in
+    ~time_between_blocks:Nothing
+  @@ fun {sequencer; _} _protocol ->
+  let* _ = produce_block sequencer in
   (* Check tracing without options works *)
   let* trace_result =
     Rpc.trace_transaction
@@ -4608,7 +4605,8 @@ let test_trace_transaction_call =
     ~tags:["evm"; "rpc"; "trace"; "call"]
     ~title:"Sequencer can run debug_traceTransaction and return a valid log"
     ~da_fee:Wei.zero
-  @@ fun {sc_rollup_node; sequencer; client; proxy; _} _protocol ->
+    ~time_between_blocks:Nothing
+  @@ fun {sequencer; _} _protocol ->
   (* Transfer funds to a random address. *)
   let endpoint = Evm_node.endpoint sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
@@ -4631,13 +4629,7 @@ let test_trace_transaction_call =
           ~bin:simple_storage_resolved.bin)
       sequencer
   in
-  (* Block few levels to ensure we are replaying on an old block. *)
-  let* () =
-    repeat 2 (fun () ->
-        next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client)
-  in
-  let* () = bake_until_sync ~sequencer ~sc_rollup_node ~proxy ~client () in
-
+  let* _ = produce_block sequencer in
   (* We will first trace with every options enabled, and check that we have the
      logs as complete as possible. We call the function `set` from the contract,
      which isn't expected to fail and doesn't return any result. *)
@@ -4652,11 +4644,7 @@ let test_trace_transaction_call =
          ~method_call:(Format.sprintf "set(%d)" value_in_storage))
       sequencer
   in
-  let* () =
-    repeat 2 (fun () ->
-        next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client)
-  in
-  let* () = bake_until_sync ~sequencer ~sc_rollup_node ~proxy ~client () in
+  let* _ = produce_block sequencer in
   (* We will use the receipt to check that the results from the trace are
      consistent with the result from the transaction once applied in the
      block. *)
@@ -4676,7 +4664,6 @@ let test_trace_transaction_call =
     | Ok trace -> check_trace false None transaction_receipt trace
     | Error _ -> Test.fail "Trace transaction shouldn't have failed"
   in
-
   (* The second test will disable every tracing options and call `get`, thats
      returns a value, so that we can check that it returns the correct value in
      the end. *)
@@ -4690,11 +4677,7 @@ let test_trace_transaction_call =
          ~method_call:"get()")
       sequencer
   in
-  let* () =
-    repeat 2 (fun () ->
-        next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client)
-  in
-  let* () = bake_until_sync ~sequencer ~sc_rollup_node ~proxy ~client () in
+  let* _ = produce_block sequencer in
   let*@ transaction_receipt =
     Rpc.get_transaction_receipt ~tx_hash:transaction_hash sequencer
   in
@@ -4717,12 +4700,12 @@ let test_trace_transaction_call_trace =
     ~tags:["evm"; "rpc"; "trace"; "call_trace"]
     ~title:"Sequencer can run debug_traceTransaction with calltracer"
     ~da_fee:Wei.zero
-  @@ fun {sc_rollup_node; sequencer; client; proxy; _} _protocol ->
+    ~time_between_blocks:Nothing
+  @@ fun {sequencer; _} _protocol ->
   (* Transfer funds to a random address. *)
   let endpoint = Evm_node.endpoint sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
   let* simple_storage_resolved = Solidity_contracts.simple_storage () in
-
   (* deploy contract *)
   let* () =
     Eth_cli.add_abi
@@ -4740,13 +4723,7 @@ let test_trace_transaction_call_trace =
           ~bin:simple_storage_resolved.bin)
       sequencer
   in
-  (* Block few levels to ensure we are replaying on an old block. *)
-  let* () =
-    repeat 2 (fun () ->
-        next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client)
-  in
-  let* () = bake_until_sync ~sequencer ~sc_rollup_node ~proxy ~client () in
-
+  let* _ = produce_block sequencer in
   (* We will first trace with every options enabled, and check that we have the
      logs as complete as possible. We call the function `set` from the contract,
      which isn't expected to fail and doesn't return any result. *)
@@ -4761,11 +4738,7 @@ let test_trace_transaction_call_trace =
          ~method_call:(Format.sprintf "set(%d)" value_in_storage))
       sequencer
   in
-  let* () =
-    repeat 2 (fun () ->
-        next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client)
-  in
-  let* () = bake_until_sync ~sequencer ~sc_rollup_node ~proxy ~client () in
+  let* _ = produce_block sequencer in
   (* We will use the receipt to check that the results from the trace are
      consistent with the result from the transaction once applied in the
      block. *)
@@ -4832,7 +4805,8 @@ let test_trace_transaction_calltracer_all_types =
     ~title:
       "debug_traceTransaction with calltracer can produce all the call types"
     ~da_fee:Wei.zero
-  @@ fun {sc_rollup_node; sequencer; client; proxy; _} _protocol ->
+    ~time_between_blocks:Nothing
+  @@ fun {sequencer; _} _protocol ->
   let endpoint = Evm_node.endpoint sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
   let* call_types = Solidity_contracts.call_types () in
@@ -4847,11 +4821,7 @@ let test_trace_transaction_calltracer_all_types =
           ~bin:call_types.bin)
       sequencer
   in
-  let* () =
-    repeat 2 (fun () ->
-        next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client)
-  in
-  let* () = bake_until_sync ~sequencer ~sc_rollup_node ~proxy ~client () in
+  let* _ = produce_block sequencer in
   let* tx_hash =
     send_transaction_to_sequencer
       (Eth_cli.contract_send
@@ -4862,11 +4832,7 @@ let test_trace_transaction_calltracer_all_types =
          ~method_call:"testProduceOpcodes()")
       sequencer
   in
-  let* () =
-    repeat 2 (fun () ->
-        next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client)
-  in
-  let* () = bake_until_sync ~sequencer ~sc_rollup_node ~proxy ~client () in
+  let* _ = produce_block sequencer in
   let*@ trace_result =
     Rpc.trace_transaction
       ~tracer:"callTracer"
@@ -4929,7 +4895,8 @@ let test_trace_transaction_call_tracer_with_logs =
     ~tags:["evm"; "rpc"; "trace"; "call_trace"; "with_logs"]
     ~title:"debug_traceTransaction with calltracer can produce a call with logs"
     ~da_fee:Wei.zero
-  @@ fun {sc_rollup_node; sequencer; client; proxy; _} _protocol ->
+    ~time_between_blocks:Nothing
+  @@ fun {sequencer; _} _protocol ->
   let endpoint = Evm_node.endpoint sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
   let* simple_logger = Solidity_contracts.simple_logger () in
@@ -4946,11 +4913,7 @@ let test_trace_transaction_call_tracer_with_logs =
           ~bin:simple_logger.bin)
       sequencer
   in
-  let* () =
-    repeat 2 (fun () ->
-        next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client)
-  in
-  let* () = bake_until_sync ~sequencer ~sc_rollup_node ~proxy ~client () in
+  let* _ = produce_block sequencer in
   let value = 251197 in
   let* tx_hash =
     send_transaction_to_sequencer
@@ -4962,11 +4925,7 @@ let test_trace_transaction_call_tracer_with_logs =
          ~method_call:(Format.sprintf "logValue(%d)" value))
       sequencer
   in
-  let* () =
-    repeat 2 (fun () ->
-        next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client)
-  in
-  let* () = bake_until_sync ~sequencer ~sc_rollup_node ~proxy ~client () in
+  let* _ = produce_block sequencer in
   let*@ trace_result =
     Rpc.trace_transaction
       ~tracer:"callTracer"
@@ -4996,7 +4955,8 @@ let test_trace_transaction_call_trace_certain_depth =
     ~tags:["evm"; "rpc"; "trace"; "call_trace"; "depth"]
     ~title:"debug_traceTransaction with calltracer to see diffuclt depth"
     ~da_fee:Wei.zero
-  @@ fun {sc_rollup_node; sequencer; client; proxy; _} _protocol ->
+    ~time_between_blocks:Nothing
+  @@ fun {sequencer; _} _protocol ->
   let endpoint = Evm_node.endpoint sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
   let* call_tracer_depth = Solidity_contracts.call_tracer_depth () in
@@ -5013,11 +4973,7 @@ let test_trace_transaction_call_trace_certain_depth =
           ~bin:call_tracer_depth.bin)
       sequencer
   in
-  let* () =
-    repeat 2 (fun () ->
-        next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client)
-  in
-  let* () = bake_until_sync ~sequencer ~sc_rollup_node ~proxy ~client () in
+  let* _ = produce_block sequencer in
   let* tx_hash =
     send_transaction_to_sequencer
       (Eth_cli.contract_send
@@ -5028,10 +4984,7 @@ let test_trace_transaction_call_trace_certain_depth =
          ~method_call:"startDepth()")
       sequencer
   in
-  let* () =
-    repeat 2 (fun () ->
-        next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client)
-  in
+  let* _ = produce_block sequencer in
   let*@ trace_result =
     Rpc.trace_transaction
       ~tracer:"callTracer"
@@ -5079,7 +5032,8 @@ let test_trace_transaction_call_trace_revert =
     ~tags:["evm"; "rpc"; "trace"; "call_trace"; "revert"]
     ~title:"debug_traceTransaction with calltracer to see how revert is handled"
     ~da_fee:Wei.zero
-  @@ fun {sc_rollup_node; sequencer; client; proxy; _} _protocol ->
+    ~time_between_blocks:Nothing
+  @@ fun {sequencer; _} _protocol ->
   let endpoint = Evm_node.endpoint sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
   let* call_tracer_revert = Solidity_contracts.call_tracer_revert () in
@@ -5099,11 +5053,7 @@ let test_trace_transaction_call_trace_revert =
           ~bin:call_tracer_revert.bin)
       sequencer
   in
-  let* () =
-    repeat 2 (fun () ->
-        next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client)
-  in
-  let* () = bake_until_sync ~sequencer ~sc_rollup_node ~proxy ~client () in
+  let* _ = produce_block sequencer in
   let* tx_hash =
     send_transaction_to_sequencer
       (Eth_cli.contract_send
@@ -5114,10 +5064,7 @@ let test_trace_transaction_call_trace_revert =
          ~method_call:"startTest()")
       sequencer
   in
-  let* () =
-    repeat 2 (fun () ->
-        next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client)
-  in
+  let* _ = produce_block sequencer in
   let*@ trace_result =
     Rpc.trace_transaction
       ~tracer:"callTracer"
@@ -5256,7 +5203,8 @@ let test_trace_transaction_calltracer_on_simple_transfer =
     ~tags:["evm"; "rpc"; "trace"; "call_trace"; "simple_transfer"]
     ~title:"debug_traceTransaction can trace a simple transfer"
     ~da_fee:Wei.zero
-  @@ fun {sc_rollup_node; sequencer; client; proxy; _} _protocol ->
+    ~time_between_blocks:Nothing
+  @@ fun {sequencer; _} _protocol ->
   let endpoint = Evm_node.endpoint sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
   let receiver = Eth_account.bootstrap_accounts.(1) in
@@ -5269,11 +5217,7 @@ let test_trace_transaction_calltracer_on_simple_transfer =
          ~endpoint)
       sequencer
   in
-  let* () =
-    repeat 2 (fun () ->
-        next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client)
-  in
-  let* () = bake_until_sync ~sequencer ~sc_rollup_node ~proxy ~client () in
+  let* _ = produce_block sequencer in
   let*@ _ =
     Rpc.trace_transaction
       ~tracer:"callTracer"
@@ -5290,7 +5234,8 @@ let test_trace_transaction_calltracer_precompiles =
     ~title:"debug_traceTransaction with calltracer can trace precompiles"
     ~da_fee:Wei.zero
     ~maximum_allowed_ticks:100_000_000_000_000L
-  @@ fun {sc_rollup_node; sequencer; client; proxy; _} _protocol ->
+    ~time_between_blocks:Nothing
+  @@ fun {sequencer; _} _protocol ->
   let endpoint = Evm_node.endpoint sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
   let* precompiles = Solidity_contracts.precompiles () in
@@ -5305,11 +5250,7 @@ let test_trace_transaction_calltracer_precompiles =
           ~bin:precompiles.bin)
       sequencer
   in
-  let* () =
-    repeat 2 (fun () ->
-        next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client)
-  in
-  let* () = bake_until_sync ~sequencer ~sc_rollup_node ~proxy ~client () in
+  let* _ = produce_block sequencer in
   let* transaction_hash =
     send_transaction_to_sequencer
       (Eth_cli.contract_send
@@ -5320,11 +5261,7 @@ let test_trace_transaction_calltracer_precompiles =
          ~method_call:"callPrecompiles()")
       sequencer
   in
-  let* () =
-    repeat 2 (fun () ->
-        next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client)
-  in
-  let* () = bake_until_sync ~sequencer ~sc_rollup_node ~proxy ~client () in
+  let* _ = produce_block sequencer in
   let*@ trace_result =
     Rpc.trace_transaction
       ~tracer:"callTracer"
