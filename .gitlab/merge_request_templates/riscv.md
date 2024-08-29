@@ -48,6 +48,8 @@ make -C src/riscv all
 - [ ] Add tests for bugs that have been fixed.
 - [ ] Put in reasonable effort to ensure that CI will pass.
 - [ ] Benchmark performance and populate the table above if needed.
+- [ ] Write commit messages to reflect the changes they're about.
+- [ ] Self-review your changes to ensure they are high-quality.
 - [ ] Complete all of the above before assigning this MR to reviewers.
 
 /label ~riscv
