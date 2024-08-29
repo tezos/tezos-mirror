@@ -76,7 +76,13 @@
    (-> PtParisB_machine.no.ml))
   (select PsParisC_machine.ml from
    (octez-protocol-020-PsParisC-libs.client -> PsParisC_machine.real.ml)
-   (-> PsParisC_machine.no.ml)))
+   (-> PsParisC_machine.no.ml))
+  (select beta_machine.ml from
+   (octez-protocol-beta-libs.client -> beta_machine.real.ml)
+   (-> beta_machine.no.ml))
+  (select alpha_machine.ml from
+   (octez-protocol-alpha-libs.client -> alpha_machine.real.ml)
+   (-> alpha_machine.no.ml)))
  (link_flags
   (:standard)
   (:include %{workspace_root}/macos-link-flags.sexp)
@@ -91,6 +97,38 @@
   -open Tezos_rpc_http_client_unix
   -open Tezos_rpc_http
   -open Lib_teztale_base))
+
+(rule
+ (target PsParisC_machine.real.ml)
+ (mode fallback)
+ (deps beta_machine.real.ml)
+ (action
+  (progn
+   (copy beta_machine.real.ml PsParisC_machine.real.ml)
+   (run
+    sed
+    -i.bak -e s/Tezos_client_beta/Tezos_client_PsParisC/g -e
+    s/Tezos_protocol_beta/Tezos_protocol_PsParisC/g -e
+    s/Tezos_protocol_plugin_beta/Tezos_protocol_plugin_PsParisC/g
+    PsParisC_machine.real.ml))))
+
+(rule
+ (target beta_machine.real.ml)
+ (mode fallback)
+ (deps alpha_machine.real.ml)
+ (action
+  (progn
+   (copy alpha_machine.real.ml beta_machine.real.ml)
+   (run
+    sed
+    -i.bak -e s/Tezos_client_alpha/Tezos_client_beta/g -e
+    s/Tezos_protocol_alpha/Tezos_protocol_beta/g -e
+    s/Tezos_protocol_plugin_alpha/Tezos_protocol_plugin_beta/g
+    beta_machine.real.ml))))
+
+(rule (action (write-file alpha_machine.no.ml "module M = struct end")))
+
+(rule (action (write-file beta_machine.no.ml "module M = struct end")))
 
 (rule (action (write-file PsParisC_machine.no.ml "module M = struct end")))
 
