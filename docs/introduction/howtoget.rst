@@ -180,6 +180,14 @@ automatically generated and published on `DockerHub
 <https://hub.docker.com/r/tezos/tezos/>`_. This provides a convenient
 way to run an always up-to-date ``octez-node``.
 
+From version 22.0 all Docker images for tezos are signed using Cosign.
+You can verify if the images are correctly signed using the Cosign utility, as explained below:
+
+.. toctree::
+   :maxdepth: 2
+
+   cosign-verify
+
 One way to run those Docker images is with `docker-compose <https://docs.docker.com/compose>`_.
 We provide ``docker-compose`` files for all active
 protocols. You can pick one and start with the following command (we'll assume alpha on this guide):
