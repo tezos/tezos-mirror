@@ -324,3 +324,5 @@ val pp_time_between_blocks : Format.formatter -> time_between_blocks -> unit
 (** [describe ()] prints the JSON schema of the configuration file to the
     standard output. *)
 val describe : unit -> unit
+
+val pp_print_json : data_dir:string -> Format.formatter -> t -> unit

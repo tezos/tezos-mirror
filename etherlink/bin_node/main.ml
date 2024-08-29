@@ -285,6 +285,13 @@ let config_path_arg =
     ~doc:"Path to a configuration file."
     Params.string
 
+let print_config_arg =
+  Tezos_clic.switch
+    ~doc:"Print the full configuration to the standard output"
+    ~short:'p'
+    ~long:"print"
+    ()
+
 let rollup_address_arg =
   let open Lwt_result_syntax in
   let open Tezos_clic in
@@ -1557,17 +1564,19 @@ let check_config_command =
     ~desc:
       "Read and validate configuration files. By default, look for config.json \
        in the data-dir. If --filename is used, check this config file instead."
-    (args2 data_dir_arg config_path_arg)
+    (args3 data_dir_arg config_path_arg print_config_arg)
     (prefixes ["check"; "config"] @@ stop)
-    (fun (data_dir, config_path) () ->
-      let* _config =
+    (fun (data_dir, config_path, print_config) () ->
+      let+ config =
         match config_path with
         | Some config_path ->
             load_file ~data_dir:Configuration.default_data_dir config_path
         | None -> load ~data_dir
       in
-      Format.printf "Configuration has been parsed successfully.\n" ;
-      return_unit)
+
+      if print_config then
+        Format.printf "%a\n" (Configuration.pp_print_json ~data_dir) config
+      else Format.printf "Configuration has been parsed successfully.\n")
 
 let config_key_arg ~name ~placeholder =
   let open Lwt_result_syntax in

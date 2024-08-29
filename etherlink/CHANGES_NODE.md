@@ -5,8 +5,10 @@
 ### Features
 
 - Add a new command `check config [--data-dir <data-dir>] [--config-file
-  <path>]` to assess the correctness of a configuration file (either
-  `<data-dir>/config.json` or `path`). (!14690)
+  <path>] [-p]` to assess the correctness of a configuration file (either
+  `<data-dir>/config.json` or `path`). With `-p`, the parsed configuration file
+  is printed in the standard output, which can be useful to review them
+  carefully. (!14690 !14713)
 
 ## Version 0.1 (2024-08-28)
 
