@@ -1,4 +1,4 @@
-// Copyright (c) 2022-2023 Nomadic Labs <contact@nomadic-labs.com>
+// Copyright (c) 2022-2024 Nomadic Labs <contact@nomadic-labs.com>
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
 // copy of this software and associated documentation files (the "Software"),
@@ -18,660 +18,171 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-local grafana = import '../vendors/grafonnet-lib/grafonnet/grafana.libsonnet';
-local singlestat = grafana.singlestat;
-local statPanel = grafana.statPanel;
-local graphPanel = grafana.graphPanel;
-local tablePanel = grafana.tablePanel;
-local prometheus = grafana.prometheus;
-local namespace = 'octez';
-local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instance"}';
+
+// Grafonnet
+local grafonnet = import 'github.com/grafana/grafonnet/gen/grafonnet-latest/main.libsonnet';
+local query = grafonnet.query;
+local panel = grafonnet.panel;
+local table = panel.table;
+local timeSeries = panel.timeSeries;
+local stat = panel.stat;
+
+// Base
+local base = import './base.jsonnet';
+local namespace = base.namespace;
+local node_instance = base.node_instance;
+local prometheus = base.prometheus;
+local info = base.info;
+local infoName = base.infoName;
+local graph = base.graph;
+local table = base.table;
 
 //##
-// P2P
+// P2p related stats
 //##
 
-local mkPeersPanel(legendRightSide) =
-  local disconnected = 'Disconnected peers';
-  local running = 'Running peers';
-  local greylisted = 'Waiting to reconnect';
-  graphPanel.new(
-    title='P2P peers connections',
-    datasource='Prometheus',
-    linewidth=1,
-    format='none',
-    legend_alignAsTable=true,
-    legend_rightSide=legendRightSide,
-    legend_avg=true,
-    legend_min=true,
-    legend_max=true,
-    legend_show=true,
-    legend_values=true,
-    aliasColors={
-      [disconnected]: 'light-yellow',
-      [running]: 'light-green',
-      [greylisted]: 'light-red',
-    },
-  ).addTarget(
-    prometheus.target(
-      namespace + '_p2p_peers_disconnected' + node_instance,
-      legendFormat=disconnected,
-    )
-  ).addTarget(
-    prometheus.target(
-      namespace + '_p2p_peers_running' + node_instance,
-      legendFormat=running,
-    )
-  ).addTarget(
-    prometheus.target(
-      namespace + '_p2p_points_greylisted' + node_instance,
-      legendFormat=greylisted,
-    )
-  );
-
+local mkPeersPanel(h, w, x, y, legendRightSide) =
+  local calcs = ['mean', 'max', 'min'];
+  local legend =
+    if legendRightSide then
+      graph.withLegendRight(calcs)
+    else
+      graph.withLegendBottom(calcs);
+  local disconnectedQuery = prometheus('p2p_peers_disconnected', legendFormat='Disconnected');
+  local runningQuery = prometheus('p2p_peers_running', legendFormat='Running peers');
+  local greylistedQuery = prometheus('p2p_points_greylisted', legendFormat='Waiting to reconnect');
+  graph.new('P2P peers connections', [disconnectedQuery, runningQuery, greylistedQuery], h, w, x, y)
+  + graph.withQueryColor([['Disconnected', 'light-yellow'], ['Running peers', 'light-green'], ['Waiting to reconnect', 'light-red']])
+  + legend;
 
 {
 
-  trustedPoints:
-    singlestat.new(
-      title='Trusted points',
-      datasource='Prometheus',
-      format='none',
-      valueName='max',
-    ).addTarget(
-      prometheus.target(
-        namespace + '_p2p_points_trusted' + node_instance,
-        legendFormat='trusted points',
-      )
-    ),
+  trustedPoints(h, w, x, y):
+    local q = prometheus('p2p_points_trusted', legendFormat='trusted points');
+    info.new('Trusted points', q, h, w, x, y, instant=false)
+    + stat.options.reduceOptions.withCalcs('lastNotNull'),
 
-  privateConnections:
-    singlestat.new(
-      title='Private Connections',
-      datasource='Prometheus',
-      format='none',
-      valueName='max',
-    ).addTarget(
-      prometheus.target(
-        namespace + '_p2p_connections_private' + node_instance,
-        legendFormat='Private Connections',
-      )
-    ),
+  privateConnections(h, w, x, y):
+    local q = prometheus('p2p_connections_private', legendFormat='Private Connections');
+    info.new('Private connections', q, h, w, x, y, instant=false)
+    + stat.options.reduceOptions.withCalcs('lastNotNull'),
 
-  peers: mkPeersPanel(true),
-  peersLegendBottom: mkPeersPanel(false),
+  peers(h, w, x, y): mkPeersPanel(h, w, x, y, legendRightSide=true),
 
-  exchangedData:
+  peersLegendBottom(h, w, x, y): mkPeersPanel(h, w, x, y, legendRightSide=false),
+
+  exchangedData(h, w, x, y):
     local received = 'Received data (KB)';
     local sent = 'Sent data (KB)';
-    graphPanel.new(
-      title='Average data exchange (1-minute interval)',
-      datasource='Prometheus',
-      legend_rightSide=false,
-      linewidth=1,
-      format='none',
-      legend_show=true,
-      aliasColors={
-        [received]: 'blue',
-        [sent]: 'green',
-      },
-    ).addTargets([
-      prometheus.target(
-        // Divide by 1,000 for KB
-        'deriv(' + namespace + '_p2p_io_scheduler_total_recv' + node_instance + '[1m]) / 1000',
-        legendFormat=received,
-      ),
-      prometheus.target(
-        // Divide by 1,000 for KB
-        'deriv(' + namespace + '_p2p_io_scheduler_total_sent' + node_instance + '[1m]) / 1000',
-        legendFormat=sent,
-      ),
-    ]),
+    local receivedQuery = grafonnet.query.prometheus.new('Prometheus', 'deriv(' + namespace + '_p2p_io_scheduler_total_recv' + base.node_instance_query + '[1m]) / 1000')
+                          + query.prometheus.withLegendFormat(received);
+    local sentQuery = grafonnet.query.prometheus.new('Prometheus', 'deriv(' + namespace + '_p2p_io_scheduler_total_sent' + base.node_instance_query + '[1m]) / 1000')
+                      + query.prometheus.withLegendFormat(sent);
+    graph.new('Average data exchange (1-minute interval)', [receivedQuery, sentQuery], h, w, x, y)
+    + graph.withQueryColor([[received, 'blue'], [sent, 'green']])
+    + graph.withLegendBottom(),
 
-  points:
-    local disconnected = 'Disconnected points';
-    local running = 'Running points';
-    local trusted = 'Trusted points';
-    graphPanel.new(
-      title='P2P points connections',
-      datasource='Prometheus',
-      linewidth=1,
-      format='none',
-      legend_alignAsTable=true,
-      legend_avg=true,
-      legend_min=true,
-      legend_max=true,
-      legend_show=true,
-      legend_values=true,
-      aliasColors={
-        [disconnected]: 'light-red',
-        [running]: 'light-green',
-        [trusted]: 'light-yellow',
-      },
-    ).addTarget(
-      prometheus.target(
-        namespace + '_p2p_points_disconnected' + node_instance,
-        legendFormat=disconnected,
-      )
-    ).addTarget(
-      prometheus.target(
-        namespace + '_p2p_points_running' + node_instance,
-        legendFormat=running,
-      )
-    ).addTarget(
-      prometheus.target(
-        namespace + '_p2p_points_trusted' + node_instance,
-        legendFormat=trusted,
-      )
-    ),
+  points(h, w, x, y):
+    local disconnectedQuery = prometheus('p2p_points_disconnected', legendFormat='Disconnected points');
+    local runningQuery = prometheus('p2p_points_running', legendFormat='Running points');
+    local trustedQuery = prometheus('p2p_points_trusted', legendFormat='Trusted points');
+    graph.new('P2P points connections', [disconnectedQuery, runningQuery, trustedQuery], h, w, x, y)
+    + graph.withQueryColor([['Disconnected points', 'light-red'], ['Running points', 'light-green'], ['Trusted points', 'light-yellow']]),
 
-  totalConnections:
-    local outgoing = 'Outgoing connections';
-    local incoming = 'Incoming connections';
-    graphPanel.new(
-      title='P2P total connections',
-      datasource='Prometheus',
-      linewidth=1,
-      format='none',
-      legend_alignAsTable=true,
-      legend_avg=true,
-      legend_min=true,
-      legend_max=true,
-      legend_show=true,
-      legend_values=true,
-      aliasColors={
-        [outgoing]: 'light-red',
-        [incoming]: 'light-green',
-      },
-    ).addTarget(
-      prometheus.target(
-        namespace + '_p2p_connections_outgoing' + node_instance,
-        legendFormat=outgoing,
-      )
-    ).addTarget(
-      prometheus.target(
-        namespace + '_p2p_connections_incoming' + node_instance,
-        legendFormat=incoming,
-      )
-    ),
+  connectionsTable(h, w, x, y):
+    local incomingQuery = prometheus('p2p_connections_incoming', legendFormat='Incoming connections');
+    local trustedQuery = prometheus('p2p_points_trusted', legendFormat='Trusted points');
+    local privateQuery = prometheus('p2p_connections_private', legendFormat='Private points');
+    table('Connections', [incomingQuery, trustedQuery, privateQuery], h, w, x, y),
 
-  incomingConnectionsMean:
-    statPanel.new(
-      title='Incoming connections mean',
-      datasource='Prometheus',
-    ).addTarget(
-      prometheus.target(
-        namespace + '_p2p_connections_incoming' + node_instance
-      )
-    ),
+  totalConnections(h, w, x, y):
+    local outgoingQuery = prometheus('p2p_connections_outgoing', legendFormat='Outgoing connections');
+    local incomingQuery = prometheus('p2p_connections_incoming', legendFormat='Incoming connections');
+    graph.new('P2P total connections', [outgoingQuery, incomingQuery], h, w, x, y)
+    + graph.withLegendBottom(calcs=['mean'])
+    + graph.withQueryColor([['Outgoing connections', 'light-red'], ['Incoming connections', 'green']]),
 
-  mempoolPending:
-    local validated = 'Validated';
-    local refused = 'Refused';
-    local outdated = 'Outdated';
-    local branch_refused = 'Branch refused';
-    local branch_delayed = 'Branch delayed';
-    local unprocessed = 'Unprocessed';
-    graphPanel.new(
-      title='Mempool status',
-      datasource='Prometheus',
-      linewidth=1,
-      format='none',
-      decimals=0,
-      legend_alignAsTable=true,
-      legend_current=true,
-      legend_avg=true,
-      legend_min=true,
-      legend_max=true,
-      legend_rightSide=true,
-      legend_show=true,
-      legend_total=true,
-      legend_values=true,
-      logBase1Y=10,
-      aliasColors={
-        [validated]: 'green',
-        [refused]: 'red',
-        [outdated]: 'blue',
-        [branch_refused]: 'light-orange',
-        [branch_delayed]: 'light-red',
-        [unprocessed]: 'light-yellow',
-      },
-    ).addTarget(
-      prometheus.target(
-        namespace + '_mempool_pending_validated' + node_instance,
-        legendFormat=validated,
-      )
-    ).addTarget(
-      prometheus.target(
-        namespace + '_mempool_pending_refused' + node_instance,
-        legendFormat=refused,
-      )
-    ).addTarget(
-      prometheus.target(
-        namespace + '_mempool_pending_outdated' + node_instance,
-        legendFormat=outdated,
-      )
-    ).addTarget(
-      prometheus.target(
-        namespace + '_mempool_pending_branch_refused' + node_instance,
-        legendFormat=branch_refused,
-      )
-    ).addTarget(
-      prometheus.target(
-        namespace + '_mempool_pending_branch_delayed' + node_instance,
-        legendFormat=branch_delayed,
-      )
-    ).addTarget(
-      prometheus.target(
-        namespace + '_mempool_pending_unprocessed' + node_instance,
-        legendFormat=unprocessed,
-      )
-    ),
+  incomingConnectionsMean(h, w, x, y):
+    local q = prometheus('p2p_connections_incoming');
+    info.new('Incoming connections mean', q, h, w, x, y, instant=false)
+    + stat.options.withGraphMode('area'),
 
-  connectionsTable:
-    tablePanel.new(
-      title='Connections',
-      datasource='Prometheus',
-      transform=('timeseries_to_rows'),
-    ).addTargets([
-      prometheus.target(
-        namespace + '_p2p_connections_incoming' + node_instance,
-        legendFormat='Incomming connections',
-        instant=true
-      ),
-      prometheus.target(
-        namespace + '_p2p_points_trusted' + node_instance,
-        legendFormat='Trusted points',
-        instant=true
-      ),
-      prometheus.target(
-        namespace + '_p2p_connections_private' + node_instance,
-        legendFormat='Private points',
-        instant=true
-      ),
-    ]).hideColumn('Time'),
+  mempoolPending(h, w, x, y):
+    local validatedQuery = prometheus('mempool_pending_validated', legendFormat='Validated');
+    local refusedQuery = prometheus('mempool_pending_refused', legendFormat='Refused');
+    local outdatedQuery = prometheus('mempool_pending_outdated', legendFormat='Outdated');
+    local branchRefusedQuery = prometheus('mempool_pending_branch_refused', legendFormat='Branch refused');
+    local branchDelayedQuery = prometheus('mempool_pending_branch_delayed', legendFormat='Branch delayed');
+    local unprocessedQuery = prometheus('mempool_pending_unprocessed', legendFormat='Unprocessed');
+    graph.new('Mempool status', [validatedQuery, refusedQuery, outdatedQuery, branchRefusedQuery, branchDelayedQuery, unprocessedQuery], h, w, x, y)
+    + graph.withLegendRight(calcs=['mean', 'lastNotNull', 'max', 'min', 'total'])
+    + graph.withLogScale()
+    + graph.withQueryColor([['Validated', 'green'], ['Refused', 'red'], ['Outdated', 'blue'], ['Branch refused', 'light-orange'], ['Branch delayed', 'light-red'], ['Unprocessed', 'light-yellow']]),
+
+  DDB:
+    {
+      base(name, nameGet, queryName, queryNameGet, h, w, x, y):
+        local getSent = 'get ' + name + ' sent';
+        local received = name + ' received';
+        local getReceived = 'get ' + name + ' received';
+        local sent = name + ' sent';
+        local queryGet(t) = query.prometheus.new('Prometheus', base.namespace + '_distributed_db_message_get_' + queryNameGet + '_messages{action="' + t + '",' + base.node_instance + '="$node_instance"}');
+        local query(t) = grafonnet.query.prometheus.new('Prometheus', base.namespace + '_distributed_db_message_' + queryName + '_messages{action="' + t + '",' + base.node_instance + '="$node_instance"}');
+        local getSentQuery = queryGet('sent')
+                             + grafonnet.query.prometheus.withLegendFormat(getSent);
+        local receivedQuery = query('received')
+                              + grafonnet.query.prometheus.withLegendFormat(received);
+        local getReceivedQuery = queryGet('received')
+                                 + grafonnet.query.prometheus.withLegendFormat(getReceived);
+        local sentQuery = query('sent')
+                          + grafonnet.query.prometheus.withLegendFormat(sent);
+        graph.new('DDB ' + name + '  messages', [getSentQuery, receivedQuery, getReceivedQuery, sentQuery], h, w, x, y)
+        + graph.withLogScale()
+        + graph.withQueryColor([[getSent, 'green'], [received, 'light-blue'], [getReceived, 'blue'], [sent, 'light-green']]),
 
 
-  DDBCurrentHead:
-    local get_broadcasted = 'get current head broadcasted';
-    local get_sent = 'get current head sent';
-    local received = 'current head received';
-    local get_received = 'get current head received';
-    local sent = 'current head sent';
-    local broadcasted = 'current head broadcasted';
-    graphPanel.new(
-      title='DDB current head messages',
-      datasource='Prometheus',
-      linewidth=1,
-      format='none',
-      legend_show=true,
-      logBase1Y=10,
-      aliasColors={
-        [get_broadcasted]: 'green',
-        [get_sent]: 'green',
-        [received]: 'light-blue',
-        [get_received]: 'blue',
-        [sent]: 'light-green',
-        [broadcasted]: 'light-green',
-      },
-    ).addTargets([
-      prometheus.target(
-        namespace + '_distributed_db_message_get_current_head_messages{action="broadcasted",' + std.extVar('node_instance_label') + '="$node_instance"}',
-        legendFormat=get_broadcasted,
-      ),
-      prometheus.target(
-        namespace + '_distributed_db_message_get_current_head_messages{action="sent",' + std.extVar('node_instance_label') + '="$node_instance"}',
-        legendFormat=get_sent,
-      ),
-      prometheus.target(
-        namespace + '_distributed_db_message_current_head_messages{action="received",' + std.extVar('node_instance_label') + '="$node_instance"}',
-        legendFormat=received,
-      ),
-      prometheus.target(
-        namespace + '_distributed_db_message_get_current_head_messages{action="received",' + std.extVar('node_instance_label') + '="$node_instance"}',
-        legendFormat=get_received,
-      ),
-      prometheus.target(
-        namespace + '_distributed_db_message_current_head_messages{action="sent",' + std.extVar('node_instance_label') + '="$node_instance"}',
-        legendFormat=sent,
-      ),
-      prometheus.target(
-        namespace + '_distributed_db_message_current_head_messages{action="broadcasted",' + std.extVar('node_instance_label') + '="$node_instance"}',
-        legendFormat=broadcasted,
-      ),
-    ]),
+      currentBranch(h, w, x, y): self.base('current branch', 'current branch', 'current_branch', 'current_branch', h, w, x, y),
 
-  DDBCurrentBranch:
-    local get_sent = 'get current branch sent';
-    local received = 'current branch received';
-    local get_received = 'get current branch received';
-    local sent = 'current branch sent';
-    graphPanel.new(
-      title='DDB current branch messages',
-      datasource='Prometheus',
-      linewidth=1,
-      format='none',
-      legend_show=true,
-      logBase1Y=10,
-      aliasColors={
-        [get_sent]: 'green',
-        [received]: 'light-blue',
-        [get_received]: 'blue',
-        [sent]: 'light-green',
-      },
-    ).addTargets([
-      prometheus.target(
-        namespace + '_distributed_db_message_get_current_branch_messages{action="sent",' + std.extVar('node_instance_label') + '="$node_instance"}',
-        legendFormat=get_sent,
-      ),
-      prometheus.target(
-        namespace + '_distributed_db_message_current_branch_messages{action="received",' + std.extVar('node_instance_label') + '="$node_instance"}',
-        legendFormat=received,
-      ),
-      prometheus.target(
-        namespace + '_distributed_db_message_get_current_branch_messages{action="received",' + std.extVar('node_instance_label') + '="$node_instance"}',
-        legendFormat=get_received,
-      ),
-      prometheus.target(
-        namespace + '_distributed_db_message_current_branch_messages{action="sent",' + std.extVar('node_instance_label') + '="$node_instance"}',
-        legendFormat=sent,
-      ),
-    ]),
+      blockHeaders(h, w, x, y): self.base('block header', 'block headers', 'block_header', 'block_headers', h, w, x, y),
 
-  DDBBlockHeaders:
-    local get_sent = 'get block headers sent';
-    local received = 'block header received';
-    local get_received = 'get block headers received';
-    local sent = 'block header sent';
-    graphPanel.new(
-      title='DDB block headers messages',
-      datasource='Prometheus',
-      linewidth=1,
-      format='none',
-      legend_show=true,
-      logBase1Y=10,
-      aliasColors={
-        [get_sent]: 'green',
-        [received]: 'light-blue',
-        [get_received]: 'blue',
-        [sent]: 'light-green',
-      },
-    ).addTargets([
-      prometheus.target(
-        namespace + '_distributed_db_message_get_block_headers_messages{action="sent",' + std.extVar('node_instance_label') + '="$node_instance"}',
-        legendFormat=get_sent,
-      ),
-      prometheus.target(
-        namespace + '_distributed_db_message_block_header_messages{action="received",' + std.extVar('node_instance_label') + '="$node_instance"}',
-        legendFormat=received,
-      ),
-      prometheus.target(
-        namespace + '_distributed_db_message_get_block_headers_messages{action="received",' + std.extVar('node_instance_label') + '="$node_instance"}',
-        legendFormat=get_received,
-      ),
-      prometheus.target(
-        namespace + '_distributed_db_message_block_header_messages{action="sent",' + std.extVar('node_instance_label') + '="$node_instance"}',
-        legendFormat=sent,
-      ),
-    ]),
+      predHeader(h, w, x, y): self.base('predecessor header', 'protocols', 'predecessor_header', 'predecessor_header', h, w, x, y),
 
-  DDBPredHeader:
-    local get_sent = 'get predecessor header sent';
-    local received = 'predecessor header received';
-    local get_received = 'get predecessor header received';
-    local sent = 'predecessor header sent';
-    graphPanel.new(
-      title='DDB predecessor header messages',
-      datasource='Prometheus',
-      linewidth=1,
-      format='none',
-      legend_show=true,
-      logBase1Y=10,
-      aliasColors={
-        [get_sent]: 'green',
-        [received]: 'light-blue',
-        [get_received]: 'blue',
-        [sent]: 'light-green',
-      },
-    ).addTargets([
-      prometheus.target(
-        namespace + '_distributed_db_message_get_predecessor_header_messages{action="sent",' + std.extVar('node_instance_label') + '="$node_instance"}',
-        legendFormat=get_sent,
-      ),
-      prometheus.target(
-        namespace + '_distributed_db_message_predecessor_header_messages{action="received",' + std.extVar('node_instance_label') + '="$node_instance"}',
-        legendFormat=received,
-      ),
-      prometheus.target(
-        namespace + '_distributed_db_message_get_predecessor_header_messages{action="received",' + std.extVar('node_instance_label') + '="$node_instance"}',
-        legendFormat=get_received,
-      ),
-      prometheus.target(
-        namespace + '_distributed_db_message_predecessor_header_messages{action="sent",' + std.extVar('node_instance_label') + '="$node_instance"}',
-        legendFormat=sent,
-      ),
-    ]),
+      operations(h, w, x, y): self.base('operation', 'operations', 'operation', 'operations', h, w, x, y),
 
-  DDBOperations:
-    local get_sent = 'get operations sent';
-    local received = 'operation received';
-    local get_received = 'get operations received';
-    local sent = 'operation sent';
-    graphPanel.new(
-      title='DDB operations messages',
-      datasource='Prometheus',
-      linewidth=1,
-      format='none',
-      legend_show=true,
-      logBase1Y=10,
-      aliasColors={
-        [get_sent]: 'green',
-        [received]: 'light-blue',
-        [get_received]: 'blue',
-        [sent]: 'light-green',
-      },
-    ).addTargets([
-      prometheus.target(
-        namespace + '_distributed_db_message_get_operations_messages{action="sent",' + std.extVar('node_instance_label') + '="$node_instance"}',
-        legendFormat=get_sent,
-      ),
-      prometheus.target(
-        namespace + '_distributed_db_message_operation_messages{action="received",' + std.extVar('node_instance_label') + '="$node_instance"}',
-        legendFormat=received,
-      ),
-      prometheus.target(
-        namespace + '_distributed_db_message_get_operations_messages{action="received",' + std.extVar('node_instance_label') + '="$node_instance"}',
-        legendFormat=get_received,
-      ),
-      prometheus.target(
-        namespace + '_distributed_db_message_operation_messages{action="sent",' + std.extVar('node_instance_label') + '="$node_instance"}',
-        legendFormat=sent,
-      ),
-    ]),
+      ops4Blocks(h, w, x, y): self.base('ops for block', 'ops for blocks', 'operations_for_block', 'operations_for_blocks', h, w, x, y),
 
-  DDBOps4Blocks:
-    local get_sent = 'get ops for blocks sent';
-    local received = 'ops for block received';
-    local get_received = 'get ops for blocks received';
-    local sent = 'ops for block sent';
-    graphPanel.new(
-      title='DDB operations for blocks messages',
-      datasource='Prometheus',
-      linewidth=1,
-      format='none',
-      legend_show=true,
-      logBase1Y=10,
-      aliasColors={
-        [get_sent]: 'green',
-        [received]: 'light-blue',
-        [get_received]: 'blue',
-        [sent]: 'light-green',
-      },
-    ).addTargets([
-      prometheus.target(
-        namespace + '_distributed_db_message_get_operations_for_blocks_messages{action="sent",' + std.extVar('node_instance_label') + '="$node_instance"}',
-        legendFormat=get_sent,
-      ),
-      prometheus.target(
-        namespace + '_distributed_db_message_operations_for_block_messages{action="received",' + std.extVar('node_instance_label') + '="$node_instance"}',
-        legendFormat=received,
-      ),
-      prometheus.target(
-        namespace + '_distributed_db_message_get_operations_for_blocks_messages{action="received",' + std.extVar('node_instance_label') + '="$node_instance"}',
-        legendFormat=get_received,
-      ),
-      prometheus.target(
-        namespace + '_distributed_db_message_operations_for_block_messages{action="sent",' + std.extVar('node_instance_label') + '="$node_instance"}',
-        legendFormat=sent,
-      ),
-    ]),
+      protocols(h, w, x, y): self.base('protocol', 'protocols', 'protocol', 'protocols', h, w, x, y),
 
-  DDBProtocols:
-    local get_sent = 'get protocols sent';
-    local received = 'protocol received';
-    local get_received = 'get protocols received';
-    local sent = 'protocol sent';
-    graphPanel.new(
-      title='DDB protocols messages',
-      datasource='Prometheus',
-      linewidth=1,
-      format='none',
-      legend_show=true,
-      logBase1Y=10,
-      aliasColors={
-        [get_sent]: 'green',
-        [received]: 'light-blue',
-        [get_received]: 'blue',
-        [sent]: 'light-green',
-      },
-    ).addTargets([
-      prometheus.target(
-        namespace + '_distributed_db_message_get_protocols_messages{action="sent",' + std.extVar('node_instance_label') + '="$node_instance"}',
-        legendFormat=get_sent,
-      ),
-      prometheus.target(
-        namespace + '_distributed_db_message_protocol_messages{action="received",' + std.extVar('node_instance_label') + '="$node_instance"}',
-        legendFormat=received,
-      ),
-      prometheus.target(
-        namespace + '_distributed_db_message_get_protocols_messages{action="received",' + std.extVar('node_instance_label') + '="$node_instance"}',
-        legendFormat=get_received,
-      ),
-      prometheus.target(
-        namespace + '_distributed_db_message_protocol_messages{action="sent",' + std.extVar('node_instance_label') + '="$node_instance"}',
-        legendFormat=sent,
-      ),
-    ]),
+      protoBranch(h, w, x, y): self.base('protocol branch', 'protocol branch', 'protocol_branch', 'protocol_branch', h, w, x, y),
 
-  DDBProtoBranch:
-    local get_sent = 'get protocol branch sent';
-    local received = 'protocol branch received';
-    local get_received = 'get protocol branch received';
-    local sent = 'protocol branch sent';
-    graphPanel.new(
-      title='DDB protocol branch messages',
-      datasource='Prometheus',
-      linewidth=1,
-      format='none',
-      legend_show=true,
-      logBase1Y=10,
-      aliasColors={
-        [get_sent]: 'green',
-        [received]: 'light-blue',
-        [get_received]: 'blue',
-        [sent]: 'light-green',
-      },
-    ).addTargets([
-      prometheus.target(
-        namespace + '_distributed_db_message_get_protocol_branch_messages{action="sent",' + std.extVar('node_instance_label') + '="$node_instance"}',
-        legendFormat=get_sent,
-      ),
-      prometheus.target(
-        namespace + '_distributed_db_message_protocol_branch_messages{action="received",' + std.extVar('node_instance_label') + '="$node_instance"}',
-        legendFormat=received,
-      ),
-      prometheus.target(
-        namespace + '_distributed_db_message_get_protocol_branch_messages{action="received",' + std.extVar('node_instance_label') + '="$node_instance"}',
-        legendFormat=get_received,
-      ),
-      prometheus.target(
-        namespace + '_distributed_db_message_protocol_branch_messages{action="sent",' + std.extVar('node_instance_label') + '="$node_instance"}',
-        legendFormat=sent,
-      ),
-    ]),
+      checkpoint(h, w, x, y): self.base('checkpoint', 'checkpoint', 'checkpoint', 'checkpoint', h, w, x, y),
 
-  DDBCheckpoint:
-    local get_sent = 'get checkpoint sent';
-    local received = 'checkpoint received';
-    local get_received = 'get checkpoint received';
-    local sent = 'checkpoint sent';
-    graphPanel.new(
-      title='DDB checkpoint messages',
-      datasource='Prometheus',
-      linewidth=1,
-      format='none',
-      legend_show=true,
-      logBase1Y=10,
-      aliasColors={
-        [get_sent]: 'green',
-        [received]: 'light-blue',
-        [get_received]: 'blue',
-        [sent]: 'light-green',
-      },
-    ).addTargets([
-      prometheus.target(
-        namespace + '_distributed_db_message_get_checkpoint_messages{action="sent",' + std.extVar('node_instance_label') + '="$node_instance"}',
-        legendFormat=get_sent,
-      ),
-      prometheus.target(
-        namespace + '_distributed_db_message_checkpoint_messages{action="received",' + std.extVar('node_instance_label') + '="$node_instance"}',
-        legendFormat=received,
-      ),
-      prometheus.target(
-        namespace + '_distributed_db_message_get_checkpoint_messages{action="received",' + std.extVar('node_instance_label') + '="$node_instance"}',
-        legendFormat=get_received,
-      ),
-      prometheus.target(
-        namespace + '_distributed_db_message_checkpoint_messages{action="sent",' + std.extVar('node_instance_label') + '="$node_instance"}',
-        legendFormat=sent,
-      ),
-    ]),
+      deactivate(h, w, x, y): self.base('deactivate', 'deactivate', 'deactivate', 'deactivate', h, w, x, y),
 
-  DDBDeactivate:
-    local get_sent = 'get deactivate sent';
-    local received = 'deactivate received';
-    local get_received = 'get deactivate received';
-    local sent = 'deactivate sent';
-    graphPanel.new(
-      title='DDB deactivate messages',
-      datasource='Prometheus',
-      linewidth=1,
-      format='none',
-      legend_show=true,
-      logBase1Y=10,
-      aliasColors={
-        [get_sent]: 'green',
-        [received]: 'light-blue',
-        [get_received]: 'blue',
-        [sent]: 'light-green',
-      },
-    ).addTargets([
-      prometheus.target(
-        namespace + '_distributed_db_message_get_deactivate_messages{action="sent",' + std.extVar('node_instance_label') + '="$node_instance"}',
-        legendFormat=get_sent,
-      ),
-      prometheus.target(
-        namespace + '_distributed_db_message_deactivate_messages{action="received",' + std.extVar('node_instance_label') + '="$node_instance"}',
-        legendFormat=received,
-      ),
-      prometheus.target(
-        namespace + '_distributed_db_message_get_deactivate_messages{action="received",' + std.extVar('node_instance_label') + '="$node_instance"}',
-        legendFormat=get_received,
-      ),
-      prometheus.target(
-        namespace + '_distributed_db_message_deactivate_messages{action="sent",' + std.extVar('node_instance_label') + '="$node_instance"}',
-        legendFormat=sent,
-      ),
-    ]),
+      currentHead(h, w, x, y):
+        local getBroadcasted = 'get current head broadcasted';
+        local getSent = 'get current head sent';
+        local received = 'current head received';
+        local getReceived = 'get current head received';
+        local sent = 'current head sent';
+        local broadcasted = 'current head broadcasted';
+        local queryGet(t) = query.prometheus.new('Prometheus', base.namespace + '_distributed_db_message_get_current_head_messages{action="' + t + '",' + base.node_instance + '="$node_instance"}');
+        local query(t) = grafonnet.query.prometheus.new('Prometheus', base.namespace + '_distributed_db_message_current_head_messages{action="' + t + '",' + base.node_instance + '="$node_instance"}');
+        local getBroadcastedQuery = queryGet('broadcasted')
+                                    + grafonnet.query.prometheus.withLegendFormat(getBroadcasted);
+        local getSentQuery = queryGet('sent')
+                             + grafonnet.query.prometheus.withLegendFormat(getSent);
+        local receivedQuery = query('received')
+                              + grafonnet.query.prometheus.withLegendFormat(received);
+        local getReceivedQuery = queryGet('received')
+                                 + grafonnet.query.prometheus.withLegendFormat(getReceived);
+        local sentQuery = query('sent')
+                          + grafonnet.query.prometheus.withLegendFormat(sent);
+        local broadcastedQuery = query('broadcased')
+                                 + grafonnet.query.prometheus.withLegendFormat(broadcasted);
+        graph.new('DDB current head messages', [getBroadcastedQuery, getSentQuery, receivedQuery, getReceivedQuery, sentQuery, broadcastedQuery], h, w, x, y)
+        + graph.withLogScale()
+        + graph.withQueryColor([[getBroadcasted, 'green'], [getSent, 'green'], [received, 'light-blue'], [getReceived, 'blue'], [sent, 'light-green'], [broadcasted, 'light-green']]),
 
+    },
 }
