@@ -210,3 +210,40 @@ module Baker = struct
         client
   end
 end
+
+module Teztale = struct
+  include Teztale
+
+  module Server = struct
+    include Teztale.Server
+
+    let run agent ?(path = Uses.path Constant.teztale_server) ?name ?address
+        ?port ?users ?admin () =
+      let runner = Agent.runner agent in
+      let address =
+        match address with
+        | Some address -> address
+        | None -> Agent.point agent |> Option.map fst
+      in
+      let port =
+        match port with
+        | Some port -> port
+        | None -> (
+            match Agent.point agent |> Option.map snd with
+            | Some port -> port
+            | None -> Agent.next_available_port agent)
+      in
+      let* path = Agent.copy agent ~source:path in
+      Teztale.Server.run ?runner ~path ~port ?name ?address ?users ?admin ()
+  end
+
+  module Archiver = struct
+    include Teztale.Archiver
+
+    let run agent ?(path = Uses.path Constant.teztale_archiver) ?name ~node_port
+        user feed =
+      let runner = Agent.runner agent in
+      let* path = Agent.copy agent ~source:path in
+      Teztale.Archiver.run ?runner ~path ?name ~node_port user feed
+  end
+end

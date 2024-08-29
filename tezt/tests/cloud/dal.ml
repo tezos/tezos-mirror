@@ -248,92 +248,31 @@ end
 
 module Teztale = struct
   type t = {
-    server_daemon : Process.t;
-    port : int;
-    mutable archivers : Process.t list;
+    server : Teztale.Server.t;
+    mutable archivers : Teztale.Archiver.t list;
   }
 
-  let make_configuration ~port =
-    let teztale_sqlite =
-      Format.asprintf
-        "sqlite3:%s/teztale.sqlite"
-        (Filename.get_temp_dir_name ())
-    in
-    Format.asprintf
-      {|
-{
-    "db": "%s",
-    "interfaces": [
-      {
-        "address": "127.0.0.1",
-        "port": %d
-      }
-    ],
-    "admins": [
-      {
-        "login": "admin",
-        "password": "saucisse"
-      }
-    ],
-    "users": [
-      {
-        "login": "user",
-        "password": "saucisse"
-      }
-    ],
-    "with_transaction": "FULL"
-}
-|}
-      teztale_sqlite
-      port
+  let fresh_user =
+    let i = ref (-1) in
+    fun () : Teztale.user ->
+      incr i ;
+      let login = "teztale-archiver-" ^ string_of_int !i in
+      {login; password = login}
 
   let run_server
       ?(path = Uses.(path (make ~tag:"codec" ~path:"./octez-teztale-server")))
       agent =
-    let runner = Agent.runner agent in
-    let configuration_file =
-      Filename.get_temp_dir_name () // "teztale-config.json"
-    in
-    let port = Agent.next_available_port agent in
-    let configuration = make_configuration ~port in
-    let* () =
-      match runner with
-      | None ->
-          write_file configuration_file ~contents:configuration ;
-          Lwt.return_unit
-      | Some runner ->
-          let cmd =
-            Runner.Shell.(
-              redirect_stdout (cmd [] "echo" [configuration]) configuration_file)
-          in
-          let cmd, args = Runner.wrap_with_ssh runner cmd in
-          Process.spawn cmd args |> Process.check
-    in
-    let* path = Agent.copy agent ~source:path in
-    let server_daemon =
-      Process.spawn ~name:"teztale-server" ?runner path [configuration_file]
-    in
-    (* Wait a bit it starts. *)
-    let* () = Lwt_unix.sleep 0.5 in
-    Lwt.return {server_daemon; port; archivers = []}
+    let* server = Teztale.Server.run ~path agent () in
+    Lwt.return {server; archivers = []}
 
-  let run_archiver
+  let add_archiver
       ?(path = Uses.(path (make ~tag:"codec" ~path:"./octez-teztale-archiver")))
       t agent ~node_port =
-    let runner = Agent.runner agent in
-    let node_endpoint = Format.asprintf "http://127.0.0.1:%d" node_port in
-    let teztale_endpoint =
-      Format.asprintf "http://user:saucisse@127.0.0.1:%d" t.port
-    in
-    let* path = Agent.copy agent ~source:path in
-    let archiver_daemon =
-      Process.spawn
-        ~name:"teztale-archiver"
-        ?runner
-        path
-        ["--endpoint"; node_endpoint; "feed"; teztale_endpoint]
-    in
-    t.archivers <- archiver_daemon :: t.archivers ;
+    let user = fresh_user () in
+    let feed : Teztale.interface list = [t.server.conf.interface] in
+    let* () = Lwt_result.get_exn (Teztale.Server.add_user t.server user) in
+    let* archiver = Teztale.Archiver.run agent ~path user feed ~node_port in
+    t.archivers <- archiver :: t.archivers ;
     Lwt.return_unit
 end
 
@@ -1120,7 +1059,7 @@ let init_teztale agent node =
   if Cli.teztale then
     let* teztale = Teztale.run_server agent in
     let* () =
-      Teztale.run_archiver teztale agent ~node_port:(Node.rpc_port node)
+      Teztale.add_archiver teztale agent ~node_port:(Node.rpc_port node)
     in
     Lwt.return_some teztale
   else Lwt.return_none
