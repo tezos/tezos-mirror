@@ -637,20 +637,19 @@ module State = struct
     in
 
     match try_apply with
-    | Apply_success
-        {
-          evm_state;
-          level = Qty blueprint_number;
-          block_hash = current_block_hash;
-          number_of_transactions;
-        } ->
+    | Apply_success {evm_state; block} ->
+        let number_of_transactions =
+          match block.transactions with
+          | TxHash l -> List.length l
+          | TxFull l -> List.length l
+        in
         Metrics.set_block
           ~time_processed:!time_processed
           ~transactions:number_of_transactions ;
         let* () =
           Evm_store.Blueprints.store
             conn
-            {number = Qty blueprint_number; timestamp; payload}
+            {number = block.number; timestamp; payload}
         in
 
         let upgrade_candidate = check_pending_upgrade ctxt timestamp in
@@ -680,11 +679,7 @@ module State = struct
         in
         let* context = commit_next_head ctxt conn evm_state in
         return
-          ( evm_state,
-            context,
-            current_block_hash,
-            kernel_upgrade,
-            delayed_transactions )
+          (evm_state, context, block.hash, kernel_upgrade, delayed_transactions)
     | Apply_failure (* Did not produce a block *) ->
         let*! () = Blueprint_events.invalid_blueprint_produced next in
         tzfail (Cannot_apply_blueprint {local_state_level = Z.pred next})
