@@ -102,6 +102,7 @@ type argument =
   | Enable_http_cache_headers  (** [--enable-http-cache-headers] *)
   | Disable_context_pruning  (** [--disable_context-pruning] *)
   | Storage_maintenance_delay of string  (** [--storage-maintenance-delay]*)
+  | Force_history_mode_switch  (** [--force-history-mode-switch] *)
 
 (** A TLS configuration for the node: paths to a [.crt] and a [.key] file.
 

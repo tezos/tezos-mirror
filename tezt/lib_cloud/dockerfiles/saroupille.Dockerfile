@@ -11,8 +11,14 @@ RUN apt-get update && apt-get install -y \
     openssh-server \
     # Tezos dependencies
     libgmp-dev curl libev-dev libhidapi-dev \
-    # With the proxy mode we may want to run docker inside docker
-    docker.io screen \
+    # Dependencies needed for tezt-cloud
+    docker.io docker-cli screen file \
+    # iproute2 installs traffic control tooling 
+    iproute2 \
+    # emacs can be useful for debugging 
+    emacs \
+    # wget can be used to import snapshots 
+    wget \
     # Necessary certificates for mirages dependencies
     ca-certificates \
     # DL3015: Use --no-install-recommends

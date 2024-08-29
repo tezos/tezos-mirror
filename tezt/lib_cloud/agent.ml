@@ -158,7 +158,7 @@ let copy agent ~source ~destination =
       runner.ssh_port
   in
   let* exists =
-    let process = Process.spawn ~runner "ls" [destination] in
+    let process = docker_run_command agent "ls" [destination] in
     let* status = process |> Process.wait in
     match status with
     | WEXITED 0 ->
@@ -171,7 +171,7 @@ let copy agent ~source ~destination =
           (fun () ->
             let* destination_hash =
               let* output =
-                Process.spawn ~runner:agent.runner "md5sum" [destination]
+                docker_run_command agent "md5sum" [destination]
                 |> Process.check_and_read_stdout
               in
               (* md5sum output is: '<hash> <file>'. We only take the hash. *)
@@ -223,6 +223,7 @@ let copy =
      always be called before using the file copied. *)
   let already_copied = Hashtbl.create 11 in
   fun ?destination agent ~source ->
+    Log.info "COPY %s" source ;
     let destination =
       Option.value ~default:(path_of agent source) destination
     in
@@ -238,8 +239,8 @@ let copy =
         else
           let p =
             let* () =
-              Process.spawn
-                ~runner:agent.runner
+              docker_run_command
+                agent
                 "mkdir"
                 ["-p"; Filename.dirname destination]
               |> Process.check

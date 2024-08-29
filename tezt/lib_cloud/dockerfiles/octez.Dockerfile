@@ -1,5 +1,6 @@
 # Start from last known release
 FROM tezos/tezos:latest
+# FROM tezos/tezos:master_cab4999d_20240724113738
 
 # Set back the user for executing the following commands
 USER root
