@@ -56,7 +56,7 @@ module Node_metrics = struct
       name
 
   let slots_waiting_for_attestation =
-    let name = "slots_waiting_for_attestaion" in
+    let name = "slots_waiting_for_attestation" in
     Prometheus.Gauge.v_label
       ~label_name:"slot_index"
       ~help:
