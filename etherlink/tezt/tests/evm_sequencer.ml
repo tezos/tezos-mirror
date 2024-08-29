@@ -4435,7 +4435,8 @@ let test_trace_transaction =
     | _, Error _ -> Test.fail "Trace transaction shouldn't have failed (rpc)"
   in
   register_all
-    ~kernels:Kernel.all
+    ~kernels:Kernel.[Latest; Ghostnet]
+      (* Re-enable on [Mainnet] when the next upgrade happens. *)
     ~tags:["evm"; "rpc"; "trace"]
     ~title:"Sequencer can run debug_traceTransaction"
   @@ fun {sc_rollup_node; sequencer; client; proxy; _} _protocol ->
@@ -4602,7 +4603,8 @@ let check_trace expect_null expected_returned_value receipt trace =
 
 let test_trace_transaction_call =
   register_all
-    ~kernels:Kernel.all
+    ~kernels:Kernel.[Latest; Ghostnet]
+      (* Re-enable on [Mainnet] when the next upgrade happens. *)
     ~tags:["evm"; "rpc"; "trace"; "call"]
     ~title:"Sequencer can run debug_traceTransaction and return a valid log"
     ~da_fee:Wei.zero
