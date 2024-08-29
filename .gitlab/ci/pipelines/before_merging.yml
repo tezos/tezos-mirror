@@ -3995,3 +3995,47 @@ trigger:debian_repository_partial:
   needs: []
   trigger:
     include: .gitlab/ci/pipelines/debian_repository_partial.yml
+
+oc.script.docker_verify_image_arm64:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  stage: manual
+  tags:
+  - gcp
+  rules:
+  - when: manual
+    allow_failure: true
+  needs:
+  - oc.docker:arm64
+  dependencies: []
+  timeout: 60 minutes
+  before_script:
+  - ./scripts/ci/docker_initialize.sh
+  script:
+  - ./scripts/ci/docker_verify_signature.sh
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    IMAGE_ARCH_PREFIX: arm64_
+
+oc.script.docker_verify_image_amd64:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  stage: manual
+  tags:
+  - gcp
+  rules:
+  - when: manual
+    allow_failure: true
+  needs:
+  - oc.docker:amd64
+  dependencies: []
+  timeout: 60 minutes
+  before_script:
+  - ./scripts/ci/docker_initialize.sh
+  script:
+  - ./scripts/ci/docker_verify_signature.sh
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    IMAGE_ARCH_PREFIX: amd64_
