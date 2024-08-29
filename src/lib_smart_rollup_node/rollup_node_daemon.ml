@@ -105,12 +105,17 @@ let maybe_split_context node_ctxt commitment_hash head_level =
   let* last = Node_context.get_last_context_split_level node_ctxt in
   let last = Option.value last ~default:node_ctxt.genesis_info.level in
   let splitting_period =
+    (* Default splitting period is challenge window / 5 or ~ 3 days *)
+    let default =
+      (Reference.get node_ctxt.current_protocol).constants.sc_rollup
+        .challenge_window_in_blocks / 5
+      |> max 1
+    in
     Option.value
       node_ctxt.config.gc_parameters.context_splitting_period
-      ~default:
-        (Reference.get node_ctxt.current_protocol).constants.sc_rollup
-          .challenge_window_in_blocks
+      ~default
   in
+
   if Int32.(to_int @@ sub head_level last) >= splitting_period then (
     Context.split node_ctxt.context ;
     Node_context.save_context_split_level node_ctxt head_level)
