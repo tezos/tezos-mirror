@@ -1,4 +1,4 @@
-// Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>
+// Copyright (c) 2022-2024 Nomadic Labs <contact@nomadic-labs.com>
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
 // copy of this software and associated documentation files (the "Software"),
@@ -18,622 +18,223 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-local grafana = import '../vendors/grafonnet-lib/grafonnet/grafana.libsonnet';
-local dashboard = grafana.dashboard;
-local template = grafana.template;
-local singlestat = grafana.singlestat;
-local statPanel = grafana.statPanel;
-local graphPanel = grafana.graphPanel;
-local tablePanel = grafana.tablePanel;
-local prometheus = grafana.prometheus;
-local namespace = 'octez';
-local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instance"}';
+
+// Grafonnet
+local grafonnet = import 'github.com/grafana/grafonnet/gen/grafonnet-latest/main.libsonnet';
+local query = grafonnet.query;
+local panel = grafonnet.panel;
+local stat = panel.stat;
+local timeSeries = panel.timeSeries;
+
+// Base
+local base = import './base.jsonnet';
+local namespace = base.namespace;
+local node_instance = base.node_instance;
+local prometheus = base.prometheus;
+local info = base.info;
+local infoName = base.infoName;
+local graph = base.graph;
+local table = base.table;
 
 //##
-// Octez related stats
+// Octez node related stats
 //##
 
 {
-  releaseVersionInfo:
-    singlestat.new(
-      title='Node release version',
-      datasource='Prometheus',
-      format='none',
-      valueName='name',
-    ).addTarget(
-      prometheus.target(
-        namespace + '_version' + node_instance,
-        legendFormat='{{ version }}',
-        instant=true
-      )
-    ),
 
-  releaseCommitInfo:
-    singlestat.new(
-      title='Node release commit',
-      datasource='Prometheus',
-      format='none',
-      valueName='name',
-    ).addTarget(
-      prometheus.target(
-        '(label_replace(' + namespace + '_version' + node_instance + ',"commit_hash_short" ,"$1","commit_hash","^(.{8}).*$"))',
-        legendFormat='{{ commit_hash_short }}',
-        instant=true
-      )
-    ),
+  releaseVersionInfo(h, w, x, y):
+    local q = prometheus('version', legendFormat='{{ version }}');
+    info.new('Node release version', q, h, w, x, y) + info.withName(),
 
-  chainNameInfo:
-    singlestat.new(
-      title='Chain name',
-      datasource='Prometheus',
-      format='none',
-      valueName='name',
-    ).addTarget(
-      prometheus.target(
-        namespace + '_version' + node_instance,
-        legendFormat='{{ chain_name }}',
-        instant=true
-      )
-    ),
+  releaseCommitInfo(h, w, x, y):
+    local q = query.prometheus.new('Prometheus', '(label_replace(' + namespace + '_version' + base.node_instance_query + ',"commit_hash_short" ,"$1","commit_hash","^(.{8}).*$"))')
+              + query.prometheus.withLegendFormat('{{ commit_hash_short }}');
+    info.new('Node release commit', q, h, w, x, y) + info.withName(),
 
-  p2pVersion:
-    singlestat.new(
-      title='P2p version',
-      datasource='Prometheus',
-      format='none',
-      valueName='name',
-    ).addTarget(
-      prometheus.target(
-        namespace + '_version' + node_instance,
-        legendFormat='{{ p2p_version }}',
-        instant=true
-      )
-    ),
+  chainNameInfo(h, w, x, y):
+    local q = prometheus('version', legendFormat='{{ chain_name }}');
+    info.new('Chain name', q, h, w, x, y) + info.withName(),
 
-  distributedDbVersion:
-    singlestat.new(
-      title='Distributed db version',
-      datasource='Prometheus',
-      format='none',
-      valueName='value',
-    ).addTarget(
-      prometheus.target(
-        namespace + '_version' + node_instance,
-        legendFormat='{{ distributed_db_version }}',
-        instant=true
-      )
-    ),
+  p2pVersion(h, w, x, y):
+    local q = prometheus('version', legendFormat='{{ p2p_version }}');
+    info.new('P2p version', q, h, w, x, y),
 
-  bootstrapStatus:
-    statPanel.new(
-      title='Bootstrap status',
-      datasource='Prometheus',
-    ).addMappings(
-      [
-        {
-          options: {
-            '0': {
-              color: 'red',
-              index: 1,
-              text: 'Bootstrapping',
-            },
-            '1': {
-              color: 'green',
-              index: 0,
-              text: 'Bootstrapped',
-            },
-            'null': {
-              color: 'yellow',
-              index: 2,
-              text: 'Unknown',
-            },
-          },
-          type: 'value',
-        },
-      ],
-    ).addTarget(
-      prometheus.target(
-        namespace + '_validator_chain_is_bootstrapped' + node_instance,
-        instant=true
-      )
-    ),
+  distributedDbVersion(h, w, x, y):
+    local q = prometheus('version', legendFormat='{{ distributed_db_version }}');
+    info.new('Distributed db version', q, h, w, x, y),
 
-  syncStatus:
-    statPanel.new(
-      title='Sync status',
-      datasource='Prometheus',
-    ).addMappings(
-      [
-        {
-          options: {
-            '0': {
-              color: 'red',
-              index: 0,
-              text: 'Unsync',
-            },
-            '1': {
-              color: 'green',
-              index: 1,
-              text: 'Sync',
-            },
-            '2': {
-              color: 'red',
-              index: 2,
-              text: 'Stuck',
-            },
-            'null': {
-              color: 'yellow',
-              index: 3,
-              text: 'Unknow',
-            },
-          },
-          type: 'value',
-        },
-      ],
-    ).addTarget(
-      prometheus.target(
-        namespace + '_validator_chain_synchronisation_status' + node_instance,
-        instant=true
-      )
-    ),
+  bootstrapStatus(h, w, x, y):
+    local q = prometheus('validator_chain_is_bootstrapped');
+    info.new('Bootstrap status', q, h, w, x, y)
+    + info.withMapping([['0', 'Bootstrapping', 'red'], ['1', 'Bootstrapped', 'green']]),
 
-  // Reflects the uptime of the monitoring of the job, not the uptime
-  // of the process.
-  uptime:
-    singlestat.new(
-      title='Node uptime',
-      datasource='Prometheus',
-      format='dtdhms',
-      valueName='max',
-      description='Reflects the uptime of the monitoring of the job, not the uptime of the process.',
-    ).addTarget(
-      prometheus.target(
-        'time()-(process_start_time_seconds' + node_instance + ')',
-        legendFormat='node uptime',
-        instant=true
-      )
-    ),
+  syncStatus(h, w, x, y):
+    local q = prometheus('validator_chain_synchronisation_status');
+    info.new('Sync status', q, h, w, x, y)
+    + info.withMapping([['0', 'Unsync', 'red'], ['1', 'Sync', 'green'], ['2', 'Stuck', 'red']]),
 
-  headLevel:
-    singlestat.new(
-      title='Current head level',
-      datasource='Prometheus',
-      format='none',
-    ).addTarget(
-      prometheus.target(
-        namespace + '_validator_chain_head_level' + node_instance,
-        legendFormat='current head level',
-        instant=true
-      )
-    ),
+  uptime(h, w, x, y):
+    local q = query.prometheus.new('Prometheus', 'time()-(process_start_time_seconds' + base.node_instance_query + ')')
+              + query.prometheus.withLegendFormat('node uptime');
+    info.new('Node uptime', q, h, w, x, y)
+    + stat.panelOptions.withDescription('Reflects the uptime of the monitoring of the job, not the uptime of the process.')
+    + stat.standardOptions.withUnit('dtdhms')
+    + stat.options.withTextMode('max'),
 
-  savepointLevel:
-    singlestat.new(
-      title='Current savepoint level',
-      datasource='Prometheus',
-      format='none',
-    ).addTarget(
-      prometheus.target(
-        namespace + '_store_savepoint_level' + node_instance,
-        legendFormat='current savepoint',
-        instant=true
-      )
-    ),
+  headLevel(h, w, x, y):
+    local q = prometheus('validator_chain_head_level', legendFormat='currrent head level');
+    info.new('Current head level', q, h, w, x, y),
 
-  checkpointLevel:
-    singlestat.new(
-      title='Current checkpoint level',
-      datasource='Prometheus',
-      format='none'
-    ).addTarget(
-      prometheus.target(
-        namespace + '_store_checkpoint_level' + node_instance,
-        legendFormat='current checkpoint',
-        instant=true
-      )
-    ),
+  savepointLevel(h, w, x, y):
+    local q = prometheus('store_savepoint_level', legendFormat='current savepoint');
+    info.new('Current savepoint level', q, h, w, x, y),
 
-  cabooseLevel:
-    singlestat.new(
-      title='Current caboose level',
-      datasource='Prometheus',
-      format='none'
-    ).addTarget(
-      prometheus.target(
-        namespace + '_store_caboose_level' + node_instance,
-        legendFormat='current caboose',
-        instant=true
-      )
-    ),
+  checkpointLevel(h, w, x, y):
+    local q = prometheus('store_checkpoint_level', legendFormat='current checkpoint');
+    info.new('Current checkpoint level', q, h, w, x, y),
 
-  levelsTable:
-    tablePanel.new(
-      title='Chain levels',
-      datasource='Prometheus',
-      transform=('timeseries_to_rows'),
-    ).addTargets([
-      prometheus.target(
-        namespace + '_validator_chain_head_cycle' + node_instance,
-        legendFormat='Current cycle',
-        instant=true
-      ),
-      prometheus.target(
-        namespace + '_store_caboose_level' + node_instance,
-        legendFormat='Current caboose',
-        instant=true
-      ),
-      prometheus.target(
-        namespace + '_store_checkpoint_level' + node_instance,
-        legendFormat='Current checkpoint',
-        instant=true
-      ),
-      prometheus.target(
-        namespace + '_store_savepoint_level' + node_instance,
-        legendFormat='Current savepoint',
-        instant=true
-      ),
-    ]).hideColumn('Time'),
+  cabooseLevel(h, w, x, y):
+    local q = prometheus('store_caboose_level', legendFormat='current caboose');
+    info.new('Current caboose level', q, h, w, x, y),
 
+  levelsTable(h, w, x, y):
+    local cycleQuery = prometheus('validator_chain_head_cycle', legendFormat='current cycle');
+    local cabooseQuery = prometheus('store_caboose_level', legendFormat='current caboose');
+    local checkpointQuery = prometheus('store_checkpoint_level', legendFormat='current checkpoint');
+    local savepointQuery = prometheus('store_savepoint_level', legendFormat='current savepoint');
+    table('Chain levels', [cycleQuery, cabooseQuery, checkpointQuery, savepointQuery], h, w, x, y),
 
-  headCycleLevel:
-    singlestat.new(
-      title='Current cycle',
-      datasource='Prometheus',
-      format='none'
-    ).addTarget(
-      prometheus.target(
-        namespace + '_validator_chain_head_cycle' + node_instance,
-        legendFormat='Current cycle',
-        instant=true
-      )
-    ),
+  headCycleLevel(h, w, x, y):
+    local q = prometheus('validator_chain_head_cycle', legendFormat='current cycle');
+    info.new('Current cycle', q, h, w, x, y),
 
-  headHistory:
-    local head = 'Head level';
-    graphPanel.new(
-      title='Head level history',
-      datasource='Prometheus',
-      linewidth=1,
-      format='none',
-      legend_show=false,
-      aliasColors={
-        [head]: 'green',
-      },
-    ).addTarget(
-      prometheus.target(
-        namespace + '_validator_chain_head_level' + node_instance,
-        legendFormat=head
-      )
-    ),
+  headHistory(h, w, x, y):
+    local q = prometheus('validator_chain_head_level', legendFormat='Head level');
+    graph.new('Head level history', [q], h, w, x, y)
+    + timeSeries.options.legend.withShowLegend(false),
 
+  invalidBlocksHistory(h, w, x, y):
+    local q = prometheus('store_invalid_blocks', legendFormat='Invalid blocks history');
+    graph.new('Invalid blocks history', [q], h, w, x, y)
+    + graph.withFixedColor('light-red')
+    + graph.withLegendBottom(calcs=['lastNotNull', 'max']),
 
-  invalidBlocksHistory:
-    local blocks = 'Invalid blocks';
-    graphPanel.new(
-      title='Invalid blocks history',
-      datasource='Prometheus',
-      linewidth=1,
-      format='none',
-      legend_alignAsTable=true,
-      legend_max=true,
-      legend_current=true,
-      legend_values=true,
-      aliasColors={
-        [blocks]: 'light-red',
-      },
-    ).addTarget(
-      prometheus.target(
-        namespace + '_store_invalid_blocks' + node_instance,
-        legendFormat=blocks,
-      )
-    ),
+  invalidBlocksMean(h, w, x, y):
+    local q = prometheus('store_invalid_blocks', legendFormat='current cycle');
+    info.new('Invalid blocks mean', q, h, w, x, y, instant=false)
+    + stat.options.withColorMode('value')
+    + stat.options.withGraphMode('area'),
 
-  invalidBlocksMean: statPanel.new(
-    title='Invalid blocks mean',
-    datasource='Prometheus',
-  ).addTarget(
-    prometheus.target(
-      namespace + '_store_invalid_blocks' + node_instance
-    )
-  ).addThresholds([
-    {
-      color: 'green',
-      value: 0,
-    },
-    {
-      color: 'red',
-      value: 1,
-    },
-  ]),
+  alternateHeadsCount(h, w, x, y):
+    local q = prometheus('store_alternate_heads_count', legendFormat='Alternate heads count');
+    graph.new('Alternate heads count', [q], h, w, x, y)
+    + timeSeries.options.legend.withShowLegend(false)
+    + graph.withFixedColor('light-yellow'),
 
-  alternateHeadsCount:
-    local alternateHeads = 'Alternate heads count';
-    graphPanel.new(
-      title='Alternate heads count',
-      datasource='Prometheus',
-      linewidth=1,
-      format='none',
-      aliasColors={
-        [alternateHeads]: 'yellow',
-      },
-    ).addTarget(
-      prometheus.target(
-        namespace + '_store_alternate_heads_count' + node_instance,
-        legendFormat=alternateHeads,
-      )
-    ),
+  headOperations(h, w, x, y):
+    local consensusQuery = query.prometheus.new('Prometheus', base.namespace + '_validator_block_operations_per_pass{pass_id="0",' + base.node_instance + '="$node_instance"}')
+                           + query.prometheus.withLegendFormat('Consensus');
+    local voteQuery = query.prometheus.new('Prometheus', base.namespace + '_validator_block_operations_per_pass{pass_id="1",' + base.node_instance + '="$node_instance"}')
+                      + query.prometheus.withLegendFormat('Vote');
+    local anonymousQuery = query.prometheus.new('Prometheus', base.namespace + '_validator_block_operations_per_pass{pass_id="2",' + base.node_instance + '="$node_instance"}')
+                           + query.prometheus.withLegendFormat('Anonymous');
+    local managerQuery = query.prometheus.new('Prometheus', base.namespace + '_validator_block_operations_per_pass{pass_id="3",' + base.node_instance + '="$node_instance"}')
+                         + query.prometheus.withLegendFormat('Manager');
+    graph.new('Head operations', [consensusQuery, voteQuery, anonymousQuery, managerQuery], h, w, x, y)
+    + graph.withLegendRight(calcs=['mean', 'lastNotNull', 'max', 'min']),
 
-  gasConsumedHistory:
-    local gas = 'Gas consumed';
-    graphPanel.new(
-      title='Gas consumed history',
-      datasource='Prometheus',
-      linewidth=1,
-      format='sci',
-      legend_alignAsTable=true,
-      legend_current=true,
-      legend_avg=true,
-      legend_min=true,
-      legend_max=true,
-      legend_total=true,
-      legend_values=true,
-      aliasColors={
-        [gas]: 'light-green',
-      },
-    ).addTarget(
-      prometheus.target(
-        namespace + '_validator_chain_head_consumed_gas' + node_instance,
-        legendFormat=gas,
-      )
-    ),
+  gasConsumedHistory(h, w, x, y):
+    local q = prometheus('validator_chain_head_consumed_gas', legendFormat='Gas consumed');
+    graph.new('Gas consumed history', [q], h, w, x, y)
+    + graph.withLegendBottom(calcs=['mean', 'lastNotNull', 'max', 'min']),
 
-  roundHistory:
-    local round = 'Round';
-    graphPanel.new(
-      title='Round history',
-      datasource='Prometheus',
-      linewidth=1,
-      format='none',
-      legend_max=true,
-      legend_alignAsTable=true,
-      legend_values=true,
-      aliasColors={
-        [round]: 'light-green',
-      },
-    ).addTarget(
-      prometheus.target(
-        namespace + '_validator_chain_head_round' + node_instance,
-        legendFormat=round,
-      )
-    ),
+  blocksValidationTime(h, w, x, y):
+    local completion = base.namespace + '_validator_block_last_finished_request_completion_timestamp' + base.node_instance_query;
+    local treatment = base.namespace + '_validator_block_last_finished_request_treatment_timestamp' + base.node_instance_query;
+    local q = query.prometheus.new('Prometheus', completion + '-' + treatment)
+              + query.prometheus.withLegendFormat('Validation time');
+    graph.new('Block validation time', [q], h, w, x, y)
+    + graph.withLegendBottom(calcs=['mean', 'max', 'min'])
+    + graph.withFixedColor('light-blue')
+    + timeSeries.standardOptions.withUnit('s'),
 
-  maxRound:
-    statPanel.new(
-      title='Max round',
-      datasource='Prometheus',
-      reducerFunction='max',
-    ).addTarget(
-      prometheus.target(
-        namespace + '_validator_chain_head_round' + node_instance,
-      )
-    ),
+  blocksValidationMean(h, w, x, y):
+    local completion = base.namespace + '_validator_block_last_finished_request_completion_timestamp' + base.node_instance_query;
+    local treatment = base.namespace + '_validator_block_last_finished_request_treatment_timestamp' + base.node_instance_query;
+    local q = query.prometheus.new('Prometheus', completion + '-' + treatment)
+              + query.prometheus.withLegendFormat('block validation mean');
+    info.new('Block validation mean', q, h, w, x, y, instant=false)
+    + stat.options.withColorMode('value')
+    + stat.options.withGraphMode('area')
+    + info.withThreshold([['0', 'green'], ['1', 'red']]),
 
-  branchSwitchCount:
-    statPanel.new(
-      title='Branch switch count',
-      datasource='Prometheus',
-    ).addTarget(
-      prometheus.target(
-        namespace + '_validator_chain_branch_switch_count' + node_instance,
-      )
-    ),
+  roundHistory(h, w, x, y):
+    local q = prometheus('validator_chain_head_round', legendFormat='Round');
+    graph.new('Round history', [q], h, w, x, y)
+    + graph.withLegendBottom(calcs=['max']),
 
-  blocksValidationTime:
-    local treatment = namespace + '_validator_block_last_finished_request_treatment_timestamp' + node_instance;
-    local completion = namespace + '_validator_block_last_finished_request_completion_timestamp' + node_instance;
-    local validation = 'Validation time';
-    graphPanel.new(
-      title='Block validation time',
-      datasource='Prometheus',
-      linewidth=1,
-      format='s',
-      legend_alignAsTable=true,
-      legend_avg=true,
-      legend_min=true,
-      legend_max=true,
-      legend_values=true,
-      aliasColors={
-        [validation]: 'light-blue',
-      },
-    ).addTarget(
-      prometheus.target(
-        completion + ' - ' + treatment,
-        format='time_series',
-        legendFormat=validation,
-      )
-    ),
+  maxRound(h, w, x, y):
+    local q = prometheus('validator_chain_head_round');
+    local threshold =
+      [['0', 'green'], ['2', 'yellow'], ['4', 'red']];
+    info.new('Max round', q, h, w, x, y, instant=false)
+    + stat.options.reduceOptions.withCalcs(['max'])
+    + stat.options.withColorMode('value')
+    + stat.options.withGraphMode('area')
+    + info.withThreshold(threshold),
 
-  blocksValidationMean:
-    local treatment = namespace + '_validator_block_last_finished_request_treatment_timestamp' + node_instance;
-    local completion = namespace + '_validator_block_last_finished_request_completion_timestamp' + node_instance;
-    local blocksValidation = 'blocks validation mean';
-    statPanel.new(
-      title='Blocks validation mean',
-      datasource='Prometheus',
-    ).addTarget(
-      prometheus.target(
-        completion + ' - ' + treatment,
-        legendFormat=blocksValidation,
-      )
-    ).addThresholds([
-      {
-        color: 'green',
-        value: 0,
-      },
-      {
-        color: 'red',
-        value: 1,
-      },
-    ]),
+  branchSwitchCount(h, w, x, y):
+    local q = prometheus('validator_chain_branch_switch_count');
+    info.new('Branch switch count', q, h, w, x, y, instant=false)
+    + stat.options.withGraphMode('area')
+    + stat.standardOptions.color.withMode('fixed'),
 
-  headOperations:
-    local consensus = 'Consensus';
-    local vote = 'Vote';
-    local anonymous = 'Anonymous';
-    local manager = 'Manager';
-    graphPanel.new(
-      title='Head operations',
-      datasource='Prometheus',
-      linewidth=1,
-      format='none',
-      decimals=0,
-      legend_alignAsTable=true,
-      legend_current=true,
-      legend_avg=true,
-      legend_min=true,
-      legend_max=true,
-      legend_rightSide=true,
-      legend_show=true,
-      legend_values=true,
-      aliasColors={
-      },
-    ).addTarget(
-      prometheus.target(
-        namespace + '_validator_block_operations_per_pass{pass_id="0",' + std.extVar('node_instance_label') + '="$node_instance"}',
-        legendFormat=consensus,
-      )
-    ).addTarget(
-      prometheus.target(
-        namespace + '_validator_block_operations_per_pass{pass_id="1",' + std.extVar('node_instance_label') + '="$node_instance"}',
-        legendFormat=vote,
-      )
-    ).addTarget(
-      prometheus.target(
-        namespace + '_validator_block_operations_per_pass{pass_id="2",' + std.extVar('node_instance_label') + '="$node_instance"}',
-        legendFormat=anonymous,
-      )
-    ).addTarget(
-      prometheus.target(
-        namespace + '_validator_block_operations_per_pass{pass_id="3",' + std.extVar('node_instance_label') + '="$node_instance"}',
-        legendFormat=manager,
-      )
-    )
-  ,
+  storeMergeTimeGraph(h, w, x, y):
+    local q = prometheus('store_last_merge_time', legendFormat='Merge Time');
+    graph.new('Store merge time', [q], h, w, x, y)
+    + graph.withLegendBottom(calcs=['lastNotNull', 'max'])
+    + graph.withFixedColor('light-blue')
+    + timeSeries.standardOptions.withUnit('s'),
 
-  storeMergeTimeGraph:
-    local mergeTime = 'Merge time';
-    graphPanel.new(
-      title='Store merge time',
-      datasource='Prometheus',
-      linewidth=1,
-      format='s',
-      legend_alignAsTable=true,
-      legend_max=true,
-      legend_current=true,
-      legend_values=true,
-      aliasColors={
-        [mergeTime]: 'light-blue',
-      },
-    ).addTarget(
-      prometheus.target(
-        namespace + '_store_last_merge_time' + node_instance,
-        legendFormat=mergeTime,
-      )
-    )
-  ,
+  storeMergeTime(h, w, x, y):
+    local q = prometheus('store_last_merge_time', legendFormat='Round');
+    info.new('Store merge time', q, h, w, x, y, instant=false)
+    + stat.options.withGraphMode('area')
+    + stat.standardOptions.color.withMode('fixed'),
 
-  storeMergeTime:
-    local mergeTime = 'Merge time';
-    statPanel.new(
-      title='Store merge time',
-      datasource='Prometheus',
-    ).addTarget(
-      prometheus.target(
-        namespace + '_store_last_merge_time' + node_instance,
-        legendFormat=mergeTime,
-      )
-    )
-  ,
+  writtenBlockSize(h, w, x, y):
+    local q = prometheus('store_last_written_block_size', legendFormat='Written block size');
+    graph.new('Last written block size', [q], h, w, x, y)
+    + graph.withLegendBottom(calcs=['mean', 'lastNotNull', 'max', 'min'])
+    + timeSeries.standardOptions.withUnit('bytes'),
 
-  writtenBlockSize:
-    local writtenBlockSize = 'Written block size';
-    graphPanel.new(
-      title='Last written block size',
-      datasource='Prometheus',
-      linewidth=1,
-      format='bytes',
-      legend_alignAsTable=true,
-      legend_min=true,
-      legend_avg=true,
-      legend_max=true,
-      legend_total=true,
-      legend_current=true,
-      legend_values=true,
-      aliasColors={
-        [writtenBlockSize]: 'light-green',
-      },
-    ).addTarget(
-      prometheus.target(
-        namespace + '_store_last_written_block_size' + node_instance,
-        legendFormat=writtenBlockSize,
-      )
-    )
-  ,
 
   //## GC
 
-  gcOperations:
+  gcOperations(h, w, x, y):
     local minor = 'Minor collections';
     local major = 'Major collections';
     local forced = 'Forced major collections';
     local compact = 'Heap compactions';
-    graphPanel.new(
-      title='GC maintenance operations',
-      datasource='Prometheus',
-      linewidth=1,
-      format='none',
-      logBase1Y=10,
-      aliasColors={
-        [minor]: 'light-green',
-        [major]: 'light-yellow',
-        [forced]: 'light-blue',
-        [compact]: 'light-red',
-      },
-    ).addTargets([
-      prometheus.target(
-        'ocaml_gc_minor_collections' + node_instance,
-        legendFormat=minor,
-      ),
-      prometheus.target(
-        'ocaml_gc_major_collections' + node_instance,
-        legendFormat=major,
-      ),
-      prometheus.target(
-        'ocaml_gc_forced_major_collections' + node_instance,
-        legendFormat=forced,
-      ),
-      prometheus.target(
-        'ocaml_gc_compactions' + node_instance,
-        legendFormat=compact,
-      ),
-    ]),
+    local minorQuery = query.prometheus.new('Prometheus', 'ocaml_gc_minor_collections' + base.node_instance_query)
+                       + query.prometheus.withLegendFormat(minor);
+    local majorQuery = query.prometheus.new('Prometheus', 'ocaml_gc_major_collections' + base.node_instance_query)
+                       + query.prometheus.withLegendFormat(major);
+    local forcedQuery = query.prometheus.new('Prometheus', 'ocaml_gc_forced_major_collections' + base.node_instance_query)
+                        + query.prometheus.withLegendFormat(forced);
+    local compactQuery = query.prometheus.new('Prometheus', 'ocaml_gc_compactions' + base.node_instance_query)
+                         + query.prometheus.withLegendFormat(compact);
+    graph.new('GC maintenance operations', [minorQuery, majorQuery, forcedQuery, compactQuery], h, w, x, y)
+    + graph.withLogScale()
+    + graph.withQueryColor([[minor, 'light-green'], [major, 'light-yellow'], [forced, 'light-blue'], [compact, 'light-red']]),
 
-  gcMajorHeap:
+  gcMajorHeap(h, w, x, y):
     local major = 'Major heap';
-    graphPanel.new(
-      title='GC major word sizes',
-      datasource='Prometheus',
-      linewidth=1,
-      format='bytes',
-      legend_show=false,
-      aliasColors={
-        [major]: 'light-green',
-      },
-    ).addTarget(
-      prometheus.target(
-        'ocaml_gc_heap_words' + node_instance + '* 8',
-        legendFormat=major,
-      )
-    ),
+    local majorQuery = query.prometheus.new('Prometheus', 'ocaml_gc_heap_words' + base.node_instance_query + '* 8')
+                       + query.prometheus.withLegendFormat(major);
+    graph.new('GC major word sizes', [majorQuery], h, w, x, y)
+    + graph.withQueryColor([[major, 'light-green']])
+    + timeSeries.standardOptions.withUnit('bytes')
+    + timeSeries.options.legend.withShowLegend(false),
 
 }

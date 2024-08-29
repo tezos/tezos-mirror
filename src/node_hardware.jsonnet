@@ -1,4 +1,4 @@
-// Copyright (c) 2022-2023 Nomadic Labs <contact@nomadic-labs.com>
+// Copyright (c) 2022-2024 Nomadic Labs <contact@nomadic-labs.com>
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
 // copy of this software and associated documentation files (the "Software"),
@@ -18,218 +18,98 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-local grafana = import '../vendors/grafonnet-lib/grafonnet/grafana.libsonnet';
-local stat = grafana.statPanel;
-local graphPanel = grafana.graphPanel;
-local prometheus = grafana.prometheus;
+
+// Grafonnet
+local grafonnet = import 'github.com/grafana/grafonnet/gen/grafonnet-latest/main.libsonnet';
+local query = grafonnet.query;
+local timeSeries = grafonnet.panel.timeSeries;
+local stat = grafonnet.panel.stat;
+
+// Base
+local base = import './base.jsonnet';
+local graph = base.graph;
+
 local filecheck = std.extVar('storage_mode') == 'filecheck';
-local netdata_legacy = std.extVar('netdata') == 'legacy';
 
 //##
-// Hardware relates stats
+// Node Hardware related stats
 //##
 
 {
-  ios:
+
+  // Query helper
+  query(q, legendFormat):
+    query.prometheus.new('Prometheus', q)
+    + query.prometheus.withLegendFormat(legendFormat),
+
+  ios(h, w, x, y):
     local reads = 'reads';
     local writes = 'writes';
-    local reads_target =
-      if netdata_legacy then 'netdata_apps_lreads_KiB_persec_average{dimension="octez"}'
-      else 'netdata_app_disk_logical_io_KiB_persec_average{app_group="octez",dimension="reads",' + std.extVar('node_instance_label') + '="$node_instance"}';
-    local writes_target =
-      if netdata_legacy then 'netdata_apps_lwrites_KiB_persec_average{dimension="octez"}'
-      else 'netdata_app_disk_logical_io_KiB_persec_average{app_group="octez",dimension="writes",' + std.extVar('node_instance_label') + '="$node_instance"}';
-    graphPanel.new(
-      title='IOs',
-      datasource='Prometheus',
-      linewidth=1,
-      format='kbytes',
-      legend_alignAsTable=true,
-      legend_current=true,
-      legend_avg=true,
-      legend_max=true,
-      legend_show=true,
-      legend_values=true,
-      aliasColors={
-        [reads]: 'light-green',
-        [writes]: 'light-yellow',
-      },
-    ).addTarget(
-      prometheus.target(
-        reads_target,
-        legendFormat=reads,
-      )
-    ).addTarget(
-      prometheus.target(
-        writes_target,
-        legendFormat=writes,
-      )
-    ),
+    local readsQuery = self.query('netdata_app_disk_logical_io_KiB_persec_average{app_group="octez",dimension="reads",' + base.node_instance + '="$node_instance"}', reads);
+    local writesQuery = self.query('netdata_app_disk_logical_io_KiB_persec_average{app_group="octez",dimension="writes",' + base.node_instance + '="$node_instance"}', writes);
+    graph.new('IOs', [readsQuery, writesQuery], h, w, x, y)
+    + timeSeries.standardOptions.withUnit('kbytes')
+    + graph.withLegendBottom(calcs=['mean', 'lastNotNull', 'max'])
+    + graph.withQueryColor([[reads, 'light-green'], [writes, 'light-yellow']]),
 
-  cpu:
+  cpu(h, w, x, y):
     local load = 'Cpu load';
-    local load_target =
-      if netdata_legacy then 'netdata_apps_cpu_percentage_average{dimension="octez"}'
-      else 'sum(netdata_app_cpu_utilization_percentage_average{app_group="octez",' + std.extVar('node_instance_label') + '="$node_instance"})';
-    graphPanel.new(
-      title='Cpu actitvity',
-      datasource='Prometheus',
-      linewidth=1,
-      format='percent',
-      aliasColors={
-        [load]: 'light-yellow',
-      },
-    ).addTarget(
-      prometheus.target(
-        load_target,
-        legendFormat=load,
-      )
-    ),
+    local loadQuery = self.query('sum(netdata_app_cpu_utilization_percentage_average{app_group="octez",' + base.node_instance + '="$node_instance"})', load);
+    graph.new('Cpu activity', [loadQuery], h, w, x, y)
+    + timeSeries.standardOptions.withUnit('percent')
+    + graph.withQueryColor([[load, 'light-yellow']]),
 
-  memory:
-    local ram = 'Memory usage';
-    local swap = 'Swap usage';
-    local ram_target =
-      if netdata_legacy then 'netdata_apps_mem_MiB_average{dimension="octez"}'
-      else 'netdata_app_mem_usage_MiB_average{app_group="octez",' + std.extVar('node_instance_label') + '="$node_instance"}';
-    local swap_target =
-      if netdata_legacy then 'netdata_apps_swap_MiB_average{dimension="octez"}'
-      else 'netdata_app_swap_usage_MiB_average{app_group="octez",' + std.extVar('node_instance_label') + '="$node_instance"}';
-    graphPanel.new(
-      title='Memory usage',
-      datasource='Prometheus',
-      linewidth=1,
-      format='mbytes',
-      legend_alignAsTable=true,
-      legend_current=true,
-      legend_avg=true,
-      legend_max=true,
-      legend_show=true,
-      legend_values=true,
-      aliasColors={
-        [ram]: 'light-green',
-        [swap]: 'light-orange',
-      },
-    ).addTarget(
-      prometheus.target(
-        ram_target,
-        legendFormat=ram,
-      )
-    ).addTarget(
-      prometheus.target(
-        swap_target,
-        legendFormat=swap,
-      )
-    ),
+  memory(h, w, x, y):
+    local ram = 'reads';
+    local swap = 'writes';
+    local ramQuery = self.query('netdata_app_mem_usage_MiB_average{app_group="octez",' + base.node_instance + '="$node_instance"}', ram);
+    local swapQuery = self.query('netdata_app_swap_usage_MiB_average{app_group="octez",' + base.node_instance + '="$node_instance"}', swap);
+    graph.new('Memory usage', [ramQuery, swapQuery], h, w, x, y)
+    + timeSeries.standardOptions.withUnit('mbytes')
+    + graph.withLegendBottom(calcs=['mean', 'max'])
+    + graph.withQueryColor([[ram, 'light-green'], [swap, 'light-orange']]),
 
-  storage:
-    local query = if filecheck then 'netdata_filecheck_dir_size_bytes_average' else 'netdata_disk_space_GiB_average{chart="disk_space._",dimension="used"}';
-    graphPanel.new(
-      title='Storage',
-      datasource='Prometheus',
-      linewidth=1,
-      format='bytes',
-    ).addTarget(
-      prometheus.target(
-        query,
-        legendFormat='{{dimension}}',
-      )
-    ),
+  storage(h, w, x, y):
+    local q =
+      if filecheck then self.query('netdata_filecheck_dir_size_bytes_average', '{{dimension}}')
+      else self.query('netdata_disk_space_GiB_average{chart="disk_space._",dimension="used"}', '{{dimension}}');
+    graph.new('Storage', [q], h, w, x, y)
+    + timeSeries.standardOptions.withUnit('bytes'),
 
-  diskFreeSpace:
-    stat.new(
-      title='Disk free space',
-      graphMode='area',
-      unit='decbytes',
-      reducerFunction='lastNotNull'
-    ).addTarget(
-      prometheus.target(
-        'node_filesystem_free_bytes{mountpoint="/"}',
-        legendFormat='Available bytes on disk.',
-      )
-    ),
+  diskFreeSpace(h, w, x, y):
+    local q = self.query('node_filesystem_free_bytes{mountpoint="/"}', 'Available bytes on disk');
+    graph.new('Disk free space', [q], h, w, x, y)
+    + stat.standardOptions.withUnit('decbytes')
+    + stat.options.withReduceOptions(stat.options.reduceOptions.withCalcs(['lastNotNull'])),
 
-  fileDescriptors:
+  fileDescriptors(h, w, x, y):
     local total = 'All fds';
     local sockets = 'Sockets';
-    local files = 'Files';
-    local pipes = 'Pipes';
-    local sockets_target =
-      if netdata_legacy then 'netdata_apps_sockets_open_sockets_average{dimension="octez"}'
-      else 'netdata_app_fds_open_fds_average{dimension="sockets",app_group="octez",' + std.extVar('node_instance_label') + '="$node_instance"}';
-    local files_target =
-      if netdata_legacy then 'netdata_apps_sockets_open_files_average{dimension="octez"}'
-      else 'netdata_app_fds_open_fds_average{dimension="files",app_group="octez",' + std.extVar('node_instance_label') + '="$node_instance"}';
-    local pipes_target =
-      if netdata_legacy then 'netdata_apps_sockets_open_pipes_average{dimension="octez"}'
-      else 'netdata_app_fds_open_fds_average{dimension="pipes",app_group="octez",' + std.extVar('node_instance_label') + '="$node_instance"}';
-    local total_target = 'sum(' + sockets_target + ') + sum(' + files_target + ') + sum(' + pipes_target + ')';
-    graphPanel.new(
-      title='File descriptors',
-      datasource='Prometheus',
-      linewidth=1,
-      format='none',
-      decimals=0,
-      legend_alignAsTable='true',
-      legend_current='true',
-      legend_avg='true',
-      legend_min='true',
-      legend_max='true',
-      legend_rightSide='true',
-      legend_show='true',
-      legend_values='true',
-      aliasColors={
-        [total]: 'light-green',
-        [sockets]: 'light-yellow',
-        [files]: 'light-blue',
-        [pipes]: 'light-orange',
-      },
-    ).addTarget(
-      prometheus.target(
-        total_target,
-        legendFormat=total,
-      )
-    ).addTarget(
-      prometheus.target(
-        sockets_target,
-        legendFormat=sockets,
-      )
-    ).addTarget(
-      prometheus.target(
-        files_target,
-        legendFormat=files,
-      )
-    ).addTarget(
-      prometheus.target(
-        pipes_target,
-        legendFormat=pipes,
-      )
-    ),
+    local files = 'reads';
+    local pipes = 'writes';
+    local socketsTarget = 'netdata_app_fds_open_fds_average{dimension="sockets",app_group="octez",' + base.node_instance + '="$node_instance"}';
+    local filesTarget = 'netdata_app_fds_open_fds_average{dimension="files",app_group="octez",' + base.node_instance + '="$node_instance"}';
+    local pipesTarget = 'netdata_app_fds_open_fds_average{dimension="pipes",app_group="octez",' + base.node_instance + '="$node_instance"}';
+    local totalTarget = 'sum(' + socketsTarget + ') + sum(' + filesTarget + ') + sum(' + pipesTarget + ')';
+    local totalQuery = self.query(totalTarget, total);
+    local socketsQuery = self.query(socketsTarget, sockets);
+    local filesQuery = self.query(filesTarget, files);
+    local pipesQuery = self.query(pipesTarget, pipes);
+    graph.new('File descriptors', [totalQuery, socketsQuery, filesQuery, pipesQuery], h, w, x, y)
+    + graph.withLegendRight(calcs=['current', 'mean', 'min', 'max'])
+    + graph.withQueryColor([[total, 'light-green'], [sockets, 'light-yellow'], [files, 'light-blue'], [pipes, 'light-orange']]),
 
-  networkIOS:
-    graphPanel.new(
-      title='Network traffic',
-      format='Bps',
-      legend_alignAsTable=true,
-      legend_current=true,
-      legend_avg=true,
-      legend_max=true,
-      legend_show=true,
-      legend_values=true,
-    ).addTarget(
-      prometheus.target(
-        'irate(node_network_receive_bytes_total[5m]) > 0',
-        legendFormat='Bytes received',
-      )
-    ).addTarget(
-      prometheus.target(
-        'irate(node_network_transmit_bytes_total[5m]) > 0',
-        legendFormat='Bytes transmitted',
-      )
-    ).addSeriesOverride(
+  networkIOS(h, w, x, y):
+    local receivedQuery = self.query('irate(node_network_receive_bytes_total[5m]) > 0', 'Bytes received');
+    local transmittedQuery = self.query('irate(node_network_transmit_bytes_total[5m]) > 0', 'Bytes transmitted');
+    graph.new('Network traffic', [receivedQuery, transmittedQuery], h, w, x, y)
+    + timeSeries.standardOptions.withUnit('Bps')
+    + graph.withLegendBottom(calcs=['current', 'mean', 'max'])
+    + timeSeries.standardOptions.withOverrides(
       {
         alias: '/.*received/',
         transform: 'negative-Y',
       }
     ),
+
 }

@@ -1,4 +1,4 @@
-// Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>
+// Copyright (c) 2022-2024 Nomadic Labs <contact@nomadic-labs.com>
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
 // copy of this software and associated documentation files (the "Software"),
@@ -18,16 +18,16 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-local grafana = import '../../vendors/grafonnet-lib/grafonnet/grafana.libsonnet';
-local dashboard = grafana.dashboard;
-local template = grafana.template;
-local singlestat = grafana.singlestat;
-local statPanel = grafana.statPanel;
-local graphPanel = grafana.graphPanel;
-local prometheus = grafana.prometheus;
+
+// Grafonnet
+local grafonnet = import 'github.com/grafana/grafonnet/gen/grafonnet-latest/main.libsonnet';
+local query = grafonnet.query;
+
+// Base
+local base = import '../base.jsonnet';
 local namespace = 'dal_node';
-local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instance"}';
-local slot_index_instance = '{' + std.extVar('node_instance_label') + '="$node_instance", slot_index="$slot_index"}';
+local prometheus = base.prometheus;
+local graph = base.graph;
 
 //##
 // DAL node related stats
@@ -35,122 +35,47 @@ local slot_index_instance = '{' + std.extVar('node_instance_label') + '="$node_i
 
 {
 
-  layer1MonitorLevels:
+  layer1MonitorLevels(h, w, x, y):
     local head = 'Seen L1 heads';
     local finalized = 'Finalized L1 blocks';
-    graphPanel.new(
-      title='Layer 1 heads & finalized blocks seen by the DAL node',
-      datasource='Prometheus',
-      format='none',
-      aliasColors={
-        [head]: 'blue',
-        [finalized]: 'green',
-      },
-    ).addTargets([
-      prometheus.target(
-        namespace + '_new_layer1_head' + node_instance,
-        legendFormat=head,
-        intervalFactor=1,
-        interval='3s',
-      ),
-      prometheus.target(
-        namespace + '_layer1_block_finalized' + node_instance,
-        legendFormat=finalized,
-        intervalFactor=1,
-        interval='3s',
-      ),
-    ]),
+    local headQuery = prometheus('new_layer1_head', legendFormat=head, namespace=namespace);
+    local finalizedQuery = prometheus('layer1_block_finalized', legendFormat=finalized, namespace=namespace);
+    graph.new('Layer 1 heads & finalized blocks seen by the DAL node', [headQuery, finalizedQuery], h, w, x, y)
+    + graph.withQueryColor([[head, 'blue'], [finalized, 'green']]),
 
-  layer1MonitorRounds:
+  layer1MonitorRounds(h, w, x, y):
     local head = "Seen L1 heads' rounds";
     local finalized = "Finalized L1 blocks' rounds";
-    graphPanel.new(
-      title='Rounds of layer 1 heads & finalized blocks seen by the DAL node',
-      datasource='Prometheus',
-      format='none',
-      aliasColors={
-        [head]: 'blue',
-        [finalized]: 'green',
-      },
-    ).addTargets([
-      prometheus.target(
-        namespace + '_new_layer1_head_round' + node_instance,
-        legendFormat=head,
-        intervalFactor=1,
-        interval='3s',
-      ),
-      prometheus.target(
-        namespace + '_layer1_block_finalized_round' + node_instance,
-        legendFormat=finalized,
-        intervalFactor=1,
-        interval='3s',
-      ),
-    ]),
+    local headQuery = prometheus('new_layer1_head_round', legendFormat=head, namespace=namespace);
+    local finalizedQuery = prometheus('layer1_block_finalized_round', legendFormat=finalized, namespace=namespace);
+    graph.new('Rounds of layer 1 heads & finalized blocks seen by the DAL node', [headQuery, finalizedQuery], h, w, x, y)
+    + graph.withQueryColor([[head, 'blue'], [finalized, 'green']]),
 
-  storedShards:
+  storedShards(h, w, x, y):
     local shards = 'Stored shards';
-    graphPanel.new(
-      title='The shards stored by this node (1-minute interval)',
-      datasource='Prometheus',
-      format='none',
-      aliasColors={
-        [shards]: 'blue',
-      },
-    ).addTargets([
-      prometheus.target(
-        'deriv(' + namespace + '_number_of_stored_shards' + node_instance + '[1m])',
-        legendFormat=shards,
-        interval='3s',
-      ),
-    ]),
+    local shardsQuery = grafonnet.query.prometheus.new('Prometheus', 'deriv(' + namespace + '_number_of_stored_shards' + base.node_instance_query + '[1m])')
+                        + query.prometheus.withLegendFormat(shards);
+    graph.new('The shards stored by this node (1-minute interval)', [shardsQuery], h, w, x, y)
+    + graph.withQueryColor([[shards, 'blue']]),
 
-  slotsAttesatationSummary:
+  slotsAttesatationSummary(h, w, x, y):
     local attested = 'Number of attested slots';
     local waiting = 'Number of slots waiting for attestation';
-    graphPanel.new(
-      title='Number of slots waiting for attesatation and of attested slots',
-      datasource='Prometheus',
-      format='none',
-      aliasColors={
-        [waiting]: 'yellow',
-        [attested]: 'green',
-      },
-    ).addTargets([
-      prometheus.target(
-        'sum(' + namespace + '_slots_waiting_for_attestaion' + slot_index_instance + ')',
-        legendFormat=waiting,
-        interval='3s',
-      ),
-      prometheus.target(
-        'sum(' + namespace + '_slots_attested' + slot_index_instance + ')',
-        legendFormat=attested
-      ),
-    ]),
+    local attestedQuery = grafonnet.query.prometheus.new('Prometheus', 'sum(' + namespace + '_slots_attested' + base.slot_index_instance_query + ')')
+                          + query.prometheus.withLegendFormat(attested);
+    local waitingQuery = grafonnet.query.prometheus.new('Prometheus', 'sum(' + namespace + '_slots_waiting_for_attestaion' + base.slot_index_instance_query + ')')
+                         + query.prometheus.withLegendFormat(waiting);
+    graph.new('Number of slots waiting for attestation and attested slots', [attestedQuery, waitingQuery], h, w, x, y)
+    + graph.withQueryColor([[waiting, 'yellow'], [attested, 'green']]),
 
-  slotsWaitingAttestations:
-    graphPanel.new(
-      title='Indexes of slots waiting for attestation',
-      datasource='Prometheus',
-      format='none',
-    ).addTargets([
-      prometheus.target(
-        namespace + '_slots_waiting_for_attestaion' + slot_index_instance,
-        legendFormat='{{ slot_waiting_for_attestaion }}',
-        interval='3s',
-      ),
-    ]),
+  slotsWaitingAttestations(h, w, x, y):
+    local q = grafonnet.query.prometheus.new('Prometheus', namespace + '_slots_waiting_for_attestaion' + base.slot_index_instance_query)
+              + query.prometheus.withLegendFormat('Slot index: {{ slot_index }}');
+    graph.new('Indexes of slots waiting for attestation', [q], h, w, x, y),
 
-  slotsAttested:
-    graphPanel.new(
-      title='Indexes of attested slots',
-      datasource='Prometheus',
-      format='none',
-    ).addTargets([
-      prometheus.target(
-        namespace + '_slots_attested' + slot_index_instance,
-        legendFormat='{{ slot_attested }}',
-        interval='3s',
-      ),
-    ]),
 
+  slotsAttested(h, w, x, y):
+    local q = grafonnet.query.prometheus.new('Prometheus', namespace + '_slots_attested' + base.slot_index_instance_query)
+              + query.prometheus.withLegendFormat('Slot index: {{ slot_index }}');
+    graph.new('Indexes of attested slots', [q], h, w, x, y),
 }

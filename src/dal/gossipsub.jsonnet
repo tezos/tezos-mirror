@@ -1,4 +1,4 @@
-// Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>
+// Copyright (c) 2022-2024 Nomadic Labs <contact@nomadic-labs.com>
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
 // copy of this software and associated documentation files (the "Software"),
@@ -18,16 +18,16 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-local grafana = import '../../vendors/grafonnet-lib/grafonnet/grafana.libsonnet';
-local dashboard = grafana.dashboard;
-local template = grafana.template;
-local graphPanel = grafana.graphPanel;
-local prometheus = grafana.prometheus;
+
+// Grafonnet
+local grafonnet = import 'github.com/grafana/grafonnet/gen/grafonnet-latest/main.libsonnet';
+local query = grafonnet.query;
+
+// Base
+local base = import '../base.jsonnet';
 local namespace = 'dal_gs';
-local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instance"}';
-local slot_index_instance = '{' + std.extVar('node_instance_label') + '="$node_instance", slot_index="$slot_index"}';
-local pkh_instance = '{' + std.extVar('node_instance_label') + '="$node_instance", pkh="$pkh"}';
-local topic_instance = '{' + std.extVar('node_instance_label') + '="$node_instance", slot_index="$slot_index", pkh="$pkh"}';
+local prometheus = base.prometheus;
+local graph = base.graph;
 
 //##
 // Gossipsub related stats
@@ -35,213 +35,86 @@ local topic_instance = '{' + std.extVar('node_instance_label') + '="$node_instan
 
 {
 
-  countTopics:
+  countTopics(h, w, x, y):
     local topics = "Node's topics";
-    graphPanel.new(
-      title='The number of topics the node is subscribed to',
-      datasource='Prometheus',
-      format='none',
-      aliasColors={
-        [topics]: 'blue',
-      },
-    ).addTargets([
-      prometheus.target(
-        namespace + '_count_topics' + node_instance,
-        legendFormat=topics
-      ),
-    ]),
+    local topicsQuery = prometheus('count_topics', legendFormat=topics, namespace=namespace);
+    graph.new('The number of topics the node is subscribed to', [topicsQuery], h, w, x, y)
+    + graph.withQueryColor([[topics, 'blue']]),
 
-  countConnections:
+  countConnections(h, w, x, y):
     local connections = 'All connections';
     local bootstrap = 'Bootstrap connections';
-    graphPanel.new(
-      title='The number of (bootstrap) connections',
-      datasource='Prometheus',
-      format='none',
-      aliasColors={
-        [connections]: 'green',
-        [bootstrap]: 'yellow',
-      },
-    ).addTargets([
-      prometheus.target(
-        namespace + '_count_connections' + node_instance,
-        legendFormat=connections
-      ),
-      prometheus.target(
-        namespace + '_count_bootstrap_connections' + node_instance,
-        legendFormat=bootstrap
-      ),
-    ]),
+    local connectionsQuery = prometheus('count_connections', legendFormat=connections, namespace=namespace);
+    local bootstrapQuery = prometheus('count_bootstrap_connections', legendFormat=bootstrap, namespace=namespace);
+    graph.new('The number of (bootstrap) connections', [connectionsQuery, bootstrapQuery], h, w, x, y)
+    + graph.withQueryColor([[connections, 'green'], [bootstrap, 'yellow']]),
 
-  workerStreams:
+  workerStreams(h, w, x, y):
     local input = 'Input stream';
-    local p2p = 'P2P output stream';
+    local p2p = 'P2p output stream';
     local app = 'Application output stream';
-    graphPanel.new(
-      title='The size of different worker streams',
-      datasource='Prometheus',
-      format='none',
-      aliasColors={
-        [input]: 'green',
-        [p2p]: 'blue',
-        [app]: 'yellow',
-      },
-    ).addTargets([
-      prometheus.target(
-        namespace + '_input_events_stream_length' + node_instance,
-        legendFormat=input,
-        interval='3s',
-      ),
-      prometheus.target(
-        namespace + '_p2p_output_stream_length' + node_instance,
-        legendFormat=p2p,
-        interval='3s',
-      ),
-      prometheus.target(
-        namespace + '_app_output_stream_length' + node_instance,
-        legendFormat=app,
-        interval='3s',
-      ),
-    ]),
+    local inputQuery = prometheus('input_events_stream_length', legendFormat=input, namespace=namespace);
+    local p2pQuery = prometheus('p2p_output_stream_length', legendFormat=p2p, namespace=namespace);
+    local appQuery = prometheus('app_output_stream_length', legendFormat=app, namespace=namespace);
+    graph.new('The size of different worker streams', [inputQuery, p2pQuery, appQuery], h, w, x, y)
+    + graph.withQueryColor([[input, 'green'], [p2p, 'blue'], [app, 'yellow']]),
 
-  appMessagesDeriv:
-    local received_valid = 'Received & valid';
-    local received_invalid = 'Received & invalid';
-    local received_unknown = 'Received & unchecked validity';
+  appMessagesDeriv(h, w, x, y):
+    local receivedValid = 'Received & valid';
+    local receivedInvalid = 'Received & invalid';
+    local receivedUnknown = 'Received & unchecked validity';
     local sent = 'Sent';
-    graphPanel.new(
-      title='Average sent & received app messages (1-minute interval)',
-      datasource='Prometheus',
-      format='none',
-      aliasColors={
-        [received_valid]: 'green',
-        [received_invalid]: 'red',
-        [received_unknown]: 'orange',
-        [sent]: 'blue',
-      },
-    ).addTargets([
-      prometheus.target(
-        'deriv(' + namespace + '_count_received_valid_messages' + node_instance + '[1m])',
-        legendFormat=received_valid,
-        interval='3s',
-      ),
-      prometheus.target(
-        'deriv(' + namespace + '_count_received_invalid_messages' + node_instance + '[1m])',
-        legendFormat=received_invalid,
-        interval='3s',
-      ),
-      prometheus.target(
-        'deriv(' + namespace + '_count_received_unknown_validity_messages' + node_instance + '[1m])',
-        legendFormat=received_unknown,
-        interval='3s',
-      ),
-      prometheus.target(
-        'deriv(' + namespace + '_count_sent_messages' + node_instance + '[1m])',
-        legendFormat=sent,
-        interval='3s',
-      ),
-    ]),
+    local receivedValidQuery = grafonnet.query.prometheus.new('Prometheus', 'deriv(' + namespace + '_count_received_valid_messages' + base.node_instance_query + '[1m])')
+                               + query.prometheus.withLegendFormat(receivedValid);
+    local receivedInvalidQuery = grafonnet.query.prometheus.new('Prometheus', 'deriv(' + namespace + '_count_received_invalid_messages' + base.node_instance_query + '[1m])')
+                                 + query.prometheus.withLegendFormat(receivedInvalid);
+    local receivedUnknownQuery = grafonnet.query.prometheus.new('Prometheus', 'deriv(' + namespace + '_count_received_unknown_validity_messages' + base.node_instance_query + '[1m])')
+                                 + query.prometheus.withLegendFormat(receivedUnknown);
+    local sentQuery = grafonnet.query.prometheus.new('Prometheus', 'deriv(' + namespace + '_count_sent_messages' + base.node_instance_query + '[1m])')
+                      + query.prometheus.withLegendFormat(sent);
+    graph.new('Average sent & received app messages (1-minute interval)', [receivedValidQuery, receivedInvalidQuery, receivedUnknownQuery, sentQuery], h, w, x, y)
+    + graph.withQueryColor([[receivedValid, 'green'], [receivedInvalid, 'red'], [receivedUnknown, 'orange'], [sent, 'blue']]),
 
-  sentOtherMessagesDeriv:
+  sentOtherMessagesDeriv(h, w, x, y):
     local grafts = 'Graft';
     local prunes = 'Prune';
     local ihaves = 'IHave';
     local iwants = 'IWant';
-    graphPanel.new(
-      title='Average sent control & metadata messages (1-minute interval)',
-      datasource='Prometheus',
-      format='none',
-      aliasColors={
-        [grafts]: 'blue',
-        [prunes]: 'yellow',
-        [ihaves]: 'purple',
-        [iwants]: 'magenta',
-      },
-    ).addTargets([
-      prometheus.target(
-        'deriv(' + namespace + '_count_sent_grafts' + node_instance + '[1m])',
-        legendFormat=grafts,
-        interval='3s',
-      ),
-      prometheus.target(
-        'deriv(' + namespace + '_count_sent_prunes' + node_instance + '[1m])',
-        legendFormat=prunes,
-        interval='3s',
-      ),
-      prometheus.target(
-        'deriv(' + namespace + '_count_sent_ihaves' + node_instance + '[1m])',
-        legendFormat=ihaves,
-        interval='3s',
-      ),
-      prometheus.target(
-        'deriv(' + namespace + '_count_sent_iwants' + node_instance + '[1m])',
-        legendFormat=iwants,
-        interval='3s',
-      ),
-    ]),
+    local graftsQuery = grafonnet.query.prometheus.new('Prometheus', 'deriv(' + namespace + '_count_sent_grafts' + base.node_instance_query + '[1m])')
+                        + query.prometheus.withLegendFormat(grafts);
+    local prunesQuery = grafonnet.query.prometheus.new('Prometheus', 'deriv(' + namespace + '_count_sent_prunes' + base.node_instance_query + '[1m])')
+                        + query.prometheus.withLegendFormat(prunes);
+    local ihavesQuery = grafonnet.query.prometheus.new('Prometheus', 'deriv(' + namespace + '_count_sent_ihaves' + base.node_instance_query + '[1m])')
+                        + query.prometheus.withLegendFormat(ihaves);
+    local iwantsQuery = grafonnet.query.prometheus.new('Prometheus', 'deriv(' + namespace + '_count_sent_iwants' + base.node_instance_query + '[1m])')
+                        + query.prometheus.withLegendFormat(iwants);
+    graph.new('Average sent control & metadata messages (1-minute interval)', [graftsQuery, prunesQuery, ihavesQuery, iwantsQuery], h, w, x, y)
+    + graph.withQueryColor([[grafts, 'blue'], [prunes, 'yellow'], [ihaves, 'purple'], [iwants, 'magenta']]),
 
-  receivedOtherMessagesDeriv:
+  receivedOtherMessagesDeriv(h, w, x, y):
     local grafts = 'Graft';
     local prunes = 'Prune';
     local ihaves = 'IHave';
     local iwants = 'IWant';
-    graphPanel.new(
-      title='Average received control & metadata messages (1-minute interval)',
-      datasource='Prometheus',
-      format='none',
-      aliasColors={
-        [grafts]: 'blue',
-        [prunes]: 'yellow',
-        [ihaves]: 'purple',
-        [iwants]: 'magenta',
-      },
-    ).addTargets([
-      prometheus.target(
-        'deriv(' + namespace + '_count_received_grafts' + node_instance + '[1m])',
-        legendFormat=grafts,
-        interval='3s',
-      ),
-      prometheus.target(
-        'deriv(' + namespace + '_count_received_prunes' + node_instance + '[1m])',
-        legendFormat=prunes,
-        interval='3s',
-      ),
-      prometheus.target(
-        'deriv(' + namespace + '_count_received_ihaves' + node_instance + '[1m])',
-        legendFormat=ihaves,
-        interval='3s',
-      ),
-      prometheus.target(
-        'deriv(' + namespace + '_count_received_iwants' + node_instance + '[1m])',
-        legendFormat=iwants,
-        interval='3s',
-      ),
-    ]),
+    local graftsQuery = grafonnet.query.prometheus.new('Prometheus', 'deriv(' + namespace + '_count_received_grafts' + base.node_instance_query + '[1m])')
+                        + query.prometheus.withLegendFormat(grafts);
+    local prunesQuery = grafonnet.query.prometheus.new('Prometheus', 'deriv(' + namespace + '_count_received_prunes' + base.node_instance_query + '[1m])')
+                        + query.prometheus.withLegendFormat(prunes);
+    local ihavesQuery = grafonnet.query.prometheus.new('Prometheus', 'deriv(' + namespace + '_count_received_ihaves' + base.node_instance_query + '[1m])')
+                        + query.prometheus.withLegendFormat(ihaves);
+    local iwantsQuery = grafonnet.query.prometheus.new('Prometheus', 'deriv(' + namespace + '_count_received_iwants' + base.node_instance_query + '[1m])')
+                        + query.prometheus.withLegendFormat(iwants);
+    graph.new('Average received control & metadata messages (1-minute interval)', [graftsQuery, prunesQuery, ihavesQuery, iwantsQuery], h, w, x, y)
+    + graph.withQueryColor([[grafts, 'blue'], [prunes, 'yellow'], [ihaves, 'purple'], [iwants, 'magenta']]),
 
-  scoresOfPeers:
-    graphPanel.new(
-      title='Score of the peers connected to this node',
-      datasource='Prometheus',
-      format='none',
-    ).addTargets([
-      prometheus.target(
-        namespace + '_scores_of_peers' + pkh_instance,
-        legendFormat='{{ scores_of_peers }}',
-        interval='3s',
-      ),
-    ]),
+  scoresOfPeers(h, w, x, y):
+    local q = grafonnet.query.prometheus.new('Prometheus', namespace + '_scores_of_peers' + base.peer_instance_query)
+              + query.prometheus.withLegendFormat('{{ peer }}');
+    graph.new('Score of the peers connected to this node', [q], h, w, x, y),
 
-  peersOfTopics:
-    graphPanel.new(
-      title='Number of peers in the mesh for each subscribed topic',
-      datasource='Prometheus',
-      format='none',
-    ).addTargets([
-      prometheus.target(
-        namespace + '_count_peers_per_topic' + topic_instance,
-        legendFormat='{{ count_peers_per_topic }}',
-        interval='3s',
-      ),
-    ]),
+  peersOfTopics(h, w, x, y):
+    local q = grafonnet.query.prometheus.new('Prometheus', namespace + '_count_peers_per_topic' + base.topic_instance_query)
+              + query.prometheus.withLegendFormat('Topic: {{ slot_index }}, {{ pkh }}');
+    graph.new('Number of peers in the mesh for each subscribed topic', [q], h, w, x, y),
 
 }

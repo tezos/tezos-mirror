@@ -1,4 +1,4 @@
-// Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>
+// Copyright (c) 2022-2024 Nomadic Labs <contact@nomadic-labs.com>
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
 // copy of this software and associated documentation files (the "Software"),
@@ -18,59 +18,42 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-local grafana = import '../vendors/grafonnet-lib/grafonnet/grafana.libsonnet';
-local stat = grafana.statPanel;
-local loki = grafana.loki;
-local prometheus = grafana.prometheus;
-local logPanel = grafana.logPanel;
-local namespace = 'octez';
+
+// Grafonnet
+local grafonnet = import 'github.com/grafana/grafonnet/gen/grafonnet-latest/main.libsonnet';
+local query = grafonnet.query;
+
+// Base
+local base = import './base.jsonnet';
+local logs = base.logs;
+
 
 //##
 // Logs
 //##
 
 {
-  nodelogs:
-    logPanel.new(
-      title='Node logs',
-      datasource='Loki'
-    ).addTarget(
-      prometheus.target(
-        '{job="' + namespace + '-node"}',
-        legendFormat='Node logs',
-      )
-    ),
 
-  bakerlogs:
-    logPanel.new(
-      title='Baker logs',
-      datasource='Loki'
-    ).addTarget(
-      prometheus.target(
-        '{job="' + namespace + '-baker"}',
-        legendFormat='Baker logs',
-      )
-    ),
+  // Query helper
+  query(type, legendFormat):
+    query.prometheus.new('Loki', '{job="' + base.namespace + '-' + type + '"}')
+    + query.prometheus.withLegendFormat(legendFormat),
 
-  accuserlogs:
-    logPanel.new(
-      title='Accuser logs',
-      datasource='Loki'
-    ).addTarget(
-      prometheus.target(
-        '{job="' + namespace + '-accuser"}',
-        legendFormat='Accuser logs',
-      )
-    ),
+  nodelogs(h, w, x, y):
+    local q = self.query('node', 'Node logs');
+    logs.new('Node logs', [q], h, w, x, y),
 
-  systemlogs:
-    logPanel.new(
-      title='System logs',
-      datasource='Loki'
-    ).addTarget(
-      prometheus.target(
-        '{job="varlogs"}',
-        legendFormat='System logs',
-      )
-    ),
+  bakerlogs(h, w, x, y):
+    local q = self.query('baker', 'Baker logs');
+    logs.new('Baker logs', [q], h, w, x, y),
+
+  accuserlogs(h, w, x, y):
+    local q = self.query('accuser', 'Accuser logs');
+    logs.new('Accuser logs', [q], h, w, x, y),
+
+  systemlogs(h, w, x, y):
+    local q = query.prometheus.new('Loki', '{job="varlogs"}')
+              + query.prometheus.withLegendFormat('System logs');
+    logs.new('System logs', [q], h, w, x, y),
+
 }

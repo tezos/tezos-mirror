@@ -1,4 +1,4 @@
-// Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>
+// Copyright (c) 2022-2024 Nomadic Labs <contact@nomadic-labs.com>
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
 // copy of this software and associated documentation files (the "Software"),
@@ -18,21 +18,23 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-local grafana = import '../vendors/grafonnet-lib/grafonnet/grafana.libsonnet';
-local graphPanel = grafana.graphPanel;
-local statPanel = grafana.statPanel;
-local prometheus = grafana.prometheus;
-local namespace = 'octez';
-local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instance"}';
 
-local count_query(endpoint) =
-  'sum(' + namespace + '_rpc_calls_count{endpoint=~' + endpoint + ',' + std.extVar('node_instance_label') + '="$node_instance"})';
+// Grafonnet
+local grafonnet = import 'github.com/grafana/grafonnet/gen/grafonnet-latest/main.libsonnet';
+local query = grafonnet.query;
+local panel = grafonnet.panel;
+local stat = panel.stat;
+local timeSeries = panel.timeSeries;
 
-local sum_query(endpoint) =
-  'sum(' + namespace + '_rpc_calls_sum{endpoint=~' + endpoint + ',' + std.extVar('node_instance_label') + '="$node_instance"})';
-
-local average_query(endpoint) =
-  sum_query(endpoint) + '/' + count_query(endpoint);
+// Base
+local base = import './base.jsonnet';
+local namespace = base.namespace;
+local node_instance = base.node_instance;
+local prometheus = base.prometheus;
+local info = base.info;
+local infoName = base.infoName;
+local graph = base.graph;
+local table = base.table;
 
 
 //##
@@ -40,165 +42,113 @@ local average_query(endpoint) =
 //##
 
 
-local graph(title, query, unit='none') =
-  local chains = 'Chains';
-  local blocks = 'Blocks';
-  local version = 'Versions';
-  local config = 'Config';
-  local workers = 'Workers';
-  local network = 'Network';
-  local protocols = 'Protocols';
-  local injection = 'Injection';
-  local private = 'Private';
-  local misc = 'Misc';
-  graphPanel.new(
-    title=title,
-    datasource='Prometheus',
-    linewidth=1,
-    format='none',
-    legend_alignAsTable=true,
-    legend_current=true,
-    legend_rightSide=true,
-    legend_show=true,
-    formatY1=unit,
-    aliasColors={
-      [chains]: 'light-red',
-      [blocks]: 'light-blue',
-      [version]: 'light-green',
-      [config]: 'light-yellow',
-      [network]: 'blue',
-      [workers]: 'light-red',
-      [injection]: 'green',
-      [protocols]: 'blue',
-      [private]: 'purple',
-      [misc]: 'grey',
-    },
-  ).addTargets([
-    prometheus.target(
-      query("'/chains/<chain_id>/.*'"),
-      legendFormat=chains
-    ),
-    prometheus.target(
-      query("'/chains/<chain_id>/blocks/.*'"),
-      legendFormat=blocks
-    ),
-    prometheus.target(
-      query("'/version.*'"),
-      legendFormat=version
-    ),
-    prometheus.target(
-      query("'/config.*'"),
-      legendFormat=config
-    ),
-    prometheus.target(
-      query("'/network.*'"),
-      legendFormat=network
-    ),
-    prometheus.target(
-      query("'/workers.*'"),
-      legendFormat=workers
-    ),
-    prometheus.target(
-      query("'/injection.*'"),
-      legendFormat=injection
-    ),
-    prometheus.target(
-      query("'/protocols.*'"),
-      legendFormat=protocols
-    ),
-    prometheus.target(
-      query("'/private.*'"),
-      legendFormat=private
-    ),
-    prometheus.target(
-      query("'/(fetch_protocol|stats|monitor)*.'"),
-      legendFormat=misc
-    ),
-  ]);
-
 {
 
-  calls: graph('RPC calls', count_query),
-  durations: graph('RPC durations', average_query, 's'),
+
+  countQuery(endpoint):
+    'sum(' + base.namespace + '_rpc_calls_count{endpoint=~' + endpoint + ',' + base.node_instance + '="$node_instance"})',
+
+  sumQuery(endpoint):
+    'sum(' + base.namespace + '_rpc_calls_sum{endpoint=~' + endpoint + ',' + base.node_instance + '="$node_instance"})',
+
+  averageQuery(endpoint):
+    self.sumQuery(endpoint) + '/' + self.countQuery(endpoint),
+
+  graph(title, q, h, w, x, y, unit='none'):
+    local chains = 'Chains';
+    local blocks = 'Blocks';
+    local version = 'Versions';
+    local config = 'Config';
+    local workers = 'Workers';
+    local network = 'Network';
+    local protocols = 'Protocols';
+    local injection = 'Injection';
+    local private = 'Private';
+    local misc = 'Misc';
+    local chainsQuery = query.prometheus.new('Prometheus', q("'/chains/<chain_id>/.*'"))
+                        + query.prometheus.withLegendFormat(chains);
+    local blocksQuery = query.prometheus.new('Prometheus', q("'/chains/<chain_id>/blocks/.*'"))
+                        + query.prometheus.withLegendFormat(blocks);
+    local versionQuery = query.prometheus.new('Prometheus', q("'/version.*'"))
+                         + query.prometheus.withLegendFormat(version);
+    local configQuery = query.prometheus.new('Prometheus', q("'/config.*'"))
+                        + query.prometheus.withLegendFormat(config);
+    local workersQuery = query.prometheus.new('Prometheus', q("'/workers.*'"))
+                         + query.prometheus.withLegendFormat(workers);
+    local networkQuery = query.prometheus.new('Prometheus', q("'/network.*'"))
+                         + query.prometheus.withLegendFormat(network);
+    local protocolsQuery = query.prometheus.new('Prometheus', q("'/protocols.*'"))
+                           + query.prometheus.withLegendFormat(protocols);
+    local injectionQuery = query.prometheus.new('Prometheus', q("'/injection.*'"))
+                           + query.prometheus.withLegendFormat(injection);
+    local privateQuery = query.prometheus.new('Prometheus', q("'/private.*'"))
+                         + query.prometheus.withLegendFormat(private);
+    local miscQuery = query.prometheus.new('Prometheus', q("'/(fetch_protocol|stats|monitor)*.'"))
+                      + query.prometheus.withLegendFormat(misc);
+    graph.new(title, [chainsQuery, blocksQuery, versionQuery, configQuery, workersQuery, networkQuery, protocolsQuery, injectionQuery, privateQuery, miscQuery], h, w, x, y)
+    + graph.withLegendRight()
+    + graph.withQueryColor([[chains, 'light-red'], [blocks, 'light-blue'], [version, 'light-green'], [config, 'light-yellow'], [network, 'blue'], [workers, 'light-red'], [injection, 'green'], [protocols, 'blue'], [private, 'purple'], [misc, 'grey']])
+    + timeSeries.standardOptions.withUnit(unit),
+
+  calls(h, w, x, y): self.graph('RPC calls', self.countQuery, h, w, x, y),
+
+  durations(h, w, x, y): self.graph('RPC durations', self.averageQuery, h, w, x, y, unit='s'),
+
   //The total number of calls
-  totalCalls:
-    statPanel.new(
-      title='Total of RPC calls',
-      datasource='Prometheus',
-      graphMode='none',
-      unit='none',
-      reducerFunction='last',
-    ).addTarget(
-      prometheus.target(
-        count_query("'.*'"),
-        legendFormat='total calls',
-      )
-    ).addThreshold({ color: 'light-yellow', value: 'Base' }),
+  totalCalls(h, w, x, y):
+    local q = query.prometheus.new('Prometheus', self.countQuery("'.*'"))
+              + query.prometheus.withLegendFormat('total calls');
+    info.new('Total of RPC calls', q, h, w, x, y)
+    + info.withThreshold([['Base', 'light-yellow']])
+    + stat.options.reduceOptions.withCalcs(['last'])
+    + stat.options.withColorMode('value'),
+
   //The rate of calls from the last hour
-  callsRate:
-    statPanel.new(
-      title='RPC calls rate per hour',
-      datasource='Prometheus',
-      graphMode='none',
-    ).addTarget(
-      prometheus.target(
-        'sum(' + 'rate(' + namespace + '_rpc_calls_count{endpoint=~".*",' + std.extVar('node_instance_label') + '="$node_instance"}' + '[1h]))',
-        legendFormat='calls rate',
-      )
-    ).addThreshold({ color: 'light-yellow', value: 'Base' }),
+  callsRate(h, w, x, y):
+    local q = grafonnet.query.prometheus.new('Prometheus', 'sum(' + 'rate(' + base.namespace + '_rpc_calls_count{endpoint=~".*",' + base.node_instance + '="$node_instance"}' + '[1h]))')
+              + query.prometheus.withLegendFormat('calls rate');
+    info.new('RPC calls rate per hour', q, h, w, x, y)
+    + info.withThreshold([['Base', 'light-yellow']])
+    + stat.options.withColorMode('value'),
+
   //The total duration of all RPCs calls
-  totalDuration: statPanel.new(
-    title='Total of RPC calls duration',
-    datasource='Prometheus',
-    graphMode='none',
-    unit='s',
-    reducerFunction='last',
-  ).addTarget(
-    prometheus.target(
-      sum_query("'.*'"),
-      legendFormat='total duration',
-    )
-  ).addThreshold({ color: 'blue', value: 'Base' }),
+  totalDuration(h, w, x, y):
+    local q = query.prometheus.new('Prometheus', self.sumQuery("'.*'"))
+              + query.prometheus.withLegendFormat('total duration');
+    info.new('Total of RPC calls durations', q, h, w, x, y)
+    + info.withThreshold([['Base', 'blue']])
+    + stat.options.reduceOptions.withCalcs(['last'])
+    + stat.standardOptions.withUnit('s')
+    + stat.options.withColorMode('value'),
+
   //The average duration of all RPC calls
-  averageDuration: statPanel.new(
-    title='Average of calls durations',
-    datasource='Prometheus',
-    graphMode='none',
-    unit='s',
-    reducerFunction='mean',
-  ).addTarget(
-    prometheus.target(
-      sum_query("'.*'") + '/' + count_query("'.*'"),
-      legendFormat='average duration',
-    )
-  ).addThreshold({ color: 'blue', value: 'Base' }),
+  averageDuration(h, w, x, y):
+    local q = query.prometheus.new('Prometheus', self.sumQuery("'.*'") + '/' + self.countQuery("'.*'"))
+              + query.prometheus.withLegendFormat('total calls');
+    info.new('Average of calls durations', q, h, w, x, y)
+    + info.withThreshold([['Base', 'blue']])
+    + stat.options.reduceOptions.withCalcs(['mean'])
+    + stat.standardOptions.withUnit('s')
+    + stat.options.withColorMode('value'),
+
   //The maximum of the total duration of each RPC calls
-  maxTotalDuration:
-    statPanel.new(
-      title='Max of total calls durations',
-      datasource='Prometheus',
-      graphMode='none',
-      unit='s',
-      reducerFunction='max',
-    ).addTarget(
-      prometheus.target(
-        'max(' + namespace + '_rpc_calls_sum{' + std.extVar('node_instance_label') + '="$node_instance"})',
-        legendFormat='max total duration',
-      )
-    ).addThreshold({ color: 'blue', value: 'Base' }),
+  maxTotalDuration(h, w, x, y):
+    local q = grafonnet.query.prometheus.new('Prometheus', 'max(' + base.namespace + '_rpc_calls_sum{' + base.node_instance + '="$node_instance"})')
+              + query.prometheus.withLegendFormat('max total duration');
+    info.new('Max of total calls durations', q, h, w, x, y)
+    + info.withThreshold([['Base', 'blue']])
+    + stat.options.reduceOptions.withCalcs(['max'])
+    + stat.standardOptions.withUnit('s')
+    + stat.options.withColorMode('value'),
+
   //The maximum of the average duration of each RPC calls
   // i.e the duration of the longest call on average
-  maxAverageDuration:
-    statPanel.new(
-      title='Max of average calls durations',
-      datasource='Prometheus',
-      graphMode='none',
-      unit='s',
-      reducerFunction='max',
-    ).addTarget(
-      prometheus.target(
-        'max(' + namespace + '_rpc_calls_sum{' + std.extVar('node_instance_label') + '="$node_instance"} / ' + namespace + '_rpc_calls_count{' + std.extVar('node_instance_label') + '="$node_instance"})',
-        legendFormat='max average duration',
-      )
-    ).addThreshold({ color: 'blue', value: 'Base' }),
+  maxAverageDuration(h, w, x, y):
+    local q = grafonnet.query.prometheus.new('Prometheus', 'max(' + base.namespace + '_rpc_calls_sum{' + base.node_instance + '="$node_instance"} / ' + base.namespace + '_rpc_calls_count{' + base.node_instance + '="$node_instance"})')
+              + query.prometheus.withLegendFormat('max average duration');
+    info.new('Max of average calls durations', q, h, w, x, y)
+    + info.withThreshold([['Base', 'blue']])
+    + stat.options.reduceOptions.withCalcs(['max'])
+    + stat.standardOptions.withUnit('s')
+    + stat.options.withColorMode('value'),
 }

@@ -13,9 +13,11 @@ build:
     - gcp
   stage: build
   before_script:
-    - apk add git make jsonnet
-    - git submodule init
-    - git submodule update
+    - apk add git make go
+    - go install github.com/google/go-jsonnet/cmd/jsonnet@latest
+    - go install -a github.com/jsonnet-bundler/jsonnet-bundler/cmd/jb@latest
+    - export PATH="$PATH:$(go env GOPATH)/bin"
+    - jb install
   script:
     - make
   artifacts:
