@@ -40,6 +40,7 @@ COPY --chown=tezos:nogroup rust-toolchain tezos/rust-toolchain
 COPY --chown=tezos:nogroup cohttp tezos/cohttp
 COPY --chown=tezos:nogroup resto tezos/resto
 COPY --chown=tezos:nogroup prometheus tezos/prometheus
+COPY --chown=tezos:nogroup teztale tezos/teztale
 ENV GIT_SHORTREF=${GIT_SHORTREF}
 ENV GIT_DATETIME=${GIT_DATETIME}
 ENV GIT_VERSION=${GIT_VERSION}
