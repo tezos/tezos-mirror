@@ -9,6 +9,7 @@ A node in the Tezos network provides different configuration possibilities:
 - rapidly catch up with a given (main or test) network by loading network snapshots
 - set up one or several proxy servers to decrease the load of the node by serving some RPC requests themselves
 - set up infrastructure for continuosly monitoring the node to help spotting operational or efficiency issues
+- set up infrastructure for continuosly monitoring the chain consensus spotting operational or efficiency issues
 
 These possibilities are described in the following pages.
 
@@ -41,3 +42,8 @@ These possibilities are described in the following pages.
    :maxdepth: 2
 
    node-monitoring
+
+.. toctree::
+   :maxdepth: 2
+
+   teztale
