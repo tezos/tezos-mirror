@@ -879,6 +879,15 @@ let encoding data_dir : t Data_encoding.t =
              (dft "public_rpc" rpc_encoding (default_rpc ()))
              (opt "private_rpc" rpc_encoding))))
 
+let pp_print_json ~data_dir fmt config =
+  let json =
+    Data_encoding.Json.construct
+      ~include_default_fields:`Always
+      (encoding data_dir)
+      config
+  in
+  Data_encoding.Json.pp fmt json
+
 let save ~force ~data_dir config =
   let open Lwt_result_syntax in
   let json = Data_encoding.Json.construct (encoding data_dir) config in
