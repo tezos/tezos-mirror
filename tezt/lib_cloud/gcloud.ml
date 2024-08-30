@@ -104,6 +104,16 @@ module DNS = struct
       "gcloud"
       ["dns"; "managed-zones"; "describe"; zone]
 
+  let list ?name_filter ~zone () =
+    let name_filter =
+      match name_filter with
+      | None -> []
+      | Some filter -> ["--filter"; Format.asprintf "name=%s" filter]
+    in
+    Process.run_and_read_stdout
+      "gcloud"
+      (["dns"; "record-sets"; "list"; "--zone"; zone] @ name_filter)
+
   module Transaction = struct
     let start ~zone () =
       Process.run
@@ -175,4 +185,21 @@ module DNS = struct
         let* () = Transaction.execute ~zone () in
         unit)
       (fun _ -> Transaction.abort ~zone ())
+
+  let get_ip ~tezt_cloud ~zone =
+    let* domain = get_domain ~tezt_cloud ~zone in
+    let* output = list ~name_filter:domain ~zone () in
+    (* Example of output
+       NAME                               TYPE  TTL  DATA
+       saroupille.nl-dal.saroupille.com.  A     300  35.187.31.38
+    *)
+    match String.split_on_char '\n' (String.trim output) with
+    | [_header; line] -> (
+        let columns =
+          String.split_on_char ' ' line |> List.filter (fun s -> s <> "")
+        in
+        match columns with
+        | [_domain; _type; _ttl; ip] -> Lwt.return_some ip
+        | _ -> assert false)
+    | _ -> Lwt.return_none
 end

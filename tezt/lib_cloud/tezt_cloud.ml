@@ -130,9 +130,9 @@ let register_dns_remove ~tags =
     ~tags:("dns" :: "remove" :: tags)
   @@ fun _cloud ->
   let tezt_cloud = Env.tezt_cloud in
-  let ip = Cli.get_string_opt "ip" in
+  let* ip = Gcloud.DNS.get_ip ~tezt_cloud ~zone:"tezt-cloud" in
   match ip with
-  | None -> Test.fail "You must provide an IP address via -a ip=<ip>"
+  | None -> Test.fail "No record found for the current domain"
   | Some ip ->
       let* () = Gcloud.DNS.remove ~tezt_cloud ~zone:"tezt-cloud" ~ip in
       unit

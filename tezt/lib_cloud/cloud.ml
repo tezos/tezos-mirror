@@ -146,14 +146,6 @@ let shutdown ?exn t =
     Option.fold ~none:Lwt.return_unit ~some:Grafana.shutdown t.grafana
   in
   let* () =
-    if Env.dns then
-      Gcloud.DNS.remove
-        ~tezt_cloud:Env.tezt_cloud
-        ~zone:"tezt-cloud"
-        ~ip:(Proxy.get_agent t.agents |> Agent.point |> fst)
-    else Lwt.return_unit
-  in
-  let* () =
     Option.fold
       ~none:Lwt.return_unit
       ~some:(Deployement.terminate ?exn)

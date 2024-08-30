@@ -54,4 +54,6 @@ module DNS : sig
   val add : tezt_cloud:string -> zone:string -> ip:string -> unit Lwt.t
 
   val remove : tezt_cloud:string -> zone:string -> ip:string -> unit Lwt.t
+
+  val get_ip : tezt_cloud:string -> zone:string -> string option Lwt.t
 end
