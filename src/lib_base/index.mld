@@ -21,6 +21,7 @@ It contains the following libraries:
 - {{!module-Plonk}Plonk}: Plonk zero-knowledge proving system
 - {{!module-Polynomial}Polynomial}: Polynomials over finite fields
 - {{!module-Ppx_brassaia}Ppx_brassaia}
+- {{!module-Ppx_profiler}Ppx_profiler}
 - {{!module-Qcheck_tezt}Qcheck_tezt}: Wrapper to register QCheck tests as Tezt tests
 - {{!module-Tezos_base}Tezos_base}: Meta-package and pervasive type definitions for Tezos
 - {{!module-Tezos_base_test_helpers}Tezos_base_test_helpers}: Octez base test helpers

@@ -1893,6 +1893,15 @@ let octez_base_test_helpers =
     ~bisect_ppx:No
     ~release_status:Released
 
+let _ppx_profiler =
+  octez_lib
+    "ppx_profiler"
+    ~path:"src/lib_ppx_profiler"
+    ~deps:[ppxlib]
+    ~ppx_kind:Ppx_rewriter
+    ~ppx_runtime_libraries:[logs]
+    ~preprocess:(pps ppxlib_metaquot)
+
 let ppx_brassaia =
   octez_lib
     "ppx_brassaia"
