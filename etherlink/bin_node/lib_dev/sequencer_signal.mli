@@ -23,15 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [create ~cctxt ~sequencer_key ~smart_rollup_address ~slot_index
-    ~published_level] creates a DAL slot import signal for a given
-    [slot_index] and [published_level].
-    Returns an external message input to put in the inbox.
+(** [create ~cctxt ~sequencer_key ~smart_rollup_address ~slot_ids] creates a DAL
+    slot import signal for a given list [slot_ids] of slot_indices and their
+    corresponding published leveles.  Returns an external message input to put
+    in the inbox.
 *)
 val create :
   cctxt:#Client_context.wallet ->
   sequencer_key:Client_keys.sk_uri ->
   smart_rollup_address:string ->
-  slot_index:int ->
-  published_level:int32 ->
+  slot_ids:(int * int32) list ->
   [> `External of string] tzresult Lwt.t

@@ -13,7 +13,7 @@ use crate::tick_model::constants::{
 };
 use crate::{
     bridge::Deposit,
-    dal_slot_import_signal::{DalSlotImportSignal, UnsignedDalSlotImportSignal},
+    dal_slot_import_signal::DalSlotImportSignals,
     inbox::{Transaction, TransactionContent},
     sequencer_blueprint::{SequencerBlueprint, UnsignedSequencerBlueprint},
     upgrade::KernelUpgrade,
@@ -114,7 +114,7 @@ pub enum ProxyInput {
 pub enum SequencerInput {
     DelayedInput(Box<Transaction>),
     SequencerBlueprint(SequencerBlueprint),
-    DalSlotImportSignal(DalSlotImportSignal),
+    DalSlotImportSignals(DalSlotImportSignals),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -349,25 +349,32 @@ impl SequencerInput {
             return InputResult::Unparsable;
         };
 
-        // Parse the signal
-        let signal: DalSlotImportSignal =
+        // Parse the signals
+        let signed_signals: DalSlotImportSignals =
             parsable!(FromRlpBytes::from_rlp_bytes(bytes).ok());
 
-        // Creates and encodes the unsigned signal:
-        let unsigned_signal: UnsignedDalSlotImportSignal = (&signal).into();
-        let bytes = unsigned_signal.rlp_bytes().to_vec();
+        // Check if all slot indices are valid
+        for unsigned_signal in &signed_signals.signals.0 {
+            for slot_index in &unsigned_signal.slot_indices.0 {
+                if !dal.slot_indices.contains(slot_index) {
+                    return InputResult::Unparsable;
+                }
+            }
+        }
 
-        if !dal.slot_indices.contains(&unsigned_signal.slot_index) {
-            return InputResult::Unparsable;
-        };
+        // Encode the entire list of unsigned signals
+        let bytes = signed_signals.signals.rlp_bytes().to_vec();
 
+        // Verify the signature against the entire encoded list
         let correctly_signed = context
             .sequencer
-            .verify_signature(&signal.signature.clone().into(), &bytes)
+            .verify_signature(&signed_signals.signature.clone().into(), &bytes)
             .unwrap_or(false);
 
         if correctly_signed {
-            InputResult::Input(Input::ModeSpecific(Self::DalSlotImportSignal(signal)))
+            InputResult::Input(Input::ModeSpecific(Self::DalSlotImportSignals(
+                signed_signals,
+            )))
         } else {
             InputResult::Unparsable
         }
