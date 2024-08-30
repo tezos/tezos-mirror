@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 use super::{
-    bus::{main_memory, Address, Addressable, Bus, OutOfBounds},
+    bus::{main_memory, Address, AddressableRead, Bus, OutOfBounds},
     csregisters::{
         satp::{Satp, SvLength, TranslationAlgorithm},
         xstatus::MStatus,

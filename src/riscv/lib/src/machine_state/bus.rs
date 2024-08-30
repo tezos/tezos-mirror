@@ -23,14 +23,17 @@ impl From<OutOfBounds> for SbiError {
     }
 }
 
-/// Addressable space
-pub trait Addressable<E: backend::Elem> {
+/// Addressable space for reading
+pub trait AddressableRead<E: backend::Elem> {
     /// Read an element of type `E` from the given address.
     fn read(&self, addr: Address) -> Result<E, OutOfBounds>;
 
     /// Read elements of type `E` from the given address.
     fn read_all(&self, addr: Address, values: &mut [E]) -> Result<(), OutOfBounds>;
+}
 
+/// Addressable space for writing
+pub trait AddressableWrite<E: backend::Elem> {
     /// Write an element of type `E` to the given address.
     fn write(&mut self, addr: Address, value: E) -> Result<(), OutOfBounds>;
 
@@ -114,13 +117,13 @@ pub fn start_of_main_memory<ML: main_memory::MainMemoryLayout>() -> Address {
     AddressSpace::MainMemory.start::<ML>()
 }
 
-impl<E, ML, M> Addressable<E> for Bus<ML, M>
+impl<E, ML, M> AddressableRead<E> for Bus<ML, M>
 where
     E: backend::Elem,
     ML: main_memory::MainMemoryLayout,
-    M: backend::Manager,
-    devices::Devices<M>: Addressable<E>,
-    main_memory::MainMemory<ML, M>: Addressable<E>,
+    M: backend::ManagerRead,
+    devices::Devices<M>: AddressableRead<E>,
+    main_memory::MainMemory<ML, M>: AddressableRead<E>,
 {
     #[inline(always)]
     fn read(&self, addr: Address) -> Result<E, OutOfBounds> {
@@ -150,7 +153,16 @@ where
             AddressSpace::OutOfBounds => Err(OutOfBounds),
         }
     }
+}
 
+impl<E, ML, M> AddressableWrite<E> for Bus<ML, M>
+where
+    E: backend::Elem,
+    ML: main_memory::MainMemoryLayout,
+    M: backend::ManagerWrite,
+    devices::Devices<M>: AddressableWrite<E>,
+    main_memory::MainMemory<ML, M>: AddressableWrite<E>,
+{
     #[inline(always)]
     fn write(&mut self, addr: Address, value: E) -> Result<(), OutOfBounds> {
         let (addr_space, local_address) = AddressSpace::locate::<ML>(addr);

@@ -5,7 +5,7 @@
 use super::{PvmHooks, PvmStatus};
 use crate::{
     machine_state::{
-        bus::{main_memory::MainMemoryLayout, Addressable},
+        bus::{main_memory::MainMemoryLayout, AddressableRead, AddressableWrite},
         registers::{a0, a1, a2, a3, a6, a7, XValue},
         AccessType, MachineState,
     },

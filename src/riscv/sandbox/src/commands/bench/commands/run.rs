@@ -13,7 +13,7 @@ use crate::{
 use enum_tag::EnumTag;
 use octez_riscv::{
     machine_state::{
-        bus::{Address, Addressable},
+        bus::{Address, AddressableRead},
         AccessType,
     },
     parser::{instruction::Instr, parse},
