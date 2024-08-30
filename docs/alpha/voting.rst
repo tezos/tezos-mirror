@@ -91,6 +91,14 @@ The five periods are as follows:
 Activation
 ----------
 
+In the last block of the last cycle of an Adoption period (called activation block),
+the current Protocol learns about the Protocol into which the next
+block should be validated.
+Once the activation block is applied, the Octez shell initializes the new protocol and
+performs the protocol-stitching process. The first block of the cycle after the Adoption period
+belongs to the new Protocol. It does not contain attestations for the
+previous block.
+
 After the activation step, the blocks added to the chain are interpreted in the
 newly activated protocol. As a result gas costs may differ, new operations may
 be available, contracts using new opcodes may be injected, etc.

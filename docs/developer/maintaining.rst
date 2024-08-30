@@ -11,6 +11,6 @@ The following howtos are intended to facilitate different maintenance tasks by p
 
    entering_alpha
    michelson_instructions
-   protocol_release_checklist
+   protocol_playbook
    howto-freeze-protocols
    protocol_environment_upgrade
