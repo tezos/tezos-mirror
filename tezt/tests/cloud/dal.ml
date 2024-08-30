@@ -1020,6 +1020,15 @@ let add_etherlink_source cloud agent ~job_name node sc_rollup_node evm_node =
     ~job_name
     [node_metric_target; sc_rollup_metric_target; evm_node_metric_target]
 
+let init_teztale agent node =
+  if Cli.teztale then
+    let* teztale = Teztale.run_server agent in
+    let* () =
+      Teztale.run_archiver teztale agent ~node_port:(Node.rpc_port node)
+    in
+    Lwt.return_some teztale
+  else Lwt.return_none
+
 let init_ghostnet cloud (configuration : configuration) agent =
   toplog "Init testnet" ;
   let* bootstrap =
@@ -1039,6 +1048,7 @@ let init_ghostnet cloud (configuration : configuration) agent =
         let client =
           Client.create ~endpoint:(Foreign_endpoint node_rpc_endpoint) ()
         in
+        let teztale = None in
         let bootstrap =
           {
             node;
@@ -1047,6 +1057,7 @@ let init_ghostnet cloud (configuration : configuration) agent =
             node_rpc_endpoint;
             dal_node_p2p_endpoint;
             client;
+            teztale;
           }
         in
         Lwt.return bootstrap
@@ -1077,6 +1088,7 @@ let init_ghostnet cloud (configuration : configuration) agent =
               port = Node.rpc_port node;
             }
         in
+        let* teztale = init_teztale agent node in
         let bootstrap =
           {
             node = Some node;
@@ -1085,6 +1097,7 @@ let init_ghostnet cloud (configuration : configuration) agent =
             node_rpc_endpoint;
             dal_node_p2p_endpoint = Dal_node.point_str dal_node;
             client;
+            teztale;
           }
         in
         Lwt.return bootstrap
@@ -1264,18 +1277,7 @@ let init_bootstrap_and_activate_protocol cloud (configuration : configuration)
         port = Node.rpc_port bootstrap_node;
       }
   in
-  let* teztale =
-    if Cli.teztale then
-      let* teztale = Teztale.run_server agent in
-      let* () =
-        Teztale.run_archiver
-          teztale
-          agent
-          ~node_port:(Node.rpc_port bootstrap_node)
-      in
-      Lwt.return_some teztale
-    else Lwt.return_none
-  in
+  let* teztale = init_teztale agent bootstrap_node in
   let (bootstrap : bootstrap) =
     {
       node = Some bootstrap_node;
