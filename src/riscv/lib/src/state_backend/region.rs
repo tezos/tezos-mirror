@@ -326,8 +326,8 @@ pub(crate) mod tests {
         backend_test, create_backend,
         state_backend::{
             layout::{Atom, Layout},
-            Array, Backend, CellRead, CellReadWrite, CellWrite, Choreographer, DynCells, Elem,
-            LazyCell, Location, ManagerAlloc, ManagerBase,
+            Array, Backend, BackendFull, CellRead, CellReadWrite, CellWrite, Choreographer,
+            DynCells, Elem, LazyCell, Location, ManagerAlloc, ManagerBase,
         },
     };
 
@@ -546,8 +546,7 @@ pub(crate) mod tests {
             assert_eq!(region.read::<Flipper>(0), Flipper { a: 13, b: 37 });
         }
 
-        let mut buffer = [0; 2];
-        backend.read(0, &mut buffer);
+        let buffer = &backend.region(&FlipperLayout::placed().into_location())[..2];
         assert_eq!(buffer, [37, 13]);
 
         // Writing to the entire region must convert properly to stored format.
@@ -577,8 +576,7 @@ pub(crate) mod tests {
             );
         }
 
-        let mut buffer = [0; 8];
-        backend.read(0, &mut buffer);
+        let buffer = &backend.region(&FlipperLayout::placed().into_location())[..8];
         assert_eq!(buffer, [22, 11, 24, 13, 26, 15, 28, 17]);
     });
 
@@ -595,8 +593,7 @@ pub(crate) mod tests {
             assert_eq!(region.read(0), Flipper { a: 13, b: 37 });
         }
 
-        let mut buffer = [0; 2];
-        backend.read(0, &mut buffer);
+        let buffer = &backend.region(&FlipperLayout::placed().into_location())[..2];
         assert_eq!(buffer, [37, 13]);
 
         // Replacing a value in the region must convert to and from stored format.
@@ -606,8 +603,7 @@ pub(crate) mod tests {
             assert_eq!(old, Flipper { a: 13, b: 37 });
         }
 
-        let mut buffer = [0; 2];
-        backend.read(0, &mut buffer);
+        let buffer = &backend.region(&FlipperLayout::placed().into_location())[..2];
         assert_eq!(buffer, [74, 26]);
 
         // Writing to sub-section must convert to stored format.
@@ -621,8 +617,7 @@ pub(crate) mod tests {
             assert_eq!(buffer, [Flipper { a: 1, b: 2 }, Flipper { a: 3, b: 4 }]);
         }
 
-        let mut buffer = [0; 4];
-        backend.read(2, &mut buffer);
+        let buffer = &backend.region(&FlipperLayout::placed().into_location())[2..6];
         assert_eq!(buffer, [2, 1, 4, 3]);
 
         // Writing to the entire region must convert properly to stored format.
@@ -647,8 +642,7 @@ pub(crate) mod tests {
             );
         }
 
-        let mut buffer = [0; 8];
-        backend.read(0, &mut buffer);
+        let buffer = &backend.region(&FlipperLayout::placed().into_location())[..8];
         assert_eq!(buffer, [22, 11, 24, 13, 26, 15, 28, 17]);
     });
 }

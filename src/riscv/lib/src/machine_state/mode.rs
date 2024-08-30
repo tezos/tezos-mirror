@@ -84,6 +84,7 @@ mod tests {
             backend::{tests::test_determinism, Backend, Layout},
             mode::{Mode, ModeCell, ModeLayout},
         },
+        state_backend::BackendFull,
     };
     use strum::IntoEnumIterator;
 
@@ -99,20 +100,16 @@ mod tests {
 
         Mode::iter().for_each(|mode| {
             let first_value = mode;
-            let offset = {
+
+            {
                 let loc = ModeLayout::placed().into_location();
-                let offset = loc.offset();
                 let mut inst = ModeCell::bind(backend.allocate(loc));
 
                 inst.write(first_value);
                 assert_eq!(inst.read(), first_value);
+            }
 
-                offset
-            };
-
-            let first_value_read = &mut [72u8];
-            backend.read(offset, first_value_read);
-            let value_read = first_value_read[0];
+            let value_read = backend.region(&ModeLayout::placed().into_location().as_array())[0];
             assert_eq!(Mode::try_from(value_read), Ok(first_value));
         });
 
