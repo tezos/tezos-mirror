@@ -250,7 +250,7 @@ macro_rules! run_cb_type_instr {
     }};
 }
 
-impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M> {
+impl<ML: main_memory::MainMemoryLayout, M: backend::ManagerBase> MachineState<ML, M> {
     /// Bind the machine state to the given allocated space.
     pub fn bind(space: backend::AllocatedOf<MachineStateLayout<ML>, M>) -> Self {
         Self {
@@ -262,7 +262,10 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
     }
 
     /// Reset the machine state.
-    pub fn reset(&mut self) {
+    pub fn reset(&mut self)
+    where
+        M: backend::ManagerWrite,
+    {
         self.hart.reset(bus::start_of_main_memory::<ML>());
         self.bus.reset();
         self.translation_cache.reset();
@@ -275,7 +278,10 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
         mode: Mode,
         satp: CSRRepr,
         virt_addr: Address,
-    ) -> Result<Address, Exception> {
+    ) -> Result<Address, Exception>
+    where
+        M: backend::ManagerReadWrite,
+    {
         // Chapter: P:S-ISA-1.9 & P:M-ISA-1.16
         // If mtval is written with a nonzero value when a
         // breakpoint, address-misaligned, access-fault, or page-fault exception
@@ -306,8 +312,11 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
     }
 
     /// Fetch the 16 bits of an instruction at the given physical address.
-    #[inline]
-    fn fetch_instr_halfword(&self, phys_addr: Address) -> Result<u16, Exception> {
+    #[inline(always)]
+    fn fetch_instr_halfword(&self, phys_addr: Address) -> Result<u16, Exception>
+    where
+        M: backend::ManagerRead,
+    {
         self.bus
             .read(phys_addr)
             .map_err(|_: OutOfBounds| Exception::InstructionAccessFault(phys_addr))
@@ -317,7 +326,10 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
     /// The spec stipulates translation is performed for each byte respectively.
     /// However, we assume the `raw_pc` is 2-byte aligned.
     #[inline]
-    fn fetch_instr(&mut self, virt_addr: Address, mode: Mode) -> Result<Instr, Exception> {
+    fn fetch_instr(&mut self, virt_addr: Address, mode: Mode) -> Result<Instr, Exception>
+    where
+        M: backend::ManagerReadWrite,
+    {
         let satp: CSRRepr = self.hart.csregisters.read(CSRegister::satp);
         let phys_addr = self.translate_instr_address(mode, satp, virt_addr)?;
         let first_halfword = self.fetch_instr_halfword(phys_addr)?;
@@ -342,7 +354,10 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
     }
 
     /// Advance [`MachineState`] by executing an [`Instr`]
-    fn run_instr(&mut self, instr: Instr) -> Result<ProgramCounterUpdate, Exception> {
+    fn run_instr(&mut self, instr: Instr) -> Result<ProgramCounterUpdate, Exception>
+    where
+        M: backend::ManagerReadWrite,
+    {
         use ProgramCounterUpdate::{Add, Set};
 
         match instr {
@@ -603,7 +618,10 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
         &mut self,
         instr_pc: u64,
         current_mode: Mode,
-    ) -> Result<ProgramCounterUpdate, Exception> {
+    ) -> Result<ProgramCounterUpdate, Exception>
+    where
+        M: backend::ManagerReadWrite,
+    {
         let instr = self.fetch_instr(instr_pc, current_mode)?;
         self.run_instr(instr)
     }
@@ -613,7 +631,10 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
     ///
     /// If trap is taken, return new address of program counter.
     /// Throw [`EnvironException`] if the interrupt has to be treated by the execution enviroment.
-    fn address_on_interrupt(&mut self, interrupt: Interrupt) -> Result<Address, EnvironException> {
+    fn address_on_interrupt(&mut self, interrupt: Interrupt) -> Result<Address, EnvironException>
+    where
+        M: backend::ManagerReadWrite,
+    {
         let current_pc = self.hart.pc.read();
         let mip: CSRRepr = self.hart.csregisters.read(CSRegister::mip);
 
@@ -638,7 +659,10 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
         &mut self,
         exception: Exception,
         current_pc: Address,
-    ) -> Result<Address, EnvironException> {
+    ) -> Result<Address, EnvironException>
+    where
+        M: backend::ManagerReadWrite,
+    {
         if let Ok(exc) = EnvironException::try_from(&exception) {
             // We need to commit the PC before returning because the caller (e.g.
             // [step]) doesn't commit it eagerly.
@@ -656,7 +680,10 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
     /// The [`Err`] case represents an [`Exception`] to be handled by
     /// the execution environment, narrowed down by the type [`EnvironException`].
     #[inline]
-    pub fn step(&mut self) -> Result<(), EnvironException> {
+    pub fn step(&mut self) -> Result<(), EnvironException>
+    where
+        M: backend::ManagerReadWrite,
+    {
         let current_mode = self.hart.mode.read();
 
         // Try to take an interrupt if available, and then
@@ -687,7 +714,10 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
     /// Perform as many steps as the given `max_steps` bound allows. Returns the number of retired
     /// instructions.
     #[inline]
-    pub fn step_max(&mut self, max_steps: Bound<usize>) -> StepManyResult<EnvironException> {
+    pub fn step_max(&mut self, max_steps: Bound<usize>) -> StepManyResult<EnvironException>
+    where
+        M: backend::ManagerReadWrite,
+    {
         let mut steps = 0;
 
         while less_than_bound(steps, max_steps) {
@@ -714,7 +744,10 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
         &mut self,
         mut step_bounds: Bound<usize>,
         mut handle: impl FnMut(&mut Self, EnvironException) -> Result<bool, E>,
-    ) -> StepManyResult<E> {
+    ) -> StepManyResult<E>
+    where
+        M: backend::ManagerReadWrite,
+    {
         let mut steps = 0usize;
 
         let error = loop {
@@ -754,7 +787,10 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
         program: &Program<ML>,
         initrd: Option<&[u8]>,
         mode: mode::Mode,
-    ) -> Result<(), MachineError> {
+    ) -> Result<(), MachineError>
+    where
+        M: backend::ManagerReadWrite,
+    {
         // Reset hart state & set pc to entrypoint
         self.hart.reset(program.entrypoint);
         // Write program to main memory and point the PC at its start
