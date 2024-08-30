@@ -1237,34 +1237,31 @@ let print_location f ((fl, fc), (tl, tc)) =
   else Format.fprintf f "lines %i-%i characters %i-%i" fl tl fc tc
 
 let parse_conf file =
-  if not (Sys.file_exists file) then
-    let () = Format.eprintf "%s is not a file@." file in
-    exit 1
-  else
-    let ic = open_in file in
-    match Ezjsonm.from_channel_result ic with
-    | Error err ->
-        Format.eprintf
-          "Error in %s: %a:@ %s@."
-          file
-          (Format.pp_print_option print_location)
-          (Ezjsonm.read_error_location err)
-          (Ezjsonm.read_error_description err) ;
-        exit 1
-    | Ok json -> (
-        try Data_encoding.Json.destruct Config.encoding json
-        with e ->
-          let () =
-            Format.eprintf
-              "@[<v>@[Invalid configuration in %s:@ @[%a@]@]@ Configuration \
-               file format is@ @[%a@]@]@."
-              file
-              (Data_encoding.Json.print_error ?print_unknown:None)
-              e
-              Json_schema.pp
-              (Data_encoding.Json.schema Config.encoding)
-          in
-          exit 1)
+  (* [non_dir_file] from [Cmdliner] already checks that the file exists. *)
+  let ic = open_in file in
+  match Ezjsonm.from_channel_result ic with
+  | Error err ->
+      Format.eprintf
+        "Error in %s: %a:@ %s@."
+        file
+        (Format.pp_print_option print_location)
+        (Ezjsonm.read_error_location err)
+        (Ezjsonm.read_error_description err) ;
+      exit 1
+  | Ok json -> (
+      try Data_encoding.Json.destruct Config.encoding json
+      with e ->
+        let () =
+          Format.eprintf
+            "@[<v>@[Invalid configuration in %s:@ @[%a@]@]@ Configuration file \
+             format is@ @[%a@]@]@."
+            file
+            (Data_encoding.Json.print_error ?print_unknown:None)
+            e
+            Json_schema.pp
+            (Data_encoding.Json.schema Config.encoding)
+        in
+        exit 1)
 
 let run (conf : Config.t) =
   let open Lwt.Syntax in
@@ -1338,17 +1335,17 @@ let run (conf : Config.t) =
          in
          let* () = Lwt.join servers in
          Lwt.return 0)
-  |> exit
 
 let () =
-  if Array.length Sys.argv <> 2 then (
-    Format.eprintf
-      "%s needs a config file or --version option as argument@."
-      Sys.executable_name ;
-    exit 1)
-  else if Sys.argv.(1) = "--version" then (
-    Printf.printf "%s\n%!" Tezos_version_value.Bin_version.octez_version_string ;
-    exit 0)
-  else
-    let conf = parse_conf Sys.argv.(1) in
-    run conf
+  let open Cmdliner in
+  let version = Tezos_version_value.Bin_version.octez_version_string in
+  let doc = "The teztale archivers' aggregator/formatter" in
+  let config =
+    let doc = "The configuration file" in
+    Arg.(
+      required & pos 0 (some non_dir_file) None & info [] ~docv:"CONFIG" ~doc)
+  in
+  let action config = run (parse_conf config) in
+  let info = Cmd.info Sys.executable_name ~version ~doc in
+  let term = Term.(const action $ config) in
+  exit @@ Cmd.eval' @@ Cmd.v info term

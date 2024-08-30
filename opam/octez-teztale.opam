@@ -19,6 +19,7 @@ depends: [
   "safepass"
   "octez-version"
   "lwt" { >= "5.7.0" }
+  "cmdliner" { >= "1.1.0" }
   "octez-shell-libs"
   "x509" { < "1.0.0" }
 ]
