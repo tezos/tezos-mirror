@@ -755,6 +755,10 @@ mod tests {
     });
 
     backend_test!(test_load_store, F, {
+        let mut backend = create_backend!(MachineStateLayout<T1K>, F);
+        let state = create_state!(MachineState, MachineStateLayout<T1K>, F, backend, T1K);
+        let state_cell = std::cell::RefCell::new(state);
+
         proptest!(|(
             v_1 in any::<u8>(),
             v_2 in any::<u16>(),
@@ -762,8 +766,8 @@ mod tests {
             v_4 in any::<u64>(),
         )|
         {
-            let mut backend = create_backend!(MachineStateLayout<T1K>, F);
-            let mut state = create_state!(MachineState, MachineStateLayout<T1K>, F, backend, T1K);
+            let mut state = state_cell.borrow_mut();
+            state.reset();
 
             let mut perform_test = |offset: u64, signed: bool| -> Result<(), Exception> {
                 // Save test values v_i in registers ai

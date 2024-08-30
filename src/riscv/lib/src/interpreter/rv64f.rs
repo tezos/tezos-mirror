@@ -613,12 +613,16 @@ mod tests {
     });
 
     backend_test!(test_load_store, F, {
+        let mut backend = create_backend!(MachineStateLayout<T1K>, F);
+        let state = create_state!(MachineState, MachineStateLayout<T1K>, F, backend, T1K);
+        let state_cell = std::cell::RefCell::new(state);
+
         proptest!(|(
             val in any::<f32>().prop_map(f32::to_bits),
         )|
         {
-            let mut backend = create_backend!(MachineStateLayout<T1K>, F);
-            let mut state = create_state!(MachineState, MachineStateLayout<T1K>, F, backend, T1K);
+            let mut state = state_cell.borrow_mut();
+            state.reset();
 
             // Turn fs on
             let mstatus = MStatus::from_bits(0u64).with_fs(ExtensionValue::Dirty);

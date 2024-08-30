@@ -858,12 +858,16 @@ mod tests {
     });
 
     backend_test!(test_step, F, {
+        let mut backend = create_backend!(MachineStateLayout<T1K>, F);
+        let state = create_state!(MachineState, MachineStateLayout<T1K>, F, backend, T1K);
+        let state_cell = std::cell::RefCell::new(state);
+
         proptest!(|(
             pc_addr_offset in 0..250_u64,
             jump_addr in 0..250_u64,
         )| {
-            let mut backend = create_backend!(MachineStateLayout<T1K>, F);
-            let mut state = create_state!(MachineState, MachineStateLayout<T1K>, F, backend, T1K);
+            let mut state = state_cell.borrow_mut();
+            state.reset();
 
             let init_pc_addr = bus::start_of_main_memory::<T1K>() + pc_addr_offset * 4;
             let jump_addr = bus::start_of_main_memory::<T1K>() + jump_addr * 4;
@@ -897,13 +901,17 @@ mod tests {
     });
 
     backend_test!(test_step_env_exc, F, {
+        let mut backend = create_backend!(MachineStateLayout<T1K>, F);
+        let state = create_state!(MachineState, MachineStateLayout<T1K>, F, backend, T1K);
+        let state_cell = std::cell::RefCell::new(state);
+
         proptest!(|(
             pc_addr_offset in 0..200_u64,
             stvec_offset in 10..20_u64,
             mtvec_offset in 25..35_u64,
         )| {
-            let mut backend = create_backend!(MachineStateLayout<T1K>, F);
-            let mut state = create_state!(MachineState, MachineStateLayout<T1K>, F, backend, T1K);
+            let mut state = state_cell.borrow_mut();
+            state.reset();
 
             let init_pc_addr = bus::start_of_main_memory::<T1K>() + pc_addr_offset * 4;
             let stvec_addr = init_pc_addr + 4 * stvec_offset;
@@ -930,12 +938,16 @@ mod tests {
     });
 
     backend_test!(test_step_exc_mm, F, {
+        let mut backend = create_backend!(MachineStateLayout<T1K>, F);
+        let state = create_state!(MachineState, MachineStateLayout<T1K>, F, backend, T1K);
+        let state_cell = std::cell::RefCell::new(state);
+
         proptest!(|(
             pc_addr_offset in 0..200_u64,
             mtvec_offset in 25..35_u64,
         )| {
-            let mut backend = create_backend!(MachineStateLayout<T1K>, F);
-            let mut state = create_state!(MachineState, MachineStateLayout<T1K>, F, backend, T1K);
+            let mut state = state_cell.borrow_mut();
+            state.reset();
 
             let init_pc_addr = bus::start_of_main_memory::<T1K>() + pc_addr_offset * 4;
             let mtvec_addr = init_pc_addr + 4 * mtvec_offset;
@@ -970,6 +982,10 @@ mod tests {
     });
 
     backend_test!(test_step_inter_mm, F, {
+        let mut backend = create_backend!(MachineStateLayout<T1K>, F);
+        let state = create_state!(MachineState, MachineStateLayout<T1K>, F, backend, T1K);
+        let state_cell = std::cell::RefCell::new(state);
+
         proptest!(|(
             pc_addr_offset in 0..200_u64,
             stvec_offset in 10..20_u64,
@@ -977,8 +993,9 @@ mod tests {
         )| {
             // Raise interrupt, take trap from M-mode to M-mode
             // (test delegation doesn't take place even if enabled by registers)
-            let mut backend = create_backend!(MachineStateLayout<T1K>, F);
-            let mut state = create_state!(MachineState, MachineStateLayout<T1K>, F, backend, T1K);
+
+            let mut state = state_cell.borrow_mut();
+            state.reset();
 
             let init_pc_addr = bus::start_of_main_memory::<T1K>() + pc_addr_offset * 4;
             let stvec_addr = init_pc_addr + 4 * stvec_offset;
@@ -1020,13 +1037,18 @@ mod tests {
     });
 
     backend_test!(test_step_exc_us, F, {
+        let mut backend = create_backend!(MachineStateLayout<T1K>, F);
+        let state = create_state!(MachineState, MachineStateLayout<T1K>, F, backend, T1K);
+        let state_cell = std::cell::RefCell::new(state);
+
         proptest!(|(
             pc_addr_offset in 0..200_u64,
             stvec_offset in 10..20_u64,
         )| {
             // Raise exception, take trap from U-mode to S-mode (test delegation takes place)
-            let mut backend = create_backend!(MachineStateLayout<T1K>, F);
-            let mut state = create_state!(MachineState, MachineStateLayout<T1K>, F, backend, T1K);
+
+            let mut state = state_cell.borrow_mut();
+            state.reset();
 
             let init_pc_addr = bus::start_of_main_memory::<T1K>() + pc_addr_offset * 4;
             let stvec_addr = init_pc_addr + 4 * stvec_offset;
@@ -1056,6 +1078,10 @@ mod tests {
     });
 
     backend_test!(test_step_trap_usm, F, {
+        let mut backend = create_backend!(MachineStateLayout<T1K>, F);
+        let state = create_state!(MachineState, MachineStateLayout<T1K>, F, backend, T1K);
+        let state_cell = std::cell::RefCell::new(state);
+
         proptest!(|(
             pc_addr_offset in 0..200_u64,
             stvec_offset in 10..20_u64,
@@ -1065,8 +1091,9 @@ mod tests {
             // this will be tested by reading mcause and scause, the interrupt will set scause
             // and the exception will set mcause
             // interrupt delegation will delegate the SEI, but not MSI, testing the priority as well
-            let mut backend = create_backend!(MachineStateLayout<T1K>, F);
-            let mut state = create_state!(MachineState, MachineStateLayout<T1K>, F, backend, T1K);
+
+            let mut state = state_cell.borrow_mut();
+            state.reset();
 
             let init_pc_addr = bus::start_of_main_memory::<T1K>() + pc_addr_offset * 4;
             let stvec_addr = init_pc_addr + 4 * stvec_offset;

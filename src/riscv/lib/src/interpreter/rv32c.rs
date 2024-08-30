@@ -298,12 +298,16 @@ mod tests {
     });
 
     backend_test!(run_caddi, F, {
+        let mut backend = create_backend!(MachineStateLayout<T1K>, F);
+        let state = create_state!(MachineState, MachineStateLayout<T1K>, F, backend, T1K);
+        let state_cell = std::cell::RefCell::new(state);
+
         proptest!(|(
             rd_val in any::<u64>(),
             imm in any::<i64>(),
         )| {
-            let mut backend = create_backend!(MachineStateLayout<T1K>, F);
-            let mut state = create_state!(MachineState, MachineStateLayout<T1K>, F, backend, T1K);
+            let mut state = state_cell.borrow_mut();
+            state.reset();
 
             state.hart.xregisters.write(a4, rd_val);
             state.hart.xregisters.run_caddi(imm, a4);

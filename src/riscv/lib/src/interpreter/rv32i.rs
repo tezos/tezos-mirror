@@ -691,12 +691,16 @@ mod tests {
     });
 
     backend_test!(test_fence, F, {
+        let mut backend = create_backend!(MachineStateLayout<T1K>, F);
+        let state = create_state!(MachineState, MachineStateLayout<T1K>, F, backend, T1K);
+        let state_cell = std::cell::RefCell::new(state);
+
         proptest!(|(
             pred in prop::array::uniform4(any::<bool>()),
             succ in prop::array::uniform4(any::<bool>())
         )| {
-            let mut backend = create_backend!(MachineStateLayout<T1K>, F);
-            let mut state = create_state!(MachineState, MachineStateLayout<T1K>, F, backend, T1K);
+            let mut state = state_cell.borrow_mut();
+            state.reset();
 
             let pred = FenceSet { i: pred[0], o: pred[1], r: pred[2], w: pred[3] };
             let succ = FenceSet { i: succ[0], o: succ[1], r: succ[2], w: succ[3] };
