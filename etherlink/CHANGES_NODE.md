@@ -11,6 +11,7 @@
   `<data-dir>/config.json` or `path`). With `-p`, the parsed configuration file
   is printed in the standard output, which can be useful to review them
   carefully. (!14690 !14713)
+- The command `replay` does not require to stop the node anymore. (!14727)
 
 #### RPCs
 

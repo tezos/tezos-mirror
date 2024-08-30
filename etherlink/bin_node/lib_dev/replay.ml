@@ -16,25 +16,19 @@ let patch_kernel ~kernel_path evm_state =
   in
   return evm_state
 
-let main ?profile ?kernel_path ~data_dir ~preimages ~preimages_endpoint
-    ?smart_rollup_address number =
+let main ?profile ?kernel_path ~data_dir ~preimages ~preimages_endpoint number =
   let open Lwt_result_syntax in
-  let* _init =
-    Evm_context.start
-      ~data_dir
-      ~preimages
-      ~preimages_endpoint
-      ~fail_on_missing_blueprint:false
-      ?smart_rollup_address
-      ~store_perm:`Read_only
-      ()
+  let* ro_ctxt =
+    Evm_ro_context.load ~data_dir ~preimages ?preimages_endpoint ()
   in
   let alter_evm_state =
     match kernel_path with
     | None -> None
     | Some kernel_path -> Some (patch_kernel ~kernel_path)
   in
-  let* apply_result = Evm_context.replay ?profile ?alter_evm_state number in
+  let* apply_result =
+    Evm_ro_context.replay ro_ctxt ?profile ?alter_evm_state number
+  in
   match apply_result with
   | Apply_success {block; _} ->
       Format.printf

@@ -1744,13 +1744,6 @@ let inspect_subkeys
 
 let blueprint level = worker_wait_for_request (Blueprint {level})
 
-let get_blueprint level =
-  let open Lwt_result_syntax in
-  let* blueprint = blueprint level in
-  match blueprint with
-  | Some blueprint -> return blueprint
-  | None -> failwith "Missing blueprint %a" Ethereum_types.pp_quantity level
-
 let blueprints_range from to_ =
   worker_wait_for_request (Blueprints_range {from; to_})
 
@@ -1760,30 +1753,6 @@ let new_last_known_l1_level l =
   worker_add_request ~request:(New_last_known_L1_level l)
 
 let delayed_inbox_hashes () = worker_wait_for_request Delayed_inbox_hashes
-
-let replay ?(log_file = "replay") ?profile
-    ?(alter_evm_state = Lwt_result_syntax.return) (Ethereum_types.Qty number) =
-  let open Lwt_result_syntax in
-  let* evm_state =
-    worker_wait_for_request (Evm_state_after (Number (Qty Z.(pred number))))
-  in
-  match evm_state with
-  | Some evm_state ->
-      let* evm_state = alter_evm_state evm_state in
-      let*! data_dir, config = execution_config in
-      let* blueprint = get_blueprint (Qty number) in
-      Evm_state.apply_blueprint
-        ~log_file
-        ?profile
-        ~data_dir
-        ~config
-        evm_state
-        blueprint.blueprint.payload
-  | None ->
-      failwith
-        "Cannot replay blueprint %a: missing context"
-        Ethereum_types.pp_quantity
-        (Qty number)
 
 let execute ?(alter_evm_state = Lwt_result_syntax.return) input block =
   let open Lwt_result_syntax in

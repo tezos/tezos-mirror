@@ -151,23 +151,6 @@ val shutdown : unit -> unit tzresult Lwt.t
 (** [delayed_inbox_hashes ctxt] returns the hashes in the delayed inbox. *)
 val delayed_inbox_hashes : unit -> Ethereum_types.hash list tzresult Lwt.t
 
-(** [replay ?alter_evm_state level] replays the [level]th blueprint on top of
-    the expected context.
-
-    The optional argument [alter_evm_state] allows to modify the EVM state
-    before replaying the blueprint. This can be useful to test how the
-    blueprint would have paned out under different circumstances like with a
-    different kernel for instance.
-
-    Note: this function only goes through the worker to fetch the correct
-    context. *)
-val replay :
-  ?log_file:string ->
-  ?profile:bool ->
-  ?alter_evm_state:(Evm_state.t -> Evm_state.t tzresult Lwt.t) ->
-  Ethereum_types.quantity ->
-  Evm_state.apply_result tzresult Lwt.t
-
 (** [patch_kernel path] modifies the state of the current head of the EVM node
     to replace its kernel with the kernel file [path]. *)
 val patch_kernel : string -> unit tzresult Lwt.t

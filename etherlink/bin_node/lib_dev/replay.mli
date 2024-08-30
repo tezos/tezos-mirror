@@ -13,6 +13,5 @@ val main :
   data_dir:string ->
   preimages:string ->
   preimages_endpoint:Uri.t option ->
-  ?smart_rollup_address:string ->
   Ethereum_types.quantity ->
   unit tzresult Lwt.t
