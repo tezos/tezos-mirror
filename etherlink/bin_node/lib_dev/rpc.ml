@@ -12,7 +12,6 @@ type t = {
   store : Evm_store.t;
   smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
   index : Irmin_context.ro_index;
-  mutable current_block_number : Ethereum_types.quantity;
 }
 
 let load ~data_dir ~preimages ?preimages_endpoint () =
@@ -23,17 +22,8 @@ let load ~data_dir ~preimages ?preimages_endpoint () =
       load ~cache_size:100_000 Read_only (Evm_state.irmin_store_path ~data_dir))
   in
   Evm_store.use store @@ fun conn ->
-  let* current_block_number, _ = Evm_store.Context_hashes.get_latest conn in
   let+ smart_rollup_address = Evm_store.Metadata.get conn in
-  {
-    store;
-    index;
-    data_dir;
-    preimages;
-    preimages_endpoint;
-    smart_rollup_address;
-    current_block_number;
-  }
+  {store; index; data_dir; preimages; preimages_endpoint; smart_rollup_address}
 
 let with_evm_state ctxt hash k =
   let open Lwt_result_syntax in
@@ -280,10 +270,12 @@ let install_finalizer_rpc server_public_finalizer =
   let* () = server_public_finalizer () in
   Misc.unwrap_error_monad @@ fun () -> Tx_pool.shutdown ()
 
-let next_blueprint_number ctxt () =
-  let open Lwt_syntax in
-  let (Qty current) = ctxt.current_block_number in
-  return (Ethereum_types.Qty Z.(succ current))
+let next_blueprint_number ctxt =
+  let open Lwt_result_syntax in
+  let* Qty current_block_number, _ =
+    Evm_store.use ctxt.store Evm_store.Context_hashes.get_latest
+  in
+  return (Ethereum_types.Qty Z.(succ current_block_number))
 
 let preload_kernel_from_level ctxt level =
   let open Lwt_result_syntax in
@@ -400,7 +392,14 @@ let main ~data_dir ~evm_node_endpoint ~(config : Configuration.t) =
     Rpc_server.start_public_server
       ~evm_services:
         {
-          next_blueprint_number = next_blueprint_number ctxt;
+          next_blueprint_number =
+            (fun () ->
+              let open Lwt_syntax in
+              let+ res = next_blueprint_number ctxt in
+              match res with
+              | Ok res -> res
+              | Error _ ->
+                  Stdlib.failwith "Couldn't fetch next blueprint number");
           find_blueprint =
             (fun level ->
               Evm_store.use ctxt.store (fun conn ->
@@ -416,7 +415,7 @@ let main ~data_dir ~evm_node_endpoint ~(config : Configuration.t) =
     install_finalizer_rpc server_public_finalizer
   in
 
-  let*! next_blueprint_number = next_blueprint_number ctxt () in
+  let* next_blueprint_number = next_blueprint_number ctxt in
 
   Blueprints_follower.start
     ~time_between_blocks
@@ -428,5 +427,4 @@ let main ~data_dir ~evm_node_endpoint ~(config : Configuration.t) =
     preload_kernel_from_level ctxt number
   in
   Blueprints_watcher.notify blueprint ;
-  ctxt.current_block_number <- number ;
   return_unit
