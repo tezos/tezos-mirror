@@ -423,24 +423,24 @@ let may_get_dal_content state consensus_vote =
        round time), we pick some small default value. *)
     let corner_case_default = 0.2 in
     match compute_next_round_time state with
-    | None -> corner_case_default
+    | None -> Lwt.return corner_case_default
     | Some (timestamp, _next_round) -> (
         let ts = Time.System.of_protocol_opt timestamp in
         match ts with
-        | None -> corner_case_default
+        | None -> Lwt.return corner_case_default
         | Some ts ->
             let now = Time.System.now () in
             let diff = Ptime.diff ts now |> Ptime.Span.to_float_s in
             if diff < 0. then
-              (* We could output a warning, as this should not happen. *)
-              corner_case_default
+              let*! () = Events.(emit warning_dal_timeout_old_round) () in
+              Lwt.return corner_case_default
             else
               let factor =
                 float_of_int
                   state.global_state.config.dal_node_timeout_percentage
                 /. 100.
               in
-              diff *. factor)
+              Lwt.return (diff *. factor))
   in
   only_if_dal_feature_enabled
     state
@@ -450,7 +450,7 @@ let may_get_dal_content state consensus_vote =
       let lag = state.global_state.constants.parametric.dal.attestation_lag in
       if Int32.sub attested_level (Int32.of_int lag) < 1l then return_none
       else
-        let timeout = compute_dal_rpc_timeout state in
+        let*! timeout = compute_dal_rpc_timeout state in
         let*! result =
           Lwt.pick
             [
