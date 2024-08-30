@@ -336,15 +336,14 @@ module type Proof = sig
   end
 
   module Env
-      (B : Backend.S)
-      (P : S
-             with type contents := B.Contents.Val.t
-              and type hash := B.Hash.t
-              and type step := B.Node.Val.step) :
+      (Backend : Backend.S)
+      (Proof : S
+                 with type contents := Backend.Contents.Val.t
+                  and type hash := Backend.Hash.t) :
     Env
-      with type hash := B.Hash.t
-       and type contents := B.Contents.Val.t
-       and type node := B.Node.Val.t
-       and type pnode := B.Node_portable.t
-       and type stream := P.stream
+      with type hash := Backend.Hash.t
+       and type contents := Backend.Contents.Val.t
+       and type node := Backend.Node.Val.t
+       and type pnode := Backend.Node_portable.t
+       and type stream := Proof.stream
 end
