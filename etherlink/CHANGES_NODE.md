@@ -9,6 +9,8 @@
   `<data-dir>/config.json` or `path`). With `-p`, the parsed configuration file
   is printed in the standard output, which can be useful to review them
   carefully. (!14690 !14713)
+- RPC `/configuration` returns the loaded configuration. Some sensitive/internal
+  fields are hidden from the output. (!13865)
 
 ## Version 0.1 (2024-08-28)
 

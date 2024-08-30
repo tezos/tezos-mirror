@@ -127,3 +127,37 @@ val register_test_for_kernels :
   (sequencer_setup -> Protocol.t -> unit Lwt.t) ->
   Protocol.t list ->
   unit
+
+val setup_sequencer :
+  ?sequencer_rpc_port:int ->
+  ?sequencer_private_rpc_port:int ->
+  mainnet_compat:bool ->
+  ?genesis_timestamp:Client.timestamp ->
+  ?time_between_blocks:Evm_node.time_between_blocks ->
+  ?max_blueprints_lag:int ->
+  ?max_blueprints_ahead:int ->
+  ?max_blueprints_catchup:int ->
+  ?catchup_cooldown:int ->
+  ?delayed_inbox_timeout:int ->
+  ?delayed_inbox_min_levels:int ->
+  ?max_number_of_chunks:int ->
+  ?commitment_period:int ->
+  ?challenge_window:int ->
+  ?bootstrap_accounts:string list ->
+  ?sequencer:Account.key ->
+  ?sequencer_pool_address:string ->
+  ?kernel:Uses.t ->
+  ?da_fee:Wei.t ->
+  ?minimum_base_fee_per_gas:Wei.t ->
+  ?preimages_dir:string ->
+  ?maximum_allowed_ticks:int64 ->
+  ?maximum_gas_per_transaction:int64 ->
+  ?max_blueprint_lookahead_in_seconds:int64 ->
+  ?enable_fa_bridge:bool ->
+  ?threshold_encryption:bool ->
+  ?drop_duplicate_when_injection:bool ->
+  ?history_mode:Sc_rollup_node.history_mode ->
+  enable_dal:bool ->
+  ?dal_slots:int list ->
+  Protocol.t ->
+  sequencer_setup Lwt.t

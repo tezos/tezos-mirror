@@ -211,3 +211,6 @@ val fee_history :
 
 (** [coinbase] calls [eth_coinbase]. *)
 val coinbase : Evm_node.t -> (string, error) result Lwt.t
+
+(** Returns the EVM node configuration. *)
+val configuration : Evm_node.t -> JSON.t Lwt.t

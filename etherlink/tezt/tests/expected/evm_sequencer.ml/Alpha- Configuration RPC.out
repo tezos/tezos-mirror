@@ -1,0 +1,129 @@
+{
+  "log_filter": {
+    "max_nb_blocks": 100,
+    "max_nb_logs": 1000,
+    "chunk_size": 10
+  },
+  "tx_pool_timeout_limit": "3600",
+  "tx_pool_addr_limit": "4000",
+  "tx_pool_tx_per_addr_limit": "16",
+  "keep_alive": false,
+  "rollup_node_endpoint": "hidden",
+  "verbose": "notice",
+  "experimental_features": {
+    "drop_duplicate_on_injection": true,
+    "enable_send_raw_transaction": true,
+    "node_transaction_validation": true
+  },
+  "proxy": {
+    "finalized_view": false,
+    "ignore_block_param": false
+  },
+  "fee_history": {},
+  "kernel_execution": {
+    "preimages": "hidden"
+  },
+  "public_rpc": {
+    "port": "hidden-for-regression-only",
+    "addr": "127.0.0.1",
+    "cors_origins": [],
+    "cors_headers": [],
+    "batch_limit": "unlimited",
+    "restricted_rpcs": "unrestricted",
+    "max_active_connections": "unlimited"
+  }
+}
+{
+  "log_filter": {
+    "max_nb_blocks": 100,
+    "max_nb_logs": 1000,
+    "chunk_size": 10
+  },
+  "sequencer": {
+    "time_between_blocks": 5,
+    "max_number_of_chunks": 128,
+    "sequencer": "hidden",
+    "blueprints_publisher_config": {
+      "max_blueprints_lag": 50,
+      "max_blueprints_ahead": 100,
+      "max_blueprints_catchup": 50,
+      "catchup_cooldown": 1
+    }
+  },
+  "tx_pool_timeout_limit": "3600",
+  "tx_pool_addr_limit": "4000",
+  "tx_pool_tx_per_addr_limit": "16",
+  "keep_alive": false,
+  "rollup_node_endpoint": "hidden",
+  "verbose": "notice",
+  "experimental_features": {
+    "drop_duplicate_on_injection": true,
+    "enable_send_raw_transaction": true,
+    "node_transaction_validation": true
+  },
+  "proxy": {
+    "finalized_view": false,
+    "ignore_block_param": false
+  },
+  "fee_history": {},
+  "kernel_execution": {
+    "preimages": "hidden"
+  },
+  "public_rpc": {
+    "port": "hidden-for-regression-only",
+    "addr": "127.0.0.1",
+    "cors_origins": [],
+    "cors_headers": [],
+    "batch_limit": "unlimited",
+    "restricted_rpcs": "unrestricted",
+    "max_active_connections": "unlimited"
+  },
+  "private_rpc": {
+    "port": "hidden-for-regression-only",
+    "addr": "127.0.0.1",
+    "cors_origins": [],
+    "cors_headers": [],
+    "batch_limit": "unlimited",
+    "restricted_rpcs": "unrestricted",
+    "max_active_connections": "unlimited"
+  }
+}
+{
+  "log_filter": {
+    "max_nb_blocks": 100,
+    "max_nb_logs": 1000,
+    "chunk_size": 10
+  },
+  "observer": {
+    "evm_node_endpoint": "hidden",
+    "rollup_node_tracking": true
+  },
+  "tx_pool_timeout_limit": "3600",
+  "tx_pool_addr_limit": "4000",
+  "tx_pool_tx_per_addr_limit": "16",
+  "keep_alive": false,
+  "rollup_node_endpoint": "hidden",
+  "verbose": "notice",
+  "experimental_features": {
+    "drop_duplicate_on_injection": true,
+    "enable_send_raw_transaction": true,
+    "node_transaction_validation": true
+  },
+  "proxy": {
+    "finalized_view": false,
+    "ignore_block_param": false
+  },
+  "fee_history": {},
+  "kernel_execution": {
+    "preimages": "hidden"
+  },
+  "public_rpc": {
+    "port": "hidden-for-regression-only",
+    "addr": "127.0.0.1",
+    "cors_origins": [],
+    "cors_headers": [],
+    "batch_limit": "unlimited",
+    "restricted_rpcs": "unrestricted",
+    "max_active_connections": "unlimited"
+  }
+}

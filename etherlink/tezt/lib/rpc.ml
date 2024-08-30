@@ -512,3 +512,6 @@ let coinbase evm_node =
   @@ decode_or_error
        (fun response -> Evm_node.extract_result response |> JSON.as_string)
        response
+
+let configuration evm_node =
+  Curl.get (Evm_node.endpoint evm_node ^ "/configuration") |> Runnable.run

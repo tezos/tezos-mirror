@@ -6126,6 +6126,61 @@ let test_da_fees_after_execution =
 
   unit
 
+let test_configuration_service =
+  Protocol.register_regression_test
+    ~__FILE__
+    ~tags:["evm"; "rpc"; "configuration"]
+    ~title:"Configuration RPC"
+    ~uses:(fun _protocol ->
+      [
+        Constant.octez_smart_rollup_node;
+        Constant.octez_evm_node;
+        Constant.smart_rollup_installer;
+        Constant.WASM.evm_kernel;
+      ])
+  @@ fun protocol ->
+  let* {sequencer; proxy; observer; _} =
+    Setup.setup_sequencer ~mainnet_compat:false ~enable_dal:false protocol
+  in
+  let* proxy_config = Rpc.configuration proxy in
+  let* sequencer_config = Rpc.configuration sequencer in
+  let* observer_config = Rpc.configuration observer in
+
+  let remove_public_rpc_port json =
+    JSON.update
+      "public_rpc"
+      (fun json ->
+        JSON.update
+          "port"
+          (fun _ ->
+            JSON.annotate
+              ~origin:"remove_fresh_ports"
+              (`String "hidden-for-regression-only"))
+          json)
+      json
+  in
+  let remove_private_rpc_port json =
+    JSON.update
+      "private_rpc"
+      (fun json ->
+        JSON.update
+          "port"
+          (fun _ ->
+            JSON.annotate
+              ~origin:"remove_fresh_ports"
+              (`String "hidden-for-regression-only"))
+          json)
+      json
+  in
+
+  Regression.capture (JSON.encode (remove_public_rpc_port proxy_config)) ;
+  Regression.capture
+    (JSON.encode
+       (remove_public_rpc_port @@ remove_private_rpc_port @@ sequencer_config)) ;
+  Regression.capture (JSON.encode (remove_public_rpc_port @@ observer_config)) ;
+
+  unit
+
 let protocols = Protocol.all
 
 let () =
@@ -6218,4 +6273,5 @@ let () =
   test_outbox_size_limit_resilience ~slow:false protocols ;
   test_proxy_node_can_forward_to_evm_endpoint protocols ;
   test_tx_pool_replacing_transactions protocols ;
-  test_da_fees_after_execution protocols
+  test_da_fees_after_execution protocols ;
+  test_configuration_service [Protocol.Alpha]
