@@ -20,6 +20,9 @@ Beta and Testnet, and allows users to deposit and withdraw FA 2.1 tokens.
 
 ### Internal
 
+- Transactions root and receipts root from blocks no longer hash all
+  transactions. It now hashes new transactions and the previous hash.
+  It will allow to remove old transactions from the durable storage. (!14688)
 - Tick model is updated with regards to FA deposits and withdrawals. (!14016)
 - L1 proxy address is added as a field to the FA withdrawal event. (!14260)
 - Preliminary support of larger delayed transactions. (!14467)
