@@ -9,7 +9,7 @@ use octez_riscv::{
     pvm::PvmHooks,
     stepper::{pvm::PvmStepper, test::TestStepper, StepResult, Stepper, StepperStatus},
 };
-use std::{error::Error, fs, io::Write};
+use std::{error::Error, fs, io::Write, ops::Bound};
 use tezos_smart_rollup::utils::{console::Console, inbox::InboxBuilder};
 use tezos_smart_rollup_encoding::smart_rollup::SmartRollupAddress;
 
@@ -73,10 +73,12 @@ fn run_pvm(program: &[u8], initrd: Option<&[u8]>, opts: &RunOptions) -> Result<(
 }
 
 fn run_stepper(mut stepper: impl Stepper, max_steps: Option<usize>) -> Result<(), Box<dyn Error>> {
-    let result = match max_steps {
-        Some(max_steps) => stepper.step_range_while(..=max_steps, |_| true),
-        None => stepper.step_range_while(.., |_| true),
+    let max_steps = match max_steps {
+        Some(max_steps) => Bound::Included(max_steps),
+        None => Bound::Unbounded,
     };
+
+    let result = stepper.step_max(max_steps);
 
     match result.to_stepper_status() {
         StepperStatus::Exited { success: true, .. } => Ok(()),

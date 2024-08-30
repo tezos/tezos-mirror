@@ -14,7 +14,7 @@ use crate::{
     },
     storage::{self, Hash, Repo},
 };
-use std::path::Path;
+use std::{ops::Bound, path::Path};
 use thiserror::Error;
 
 pub type StateLayout = (
@@ -141,9 +141,7 @@ impl NodePvm {
         let placed = <StateLayout as Layout>::placed().into_location();
         let space = backend.allocate(placed);
         let mut state = State::bind(space);
-        let steps = state
-            .pvm
-            .eval_range_while(pvm_hooks, &(..=max_steps), |_| true);
+        let steps = state.pvm.eval_max(pvm_hooks, Bound::Included(max_steps));
         state.tick.write(state.tick.read() + steps as u64);
         (Self { backend }, steps as i64)
     }

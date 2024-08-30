@@ -26,6 +26,7 @@ use std::{
     collections::HashSet,
     error::Error,
     fs,
+    ops::Bound,
     path::{Path, PathBuf},
 };
 
@@ -88,7 +89,7 @@ fn bench_fine(interpreter: &mut TestStepper, opts: &BenchRunOptions) -> BenchDat
         };
 
         let start = quanta::Instant::now();
-        let step_res = interpreter.step_max(1);
+        let step_res = interpreter.step_max(Bound::Included(1));
         let step_duration = start.elapsed();
 
         bench_data.add_instr(instr, step_duration);
@@ -109,7 +110,12 @@ fn bench_fine(interpreter: &mut TestStepper, opts: &BenchRunOptions) -> BenchDat
 /// Provides basic benchmark data and interpreter result.
 fn bench_simple(interpreter: &mut TestStepper, opts: &BenchRunOptions) -> BenchData {
     let start = quanta::Instant::now();
-    let res = interpreter.step_max(opts.common.max_steps.unwrap_or(usize::MAX));
+    let step_bound = opts
+        .common
+        .max_steps
+        .map(Bound::Included)
+        .unwrap_or(Bound::Unbounded);
+    let res = interpreter.step_max(step_bound);
     let duration = start.elapsed();
 
     use TestStepperResult::*;

@@ -12,7 +12,7 @@ use octez_riscv::{
         AccessType,
     },
     parser::{instruction::Instr, parse},
-    stepper::Stepper,
+    stepper::{Stepper, StepperStatus},
 };
 use std::{collections::HashMap, ops::Range};
 
@@ -20,7 +20,7 @@ impl<'a, S> DebuggerApp<'a, S>
 where
     S: Stepper,
 {
-    pub(super) fn update_after_step(&mut self, result: S::StepResult) {
+    pub(super) fn update_after_step(&mut self, result: StepperStatus) {
         let (pc, faulting) = self.update_pc_after_step();
         self.update_translation_after_step(faulting);
         self.update_instr_list(pc);

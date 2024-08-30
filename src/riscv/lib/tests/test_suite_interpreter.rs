@@ -15,7 +15,7 @@ use octez_riscv::{
         Stepper,
     },
 };
-use std::{fs, io::Write};
+use std::{fs, io::Write, ops::Bound};
 
 const TESTS_DIR: &str = "../../../tezt/tests/riscv-tests/generated";
 const GOLDEN_DIR: &str = "tests/expected";
@@ -46,7 +46,7 @@ fn interpret_test_with_check(path: &str, exit_mode: Mode, check_xregs: &[(XRegis
     let mut interpreter =
         TestStepper::new(&mut backend, &contents, None, exit_mode).expect("Boot failed");
 
-    let res = interpreter.step_max(MAX_STEPS);
+    let res = interpreter.step_max(Bound::Included(MAX_STEPS));
     // Record the result to compare to the expected result
     writeln!(golden, "{res:?}").unwrap();
     match res {
