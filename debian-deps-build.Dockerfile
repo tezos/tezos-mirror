@@ -25,7 +25,7 @@ RUN apt-get update && \
       libhidapi-dev pkg-config \
       zlib1g-dev debhelper debconf \
       libprotobuf-dev protobuf-compiler \
-      libsqlite3-dev \
+      libsqlite3-dev libpq-dev \
       lintian devscripts && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
