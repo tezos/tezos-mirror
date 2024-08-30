@@ -200,6 +200,15 @@ module PVMState = struct
              ~pvmstate
              ~impl_name)
 
+  let get ctxt =
+    let open Lwt_result_syntax in
+    let*! pvm_state = find ctxt in
+    match pvm_state with
+    | None ->
+        failwith
+          "Could not retrieve PVM state from context, this shouldn't happen."
+    | Some pvm_state -> return pvm_state
+
   let lookup : value -> string list -> bytes option Lwt.t =
    fun (PVMState {pvm_context_impl = (module Pvm_Context_Impl); pvmstate; _})
        path ->

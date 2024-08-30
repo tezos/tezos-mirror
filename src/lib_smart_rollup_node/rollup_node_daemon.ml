@@ -116,12 +116,9 @@ let maybe_split_context node_ctxt commitment_hash head_level =
 let register_outbox_messages (module Plugin : Protocol_plugin_sig.S) node_ctxt
     ctxt level =
   let open Lwt_result_syntax in
+  let* pvm_state = Context.PVMState.get ctxt in
   let*! outbox_messages =
-    let*! pvm_state = Context.PVMState.find ctxt in
-    match pvm_state with
-    | None -> Lwt.return_nil
-    | Some pvm_state ->
-        Plugin.Pvm.get_outbox_messages node_ctxt pvm_state ~outbox_level:level
+    Plugin.Pvm.get_outbox_messages node_ctxt pvm_state ~outbox_level:level
   in
   match outbox_messages with
   | [] -> return_unit

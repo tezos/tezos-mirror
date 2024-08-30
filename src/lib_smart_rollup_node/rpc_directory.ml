@@ -382,20 +382,17 @@ let get_outbox_content (node_ctxt : _ Node_context.t)
     in
     match ctxt_block_hash with
     | None -> return_nil
-    | Some ctxt_block_hash -> (
+    | Some ctxt_block_hash ->
         let* ctxt = Node_context.checkout_context node_ctxt ctxt_block_hash in
-        let*! state = Context.PVMState.find ctxt in
-        match state with
-        | None -> return_nil
-        | Some state ->
-            let*? (module Plugin) =
-              Protocol_plugins.proto_plugin_for_protocol
-                (Reference.get node_ctxt.current_protocol).hash
-            in
-            let*! outbox =
-              Plugin.Pvm.get_outbox_messages node_ctxt state ~outbox_level
-            in
-            return outbox)
+        let* state = Context.PVMState.get ctxt in
+        let*? (module Plugin) =
+          Protocol_plugins.proto_plugin_for_protocol
+            (Reference.get node_ctxt.current_protocol).hash
+        in
+        let*! outbox =
+          Plugin.Pvm.get_outbox_messages node_ctxt state ~outbox_level
+        in
+        return outbox
   in
   let messages =
     List.rev_map
