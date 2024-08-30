@@ -1532,6 +1532,8 @@ let init_etherlink_operator_setup cloud configuration name ~bootstrap ~dal_slots
       ?sequencer
       ~bootstrap_accounts
       ~output:output_config
+      ~enable_dal:(Option.is_some dal_slots)
+      ?dal_slots
       ()
   in
   let* dal_node =
