@@ -73,10 +73,7 @@ module type Sigs = sig
                 with type hash = H.t
                  and type contents_key = H.t Pack_key.t
                  and type node_key = H.t Pack_key.t)
-      (Inter : Internal
-                 with type hash = H.t
-                  and type key = H.t Pack_key.t
-                  and type Val.step = Node.step)
+      (Inter : Internal with type hash = H.t and type key = H.t Pack_key.t)
       (Pack : Pack_store.S
                 with type hash = H.t
                  and type key = H.t Pack_key.t
@@ -84,7 +81,6 @@ module type Sigs = sig
     Persistent
       with type key = H.t Pack_key.t
        and type hash = H.t
-       and type Val.step = Node.step
        and type file_manager = Pack.file_manager
        and type dict = Pack.dict
        and type dispatcher = Pack.dispatcher

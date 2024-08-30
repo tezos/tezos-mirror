@@ -113,7 +113,7 @@ end = struct
   module Schema = Brassaia.Schema.KV (Brassaia.Contents.String)
   module Hash = Schema.Hash
   module Key = Brassaia.Key.Of_hash (Hash)
-  module Node = Make_node (Hash) (Schema.Path) (Key) (Key)
+  module Node = Make_node (Hash) (Key) (Key)
 
   type key = Key.t [@@deriving brassaia]
 

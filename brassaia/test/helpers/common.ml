@@ -36,23 +36,18 @@ open Astring
 
 module type S =
   Brassaia.S
-    with type Schema.Path.step = string
-     and type Schema.Path.t = string list
-     and type Schema.Contents.t = string
+    with type Schema.Contents.t = string
      and type Schema.Branch.t = string
 
 module type Generic_key =
   Brassaia.Generic_key.S
-    with type Schema.Path.step = string
-     and type Schema.Path.t = string list
-     and type Schema.Contents.t = string
+    with type Schema.Contents.t = string
      and type Schema.Branch.t = string
 
 module Schema = struct
   module Hash = Brassaia.Hash.SHA1
   module Commit = Brassaia.Commit.Make (Hash)
-  module Path = Brassaia.Path.String_list
-  module Node = Brassaia.Node.Generic_key.Make (Hash) (Path)
+  module Node = Brassaia.Node.Generic_key.Make (Hash)
   module Branch = Brassaia.Branch.String
   module Info = Brassaia.Info.Default
   module Contents = Brassaia.Contents.String
@@ -62,7 +57,7 @@ let store : (module Brassaia.Maker) -> (module S) =
  fun (module B) ->
   let module Schema = struct
     include Schema
-    module Node = Brassaia.Node.Generic_key.Make (Hash) (Path)
+    module Node = Brassaia.Node.Generic_key.Make (Hash)
   end in
   let module S = B.Make (Schema) in
   (module S)

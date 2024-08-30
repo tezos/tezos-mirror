@@ -26,8 +26,6 @@ module Lower = Brassaia_pack_unix.Lower
 module Schema :
   Brassaia.Schema.Extended
     with type Hash.t = Brassaia.Hash.SHA1.t
-     and type Path.step = string
-     and type Path.t = string list
      and type Branch.t = string
      and type Contents.t = string
 

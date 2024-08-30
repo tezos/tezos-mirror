@@ -49,8 +49,6 @@ module type Maker = sig
        TODO: extract these extensions as a separate functor argument instead. *)
       with type Schema.Hash.t = Schema.Hash.t
        and type Schema.Branch.t = Schema.Branch.t
-       and type Schema.Path.t = Schema.Path.t
-       and type Schema.Path.step = Schema.Path.step
        and type Schema.Contents.t = Schema.Contents.t
        and type Schema.Info.t = Schema.Info.t
        and type contents_key = (Schema.Hash.t, Schema.Contents.t) contents_key

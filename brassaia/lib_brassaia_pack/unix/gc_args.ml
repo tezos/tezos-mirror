@@ -37,11 +37,11 @@ module type S = sig
 
   module Node_value : sig
     type t
-    type step
 
     val pred :
       t ->
-      (step option * [ `Contents of key | `Inode of key | `Node of key ]) list
+      (Path.step option * [ `Contents of key | `Inode of key | `Node of key ])
+      list
   end
 
   module Node_store : sig

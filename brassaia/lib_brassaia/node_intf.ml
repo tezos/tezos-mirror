@@ -38,12 +38,6 @@ module type Core = sig
   val node_key_encoding : node_key Data_encoding.t
   (** [node_key_encoding] is the data_encoding for {!type-node_key}. *)
 
-  type step [@@deriving brassaia]
-  (** The type for steps between nodes. *)
-
-  val step_encoding : step Data_encoding.t
-  (** [step_encoding] is the data_encoding for {!type-step}. *)
-
   type value = [ `Node of node_key | `Contents of contents_key ]
   [@@deriving brassaia]
   (** The type for either (node) keys or (contents) keys combined *)
@@ -57,19 +51,19 @@ module type Core = sig
   val hash_encoding : hash Data_encoding.t
   (** [hash_encoding] is the data_encoding for {!type-hash}. *)
 
-  val of_list : (step * value) list -> t
+  val of_list : (Path.step * value) list -> t
   (** [of_list l] is the node [n] such that [list n = l]. *)
 
   val list :
-    ?offset:int -> ?length:int -> ?cache:bool -> t -> (step * value) list
+    ?offset:int -> ?length:int -> ?cache:bool -> t -> (Path.step * value) list
   (** [list t] is the contents of [t]. [offset] and [length] are used to
       paginate results. *)
 
-  val of_seq : (step * value) Seq.t -> t
+  val of_seq : (Path.step * value) Seq.t -> t
   (** [of_seq s] is the node [n] such that [seq n = s]. *)
 
   val seq :
-    ?offset:int -> ?length:int -> ?cache:bool -> t -> (step * value) Seq.t
+    ?offset:int -> ?length:int -> ?cache:bool -> t -> (Path.step * value) Seq.t
   (** [seq t] is the contents of [t]. [offset] and [length] are used to paginate
       results.
 
@@ -98,19 +92,19 @@ module type Core = sig
   val clear : t -> unit
   (** Cleanup internal caches. *)
 
-  val find : ?cache:bool -> t -> step -> value option
+  val find : ?cache:bool -> t -> Path.step -> value option
   (** [find t s] is the value associated with [s] in [t].
 
       A node can point to user-defined {{!contents_key} contents}. The edge
-      between the node and the contents is labeled by a {!step}.
+      between the node and the contents is labeled by a {!Path.step}.
 
       See {!caching} for an explanation of the [cache] parameter *)
 
-  val add : t -> step -> value -> t
+  val add : t -> Path.step -> value -> t
   (** [add t s v] is the node where [find t v] is [Some s] but is similar to [t]
       otherwise. *)
 
-  val remove : t -> step -> t
+  val remove : t -> Path.step -> t
   (** [remove t s] is the node where [find t s] is [None] but is similar to [t]
       otherwise. *)
 
@@ -144,7 +138,7 @@ module type Core = sig
       recursive operations on nodes. .*)
 
   type head :=
-    [ `Node of (step * value) list | `Inode of int * (int * hash) list ]
+    [ `Node of (Path.step * value) list | `Inode of int * (int * hash) list ]
   [@@deriving brassaia]
 
   val head : t -> head
@@ -206,7 +200,7 @@ module type Portable = sig
 
   type proof =
     [ `Blinded of hash
-    | `Values of (step * value) list
+    | `Values of (Path.step * value) list
     | `Inode of int * (int * proof) list ]
   [@@deriving brassaia]
   (** The type for proof trees. *)
@@ -226,29 +220,21 @@ end
 
 module type Maker_generic_key = functor
   (Hash : Hash.S)
-  (Path : sig
-     type step [@@deriving brassaia]
-
-     val step_encoding : step Data_encoding.t
-   end)
   (Contents_key : Key.S with type hash = Hash.t)
   (Node_key : Key.S with type hash = Hash.t)
   -> sig
   include
     S_generic_key
-      with type step = Path.step
-       and type hash = Hash.t
+      with type hash = Hash.t
        and type contents_key = Contents_key.t
        and type node_key = Node_key.t
 
-  module Portable :
-    Portable with type node := t and type step := step and type hash := hash
+  module Portable : Portable with type node := t and type hash := hash
 end
 
 module type Store = sig
   include Indexable.S
 
-  module Path : Path.S
   (** [Path] provides base functions on node paths. *)
 
   val merge : [> read_write ] t -> key option Merge.t
@@ -260,7 +246,6 @@ module type Store = sig
       with type t = value
        and type hash = hash
        and type node_key = key
-       and type step = Path.step
 
   module Hash : Hash.Typed with type t = hash and type value = value
 
@@ -280,12 +265,6 @@ module type Graph = sig
   type node_key [@@deriving brassaia]
   (** The type for node values. *)
 
-  type step [@@deriving brassaia]
-  (** The type of steps. A step is used to pass from one node to another. *)
-
-  type path [@@deriving brassaia]
-  (** The type of store paths. A path is composed of {{!step} steps}. *)
-
   type value = [ `Node of node_key | `Contents of contents_key ]
   [@@deriving brassaia]
   (** The type for store values. *)
@@ -293,20 +272,20 @@ module type Graph = sig
   val empty : [> write ] t -> node_key Lwt.t
   (** The empty node. *)
 
-  val init : [> write ] t -> (step * value) list -> node_key Lwt.t
+  val init : [> write ] t -> (Path.step * value) list -> node_key Lwt.t
   (** [init t n] is a new node containing [n]. *)
 
-  val list : [> read ] t -> node_key -> (step * value) list Lwt.t
+  val list : [> read ] t -> node_key -> (Path.step * value) list Lwt.t
   (** [list t n] is the contents of the node [n]. *)
 
-  val find : [> read ] t -> node_key -> path -> value option Lwt.t
+  val find : [> read ] t -> node_key -> Path.t -> value option Lwt.t
   (** [find t n p] is the contents of the path [p] starting form [n]. *)
 
-  val add : [> read_write ] t -> node_key -> path -> value -> node_key Lwt.t
+  val add : [> read_write ] t -> node_key -> Path.t -> value -> node_key Lwt.t
   (** [add t n p v] is the node [x] such that [find t x p] is [Some v] and it
       behaves the same [n] for other operations. *)
 
-  val remove : [> read_write ] t -> node_key -> path -> node_key Lwt.t
+  val remove : [> read_write ] t -> node_key -> Path.t -> node_key Lwt.t
   (** [remove t n path] is the node [x] such that [find t x] is [None] and it
       behhaves then same as [n] for other operations. *)
 
@@ -350,13 +329,7 @@ module type Sigs = sig
   (** [Make] provides a simple node implementation, parameterized by hash and
       path implementations. The contents and node values are addressed
       directly by their hash. *)
-  module Make
-      (Hash : Hash.S)
-      (Path : sig
-        type step [@@deriving brassaia]
-
-        val step_encoding : step Data_encoding.t
-      end) : S with type hash = Hash.t and type step = Path.step
+  module Make (Hash : Hash.S) : S with type hash = Hash.t
 
   (** [Generic_key] generalises the concept of "node" to one that supports
       object keys that are not strictly equal to hashes. *)
@@ -379,24 +352,21 @@ module type Sigs = sig
                with type t = S.value
                 and type hash = H.t
                 and type contents_key = C.key
-                and type node_key = S.key)
-        (P : Path.S with type step = V.step) :
+                and type node_key = S.key) :
       Store
         with type 'a t = 'a C.t * 'a S.t
          and type key = S.key
          and type hash = S.hash
          and type value = S.value
-         and module Path = P
          and module Val = V
   end
 
   (** v1 serialisation *)
-  module V1 (N : Generic_key.S with type step = string) : sig
+  module V1 (N : Generic_key.S) : sig
     include
       Generic_key.S
         with type contents_key = N.contents_key
          and type node_key = N.node_key
-         and type step = N.step
 
     val import : N.t -> t
     val export : t -> N.t
@@ -426,11 +396,7 @@ module type Sigs = sig
 
     (** A node implementation with hashes for keys is trivially portable: *)
     module Of_node (S : S) :
-      Portable
-        with type node := S.t
-         and type t = S.t
-         and type step = S.step
-         and type hash = S.hash
+      Portable with type node := S.t and type t = S.t and type hash = S.hash
 
     module type S = Portable
   end
@@ -443,14 +409,12 @@ module type Sigs = sig
       (C : Contents.Store)
       (S : Content_addressable.S with type key = C.key)
       (H : Hash.S with type t = S.key)
-      (V : S with type t = S.value and type hash = S.key)
-      (P : Path.S with type step = V.step) :
+      (V : S with type t = S.value and type hash = S.key) :
     Store
       with type 'a t = 'a C.t * 'a S.t
        and type key = S.key
        and type value = S.value
        and type hash = H.t
-       and module Path = P
        and module Val = V
 
   module type Graph = Graph
@@ -462,6 +426,4 @@ module type Sigs = sig
       with type 'a t = 'a N.t
        and type contents_key = N.Contents.key
        and type node_key = N.key
-       and type step = N.Path.step
-       and type path = N.Path.t
 end

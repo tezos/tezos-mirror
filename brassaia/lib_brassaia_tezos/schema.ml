@@ -14,7 +14,6 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-module Path = Brassaia.Path.String_list
 module Branch = Brassaia.Branch.String
 
 module Hash : Brassaia.Hash.S = struct
@@ -65,8 +64,7 @@ module Node
     (Contents_key : Brassaia.Key.S with type hash = Hash.t)
     (Node_key : Brassaia.Key.S with type hash = Hash.t) =
 struct
-  module M =
-    Brassaia.Node.Generic_key.Make (Hash) (Path) (Contents_key) (Node_key)
+  module M = Brassaia.Node.Generic_key.Make (Hash) (Contents_key) (Node_key)
 
   (* [V1] is only used to compute preimage hashes. [assert false]
      statements should be unreachable.*)
@@ -82,7 +80,6 @@ struct
        Brassaia 2 use a variable-size encoding for strings; this is using int8
        for strings of size stricly less than 128 (e.g. 2^7) which happen to
        be the case for all filenames ever produced by Brassaia 1.4. *)
-    let step_t = Brassaia.Type.string
 
     let hash_of_entry (_, t) =
       match t with
@@ -104,7 +101,7 @@ struct
       let open Brassaia.Type in
       record "Tree.entry" (fun _ _ _ -> assert false)
       |+ field "kind" metadata_t metadata_of_entry
-      |+ field "name" step_t fst
+      |+ field "name" Brassaia.Path.step_t fst
       |+ field "hash" Hash.t hash_of_entry
       |> sealr
 
@@ -113,7 +110,10 @@ struct
 
     let pre_hash_entries = Brassaia.Type.(unstage (pre_hash entries_t))
     let compare_entry (x, _) (y, _) = String.compare x y
-    let step_to_string = Brassaia.Type.(unstage (to_bin_string Path.step_t))
+
+    let step_to_string =
+      Brassaia.Type.(unstage (to_bin_string Brassaia.Path.step_t))
+
     let str_key (k, v) = (step_to_string k, v)
 
     let pre_hash t =
