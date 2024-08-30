@@ -257,8 +257,10 @@ let main ?kernel_path ~data_dir ~(config : Configuration.t) () =
       finalizer_private_server
   in
 
+  let*! next_blueprint_number = Evm_context.next_blueprint_number () in
+
   Blueprints_follower.start
     ~time_between_blocks
     ~evm_node_endpoint
-    ~get_next_blueprint_number:Evm_context.next_blueprint_number
+    ~next_blueprint_number
     on_new_blueprint
