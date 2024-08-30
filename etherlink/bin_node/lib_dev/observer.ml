@@ -118,12 +118,7 @@ let main ?kernel_path ~data_dir ~(config : Configuration.t) () =
   let* finalizer_public_server =
     Rpc_server.start_public_server
       ~evm_services:
-        {
-          next_blueprint_number = Evm_context.next_blueprint_number;
-          find_blueprint = Evm_context.blueprint;
-          smart_rollup_address;
-          time_between_blocks;
-        }
+        Evm_ro_context.(evm_services_methods ro_ctxt time_between_blocks)
       config
       (observer_backend, smart_rollup_address)
   in
