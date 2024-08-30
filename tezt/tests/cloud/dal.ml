@@ -1544,7 +1544,13 @@ let init_etherlink_operator_setup cloud configuration name ~bootstrap ~dal_slots
             ~node
             agent
         in
-        let* () = Dal_node.init_config ~producer_profiles:dal_slots dal_node in
+        let* () =
+          Dal_node.init_config
+            ~expected_pow:(if Cli.network = Ghostnet then 26. else 0.)
+            ~producer_profiles:dal_slots
+            ~peers:[bootstrap.dal_node_p2p_endpoint]
+            dal_node
+        in
         let* () = Dal_node.run dal_node in
         some dal_node
   in
