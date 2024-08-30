@@ -139,6 +139,8 @@ module type S = sig
 
   val smart_rollup_address : string
 
+  val replay : Ethereum_types.quantity -> Ethereum_types.block tzresult Lwt.t
+
   (** [trace_transaction hash tracer] replays the block containing the
       transaction [hash], and traces this transaction with the specified
       [tracer]. *)
@@ -194,6 +196,15 @@ module Make (Backend : Backend) (Executor : Evm_execution.S) : S = struct
         let transaction_receipt = Block_storage.transaction_receipt
       end)
       (Backend.Tracer)
+
+  let replay number =
+    let open Lwt_result_syntax in
+    let* result =
+      Executor.replay ~log_file:"replay_rpc" ~profile:false number
+    in
+    match result with
+    | Apply_success {block; _} -> return block
+    | Apply_failure -> failwith "Could not replay the block"
 
   let smart_rollup_address = Backend.smart_rollup_address
 end
