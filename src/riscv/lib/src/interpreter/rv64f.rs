@@ -51,7 +51,7 @@ impl FloatExt for Single {
 
 impl<M> HartState<M>
 where
-    M: backend::Manager,
+    M: backend::ManagerReadWrite,
 {
     /// `FCLASS.S` F-type instruction.
     ///
@@ -503,7 +503,7 @@ where
 impl<ML, M> MachineState<ML, M>
 where
     ML: MainMemoryLayout,
-    M: backend::Manager,
+    M: backend::ManagerReadWrite,
 {
     /// `FLW` I-type instruction.
     ///

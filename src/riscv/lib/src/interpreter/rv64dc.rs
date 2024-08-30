@@ -20,7 +20,7 @@ use crate::{
 impl<ML, M> MachineState<ML, M>
 where
     ML: MainMemoryLayout,
-    M: backend::Manager,
+    M: backend::ManagerReadWrite,
 {
     /// `C.FLD` CL-type compressed instruction
     ///

@@ -18,7 +18,7 @@ use crate::{
 
 impl<M> XRegisters<M>
 where
-    M: backend::Manager,
+    M: backend::ManagerReadWrite,
 {
     /// `C.ADDIW` CI-type compressed instruction
     ///
@@ -51,7 +51,7 @@ where
 impl<ML, M> MachineState<ML, M>
 where
     ML: MainMemoryLayout,
-    M: backend::Manager,
+    M: backend::ManagerReadWrite,
 {
     /// `C.LD` CL-type compressed instruction
     ///

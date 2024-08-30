@@ -16,7 +16,7 @@ use std::ops::{BitAnd, BitOr, BitXor};
 impl<ML, M> MachineState<ML, M>
 where
     ML: MainMemoryLayout,
-    M: backend::Manager,
+    M: backend::ManagerReadWrite,
 {
     /// `LR.D` R-type instruction
     ///

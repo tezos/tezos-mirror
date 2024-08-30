@@ -16,7 +16,7 @@ use crate::{
 impl<ML, M> MachineState<ML, M>
 where
     ML: MainMemoryLayout,
-    M: backend::Manager,
+    M: backend::ManagerReadWrite,
 {
     /// Generic read function for loading `mem::size_of<T>` bytes from `address`
     pub(super) fn read_from_address<T: backend::Elem>(

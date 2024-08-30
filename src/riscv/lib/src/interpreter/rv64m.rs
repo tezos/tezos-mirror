@@ -13,7 +13,7 @@ use crate::{
 
 impl<M> XRegisters<M>
 where
-    M: backend::Manager,
+    M: backend::ManagerReadWrite,
 {
     /// `REMW` R-type instruction
     ///

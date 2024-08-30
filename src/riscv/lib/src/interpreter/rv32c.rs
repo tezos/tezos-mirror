@@ -19,7 +19,7 @@ use crate::{
 
 impl<M> HartState<M>
 where
-    M: backend::Manager,
+    M: backend::ManagerReadWrite,
 {
     /// `C.J` CJ-type compressed instruction
     ///
@@ -75,7 +75,7 @@ where
 
 impl<M> XRegisters<M>
 where
-    M: backend::Manager,
+    M: backend::ManagerReadWrite,
 {
     /// `C.ADDI` CI-type compressed instruction
     ///
@@ -211,7 +211,7 @@ where
 impl<ML, M> MachineState<ML, M>
 where
     ML: MainMemoryLayout,
-    M: backend::Manager,
+    M: backend::ManagerReadWrite,
 {
     /// `C.LW` CL-type compressed instruction
     ///

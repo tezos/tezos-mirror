@@ -37,7 +37,7 @@ pub trait FloatExt: Float + Into<FValue> + Copy + Neg + From<FValue> {
 
 impl<M> HartState<M>
 where
-    M: backend::Manager,
+    M: backend::ManagerReadWrite,
 {
     /// `FCLASS.*` instruction.
     ///
@@ -593,7 +593,7 @@ pub enum Fflag {
     NV = 4,
 }
 
-impl<M: backend::Manager> CSRegisters<M> {
+impl<M: backend::ManagerReadWrite> CSRegisters<M> {
     fn set_exception_flag(&mut self, mask: Fflag) {
         self.set_bits(CSRegister::fflags, 1 << mask as usize);
     }

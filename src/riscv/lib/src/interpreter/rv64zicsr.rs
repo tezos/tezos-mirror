@@ -9,7 +9,7 @@ use crate::{
 
 impl<M> HartState<M>
 where
-    M: backend::Manager,
+    M: backend::ManagerReadWrite,
 {
     /// Execute a `CSRRW` instruction.
     #[inline(always)]

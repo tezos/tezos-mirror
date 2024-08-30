@@ -12,7 +12,7 @@ use crate::{
 impl<ML, M> MachineState<ML, M>
 where
     ML: main_memory::MainMemoryLayout,
-    M: state_backend::Manager,
+    M: state_backend::ManagerReadWrite,
 {
     /// Execute a `fence.i` instruction.
     #[inline(always)]
