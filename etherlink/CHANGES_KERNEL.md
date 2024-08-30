@@ -28,6 +28,8 @@ Beta and Testnet, and allows users to deposit and withdraw FA 2.1 tokens.
 - Preliminary support of larger delayed transactions. (!14467)
 - Move block storage related functions to another file to improve the readability
   (!14685)
+- EVM Execution no longer require an additional storage for block number to
+  block hash. Uses the existing indexing table instead. (!14704)
 
 ## Version af7909023768bc4aad3120bec7bea4a64a576047
 
