@@ -81,7 +81,7 @@ fn sv_translate_impl<ML, M>(
 ) -> Result<Address, Exception>
 where
     ML: main_memory::MainMemoryLayout,
-    M: backend::Manager,
+    M: backend::ManagerRead,
 {
     use physical_address as p_addr;
     use virtual_address as v_addr;
@@ -188,7 +188,7 @@ where
     p_addr.ok_or(access_type.exception(v_addr))
 }
 
-impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M> {
+impl<ML: main_memory::MainMemoryLayout, M: backend::ManagerBase> MachineState<ML, M> {
     /// Get the effective hart mode when addressing memory.
     /// Section P:M-ISA-1.6.3
     /// The MPRV (Modify PRiVilege) bit modifies the effective privilege mode, i.e.,
@@ -199,7 +199,10 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
     /// as though the current privilege mode were set to MPP.
     /// Instruction address-translation and protection are unaffected by the setting of MPRV
     #[inline]
-    pub fn effective_translation_hart_mode(&self, mode: Mode, access_type: AccessType) -> Mode {
+    pub fn effective_translation_hart_mode(&self, mode: Mode, access_type: AccessType) -> Mode
+    where
+        M: backend::ManagerRead,
+    {
         let mstatus: MStatus = self.hart.csregisters.read(CSRegister::mstatus);
         match access_type {
             AccessType::Store | AccessType::Load if mstatus.mprv() => mstatus.mpp().into(),
@@ -216,7 +219,10 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
         mode: Mode,
         satp: CSRRepr,
         access_type: AccessType,
-    ) -> TranslationAlgorithm {
+    ) -> TranslationAlgorithm
+    where
+        M: backend::ManagerRead,
+    {
         // 1. Let a be satp.ppn × PAGESIZE, and let i = LEVELS − 1.
         //    The satp register must be active, i.e.,
         //    the effective privilege mode must be S-mode or U-mode.
@@ -236,7 +242,10 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
         satp: CSRRepr,
         virt_addr: Address,
         access_type: AccessType,
-    ) -> Result<Address, Exception> {
+    ) -> Result<Address, Exception>
+    where
+        M: backend::ManagerRead,
+    {
         let mode = self.effective_translation_alg(mode, satp, access_type);
 
         use TranslationAlgorithm::*;
@@ -258,7 +267,10 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
         &mut self,
         virt_addr: Address,
         access_type: AccessType,
-    ) -> Result<Address, Exception> {
+    ) -> Result<Address, Exception>
+    where
+        M: backend::ManagerReadWrite,
+    {
         let mode = self.hart.mode.read();
         let satp = self.hart.csregisters.read(CSRegister::satp);
 
@@ -282,7 +294,10 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
         &self,
         virt_addr: Address,
         access_type: AccessType,
-    ) -> Result<Address, Exception> {
+    ) -> Result<Address, Exception>
+    where
+        M: backend::ManagerRead,
+    {
         let mode = self.hart.mode.read();
         let satp = self.hart.csregisters.read(CSRegister::satp);
         self.translate_with_prefetch(mode, satp, virt_addr, access_type)
