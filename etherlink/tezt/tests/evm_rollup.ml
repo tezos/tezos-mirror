@@ -3734,12 +3734,89 @@ let test_kernel_root_hash_after_upgrade =
     ~error_msg:"Found incorrect kernel root hash (expected %L, got %R)" ;
   unit
 
+let test_storage_migration_v18 protocols =
+  let storage_migration_v18 ~from ~number_blocks =
+    let from_tag, from_use = Kernel.to_uses_and_tags from in
+    Protocol.register_test
+      ~__FILE__
+      ~tags:
+        [
+          "evm";
+          "migration";
+          "upgrade";
+          from_tag;
+          "v18";
+          string_of_int number_blocks;
+        ]
+      ~uses:(fun _protocol ->
+        [
+          Constant.octez_smart_rollup_node;
+          Constant.octez_evm_node;
+          Constant.smart_rollup_installer;
+          Constant.WASM.evm_kernel;
+          from_use;
+        ])
+      ~title:
+        Format.(
+          sprintf
+            "Test migration V18 with %d blocks (%s -> latest)."
+            number_blocks
+            from_tag)
+    @@ fun protocol ->
+    let scenario_prior ~evm_setup:{sc_rollup_node; client; evm_node; _} =
+      let* () =
+        repeat number_blocks (fun () ->
+            let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+            unit)
+      in
+      let*@ head = Rpc.block_number evm_node in
+      Check.((head = Int32.of_int number_blocks) int32)
+        ~error_msg:"Expected head is %R, got %L" ;
+      return ()
+    in
+    let scenario_after ~evm_setup:{sc_rollup_node; _} ~sanity_check:_ =
+      let* blocks_subkeys =
+        Sc_rollup_node.RPC.call
+          sc_rollup_node
+          ~rpc_hooks:Tezos_regression.rpc_hooks
+        @@ Sc_rollup_rpc.get_global_block_durable_state_value
+             ~pvm_kind
+             ~operation:Sc_rollup_rpc.Subkeys
+             ~key:"/evm/world_state/blocks"
+             ()
+      in
+
+      List.iter
+        (fun key ->
+          if key = "current" || String.length key = 64 then ()
+          else
+            Test.fail
+              "Any key that is not current or a block hash should have been \
+               removed, but found %S"
+              key)
+        blocks_subkeys ;
+
+      unit
+    in
+    gen_kernel_migration_test
+      ~from
+      ~to_:Latest
+      ~scenario_prior
+      ~scenario_after
+      protocol
+  in
+  storage_migration_v18 ~from:Ghostnet ~number_blocks:5 protocols ;
+  storage_migration_v18 ~from:Ghostnet ~number_blocks:256 protocols ;
+  storage_migration_v18 ~from:Mainnet ~number_blocks:5 protocols ;
+  storage_migration_v18 ~from:Mainnet ~number_blocks:256 protocols
+
 let register_evm_migration ~protocols =
   test_latest_kernel_migration protocols ;
   test_mainnet_ghostnet_kernel_migration protocols ;
   test_deposit_before_and_after_migration protocols ;
   test_block_storage_before_and_after_migration protocols ;
-  test_transaction_storage_before_and_after_migration protocols
+  test_transaction_storage_before_and_after_migration protocols ;
+  test_storage_migration_v18 protocols
 
 let block_transaction_count_by ~by arg =
   let method_ = "eth_getBlockTransactionCountBy" ^ by_block_arg_string by in

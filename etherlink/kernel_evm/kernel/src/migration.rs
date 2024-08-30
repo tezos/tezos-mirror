@@ -4,6 +4,7 @@
 //
 // SPDX-License-Identifier: MIT
 
+use crate::block_storage;
 use crate::error::Error;
 use crate::error::StorageError;
 use crate::error::UpgradeProcessError;
@@ -12,8 +13,10 @@ use crate::storage::{
     read_chain_id, read_storage_version, store_storage_version, StorageVersion,
 };
 use evm_execution::NATIVE_TOKEN_TICKETER_PATH;
+use primitive_types::U256;
 use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup::storage::path::RefPath;
+use tezos_smart_rollup_host::path::OwnedPath;
 use tezos_smart_rollup_host::runtime::{Runtime, RuntimeError};
 
 #[derive(Eq, PartialEq)]
@@ -93,6 +96,29 @@ fn migrate_to<Host: Runtime>(
         StorageVersion::V17 => {
             // Starting version 17 the kernel no longer needs all transactions
             // in its storage to produce the receipts and transactions root.
+            Ok(MigrationStatus::Done)
+        }
+        StorageVersion::V18 => {
+            // Blocks were indexed twice in the storage.
+            // [/evm/world_state/indexes/blocks] is the mapping of all block
+            // numbers to hashes.
+            // [/evm/world_state/blocks/<number>/hash] is the mapgping of the
+            // last 256 blocks to hashes
+            //
+            // We need only the former.
+
+            let current_number = block_storage::read_current_number(host)?;
+            let to_clean = U256::min(
+                current_number + 1,
+                evm_execution::storage::blocks::BLOCKS_STORED.into(),
+            );
+            for i in 0..to_clean.as_usize() {
+                let number = current_number - i;
+                let path: Vec<u8> =
+                    format!("/evm/world_state/blocks/{}/hash", number).into();
+                let owned_path = OwnedPath::try_from(path)?;
+                host.store_delete(&owned_path)?;
+            }
             Ok(MigrationStatus::Done)
         }
     }
