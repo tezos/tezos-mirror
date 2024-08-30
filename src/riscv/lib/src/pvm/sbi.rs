@@ -10,7 +10,7 @@ use crate::{
         AccessType, MachineState,
     },
     parser::instruction::Instr,
-    state_backend::{CellRead, CellReadWrite, CellWrite, Manager},
+    state_backend::{CellRead, CellReadWrite, CellWrite, ManagerReadWrite},
     traps::EnvironException,
 };
 use ed25519_dalek::{Signature, Signer, SigningKey, VerifyingKey};
@@ -26,7 +26,7 @@ use tezos_smart_rollup_constants::{
 
 /// Write the SBI error code as the return value.
 #[inline(always)]
-fn sbi_return_error<ML: MainMemoryLayout, M: Manager>(
+fn sbi_return_error<ML: MainMemoryLayout, M: ManagerReadWrite>(
     machine: &mut MachineState<ML, M>,
     code: SbiError,
 ) {
@@ -35,7 +35,10 @@ fn sbi_return_error<ML: MainMemoryLayout, M: Manager>(
 
 /// Write an arbitrary value as single return value.
 #[inline(always)]
-fn sbi_return1<ML: MainMemoryLayout, M: Manager>(machine: &mut MachineState<ML, M>, value: XValue) {
+fn sbi_return1<ML: MainMemoryLayout, M: ManagerReadWrite>(
+    machine: &mut MachineState<ML, M>,
+    value: XValue,
+) {
     // The SBI caller interprets the return value as a [i64]. We don't want the value to be
     // interpreted as negative because that indicates an error.
     if (value as i64) < 0 {
@@ -47,7 +50,7 @@ fn sbi_return1<ML: MainMemoryLayout, M: Manager>(machine: &mut MachineState<ML, 
 
 /// Write an `sbiret` return struct.
 #[inline(always)]
-fn sbi_return_sbiret<ML: MainMemoryLayout, M: Manager>(
+fn sbi_return_sbiret<ML: MainMemoryLayout, M: ManagerReadWrite>(
     machine: &mut MachineState<ML, M>,
     error: Option<SbiError>,
     value: XValue,
@@ -64,7 +67,7 @@ fn sbi_return_sbiret<ML: MainMemoryLayout, M: Manager>(
 fn sbi_wrap<ML, M, F>(machine: &mut MachineState<ML, M>, inner: F)
 where
     ML: MainMemoryLayout,
-    M: Manager,
+    M: ManagerReadWrite,
     F: FnOnce(&mut MachineState<ML, M>) -> Result<XValue, SbiError>,
 {
     match inner(machine) {
@@ -79,7 +82,7 @@ pub fn provide_no_input<S, ML, M>(status: &mut S, machine: &mut MachineState<ML,
 where
     S: CellReadWrite<Value = PvmStatus>,
     ML: MainMemoryLayout,
-    M: Manager,
+    M: ManagerReadWrite,
 {
     // This method should only do something when we're waiting for input.
     match status.read() {
@@ -107,7 +110,7 @@ pub fn provide_input<S, ML, M>(
 where
     S: CellReadWrite<Value = PvmStatus>,
     ML: MainMemoryLayout,
-    M: Manager,
+    M: ManagerReadWrite,
 {
     // This method should only do something when we're waiting for input.
     match status.read() {
@@ -164,7 +167,7 @@ pub fn provide_metadata<S, ML, M>(
 where
     S: CellReadWrite<Value = PvmStatus>,
     ML: MainMemoryLayout,
-    M: Manager,
+    M: ManagerReadWrite,
 {
     // This method should only do something when we're waiting for metadata.
     match status.read() {
@@ -219,7 +222,7 @@ where
 fn handle_tezos_ed25519_sign<ML, M>(machine: &mut MachineState<ML, M>) -> Result<u64, SbiError>
 where
     ML: MainMemoryLayout,
-    M: Manager,
+    M: ManagerReadWrite,
 {
     let arg_sk_addr = machine.hart.xregisters.read(a0);
     let arg_msg_addr = machine.hart.xregisters.read(a1);
@@ -250,7 +253,7 @@ where
 fn handle_tezos_ed25519_verify<ML, M>(machine: &mut MachineState<ML, M>) -> Result<u64, SbiError>
 where
     ML: MainMemoryLayout,
-    M: Manager,
+    M: ManagerReadWrite,
 {
     let arg_pk_addr = machine.hart.xregisters.read(a0);
     let arg_sig_addr = machine.hart.xregisters.read(a1);
@@ -282,7 +285,7 @@ where
 fn handle_tezos_blake2b_hash256<ML, M>(machine: &mut MachineState<ML, M>) -> Result<u64, SbiError>
 where
     ML: MainMemoryLayout,
-    M: Manager,
+    M: ManagerReadWrite,
 {
     let arg_out_addr = machine.hart.xregisters.read(a0);
     let arg_msg_addr = machine.hart.xregisters.read(a1);
@@ -305,7 +308,7 @@ where
 fn handle_legacy_shutdown<ML, M>(machine: &mut MachineState<ML, M>)
 where
     ML: MainMemoryLayout,
-    M: Manager,
+    M: ManagerReadWrite,
 {
     // This call always fails.
     handle_not_supported(machine);
@@ -316,7 +319,7 @@ where
 fn handle_legacy_console_putchar<ML, M>(machine: &mut MachineState<ML, M>, hooks: &mut PvmHooks)
 where
     ML: MainMemoryLayout,
-    M: Manager,
+    M: ManagerReadWrite,
 {
     let char = machine.hart.xregisters.read(a0) as u8;
     (hooks.putchar_hook)(char);
@@ -330,7 +333,7 @@ where
 fn handle_debug_console_write_byte<ML, M>(machine: &mut MachineState<ML, M>, hooks: &mut PvmHooks)
 where
     ML: MainMemoryLayout,
-    M: Manager,
+    M: ManagerReadWrite,
 {
     let char = machine.hart.xregisters.read(a0) as u8;
     (hooks.putchar_hook)(char);
@@ -344,7 +347,7 @@ where
 fn handle_system_reset<ML, M>(machine: &mut MachineState<ML, M>)
 where
     ML: MainMemoryLayout,
-    M: Manager,
+    M: ManagerReadWrite,
 {
     sbi_return_sbiret(machine, Some(SbiError::NotSupported), 0);
 }
@@ -354,7 +357,7 @@ where
 fn handle_not_supported<ML, M>(machine: &mut MachineState<ML, M>)
 where
     ML: MainMemoryLayout,
-    M: Manager,
+    M: ManagerReadWrite,
 {
     // SBI requires us to indicate that we don't support this function by returning
     // `ERR_NOT_SUPPORTED`.
@@ -372,7 +375,7 @@ pub fn handle_call<S, ML, M>(
 where
     S: CellReadWrite<Value = PvmStatus>,
     ML: MainMemoryLayout,
-    M: Manager,
+    M: ManagerReadWrite,
 {
     if let EnvironException::EnvCallFromMMode = env_exception {
         sbi_return_error(machine, SbiError::Failed);

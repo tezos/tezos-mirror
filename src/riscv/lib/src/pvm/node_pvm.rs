@@ -25,7 +25,7 @@ pub type StateLayout = (
     state_backend::Atom<u64>,
 );
 
-pub struct State<M: state_backend::Manager> {
+pub struct State<M: state_backend::ManagerBase> {
     pvm: Pvm<M100M, M>,
     level_is_set: state_backend::Cell<bool, M>,
     level: state_backend::Cell<u32, M>,
@@ -33,7 +33,7 @@ pub struct State<M: state_backend::Manager> {
     tick: state_backend::Cell<u64, M>,
 }
 
-impl<M: state_backend::Manager> State<M> {
+impl<M: state_backend::ManagerBase> State<M> {
     pub fn bind(space: state_backend::AllocatedOf<StateLayout, M>) -> Self {
         Self {
             pvm: Pvm::<M100M, M>::bind(space.0),
@@ -44,7 +44,10 @@ impl<M: state_backend::Manager> State<M> {
         }
     }
 
-    pub fn reset(&mut self) {
+    pub fn reset(&mut self)
+    where
+        M: state_backend::ManagerWrite,
+    {
         self.pvm.reset();
         self.level_is_set.write(false);
         self.level.write(0);

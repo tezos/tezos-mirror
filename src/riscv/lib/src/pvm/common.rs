@@ -108,12 +108,9 @@ pub struct Pvm<ML: main_memory::MainMemoryLayout, M: state_backend::ManagerBase>
     status: EnumCell<PvmStatus, u8, M>,
 }
 
-impl<ML: main_memory::MainMemoryLayout, M: state_backend::Manager> Pvm<ML, M> {
+impl<ML: main_memory::MainMemoryLayout, M: state_backend::ManagerBase> Pvm<ML, M> {
     /// Bind the PVM to the given allocated region.
     pub fn bind(space: state_backend::AllocatedOf<PvmLayout<ML>, M>) -> Self {
-        // Ensure we're binding a version we can deal with
-        assert_eq!(space.0.read(), INITIAL_VERSION);
-
         Self {
             version: space.0,
             machine_state: machine_state::MachineState::bind(space.1),
@@ -122,7 +119,10 @@ impl<ML: main_memory::MainMemoryLayout, M: state_backend::Manager> Pvm<ML, M> {
     }
 
     /// Reset the PVM state.
-    pub fn reset(&mut self) {
+    pub fn reset(&mut self)
+    where
+        M: state_backend::ManagerWrite,
+    {
         self.version.write(INITIAL_VERSION);
         self.machine_state.reset();
         self.status.reset();
@@ -133,12 +133,18 @@ impl<ML: main_memory::MainMemoryLayout, M: state_backend::Manager> Pvm<ML, M> {
         &mut self,
         hooks: &mut PvmHooks<'_>,
         exception: EnvironException,
-    ) -> bool {
+    ) -> bool
+    where
+        M: state_backend::ManagerReadWrite,
+    {
         sbi::handle_call(&mut self.status, &mut self.machine_state, hooks, exception)
     }
 
     /// Perform one evaluation step.
-    pub fn eval_one(&mut self, hooks: &mut PvmHooks<'_>) {
+    pub fn eval_one(&mut self, hooks: &mut PvmHooks<'_>)
+    where
+        M: state_backend::ManagerReadWrite,
+    {
         if let Err(exc) = self.machine_state.step() {
             self.handle_exception(hooks, exc);
         }
@@ -158,7 +164,10 @@ impl<ML: main_memory::MainMemoryLayout, M: state_backend::Manager> Pvm<ML, M> {
     /// the execution environment will still retire an instruction, just not itself.
     /// (a possible case: the privilege mode access violation is treated in EE,
     /// but a page fault is not)
-    pub fn eval_max(&mut self, hooks: &mut PvmHooks<'_>, step_bounds: Bound<usize>) -> usize {
+    pub fn eval_max(&mut self, hooks: &mut PvmHooks<'_>, step_bounds: Bound<usize>) -> usize
+    where
+        M: state_backend::ManagerReadWrite,
+    {
         self.machine_state
             .step_max_handle::<Infallible>(step_bounds, |machine_state, exc| {
                 Ok(sbi::handle_call(
@@ -173,13 +182,19 @@ impl<ML: main_memory::MainMemoryLayout, M: state_backend::Manager> Pvm<ML, M> {
 
     /// Respond to a request for input with no input. Returns `false` in case the
     /// machine wasn't expecting any input, otherwise returns `true`.
-    pub fn provide_no_input(&mut self) -> bool {
+    pub fn provide_no_input(&mut self) -> bool
+    where
+        M: state_backend::ManagerReadWrite,
+    {
         sbi::provide_no_input(&mut self.status, &mut self.machine_state)
     }
 
     /// Provide input. Returns `false` if the machine state is not expecting
     /// input.
-    pub fn provide_input(&mut self, level: u32, counter: u32, payload: &[u8]) -> bool {
+    pub fn provide_input(&mut self, level: u32, counter: u32, payload: &[u8]) -> bool
+    where
+        M: state_backend::ManagerReadWrite,
+    {
         sbi::provide_input(
             &mut self.status,
             &mut self.machine_state,
@@ -191,7 +206,10 @@ impl<ML: main_memory::MainMemoryLayout, M: state_backend::Manager> Pvm<ML, M> {
 
     /// Provide metadata in response to a metadata request. Returns `false`
     /// if the machine is not expecting metadata.
-    pub fn provide_metadata(&mut self, rollup_address: &[u8; 20], origination_level: u32) -> bool {
+    pub fn provide_metadata(&mut self, rollup_address: &[u8; 20], origination_level: u32) -> bool
+    where
+        M: state_backend::ManagerReadWrite,
+    {
         sbi::provide_metadata(
             &mut self.status,
             &mut self.machine_state,
@@ -201,7 +219,10 @@ impl<ML: main_memory::MainMemoryLayout, M: state_backend::Manager> Pvm<ML, M> {
     }
 
     /// Get the current machine status.
-    pub fn status(&self) -> PvmStatus {
+    pub fn status(&self) -> PvmStatus
+    where
+        M: state_backend::ManagerRead,
+    {
         self.status.read()
     }
 }
