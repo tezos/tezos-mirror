@@ -9,7 +9,9 @@ use crate::{
         registers::{a0, a7},
         MachineState,
     },
-    state_backend::{AllocatedOf, Atom, Cell, Manager},
+    state_backend::{
+        AllocatedOf, Atom, Cell, ManagerBase, ManagerRead, ManagerReadWrite, ManagerWrite,
+    },
     traps::EnvironException,
 };
 
@@ -17,29 +19,13 @@ use crate::{
 pub type PosixStateLayout = (Atom<u64>, Atom<u8>, ModeLayout);
 
 /// Posix execution environment state
-pub struct PosixState<M: Manager> {
+pub struct PosixState<M: ManagerBase> {
     code: Cell<u64, M>,
     exited: Cell<u8, M>,
     exit_mode: ModeCell<M>,
 }
 
-impl<M: Manager> PosixState<M> {
-    /// If an exit has been requested, return the exit code.
-    #[allow(dead_code)]
-    pub fn exit_code(&self) -> Option<u64> {
-        self.exited().then(|| self.code.read())
-    }
-
-    /// Has an exit been requested?
-    pub fn exited(&self) -> bool {
-        self.exited.read() > 0
-    }
-
-    /// Configures the mode from which the test harness will exit.
-    pub fn set_exit_mode(&mut self, mode: Mode) {
-        self.exit_mode.write(mode);
-    }
-
+impl<M: ManagerBase> PosixState<M> {
     /// Bind the posix state to the given allocated space.
     pub fn bind(space: AllocatedOf<PosixStateLayout, M>) -> Self {
         Self {
@@ -49,12 +35,40 @@ impl<M: Manager> PosixState<M> {
         }
     }
 
+    /// If an exit has been requested, return the exit code.
+    #[allow(dead_code)]
+    pub fn exit_code(&self) -> Option<u64>
+    where
+        M: ManagerRead,
+    {
+        self.exited().then(|| self.code.read())
+    }
+
+    /// Has an exit been requested?
+    pub fn exited(&self) -> bool
+    where
+        M: ManagerRead,
+    {
+        self.exited.read() > 0
+    }
+
+    /// Configures the mode from which the test harness will exit.
+    pub fn set_exit_mode(&mut self, mode: Mode)
+    where
+        M: ManagerWrite,
+    {
+        self.exit_mode.write(mode);
+    }
+
     /// Handle a POSIX system call. Returns `Ok(true)` if it makes sense to continue execution.
     pub fn handle_call<ML: MainMemoryLayout>(
         &mut self,
         machine: &mut MachineState<ML, M>,
         env_exception: EnvironException,
-    ) -> Result<bool, String> {
+    ) -> Result<bool, String>
+    where
+        M: ManagerReadWrite,
+    {
         if self.exited() {
             // Can't exit twice
             return Err("Machine has already exited".to_owned());
