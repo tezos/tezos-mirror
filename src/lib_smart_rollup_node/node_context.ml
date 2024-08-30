@@ -1018,6 +1018,19 @@ let save_gc_info node_ctxt step ~at_level ~gc_level =
   | Error _ -> Event.gc_levels_storage_failure ()
   | Ok () -> return_unit
 
+let splitting_period node_ctxt =
+  (* Default splitting period is challenge window / 5 or ~ 3 days unless
+     challenge window is too small. *)
+  let challenge_window =
+    (Reference.get node_ctxt.current_protocol).constants.sc_rollup
+      .challenge_window_in_blocks
+  in
+  let default =
+    if challenge_window <= 5 then challenge_window
+    else max (challenge_window / 5) 1
+  in
+  Option.value node_ctxt.config.gc_parameters.context_splitting_period ~default
+
 let save_context_split_level node_ctxt level =
   Store.Last_context_split.write node_ctxt.store.last_context_split_level level
 
@@ -1041,19 +1054,21 @@ let gc ?(wait_finished = false) ?(force = false) node_ctxt ~(level : int32) =
   (* [gc_level] is the level corresponding to the hash on which GC will be
      called. *)
   let* gc_level = candidate_gc_level node_ctxt in
-  let frequency = node_ctxt.config.gc_parameters.frequency_in_blocks in
   let* gc_info = get_gc_info node_ctxt `Successful in
-  let last_gc_at, last_gc_target =
+  let last_gc_target =
     match gc_info with
-    | Some {last_gc_level; first_available_level} ->
-        (last_gc_level, first_available_level)
-    | None -> (node_ctxt.genesis_info.level, node_ctxt.genesis_info.level)
+    | Some {first_available_level; _} -> first_available_level
+    | None -> node_ctxt.genesis_info.level
+  in
+  let frequency =
+    match node_ctxt.config.gc_parameters.frequency_in_blocks with
+    | Some f -> f
+    | None -> Int32.of_int (splitting_period node_ctxt)
   in
   match gc_level with
   | None -> return_unit
   | Some gc_level
-    when gc_level > last_gc_target
-         && (force || Int32.(sub level last_gc_at >= frequency))
+    when (force || Int32.(sub gc_level last_gc_target >= frequency))
          && Context.is_gc_finished node_ctxt.context
          && Store.is_gc_finished node_ctxt.store -> (
       let* hash = hash_of_level node_ctxt gc_level in

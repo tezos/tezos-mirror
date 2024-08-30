@@ -583,6 +583,10 @@ val first_available_level : _ t -> int32 tzresult Lwt.t
     [level] is before the first non garbage collected level. *)
 val check_level_available : _ t -> int32 -> unit tzresult Lwt.t
 
+(** The splitting period for the context, as defined in the configuration or
+    challenge window / 5. *)
+val splitting_period : _ t -> int
+
 val get_last_context_split_level : _ t -> int32 option tzresult Lwt.t
 
 val save_context_split_level : rw -> int32 -> unit tzresult Lwt.t

@@ -421,10 +421,8 @@ let gc_frequency_arg =
     ~long:"gc-frequency"
     ~placeholder:"blocks"
     ~doc:
-      (Format.sprintf
-         "The number of blocks between each launch of the garbage collection. \
-          Default value is %ld."
-         Configuration.default_gc_parameters.frequency_in_blocks)
+      "The number of blocks between each launch of the garbage collection. \
+       Default is protocol constant challenge_window_in_blocks / 5."
     positive_int32_parameter
 
 let history_mode_parameter =
