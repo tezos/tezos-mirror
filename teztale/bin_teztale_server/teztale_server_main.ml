@@ -1231,22 +1231,17 @@ let print_location f ((fl, fc), (tl, tc)) =
     else Format.fprintf f "line %i characters %i-%i" fl fc tc
   else Format.fprintf f "lines %i-%i characters %i-%i" fl tl fc tc
 
-let conf =
-  if Array.length Sys.argv < 2 then
-    let () =
-      Format.eprintf "%s needs a config file as argument@." Sys.executable_name
-    in
-    exit 1
-  else if not (Sys.file_exists Sys.argv.(1)) then
-    let () = Format.eprintf "%s is not a file@." Sys.argv.(1) in
+let parse_conf file =
+  if not (Sys.file_exists file) then
+    let () = Format.eprintf "%s is not a file@." file in
     exit 1
   else
-    let ic = open_in Sys.argv.(1) in
+    let ic = open_in file in
     match Ezjsonm.from_channel_result ic with
     | Error err ->
         Format.eprintf
           "Error in %s: %a:@ %s@."
-          Sys.argv.(1)
+          file
           (Format.pp_print_option print_location)
           (Ezjsonm.read_error_location err)
           (Ezjsonm.read_error_description err) ;
@@ -1258,7 +1253,7 @@ let conf =
             Format.eprintf
               "@[<v>@[Invalid configuration in %s:@ @[%a@]@]@ Configuration \
                file format is@ @[%a@]@]@."
-              Sys.argv.(1)
+              file
               (Data_encoding.Json.print_error ?print_unknown:None)
               e
               Json_schema.pp
@@ -1266,7 +1261,7 @@ let conf =
           in
           exit 1)
 
-let () =
+let run (conf : Config.t) =
   Lib_teztale_base.Log.verbosity := conf.Config.verbosity ;
   let logger = Lib_teztale_base.Log.logger () in
   let uri = Uri.of_string conf.Config.db_uri in
@@ -1360,3 +1355,16 @@ let () =
                                       Lwt.return 0)))))
   in
   exit code
+
+let () =
+  if Array.length Sys.argv <> 2 then (
+    Format.eprintf
+      "%s needs a config file or --version option as argument@."
+      Sys.executable_name ;
+    exit 1)
+  else if Sys.argv.(1) = "--version" then (
+    Printf.printf "%s\n%!" Tezos_version_value.Bin_version.octez_version_string ;
+    exit 0)
+  else
+    let conf = parse_conf Sys.argv.(1) in
+    run conf
