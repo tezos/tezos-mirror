@@ -135,6 +135,9 @@ type t = {
   fee_history : fee_history;
 }
 
+(** [encoding data_dir] is the encoding of {!t} based on data dir [data_dir]. *)
+val encoding : string -> t Data_encoding.t
+
 (** [default_data_dir] is the default value for [data_dir]. *)
 val default_data_dir : string
 

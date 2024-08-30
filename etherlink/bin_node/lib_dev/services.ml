@@ -35,6 +35,13 @@ let version_service =
     ~output:Data_encoding.string
     Path.(root / "version")
 
+let configuration_service =
+  Service.get_service
+    ~description:"configuration"
+    ~query:Query.empty
+    ~output:Data_encoding.Json.encoding
+    Path.(root / "configuration")
+
 let client_version =
   Format.sprintf
     "%s/%s-%s/%s/ocamlc.%s"
@@ -48,6 +55,56 @@ let client_version =
 let version dir =
   Directory.register0 dir version_service (fun () () ->
       Lwt.return_ok client_version)
+
+let configuration config dir =
+  Directory.register0 dir configuration_service (fun () () ->
+      let open Configuration in
+      (* Hide some parts of the configuration. *)
+      let hidden = "hidden" in
+      let kernel_execution =
+        Configuration.{config.kernel_execution with preimages = hidden}
+      in
+      let sequencer =
+        Option.map
+          (fun (sequencer_config : sequencer) ->
+            {
+              sequencer_config with
+              sequencer = Client_keys.sk_uri_of_string hidden;
+            })
+          config.sequencer
+      in
+      let observer =
+        Option.map
+          (fun (observer : observer) ->
+            {observer with evm_node_endpoint = Uri.of_string hidden})
+          config.observer
+      in
+      let proxy : proxy =
+        let evm_node_endpoint =
+          Option.map
+            (fun _ -> Uri.of_string hidden)
+            config.proxy.evm_node_endpoint
+        in
+        {config.proxy with evm_node_endpoint}
+      in
+
+      let config =
+        {
+          config with
+          rollup_node_endpoint = Uri.of_string hidden;
+          kernel_execution;
+          sequencer;
+          threshold_encryption_sequencer = None;
+          proxy;
+          observer;
+        }
+      in
+
+      Lwt.return_ok
+        (Data_encoding.Json.construct
+           ~include_default_fields:`Always
+           (Configuration.encoding hidden)
+           config))
 
 (* The node can either take a single request or multiple requests at
    once. *)
@@ -766,7 +823,7 @@ let dispatch_private (rpc : Configuration.rpc) ~block_production config ctx dir
 
 let directory rpc config
     ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address) =
-  Directory.empty |> version
+  Directory.empty |> version |> configuration config
   |> dispatch_public
        rpc
        config
