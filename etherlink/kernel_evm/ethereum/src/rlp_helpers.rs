@@ -27,6 +27,13 @@ pub fn check_list(decoder: &Rlp<'_>, length: usize) -> Result<(), DecoderError> 
     }
 }
 
+pub fn check_is_list(decoder: &rlp::Rlp) -> Result<(), DecoderError> {
+    if !decoder.is_list() {
+        return Err(DecoderError::RlpExpectedToBeList);
+    }
+    Ok(())
+}
+
 pub fn decode_field<T: Decodable>(
     decoder: &Rlp<'_>,
     field_name: &'static str,
