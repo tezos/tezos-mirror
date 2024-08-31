@@ -439,6 +439,7 @@ impl BlockInProgress {
         match execution_outcome {
             Some(outcome) => {
                 let is_success = outcome.is_success();
+                let contract_address = outcome.new_address();
                 let log_iter = outcome.logs.into_iter();
                 let logs: Vec<IndexedLog> = log_iter
                     .enumerate()
@@ -457,7 +458,7 @@ impl BlockInProgress {
                     cumulative_gas_used: cumulative_gas,
                     effective_gas_price,
                     gas_used: U256::from(outcome.gas_used),
-                    contract_address: outcome.new_address,
+                    contract_address,
                     logs_bloom: TransactionReceipt::logs_to_bloom(&logs),
                     logs,
                     type_,

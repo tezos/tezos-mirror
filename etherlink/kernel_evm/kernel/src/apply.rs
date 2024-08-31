@@ -10,7 +10,9 @@ use ethereum::Log;
 use evm_execution::account_storage::{EthereumAccount, EthereumAccountStorage};
 use evm_execution::fa_bridge::deposit::FaDeposit;
 use evm_execution::fa_bridge::execute_fa_deposit;
-use evm_execution::handler::{ExecutionOutcome, ExtendedExitReason, RouterInterface};
+use evm_execution::handler::{
+    ExecutionOutcome, ExecutionResult as ExecutionOutcomeResult, RouterInterface,
+};
 use evm_execution::precompiles::PrecompileBTreeMap;
 use evm_execution::run_transaction;
 use evm_execution::storage::tracer;
@@ -373,7 +375,7 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
             (
                 execution_outcome.gas_used.into(),
                 execution_outcome.estimated_ticks_used,
-                execution_outcome.reason == ExtendedExitReason::OutOfTicks,
+                execution_outcome.result == ExecutionOutcomeResult::OutOfTicks,
             )
         }
         None => {
@@ -556,7 +558,7 @@ pub fn handle_transaction_result<Host: Runtime>(
     if let Some(outcome) = &mut execution_outcome {
         log!(host, Debug, "Transaction executed, outcome: {:?}", outcome);
         log!(host, Benchmarking, "gas_used: {:?}", outcome.gas_used);
-        log!(host, Benchmarking, "reason: {:?}", outcome.reason);
+        log!(host, Benchmarking, "reason: {:?}", outcome.result);
         fee_updates.modify_outcome(outcome);
         for message in outcome.withdrawals.drain(..) {
             let outbox_message: OutboxMessage<RouterInterface> = message;

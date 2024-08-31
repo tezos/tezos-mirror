@@ -171,7 +171,7 @@ mod tests {
         assert!(result.is_ok());
         let outcome = result.unwrap();
         assert!(outcome.is_success());
-        assert_eq!(Some(vec![]), outcome.result);
+        assert_eq!(Some(&[] as &[u8]), outcome.output());
     }
 
     #[test]
@@ -192,7 +192,7 @@ mod tests {
         assert!(result.is_ok());
         let outcome = result.unwrap();
         assert!(outcome.is_success());
-        assert_eq!(Some(vec![]), outcome.result);
+        assert_eq!(Some(&[] as &[u8]), outcome.output());
     }
 
     #[test]
@@ -275,7 +275,7 @@ mod tests {
         assert!(outcome.is_success());
         assert_eq!(
             hex::encode(expected_output),
-            hex::encode(outcome.result.unwrap())
+            hex::encode(outcome.output().unwrap())
         );
     }
 
@@ -295,7 +295,7 @@ mod tests {
 
         assert!(result.is_ok());
         let outcome = result.unwrap();
-        assert!(outcome.result.unwrap().is_empty());
+        assert!(outcome.output().unwrap().is_empty());
     }
 
     #[test]
@@ -314,7 +314,7 @@ mod tests {
 
         assert!(result.is_ok());
         let outcome = result.unwrap();
-        assert!(outcome.result.unwrap().is_empty());
+        assert!(outcome.output().unwrap().is_empty());
     }
 
     #[test]
@@ -344,7 +344,7 @@ mod tests {
         assert!(outcome.is_success());
         assert_eq!(
             hex::encode(expected_output),
-            hex::encode(outcome.result.unwrap())
+            hex::encode(outcome.output().unwrap())
         );
     }
 }

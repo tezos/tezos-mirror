@@ -214,11 +214,10 @@ mod tick {
 
 #[cfg(test)]
 mod tests {
-    use evm::ExitReason;
     use primitive_types::H160;
 
     use crate::{
-        handler::ExtendedExitReason, precompiles::test_helpers::execute_precompiled,
+        handler::ExecutionResult, precompiles::test_helpers::execute_precompiled,
     };
 
     struct ModexpTestCase {
@@ -402,7 +401,7 @@ mod tests {
             assert!(result.is_ok());
             let outcome = result.unwrap();
             assert!(outcome.is_success());
-            assert_eq!(hex::encode(outcome.result.unwrap()), test.expected,);
+            assert_eq!(hex::encode(outcome.output().unwrap()), test.expected);
         }
     }
 
@@ -415,7 +414,7 @@ mod tests {
         let outcome = result.unwrap();
         assert!(outcome.is_success());
 
-        assert_eq!("", hex::encode(outcome.result.unwrap()));
+        assert_eq!("", hex::encode(outcome.output().unwrap()));
     }
 
     // All the tests for ecAdd, ecMul, ecPrecompile were taken from:
@@ -437,10 +436,10 @@ mod tests {
 
         assert!(result.is_ok());
         let outcome = result.unwrap();
-        match outcome.reason {
-            ExtendedExitReason::Exit(ExitReason::Error(_)) => (),
+        match outcome.result {
+            ExecutionResult::Error(_) => (),
             _ => panic!("The execution should exit with an error."),
         }
-        assert!(outcome.result.is_none());
+        assert!(outcome.output().is_none());
     }
 }

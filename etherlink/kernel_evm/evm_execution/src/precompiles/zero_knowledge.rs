@@ -327,7 +327,7 @@ mod tests {
         assert!(result.is_ok());
         let outcome = result.unwrap();
         assert!(outcome.is_success());
-        assert_eq!(outcome.result.unwrap(), expected);
+        assert_eq!(*outcome.output().unwrap(), expected);
 
         // zero sum test
         let input = hex::decode(
@@ -355,7 +355,7 @@ mod tests {
         assert!(result.is_ok());
         let outcome = result.unwrap();
         assert!(outcome.is_success());
-        assert_eq!(outcome.result.unwrap(), expected);
+        assert_eq!(*outcome.output().unwrap(), expected);
 
         // no input test
         let input = [0u8; 0];
@@ -376,7 +376,7 @@ mod tests {
         assert!(result.is_ok());
         let outcome = result.unwrap();
         assert!(outcome.is_success());
-        assert_eq!(outcome.result.unwrap(), expected);
+        assert_eq!(*outcome.output().unwrap(), expected);
 
         // point not on curve fail
         let input = hex::decode(
@@ -425,7 +425,7 @@ mod tests {
         assert!(result.is_ok());
         let outcome = result.unwrap();
         assert!(outcome.is_success());
-        assert_eq!(outcome.result.unwrap(), expected);
+        assert_eq!(*outcome.output().unwrap(), expected);
 
         // zero multiplication test
         let input = hex::decode(
@@ -452,7 +452,7 @@ mod tests {
         assert!(result.is_ok());
         let outcome = result.unwrap();
         assert!(outcome.is_success());
-        assert_eq!(outcome.result.unwrap(), expected);
+        assert_eq!(*outcome.output().unwrap(), expected);
 
         // no input test
         let input = [0u8; 0];
@@ -473,7 +473,7 @@ mod tests {
         assert!(result.is_ok());
         let outcome = result.unwrap();
         assert!(outcome.is_success());
-        assert_eq!(outcome.result.unwrap(), expected);
+        assert_eq!(*outcome.output().unwrap(), expected);
 
         // point not on curve fail
         let input = hex::decode(
@@ -529,7 +529,7 @@ mod tests {
         assert!(result.is_ok());
         let outcome = result.unwrap();
         assert!(outcome.is_success());
-        assert_eq!(outcome.result.unwrap(), expected);
+        assert_eq!(*outcome.output().unwrap(), expected);
 
         // no input test
         let input = [0u8; 0];
@@ -548,7 +548,7 @@ mod tests {
         assert!(result.is_ok());
         let outcome = result.unwrap();
         assert!(outcome.is_success());
-        assert_eq!(outcome.result.unwrap(), expected);
+        assert_eq!(*outcome.output().unwrap(), expected);
 
         // point not on curve fail
         let input = hex::decode(
