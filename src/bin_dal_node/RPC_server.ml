@@ -374,6 +374,28 @@ module P2P = struct
   end
 end
 
+module Health = struct
+  let get_health ctxt () () =
+    let open Lwt_result_syntax in
+    let open Types.Health in
+    let* points = Node_context.P2P.get_points ctxt in
+    let topics = Node_context.P2P.Gossipsub.get_topics ctxt in
+    let connections = Node_context.P2P.Gossipsub.get_connections ctxt in
+    match (points, topics, connections) with
+    | [], _, _ ->
+        let checks = [("p2p", Down)] in
+        return {status = Down; checks}
+    | _, [], _ ->
+        let checks = [("p2p", Up); ("topics", Ko)] in
+        return {status = Degraded; checks}
+    | _, _, [] ->
+        let checks = [("p2p", Up); ("topics", Ok); ("gossipsub", Down)] in
+        return {status = Degraded; checks}
+    | _ ->
+        let checks = [("p2p", Up); ("topics", Ok); ("gossipsub", Up)] in
+        return {status = Up; checks}
+end
+
 let add_service registerer service handler directory =
   registerer directory service handler
 
@@ -498,6 +520,10 @@ let register :
        Tezos_rpc.Directory.opt_register3
        Services.get_slot_shard
        (Slots_handlers.get_slot_shard ctxt)
+  |> add_service
+       Tezos_rpc.Directory.register0
+       Services.health
+       (Health.get_health ctxt)
 
 let register_plugin node_ctxt =
   let open Lwt_syntax in

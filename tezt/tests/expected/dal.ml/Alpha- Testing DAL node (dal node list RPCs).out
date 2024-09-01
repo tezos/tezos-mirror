@@ -3,6 +3,10 @@
 
 Available services:
   
+  - GET /health
+      Performs health checks on the DAL node, evaluating key components of
+      the DAL node. Returns a health status indicating whether the DAL node
+      is 'Up', 'Down', or 'Degraded' based on the results of these checks. 
   + levels/<int32>/slots/<int>/
     - GET /levels/<int32>/slots/<int>/commitment
         Return the accepted commitment associated to the given slot index and

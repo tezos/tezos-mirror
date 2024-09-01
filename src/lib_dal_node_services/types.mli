@@ -354,3 +354,11 @@ module Version : sig
 
   include ENCODABLE with type t := t
 end
+
+module Health : sig
+  type status = Up | Degraded | Down | Ok | Ko
+
+  type t = {status : status; checks : (string * status) list}
+
+  val encoding : t Data_encoding.t
+end
