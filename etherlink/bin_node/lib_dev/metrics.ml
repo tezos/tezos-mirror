@@ -39,6 +39,23 @@ let namespace = Tezos_version.Octez_node_version.namespace
 
 let subsystem = "evm_node"
 
+module Health = struct
+  type t = {bootstrapping : Gauge.t}
+
+  let init name =
+    let bootstrapping =
+      Gauge.v_label
+        ~registry
+        ~label_name:"bootstrapping"
+        ~help:"1.0 if the EVM node is catching up with its upstream EVM node"
+        ~namespace
+        ~subsystem
+        "bootstrapping"
+        name
+    in
+    {bootstrapping}
+end
+
 module Chain = struct
   type t = {head : Gauge.t; confirmed_head : Gauge.t}
 
@@ -203,7 +220,12 @@ module Simulation = struct
     {inconsistent_da_fees; confirm_gas_needed}
 end
 
-type t = {chain : Chain.t; block : Block.t; simulation : Simulation.t}
+type t = {
+  chain : Chain.t;
+  block : Block.t;
+  simulation : Simulation.t;
+  health : Health.t;
+}
 
 module BlueprintChunkSent = struct
   let on_inbox =
@@ -228,7 +250,8 @@ let metrics =
   let chain = Chain.init name in
   let block = Block.init name in
   let simulation = Simulation.init name in
-  {chain; block; simulation}
+  let health = Health.init name in
+  {chain; block; simulation; health}
 
 let init ~mode ~tx_pool_size_info =
   Info.init ~mode ;
@@ -238,6 +261,10 @@ let set_level ~level = Gauge.set metrics.chain.head (Z.to_float level)
 
 let set_confirmed_level ~level =
   Gauge.set metrics.chain.confirmed_head (Z.to_float level)
+
+let start_bootstrapping () = Gauge.set metrics.health.bootstrapping 1.
+
+let stop_bootstrapping () = Gauge.set metrics.health.bootstrapping 0.
 
 let set_block ~time_processed ~transactions =
   let pt = Ptime.Span.to_float_s time_processed in
