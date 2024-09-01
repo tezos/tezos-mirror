@@ -33,9 +33,19 @@ let local_head_too_old ?remote_head ~evm_node_endpoint
     (Qty next_blueprint_number) =
   let open Lwt_result_syntax in
   let open Rpc_encodings in
+  let is_too_old ~remote ~next = Z.Compare.(next <= remote) in
   let* (Qty remote_head_number) =
     match remote_head with
-    | None ->
+    | Some (Qty remote_head)
+    (* If we are still behind the remote head, no need to fetch it again, we
+       already know we have some work to do. On the other hand, if it appears
+       that we have finally caught-up, we ctually don’t know how much time it
+       took us. Worst-case scenario, the remote EVM node can now dozens of
+       thousands of blocks or more. It is safer to call `eth_blockNumber` one
+       last time in that case. *)
+      when is_too_old ~remote:remote_head ~next:next_blueprint_number ->
+        return (Qty remote_head)
+    | None | Some _ ->
         (* The observer is designed to be resilent to downtime from its EVM
            node endpoint. It would not make sense to break this logic here, so
            we force [keep_alive] to true. *)
@@ -44,10 +54,9 @@ let local_head_too_old ?remote_head ~evm_node_endpoint
           ~keep_alive:true
           ~evm_node_endpoint
           ()
-    | Some remote_head -> return remote_head
   in
   return
-    ( Z.Compare.(next_blueprint_number <= remote_head_number),
+    ( is_too_old ~remote:remote_head_number ~next:next_blueprint_number,
       Qty remote_head_number )
 
 let quantity_succ (Qty x) = Qty Z.(succ x)
