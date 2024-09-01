@@ -35,6 +35,7 @@ module Baker : sig
     ?votes:Baking_configuration.per_block_votes_config ->
     ?extra_operations:Baking_configuration.Operations_source.t ->
     ?dal_node_endpoint:Uri.t ->
+    ?dal_node_timeout_percentage:int ->
     ?pre_emptive_forge_time:Q.t ->
     ?force_apply:bool ->
     ?context_path:string ->

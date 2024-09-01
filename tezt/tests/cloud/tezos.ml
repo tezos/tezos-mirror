@@ -193,8 +193,8 @@ module Baker = struct
 
   module Agent = struct
     let init ?name ~delegate ~protocol
-        ?(path = Uses.path (Protocol.baker protocol)) ~client dal_node node
-        agent =
+        ?(path = Uses.path (Protocol.baker protocol)) ~client dal_node
+        ?dal_node_timeout_percentage node agent =
       let* path = Agent.copy agent ~source:path in
       let runner = Agent.runner agent in
       init
@@ -205,6 +205,7 @@ module Baker = struct
         ~delegates:[delegate]
         ~protocol
         ~dal_node
+        ?dal_node_timeout_percentage
         node
         client
   end
