@@ -14,15 +14,18 @@ type t = {
   index : Irmin_context.ro_index;
 }
 
-let load ~data_dir ~preimages ?preimages_endpoint () =
+let load ?smart_rollup_address ~data_dir ~preimages ?preimages_endpoint () =
   let open Lwt_result_syntax in
   let* store = Evm_store.init ~data_dir ~perm:`Read_only () in
   let* index =
     Irmin_context.(
       load ~cache_size:100_000 Read_only (Evm_state.irmin_store_path ~data_dir))
   in
-  Evm_store.use store @@ fun conn ->
-  let+ smart_rollup_address = Evm_store.Metadata.get conn in
+  let+ smart_rollup_address =
+    match smart_rollup_address with
+    | None -> Evm_store.(use store Metadata.get)
+    | Some smart_rollup_address -> return smart_rollup_address
+  in
   {store; index; data_dir; preimages; preimages_endpoint; smart_rollup_address}
 
 let get_evm_state ctxt hash =
@@ -94,7 +97,7 @@ let find_irmin_hash ctxt (block : Ethereum_types.Block_parameter.extended) =
 module MakeBackend (Ctxt : sig
   val ctxt : t
 
-  val evm_node_endpoint : Uri.t
+  val evm_node_endpoint : Uri.t option
 
   val keep_alive : bool
 end) =
@@ -169,21 +172,24 @@ struct
     let publish_messages ~timestamp:_ ~smart_rollup_address:_ ~messages =
       let open Rollup_services in
       let open Lwt_result_syntax in
-      let methods = List.map send_raw_transaction_method messages in
+      match Ctxt.evm_node_endpoint with
+      | Some evm_node_endpoint ->
+          let methods = List.map send_raw_transaction_method messages in
 
-      let* response =
-        call_service
-          ~keep_alive:Ctxt.keep_alive
-          ~base:Ctxt.evm_node_endpoint
-          (Services.dispatch_service ~path:Resto.Path.root)
-          ()
-          ()
-          (Batch methods)
-      in
+          let* response =
+            call_service
+              ~keep_alive:Ctxt.keep_alive
+              ~base:evm_node_endpoint
+              (Services.dispatch_service ~path:Resto.Path.root)
+              ()
+              ()
+              (Batch methods)
+          in
 
-      let* () = check_batched_response response in
+          let* () = check_batched_response response in
 
-      return_unit
+          return_unit
+      | None -> assert false
   end
 
   module SimulatorBackend = struct
@@ -259,7 +265,7 @@ module Make (Base : sig
 
   val ctxt : t
 
-  val evm_node_endpoint : Uri.t
+  val evm_node_endpoint : Uri.t option
 
   val keep_alive : bool
 end) =
@@ -291,7 +297,7 @@ let replay ctxt ?(log_file = "replay") ?profile
     evm_state
     blueprint.blueprint.payload
 
-let ro_backend ctxt config evm_node_endpoint =
+let ro_backend ?evm_node_endpoint ctxt config =
   (module Make (struct
     module Executor = struct
       let pvm_config = pvm_config ctxt
