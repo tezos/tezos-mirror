@@ -102,6 +102,13 @@ Node
   automatically trigger the maintenance whenever it is the most
   suitable. (MR :gl:`!14503`)
 
+- **Breaking change** Bumped the node’s storage version to
+  ``3.2``. This new version changes the store’s representation,
+  allowing the storage to scale to the increasing number of blocks per
+  cycles, thus paving the way to reducing even more the block
+  time. Upgrading to this new version must be done manually (using the
+  ``octez-node upgrade storage`` command) and is irreversible. (MR
+  :gl:`!14211`)
 Client
 ------
 
