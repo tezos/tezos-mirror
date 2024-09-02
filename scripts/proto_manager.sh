@@ -1712,8 +1712,8 @@ function hash() {
   make
 
   if [[ "${is_snapshot}" == true ]]; then
-    # dune exec tezt/tests/main.exe -- --on-unknown-regression-files delete
-    # commit_if_changes "tezt: delete unknown regression files"
+    dune exec tezt/tests/main.exe -- --on-unknown-regression-files delete
+    commit_if_changes "tezt: delete unknown regression files"
 
     dune exec tezt/tests/main.exe -- --title 'meta: list runtime dependencies' --reset-regressions
     commit_if_changes "tezt: reset runtime dependencies regressions"
@@ -1727,7 +1727,6 @@ function hash() {
   fi
 
   if [[ "${is_snapshot}" == true ]]; then
-    make
     log_blue "Update kaitai structs"
     make check-kaitai-struct-files || log_blue "updated kaitai files"
     make kaitai-struct-files-update
