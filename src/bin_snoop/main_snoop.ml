@@ -619,7 +619,7 @@ let codegen_cmd solution_fn model_name codegen_options =
       stdout_or_file codegen_options.save_to (fun ppf ->
           Format.fprintf ppf "%a@." Codegen.pp_code code)
 
-(** It returns [(destination, code list) map] *)
+(** Returns [(destination, code list) map] *)
 let generate_code_for_models sol models codegen_options =
   (* The order of the models is pretty random.  It is better to sort them. *)
   let models =
