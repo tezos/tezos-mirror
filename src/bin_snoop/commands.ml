@@ -844,7 +844,7 @@ module Codegen_check_definitions_cmd = struct
 
   let params =
     Tezos_clic.(
-      prefixes ["check"; "definitions"; "of"]
+      prefixes ["check"; "definitions"; "in"; "generated"; "files"]
       @@ seq_of_param
            (string
               ~name:"MLFILE"
@@ -854,7 +854,7 @@ module Codegen_check_definitions_cmd = struct
     Tezos_clic.(
       command
         ~group
-        ~desc:"Check cost functions defined in the given .ml files"
+        ~desc:"Check cost functions defined in the given generated .ml files"
         no_options
         params
         codegen_check_definitions_handler)
