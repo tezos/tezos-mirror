@@ -152,6 +152,14 @@ Baker
   version or dev version, use the --node-version-check-bypass or
   --node-version-allowed option. (MRs :gl:`!14044`, :gl:`!14189`)
 
+- The baker accepts a new argument ``--dal-node-timeout-percentage
+  <percentage>``, which specifies the percentage of the time until the end of
+  round determining the timeout to wait for the DAL node to provide shards'
+  attestation status. The default value is 10%. For instance, the default value
+  means that if there are 5 seconds left till the end of the round, then the
+  baker will wait for ``0.5`` seconds for the DAL attestations' status. (MR
+  :gl:`!14480`)
+
 Accuser
 -------
 
