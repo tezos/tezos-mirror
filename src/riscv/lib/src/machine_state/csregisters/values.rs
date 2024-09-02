@@ -13,7 +13,7 @@ use crate::{
     bits::Bits64,
     state_backend::{
         AllocatedOf, Choreographer, EffectCell, EffectCellLayout, Layout, ManagerAlloc,
-        ManagerBase, PlacedOf,
+        ManagerBase, ManagerRead, ManagerReadWrite, ManagerWrite, PlacedOf,
     },
 };
 use mstatus::MStatusLayout;
@@ -64,7 +64,7 @@ type EffectCSRLayout = EffectCellLayout<CSRRepr>;
 
 pub(super) struct CSRegisterValues<M>
 where
-    M: crate::state_backend::ManagerBase,
+    M: ManagerBase,
 {
     pub(super) mstatus: MStatusValue<M>,
     pub(super) mip: MipEffectCSR<M>,
@@ -301,7 +301,8 @@ where
     dscratch0: NoEffectCSR<M>,
     dscratch1: NoEffectCSR<M>,
 }
-impl<M: crate::state_backend::ManagerBase> CSRegisterValues<M> {
+
+impl<M: ManagerBase> CSRegisterValues<M> {
     pub fn bind(space: AllocatedOf<CSRValuesLayout, M>) -> Self {
         Self {
             mstatus: <MStatusValue<M>>::bind(space.mstatus),
@@ -541,11 +542,12 @@ impl<M: crate::state_backend::ManagerBase> CSRegisterValues<M> {
         }
     }
 }
-impl<M: crate::state_backend::ManagerBase> CSRegisters<M> {
+
+impl<M: ManagerBase> CSRegisters<M> {
     #[inline(always)]
     pub(super) fn general_raw_read(&self, csr: RootCSRegister) -> CSRRepr
     where
-        M: crate::state_backend::ManagerRead,
+        M: ManagerRead,
     {
         match csr {
             RootCSRegister::mstatus => self.registers.mstatus.read(),
@@ -784,10 +786,11 @@ impl<M: crate::state_backend::ManagerBase> CSRegisters<M> {
             RootCSRegister::dscratch1 => self.registers.dscratch1.read(),
         }
     }
+
     #[inline(always)]
     pub(super) fn general_raw_write(&mut self, csr: RootCSRegister, value: CSRRepr)
     where
-        M: crate::state_backend::ManagerWrite,
+        M: ManagerWrite,
     {
         let effect = match csr {
             RootCSRegister::mstatus => self.registers.mstatus.write(value),
@@ -1025,12 +1028,14 @@ impl<M: crate::state_backend::ManagerBase> CSRegisters<M> {
             RootCSRegister::dscratch0 => self.registers.dscratch0.write(value),
             RootCSRegister::dscratch1 => self.registers.dscratch1.write(value),
         };
+
         handle_csr_effect(self, effect);
     }
+
     #[inline(always)]
     pub(super) fn general_raw_replace(&mut self, csr: RootCSRegister, value: CSRRepr) -> CSRRepr
     where
-        M: crate::state_backend::ManagerReadWrite,
+        M: ManagerReadWrite,
     {
         let (old_value, effect) = match csr {
             RootCSRegister::mstatus => self.registers.mstatus.replace(value),
@@ -1268,7 +1273,9 @@ impl<M: crate::state_backend::ManagerBase> CSRegisters<M> {
             RootCSRegister::dscratch0 => self.registers.dscratch0.replace(value),
             RootCSRegister::dscratch1 => self.registers.dscratch1.replace(value),
         };
+
         handle_csr_effect(self, effect);
+
         old_value
     }
 }
