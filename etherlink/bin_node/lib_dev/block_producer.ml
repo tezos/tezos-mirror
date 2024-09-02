@@ -165,7 +165,8 @@ let produce_block_with_transactions ~sequencer_key ~cctxt ~timestamp
   let* () =
     Blueprints_publisher.publish
       number
-      (Blueprints_publisher_types.Request.Blueprint blueprint_chunks)
+      (Blueprints_publisher_types.Request.Blueprint
+         {chunks = blueprint_chunks; inbox_payload = blueprint_payload})
   in
   let*! () =
     List.iter_p

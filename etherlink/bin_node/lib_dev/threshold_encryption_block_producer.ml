@@ -99,7 +99,8 @@ let produce_block ~sequencer_key ~cctxt ~smart_rollup_address preblock =
   let* () =
     Blueprints_publisher.publish
       number
-      (Blueprints_publisher_types.Request.Blueprint chunks)
+      (Blueprints_publisher_types.Request.Blueprint
+         {chunks; inbox_payload = payload})
   in
   let*! () =
     List.iter_p

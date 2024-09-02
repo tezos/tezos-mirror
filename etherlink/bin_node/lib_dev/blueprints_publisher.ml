@@ -54,7 +54,7 @@ end
 module Worker = struct
   include Worker.MakeSingle (Name) (Blueprints_publisher_types.Request) (Types)
 
-  let smart_rollup_address worker = (state worker).smart_rollup_address
+  let _smart_rollup_address worker = (state worker).smart_rollup_address
 
   let rollup_node_endpoint worker = (state worker).rollup_node_endpoint
 
@@ -108,10 +108,9 @@ module Worker = struct
     let rollup_node_endpoint = rollup_node_endpoint self in
     let payload =
       match chunks with
-      | Blueprints_publisher_types.Request.Blueprint chunks ->
-          Sequencer_blueprint.create
-            ~smart_rollup_address:(smart_rollup_address self)
-            ~chunks
+      | Blueprints_publisher_types.Request.Blueprint {chunks = _; inbox_payload}
+        ->
+          inbox_payload
       | Inbox payload -> payload
     in
     (* We do not check if we succeed or not: this will be done when new L2

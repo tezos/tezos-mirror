@@ -126,7 +126,8 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
       in
       Blueprints_publisher.publish
         Z.zero
-        (Blueprints_publisher_types.Request.Blueprint genesis_chunks)
+        (Blueprints_publisher_types.Request.Blueprint
+           {chunks = genesis_chunks; inbox_payload = genesis_payload})
     else return_unit
   in
   let* ro_ctxt =

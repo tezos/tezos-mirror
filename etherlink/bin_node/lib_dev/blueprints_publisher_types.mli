@@ -13,7 +13,10 @@ module Request : sig
       of a catchup, the messages have already been produced for the inbox and
       extracted from the store to be republished as is. *)
   type payload =
-    | Blueprint of Sequencer_blueprint.t list
+    | Blueprint of {
+        chunks : Sequencer_blueprint.t list;
+        inbox_payload : Blueprint_types.payload;
+      }
     | Inbox of Blueprint_types.payload
         (** Type of requests accepted by the publisher worker. *)
 
