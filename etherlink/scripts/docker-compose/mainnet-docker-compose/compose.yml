@@ -22,14 +22,14 @@ services:
 
   proxy:
     container_name: evm-proxy
-    image: tezos/tezos-bare:${EVM_OCTEZ_TAG}
+    image: us-central1-docker.pkg.dev/nl-gitlab-runner/protected-registry/tezos/tezos/bare:${EVM_OCTEZ_TAG}
     restart: always
     volumes:
       - ${HOST_TEZOS_DATA_DIR}:/home/tezos
     ports:
       - ${EVM_OCTEZ_PORT}:8545
     entrypoint: /usr/local/bin/octez-evm-node
-    command: run proxy --finalized-view --read-only --keep-alive
+    command: run proxy --finalized-view --ignore-block-param --keep-alive --evm-node-endpoint https://relay.mainnet.etherlink.com
 
   curl-runner:
     container_name: curl-runner

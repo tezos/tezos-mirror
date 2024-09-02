@@ -25,7 +25,7 @@ docker_update_images() {
   # pull latest version
   docker pull tezos/tezos-bare:"${OCTEZ_TAG}"
   docker pull tezos/tezos-bare:"${ROLLUP_OCTEZ_TAG}"
-  docker pull tezos/tezos-bare:"${EVM_OCTEZ_TAG}"
+  docker pull us-central1-docker.pkg.dev/nl-gitlab-runner/protected-registry/tezos/tezos/bare:"${EVM_OCTEZ_TAG}"
 }
 
 # fallback function to say which datadir to delete. This allows to recall the
@@ -88,7 +88,7 @@ init_rollup_node() {
 init_evm_node() {
   trap 'script_failed "{.tezos-node, .tezos-smart-rollup-node, .tezos-evm-node}"' ERR
   echo "creating evm node config"
-  run_in_docker_compose proxy init config --rollup-node-endpoint http://rollup-node:8932 --cors-origins '*' --cors-headers '*' --rpc-addr 0.0.0.0 --rpc-port 8545 --keep-alive
+  run_in_docker_compose proxy init config --evm-node-endpoint https://relay.mainnet.etherlink.com --rollup-node-endpoint http://rollup-node:8932 --cors-origins '*' --cors-headers '*' --rpc-addr 0.0.0.0 --rpc-port 8545 --keep-alive
 }
 
 init() {
