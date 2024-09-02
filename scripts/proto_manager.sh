@@ -679,6 +679,23 @@ function update_protocol_tests() {
 
 function update_source() {
 
+  log_blue "update teztale"
+  #  Teztale
+  if [[ ${is_snapshot} == true ]]; then
+    git mv "teztale/bin_teztale_archiver/${protocol_source}_machine.real.ml" "teztale/bin_teztale_archiver/${short_hash}_machine.real.ml"
+    sed -e "s/${protocol_source}/${new_protocol_name}/g" -i.old "teztale/bin_teztale_archiver/${short_hash}_machine.real.ml"
+    sed -e "s/${protocol_source}/${version}/g" \
+      -e "s/${capitalized_source}/${short_hash}/g" -i.old "teztale/bin_teztale_archiver/teztale_archiver_main.ml"
+  else
+    git mv "teztale/bin_teztale_archiver/${protocol_source}_machine.real.ml" "teztale/bin_teztale_archiver/${label}_machine.real.ml"
+    sed -e "s/${protocol_source}/${label}/g" -i.old "teztale/bin_teztale_archiver/${label}_machine.real.ml"
+    sed -e "s/${protocol_source}/${version}/g" \
+      -e "s/${capitalized_source}/${short_hash}/g" -i.old "teztale/bin_teztale_archiver/teztale_archiver_main.ml"
+  fi
+  ocamlformat -i "teztale/bin_teztale_archiver/${short_hash}_machine.real.ml"
+  ocamlformat -i "teztale/bin_teztale_archiver/teztale_archiver_main.ml"
+  commit_if_changes "teztale: update teztale_archiver_main.ml"
+
   log_blue "update raw_context.ml"
   # add  "else if Compare.String.(s = "$label") then return ($capitalized_label, ctxt)" before else Lwt.return @@ storage_error (Incompatible_protocol_version s)
   #sed "/else Lwt.return @@ storage_error (Incompatible_protocol_version s)/i \  else if Compare.String.(s = \"${label}\") then return (${capitalized_label}, ctxt)" -i.old "src/proto_${protocol_source}/lib_protocol/raw_context.ml"
@@ -1589,6 +1606,16 @@ function hash() {
   # sed -e "s/Proto_${protocol_source}/${capitalized_label}/g" \
   #   -e "s/_${previous_tag}/${new_tag}/g" \
   #   -i.old "src/proto_${new_protocol_name}/lib_protocol/test/unit/test_sc_rollup_wasm.ml"
+
+  #  Teztale
+  if [[ ${is_snapshot} == true ]]; then
+    git mv "teztale/bin_teztale_archiver/${source_short_hash}_machine.real.ml" "teztale/bin_teztale_archiver/${short_hash}_machine.real.ml"
+    sed -e "s/${protocol_source}/${new_protocol_name}/g" -i.old "teztale/bin_teztale_archiver/${short_hash}_machine.real.ml"
+    sed -e "s/${source_short_hash}/${short_hash}/g" -i.old "teztale/bin_teztale_archiver/teztale_archiver_main.ml"
+  fi
+  ocamlformat -i "teztale/bin_teztale_archiver/teztale_archiver_main.ml"
+  ocamlformat -i "teztale/bin_teztale_archiver/${short_hash}_machine.real.ml"
+  commit_if_changes "teztale: update teztale_archiver_main.ml"
 
   for file in \
     "src/proto_alpha/lib_protocol/raw_context.ml" \
