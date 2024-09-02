@@ -303,6 +303,18 @@ let jobs pipeline_type =
            ])
       script
   in
+  (* These test the upgrade of the current packages *)
+  let job_upgrade_bin ~__POS__ ~name ~dependencies ~image ?allow_failure script
+      =
+    job
+      ?allow_failure
+      ~__POS__
+      ~name
+      ~image
+      ~dependencies
+      ~stage:Stages.publishing_tests
+      script
+  in
   let test_current_ubuntu_packages_jobs =
     (* in merge pipelines we tests only debian. release pipelines
        test the entire matrix *)
@@ -325,20 +337,13 @@ let jobs pipeline_type =
         ~dependencies:(Dependent [Job job_apt_repo_ubuntu_current])
         ~image:Images.ubuntu_jammy
         ["./docs/introduction/install-bin-deb.sh ubuntu jammy"];
-      job_install_bin
+      job_upgrade_bin
         ~__POS__
-        ~name:"oc.install_bin_ubuntu_noble"
-        ~dependencies:(Dependent [Job job_apt_repo_ubuntu])
-        ~variables:[("PREFIX", "next")]
-        ~image:Images.ubuntu_noble
-        ["./docs/introduction/install-bin-deb.sh ubuntu noble"];
-      job_install_bin
-        ~__POS__
-        ~name:"oc.install_bin_ubuntu_jammy"
-        ~dependencies:(Dependent [Job job_apt_repo_ubuntu])
-        ~variables:[("PREFIX", "next")]
+        ~name:"oc.upgrade_bin_ubuntu_jammy"
+        ~dependencies:
+          (Dependent [Job job_apt_repo_ubuntu_current; Job job_apt_repo_debian])
         ~image:Images.ubuntu_jammy
-        ["./docs/introduction/install-bin-deb.sh ubuntu jammy"];
+        ["./docs/introduction/upgrade-bin-deb.sh ubuntu jammy"];
     ]
   in
   let test_current_debian_packages_jobs =
@@ -362,6 +367,13 @@ let jobs pipeline_type =
         ~variables:[("PREFIX", "next")]
         ~image:Images.debian_bookworm
         ["./docs/introduction/install-bin-deb.sh debian bookworm"];
+      job_upgrade_bin
+        ~__POS__
+        ~name:"oc.upgrade_bin_debian_bookworm"
+        ~dependencies:
+          (Dependent [Job job_apt_repo_debian_current; Job job_apt_repo_debian])
+        ~image:Images.debian_bookworm
+        ["./docs/introduction/upgrade-bin-deb.sh debian bookworm"];
     ]
   in
   let debian_jobs =

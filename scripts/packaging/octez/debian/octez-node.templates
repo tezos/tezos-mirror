@@ -40,3 +40,16 @@ Description: Skipping node init:
  Enter "yes" to skip.
 Type: string
 Default: no
+
+Template: octez-node/upgrade_note_current
+Type: note
+Description: Important upgrade information
+ This package has been upgraded to a new version. Please note that
+ some changes have been made that may affect your usage of the
+ package.
+ .
+ In particular this new version now use systemd to manage the octez-node
+ life-cycle instead of a plain system V init script. Also the default values
+ in /etc/default/octez-node have been revised and updated.
+ .
+ Please review the release notes for more information.

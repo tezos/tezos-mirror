@@ -9,7 +9,7 @@ packages() {
   # shellcheck disable=SC1091
   . "$HOME/.cargo/env"
   eval "$(opam env)"
-  make all
+  make octez
 
   # Prepare the packaging by copying all the freshly compiled binaries
   mkdir -p scripts/packaging/octez/binaries
@@ -18,7 +18,9 @@ packages() {
 
   EXECUTABLES=$(cat script-inputs/*-executables)
   for ex in $EXECUTABLES; do
-    cp "$ex" scripts/packaging/octez/binaries/
+    if [ -f "$ex" ]; then
+      cp "$ex" scripts/packaging/octez/binaries/
+    fi
   done
 
   # Build the debian packages

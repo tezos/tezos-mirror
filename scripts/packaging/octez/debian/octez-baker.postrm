@@ -11,11 +11,15 @@ set -e
 debsystemctl=$(command -v deb-systemd-invoke || echo systemctl)
 
 case "${1}" in
+remove)
+  rm -Rf /run/octez-baker
+  ;;
 purge)
   rm -Rf /run/octez-baker
   # Purge debconf data for the package in any case
   # shellcheck disable=SC2119
   db_purge || true
+  echo "Octez baker purged"
   ;;
 upgrade)
   for s in baker accuser; do
@@ -23,12 +27,13 @@ upgrade)
       # Check if the daemon was running before the upgrade
       if [ -f "/run/octez-baker/$s-$p-daemon_was_running" ]; then
         # Start the daemon if it was running
+        echo "Restarting Octez baker daemon: octez-$s-$p"
         $debsystemctl "start octez-$s-$p.service"
       fi
     done
   done
   ;;
-remove | failed-upgrade | abort-install | abort-upgrade | disappear) ;;
+failed-upgrade | abort-install | abort-upgrade | disappear) ;;
 *)
   echo "postrm called with unknown argument \`$1'" >&2
   exit 1
