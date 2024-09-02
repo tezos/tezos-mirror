@@ -33,6 +33,7 @@ type experimental_features = {
   drop_duplicate_on_injection : bool;
   enable_send_raw_transaction : bool;
   node_transaction_validation : bool;
+  block_storage_sqlite3 : bool;
 }
 
 type sequencer = {
@@ -120,6 +121,7 @@ let default_experimental_features =
     enable_send_raw_transaction = default_enable_send_raw_transaction;
     drop_duplicate_on_injection = false;
     node_transaction_validation = false;
+    block_storage_sqlite3 = false;
   }
 
 let default_data_dir = Filename.concat (Sys.getenv "HOME") ".octez-evm-node"
@@ -594,19 +596,23 @@ let experimental_features_encoding =
            drop_duplicate_on_injection;
            enable_send_raw_transaction;
            node_transaction_validation;
+           block_storage_sqlite3;
          } ->
       ( drop_duplicate_on_injection,
         enable_send_raw_transaction,
-        node_transaction_validation ))
+        node_transaction_validation,
+        block_storage_sqlite3 ))
     (fun ( drop_duplicate_on_injection,
            enable_send_raw_transaction,
-           node_transaction_validation ) ->
+           node_transaction_validation,
+           block_storage_sqlite3 ) ->
       {
         drop_duplicate_on_injection;
         enable_send_raw_transaction;
         node_transaction_validation;
+        block_storage_sqlite3;
       })
-    (obj3
+    (obj4
        (dft
           ~description:
             "Request the rollup node to filter messages it has already \
@@ -622,7 +628,14 @@ let experimental_features_encoding =
           "enable_send_raw_transaction"
           bool
           default_enable_send_raw_transaction)
-       (dft "node_transaction_validation" bool false))
+       (dft "node_transaction_validation" bool false)
+       (dft
+          "block_storage_sqlite3"
+          ~description:
+            "Store the blocks and transactions in a sqlite3 database and \
+             removes them from the durable storage"
+          bool
+          false))
 
 let proxy_encoding =
   let open Data_encoding in
