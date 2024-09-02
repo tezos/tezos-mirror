@@ -9,8 +9,13 @@ use const_decoder::Decoder;
 use host::path::{concat, OwnedPath, Path, RefPath};
 use host::runtime::{Runtime, RuntimeError, ValueType};
 use primitive_types::{H160, H256, U256};
-use sha3::{Digest, Keccak256};
+use rlp::DecoderError;
 use tezos_smart_rollup_storage::storage::Storage;
+use tezos_storage::helpers::bytes_hash;
+use tezos_storage::{
+    error::Error as GenStorageError, read_u256_le_default, read_u64_le_default,
+};
+use tezos_storage::{path_from_h256, read_h256_be_default};
 use thiserror::Error;
 
 use crate::DurableStorageError;
@@ -30,6 +35,10 @@ pub enum AccountStorageError {
     /// API.
     #[error("Transaction storage API error: {0:?}")]
     StorageError(tezos_smart_rollup_storage::StorageError),
+    #[error("Failed to decode: {0}")]
+    RlpDecoderError(DecoderError),
+    #[error("Storage error: error while reading a value (incorrect size). Expected {expected} but got {actual}")]
+    InvalidLoadValue { expected: usize, actual: usize },
     /// Some account balance became greater than what can be
     /// stored in an unsigned 256 bit integer.
     #[error("Account balance overflow")]
@@ -57,6 +66,26 @@ impl From<host::path::PathError> for AccountStorageError {
 impl From<host::runtime::RuntimeError> for AccountStorageError {
     fn from(error: host::runtime::RuntimeError) -> Self {
         AccountStorageError::DurableStorageError(DurableStorageError::from(error))
+    }
+}
+
+impl From<GenStorageError> for AccountStorageError {
+    fn from(e: GenStorageError) -> Self {
+        match e {
+            GenStorageError::Path(e) => {
+                AccountStorageError::DurableStorageError(DurableStorageError::from(e))
+            }
+            GenStorageError::Runtime(e) => {
+                AccountStorageError::DurableStorageError(DurableStorageError::from(e))
+            }
+            GenStorageError::Storage(e) => AccountStorageError::StorageError(e),
+            GenStorageError::RlpDecoderError(e) => {
+                AccountStorageError::RlpDecoderError(e)
+            }
+            GenStorageError::InvalidLoadValue { expected, actual } => {
+                AccountStorageError::InvalidLoadValue { expected, actual }
+            }
+        }
     }
 }
 
@@ -155,75 +184,6 @@ const CODE_HASH_BYTES: [u8; WORD_SIZE] = Decoder::Hex
 /// The default hash for when there is no code - the hash of the empty string.
 pub const CODE_HASH_DEFAULT: H256 = H256(CODE_HASH_BYTES);
 
-/// Read a single unsigned 256 bit value from storage at the path given.
-pub fn read_u256(
-    host: &impl Runtime,
-    path: &impl Path,
-    default: U256,
-) -> Result<U256, AccountStorageError> {
-    match host.store_read_all(path) {
-        Ok(bytes) if bytes.len() == WORD_SIZE => Ok(U256::from_little_endian(&bytes)),
-        Ok(_) | Err(RuntimeError::PathNotFound) => Ok(default),
-        Err(err) => Err(err.into()),
-    }
-}
-
-/// Write a single unsigned 256 but value to the storage at the given path
-pub fn write_u256(
-    host: &mut impl Runtime,
-    path: &impl Path,
-    x: U256,
-) -> Result<(), RuntimeError> {
-    let mut x_bytes = [0u8; 32];
-    x.to_little_endian(&mut x_bytes);
-    host.store_write(path, &x_bytes, 0)
-}
-
-/// Read a single unsigned 64 bit value from storage at the path given.
-fn read_u64(
-    host: &impl Runtime,
-    path: &impl Path,
-    default: u64,
-) -> Result<u64, AccountStorageError> {
-    match host.store_read(path, 0, 8) {
-        Ok(bytes) if bytes.len() == 8 => {
-            let bytes_array: [u8; 8] = bytes.try_into().map_err(|_| {
-                AccountStorageError::DurableStorageError(
-                    DurableStorageError::RuntimeError(RuntimeError::DecodingError),
-                )
-            })?;
-            Ok(u64::from_le_bytes(bytes_array))
-        }
-        Ok(_) | Err(RuntimeError::PathNotFound) => Ok(default),
-        Err(err) => Err(err.into()),
-    }
-}
-
-/// Read a single 256 bit hash from storage at the path given.
-fn read_h256(
-    host: &impl Runtime,
-    path: &impl Path,
-    default: H256,
-) -> Result<H256, AccountStorageError> {
-    match host.store_read_all(path) {
-        Ok(bytes) if bytes.len() == WORD_SIZE => Ok(H256::from_slice(&bytes)),
-        Ok(_) | Err(RuntimeError::PathNotFound) => Ok(default),
-        Err(err) => Err(err.into()),
-    }
-}
-
-/// Get the path corresponding to an index of H256. This is used to
-/// find the path to a value a contract stores in durable storage.
-pub fn path_from_h256(index: &H256) -> Result<OwnedPath, AccountStorageError> {
-    let path_string = alloc::format!("/{}", hex::encode(index.to_fixed_bytes()));
-    OwnedPath::try_from(path_string).map_err(AccountStorageError::from)
-}
-
-/// Compute Keccak 256 for some bytes
-fn bytes_hash(bytes: &[u8]) -> H256 {
-    H256(Keccak256::digest(bytes).into())
-}
-
 /// Turn an Ethereum address - a H160 - into a valid path
 pub fn account_path(address: &H160) -> Result<OwnedPath, DurableStorageError> {
     let path_string = alloc::format!("/{}", hex::encode(address.to_fixed_bytes()));
@@ -240,7 +200,8 @@ impl EthereumAccount {
     /// _always_ have this **nonce**.
     pub fn nonce(&self, host: &impl Runtime) -> Result<u64, AccountStorageError> {
         let path = concat(&self.path, &NONCE_PATH)?;
-        read_u64(host, &path, NONCE_DEFAULT_VALUE)
+        read_u64_le_default(host, &path, NONCE_DEFAULT_VALUE)
+            .map_err(AccountStorageError::from)
     }
 
     /// Increment the **nonce** by one. It is technically possible for this operation to overflow,
@@ -296,7 +257,8 @@ impl EthereumAccount {
     /// Get the **balance** of an account in Wei held by the account.
     pub fn balance(&self, host: &impl Runtime) -> Result<U256, AccountStorageError> {
         let path = concat(&self.path, &BALANCE_PATH)?;
-        read_u256(host, &path, BALANCE_DEFAULT_VALUE).map_err(AccountStorageError::from)
+        read_u256_le_default(host, &path, BALANCE_DEFAULT_VALUE)
+            .map_err(AccountStorageError::from)
     }
 
     /// Add an amount in Wei to the balance of an account. In theory, this can overflow if the
@@ -396,7 +358,8 @@ impl EthereumAccount {
         index: &H256,
     ) -> Result<H256, AccountStorageError> {
         let path = self.storage_path(index)?;
-        read_h256(host, &path, STORAGE_DEFAULT_VALUE).map_err(AccountStorageError::from)
+        read_h256_be_default(host, &path, STORAGE_DEFAULT_VALUE)
+            .map_err(AccountStorageError::from)
     }
 
     /// Set the value associated with an index in durable storage. The result depends on the
@@ -475,7 +438,8 @@ impl EthereumAccount {
     /// stored when the code of a contract is set.
     pub fn code_hash(&self, host: &impl Runtime) -> Result<H256, AccountStorageError> {
         let path = concat(&self.path, &CODE_HASH_PATH)?;
-        read_h256(host, &path, CODE_HASH_DEFAULT).map_err(AccountStorageError::from)
+        read_h256_be_default(host, &path, CODE_HASH_DEFAULT)
+            .map_err(AccountStorageError::from)
     }
 
     /// Get the size of a contract in number of bytes used for opcodes. This value is
@@ -556,6 +520,7 @@ mod test {
     use host::path::RefPath;
     use primitive_types::U256;
     use tezos_smart_rollup_mock::MockHost;
+    use tezos_storage::write_u256_le;
 
     #[test]
     fn test_account_nonce_update() {
@@ -1174,16 +1139,19 @@ mod test {
     }
 
     #[test]
-    fn test_read_u256_le() {
+    fn test_read_u256_le_default_le() {
         let mut host = MockHost::default();
         let path = RefPath::assert_from(b"/value");
         assert_eq!(
-            read_u256(&host, &path, U256::from(128)).unwrap(),
+            read_u256_le_default(&host, &path, U256::from(128)).unwrap(),
             U256::from(128)
         );
 
         host.store_write_all(&path, &[1u8; 20]).unwrap();
-        assert_eq!(read_u256(&host, &path, U256::zero()).unwrap(), U256::zero());
+        assert_eq!(
+            read_u256_le_default(&host, &path, U256::zero()).unwrap(),
+            U256::zero()
+        );
 
         host.store_write_all(
             &path,
@@ -1194,17 +1162,17 @@ mod test {
         )
         .unwrap();
         assert_eq!(
-            read_u256(&host, &path, U256::zero()).unwrap(),
+            read_u256_le_default(&host, &path, U256::zero()).unwrap(),
             U256::from(255)
         );
     }
 
     #[test]
-    fn test_write_u256_le() {
+    fn test_write_u256_le_le() {
         let mut host = MockHost::default();
         let path = RefPath::assert_from(b"/value");
 
-        write_u256(&mut host, &path, U256::from(255)).unwrap();
+        write_u256_le(&mut host, &path, U256::from(255)).unwrap();
         assert_eq!(
             hex::encode(host.store_read_all(&path).unwrap()),
             "ff00000000000000000000000000000000000000000000000000000000000000"
