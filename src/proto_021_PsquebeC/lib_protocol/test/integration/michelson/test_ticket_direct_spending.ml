@@ -103,7 +103,7 @@ let test_spending ~direct_ticket_spending_enable ~constructor () =
   let open Lwt_result_syntax in
   let constants =
     let default_constants =
-      Tezos_protocol_beta_parameters.Default_parameters.constants_test
+      Tezos_protocol_021_PsquebeC_parameters.Default_parameters.constants_test
     in
     {
       default_constants with
