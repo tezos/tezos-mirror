@@ -30,26 +30,38 @@ let sigint =
 module Input : sig
   (** This module should be the only one that reads on [stdin]. *)
 
-  (** [next ()] returns the next line on stdin. *)
-  val next : unit -> string Lwt.t
+  (** [next ()] returns the next line on stdin or none if stdin is closed. *)
+  val next : unit -> string option Lwt.t
 end = struct
-  type t = {mutable resolvers : string Lwt.u list}
+  type t = {
+    mutable resolvers : string option Lwt.u list;
+    mutable stdin_closed : bool;
+  }
 
-  let state = {resolvers = []}
+  let state = {resolvers = []; stdin_closed = false}
 
   let next () =
-    let t, u = Lwt.task () in
-    state.resolvers <- u :: state.resolvers ;
-    t
+    if state.stdin_closed then Lwt.return_none
+    else
+      let t, u = Lwt.task () in
+      state.resolvers <- u :: state.resolvers ;
+      t
 
   let rec loop () =
     let* input = Lwt_io.read_line Lwt_io.stdin in
     state.resolvers
-    |> List.iter (fun resolver -> Lwt.wakeup_later resolver input) ;
+    |> List.iter (fun resolver -> Lwt.wakeup_later resolver (Some input)) ;
     state.resolvers <- [] ;
     loop ()
 
-  let _ = loop ()
+  let _ =
+    Lwt.catch
+      (fun () -> loop ())
+      (fun _exn ->
+        state.resolvers
+        |> List.iter (fun resolver -> Lwt.wakeup_later resolver None) ;
+        state.stdin_closed <- true ;
+        Lwt.return_unit)
 end
 
 let eof =
@@ -57,8 +69,12 @@ let eof =
   Lwt.dont_wait
     (fun () ->
       let rec loop () =
-        let* _ = Input.next () in
-        loop ()
+        let* input = Input.next () in
+        match input with
+        | None ->
+            Lwt.wakeup resolver () ;
+            Lwt.return_unit
+        | Some _ -> loop ()
       in
       loop ())
     (fun _ -> Lwt.wakeup resolver ()) ;
