@@ -801,6 +801,19 @@ module Local = struct
       (path / "injector" / "operation"
      /: Tezos_crypto.Hashed.Injector_operations_hash.rpc_arg / "status")
 
+  let dal_injected_operations_statuses =
+    Tezos_rpc.Service.get_service
+      ~description:
+        "Retrieve the statuses of all known operations injected via DAL."
+      ~query:Tezos_rpc.Query.empty
+      ~output:
+        Data_encoding.(
+          list
+            (tup2
+               Tezos_crypto.Hashed.Injector_operations_hash.encoding
+               Encodings.message_status))
+      (path / "dal" / "injected" / "operations" / "statuses")
+
   let synchronized =
     Tezos_rpc.Service.get_service
       ~description:
