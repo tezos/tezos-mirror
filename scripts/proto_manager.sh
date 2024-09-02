@@ -1802,7 +1802,7 @@ function hash() {
   doc_index="docs/index.rst"
   sed -i.old -e "s@protocols/${protocol_source}@protocols/${new_versioned_name}@g" "${doc_index}"
   sed -i.old -e "s/${capitalized_source}/${capitalized_label}/g" "${doc_index}"
-  sed -i.old -e "s/${protocol_source}/${label}/g" "${doc_index}"
+  sed -i.old -e "s/${source_label}/${label}/g" "${doc_index}"
   commit_if_changes "docs: add entries in the doc index"
 
   sed -e "s/${previous_tag}/${new_tag}/g" \
