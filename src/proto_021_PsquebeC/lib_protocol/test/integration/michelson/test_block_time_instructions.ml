@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (Michelson block-time instructions)
-    Invocation: dune exec src/proto_beta/lib_protocol/test/integration/michelson/main.exe \
+    Invocation: dune exec src/proto_021_PsquebeC/lib_protocol/test/integration/michelson/main.exe \
                   -- --file test_block_time_instructions.ml
     Subject:    This module tests that Michelson instructions related to block time are correct.
 *)

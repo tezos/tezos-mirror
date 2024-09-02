@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Protocol (type-checking)
-    Invocation:   dune exec src/proto_beta/lib_protocol/test/regression/main.exe
+    Invocation:   dune exec src/proto_021_PsquebeC/lib_protocol/test/regression/main.exe
     Subject:      Type-checking
  *)
 

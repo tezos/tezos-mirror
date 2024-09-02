@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (attestation)
-    Invocation: dune exec src/proto_beta/lib_protocol/test/integration/consensus/main.exe \
+    Invocation: dune exec src/proto_021_PsquebeC/lib_protocol/test/integration/consensus/main.exe \
                   -- --file test_attestation.ml
     Subject:    Attesting a block adds an extra layer of confidence
                 to the Tezos' PoS algorithm. The block attesting

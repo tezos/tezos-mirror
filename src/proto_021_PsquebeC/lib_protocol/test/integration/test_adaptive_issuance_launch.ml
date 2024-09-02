@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Adaptive Issuance, launch vote
-    Invocation:   dune exec src/proto_beta/lib_protocol/test/integration/main.exe \
+    Invocation:   dune exec src/proto_021_PsquebeC/lib_protocol/test/integration/main.exe \
                    -- --file test_adaptive_issuance_launch.ml
     Subject:      Test the launch vote feature of Adaptive Issuance.
 *)

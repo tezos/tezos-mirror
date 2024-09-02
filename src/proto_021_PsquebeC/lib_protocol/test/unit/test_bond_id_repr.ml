@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Bond_id_repr
-    Invocation:   dune exec src/proto_beta/lib_protocol/test/unit/main.exe \
+    Invocation:   dune exec src/proto_021_PsquebeC/lib_protocol/test/unit/main.exe \
                   -- --file test_bond_id_repr.ml
     Dependencies: --
     Subject:      Test bond id representations for RPC definitions.

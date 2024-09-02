@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (delegate_consensus_key)
-    Invocation: dune exec src/proto_beta/lib_protocol/test/unit/main.exe \
+    Invocation: dune exec src/proto_021_PsquebeC/lib_protocol/test/unit/main.exe \
                   -- --file test_consensus_key.ml
     Subject:    Functions from the module `Delegate_consensus_key`
 *)

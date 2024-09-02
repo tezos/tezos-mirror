@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component: Protocol (Ticket_balance_key)
-    Invocation: dune exec src/proto_beta/lib_protocol/test/integration/michelson/main.exe \
+    Invocation: dune exec src/proto_021_PsquebeC/lib_protocol/test/integration/michelson/main.exe \
                   -- --file test_ticket_manager.ml
     Subject: Tests that compare the ticket-balance table against tickets in the
              contract storages. The tests include a lot of operations that

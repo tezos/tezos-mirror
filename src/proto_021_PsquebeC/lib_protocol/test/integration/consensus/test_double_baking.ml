@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Protocol (double baking)
-    Invocation:   dune exec src/proto_beta/lib_protocol/test/integration/consensus/main.exe \
+    Invocation:   dune exec src/proto_021_PsquebeC/lib_protocol/test/integration/consensus/main.exe \
                   -- --file test_double_baking.ml
     Subject:      A double baking evidence operation may be injected when it has
                   been observed that a baker baked two different blocks at the

@@ -8,7 +8,7 @@
 (** Testing
     -------
     Component:  Protocol (time repr)
-    Invocation: dune exec src/proto_beta/lib_protocol/test/unit/main.exe \
+    Invocation: dune exec src/proto_021_PsquebeC/lib_protocol/test/unit/main.exe \
                   -- --file test_time_repr.ml
     Subject:    Error handling of time operations
 *)
