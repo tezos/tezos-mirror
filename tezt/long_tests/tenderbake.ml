@@ -497,15 +497,16 @@ module Long_dynamic_bake = struct
     in
     (* One client to activate the protocol later on *)
     let* _, node_hd, activator_client, _ =
-      Sandbox.add_node_with_baker sandbox
+      Sandbox.add_node_with_baker ~run_baker:false sandbox
     in
     let* () =
       Base.repeat (num_nodes - 2) @@ fun () ->
-      lwt_ignore @@ Sandbox.add_node_with_baker sandbox
+      lwt_ignore @@ Sandbox.add_node_with_baker ~run_baker:false sandbox
     in
     (* Add a node without a baker *)
     let* dead_baker_handle, _ = Sandbox.add_node sandbox in
     let nodes = Sandbox.nodes sandbox in
+    let bakers = Sandbox.bakers sandbox in
 
     Log.info
       "Setting up node %s topology: %s"
@@ -515,6 +516,9 @@ module Long_dynamic_bake = struct
 
     Log.info "Starting nodes" ;
     let* () = Cluster.start ~wait_connections:true nodes in
+
+    Log.info "Starting bakers" ;
+    let* () = Lwt_list.iter_p Baker.run bakers in
 
     Log.info "Activating protocol" ;
     let* () =
