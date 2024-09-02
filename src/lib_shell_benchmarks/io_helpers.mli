@@ -170,3 +170,6 @@ val fill_disk_cache :
   Tezos_protocol_environment.Context.t ->
   (Tezos_protocol_environment.Context.key * _) array list ->
   unit Lwt.t
+
+val get_head_block_from_context_dir :
+  string -> Int32.t * Block_hash.t * Context_hash.t

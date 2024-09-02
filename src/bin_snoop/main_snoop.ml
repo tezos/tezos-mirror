@@ -926,25 +926,14 @@ module Auto_build = struct
         mich_fn ;
       None)
 
-  let get_head_context_hash data_dir =
-    match
-      Lwt_main.run @@ Tezos_shell_benchmarks.Io_helpers.load_head_block data_dir
-    with
-    | Error e ->
-        Format.eprintf
-          "Error: %a@."
-          Tezos_error_monad.Error_monad.pp_print_trace
-          e ;
-        Format.eprintf "Failed to find a Tezos context at %s@." data_dir ;
-        exit 1
-    | Ok res -> res
-
   (* Assumes the data files are found in [_snoop/tezos_node] *)
   let make_io_read_random_key_benchmark_config dest ns =
     let open Tezos_shell_benchmarks.Io_benchmarks.Read_random_key_bench in
     let data_dir = "_snoop/tezos-node" in
     let context_dir = Filename.concat data_dir "context" in
-    let level, block_hash, context_hash = get_head_context_hash data_dir in
+    let level, block_hash, context_hash =
+      Tezos_shell_benchmarks.Io_helpers.get_head_block_from_context_dir data_dir
+    in
     Format.eprintf
       "Using %s, Context_hash: %a; Block: %ld %a@."
       context_dir
@@ -968,7 +957,9 @@ module Auto_build = struct
     let open Tezos_shell_benchmarks.Io_benchmarks.Write_random_keys_bench in
     let data_dir = "_snoop/tezos-node" in
     let context_dir = Filename.concat data_dir "context" in
-    let level, block_hash, context_hash = get_head_context_hash data_dir in
+    let level, block_hash, context_hash =
+      Tezos_shell_benchmarks.Io_helpers.get_head_block_from_context_dir data_dir
+    in
     Format.eprintf
       "Using %s, Context_hash: %a; Block: %ld %a@."
       context_dir

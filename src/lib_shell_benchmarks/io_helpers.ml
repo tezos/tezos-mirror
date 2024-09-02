@@ -513,3 +513,14 @@ let fill_disk_cache ~rng ~restrict_memory context keys_list =
   let meminfo = Meminfo.get () in
   Format.eprintf "%a@." Meminfo.pp meminfo ;
   Lwt.return_unit
+
+let get_head_block_from_context_dir data_dir =
+  match Lwt_main.run @@ load_head_block data_dir with
+  | Error e ->
+      Format.eprintf
+        "Error: %a@."
+        Tezos_error_monad.Error_monad.pp_print_trace
+        e ;
+      Format.eprintf "Failed to find a Tezos context at %s@." data_dir ;
+      exit 1
+  | Ok res -> res
