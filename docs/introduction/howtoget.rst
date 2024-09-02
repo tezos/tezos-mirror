@@ -89,17 +89,12 @@ There are several packages:
 - ``octez-smartrollup``: the Octez Smart Rollup daemons
 - ``octez-signer``: the remote signer, to hold keys on (and sign from) a different machine from the baker or client
 
-
 Ubuntu and Debian Octez packages
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 If you're using Ubuntu or Debian, you can also install packages with Octez binaries
 using ``apt`` directly from our APT repository, instead of going to the Octez
 release page as explained above.
-
-.. warning::
-
-    This APT repository is currently empty. For installing the latest release (:doc:`../releases/version-20`), you must still use the installation method above.
 
 We support the following distribution/releases:
 - ``debian/bookworm``
