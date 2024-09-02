@@ -59,7 +59,7 @@ val copy : ?destination:string -> t -> source:string -> string Lwt.t
 val next_available_port : t -> int
 
 (** [runner agent] returns the runner associated with the agent. *)
-val runner : t -> Runner.t
+val runner : t -> Runner.t option
 
 (** [point agent] returns the point asociated with the agent. *)
 val point : t -> string * int

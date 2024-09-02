@@ -56,20 +56,23 @@ let configuration ~agents =
   Format.asprintf "# Configurations@.%s\n" str
 
 let string_docker_command agent =
-  let point = Agent.point agent in
-  let ssh_id = (Agent.runner agent).Runner.ssh_id in
-  String.concat
-    " "
-    [
-      "ssh";
-      Format.asprintf "root@%s" (fst point);
-      "-p";
-      string_of_int (snd point);
-      "-o";
-      "StrictHostKeyChecking=no";
-      "-i";
-      ssh_id |> Option.get;
-    ]
+  match Agent.runner agent with
+  | None -> "<no command, docker is host>"
+  | Some runner ->
+      let point = Agent.point agent in
+      let ssh_id = runner.Runner.ssh_id in
+      String.concat
+        " "
+        [
+          "ssh";
+          Format.asprintf "root@%s" (fst point);
+          "-p";
+          string_of_int (snd point);
+          "-o";
+          "StrictHostKeyChecking=no";
+          "-i";
+          ssh_id |> Option.get;
+        ]
 
 let string_vm_command agent =
   match Agent.cmd_wrapper agent with
@@ -118,9 +121,7 @@ let monitoring ~agents =
     let str =
       agents
       |> List.map (fun agent ->
-             let address =
-               Agent.runner agent |> fun runner -> Runner.address (Some runner)
-             in
+             let address = Agent.runner agent |> Runner.address in
              Format.asprintf
                "- [%s](http://%s:19999)"
                (Agent.name agent)

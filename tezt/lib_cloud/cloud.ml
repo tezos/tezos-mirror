@@ -176,18 +176,22 @@ let shutdown ?exn t =
 
 (* This function is used to ensure we can connect to the docker image on the VM. *)
 let wait_ssh_server_running agent =
-  let runner = Agent.runner agent in
   if (Agent.configuration agent).os = "debian" then Lwt.return_unit
   else
-    let is_ready _output = true in
-    let run () =
-      let cmd, args =
-        Runner.wrap_with_ssh runner (Runner.Shell.cmd [] "echo" ["-n"; "check"])
-      in
-      Process.spawn cmd (["-o"; "StrictHostKeyChecking=no"] @ args)
-    in
-    let* _ = Env.wait_process ~is_ready ~run () in
-    Lwt.return_unit
+    match Agent.runner agent with
+    | None -> Lwt.return_unit
+    | Some runner ->
+        let is_ready _output = true in
+        let run () =
+          let cmd, args =
+            Runner.wrap_with_ssh
+              runner
+              (Runner.Shell.cmd [] "echo" ["-n"; "check"])
+          in
+          Process.spawn cmd (["-o"; "StrictHostKeyChecking=no"] @ args)
+        in
+        let* _ = Env.wait_process ~is_ready ~run () in
+        Lwt.return_unit
 
 let orchestrator deployement f =
   let agents = Deployement.agents deployement in
@@ -238,7 +242,8 @@ let orchestrator deployement f =
   shutdown ?exn t
 
 let attach agent =
-  let runner = Agent.runner agent in
+  (* The proxy agent has to have a runner attached to it. *)
+  let runner = Agent.runner agent |> Option.get in
   let hooks =
     Process.
       {
@@ -360,7 +365,7 @@ let try_reattach () =
           (fun () ->
             let* status =
               Process.spawn
-                ~runner:(Agent.runner proxy_agent)
+                ?runner:(Agent.runner proxy_agent)
                 "ls"
                 ["screenlog.0"]
               |> Process.wait
@@ -410,13 +415,13 @@ let init_proxy ?(proxy_files = []) deployement =
   let runner = Agent.runner proxy_agent in
   let* () =
     (* This should not be necessary, this is to ensure there is no [screen] leftover. *)
-    let process = Process.spawn ~runner "pkill" ["screen"] in
+    let process = Process.spawn ?runner "pkill" ["screen"] in
     let* _ = Process.wait process in
     Lwt.return_unit
   in
   let* () =
     (* We start a screen session in detached mode. The orchestrator will run in this session. *)
-    Process.spawn ~runner "screen" ["-S"; "tezt-cloud"; "-d"; "-m"]
+    Process.spawn ?runner "screen" ["-S"; "tezt-cloud"; "-d"; "-m"]
     |> Process.check
   in
   let process =
@@ -566,7 +571,7 @@ let add_prometheus_source t ?metric_path ~job_name targets =
   | None -> Lwt.return_unit
   | Some prometheus ->
       let prometheus_target {agent; port; app_name} =
-        let address = agent |> Agent.runner |> Option.some |> Runner.address in
+        let address = agent |> Agent.runner |> Runner.address in
         Prometheus.{address; port; app_name}
       in
       let targets = List.map prometheus_target targets in

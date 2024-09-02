@@ -20,7 +20,7 @@ module Node = struct
         ?data_dir
         ?name
         ~path
-        ~runner
+        ?runner
         ~rpc_port
         ~net_port
         ~metrics_port
@@ -38,7 +38,7 @@ module Node = struct
         ?name
         ?data_dir
         ~path
-        ~runner
+        ?runner
         ~rpc_port
         ~net_port
         ~metrics_port
@@ -65,7 +65,7 @@ module Dal_node = struct
       let metrics_port = Agent.next_available_port agent in
       let metrics_addr = Format.asprintf "0.0.0.0:%d" metrics_port in
       let listen_addr = Format.asprintf "0.0.0.0:%d" net_port in
-      create ?name ~path ~runner ~rpc_port ~metrics_addr ~listen_addr ~node ()
+      create ?name ~path ?runner ~rpc_port ~metrics_addr ~listen_addr ~node ()
       |> Lwt.return
   end
 end
@@ -86,7 +86,7 @@ module Sc_rollup_node = struct
         ?default_operator
         ?dal_node
         ~path
-        ~runner
+        ?runner
         ~rpc_port
         ~metrics_addr
         ~metrics_port
@@ -110,7 +110,7 @@ module Sc_rollup_helpers = struct
       let runner = Agent.runner agent in
       prepare_installer_kernel_with_arbitrary_file
         ~smart_rollup_installer_path
-        ~runner
+        ?runner
         ~boot_sector:`Filename
         ~preimages_dir
         ?config
@@ -160,7 +160,7 @@ module Evm_node = struct
       let* path = Agent.copy agent ~source:path in
       let runner = Agent.runner agent in
       let rpc_port = Agent.next_available_port agent in
-      create ?name ~path ~runner ?data_dir ~rpc_port ?mode endpoint
+      create ?name ~path ?runner ?data_dir ~rpc_port ?mode endpoint
       |> Lwt.return
 
     let init ?patch_config ?name ?mode ?data_dir rollup_node agent =
@@ -184,7 +184,7 @@ module Client = struct
       let* path = Agent.copy agent ~source:path in
       let runner = Agent.runner agent in
       let endpoint = Option.map (fun x -> Node x) node in
-      create ~runner ~path ?endpoint () |> Lwt.return
+      create ?runner ~path ?endpoint () |> Lwt.return
   end
 end
 
@@ -200,7 +200,7 @@ module Baker = struct
       init
         ?name
         ~event_level:`Notice
-        ~runner
+        ?runner
         ~path
         ~delegates:[delegate]
         ~protocol

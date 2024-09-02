@@ -18,7 +18,7 @@ let simple () =
   let* output =
     Process.spawn
       ~name:"agent0"
-      ~runner:(Agent.runner agent0)
+      ?runner:(Agent.runner agent0)
       "echo"
       ["Hello world"]
     |> Process.check_and_read_stdout
@@ -27,7 +27,7 @@ let simple () =
   let* output =
     Process.spawn
       ~name:"agent1"
-      ~runner:(Agent.runner agent1)
+      ?runner:(Agent.runner agent1)
       "echo"
       ["Hello world"]
     |> Process.check_and_read_stdout

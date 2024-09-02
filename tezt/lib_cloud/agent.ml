@@ -253,6 +253,6 @@ let copy =
 
 let next_available_port t = t.next_available_port ()
 
-let runner {runner; _} = runner
+let runner {runner; _} = Some runner
 
 let configuration {configuration; _} = configuration

@@ -121,7 +121,7 @@ module Node = struct
             toplog "Downloading a rolling snapshot" ;
             let* () =
               Process.spawn
-                ~runner:(runner_of_agent agent)
+                ?runner:(runner_of_agent agent)
                 "wget"
                 [
                   "-O";
