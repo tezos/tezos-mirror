@@ -16,6 +16,11 @@ type head = {
   pending_upgrade : Evm_events.Upgrade.t option;
 }
 
+(** [lock_data_dir ~data_dir] takes an exclusive lock on [data_dir] for the
+    duration of the process. It fails if there is already another evm node with
+    a lock. *)
+val lock_data_dir : data_dir:string -> unit tzresult Lwt.t
+
 (** [vacuum ~data_dir ~output_db_file] initialize the database with data
     from the [data_dir] and vacuum it into the [output_db_file]. *)
 val vacuum : data_dir:string -> output_db_file:string -> unit tzresult Lwt.t
@@ -181,7 +186,4 @@ val execute :
 module State : sig
   (** Path of EVM state store. *)
   val store_path : data_dir:string -> string
-
-  (** Path of lock file for EVM state w.r.t. {!store_path}. *)
-  val lockfile_path : store_path:string -> string
 end
