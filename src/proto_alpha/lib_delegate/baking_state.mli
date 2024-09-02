@@ -98,8 +98,6 @@ type block_to_bake = {
 
 val block_info_encoding : block_info Data_encoding.t
 
-val round_of_shell_header : Block_header.shell_header -> Round.t tzresult
-
 module SlotMap : Map.S with type key = Slot.t
 
 (** A delegate slot consists of the delegate's consensus key, its public key

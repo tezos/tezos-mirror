@@ -178,6 +178,14 @@ let generate_seed_nonce_hash config delegate level =
     return_some seed_nonce
   else return_none
 
+let round_of_shell_header shell_header =
+  let open Result_syntax in
+  let* fitness =
+    Environment.wrap_tzresult
+    @@ Fitness.from_raw shell_header.Tezos_base.Block_header.fitness
+  in
+  return (Fitness.round fitness)
+
 let sign_block_header global_state proposer unsigned_block_header =
   let open Lwt_result_syntax in
   let cctxt = global_state.cctxt in
@@ -192,7 +200,7 @@ let sign_block_header global_state proposer unsigned_block_header =
       (shell, contents)
   in
   let level = shell.level in
-  let*? round = Baking_state.round_of_shell_header shell in
+  let*? round = round_of_shell_header shell in
   let open Baking_highwatermarks in
   let* result =
     cctxt#with_lock (fun () ->

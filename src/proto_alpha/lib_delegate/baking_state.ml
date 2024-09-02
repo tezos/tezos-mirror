@@ -186,14 +186,6 @@ let block_info_encoding =
        (req "quorum" (list (dynamic_size Operation.encoding)))
        (req "payload" Operation_pool.payload_encoding))
 
-let round_of_shell_header shell_header =
-  let open Result_syntax in
-  let* fitness =
-    Environment.wrap_tzresult
-    @@ Fitness.from_raw shell_header.Tezos_base.Block_header.fitness
-  in
-  return (Fitness.round fitness)
-
 module SlotMap : Map.S with type key = Slot.t = Map.Make (Slot)
 
 type delegate_slot = {
