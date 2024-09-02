@@ -97,7 +97,6 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
   in
   let* () =
     Blueprints_publisher.start
-      ~smart_rollup_address
       ~rollup_node_endpoint
       ~config:threshold_encryption_sequencer_config.blueprints_publisher_config
       ~latest_level_seen:(Z.pred next_blueprint_number)
