@@ -283,3 +283,9 @@ let register_dal_slot ~slot_content ~slot_index =
     w
     (Request.Register {slot_content; slot_index})
   |> handle_request_error
+
+let get_injection_ids () =
+  let open Result_syntax in
+  let+ w = Result.map_error TzTrace.make (Lazy.force worker) in
+  let state = Worker.state w in
+  Recent_dal_injections.keys state.recent_dal_injections
