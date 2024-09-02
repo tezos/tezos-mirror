@@ -176,6 +176,7 @@ let patch_durable_storage ~data_dir ~key ~value =
     | None ->
         failwith "Processed L2 head is not found in the rollup node storage"
   in
+
   let* ((module Plugin) as plugin) =
     Protocol_plugins.proto_plugin_for_level_with_store store block_level
   in
@@ -184,6 +185,11 @@ let patch_durable_storage ~data_dir ~key ~value =
     match l2_header with
     | None -> tzfail Rollup_node_errors.Cannot_checkout_l2_header
     | Some header -> return header
+  in
+  let* () =
+    fail_when
+      (Option.is_some l2_header.commitment_hash)
+      (Rollup_node_errors.Patch_durable_storage_on_commitment block_level)
   in
   let* context = load_context ~data_dir plugin Store_sigs.Read_write in
   let* state = get_wasm_pvm_state ~l2_header context in
