@@ -367,7 +367,8 @@ let test_patch_state =
     ~tags:["evm"; "patch"; "state"]
     ~title:"Patch state via command"
     ~time_between_blocks:Nothing
-  @@ fun {sequencer; _} _protocol ->
+  @@ fun {sequencer; sc_rollup_node; sc_rollup_address; client; _} _protocol ->
+  (* Test patch state for the evm-node. *)
   let path = Durable_storage_path.sequencer in
   let*@! before_patch = Rpc.state_value sequencer path in
   let* () = Evm_node.terminate sequencer in
@@ -376,7 +377,36 @@ let test_patch_state =
   let*@! after_patch = Rpc.state_value sequencer path in
   Check.((before_patch <> after_patch) string)
     ~error_msg:"value should have changed" ;
-  Check.((after_patch = "00") string) ~error_msg:"value be 00" ;
+  Check.((after_patch = "00") string) ~error_msg:"value should be 00" ;
+
+  (* Test patch state for the rollup node. *)
+  let* before_patch =
+    Sc_rollup_node.RPC.call sc_rollup_node
+    @@ Sc_rollup_rpc.get_global_block_durable_state_value
+         ~pvm_kind:"wasm_2_0_0"
+         ~operation:Sc_rollup_rpc.Value
+         ~key:path
+         ()
+  in
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  let* () = Sc_rollup_node.terminate sc_rollup_node in
+  let* () =
+    Sc_rollup_node.patch_durable_storage sc_rollup_node ~key:path ~value:"00"
+  in
+  let* () = Sc_rollup_node.run sc_rollup_node sc_rollup_address [] in
+  let* after_patch =
+    Sc_rollup_node.RPC.call sc_rollup_node
+    @@ Sc_rollup_rpc.get_global_block_durable_state_value
+         ~pvm_kind:"wasm_2_0_0"
+         ~operation:Sc_rollup_rpc.Value
+         ~key:path
+         ()
+  in
+  Check.((before_patch <> after_patch) (option string))
+    ~error_msg:"value should have changed" ;
+  Check.((after_patch = Some "00") (option string))
+    ~error_msg:"value should be 00" ;
+
   unit
 
 let test_persistent_state =
