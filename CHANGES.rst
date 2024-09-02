@@ -109,6 +109,15 @@ Node
   time. Upgrading to this new version must be done manually (using the
   ``octez-node upgrade storage`` command) and is irreversible. (MR
   :gl:`!14211`)
+
+- **Breaking change** Bumped the snapshot version from ``7`` to ``8``,
+  in order to support the changes introduced by the ``3.2`` storage
+  version. Snapshots of version ``7`` exported with previous versions
+  of Octez (``v20``) can still be imported. Snapshots of version ``8``
+  are not retro-compatible with previous octez versions (MR
+  :gl:`!14398`).
+
+
 Client
 ------
 
