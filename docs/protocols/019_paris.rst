@@ -157,6 +157,12 @@ RPC Changes
 - Updated the description of delegates' ``frozen_deposits`` queried via
   ``GET '/chains/<chain_id>/blocks/<block_id>/context/delegates/<delegate_id>/frozen_deposits'``. (MR :gl:`!12010`)
 
+- Added RPC ``GET '/chains/<chain>/blocks/<block>/context/dal/commitments_history'``
+  returning the current last skip list cell. (MR :gl:`!12420`)
+
+- Added RPC ``GET '/chains/<chain>/blocks/<block>/context/dal/published_slot_headers'``
+  that returns the published slot headers of a given level. (MR :gl:`!12204`)
+
 Protocol parameters
 -------------------
 
