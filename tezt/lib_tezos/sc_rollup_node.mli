@@ -284,6 +284,8 @@ type unsafe_pvm_patch = Increase_max_nb_ticks of int
 
 val patch_config_unsafe_pvm_patches : unsafe_pvm_patch list -> JSON.t -> JSON.t
 
+val patch_durable_storage : t -> key:string -> value:string -> unit Lwt.t
+
 (** Wait until the sc node is ready.
 
     More precisely, wait until a [node_is_ready] event occurs.
