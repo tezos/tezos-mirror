@@ -1,0 +1,63 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name src_proto_021_PsquebeC_lib_protocol_test_integration_tezt_lib)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezt.core
+  tezt
+  octez-libs.base
+  octez-protocol-021-PsquebeC-libs.client
+  tezos-protocol-021-PsquebeC.protocol
+  tezos-protocol-021-PsquebeC.parameters
+  octez-protocol-021-PsquebeC-libs.test-helpers
+  octez-libs.base-test-helpers)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
+  -open Tezos_base.TzPervasives
+  -open Tezos_client_021_PsquebeC
+  -open Tezos_protocol_021_PsquebeC
+  -open Tezos_protocol_021_PsquebeC_parameters
+  -open Tezos_021_PsquebeC_test_helpers
+  -open Tezos_base_test_helpers)
+ (modules
+  test_constants
+  test_frozen_bonds
+  test_adaptive_issuance_launch
+  test_scenario_base
+  test_scenario_stake
+  test_scenario_rewards
+  test_scenario_autostaking
+  test_scenario_slashing
+  test_scenario_slashing_stakers
+  test_scenario_deactivation
+  test_liquidity_baking
+  test_storage_functions
+  test_storage
+  test_token))
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (libraries
+  src_proto_021_PsquebeC_lib_protocol_test_integration_tezt_lib
+  tezt)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp))
+ (modules main))
+
+(rule
+ (alias runtest)
+ (package tezos-protocol-021-PsquebeC-tests)
+ (deps (glob_files wasm_kernel/*.wasm))
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run %{dep:./main.exe} /flaky /ci_disabled)))
+
+(rule
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))

@@ -16,12 +16,12 @@ depends: [
   "octez-protocol-020-PsParisC-libs" {with-test}
   "octez-smart-rollup-node-PsParisC" {with-test}
   "octez-alcotezt" {with-test}
+  "tezos-protocol-021-PsquebeC" {with-test}
+  "octez-protocol-021-PsquebeC-libs" {with-test}
+  "octez-smart-rollup-node-PsquebeC" {with-test}
   "tezos-protocol-alpha" {with-test}
   "octez-protocol-alpha-libs" {with-test}
   "octez-smart-rollup-node-alpha" {with-test}
-  "tezos-protocol-beta" {with-test}
-  "octez-protocol-beta-libs" {with-test}
-  "octez-smart-rollup-node-beta" {with-test}
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
