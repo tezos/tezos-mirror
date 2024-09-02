@@ -169,22 +169,27 @@ let dal_injection =
     ~output:Tezos_crypto.Hashed.Injector_operations_hash.encoding
     (open_root / "local" / "dal" / "injection")
 
-let injector_operation_status :
+let dal_injected_operations_statuses :
     ( [`GET],
       unit,
-      unit * Tezos_crypto.Hashed.Injector_operations_hash.t,
       unit,
       unit,
-      Octez_smart_rollup__Rollup_node_services.message_status )
+      unit,
+      (Tezos_crypto.Hashed.Injector_operations_hash.t
+      * Octez_smart_rollup__Rollup_node_services.message_status)
+      list )
     Service.service =
   Tezos_rpc.Service.get_service
     ~description:
-      "Retrieve the status of the (injected) operation whose injector ID is \
-       given"
+      "Retrieve the statuses of all known operations injected via DAL."
     ~query:Tezos_rpc.Query.empty
-    ~output:Rollup_node_services.Encodings.message_status
-    (open_root / "local" / "injector" / "operation"
-   /: Tezos_crypto.Hashed.Injector_operations_hash.rpc_arg / "status")
+    ~output:
+      Data_encoding.(
+        list
+          (tup2
+             Tezos_crypto.Hashed.Injector_operations_hash.encoding
+             Rollup_node_services.Encodings.message_status))
+    (open_root / "local" / "dal" / "injected" / "operations" / "statuses")
 
 let simulation :
     ( [`POST],
@@ -316,16 +321,19 @@ let publish_on_dal :
     ()
     (inputs, slot_index)
 
-let get_injector_operation_status :
+let get_injected_dal_operations_statuses :
     rollup_node_endpoint:Uri.t ->
-    injection_id:Tezos_crypto.Hashed.Injector_operations_hash.t ->
-    Rollup_node_services.message_status tzresult Lwt.t =
- fun ~rollup_node_endpoint ~injection_id ->
+    (Tezos_crypto.Hashed.Injector_operations_hash.t
+    * Octez_smart_rollup__Rollup_node_services.message_status)
+    list
+    tzresult
+    Lwt.t =
+ fun ~rollup_node_endpoint ->
   call_service
     ~keep_alive:false
     ~base:rollup_node_endpoint
-    injector_operation_status
-    ((), injection_id)
+    dal_injected_operations_statuses
+    ()
     ()
     ()
 
