@@ -59,7 +59,7 @@ let string_docker_command agent =
   match Agent.runner agent with
   | None -> "<no command, docker is host>"
   | Some runner ->
-      let point = Agent.point agent in
+      let point = Agent.point agent |> Option.get in
       let ssh_id = runner.Runner.ssh_id in
       String.concat
         " "
@@ -135,7 +135,8 @@ let monitoring ~agents =
 let prometheus ~agents =
   let domain =
     match Env.mode with
-    | `Orchestrator -> Proxy.get_agent agents |> Agent.point |> fst
+    | `Orchestrator ->
+        Proxy.get_agent agents |> Agent.point |> Option.get |> fst
     | `Host | `Localhost | `Cloud -> "localhost"
   in
   if Env.prometheus then
@@ -148,7 +149,8 @@ let prometheus ~agents =
 let grafana ~agents =
   let domain =
     match Env.mode with
-    | `Orchestrator -> Proxy.get_agent agents |> Agent.point |> fst
+    | `Orchestrator ->
+        Proxy.get_agent agents |> Agent.point |> Option.get |> fst
     | `Host | `Localhost | `Cloud -> "localhost"
   in
   if Env.grafana then

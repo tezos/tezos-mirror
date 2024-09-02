@@ -10,7 +10,7 @@ type t = {
   mutable name : string;
   vm_name : string;
   zone : string option;
-  point : string * int;
+  point : (string * int) option;
   runner : Runner.t option;
   next_available_port : unit -> int;
   configuration : Configuration.t;
@@ -66,18 +66,19 @@ let encoding =
          } ->
       (name, vm_name, zone, point, next_available_port (), configuration))
     (fun (name, vm_name, zone, point, next_available_port, configuration) ->
-      let ssh_port = snd point in
-      let address = fst point in
-      let ssh_id = ssh_id () in
-      let runner =
-        Runner.create ~ssh_user:"root" ~ssh_id ~ssh_port ~address ()
-        |> Option.some
-      in
       let next_available_port =
         let current_port = ref (next_available_port - 1) in
         fun () ->
           incr current_port ;
           !current_port
+      in
+      let runner =
+        match point with
+        | None -> None
+        | Some (address, ssh_port) ->
+            let ssh_id = ssh_id () in
+            Runner.create ~ssh_user:"root" ~ssh_id ~ssh_port ~address ()
+            |> Option.some
       in
       {name; vm_name; zone; point; runner; next_available_port; configuration})
     (obj6
@@ -86,15 +87,20 @@ let encoding =
        (req "zone" (Data_encoding.option Data_encoding.string))
        (req
           "point"
-          (Data_encoding.tup2 Data_encoding.string Data_encoding.int31))
+          (Data_encoding.option
+             (Data_encoding.tup2 Data_encoding.string Data_encoding.int31)))
        (req "next_available_port" Data_encoding.int31)
        (req "configuration" configuration_encoding))
 
-let make ?zone ~ssh_id ~point:((address, ssh_port) as point) ~configuration
-    ~next_available_port ~name () =
+let make ?zone ?ssh_id ?point ~configuration ~next_available_port ~name () =
   let ssh_user = "root" in
   let runner =
-    Runner.create ~ssh_user ~ssh_id ~ssh_port ~address () |> Option.some
+    match (point, ssh_id) with
+    | None, None -> None
+    | Some _, None | None, Some _ ->
+        Test.fail "Agent.make was not initialized correctly"
+    | Some (address, ssh_port), Some ssh_id ->
+        Runner.create ~ssh_user ~ssh_id ~ssh_port ~address () |> Option.some
   in
   {
     point;

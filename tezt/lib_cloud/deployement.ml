@@ -196,7 +196,7 @@ module Remote = struct
             Gcloud.DNS.add
               ~tezt_cloud:Env.tezt_cloud
               ~zone:"tezt-cloud"
-              ~ip:(Agent.point agent |> fst)
+              ~ip:(Agent.point agent |> Option.get |> fst)
           else Lwt.return_unit
         in
         Lwt.return {agents = agent :: agents}

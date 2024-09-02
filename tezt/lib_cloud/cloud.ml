@@ -109,19 +109,21 @@ let shutdown ?exn t =
             let agents = Deployement.agents deployement in
             agents
             |> List.map (fun agent ->
-                   let point = Agent.point agent in
-                   Process.run
-                     "ssh"
-                     [
-                       "-S";
-                       Format.asprintf
-                         "~/.ssh/sockets/root@%s-%d"
-                         (fst point)
-                         (snd point);
-                       "-O";
-                       "exit";
-                       Format.asprintf "root@%s" (fst point);
-                     ])
+                   match Agent.point agent with
+                   | None -> Lwt.return_unit
+                   | Some point ->
+                       Process.run
+                         "ssh"
+                         [
+                           "-S";
+                           Format.asprintf
+                             "~/.ssh/sockets/root@%s-%d"
+                             (fst point)
+                             (snd point);
+                           "-O";
+                           "exit";
+                           Format.asprintf "root@%s" (fst point);
+                         ])
             |> Lwt.join)
       (fun _exn -> Lwt.return_unit)
   in
@@ -306,7 +308,11 @@ let attach agent =
             Gcloud.DNS.get_domain ~tezt_cloud:Env.tezt_cloud ~zone:"tezt-cloud"
           in
           Lwt.return (Format.asprintf "http://%s" domain)
-        else Lwt.return (Format.asprintf "http://%s" (Agent.point agent |> fst))
+        else
+          Lwt.return
+            (Format.asprintf
+               "http://%s"
+               (Agent.point agent |> Option.get |> fst))
       in
       Log.info "Deployement website can be accessed here: %s" uri ;
       Lwt.return_unit

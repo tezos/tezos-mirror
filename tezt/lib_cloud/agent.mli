@@ -18,8 +18,8 @@ type t
     the ssh connection. *)
 val make :
   ?zone:string ->
-  ssh_id:string ->
-  point:string * int ->
+  ?ssh_id:string ->
+  ?point:string * int ->
   configuration:Configuration.t ->
   next_available_port:(unit -> int) ->
   name:string ->
@@ -62,7 +62,7 @@ val next_available_port : t -> int
 val runner : t -> Runner.t option
 
 (** [point agent] returns the point asociated with the agent. *)
-val point : t -> string * int
+val point : t -> (string * int) option
 
 (** [configuration t] the configuration of the agent. *)
 val configuration : t -> Configuration.t

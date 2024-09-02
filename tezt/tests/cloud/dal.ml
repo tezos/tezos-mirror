@@ -1091,7 +1091,10 @@ let init_ghostnet cloud (configuration : configuration) agent =
           Endpoint.
             {
               scheme = "http";
-              host = Agent.point agent |> fst;
+              host =
+                (match Agent.point agent with
+                | None -> "127.0.0.1"
+                | Some point -> fst point);
               port = Node.rpc_port node;
             }
         in
@@ -1280,7 +1283,10 @@ let init_bootstrap_and_activate_protocol cloud (configuration : configuration)
     Endpoint.
       {
         scheme = "http";
-        host = Agent.point agent |> fst;
+        host =
+          (match Agent.point agent with
+          | None -> "127.0.0.1"
+          | Some point -> fst point);
         port = Node.rpc_port bootstrap_node;
       }
   in
