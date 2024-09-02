@@ -100,7 +100,17 @@ module Events = struct
       ~pp2:Worker_types.pp_status
 end
 
-type state = {node_ctxt : Node_context.ro}
+module Recent_dal_injections =
+  Hash_queue.Make
+    (Hashed.Injector_operations_hash)
+    (struct
+      type t = unit
+    end)
+
+type state = {
+  node_ctxt : Node_context.ro;
+  recent_dal_injections : Recent_dal_injections.t;
+}
 
 let inject_slot state ~slot_content ~slot_index =
   let open Lwt_result_syntax in
@@ -133,6 +143,7 @@ let inject_slot state ~slot_content ~slot_index =
         return op.id
   in
   let*! () = Events.(emit injected) (commitment, slot_index, l1_hash) in
+  Recent_dal_injections.replace state.recent_dal_injections l1_hash () ;
   return l1_hash
 
 let on_register state ~slot_content ~slot_index :
@@ -148,7 +159,20 @@ let on_register state ~slot_content ~slot_index :
   in
   inject_slot state ~slot_content ~slot_index
 
-let init_dal_worker_state node_ctxt = {node_ctxt}
+let init_dal_worker_state node_ctxt =
+  let dal_constants =
+    let open Node_context in
+    (Reference.get node_ctxt.current_protocol).constants.dal
+  in
+  (* We initialize a bounded cache for [known_slots] large enough to contain
+     [number_of_slots] entries during [attestation_lag] * 4 (sliding) levels. *)
+  let max_retained_slots_info =
+    dal_constants.number_of_slots * dal_constants.attestation_lag * 4
+  in
+  {
+    node_ctxt;
+    recent_dal_injections = Recent_dal_injections.create max_retained_slots_info;
+  }
 
 module Types = struct
   type nonrec state = state
