@@ -2341,6 +2341,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "tezos-storage"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "hex",
+ "primitive-types",
+ "rlp",
+ "sha3",
+ "tezos-smart-rollup-host",
+ "tezos-smart-rollup-storage",
+ "tezos_crypto_rs",
+ "tezos_ethereum",
+ "thiserror",
+]
+
+[[package]]
 name = "tezos_crypto_rs"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
