@@ -5,6 +5,7 @@
 #![allow(non_upper_case_globals)]
 
 pub mod bits;
+pub mod effects;
 mod root;
 pub mod satp;
 pub mod values;
@@ -30,7 +31,7 @@ use crate::{
 use num_enum::TryFromPrimitive;
 use root::RootCSRegister;
 use strum::IntoEnumIterator;
-use values::{CSRegisterValues, CSRegisterValuesLayout};
+use values::{CSRegisterValues, CSRegisterValuesLayout, MStatusValue};
 
 /// Privilege required to access a CSR
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -1055,10 +1056,10 @@ fn check_fs_access(csr: CSRegister, fs_field: ExtensionValue) -> Result<()> {
 pub fn access_checks(csr: CSRegister, hart_state: &HartState<impl ManagerRead>) -> Result<()> {
     let mode = hart_state.mode.read();
     check_privilege(csr, mode)?;
-    let mstatus: MStatus = hart_state.csregisters.read(CSRegister::mstatus);
-    let tvm = mstatus.tvm();
+    let mstatus = hart_state.csregisters.mstatus();
+    let tvm = mstatus.tvm.read();
     check_satp_access(csr, tvm)?;
-    let fs = mstatus.fs();
+    let fs = mstatus.fs.read();
     check_fs_access(csr, fs)
 }
 
@@ -1069,6 +1070,16 @@ pub struct CSRegisters<M: backend::ManagerBase> {
 }
 
 impl<M: backend::ManagerBase> CSRegisters<M> {
+    #[inline(always)]
+    pub const fn mstatus(&self) -> &MStatusValue<M> {
+        &self.registers.mstatus
+    }
+
+    #[inline(always)]
+    pub fn mstatus_mut(&mut self) -> &mut MStatusValue<M> {
+        &mut self.registers.mstatus
+    }
+
     /// Transform the write operation to account for shadow registers.
     /// (e.g. `sstatus` register)
     ///
@@ -1085,32 +1096,32 @@ impl<M: backend::ManagerBase> CSRegisters<M> {
         // Note: This works because currently there are no shadowed WLRL registers
         match reg {
             CSRegister::sstatus => {
-                let mstatus = self.registers.read_mstatus();
+                let mstatus = self.registers.mstatus.read();
                 let mstatus = MStatus::from_bits(mstatus);
                 let sstatus = SStatus::from_bits(value);
                 let mstatus = sstatus.to_mstatus(mstatus);
                 mstatus.to_bits()
             }
             CSRegister::sip => {
-                let mip = self.registers.read_mip();
+                let mip = self.registers.mip.read();
                 let sip_only = value & CSRegister::WARL_MASK_SIP_SIE;
                 let mip_only = mip & !CSRegister::WARL_MASK_SIP_SIE;
                 sip_only | mip_only
             }
             CSRegister::sie => {
-                let mie = self.registers.read_mie();
+                let mie = self.registers.mie.read();
                 let sie_only = value & CSRegister::WARL_MASK_SIP_SIE;
                 let mie_only = mie & !CSRegister::WARL_MASK_SIP_SIE;
                 sie_only | mie_only
             }
             CSRegister::fcsr => value & CSRegister::FCSR_MASK,
             CSRegister::frm => {
-                let fcsr = self.registers.read_fcsr();
+                let fcsr = self.registers.fcsr.read();
                 let fcsr = fcsr & !CSRegister::FRM_MASK;
                 ((value << CSRegister::FRM_SHIFT) & CSRegister::FRM_MASK) | fcsr
             }
             CSRegister::fflags => {
-                let fcsr = self.registers.read_fcsr();
+                let fcsr = self.registers.fcsr.read();
                 let fcsr = fcsr & !CSRegister::FFLAGS_MASK;
                 (value & CSRegister::FFLAGS_MASK) | fcsr
             }
@@ -1134,7 +1145,7 @@ impl<M: backend::ManagerBase> CSRegisters<M> {
     {
         let source_reg_value = source_reg_value.unwrap_or_else(|| {
             // If reg is a shadow, obtain the underlying ground truth for that register
-            self.registers.general_raw_read(reg.into())
+            self.general_raw_read(reg.into())
         });
 
         // modify the value according to the shadowing rules of each register
@@ -1158,19 +1169,7 @@ impl<M: backend::ManagerBase> CSRegisters<M> {
         if let Some(value) = reg.make_value_writable(value.to_bits()) {
             let value = self.transform_write(reg, value);
             let source_reg: RootCSRegister = reg.into();
-            self.registers.general_raw_write(source_reg, value);
-
-            // TODO: RV-159. after !14177
-            // invalidation will be incorporated into `csregisters_boilerplate!`
-            match source_reg {
-                RootCSRegister::mstatus => {
-                    self.interrupt_cache.invalidate();
-                }
-                RootCSRegister::mip => {
-                    self.interrupt_cache.invalidate_by_mip();
-                }
-                _ => {}
-            }
+            self.general_raw_write(source_reg, value);
         }
     }
 
@@ -1195,20 +1194,7 @@ impl<M: backend::ManagerBase> CSRegisters<M> {
         if let Some(value) = reg.make_value_writable(value.to_bits()) {
             let value = self.transform_write(reg, value);
             let source_reg: RootCSRegister = reg.into();
-            let old_value = self.registers.general_raw_replace(source_reg, value);
-
-            // TODO: RV-159. after !14177
-            // invalidation will be incorporated into `csregisters_boilerplate!`
-            match source_reg {
-                RootCSRegister::mstatus => {
-                    self.interrupt_cache.invalidate();
-                }
-                RootCSRegister::mip => {
-                    self.interrupt_cache.invalidate_by_mip();
-                }
-                _ => {}
-            };
-
+            let old_value = self.general_raw_replace(source_reg, value);
             let old_value = self.transform_read(reg, Some(old_value));
             V::from_bits(old_value)
         } else {
@@ -1257,21 +1243,17 @@ impl<M: backend::ManagerBase> CSRegisters<M> {
         match current_mode {
             Mode::User => Interrupt::SUPERVISOR_BIT_MASK | Interrupt::MACHINE_BIT_MASK,
             Mode::Supervisor => {
-                let mstatus: MStatus = self.read(CSRegister::mstatus);
-                let ie_supervisor = match mstatus.sie() {
+                let ie_supervisor = match self.mstatus().sie.read() {
                     true => self.read(CSRegister::sie),
                     false => 0,
                 };
 
                 ie_supervisor | Interrupt::MACHINE_BIT_MASK
             }
-            Mode::Machine => {
-                let mstatus: MStatus = self.read(CSRegister::mstatus);
-                match mstatus.mie() {
-                    true => self.read(CSRegister::mie),
-                    false => 0,
-                }
-            }
+            Mode::Machine => match self.mstatus().mie.read() {
+                true => self.read(CSRegister::mie),
+                false => 0,
+            },
         }
     }
 
@@ -1368,8 +1350,7 @@ impl<M: backend::ManagerBase> CSRegisters<M> {
     {
         // Try to reset known CSRs to known default values.
         for reg in CSRegister::iter() {
-            self.registers
-                .general_raw_write(reg.into(), reg.default_value());
+            self.general_raw_write(reg.into(), reg.default_value());
         }
     }
 
@@ -1378,8 +1359,8 @@ impl<M: backend::ManagerBase> CSRegisters<M> {
     where
         M: backend::ManagerRead,
     {
-        let mstatus: MStatus = self.read(CSRegister::mstatus);
-        mstatus.fs() == ExtensionValue::Off
+        let fs = self.mstatus().fs.read();
+        fs == ExtensionValue::Off
     }
 }
 
@@ -1387,14 +1368,17 @@ impl<M: backend::ManagerBase> CSRegisters<M> {
 #[allow(clippy::identity_op)]
 mod tests {
     use crate::{
-        backend_test, create_backend, create_state,
+        backend_test,
+        bits::Bits64,
+        create_backend, create_state,
         machine_state::{
             backend::{
                 tests::{test_determinism, ManagerFor},
                 Backend, Layout,
             },
             csregisters::{
-                values::CSRValue, CSRRepr, CSRegister, CSRegisters, CSRegistersLayout, Exception,
+                values::CSRValue, xstatus::MStatus, CSRRepr, CSRegister, CSRegisters,
+                CSRegistersLayout, Exception,
             },
             mode::Mode,
         },
@@ -1613,9 +1597,9 @@ mod tests {
             1u64 << 37 | 0b01 << 34 | 0b11 << 32 | 0b11 << 15 | 0b11 << 11 | 1 << 8 | 1 << 7,
         );
         // SXL, UXL should be set to MXL (WARL), SD bit should be 1
-        let read_mstatus: CSRValue = csrs.read(CSRegister::mstatus);
+        let read_mstatus: MStatus = csrs.read(CSRegister::mstatus);
         assert_eq!(
-            read_mstatus.repr(),
+            read_mstatus.to_bits(),
             1u64 << 63
                 | 1 << 37
                 | 0b10 << 34
