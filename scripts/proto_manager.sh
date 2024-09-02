@@ -1814,6 +1814,9 @@ function hash() {
   make -C docs "${label}"/rpc.rst
   commit_if_changes "docs: generate ${label}/rpc.rst"
 
+  make -C docs openapi
+  commit_if_changes "docs: generate openapi"
+
   echo "Rehashing done"
 }
 
