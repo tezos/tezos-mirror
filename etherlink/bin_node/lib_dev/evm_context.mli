@@ -186,7 +186,4 @@ val execute :
 module State : sig
   (** Path of EVM state store. *)
   val store_path : data_dir:string -> string
-
-  (** Path of lock file for EVM state w.r.t. {!store_path}. *)
-  val lockfile_path : store_path:string -> string
 end
