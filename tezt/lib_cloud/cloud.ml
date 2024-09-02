@@ -473,18 +473,31 @@ let register ?proxy_files ?vms ~__FILE__ ~title ~tags ?seed f =
     (* The Cli arguments by-pass the argument given here. This enable the user
        to always have decide precisely the number of vms to be run. *)
     match (vms, Env.vms) with
-    | None, None -> None
+    | None, None | None, Some 0 -> None
+    | Some _, Some 0 when Env.mode = `Localhost || Env.mode = `Cloud ->
+        (* We don't want to go here when using the proxy mode. *)
+        None
     | None, Some i | Some _, Some i ->
         let vms = List.init i (fun _ -> Configuration.make ()) in
         Some vms
     | Some vms, None -> Some vms
   in
   match vms with
-  | None | Some [] ->
-      (* If there is no configuration, it is a similar scenario as if there were not agent. *)
+  | None ->
+      let default_agent =
+        Agent.make
+          ~configuration:(Configuration.make ())
+          ~next_available_port:
+            (let cpt = ref 30_000 in
+             fun () ->
+               incr cpt ;
+               !cpt)
+          ~name:"default agent"
+          ()
+      in
       f
         {
-          agents = [];
+          agents = [default_agent];
           website = None;
           grafana = None;
           prometheus = None;
@@ -545,11 +558,27 @@ let register ?proxy_files ?vms ~__FILE__ ~title ~tags ?seed f =
 
 let agents t =
   match Env.mode with
-  | `Orchestrator ->
+  | `Orchestrator -> (
       let proxy_agent = Proxy.get_agent t.agents in
       let proxy_vm_name = Agent.vm_name proxy_agent in
-      t.agents
-      |> List.filter (fun agent -> Agent.vm_name agent <> proxy_vm_name)
+      match
+        t.agents
+        |> List.filter (fun agent -> Agent.vm_name agent <> proxy_vm_name)
+      with
+      | [] ->
+          let default_agent =
+            Agent.make
+              ~configuration:(Configuration.make ())
+              ~next_available_port:
+                (let cpt = ref 30_000 in
+                 fun () ->
+                   incr cpt ;
+                   !cpt)
+              ~name:"default agent"
+              ()
+          in
+          [default_agent]
+      | agents -> agents)
   | `Host | `Cloud | `Localhost -> t.agents
 
 let get_configuration = Agent.configuration
