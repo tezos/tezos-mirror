@@ -5708,6 +5708,7 @@ let test_finalized_block_param =
       "The finalized block parameter is correctly interpreted by the EVM node"
     ~da_fee:Wei.zero
   @@ fun {sc_rollup_node; client; sequencer; proxy; _} _protocol ->
+  let* rpc = run_new_rpc_endpoint sequencer in
   (* Produce a few EVM blocks *)
   let* () =
     repeat 4 @@ fun () ->
@@ -5769,6 +5770,14 @@ let test_finalized_block_param =
       ~left:proxy
       ~right:sequencer
       ~error_msg:"Sequencer and proxy should have the same last finalized"
+      ()
+  in
+  let* () =
+    check_block_consistency
+      ~block:`Finalized
+      ~left:rpc
+      ~right:sequencer
+      ~error_msg:"Sequencer and rpc should have the same last finalized"
       ()
   in
 

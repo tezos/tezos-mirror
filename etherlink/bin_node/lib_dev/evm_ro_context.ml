@@ -234,8 +234,13 @@ struct
         match res with
         | Some (earliest, _) -> return earliest
         | None -> failwith "The EVM node does not have any state available")
-    | Block_parameter Finalized ->
-        failwith "Block parameter finalized is not supported in rpc mode"
+    | Block_parameter Finalized -> (
+        let* res =
+          Evm_store.(use Ctxt.ctxt.store Context_hashes.find_finalized)
+        in
+        match res with
+        | Some (finalized, _) -> return finalized
+        | None -> failwith "The EVM node is not aware of any finalized block")
     | Block_hash {hash; _} -> (
         let* irmin_hash = find_irmin_hash Ctxt.ctxt block_param in
         let* evm_state = get_evm_state Ctxt.ctxt irmin_hash in
