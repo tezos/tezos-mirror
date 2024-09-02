@@ -6988,7 +6988,7 @@ let hash = Protocol.hash
 
   let _020_PsParisC = active (Name.v "PsParisC" 020)
 
-  let _beta = active (Name.dev "beta")
+  let _021_PsquebeC = active (Name.v "PsquebeC" 021)
 
   let alpha = active (Name.dev "alpha")
 
