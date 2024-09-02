@@ -2202,10 +2202,12 @@ dependencies = [
 name = "tezos-indexable-storage"
 version = "0.1.0"
 dependencies = [
+ "rlp",
  "tezos-evm-logging",
  "tezos-smart-rollup-host",
  "tezos-smart-rollup-mock",
  "tezos-smart-rollup-storage",
+ "tezos-storage",
  "thiserror",
 ]
 

@@ -204,6 +204,10 @@ impl From<IndexableStorageError> for Error {
             IndexableStorageError::IndexOutOfBounds => {
                 Error::Storage(StorageError::IndexOutOfBounds)
             }
+            IndexableStorageError::RlpDecoderError(e) => Error::RlpDecoderError(e),
+            IndexableStorageError::InvalidLoadValue { expected, actual } => {
+                Error::Storage(StorageError::InvalidLoadValue { expected, actual })
+            }
         }
     }
 }
