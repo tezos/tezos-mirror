@@ -16,6 +16,11 @@
 
 - Fix `octez_evm_node_head` for the RPC mode. (!14849)
 
+#### RPCs
+
+- Add state override option to `eth_call` RPC, similar to go-ethereum.
+  Limited to fields `balance`, `nonce` and `code`. (!14708)
+
 ## Version 0.2 (2024-09-05)
 
 This release introduces a number of quality of life improvements for operators
