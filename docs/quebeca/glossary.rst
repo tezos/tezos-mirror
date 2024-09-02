@@ -18,7 +18,7 @@ _`Block`
     The header itself decomposes into a :ref:`shell header<shell_header>` (common to all Tezos economic protocols), and a protocol-specific header.
     The shell header contains protocol-agnostic data such as the predecessor's block hash and the block's timestamp.
 
-.. _def_context_beta:
+.. _def_context_quebeca:
 
 _`Context`
     The state of the blockchain. The context is defined by the
@@ -44,7 +44,7 @@ _`Fitness` (a.k.a. score, weight)
 _`Height`
     See level_.
 
-.. _def_level_beta:
+.. _def_level_quebeca:
 
 _`Level` (a.k.a. block height)
     The position of a block_ in the blockchain, that is, the number of blocks
@@ -53,7 +53,7 @@ _`Level` (a.k.a. block height)
 _`Mempool`
    A pool (set) of operation_\ s maintained by a node_ and not yet included in a block_.
 
-.. _def_metadata_beta:
+.. _def_metadata_quebeca:
 
 _`Metadata`
     A (block or operation) metadata is a piece of data
@@ -99,7 +99,7 @@ _`Weight`
 Protocol terms
 --------------
 
-.. _def_accuser_beta:
+.. _def_accuser_quebeca:
 
 _`Accuser`
     When a delegate_ attempts `double signing`_ (or when it tries
@@ -111,7 +111,7 @@ _`Accuser`
     When using :ref:`Octez <octez>`, accusation operations are emitted by the
     accuser daemon. Note that this daemon is not associated to a delegate: accusation operations are anonymous, and any delegate can include them in a block.
 
-.. _def_account_beta:
+.. _def_account_quebeca:
 
 _`Account`
     An account is an address managed by the protocol.
@@ -166,7 +166,7 @@ _`Constant`
 _`Contract`
     See account_.
 
-.. _def_cycle_beta:
+.. _def_cycle_quebeca:
 
 _`Cycle`
     A cycle is a sequence of consecutive block_\ s of fixed length (given by a protocol constant_). E.g., cycle 12 started at block
@@ -180,7 +180,7 @@ _`Cycle`
     constant_, and thus might change across different
     Tezos protocols.
 
-.. _def_delegate_beta:
+.. _def_delegate_quebeca:
 
 _`Delegate`
     A `user account`_ that can participate in consensus and in governance.
@@ -196,7 +196,7 @@ _`Delegation`
     its `baking rights`_ and `attesting rights`_. However, the delegate_ does not control the funds of
     the delegating account_, e.g., it can not spend them.
 
-.. _def_double_signing_beta:
+.. _def_double_signing_quebeca:
 
 _`Double signing`
     The situation when a baker_ signs two different block_\ s at the same level and same round,
@@ -205,29 +205,29 @@ _`Double signing`
     The same goes for signing two different attestations at the same level and the same round.
     As such, double signing (i.e., double baking or double attesting) is punished by the
     network: an accuser_ can provide proof of the double signing to be awarded
-    part of the double signer's deposit -- see :ref:`Slashing<slashing_beta>`.
+    part of the double signer's deposit -- see :ref:`Slashing<slashing_quebeca>`.
 
 _`Failing Noop`
     The ``Failing_noop`` operation implements a *No-op*, which always
-    fails at :ref:`application time<operation_validity_beta>`, and
+    fails at :ref:`application time<operation_validity_quebeca>`, and
     should never appear in :ref:`applied
-    blocks<full_application_beta>`. This operation allows end-users to
-    :ref:`sign arbitrary messages<failing_noop_beta>` which have no
+    blocks<full_application_quebeca>`. This operation allows end-users to
+    :ref:`sign arbitrary messages<failing_noop_quebeca>` which have no
     computational semantics.
 
-.. _def_fee_beta:
+.. _def_fee_quebeca:
 
 _`Fee`
     To ensure responsible use of computation resources of other nodes, and also to encourage active participation in the consensus protocol,
     users pay fees to bakers for including their operation_\ s in block_\ s.
     For example, fees are paid to a baker for operations such as a transaction_ or a revelation of a public key.
 
-    Currently, only :ref:`manager operations<manager_operations_beta>`
+    Currently, only :ref:`manager operations<manager_operations_quebeca>`
     require collecting fees from its sender account_.
 
     See also `burn`_.
 
-.. _def_gas_beta:
+.. _def_gas_quebeca:
 
 _`Gas`
     A measure of the number of elementary steps performed during
@@ -254,7 +254,7 @@ _`Layer 2`
 _`Michelson`
     The built-in language used by a `smart contract`_.
 
-.. _def_minimal_stake_beta:
+.. _def_minimal_stake_quebeca:
 
 _`Minimal stake`
     An amount of tez (e.g., 6000ꜩ) serving as a minimal amount for a
@@ -269,7 +269,7 @@ _`Operation kinds`
 _`Originated account`
     See `smart contract`_.
 
-.. _def_origination_beta:
+.. _def_origination_quebeca:
 
 _`Origination`
     A manager operation_ whose purpose is to create -- that
@@ -327,7 +327,7 @@ _`Rollup outbox`
    cemented (hence, at least two weeks after the actual execution of
    the operation).
 
-.. _def_round_beta:
+.. _def_round_quebeca:
 
 _`Round`
     An attempt to reach consensus on a block at a given level.
@@ -355,13 +355,13 @@ _`Stake`
     `attesting rights`_. A delegate's stake is usually given by the
     delegate's own tokens plus the sum of tokens delegated to
     it. However, there are cases when this is not the case, see
-    :ref:`here<active_stake_beta>` for details.
+    :ref:`here<active_stake_quebeca>` for details.
 
 _`Staker`
     A `user account`_ that made a security deposit.
     The user account must have set a delegate.
     The security deposit accrues to the stake of the user account's delegate and is
-    subject to slashing in case the delegate misbehaves -- see :ref:`Slashing<slashing_beta>`.
+    subject to slashing in case the delegate misbehaves -- see :ref:`Slashing<slashing_quebeca>`.
 
 _`Tez`
     A unit of the cryptocurrency native to a Tezos_ chain, such as in "I sent you 2 tez." Tez is invariable. It is not capitalized except at the beginning of a sentence or when you would otherwise capitalize a noun.
@@ -371,7 +371,7 @@ _`Transaction`
     An operation_ to transfer tez between two accounts, or to run the code of a
     `smart contract`_.
 
-.. _def_user_account_beta:
+.. _def_user_account_quebeca:
 
 _`User account`
     An account_ that is linked to a public key. Contrary to a `smart
@@ -390,7 +390,7 @@ _`Validation pass`
     An index (a natural number) associated with a particular kind of
     operations, allowing to group them into classes. Validation passes
     enable prioritizing the :ref:`validation and
-    application<operation_validity_beta>` of certain classes of
+    application<operation_validity_quebeca>` of certain classes of
     operations.
 
 _`Voting period`
