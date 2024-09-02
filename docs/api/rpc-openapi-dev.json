@@ -3,7 +3,7 @@
   "info": {
     "title": "Octez RPC",
     "description": "The RPC API served by the Octez node.",
-    "version": "Octez 21.0~beta1+dev (4f903ead)"
+    "version": "Octez 21.0~beta1+dev (efef919d)"
   },
   "paths": {
     "/chains/{chain_id}": {
@@ -1141,8 +1141,8 @@
                         "history_mode": {
                           "$ref": "#/components/schemas/history_mode"
                         },
-                        "context_pruning": {
-                          "$ref": "#/components/schemas/context_pruning"
+                        "disable_context_pruning": {
+                          "type": "boolean"
                         },
                         "storage_maintenance_delay": {
                           "$ref": "#/components/schemas/storage_maintenance_delay"
@@ -9747,28 +9747,6 @@
           "increment"
         ]
       },
-      "context_pruning": {
-        "title": "context_pruning",
-        "description": "Context pruning status",
-        "oneOf": [
-          {
-            "title": "disabled",
-            "description": "When disabled, the storage maintenance won't be triggered",
-            "type": "string",
-            "enum": [
-              "disabled"
-            ]
-          },
-          {
-            "title": "enabled",
-            "description": "When enabled, the storage maintenance is triggered as soon as a cycle dawn is encountered. This is the default value.",
-            "type": "string",
-            "enum": [
-              "enabled"
-            ]
-          }
-        ]
-      },
       "distributed_db_version": {
         "description": "A version number for the distributed DB protocol",
         "type": "integer",
@@ -10397,7 +10375,39 @@
       "storage_maintenance_delay": {
         "title": "storage maintenance delay",
         "description": "Delay prior to the storage maintenance trigger",
-        "type": "string"
+        "oneOf": [
+          {
+            "title": "disabled",
+            "description": "When disabled, the storage maintenance is triggered without any delay, as soon as a new cycle starts.",
+            "type": "string",
+            "enum": [
+              "disabled"
+            ]
+          },
+          {
+            "title": "custom",
+            "description": "When \"custom <N>\" is set, storage maintenance is triggered \"N\" blocks after the start of a new cycle.",
+            "type": "object",
+            "properties": {
+              "custom": {
+                "type": "integer",
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              }
+            },
+            "required": [
+              "custom"
+            ]
+          },
+          {
+            "title": "auto",
+            "description": "When \"auto\" is set, storage maintenance is triggered after a delay that is determined automatically.",
+            "type": "string",
+            "enum": [
+              "auto"
+            ]
+          }
+        ]
       },
       "timespan.system": {
         "description": "A span of time, as seen by the local computer.",

@@ -3,7 +3,7 @@
   "info": {
     "title": "Octez DAL Node RPC",
     "description": "The RPC API for the Octez DAL node.",
-    "version": "Octez 21.0~beta1+dev (4f903ead)"
+    "version": "Octez 21.0~beta1+dev (efef919d)"
   },
   "paths": {
     "/levels/{int32}/slots/{int}/commitment": {
@@ -602,6 +602,61 @@
         }
       }
     },
+    "/p2p/gossipsub/pkhs/peers": {
+      "get": {
+        "description": "Get an association list between each topic subscribed to by the connected peers and the remote peers subscribed to that topic. If the 'subscribed' flag is given, then restrict the output to the topics this peer is subscribed to.",
+        "parameters": [
+          {
+            "name": "subscribed",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "pkh": {
+                        "$ref": "#/components/schemas/Signature.Public_key_hash"
+                      },
+                      "peers": {
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                        }
+                      }
+                    },
+                    "required": [
+                      "pkh",
+                      "peers"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/p2p/gossipsub/scores": {
       "get": {
         "description": "Get the scores of the peers with a known score.",
@@ -625,6 +680,63 @@
                     "required": [
                       "peer",
                       "score"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/p2p/gossipsub/slot_indexes/peers": {
+      "get": {
+        "description": "Get an association list between each public key hash part of a topic subscribed to by the connected peers and the remote peers subscribed to such topics. If the 'subscribed' flag is given, then restrict the output to the topics this peer is subscribed to.",
+        "parameters": [
+          {
+            "name": "subscribed",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "slot_index": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 255
+                      },
+                      "peers": {
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                        }
+                      }
+                    },
+                    "required": [
+                      "slot_index",
+                      "peers"
                     ]
                   }
                 }
@@ -690,7 +802,7 @@
     },
     "/p2p/gossipsub/topics/peers": {
       "get": {
-        "description": "Get an association list between each topic subscribed to by the connected peers and the remote peers subscribed to that topic. If the 'subscribed' flag is given, then restrict the output to the topics this node is subscribed to.",
+        "description": "Get an association list between each topic subscribed to by the connected peers and the remote peers subscribed to that topic. If the 'subscribed' flag is given, then restrict the output to the topics this peer is subscribed to.",
         "parameters": [
           {
             "name": "subscribed",

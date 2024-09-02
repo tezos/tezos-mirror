@@ -3,7 +3,7 @@
   "info": {
     "title": "Octez Protocol alpha RPC",
     "description": "The RPC API for protocol alpha served by the Octez node.",
-    "version": "Octez 21.0~beta1+dev (4f903ead)"
+    "version": "Octez 21.0~beta1+dev (efef919d)"
   },
   "paths": {
     "/": {
@@ -2875,7 +2875,7 @@
     },
     "/context/contracts/{contract_id}/staked_balance": {
       "get": {
-        "description": "Access the staked balance of a contract. Returns None if the contract is originated, or neither delegated nor a delegate.",
+        "description": "Access the staked balance of a contract (in mutez). Returns None if the contract is originated, or neither delegated nor a delegate.",
         "parameters": [
           {
             "name": "contract_id",
@@ -5959,7 +5959,7 @@
     },
     "/context/issuance/current_yearly_rate": {
       "get": {
-        "description": "Returns the current expected maximum yearly issuance rate (in %)",
+        "description": "Returns the current expected maximum yearly issuance rate (in %). The value only includes participation rewards (and does not include liquidity baking)",
         "responses": {
           "200": {
             "description": "",
@@ -6008,7 +6008,7 @@
     },
     "/context/issuance/current_yearly_rate_details": {
       "get": {
-        "description": "Returns the static and dynamic parts of the current expected maximum yearly issuance rate.",
+        "description": "Returns the static and dynamic parts of the current expected maximum yearly issuance rate (in %). The value only includes participation rewards (and does not include liquidity baking)",
         "responses": {
           "200": {
             "description": "",
@@ -6071,7 +6071,7 @@
     },
     "/context/issuance/current_yearly_rate_exact": {
       "get": {
-        "description": "Returns the current expected maximum yearly issuance rate (exact quotient)",
+        "description": "Returns the current expected maximum yearly issuance rate (exact quotient) (in %). The value only includes participation rewards (and does not include liquidity baking)",
         "responses": {
           "200": {
             "description": "",
@@ -6110,7 +6110,7 @@
     },
     "/context/issuance/expected_issuance": {
       "get": {
-        "description": "Returns the expected issued tez for the provided block and the next 'consensus_rights_delay' cycles",
+        "description": "Returns the expected issued tez for the provided block and the next 'consensus_rights_delay' cycles (in mutez)",
         "responses": {
           "200": {
             "description": "",
@@ -6170,7 +6170,7 @@
     },
     "/context/issuance/issuance_per_minute": {
       "get": {
-        "description": "Returns the current expected maximum issuance per minute (in mutez)",
+        "description": "Returns the current expected maximum issuance per minute (in mutez). The value only includes participation rewards (and does not include liquidity baking)",
         "responses": {
           "200": {
             "description": "",
