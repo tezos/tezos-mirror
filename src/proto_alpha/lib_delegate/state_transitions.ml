@@ -77,7 +77,8 @@ let is_acceptable_proposal_for_current_level state
    finalized) instead of the predecessor. This is done to avoid having consensus
    operation branched on block that are not part of the canonical chain
    anymore. *)
-let get_branch_from_proposal proposal = proposal.predecessor.shell.predecessor
+let get_branch_from_proposal (proposal : proposal) =
+  proposal.predecessor.shell.predecessor
 
 let make_consensus_vote_batch state proposal kind =
   let level =

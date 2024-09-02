@@ -177,7 +177,7 @@ let handle_forge_consensus_votes worker baking_state
           unsigned_consensus_votes)
   in
   List.iter
-    (fun unsigned_preattestation ->
+    (fun (unsigned_preattestation : unsigned_consensus_vote) ->
       let queue = get_or_create_queue worker unsigned_preattestation.delegate in
       Delegate_signing_queue.push_task
         ~on_error:(fun _err -> Lwt.return_unit)

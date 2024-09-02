@@ -569,7 +569,8 @@ let authorized_consensus_votes global_state
         (* Record all consensus votes new highwatermarks as one batch *)
         let delegates =
           List.map
-            (fun {delegate = ck, _; _} -> ck.public_key_hash)
+            (fun ({delegate = ck, _; _} : unsigned_consensus_vote) ->
+              ck.public_key_hash)
             authorized_votes
         in
         let record_all_consensus_vote =
@@ -862,7 +863,7 @@ let start_waiting_for_attestation_quorum state =
     ~get_slot_voting_power
     candidate
 
-let compute_round proposal round_durations =
+let compute_round (proposal : proposal) round_durations =
   let open Protocol in
   let open Baking_state in
   let timestamp = Time.System.now () |> Time.System.to_protocol in

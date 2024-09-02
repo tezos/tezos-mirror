@@ -26,6 +26,8 @@
 open Protocol
 open Alpha_context
 
+(** {2 Consensus key type and functions} *)
+
 type consensus_key = {
   alias : string option;
   public_key : Signature.public_key;
@@ -45,60 +47,7 @@ val consensus_key_and_delegate_encoding :
 val pp_consensus_key_and_delegate :
   Format.formatter -> consensus_key_and_delegate -> unit
 
-(** The validation mode specifies whether the baker (filters and) validates
-    mempool operations via an RPC to the node, or if it does so "locally", by
-    using the context. *)
-type validation_mode = Node | Local of Abstract_context_index.t
-
-type prequorum = {
-  level : int32;
-  round : Round.t;
-  block_payload_hash : Block_payload_hash.t;
-  preattestations : Kind.preattestation operation list;
-}
-
-type block_info = {
-  hash : Block_hash.t;
-  shell : Block_header.shell_header;
-  payload_hash : Block_payload_hash.t;
-  payload_round : Round.t;
-  round : Round.t;
-  prequorum : prequorum option;
-  quorum : Kind.attestation operation list;
-  payload : Operation_pool.payload;
-}
-
-type cache = {
-  known_timestamps : Timestamp.time Baking_cache.Timestamp_of_round_cache.t;
-  round_timestamps :
-    (Timestamp.time * Round.t * consensus_key_and_delegate)
-    Baking_cache.Round_timestamp_interval_cache.t;
-}
-
-type block_kind =
-  | Fresh of Operation_pool.pool
-  | Reproposal of {
-      consensus_operations : packed_operation list;
-      payload_hash : Block_payload_hash.t;
-      payload_round : Round.t;
-      payload : Operation_pool.payload;
-    }
-
-type block_to_bake = {
-  predecessor : block_info;
-  round : Round.t;
-  delegate : consensus_key_and_delegate;
-  kind : block_kind;
-  force_apply : bool;
-      (** if true, while baking the block, try and apply the block and its
-          operations instead of only validating them. this can be permanently
-          set using the [--force-apply] flag (see [force_apply_switch_arg] in
-          [baking_commands.ml]). *)
-}
-
-val block_info_encoding : block_info Data_encoding.t
-
-module SlotMap : Map.S with type key = Slot.t
+(** {2 Delegates slots type and functions} *)
 
 (** A delegate slot consists of the delegate's consensus key, its public key
     hash, its first slot, and its attesting power at some level. *)
@@ -107,6 +56,8 @@ type delegate_slot = {
   first_slot : Slot.t;
   attesting_power : int;
 }
+
+val pp_delegate_slot : Format.formatter -> delegate_slot -> unit
 
 module Delegate_slots : sig
   (** Information regarding the slot distribution at some level. *)
@@ -128,45 +79,15 @@ end
 
 type delegate_slots = Delegate_slots.t
 
-type proposal = {block : block_info; predecessor : block_info}
+val pp_delegate_slots : Format.formatter -> delegate_slots -> unit
 
-val proposal_encoding : proposal Data_encoding.t
-
-(** Identify the first block of the protocol, ie. the block that
-    activates the current protocol.
-
-    This block should be baked by the baker of the previous protocol
-    (that's why this same block is also referred to as the last block
-    of the previous protocol). It is always considered final and
-    therefore is not attested.*)
-val is_first_block_in_protocol : proposal -> bool
-
-type locked_round = {payload_hash : Block_payload_hash.t; round : Round.t}
-
-val locked_round_encoding : locked_round Data_encoding.t
-
-type attestable_payload = {proposal : proposal; prequorum : prequorum}
-
-val attestable_payload_encoding : attestable_payload Data_encoding.t
-
-type elected_block = {
-  proposal : proposal;
-  attestation_qc : Kind.attestation operation list;
-}
-
-type prepared_block = {
-  signed_block_header : block_header;
-  round : Round.t;
-  delegate : consensus_key_and_delegate;
-  operations : Tezos_base.Operation.t list list;
-  baking_votes : Per_block_votes_repr.per_block_votes;
-}
+(** {2 Consensus operations types functions} *)
 
 type consensus_vote_kind = Attestation | Preattestation
 
-val pp_consensus_vote_kind : Format.formatter -> consensus_vote_kind -> unit
-
 val consensus_vote_kind_encoding : consensus_vote_kind Data_encoding.t
+
+val pp_consensus_vote_kind : Format.formatter -> consensus_vote_kind -> unit
 
 type unsigned_consensus_vote = {
   vote_kind : consensus_vote_kind;
@@ -212,8 +133,6 @@ type signed_consensus_vote_batch = private {
   signed_consensus_votes : signed_consensus_vote list;
 }
 
-type error += Mismatch_signed_consensus_vote_in_batch
-
 val make_signed_consensus_vote_batch :
   consensus_vote_kind ->
   batch_content ->
@@ -223,6 +142,74 @@ val make_signed_consensus_vote_batch :
 
 val make_singleton_consensus_vote_batch :
   signed_consensus_vote -> signed_consensus_vote_batch
+
+(** {2 Block info types and functions}  *)
+
+type prequorum = {
+  level : int32;
+  round : Round.t;
+  block_payload_hash : Block_payload_hash.t;
+  preattestations : Kind.preattestation operation list;
+}
+
+type block_info = {
+  hash : Block_hash.t;
+  shell : Block_header.shell_header;
+  payload_hash : Block_payload_hash.t;
+  payload_round : Round.t;
+  round : Round.t;
+  prequorum : prequorum option;
+  quorum : Kind.attestation operation list;
+  payload : Operation_pool.payload;
+}
+
+val block_info_encoding : block_info Data_encoding.t
+
+val pp_block_info : Format.formatter -> block_info -> unit
+
+(** {2 Proposal type and functions}  *)
+
+type proposal = {block : block_info; predecessor : block_info}
+
+val proposal_encoding : proposal Data_encoding.t
+
+val pp_proposal : Format.formatter -> proposal -> unit
+
+(** {2 Elected block type and functions} *)
+
+type elected_block = {
+  proposal : proposal;
+  attestation_qc : Kind.attestation operation list;
+}
+
+val pp_elected_block : Format.formatter -> elected_block -> unit
+
+(** Identify the first block of the protocol, ie. the block that
+    activates the current protocol.
+
+    This block should be baked by the baker of the previous protocol
+    (that's why this same block is also referred to as the last block
+    of the previous protocol). It is always considered final and
+    therefore is not attested.*)
+val is_first_block_in_protocol : proposal -> bool
+
+(** {2 Locked_round type and functions} *)
+
+type locked_round = {payload_hash : Block_payload_hash.t; round : Round.t}
+
+val locked_round_encoding : locked_round Data_encoding.t
+
+val pp_locked_round : Format.formatter -> locked_round -> unit
+
+(** {2 Attestable_payload type and functions} *)
+
+type attestable_payload = {proposal : proposal; prequorum : prequorum}
+
+val attestable_payload_encoding : attestable_payload Data_encoding.t
+
+val pp_attestable_payload : Format.formatter -> attestable_payload -> unit
+
+(** {2 Level_state type and functions} *)
 
 type level_state = {
   current_level : int32;
@@ -236,6 +223,10 @@ type level_state = {
   next_level_proposed_round : Round.t option;
 }
 
+val pp_level_state : Format.formatter -> level_state -> unit
+
+(** {2 Round_state type and functions} *)
+
 type phase =
   | Idle
   | Awaiting_preattestations
@@ -243,6 +234,8 @@ type phase =
   | Awaiting_application
 
 val phase_encoding : phase Data_encoding.t
+
+val pp_phase : Format.formatter -> phase -> unit
 
 type round_state = {
   current_round : Round.t;
@@ -252,12 +245,30 @@ type round_state = {
   awaiting_unlocking_pqc : bool;
 }
 
-(** [forge_event] type used to return the result of a task completion
-    in the forge worker. *)
-type forge_event =
-  | Block_ready of prepared_block
-  | Preattestation_ready of signed_consensus_vote
-  | Attestation_ready of signed_consensus_vote
+val pp_round_state : Format.formatter -> round_state -> unit
+
+(** {2 Forge types and functions} *)
+
+type block_kind =
+  | Fresh of Operation_pool.pool
+  | Reproposal of {
+      consensus_operations : packed_operation list;
+      payload_hash : Block_payload_hash.t;
+      payload_round : Round.t;
+      payload : Operation_pool.payload;
+    }
+
+type block_to_bake = {
+  predecessor : block_info;
+  round : Round.t;
+  delegate : consensus_key_and_delegate;
+  kind : block_kind;
+  force_apply : bool;
+      (** if true, while baking the block, try and apply the block and its
+          operations instead of only validating them. this can be permanently
+          set using the [--force-apply] flag (see [force_apply_switch_arg] in
+          [baking_commands.ml]). *)
+}
 
 (** [forge_request] type used to push a concurrent forging task in the
     forge worker. *)
@@ -270,6 +281,27 @@ type forge_request =
       unsigned_attestations : unsigned_consensus_vote_batch;
     }
 
+type prepared_block = {
+  signed_block_header : block_header;
+  round : Round.t;
+  delegate : consensus_key_and_delegate;
+  operations : Tezos_base.Operation.t list list;
+  baking_votes : Per_block_votes_repr.per_block_votes;
+}
+
+val pp_prepared_block : Format.formatter -> prepared_block -> unit
+
+(** [forge_event] type used to return the result of a task completion
+    in the forge worker. *)
+type forge_event =
+  | Block_ready of prepared_block
+  | Preattestation_ready of signed_consensus_vote
+  | Attestation_ready of signed_consensus_vote
+
+val forge_event_encoding : forge_event Data_encoding.t
+
+val pp_forge_event : Format.formatter -> forge_event -> unit
+
 (** [forge_worker_hooks] type that allows interactions with the forge
     worker. Hooks are needed in order to break a circular dependency. *)
 type forge_worker_hooks = {
@@ -277,6 +309,24 @@ type forge_worker_hooks = {
   get_forge_event_stream : unit -> forge_event Lwt_stream.t;
   cancel_all_pending_tasks : unit -> unit;
 }
+
+(** {2 Global_state types and functions} *)
+
+(** The validation mode specifies whether the baker (filters and) validates
+    mempool operations via an RPC to the node, or if it does so "locally", by
+    using the context. *)
+type validation_mode = Node | Local of Abstract_context_index.t
+
+val pp_validation_mode : Format.formatter -> validation_mode -> unit
+
+type cache = {
+  known_timestamps : Timestamp.time Baking_cache.Timestamp_of_round_cache.t;
+  round_timestamps :
+    (Timestamp.time * Round.t * consensus_key_and_delegate)
+    Baking_cache.Round_timestamp_interval_cache.t;
+}
+
+val create_cache : unit -> cache
 
 type global_state = {
   cctxt : Protocol_client_context.full;
@@ -292,6 +342,8 @@ type global_state = {
   dal_node_rpc_ctxt : Tezos_rpc.Context.generic option;
 }
 
+val pp_global_state : Format.formatter -> global_state -> unit
+
 type state = {
   global_state : global_state;
   level_state : level_state;
@@ -300,7 +352,14 @@ type state = {
 
 type t = state
 
+val pp : Format.formatter -> t -> unit
+
 val update_current_phase : t -> phase -> t
+
+val record_state : t -> unit tzresult Lwt.t
+
+val may_record_new_state :
+  previous_state:t -> new_state:t -> unit tzresult Lwt.t
 
 (** Returns, among our *own* delegates, the delegate (and its attesting slot)
     that has a proposer slot at the given round and the current or next level,
@@ -308,11 +367,56 @@ val update_current_phase : t -> phase -> t
 val round_proposer :
   state -> level:[`Current | `Next] -> Round.t -> delegate_slot option
 
+val may_load_attestable_data : t -> t tzresult Lwt.t
+
+(** Memoization wrapper for [Round.timestamp_of_round]. *)
+val timestamp_of_round :
+  state ->
+  predecessor_timestamp:Time.Protocol.t ->
+  predecessor_round:Round.t ->
+  round:Round.t ->
+  Time.Protocol.t tzresult
+
+(** @param block default to [`Head 0]*)
+val compute_delegate_slots :
+  Protocol_client_context.full ->
+  ?block:Block_services.block ->
+  level:int32 ->
+  chain:Shell_services.chain ->
+  consensus_key list ->
+  delegate_slots tzresult Lwt.t
+
+(** From the current [state], the function returns an optional
+    association pair, which consists of the next round timestamp and its
+    round. *)
+val compute_next_round_time : state -> (Time.Protocol.t * Round.t) option
+
+(** {2 Timeout type and functions} *)
+
 type timeout_kind =
   | End_of_round of {ending_round : Round.t}
   | Time_to_prepare_next_level_block of {at_round : Round.t}
 
 val timeout_kind_encoding : timeout_kind Data_encoding.t
+
+val pp_timeout_kind : Format.formatter -> timeout_kind -> unit
+
+(** {2 State_data type and functions} *)
+
+type state_data = {
+  level_data : int32;
+  locked_round_data : locked_round option;
+  attestable_payload_data : attestable_payload option;
+}
+
+val state_data_encoding : state_data Data_encoding.t
+
+val load_attestable_data :
+  Protocol_client_context.full ->
+  [`State] Baking_files.location ->
+  state_data option tzresult Lwt.t
+
+(** {2 Event type and functions} *)
 
 type event =
   | New_valid_proposal of proposal
@@ -326,85 +430,4 @@ type event =
 
 val event_encoding : event Data_encoding.t
 
-val forge_event_encoding : forge_event Data_encoding.t
-
-type state_data = {
-  level_data : int32;
-  locked_round_data : locked_round option;
-  attestable_payload_data : attestable_payload option;
-}
-
-val state_data_encoding : state_data Data_encoding.t
-
-val record_state : t -> unit tzresult Lwt.t
-
-val may_record_new_state :
-  previous_state:t -> new_state:t -> unit tzresult Lwt.t
-
-val load_attestable_data :
-  Protocol_client_context.full ->
-  [`State] Baking_files.location ->
-  state_data option tzresult Lwt.t
-
-val may_load_attestable_data : t -> t tzresult Lwt.t
-
-(** @param block default to [`Head 0]*)
-val compute_delegate_slots :
-  Protocol_client_context.full ->
-  ?block:Block_services.block ->
-  level:int32 ->
-  chain:Shell_services.chain ->
-  consensus_key list ->
-  delegate_slots tzresult Lwt.t
-
-val create_cache : unit -> cache
-
-(** Memoization wrapper for [Round.timestamp_of_round]. *)
-val timestamp_of_round :
-  state ->
-  predecessor_timestamp:Time.Protocol.t ->
-  predecessor_round:Round.t ->
-  round:Round.t ->
-  Time.Protocol.t tzresult
-
-(** From the current [state], the function returns an optional
-    association pair, which consists of the next round timestamp and its
-    round. *)
-val compute_next_round_time : state -> (Time.Protocol.t * Round.t) option
-
-val pp_validation_mode : Format.formatter -> validation_mode -> unit
-
-val pp_global_state : Format.formatter -> global_state -> unit
-
-val pp_option :
-  (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a option -> unit
-
-val pp_block_info : Format.formatter -> block_info -> unit
-
-val pp_proposal : Format.formatter -> proposal -> unit
-
-val pp_locked_round : Format.formatter -> locked_round -> unit
-
-val pp_attestable_payload : Format.formatter -> attestable_payload -> unit
-
-val pp_elected_block : Format.formatter -> elected_block -> unit
-
-val pp_delegate_slot : Format.formatter -> delegate_slot -> unit
-
-val pp_delegate_slots : Format.formatter -> delegate_slots -> unit
-
-val pp_prepared_block : Format.formatter -> prepared_block -> unit
-
-val pp_level_state : Format.formatter -> level_state -> unit
-
-val pp_phase : Format.formatter -> phase -> unit
-
-val pp_round_state : Format.formatter -> round_state -> unit
-
-val pp : Format.formatter -> t -> unit
-
-val pp_timeout_kind : Format.formatter -> timeout_kind -> unit
-
 val pp_event : Format.formatter -> event -> unit
-
-val pp_forge_event : Format.formatter -> forge_event -> unit

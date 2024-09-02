@@ -462,7 +462,7 @@ let inject_seed_nonce_revelation (cctxt : #Protocol_client_context.full) ~chain
 (** [reveal_potential_nonces state new_proposal] updates the internal [state]
     of the worker each time a proposal with a new predecessor is received; this means
     revealing the necessary nonces. *)
-let reveal_potential_nonces state new_proposal =
+let reveal_potential_nonces state (new_proposal : Baking_state.proposal) =
   let open Lwt_result_syntax in
   let {
     cctxt;
