@@ -25,13 +25,6 @@ be documented here either.
 General
 -------
 
-- Add and **experimental** switch to enable the use of the Brassaia context
-  backend using ``TEZOS_CONTEXT_BACKEND=Brassaia`` environment variable. (MR :gl:`!13054`)
-
-- Removed binaries for Oxford. (MR :gl:`!13795`)
-
-- Removed binaries for ParisB. (MR :gl:`!14026`)
-
 Node
 ----
 
@@ -151,6 +144,9 @@ Client
 
 - **Breaking change** Removed read-write commands specific to ParisB. (MR :gl:`!14033`)
 
+Client
+------
+
 Baker
 -----
 
@@ -187,22 +183,11 @@ Baker
 Accuser
 -------
 
-- When available, add some colors to some event logs: (MR :gl:`!13611`)
-   - double_attestation_detected and double_preattestation_detected is now
-     Magenta
-   - double_attestation_denounced and double_preattestation_denounced is now
-     Blue
-
 Proxy Server
 ------------
 
 Protocol Compiler And Environment
 ---------------------------------
-
-- Added a new version of the protocol environment (V13). (MR :gl:`!12966`)
-
-- Remove with_legacy_attestation_name encodings from the protocol environment.
-  (MR :gl:`!14046`)
 
 Codec
 -----
@@ -349,15 +334,3 @@ profile allows to publish data on the given slot index (MR :gl:`!14825`).
 
 Miscellaneous
 -------------
-
-- Depends on OCaml 4.14.2 (was 4.14.1 before). (MR :gl:`!14536`)
-
-- Current Debian packages are now available via APT repository for Ubuntu
-  (Noble and Jammy) and Debian Bookworm, both for AMD64 and ARM64.
-
-- New set of Debian packages are now available for testing. These new set of
-  packages are built following Debian best practices for packaging, use debconf
-  for configuration and systemd to handle the runtime lifecycle of the daemons.
-  These new packages are going to introduce few breaking changes starting from
-  the next release. Please check our documentation for more details. (MR
-  :gl:`!13273`)
