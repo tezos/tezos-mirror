@@ -32,7 +32,18 @@ which they can solve using the following command::
 
   ./octez-node upgrade storage --data-dir <data-dir>
 
-This operation will be almost instant on Rolling nodes (up to 10s), which is the recommended setup for bakers. However, it may require around 10 minutes on Full and Archive nodes, depending on the performance of the machine. Users must be aware of the downtime during the upgrade that may impact their services.
+This operation should only take up to 10s in nodes operating in Rolling history mode, which is the recommended setup for bakers. However, it may require around 10 minutes for nodes operating on Full and Archive modes, depending on the performance of the machine. Users must be aware of the downtime during the upgrade that may impact their services.
+
+DAL node
+~~~~~~~~
+
+Octez v21.0 release candidates increase the stability of the DAL node. In particular, the changes include:
+faster loading of cryptographic material (the so-called SRS), reduced memory and
+disk footprints, an improved RPC interface, resilience against Octez node's
+disconnections. Also, after a restart, the DAL node cleans-up its storage and
+catches up the Octez node. Finally, the DAL node can now start one of the 4 profiles:
+bootstrap, attester, operator, and observer; the last two profiles match the
+corresponding modes of an accompanying smart rollup node.
 
 Update Instructions
 -------------------
