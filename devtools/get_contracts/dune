@@ -9,8 +9,8 @@
   octez-shell-libs.store
   tezos-protocol-020-PsParisC.protocol
   octez-protocol-020-PsParisC-libs.client
-  tezos-protocol-beta.protocol
-  octez-protocol-beta-libs.client
+  tezos-protocol-021-PsquebeC.protocol
+  octez-protocol-021-PsquebeC-libs.client
   tezos-protocol-alpha.protocol
   octez-protocol-alpha-libs.client)
  (library_flags (:standard -linkall))
