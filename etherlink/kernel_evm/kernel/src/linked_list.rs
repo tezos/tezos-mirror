@@ -1,6 +1,5 @@
 // SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
 
-use crate::storage;
 use anyhow::{Context, Result};
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpIterator, RlpStream};
 use std::marker::PhantomData;
@@ -9,6 +8,7 @@ use tezos_smart_rollup_host::{
     path::{concat, OwnedPath, Path},
     runtime::Runtime,
 };
+use tezos_storage::{read_optional_rlp, read_rlp, store_rlp};
 
 /// Doubly linked list using the durable storage.
 ///
@@ -183,22 +183,22 @@ impl<Id: Decodable + Encodable + AsRef<[u8]>, Elt: Encodable + Decodable>
         data: &Elt,
     ) -> Result<()> {
         let path = self.data_path(prefix)?;
-        storage::store_rlp(data, host, &path).context("cannot save the pointer's data")
+        store_rlp(data, host, &path).context("cannot save the pointer's data")
     }
 
     fn get_data(&self, host: &impl Runtime, prefix: &impl Path) -> Result<Elt> {
         let path = self.data_path(prefix)?;
-        storage::read_rlp(host, &path).context("cannot read the pointer's data")
+        read_rlp(host, &path).context("cannot read the pointer's data")
     }
 
     /// Load the pointer from the durable storage
     fn read(host: &impl Runtime, prefix: &impl Path, id: &Id) -> Result<Option<Self>> {
-        storage::read_optional_rlp(host, &Self::pointer_path(id, prefix)?)
+        read_optional_rlp(host, &Self::pointer_path(id, prefix)?)
     }
 
     /// Save the pointer in the durable storage
     fn save(&self, host: &mut impl Runtime, prefix: &impl Path) -> Result<()> {
-        storage::store_rlp(self, host, &self.path(prefix)?)
+        store_rlp(self, host, &self.path(prefix)?)
             .context("cannot save pointer to storage")
     }
 
@@ -248,14 +248,13 @@ where
     /// Only save the back and front pointers.
     fn save(&self, host: &mut impl Runtime) -> Result<()> {
         let path = Self::metadata_path(&self.path)?;
-        storage::store_rlp(self, host, &path)
-            .context("cannot save linked list from the storage")
+        store_rlp(self, host, &path).context("cannot save linked list from the storage")
     }
 
     /// Load the LinkedList from the durable storage.
     fn read(host: &impl Runtime, path: &impl Path) -> Result<Option<Self>> {
         let path = Self::metadata_path(path)?;
-        storage::read_optional_rlp(host, &path)
+        read_optional_rlp(host, &path)
     }
 
     /// Returns true if the list contains no elements.
@@ -330,7 +329,7 @@ where
         else {
             return Ok(None);
         };
-        storage::read_optional_rlp(host, &pointer.data_path(&self.path)?)
+        read_optional_rlp(host, &pointer.data_path(&self.path)?)
     }
 
     /// Removes and returns the element at position index within the vector.

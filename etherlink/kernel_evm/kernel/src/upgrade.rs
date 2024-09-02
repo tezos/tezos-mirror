@@ -11,9 +11,7 @@ use core::fmt;
 use crate::error::UpgradeProcessError;
 use crate::event::Event;
 use crate::storage;
-use crate::storage::read_optional_rlp;
-use crate::storage::store_sequencer;
-use crate::storage::store_sequencer_pool_address;
+use crate::storage::{store_sequencer, store_sequencer_pool_address};
 use anyhow::Context;
 use primitive_types::H160;
 use rlp::Decodable;
@@ -34,6 +32,7 @@ use tezos_smart_rollup_host::path::Path;
 use tezos_smart_rollup_host::path::RefPath;
 use tezos_smart_rollup_host::runtime::Runtime;
 use tezos_smart_rollup_installer_config::binary::promote::upgrade_reveal_flow;
+use tezos_storage::read_optional_rlp;
 
 const KERNEL_UPGRADE: RefPath = RefPath::assert_from(b"/evm/kernel_upgrade");
 pub const KERNEL_ROOT_HASH: RefPath = RefPath::assert_from(b"/evm/kernel_root_hash");

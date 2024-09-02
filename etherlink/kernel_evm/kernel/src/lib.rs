@@ -634,8 +634,7 @@ mod tests {
     #[test]
     fn load_block_fees_with_minimum() {
         let min_path =
-            RefPath::assert_from(b"/evm/world_state/fees/minimum_base_fee_per_gas")
-                .into();
+            RefPath::assert_from(b"/evm/world_state/fees/minimum_base_fee_per_gas");
 
         // Arrange
         let mut host = MockHost::default();
@@ -643,7 +642,7 @@ mod tests {
         let min_base_fee = U256::from(17);
         let curr_base_fee = U256::from(20);
         storage::store_base_fee_per_gas(&mut host, curr_base_fee).unwrap();
-        storage::write_u256_le(&mut host, &min_path, min_base_fee).unwrap();
+        tezos_storage::write_u256_le(&mut host, &min_path, min_base_fee).unwrap();
 
         // Act
         let result = crate::retrieve_block_fees(&mut host);
