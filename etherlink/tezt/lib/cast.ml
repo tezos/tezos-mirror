@@ -83,3 +83,6 @@ let gen_wallets ~number () =
     | None -> []
   in
   return wallets
+
+let calldata ?(args = []) signature =
+  spawn_command_and_read_string ("calldata" :: signature :: args)

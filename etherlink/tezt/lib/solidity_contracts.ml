@@ -345,3 +345,10 @@ let precompiles () =
     ~label:"precompiles"
     ~contract:"PrecompileCaller"
     ~evm_version:"shanghai"
+
+let state_override_tester () =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/state_override_tester.sol")
+    ~label:"state_override_tester"
+    ~contract:"StateOverrideTester"
+    ~evm_version:"shanghai"
