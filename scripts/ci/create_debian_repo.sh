@@ -73,11 +73,6 @@ if [ -n "${gitlab_release_no_v:-}" ]; then
     TARGETDIR="public/$PREFIX/$DISTRIBUTION"
   fi
 else
-  # Not a release tag. This is strictly for testing
-  # We embed these keys here for testing only.
-  GPG_KEY_ID="CFC482F3CD08D36D"
-  GPG_PASSPHRASE="07cde771b39a4ed394864baa46126b"
-  GPG_PRIVATE_KEY=$(cat ./scripts/packaging/test_repo_private.key)
   if [ "$CI_COMMIT_REF_PROTECTED" = "false" ]; then
     if [ "$CI_COMMIT_REF_NAME" = "RC" ]; then
       echo "Cannot create a repository for a branch named 'RC'"
@@ -100,6 +95,21 @@ else
       fi
     fi
   fi
+fi
+
+if [ "$CI_PROJECT_NAMESPACE" = "tezos" ] && [ "$CI_COMMIT_REF_PROTECTED" = "true" ]; then
+  # the keys used for official releases only
+  # These env vars are only available on tezos/tezos
+  # and in protected branches
+  GPG_KEY_ID="5DC80C4ED0B7C4FE"
+  GPG_PRIVATE_KEY="$GPG_LINUX_PACKAGES_PRIVATE_KEY"
+  GPG_PASSPHRASE="$GPG_LINUX_PACKAGES_PASSPHRASE"
+else
+  # This is strictly for testing
+  # We embed these keys here for testing only.
+  GPG_KEY_ID="CFC482F3CD08D36D"
+  GPG_PASSPHRASE="07cde771b39a4ed394864baa46126b"
+  GPG_PRIVATE_KEY=$(cat ./scripts/packaging/test_repo_private.key)
 fi
 
 echo "$GPG_PRIVATE_KEY" | base64 --decode | gpg --batch --import --
