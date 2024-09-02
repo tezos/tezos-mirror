@@ -53,6 +53,7 @@ val run_new_observer_node :
     [Evm_node]. *)
 val register_test :
   __FILE__:string ->
+  ?block_storage_sqlite3:bool ->
   ?sequencer_rpc_port:int ->
   ?sequencer_private_rpc_port:int ->
   ?genesis_timestamp:Client.timestamp ->
@@ -94,6 +95,7 @@ val register_test :
     [Evm_node]. The test is registered for each kernel. *)
 val register_test_for_kernels :
   __FILE__:string ->
+  ?block_storage_sqlite3:bool ->
   ?sequencer_rpc_port:int ->
   ?sequencer_private_rpc_port:int ->
   ?genesis_timestamp:Client.timestamp ->
@@ -129,6 +131,7 @@ val register_test_for_kernels :
   unit
 
 val setup_sequencer :
+  ?block_storage_sqlite3:bool ->
   ?sequencer_rpc_port:int ->
   ?sequencer_private_rpc_port:int ->
   mainnet_compat:bool ->
