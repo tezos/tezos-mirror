@@ -679,6 +679,23 @@ function update_protocol_tests() {
 
 function update_source() {
 
+  log_blue "update teztale"
+  #  Teztale
+  if [[ ${is_snapshot} == true ]]; then
+    git mv "teztale/bin_teztale_archiver/${protocol_source}_machine.real.ml" "teztale/bin_teztale_archiver/${short_hash}_machine.real.ml"
+    sed -e "s/${protocol_source}/${new_protocol_name}/g" -i.old "teztale/bin_teztale_archiver/${short_hash}_machine.real.ml"
+    sed -e "s/${protocol_source}/${version}/g" \
+      -e "s/${capitalized_source}/${short_hash}/g" -i.old "teztale/bin_teztale_archiver/teztale_archiver_main.ml"
+  else
+    git mv "teztale/bin_teztale_archiver/${protocol_source}_machine.real.ml" "teztale/bin_teztale_archiver/${label}_machine.real.ml"
+    sed -e "s/${protocol_source}/${label}/g" -i.old "teztale/bin_teztale_archiver/${label}_machine.real.ml"
+    sed -e "s/${protocol_source}/${version}/g" \
+      -e "s/${capitalized_source}/${short_hash}/g" -i.old "teztale/bin_teztale_archiver/teztale_archiver_main.ml"
+  fi
+  ocamlformat -i "teztale/bin_teztale_archiver/${short_hash}_machine.real.ml"
+  ocamlformat -i "teztale/bin_teztale_archiver/teztale_archiver_main.ml"
+  commit_if_changes "teztale: update teztale_archiver_main.ml"
+
   log_blue "update raw_context.ml"
   # add  "else if Compare.String.(s = "$label") then return ($capitalized_label, ctxt)" before else Lwt.return @@ storage_error (Incompatible_protocol_version s)
   #sed "/else Lwt.return @@ storage_error (Incompatible_protocol_version s)/i \  else if Compare.String.(s = \"${label}\") then return (${capitalized_label}, ctxt)" -i.old "src/proto_${protocol_source}/lib_protocol/raw_context.ml"
@@ -992,7 +1009,7 @@ function misc_updates() {
 
   if [[ ${is_snapshot} == true ]]; then
     # update linter to remove special rule for stabilised protocol
-    sed -i.old -e "s/-not -name \"proto_${protocol_source}\"//" scripts/lint.sh
+    sed -i.old -e "s/ -not -name \"proto_${protocol_source}\"//" scripts/lint.sh
     commit "scripts: update linter to remove special rule for ${protocol_source} protocol"
   else
     # update linter to allow reformating of beta protocol
@@ -1590,6 +1607,16 @@ function hash() {
   #   -e "s/_${previous_tag}/${new_tag}/g" \
   #   -i.old "src/proto_${new_protocol_name}/lib_protocol/test/unit/test_sc_rollup_wasm.ml"
 
+  #  Teztale
+  if [[ ${is_snapshot} == true ]]; then
+    git mv "teztale/bin_teztale_archiver/${source_short_hash}_machine.real.ml" "teztale/bin_teztale_archiver/${short_hash}_machine.real.ml"
+    sed -e "s/${protocol_source}/${new_protocol_name}/g" -i.old "teztale/bin_teztale_archiver/${short_hash}_machine.real.ml"
+    sed -e "s/${source_short_hash}/${short_hash}/g" -i.old "teztale/bin_teztale_archiver/teztale_archiver_main.ml"
+  fi
+  ocamlformat -i "teztale/bin_teztale_archiver/teztale_archiver_main.ml"
+  ocamlformat -i "teztale/bin_teztale_archiver/${short_hash}_machine.real.ml"
+  commit_if_changes "teztale: update teztale_archiver_main.ml"
+
   for file in \
     "src/proto_alpha/lib_protocol/raw_context.ml" \
     "src/proto_alpha/lib_protocol/raw_context.mli" \
@@ -1685,8 +1712,8 @@ function hash() {
   make
 
   if [[ "${is_snapshot}" == true ]]; then
-    # dune exec tezt/tests/main.exe -- --on-unknown-regression-files delete
-    # commit_if_changes "tezt: delete unknown regression files"
+    dune exec tezt/tests/main.exe -- --on-unknown-regression-files delete
+    commit_if_changes "tezt: delete unknown regression files"
 
     dune exec tezt/tests/main.exe -- --title 'meta: list runtime dependencies' --reset-regressions
     commit_if_changes "tezt: reset runtime dependencies regressions"
@@ -1700,7 +1727,6 @@ function hash() {
   fi
 
   if [[ "${is_snapshot}" == true ]]; then
-    make
     log_blue "Update kaitai structs"
     make check-kaitai-struct-files || log_blue "updated kaitai files"
     make kaitai-struct-files-update
@@ -1775,7 +1801,7 @@ function hash() {
   doc_index="docs/index.rst"
   sed -i.old -e "s@protocols/${protocol_source}@protocols/${new_versioned_name}@g" "${doc_index}"
   sed -i.old -e "s/${capitalized_source}/${capitalized_label}/g" "${doc_index}"
-  sed -i.old -e "s/${protocol_source}/${label}/g" "${doc_index}"
+  sed -i.old -e "s/${source_label}/${label}/g" "${doc_index}"
   commit_if_changes "docs: add entries in the doc index"
 
   sed -e "s/${previous_tag}/${new_tag}/g" \
@@ -1787,6 +1813,9 @@ function hash() {
   rm -f "docs/${label}/rpc.rst"
   make -C docs "${label}"/rpc.rst
   commit_if_changes "docs: generate ${label}/rpc.rst"
+
+  make -C docs openapi
+  commit_if_changes "docs: generate openapi"
 
   echo "Rehashing done"
 }
