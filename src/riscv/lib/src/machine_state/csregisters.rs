@@ -31,7 +31,7 @@ use crate::{
 use num_enum::TryFromPrimitive;
 use root::RootCSRegister;
 use strum::IntoEnumIterator;
-use values::{CSRegisterValues, CSRegisterValuesLayout, MStatusValue};
+use values::{CSRValuesLayout, CSRegisterValues, MStatusValue};
 
 /// Privilege required to access a CSR
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -1624,7 +1624,7 @@ impl<M: backend::ManagerBase> CSRegisters<M> {
 }
 
 /// Layout for [CSRegisters]
-pub type CSRegistersLayout = CSRegisterValuesLayout;
+pub type CSRegistersLayout = CSRValuesLayout;
 
 impl<M: backend::ManagerBase> CSRegisters<M> {
     /// Bind the CSR state to the allocated space.

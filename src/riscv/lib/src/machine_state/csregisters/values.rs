@@ -123,7 +123,7 @@ type MipEffectCSR<M> = EffectCell<CSRRepr, XipEffect, M>;
 type EffectCSRLayout = EffectCellLayout<CSRRepr>;
 
 csregisters_boilerplate!(
-    pub(super) struct CSRegisterValues where layout CSRegisterValuesLayout {
+    pub(super) struct CSRegisterValues where layout CSRValuesLayout {
         pub(super) mstatus: MStatusValue<M>,
         pub(super) mip: MipEffectCSR<M>,
 
@@ -362,7 +362,7 @@ csregisters_boilerplate!(
     }
 );
 
-pub struct CSRegisterValuesLayout {
+pub struct CSRValuesLayout {
     _mstatus: MStatusLayout,
     _mnscratch: EffectCSRLayout,
     _mnepc: EffectCSRLayout,
@@ -599,7 +599,7 @@ pub struct CSRegisterValuesLayout {
     _dscratch1: EffectCSRLayout,
 }
 
-pub struct CSRegisterValuesLayoutPlaced {
+pub struct CSRValuesPlaced {
     mstatus: crate::state_backend::PlacedOf<MStatusLayout>,
     mnscratch: crate::state_backend::PlacedOf<EffectCSRLayout>,
     mnepc: crate::state_backend::PlacedOf<EffectCSRLayout>,
@@ -836,7 +836,7 @@ pub struct CSRegisterValuesLayoutPlaced {
     dscratch1: crate::state_backend::PlacedOf<EffectCSRLayout>,
 }
 
-pub struct CSRegisterValuesLayoutAllocated<M: crate::state_backend::ManagerBase> {
+pub struct CSRValuesAllocated<M: crate::state_backend::ManagerBase> {
     mstatus: AllocatedOf<MStatusLayout, M>,
     mnscratch: AllocatedOf<EffectCSRLayout, M>,
     mnepc: AllocatedOf<EffectCSRLayout, M>,
@@ -1073,13 +1073,13 @@ pub struct CSRegisterValuesLayoutAllocated<M: crate::state_backend::ManagerBase>
     dscratch1: AllocatedOf<EffectCSRLayout, M>,
 }
 
-impl crate::state_backend::Layout for CSRegisterValuesLayout {
-    type Placed = CSRegisterValuesLayoutPlaced;
+impl crate::state_backend::Layout for CSRValuesLayout {
+    type Placed = CSRValuesPlaced;
 
-    type Allocated<M: crate::state_backend::ManagerBase> = CSRegisterValuesLayoutAllocated<M>;
+    type Allocated<M: crate::state_backend::ManagerBase> = CSRValuesAllocated<M>;
 
     fn place_with(alloc: &mut crate::state_backend::Choreographer) -> Self::Placed {
-        CSRegisterValuesLayoutPlaced {
+        CSRValuesPlaced {
             mstatus: <MStatusLayout>::place_with(alloc),
             mnscratch: <EffectCSRLayout>::place_with(alloc),
             mnepc: <EffectCSRLayout>::place_with(alloc),
