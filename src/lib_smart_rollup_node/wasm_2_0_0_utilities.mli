@@ -13,3 +13,9 @@ val dump_durable_storage :
   data_dir:string ->
   file:string ->
   unit tzresult Lwt.t
+
+(** [patch_durable_storage ~data_dir ~key ~value] adds [value] to
+    [key] into the durable storage of PVM state. If the value exists
+    it's replaced. *)
+val patch_durable_storage :
+  data_dir:string -> key:string -> value:string -> unit tzresult Lwt.t

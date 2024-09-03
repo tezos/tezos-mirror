@@ -364,6 +364,14 @@ module Make_pvm (Wasm_vm : Wasm_vm_sig.S) (T : Tezos_tree_encoding.TREE) :
       let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
       let pvm_state = {pvm_state with max_nb_ticks = n} in
       Tree_encoding_runner.encode pvm_state_encoding pvm_state tree
+
+    let durable_set ~key ~value tree =
+      let open Lwt_syntax in
+      let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
+      let key = Durable.key_of_string_exn key in
+      let* durable = Durable.set_value_exn pvm_state.durable key value in
+      let pvm_state = {pvm_state with durable} in
+      Tree_encoding_runner.encode pvm_state_encoding pvm_state tree
   end
 
   module Internal_for_tests = struct

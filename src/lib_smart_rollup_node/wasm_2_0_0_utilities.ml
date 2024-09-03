@@ -5,22 +5,21 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let load_context ~data_dir (module Plugin : Protocol_plugin_sig.S) mode =
+  let (module C) = Plugin.Pvm.context Wasm_2_0_0 in
+  Context.load
+    (module C)
+    ~cache_size:0
+    mode
+    (Configuration.default_context_dir data_dir)
+
 (** [get_wasm_pvm_state ~l2_header data_dir] reads the WASM PVM state in
     [data_dir] for the given [l2_header].*)
-let get_wasm_pvm_state (module Plugin : Protocol_plugin_sig.S)
-    ~(l2_header : Sc_rollup_block.header) data_dir =
+let get_wasm_pvm_state ~(l2_header : Sc_rollup_block.header) context =
   let open Lwt_result_syntax in
   let context_hash = l2_header.context in
   let block_hash = l2_header.block_hash in
-  let (module C) = Plugin.Pvm.context Wasm_2_0_0 in
   (* Now, we can checkout the state of the rollup of the given block hash *)
-  let* context =
-    Context.load
-      (module C)
-      ~cache_size:0
-      Tezos_layer2_store.Store_sigs.Read_only
-      (Configuration.default_context_dir data_dir)
-  in
   let*! ctxt = Context.checkout context context_hash in
   let* ctxt =
     match ctxt with
@@ -153,7 +152,67 @@ let dump_durable_storage ~block ~data_dir ~file =
     | None -> tzfail Rollup_node_errors.Cannot_checkout_l2_header
     | Some header -> return header
   in
-  let* state = get_wasm_pvm_state plugin ~l2_header data_dir in
+  let* context = load_context ~data_dir plugin Store_sigs.Read_only in
+  let* state = get_wasm_pvm_state ~l2_header context in
   let* instrs = generate_durable_storage ~plugin state in
   let* () = Installer_config.to_file instrs ~output:file in
   return_unit
+
+let patch_durable_storage ~data_dir ~key ~value =
+  let open Lwt_result_syntax in
+  (* Loads the state of the head. *)
+  let* _lock = Node_context_loader.lock ~data_dir in
+  let* store =
+    Store.load
+      Tezos_layer2_store.Store_sigs.Read_write
+      ~index_buffer_size:0
+      ~l2_blocks_cache_size:1
+      (Configuration.default_storage_dir data_dir)
+  in
+  let* ({header = {block_hash; level = block_level; _}; _} as l2_block) =
+    let* r = Store.L2_head.read store.l2_head in
+    match r with
+    | Some v -> return v
+    | None ->
+        failwith "Processed L2 head is not found in the rollup node storage"
+  in
+
+  let* ((module Plugin) as plugin) =
+    Protocol_plugins.proto_plugin_for_level_with_store store block_level
+  in
+  let* l2_header = Store.L2_blocks.header store.l2_blocks block_hash in
+  let* l2_header =
+    match l2_header with
+    | None -> tzfail Rollup_node_errors.Cannot_checkout_l2_header
+    | Some header -> return header
+  in
+  let* () =
+    fail_when
+      (Option.is_some l2_header.commitment_hash)
+      (Rollup_node_errors.Patch_durable_storage_on_commitment block_level)
+  in
+  let* context = load_context ~data_dir plugin Store_sigs.Read_write in
+  let* state = get_wasm_pvm_state ~l2_header context in
+
+  (* Patches the state via an unsafe patch. *)
+  let* patched_state =
+    Plugin.Pvm.Unsafe.apply_patch
+      Kind.Wasm_2_0_0
+      state
+      (Pvm_patches.Patch_durable_storage {key; value})
+  in
+
+  (* Replaces the PVM state. *)
+  let*! context = Context.PVMState.set context patched_state in
+  let*! new_commit = Context.commit context in
+  let new_l2_header = {l2_header with context = new_commit} in
+  let new_l2_block = {l2_block with header = (); content = ()} in
+  let* () =
+    Store.L2_blocks.append
+      store.l2_blocks
+      ~key:new_l2_header.block_hash
+      ~header:new_l2_header
+      ~value:new_l2_block
+  in
+  let new_l2_block_with_header = {l2_block with header = new_l2_header} in
+  Store.L2_head.write store.l2_head new_l2_block_with_header

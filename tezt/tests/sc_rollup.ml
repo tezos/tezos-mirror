@@ -6046,6 +6046,43 @@ let start_rollup_node_with_encrypted_key ~kind =
   in
   unit
 
+let test_patch_durable_storage_on_commitment =
+  let kind = "wasm_2_0_0" in
+  test_full_scenario
+    ~commitment_period:2
+    ~timeout:120
+    ~kind
+    {
+      tags = ["patch"; "durable_storage"];
+      variant = None;
+      description = "Patch durable storage fails on commitment";
+    }
+  @@ fun _protocol sc_rollup_node sc_rollup _node client ->
+  let* () = Sc_rollup_node.run sc_rollup_node sc_rollup [] in
+  let* _ = Sc_rollup_node.wait_sync ~timeout:30. sc_rollup_node in
+  (* Stop the rollup node. *)
+  let* () = Sc_rollup_node.terminate sc_rollup_node in
+  (* This will fail as there is a commitment for that level. *)
+  let* () =
+    Lwt.catch
+      (fun () ->
+        Sc_rollup_node.patch_durable_storage
+          sc_rollup_node
+          ~key:"/foo"
+          ~value:"00")
+      (fun _exn -> unit)
+  in
+  (* Restart the node and bake a block. *)
+  let* () = Sc_rollup_node.run sc_rollup_node sc_rollup [] in
+  let* () = Client.bake_for_and_wait client in
+  let* _ = Sc_rollup_node.wait_sync sc_rollup_node ~timeout:30. in
+  (* It will now work. *)
+  let* () = Sc_rollup_node.terminate sc_rollup_node in
+  let* () =
+    Sc_rollup_node.patch_durable_storage sc_rollup_node ~key:"/foo" ~value:"00"
+  in
+  unit
+
 (* TODO: https://linear.app/tezos/issue/RV-109/port-kernel-installer-to-risc-v
  * Originate RISC-V kernels using installer kernel instead *)
 let read_riscv_kernel (kernel_path : Uses.t) (checksum_path : Uses.t) : string =
@@ -6197,6 +6234,7 @@ let register ~protocols =
   test_refutation protocols ~kind:"arith" ;
   test_refutation protocols ~kind:"wasm_2_0_0" ;
   test_recover_bond_of_stakers protocols ;
+  test_patch_durable_storage_on_commitment protocols ;
   (* Specific Arith PVM tezts *)
   test_rollup_origination_boot_sector
     ~boot_sector:"10 10 10 + +"

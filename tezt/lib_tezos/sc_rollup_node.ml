@@ -667,6 +667,27 @@ let dump_durable_storage ~sc_rollup_node ~dump ?(block = "head") () =
   let process = spawn_command sc_rollup_node cmd in
   Process.check process
 
+let patch_durable_storage sc_rollup_node ~key ~value =
+  match sc_rollup_node.status with
+  | Not_running ->
+      let cmd =
+        [
+          "patch";
+          "durable";
+          "storage";
+          "at";
+          key;
+          "with";
+          value;
+          "--data-dir";
+          sc_rollup_node.persistent_state.data_dir;
+          "--force";
+        ]
+      in
+      let process = spawn_command sc_rollup_node cmd in
+      Process.check process
+  | Running _ -> Test.fail "Cannot patch the state of a running node"
+
 let export_snapshot ?(compress_on_the_fly = false) ?(compact = false)
     sc_rollup_node dir =
   let process =

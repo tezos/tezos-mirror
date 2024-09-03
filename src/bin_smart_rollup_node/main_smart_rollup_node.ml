@@ -415,12 +415,43 @@ let dump_durable_storage =
     @@ Cli.wasm_dump_file_param @@ stop)
     (fun (data_dir, block) file cctxt ->
       let open Lwt_result_syntax in
-      let*! res = Wasm_2_0_0_dump.dump_durable_storage ~block ~data_dir ~file in
+      let*! res =
+        Wasm_2_0_0_utilities.dump_durable_storage ~block ~data_dir ~file
+      in
       match res with
       | Ok () ->
           let*! () = cctxt#message "Dumped WASM PVM state to %s@." file in
           return_unit
       | Error errs -> cctxt#error "%a" pp_print_trace errs)
+
+let patch_durable_storage =
+  let open Tezos_clic in
+  command
+    ~group
+    ~desc:
+      "Patches the durable storage with an arbitrary value. This is an unsafe \
+       command, it should be used for debugging only. Patched durable storage \
+       is persisted and cannot be reverted."
+    (args2
+       data_dir_arg
+       (switch
+          ~long:"force"
+          ~short:'f'
+          ~doc:"Force patching the durable storage"
+          ()))
+    (prefixes ["patch"; "durable"; "storage"; "at"]
+    @@ param ~name:"path" ~desc:"Durable storage path" Cli.string_parameter
+    @@ prefixes ["with"]
+    @@ param ~name:"value" ~desc:"Patched value" Cli.hex_parameter
+    @@ stop)
+    (fun (data_dir, force) key value cctxt ->
+      if force then
+        Wasm_2_0_0_utilities.patch_durable_storage ~data_dir ~key ~value
+      else
+        cctxt#error
+          "You must add --force to your command-line to execute this command. \
+           As a reminder, patching the state is an advanced and unsafe \
+           procedure.")
 
 let export_snapshot
     (data_dir, dest, no_checks, compress_on_the_fly, uncompressed, compact)
@@ -559,6 +590,7 @@ let sc_rollup_commands () =
     protocols_command;
     dump_metrics;
     dump_durable_storage;
+    patch_durable_storage;
     export_snapshot_auto_name;
     export_snapshot_named;
     import_snapshot;

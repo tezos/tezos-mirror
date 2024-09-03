@@ -63,6 +63,7 @@ type error +=
   | Refutation_player_failed_to_start
   | No_refutation_coordinator
   | Could_not_acquire_lock of string
+  | Patch_durable_storage_on_commitment of int32
 
 type error +=
   | Could_not_open_preimage_file of String.t
@@ -591,4 +592,21 @@ let () =
           Some (our_commitment, their_commitment)
       | _ -> None)
     (fun (our_commitment, their_commitment) ->
-      Disagree_with_commitment {our_commitment; their_commitment})
+      Disagree_with_commitment {our_commitment; their_commitment}) ;
+
+  register_error_kind
+    ~id:"sc_rollup.node.patch_durable_storage_on_commitment"
+    ~title:"Patch durable storage on commitment"
+    ~description:
+      "The command patch durable storage was run on a level with a commitment."
+    ~pp:(fun ppf level ->
+      Format.fprintf
+        ppf
+        "The command patch durable storage cannot be run on a level with a \
+         commitment, current level %ld has one. Please try in the next block."
+        level)
+    `Permanent
+    Data_encoding.(obj1 (req "level" int32))
+    (function
+      | Patch_durable_storage_on_commitment level -> Some level | _ -> None)
+    (fun level -> Patch_durable_storage_on_commitment level)
