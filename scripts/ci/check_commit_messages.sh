@@ -12,13 +12,9 @@ Checks that the current branch's history, up to MERGE BASE does not
 contain any commits whose title matches any of the forbidden patterns
 in ./forbidden_commit_messages.txt
 
-When running locally, MERGE BASE is the best common ancestor between
-HEAD and the supposed target branch master (can be set through
-CI_MERGE_REQUEST_TARGET_BRANCH_NAME), obtained through
-'scripts/ci/git_merge_base.sh'.
-
-When running in GitLab CI merge request pipeline, the commit history
-is checked between MERGE BASE and CI_MERGE_REQUEST_SOURCE_BRANCH_SHA.
+MERGE BASE is obtained by passing the variables
+TEZOS_CI_MR_{TARGET,HEAD} obtained by
+scripts/ci/gitlab_mr_environment.sh to scripts/ci/git_merge_base.sh.
 
 This script exits with error code 0 if no forbidden commit subjects
 are found. If a forbidden commit subject is found in a merge requests
@@ -37,38 +33,10 @@ script_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
 src_dir="$(dirname "$(dirname "$script_dir")")"
 pattern_file="${script_dir}forbidden_commit_messages.txt"
 
-# Use git_merge_base.sh on merged result pipelines, to ensure we only
-# check commit messages of the MR in question.
-ORIGIN=${ORIGIN:-origin}
+# shellcheck source=scripts/ci/gitlab_mr_environment.sh
+. "$src_dir"/scripts/ci/gitlab_mr_environment.sh
 
-# CI_MERGE_REQUEST_{SOURCE,TARGET}_BRANCH_SHA are only available in
-# merged result pipelines. In merge request pipelines, use
-# CI_MERGE_REQUEST_TARGET_BRANCH_NAME instead.
-if [ -n "${CI_MERGE_REQUEST_SOURCE_BRANCH_SHA:-}" ] &&
-  [ -n "${CI_MERGE_REQUEST_TARGET_BRANCH_SHA:-}" ]; then
-  head=${CI_MERGE_REQUEST_SOURCE_BRANCH_SHA}
-  target=${CI_MERGE_REQUEST_TARGET_BRANCH_SHA}
-elif [ -n "${CI_MERGE_REQUEST_TARGET_BRANCH_NAME:-}" ]; then
-  head=HEAD
-  target=${ORIGIN}/${CI_MERGE_REQUEST_TARGET_BRANCH_NAME}
-
-  # Make CI_MERGE_REQUEST_TARGET_BRANCH_NAME available locally -- this
-  # is a prerequisite for 'git_merge_base.sh' when it's operands are
-  # not fully spelled out hex object names (e.g. when they are branch
-  # names instead of commit SHAs).
-  git fetch --depth 1 "${ORIGIN}" "${CI_MERGE_REQUEST_TARGET_BRANCH_NAME}"
-else
-  car << EOT
-None of:
- - CI_MERGE_REQUEST_SOURCE_BRANCH_SHA
- - CI_MERGE_REQUEST_TARGET_BRANCH_SHA
- - CI_MERGE_REQUEST_TARGET_BRANCH_NAME
-are set. Cannot retrieve the commit history of this MR.
-EOT
-  exit 1
-fi
-
-merge_base=$("$src_dir"/scripts/ci/git_merge_base.sh "$target" "$head" || {
+merge_base=$("$src_dir"/scripts/ci/git_merge_base.sh "$TEZOS_CI_MR_TARGET" "$TEZOS_CI_MR_HEAD" || {
   # Print on stderr to make visible outside command substitution
   echo "Failed to get merge base, cannot check commit messages." >&2
   exit 1
@@ -79,16 +47,16 @@ if [ -z "$merge_base" ]; then
 fi
 
 check_history() {
-  echo "Check git commit messages in the range ${merge_base}..${head}:"
+  echo "Check git commit messages in the range ${merge_base}..${TEZOS_CI_MR_HEAD}:"
   echo ""
-  git log --format=" - '%s'" "${merge_base}".."${head}"
+  git log --format=" - '%s'" "${merge_base}".."${TEZOS_CI_MR_HEAD}"
   echo
 
   # Use short flags for grep for busybox-compatibility.
-  if git log --format="%s" "${merge_base}".."${head}" | grep -qE -f "${pattern_file}" > /dev/null; then
+  if git log --format="%s" "${merge_base}".."${TEZOS_CI_MR_HEAD}" | grep -qE -f "${pattern_file}" > /dev/null; then
     # Match commits / forbidden patterns cross wise for user
     # friendly output.
-    for commit in $(git log --format="%H" "${merge_base}".."${head}"); do
+    for commit in $(git log --format="%H" "${merge_base}".."${TEZOS_CI_MR_HEAD}"); do
       commit_title=$(git show -s --format=%B "${commit}" | head -n1)
       while read -r pattern; do
         if echo "${commit_title}" | grep -qE "$pattern"; then

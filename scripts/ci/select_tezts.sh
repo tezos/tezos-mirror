@@ -18,14 +18,10 @@ abort() {
   exit 17
 }
 
-# If set, diff base against CI_MERGE_REQUEST_SOURCE_BRANCH_SHA instead of HEAD.
-# This variable contains the HEAD SHA of the merge request's source branch.
-# On merged result pipelines, this is not equivalent on the local git's HEAD,
-# as the merged result pipeline runs on an ephemeral, rebased branch.
-head=${CI_MERGE_REQUEST_SOURCE_BRANCH_SHA:-HEAD}
-target=${CI_MERGE_REQUEST_TARGET_BRANCH_SHA:-${ORIGIN}/master}
+# shellcheck source=scripts/ci/gitlab_mr_environment.sh
+. "$src_dir"/scripts/ci/gitlab_mr_environment.sh
 
-merge_base=$("$src_dir"/scripts/ci/git_merge_base.sh "$target" "$head" || {
+merge_base=$("$src_dir"/scripts/ci/git_merge_base.sh "$TEZOS_CI_MR_TARGET" "$TEZOS_CI_MR_HEAD" || {
   # Print on stderr to make visible outside command substitution
   echo "Failed to get merge base, test selection is disabled." >&2
   abort
@@ -35,8 +31,8 @@ if [ -z "$merge_base" ]; then
   abort
 fi
 
-echo "---- Fetching source branch HEAD ($head) and base ($merge_base) from $ORIGIN..."
-if ! git fetch "$ORIGIN" "$head" "$merge_base"; then
+echo "---- Fetching source branch HEAD ($TEZOS_CI_MR_HEAD) and base ($merge_base) from $ORIGIN..."
+if ! git fetch "$ORIGIN" "$TEZOS_CI_MR_HEAD" "$merge_base"; then
   # Example error that was seen in a job:
   # error: RPC failed; curl 92 HTTP/2 stream 5 was not closed cleanly: INTERNAL_ERROR (err 2)
   # error: 50483 bytes of body are still expected
@@ -47,7 +43,7 @@ if ! git fetch "$ORIGIN" "$head" "$merge_base"; then
 fi
 
 echo "---- Diffing..."
-CHANGES="$(git diff --name-only "$merge_base" "$head")"
+CHANGES="$(git diff --name-only "$merge_base" "$TEZOS_CI_MR_HEAD")"
 echo "$CHANGES"
 
 echo "---- Compiling manifest/manifest..."
