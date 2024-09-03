@@ -1411,8 +1411,6 @@ function delete_protocol() {
 
 function hash() {
 
-  log_cyan "Computing hash"
-
   # extract hash from  src/${protocol_source}/TEZOS_PROTOCOL in line "hash": "..."
   source_hash=$(grep -oP '(?<="hash": ")[^"]*' "src/proto_${protocol_source}/lib_protocol/TEZOS_PROTOCOL")
   source_short_hash=$(echo "${source_hash}" | head -c 8)
@@ -1435,6 +1433,21 @@ function hash() {
   capitalized_label="${capitalized_new_tag}"
 
   tezos_protocol_source=$(echo "${protocol_source}" | tr '_' '-')
+
+  echo "Setting current version in raw_context and proxy"
+  sed -i.old \
+    -e "s/${previous_variant}/${new_variant}/g" \
+    -e "s/${capitalized_source}/${capitalized_label}/g" \
+    -e "s/${previous_tag}/${new_tag}/g" \
+    "src/proto_${protocol_source}/lib_protocol/constants_repr.ml" \
+    "src/proto_${protocol_source}/lib_protocol/raw_context.ml" \
+    "src/proto_${protocol_source}/lib_protocol/raw_context.mli" \
+    "src/proto_${protocol_source}/lib_client/proxy.ml" \
+    "src/proto_${protocol_source}/lib_protocol/init_storage.ml"
+
+  commit_no_hooks "src: set current version"
+
+  log_cyan "Computing hash"
 
   short_hash=$(echo "${protocol_source}" | cut -d'_' -f2)
   if [[ ${source_short_hash} != "${short_hash}" ]]; then
@@ -1623,11 +1636,12 @@ function hash() {
     "src/proto_alpha/lib_protocol/init_storage.ml"; do
     log_blue "Update ${file}"
     sed -i.old \
+      -e "s/${previous_variant}/${new_variant}/g" \
       -e "s/${capitalized_source}/${capitalized_label}/g" \
-      -e "s/${protocol_source}/${label}/g" -i.old "${file}"
+      -e "s/${source_label}/${label}/g" -i.old "${file}"
     ocamlformat -i "${file}"
   done
-  commit_if_changes "alpha: add ${capitalized_label} as Alpha previous protocol"
+  commit_if_changes "Alpha: add ${capitalized_label} as Alpha previous protocol"
 
   sed -i.old -e "s/${protocol_source}/${new_protocol_name}/g" \
     -e "s/${previous_tag}/${new_tag}/g" \
@@ -1723,6 +1737,7 @@ function hash() {
   sed -i.old \
     -e "s/${source_hash}/${long_hash}/g" \
     -e "s/${source_short_hash}/${short_hash}/g" \
+    -e "s/${source_label}/${label}/"g \
     src/bin_client/octez-init-sandboxed-client.sh
   commit_no_hooks_if_changes "sandbox: update octez-activate-${label} command to client sandbox"
 
