@@ -92,7 +92,7 @@ There are several packages:
 Ubuntu and Debian Octez packages
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-If you're using Ubuntu or Debian, you can also install packages with Octez binaries
+If you're using Ubuntu or Debian, you can install the same packages as in the release page
 using ``apt`` directly from our APT repository, instead of going to the Octez
 release page as explained above.
 
@@ -149,6 +149,26 @@ possible to configure the software to use a different user (even root).
 
 The documentation for these packages, originally developed by Chris Pinnock,
 can be found here: https://chrispinnock.com/tezos/packages/
+
+New set of Debian packages
+""""""""""""""""""""""""""
+
+There is also a new generation of Debian packages that are available for testing.
+These packages will replace the currently available packages mentioned above.
+
+The new set of packages can be installed by adding the following apt repository::
+
+  export distribution=debian
+  export release=bookworm
+  export bucket="tezos-linux-protected-repo"
+
+  curl "https://$bucket.storage.googleapis.com/next/$distribution/octez.asc" | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/octez.gpg
+  echo "deb [arch=amd64] https://$bucket.storage.googleapis.com/next/$distribution $release main" | sudo tee /etc/apt/sources.list.d/octez.list
+  sudo apt-get update
+  sudo apt-get install octez-node ...
+
+Once the Octez binary packages are installed, they can be set up as services
+as explained in :doc:`./services`.
 
 Fedora Octez packages
 ~~~~~~~~~~~~~~~~~~~~~
