@@ -64,7 +64,7 @@ let drop_file_mutex filename =
       !files_in_use
 
 (* [add_to_operations block_hash ops_kind ops_round ops] adds the
-   preendorsements or endorsements in [ops] that were included in block
+   preattestations or attestations in [ops] that were included in block
    [block_hash] to the list of operations already known for operation's
    producer. *)
 let add_to_operations block_hash ops_hash ops_kind ?ops_round operations =
@@ -102,8 +102,8 @@ let add_to_operations block_hash ops_hash ops_kind ?ops_round operations =
       }
       :: operations
 
-(* [validators] are those delegates whose operations (either preendorsements or
-   endorsements) have been included in the given block.*)
+(* [validators] are those delegates whose operations (either preattestations or
+   attestations) have been included in the given block.*)
 let add_inclusion_in_block block_hash validators delegate_operations =
   let updated_known, unknown =
     List.fold_left
@@ -209,8 +209,8 @@ let dump_included_in_block logger path block_level block_hash block_predecessor
     block_round timestamp reception_times baker cycle_info consensus_ops
     baking_rights =
   let delegate_operations_t =
-    let endorsements_level = Int32.pred block_level in
-    let filename = filename_of_level path endorsements_level in
+    let attestations_level = Int32.pred block_level in
+    let filename = filename_of_level path attestations_level in
     Log.info logger (fun () ->
         Format.asprintf
           "Dumping delegate operations in block %a at level %li."

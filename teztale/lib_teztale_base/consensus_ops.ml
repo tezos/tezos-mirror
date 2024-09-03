@@ -25,16 +25,16 @@ type rights = right list
 
 let rights_encoding = Data_encoding.list right_encoding
 
-type operation_kind = Endorsement | Preendorsement
+type operation_kind = Attestation | Preattestation
 
 let operation_kind_encoding =
   let open Data_encoding in
-  string_enum [("Endorsement", Endorsement); ("Preendorsement", Preendorsement)]
+  string_enum [("Endorsement", Attestation); ("Preendorsement", Preattestation)]
 
 let pp_operation_kind ppf kind =
   match kind with
-  | Endorsement -> Format.fprintf ppf "Endorsement"
-  | Preendorsement -> Format.fprintf ppf "Preendorsement"
+  | Attestation -> Format.fprintf ppf "Endorsement"
+  | Preattestation -> Format.fprintf ppf "Preendorsement"
 
 type operation = {
   hash : Operation_hash.t;

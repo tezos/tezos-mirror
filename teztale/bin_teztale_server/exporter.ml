@@ -203,8 +203,8 @@ type op_info = {
 }
 
 let kind_of_bool = function
-  | false -> Lib_teztale_base.Consensus_ops.Preendorsement
-  | true -> Lib_teztale_base.Consensus_ops.Endorsement
+  | false -> Lib_teztale_base.Consensus_ops.Preattestation
+  | true -> Lib_teztale_base.Consensus_ops.Attestation
 
 let select_ops conf db_pool boundaries =
   (* We make 3 queries:
@@ -262,12 +262,12 @@ let select_ops conf db_pool boundaries =
     in
     Int32Map.add level ops info
   in
-  let cb_included ((level, delegate, endorsement, round), (op_hash, block_hash))
+  let cb_included ((level, delegate, attestation, round), (op_hash, block_hash))
       info =
     let ops =
       match Int32Map.find_opt level info with Some m -> m | None -> Ops.empty
     in
-    let kind = kind_of_bool endorsement in
+    let kind = kind_of_bool attestation in
     let ops =
       Ops.update
         delegate
@@ -293,11 +293,11 @@ let select_ops conf db_pool boundaries =
 
   let cb_received
       ( (level, delegate, reception_time, op_hash),
-        (errors, source, endorsement, round) ) info =
+        (errors, source, attestation, round) ) info =
     let ops =
       match Int32Map.find_opt level info with Some m -> m | None -> Ops.empty
     in
-    let kind = kind_of_bool endorsement in
+    let kind = kind_of_bool attestation in
     let received_info =
       Lib_teztale_base.Data.Delegate_operations.{source; reception_time; errors}
     in

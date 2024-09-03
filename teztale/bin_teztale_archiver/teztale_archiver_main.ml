@@ -44,7 +44,7 @@ let main_json cctxt prefix =
       Lwt.join
         [
           General_archiver.Json_loops.blocks_loop cctxt;
-          General_archiver.Json_loops.endorsements_loop cctxt;
+          General_archiver.Json_loops.attestations_loop cctxt;
         ]
     in
     let () = Json_archiver.stop () in
@@ -64,7 +64,7 @@ let main_server state cctxt =
       Lwt.join
         [
           General_archiver.Server_loops.blocks_loop cctxt;
-          General_archiver.Server_loops.endorsements_loop cctxt;
+          General_archiver.Server_loops.attestations_loop cctxt;
         ]
     in
     let () = Server_archiver.stop () in

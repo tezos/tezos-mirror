@@ -77,7 +77,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
         Some
           ( ( block_payload_hash,
               Protocol.Alpha_context.Raw_level.to_int32 level,
-              Consensus_ops.Endorsement,
+              Consensus_ops.Attestation,
               Some (Protocol.Alpha_context.Round.to_int32 round) ),
             slot_to_int slot )
     | {
@@ -93,7 +93,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
         Some
           ( ( block_payload_hash,
               Protocol.Alpha_context.Raw_level.to_int32 level,
-              Consensus_ops.Preendorsement,
+              Consensus_ops.Preattestation,
               Some (Protocol.Alpha_context.Round.to_int32 round) ),
             slot_to_int slot )
     | _ -> None
@@ -234,7 +234,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
                   {
                     hash;
                     round = Some (get_preattestation_round protocol_data);
-                    kind = Consensus_ops.Preendorsement;
+                    kind = Consensus_ops.Preattestation;
                   };
                 delegate;
                 power = consensus_power;
@@ -254,7 +254,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
                   {
                     hash;
                     round = Some (get_attestation_round protocol_data);
-                    kind = Consensus_ops.Endorsement;
+                    kind = Consensus_ops.Attestation;
                   };
                 delegate;
                 power = consensus_power;

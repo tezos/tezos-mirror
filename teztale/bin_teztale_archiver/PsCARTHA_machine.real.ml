@@ -51,7 +51,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
 
   module BlockIdMap = Block_hash.Map
 
-  let extract_endorsement
+  let extract_attestation
       (_operation_content : Protocol.Alpha_context.packed_operation) =
     (* match operation_content with
        | {
@@ -66,7 +66,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
            Some
              ( ( branch,
                  Protocol.Alpha_context.Raw_level.to_int32 level,
-                 Consensus_ops.Endorsement,
+                 Consensus_ops.Attestation,
                  None ),
                slot )
           | _ ->*)
@@ -89,7 +89,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
     return
       ( Lwt_stream.filter_map
           (fun ((hash, op), errors) ->
-            Option.map (fun x -> ((hash, x), errors)) (extract_endorsement op))
+            Option.map (fun x -> ((hash, x), errors)) (extract_attestation op))
           op_stream,
         stopper )
 
@@ -174,7 +174,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
         ~block:(`Hash (hash, 0))
         0
     in
-    let endorsements =
+    let attestations =
       List.filter_map
         (fun Block_services.{hash; receipt; _} ->
           match receipt with
@@ -189,14 +189,14 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
               Some
                 Consensus_ops.
                   {
-                    op = {hash; round = None; kind = Consensus_ops.Endorsement};
+                    op = {hash; round = None; kind = Consensus_ops.Attestation};
                     delegate = public_key_hash_of_v0 delegate;
                     power = List.length slots;
                   }
           | _ -> None)
         ops
     in
-    return endorsements
+    return attestations
 
   let get_block_info cctxt level =
     let* header =

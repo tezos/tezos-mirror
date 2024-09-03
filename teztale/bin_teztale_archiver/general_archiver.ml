@@ -18,12 +18,12 @@ let print_failures logger f =
   let*! o = f in
   match o with Ok () -> Lwt.return_unit | Error e -> print_error logger e
 
-let split_endorsements_preendorsements operations =
+let split_attestations_preattestations operations =
   List.fold_left
     (fun (en, pre) (Consensus_ops.{op = {kind; _}; _} as x) ->
       match kind with
-      | Consensus_ops.Preendorsement -> (en, x :: pre)
-      | Consensus_ops.Endorsement -> (x :: en, pre))
+      | Consensus_ops.Preattestation -> (en, x :: pre)
+      | Consensus_ops.Attestation -> (x :: en, pre))
     ([], [])
     operations
 
@@ -45,7 +45,7 @@ let rights_machine = Protocol_hash.Table.create 10
 
 let past_block_machine = Protocol_hash.Table.create 10
 
-let endorsement_machine = Protocol_hash.Table.create 10
+let attestation_machine = Protocol_hash.Table.create 10
 
 let validated_block_machine = Protocol_hash.Table.create 10
 
@@ -57,10 +57,10 @@ let maybe_add_rights (module A : Archiver.S) level rights =
     let () = Ring.add registered_rights_levels level in
     A.add_rights ~level rights
 
-let dump_my_current_endorsements (module A : Archiver.S) ~unaccurate ~level
-    rights endorsements =
+let dump_my_current_attestations (module A : Archiver.S) ~unaccurate ~level
+    rights attestations =
   let () = maybe_add_rights (module A) level rights in
-  let () = A.add_mempool ~unaccurate ~level endorsements in
+  let () = A.add_mempool ~unaccurate ~level attestations in
   return_unit
 
 module Define (Services : Protocol_machinery.PROTOCOL_SERVICES) = struct
@@ -95,7 +95,7 @@ module Define (Services : Protocol_machinery.PROTOCOL_SERVICES) = struct
     return
       ( block_info_data info reception_times,
         cycle_info,
-        split_endorsements_preendorsements operations,
+        split_attestations_preattestations operations,
         [] )
 
   let past_block ctxt level =
@@ -171,7 +171,7 @@ module Define (Services : Protocol_machinery.PROTOCOL_SERVICES) = struct
     in
     (items, missing)
 
-  let endorsements_recorder (module A : Archiver.S) cctx current_level =
+  let attestations_recorder (module A : Archiver.S) cctx current_level =
     let cctx' = Services.wrap_full cctx in
     let* op_stream, _stopper = Services.consensus_operation_stream cctx' in
     let*! out =
@@ -191,30 +191,30 @@ module Define (Services : Protocol_machinery.PROTOCOL_SERVICES) = struct
         Services.BlockIdMap.empty
     in
     Services.BlockIdMap.iter_ep
-      (fun _ (level, endorsements) ->
+      (fun _ (level, attestations) ->
         let* rights =
           Services.endorsing_rights cctx' ~reference_level:current_level level
         in
-        let items, missing = couple_ops_to_rights endorsements rights in
+        let items, missing = couple_ops_to_rights attestations rights in
         let full = Compare.Int32.(current_level = level) in
-        let endorsements =
+        let attestations =
           if full then
             List.fold_left (fun acc right -> (right, []) :: acc) items missing
           else items
         in
-        dump_my_current_endorsements
+        dump_my_current_attestations
           (module A)
           ~unaccurate:(not full)
           ~level
           rights
-          endorsements)
+          attestations)
       out
 
   let () =
     Protocol_hash.Table.add
-      endorsement_machine
+      attestation_machine
       Services.hash
-      endorsements_recorder
+      attestations_recorder
 end
 
 module Loops (Archiver : Archiver.S) = struct
@@ -274,7 +274,7 @@ module Loops (Archiver : Archiver.S) = struct
         else return_unit
           (* hack to ignore transition block because they need their own instantiation of Block_services *))
 
-  let endorsements_loop cctx =
+  let attestations_loop cctx =
     let logger = Log.logger () in
     let*! head_stream = Shell_services.Monitor.heads cctx cctx#chain in
     match head_stream with
@@ -283,7 +283,7 @@ module Loops (Archiver : Archiver.S) = struct
         let*! _ =
           Lwt_stream.fold_s
             (fun (hash, header) acc ->
-              let*! endorsements_recorder, acc' =
+              let*! attestations_recorder, acc' =
                 match acc with
                 | Some (f, proto_level)
                   when proto_level
@@ -302,14 +302,14 @@ module Loops (Archiver : Archiver.S) = struct
                     | Ok Shell_services.Blocks.{next_protocol; _} -> (
                         let recorder =
                           Protocol_hash.Table.find
-                            endorsement_machine
+                            attestation_machine
                             next_protocol
                         in
                         match recorder with
                         | None ->
                             let*! () =
                               Lwt_fmt.eprintf
-                                "no endorsement recorder found for protocol \
+                                "no attestation recorder found for protocol \
                                  %a@."
                                 Protocol_hash.pp
                                 next_protocol
@@ -325,7 +325,7 @@ module Loops (Archiver : Archiver.S) = struct
               in
               let block_level = header.Block_header.shell.Block_header.level in
               let*! () =
-                print_failures logger (endorsements_recorder cctx block_level)
+                print_failures logger (attestations_recorder cctx block_level)
               in
               Lwt.return acc')
             head_stream
@@ -385,7 +385,7 @@ module Loops (Archiver : Archiver.S) = struct
                                   =
                                 let* (( _block_info,
                                         _cycle_info,
-                                        (endorsements, preendorsements),
+                                        (attestations, preattestations),
                                         _baking_rights ) as block_data) =
                                   get_applied_block
                                     cctx
@@ -394,7 +394,7 @@ module Loops (Archiver : Archiver.S) = struct
                                     reception_time
                                 in
                                 let* () =
-                                  if List.is_empty endorsements then return_unit
+                                  if List.is_empty attestations then return_unit
                                   else
                                     let* rights =
                                       rights_of cctx (Int32.pred level)
@@ -408,7 +408,7 @@ module Loops (Archiver : Archiver.S) = struct
                                     return_unit
                                 in
                                 let* () =
-                                  if List.is_empty preendorsements then
+                                  if List.is_empty preattestations then
                                     return_unit
                                   else
                                     let* rights = rights_of cctx level in
