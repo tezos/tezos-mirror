@@ -89,6 +89,8 @@ There are several packages:
 - ``octez-smartrollup``: the Octez Smart Rollup daemons
 - ``octez-signer``: the remote signer, to hold keys on (and sign from) a different machine from the baker or client
 
+.. _installing_packages:
+
 Ubuntu and Debian Octez packages
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
