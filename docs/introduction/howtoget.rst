@@ -152,6 +152,8 @@ possible to configure the software to use a different user (even root).
 The documentation for these packages, originally developed by Chris Pinnock,
 can be found here: https://chrispinnock.com/tezos/packages/
 
+.. _new_packages:
+
 New set of Debian packages
 """"""""""""""""""""""""""
 
