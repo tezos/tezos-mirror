@@ -4,28 +4,25 @@
 // SPDX-License-Identifier: MIT
 
 use cli::ExitMode;
-use octez_riscv::{
-    machine_state::mode::Mode, stepper::test::TestStepperResult, traps::EnvironException,
-};
+use octez_riscv::{machine_state::mode::Mode, stepper::StepperStatus};
 use std::error::Error;
 
 mod cli;
 mod commands;
 mod table;
 
-fn format_status(result: &TestStepperResult) -> String {
-    use TestStepperResult::*;
+fn format_status(result: &StepperStatus) -> String {
+    use StepperStatus::*;
     match result {
-        Exit { code: 0, .. } => "Ok (exit code = 0)".to_string(),
-        Exit { code, .. } => format!("Failed with exit code = {}", code),
+        Exited {
+            success: true,
+            status,
+            ..
+        } => format!("Ok (status = {status})"),
+        Exited { status, .. } => format!("Exit with exit code = {}", status),
         Running { .. } => "Timeout".to_string(),
-        Exception { cause, .. } => format!("{}", exception_to_error(cause)),
+        Errored { cause, message, .. } => format!("{message}\nCaused by: {cause}"),
     }
-}
-
-/// Convert a RISC-V exception into an error.
-fn exception_to_error(exc: &EnvironException) -> Box<dyn Error> {
-    format!("{:?}", exc).into()
 }
 
 fn posix_exit_mode(exit_mode: &ExitMode) -> Mode {

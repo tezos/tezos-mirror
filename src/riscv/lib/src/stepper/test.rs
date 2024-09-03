@@ -71,7 +71,7 @@ pub enum TestStepperError {
     MachineError(MachineError),
 }
 
-type TestStepperLayout<ML = M1G> = (PosixStateLayout, MachineStateLayout<ML>);
+pub type TestStepperLayout<ML = M1G> = (PosixStateLayout, MachineStateLayout<ML>);
 
 pub struct TestStepper<'a, ML: MainMemoryLayout = M1G> {
     machine_state: MachineState<ML, SliceManager<'a>>,
