@@ -17,6 +17,7 @@ use octez_riscv::{
     },
     program::Program,
     pvm::PvmHooks,
+    state_backend::ManagerReadWrite,
     stepper::{pvm::PvmStepper, test::TestStepper, StepResult, Stepper, StepperStatus},
 };
 use ratatui::{prelude::*, style::palette::tailwind, widgets::*};
@@ -243,7 +244,10 @@ where
         }
     }
 
-    fn run_debugger(&mut self, mut terminal: Terminal<impl Backend>) -> Result<()> {
+    fn run_debugger(&mut self, mut terminal: Terminal<impl Backend>) -> Result<()>
+    where
+        S::Manager: ManagerReadWrite,
+    {
         loop {
             self.draw(&mut terminal)?;
             if let Event::Key(key) = event::read()? {
@@ -278,12 +282,18 @@ where
         }
     }
 
-    fn draw(&mut self, terminal: &mut Terminal<impl Backend>) -> Result<()> {
+    fn draw(&mut self, terminal: &mut Terminal<impl Backend>) -> Result<()>
+    where
+        S::Manager: ManagerReadWrite,
+    {
         terminal.draw(|f| f.render_widget(self, f.size()))?;
         Ok(())
     }
 
-    fn step(&mut self, max_steps: usize) {
+    fn step(&mut self, max_steps: usize)
+    where
+        S::Manager: ManagerReadWrite,
+    {
         let result = self
             .stepper
             .step_max(Bound::Included(max_steps))
@@ -291,7 +301,10 @@ where
         self.update_after_step(result);
     }
 
-    fn step_until_breakpoint(&mut self) {
+    fn step_until_breakpoint(&mut self)
+    where
+        S::Manager: ManagerReadWrite,
+    {
         // perform at least a step to progress if already on a breakpoint
         let mut result = self
             .stepper
@@ -316,7 +329,10 @@ where
         self.update_after_step(result);
     }
 
-    fn step_until_next_symbol(&mut self) {
+    fn step_until_next_symbol(&mut self)
+    where
+        S::Manager: ManagerReadWrite,
+    {
         // perform at least a step to progress if already on a breakpoint/symbol
         let mut result = self
             .stepper

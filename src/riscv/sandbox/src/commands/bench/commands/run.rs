@@ -17,6 +17,7 @@ use octez_riscv::{
         AccessType,
     },
     parser::{instruction::Instr, parse},
+    state_backend::ManagerRead,
     stepper::{
         test::{TestStepper, TestStepperResult},
         Stepper,
@@ -32,7 +33,10 @@ use std::{
 
 /// Helper function to look in the [`Interpreter`] to peek for the current [`Instr`]
 /// Assumes the program counter will be a multiple of 2.
-fn get_current_instr<S: Stepper>(stepper: &S) -> Result<Instr, InstrGetError> {
+fn get_current_instr<S: Stepper>(stepper: &S) -> Result<Instr, InstrGetError>
+where
+    S::Manager: ManagerRead,
+{
     let machine_state = stepper.machine_state();
     let get_half_instr = |raw_pc: Address| -> Result<u16, InstrGetError> {
         let pc = machine_state

@@ -10,6 +10,7 @@ use octez_riscv::{
         mode::Mode,
         registers::{gp, XRegister, XValue},
     },
+    state_backend::ManagerRead,
     stepper::{
         test::{TestStepper, TestStepperResult::*},
         Stepper,
@@ -21,7 +22,10 @@ const TESTS_DIR: &str = "../../../tezt/tests/riscv-tests/generated";
 const GOLDEN_DIR: &str = "tests/expected";
 const MAX_STEPS: usize = 1_000_000;
 
-fn check_register_values<S: Stepper>(stepper: &S, check_xregs: &[(XRegister, XValue)]) {
+fn check_register_values<S: Stepper>(stepper: &S, check_xregs: &[(XRegister, XValue)])
+where
+    S::Manager: ManagerRead,
+{
     let failure = check_xregs
         .iter()
         .filter_map(|(xreg, xval)| {

@@ -12,6 +12,7 @@ use octez_riscv::{
         AccessType,
     },
     parser::{instruction::Instr, parse},
+    state_backend::{ManagerRead, ManagerReadWrite},
     stepper::{Stepper, StepperStatus},
 };
 use std::{collections::HashMap, ops::Range};
@@ -20,7 +21,10 @@ impl<'a, S> DebuggerApp<'a, S>
 where
     S: Stepper,
 {
-    pub(super) fn update_after_step(&mut self, result: StepperStatus) {
+    pub(super) fn update_after_step(&mut self, result: StepperStatus)
+    where
+        S::Manager: ManagerReadWrite,
+    {
         let (pc, faulting) = self.update_pc_after_step();
         self.update_translation_after_step(faulting);
         self.update_instr_list(pc);
@@ -40,7 +44,10 @@ where
 
     /// Even if pc is not updated, the selected instruction can change,
     /// needing to update the "surrounding" addresses for new instructions.
-    pub(super) fn update_selected_context(&mut self) -> Option<()> {
+    pub(super) fn update_selected_context(&mut self) -> Option<()>
+    where
+        S::Manager: ManagerReadWrite,
+    {
         let selected_offset = self.program.state.selected()?;
         let selected_instr = self.program.instructions.get(selected_offset)?;
         let selected_pc = selected_instr.address;
@@ -49,7 +56,10 @@ where
     }
 
     /// Returns the physical program counter, and if the translation algorithm is faulting
-    fn update_pc_after_step(&mut self) -> (Address, bool) {
+    fn update_pc_after_step(&mut self) -> (Address, bool)
+    where
+        S::Manager: ManagerReadWrite,
+    {
         let raw_pc = self.stepper.machine_state().hart.pc.read();
         let res @ (pc, _faulting) = match self
             .stepper
@@ -66,7 +76,10 @@ where
     }
 
     /// Updates the state of [`super::TranslationState`]
-    fn update_translation_after_step(&mut self, faulting: bool) {
+    fn update_translation_after_step(&mut self, faulting: bool)
+    where
+        S::Manager: ManagerReadWrite,
+    {
         let mode = self.stepper.machine_state().hart.mode.read();
         let satp_val: Satp = self
             .stepper
@@ -119,7 +132,10 @@ where
         &self,
         range: Range<u64>,
         symbols: &HashMap<u64, &str>,
-    ) -> Vec<Instruction> {
+    ) -> Vec<Instruction>
+    where
+        S::Manager: ManagerRead,
+    {
         let get_u16_at = |addr: Address| -> Option<(Address, u16)> {
             self.stepper
                 .machine_state()
@@ -156,7 +172,10 @@ where
 
     /// Get a range of bytes around `pc` and try to introduce the newly
     /// discovered instructions in the existing list of [`Instruction`]
-    fn update_instr_list(&mut self, pc: Address) {
+    fn update_instr_list(&mut self, pc: Address)
+    where
+        S::Manager: ManagerReadWrite,
+    {
         let pc = pc - pc % 4;
         let range = pc - PC_CONTEXT * 4..pc + PC_CONTEXT * 4;
         let instructions = self.get_range_instructions(range, &self.program.symbols);

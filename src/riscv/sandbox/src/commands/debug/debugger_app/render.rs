@@ -17,6 +17,7 @@ use octez_riscv::{
         },
         registers,
     },
+    state_backend::ManagerRead,
     stepper::{Stepper, StepperStatus},
 };
 use ratatui::{
@@ -181,7 +182,10 @@ where
         StatefulWidget::render(list, area, buf, &mut self.program.state)
     }
 
-    fn render_xregisters_pane(&self, area: Rect, buf: &mut Buffer) {
+    fn render_xregisters_pane(&self, area: Rect, buf: &mut Buffer)
+    where
+        S::Manager: ManagerRead,
+    {
         let title = Title::from(" X Registers ".bold());
         let block = Block::default()
             .title(title.alignment(Alignment::Left))
@@ -229,7 +233,10 @@ where
             .render(area, buf)
     }
 
-    fn render_mstatus_pane(&self, area: Rect, buf: &mut Buffer) {
+    fn render_mstatus_pane(&self, area: Rect, buf: &mut Buffer)
+    where
+        S::Manager: ManagerRead,
+    {
         let title = Title::from(" MSTATUS ".bold());
         let block = Block::default()
             .title(title.alignment(Alignment::Left))
@@ -325,7 +332,10 @@ where
             .render(area, buf)
     }
 
-    fn render_fregisters_pane(&self, area: Rect, buf: &mut Buffer) {
+    fn render_fregisters_pane(&self, area: Rect, buf: &mut Buffer)
+    where
+        S::Manager: ManagerRead,
+    {
         let title = Title::from(" F Registers ".bold());
         let block = Block::default()
             .title(title.alignment(Alignment::Left))
@@ -373,7 +383,10 @@ where
             .render(area, buf)
     }
 
-    fn render_fcsr_pane(&self, area: Rect, buf: &mut Buffer) {
+    fn render_fcsr_pane(&self, area: Rect, buf: &mut Buffer)
+    where
+        S::Manager: ManagerRead,
+    {
         let title = Title::from(" FCSR ".bold());
         let block = Block::default()
             .title(title.alignment(Alignment::Left))
@@ -452,7 +465,10 @@ where
             .render(area, buf)
     }
 
-    fn render_status_pane(&self, area: Rect, buf: &mut Buffer) {
+    fn render_status_pane(&self, area: Rect, buf: &mut Buffer)
+    where
+        S::Manager: ManagerRead,
+    {
         let title = Title::from(" Status ".bold());
         let block = Block::default()
             .title(title.alignment(Alignment::Left))
@@ -541,6 +557,7 @@ where
 impl<'a, S> Widget for &mut DebuggerApp<'a, S>
 where
     S: Stepper,
+    S::Manager: ManagerRead,
 {
     fn render(self, area: Rect, buf: &mut Buffer) {
         // Split main layout from bottom instructions bar
