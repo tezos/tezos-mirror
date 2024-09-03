@@ -704,14 +704,15 @@ module State = struct
     Evm_store.assert_in_transaction conn ;
 
     let*! data_dir, config = execution_config in
-    let next = ctxt.session.next_blueprint_number in
+    let (Qty next) = ctxt.session.next_blueprint_number in
     let* () =
       List.iter_es
-        (Evm_store.Delayed_transactions.store conn next)
+        (Evm_store.Delayed_transactions.store conn (Qty next))
         delayed_transactions
     in
 
     let time_processed = ref Ptime.Span.zero in
+
     let* try_apply =
       Misc.with_timing
         (fun time -> Lwt.return (time_processed := time))
@@ -740,10 +741,12 @@ module State = struct
             {number = block.number; timestamp; payload}
         in
 
-        let* () =
+        let* evm_state =
           if ctxt.block_storage_sqlite3 then
-            store_block_unsafe conn evm_state block
-          else return_unit
+            let* () = store_block_unsafe conn evm_state block in
+            let*! evm_state = Evm_state.clear_block_storage block evm_state in
+            return evm_state
+          else return evm_state
         in
 
         let upgrade_candidate = check_pending_upgrade ctxt timestamp in
@@ -759,7 +762,6 @@ module State = struct
         let* context = commit_next_head ctxt conn evm_state in
         return (evm_state, context, block.hash, kernel_upgrade)
     | Apply_failure (* Did not produce a block *) ->
-        let (Qty next) = next in
         let*! () = Blueprint_events.invalid_blueprint_produced next in
         tzfail (Cannot_apply_blueprint {local_state_level = Z.pred next})
 

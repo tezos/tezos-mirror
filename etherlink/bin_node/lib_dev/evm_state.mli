@@ -116,3 +116,8 @@ val preload_kernel : t -> unit Lwt.t
     cannot be decoded. *)
 val get_delayed_inbox_item :
   t -> Ethereum_types.hash -> Evm_events.Delayed_transaction.t tzresult Lwt.t
+
+(**[clear_block_storage block state] removes the parent of [block], and all
+   durable storage information stored for [block], if this function is called
+   they need to be store elsewhere, mainly it consists in transactions. *)
+val clear_block_storage : Ethereum_types.block -> t -> t Lwt.t

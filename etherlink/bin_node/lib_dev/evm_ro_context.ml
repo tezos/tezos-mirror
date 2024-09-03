@@ -326,7 +326,7 @@ let pvm_config ctxt =
 let replay ctxt ?(log_file = "replay") ?profile
     ?(alter_evm_state = Lwt_result_syntax.return) (Ethereum_types.Qty number) =
   let open Lwt_result_syntax in
-  let* hash = find_irmin_hash_from_number ctxt (Qty Z.(pred number)) in
+  let* hash = find_irmin_hash_from_number ctxt (Qty (Z.pred number)) in
   let* evm_state = get_evm_state ctxt hash in
   let* evm_state = alter_evm_state evm_state in
   let* blueprint =
