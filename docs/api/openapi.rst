@@ -70,6 +70,19 @@ and specific to the Paris protocol can be found at:
 
 - :src:`docs/api/paris-mempool-openapi.json` (version 20.2)
 
+Quebec RPCs
+-----------
+
+The OpenAPI specifications for RPCs which are specific to the Quebec (``PsquebeC``)
+protocol proposal can be found at:
+
+- :src:`docs/api/quebec-openapi.json` (version 21.0~rc1)
+
+The OpenAPI specifications for RPCs which are related to the mempool
+and specific to the Quebec protocol proposal can be found at:
+
+- :src:`docs/api/quebec-mempool-openapi.json` (version 21.0~rc1)
+
 Alpha RPCs
 ----------
 
