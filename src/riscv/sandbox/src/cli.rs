@@ -108,6 +108,10 @@ pub struct BenchRunOptions {
     #[arg(long, short, num_args=1..)]
     pub inputs: Vec<Box<Path>>,
 
+    /// Path to the initrd
+    #[arg(long)]
+    pub initrd: Option<Box<Path>>,
+
     #[command(flatten)]
     pub sort_args: TableSortArgs,
 }

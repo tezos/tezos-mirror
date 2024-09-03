@@ -4,11 +4,14 @@
 
 use crate::{
     cli::{BenchMode, BenchRunOptions},
-    commands::bench::{
-        data::{BenchData, FineBenchData, InstrGetError, InstrType, SimpleBenchData},
-        save_to_file, show_results, BenchStats,
+    commands::{
+        bench::{
+            data::{BenchData, FineBenchData, InstrGetError, InstrType, SimpleBenchData},
+            save_to_file, show_results, BenchStats,
+        },
+        run::{general_run, UseStepper},
     },
-    format_status, posix_exit_mode,
+    format_status,
 };
 use enum_tag::EnumTag;
 use octez_riscv::{
@@ -18,10 +21,7 @@ use octez_riscv::{
     },
     parser::{instruction::Instr, parse},
     state_backend::ManagerRead,
-    stepper::{
-        test::{TestStepper, TestStepperResult},
-        Stepper,
-    },
+    stepper::{StepResult, Stepper, StepperStatus},
 };
 use std::{
     collections::HashSet,
@@ -52,24 +52,26 @@ where
 
 /// Composes "in time" two [`InterpreterResult`] one after another,
 /// to obtain the equivalent final [`InterpreterResult`]
-fn compose(
-    current_state: TestStepperResult,
-    following_result: TestStepperResult,
-) -> TestStepperResult {
-    use TestStepperResult::*;
+fn compose(current_state: StepperStatus, following_result: StepperStatus) -> StepperStatus {
+    use StepperStatus::*;
     match current_state {
-        Exit { .. } => current_state,
-        Exception { .. } => current_state,
+        Exited { .. } => current_state,
+        Errored { .. } => current_state,
         Running { steps: prev_steps } => match following_result {
-            Exit { code, steps } => Exit {
-                code,
+            Exited {
+                steps,
+                status,
+                success,
+            } => Exited {
+                success,
+                status,
                 steps: prev_steps + steps,
             },
-            Exception {
+            Errored {
                 cause,
                 steps,
                 message,
-            } => Exception {
+            } => Errored {
                 cause,
                 message,
                 steps: prev_steps + steps,
@@ -81,8 +83,8 @@ fn compose(
     }
 }
 
-fn bench_fine(interpreter: &mut TestStepper, opts: &BenchRunOptions) -> BenchData {
-    let mut run_res = TestStepperResult::default();
+fn bench_fine<S: Stepper>(interpreter: &mut S, opts: &BenchRunOptions) -> BenchData {
+    let mut run_res = StepperStatus::default();
     let mut bench_data = FineBenchData::new();
     let bench_start = quanta::Instant::now();
 
@@ -98,11 +100,11 @@ fn bench_fine(interpreter: &mut TestStepper, opts: &BenchRunOptions) -> BenchDat
 
         bench_data.add_instr(instr, step_duration);
 
-        run_res = compose(run_res, step_res);
+        run_res = compose(run_res.to_stepper_status(), step_res.to_stepper_status());
         match run_res {
-            TestStepperResult::Exit { .. } => break,
-            TestStepperResult::Exception { .. } => break,
-            TestStepperResult::Running { .. } => (),
+            StepperStatus::Exited { .. } => break,
+            StepperStatus::Errored { .. } => break,
+            StepperStatus::Running { .. } => (),
         }
     }
     let bench_duration = bench_start.elapsed();
@@ -112,7 +114,7 @@ fn bench_fine(interpreter: &mut TestStepper, opts: &BenchRunOptions) -> BenchDat
 
 /// A single run of the given `interpreter`.
 /// Provides basic benchmark data and interpreter result.
-fn bench_simple(interpreter: &mut TestStepper, opts: &BenchRunOptions) -> BenchData {
+fn bench_simple<S: Stepper>(interpreter: &mut S, opts: &BenchRunOptions) -> BenchData {
     let start = quanta::Instant::now();
     let step_bound = opts
         .common
@@ -122,32 +124,34 @@ fn bench_simple(interpreter: &mut TestStepper, opts: &BenchRunOptions) -> BenchD
     let res = interpreter.step_max(step_bound);
     let duration = start.elapsed();
 
-    use TestStepperResult::*;
-    let steps = match res {
-        Exit { steps, .. } => steps,
+    use StepperStatus::*;
+    let steps = match res.to_stepper_status() {
+        Exited { steps, .. } => steps,
         Running { steps } => steps,
-        Exception { steps, .. } => steps,
+        Errored { steps, .. } => steps,
     };
     let data = SimpleBenchData::new(duration, steps);
 
-    BenchData::from_simple(data, res)
+    BenchData::from_simple(data, res.to_stepper_status())
 }
 
 fn bench_iteration(path: &Path, opts: &BenchRunOptions) -> Result<BenchData, Box<dyn Error>> {
-    let contents = std::fs::read(path)?;
-    let mut backend = TestStepper::<'_>::create_backend();
-    let mut interpreter = TestStepper::new(
-        &mut backend,
-        &contents,
-        None,
-        posix_exit_mode(&opts.common.posix_exit_mode),
-    )?;
+    let program = std::fs::read(path)?;
+    let initrd = opts.initrd.as_ref().map(fs::read).transpose()?;
 
-    let data = match opts.mode {
-        BenchMode::Simple => bench_simple(&mut interpreter, opts),
-        BenchMode::Fine => bench_fine(&mut interpreter, opts),
-    };
-    Ok(data)
+    struct Runner<'a>(&'a BenchRunOptions);
+
+    impl UseStepper<BenchData> for Runner<'_> {
+        fn advance<S: Stepper>(self, mut stepper: S) -> BenchData {
+            let opts = &self.0;
+            match opts.mode {
+                BenchMode::Simple => bench_simple(&mut stepper, opts),
+                BenchMode::Fine => bench_fine(&mut stepper, opts),
+            }
+        }
+    }
+
+    general_run(&opts.common, program, initrd, Runner(opts))
 }
 
 fn transform_folders(inputs: &[Box<Path>]) -> Result<Vec<PathBuf>, Box<dyn Error>> {
@@ -182,7 +186,7 @@ pub fn run(opts: BenchRunOptions) -> Result<(), Box<dyn Error>> {
 
 fn run_binary(path: &Path, opts: &BenchRunOptions) -> Result<BenchStats, Box<dyn Error>> {
     let get_warning_from_iteration = |iteration: &BenchData| match &iteration.run_result {
-        TestStepperResult::Exit { code: 0, steps: _ } => None,
+        StepperStatus::Exited { success: true, .. } => None,
         result => Some(format_status(result)),
     };
 

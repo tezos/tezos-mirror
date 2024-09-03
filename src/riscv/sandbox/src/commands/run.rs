@@ -3,7 +3,10 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::{cli::RunOptions, posix_exit_mode};
+use crate::{
+    cli::{CommonOptions, RunOptions},
+    posix_exit_mode,
+};
 use octez_riscv::{
     machine_state::bus::main_memory::M1G,
     pvm::PvmHooks,
@@ -17,38 +20,71 @@ pub fn run(opts: RunOptions) -> Result<(), Box<dyn Error>> {
     let program = fs::read(&opts.input)?;
     let initrd = opts.initrd.as_ref().map(fs::read).transpose()?;
 
-    if opts.common.pvm {
-        run_pvm(program.as_slice(), initrd.as_deref(), &opts)
+    struct Runner<'a>(&'a RunOptions);
+
+    impl UseStepper<Result<(), Box<dyn Error>>> for Runner<'_> {
+        fn advance<S: Stepper>(self, stepper: S) -> Result<(), Box<dyn Error>> {
+            run_stepper(stepper, self.0.common.max_steps)
+        }
+    }
+
+    general_run(&opts.common, program, initrd, Runner(&opts))?
+}
+
+/// XXX: Trait used to pass a function for using the generic stepper.
+/// (Couldn't use a trait object + impl FnOnce(...) since [`Stepper`] is not object safe)
+pub trait UseStepper<R> {
+    fn advance<S: Stepper>(self, stepper: S) -> R;
+}
+
+pub fn general_run<F: UseStepper<R>, R>(
+    common: &CommonOptions,
+    program: Vec<u8>,
+    initrd: Option<Vec<u8>>,
+    f: F,
+) -> Result<R, Box<dyn Error>> {
+    if common.pvm {
+        run_pvm(program.as_slice(), initrd.as_deref(), common, |stepper| {
+            f.advance(stepper)
+        })
     } else {
-        run_test(program.as_slice(), initrd.as_deref(), &opts)
+        run_test(program.as_slice(), initrd.as_deref(), common, |stepper| {
+            f.advance(stepper)
+        })
     }
 }
 
-fn run_test(
+fn run_test<R>(
     program: &[u8],
     initrd: Option<&[u8]>,
-    opts: &RunOptions,
-) -> Result<(), Box<dyn Error>> {
+    common: &CommonOptions,
+    f_stepper: impl FnOnce(TestStepper) -> R,
+) -> Result<R, Box<dyn Error>> {
     let mut backend = TestStepper::<'_, M1G>::create_backend();
     let stepper = TestStepper::new(
         &mut backend,
         program,
         initrd,
-        posix_exit_mode(&opts.common.posix_exit_mode),
+        posix_exit_mode(&common.posix_exit_mode),
     )?;
 
-    run_stepper(stepper, opts.common.max_steps)
+    Ok(f_stepper(stepper))
 }
 
-fn run_pvm(program: &[u8], initrd: Option<&[u8]>, opts: &RunOptions) -> Result<(), Box<dyn Error>> {
+fn run_pvm<R>(
+    program: &[u8],
+    initrd: Option<&[u8]>,
+    common: &CommonOptions,
+    f_stepper: impl FnOnce(PvmStepper<M1G>) -> R,
+) -> Result<R, Box<dyn Error>> {
     let mut inbox = InboxBuilder::new();
-    if let Some(inbox_file) = &opts.common.inbox.file {
+    if let Some(inbox_file) = &common.inbox.file {
         inbox.load_from_file(inbox_file)?;
     }
 
-    let rollup_address = SmartRollupAddress::from_b58check(opts.common.inbox.address.as_str())?;
+    let rollup_address = SmartRollupAddress::from_b58check(common.inbox.address.as_str())?;
 
-    let mut console = if opts.common.timings {
+    let mut console = if common.timings {
         Console::with_timings()
     } else {
         Console::new()
@@ -66,10 +102,10 @@ fn run_pvm(program: &[u8], initrd: Option<&[u8]>, opts: &RunOptions) -> Result<(
         inbox.build(),
         hooks,
         rollup_address.into_hash().as_ref().try_into().unwrap(),
-        opts.common.inbox.origination_level,
+        common.inbox.origination_level,
     )?;
 
-    run_stepper(stepper, opts.common.max_steps)
+    Ok(f_stepper(stepper))
 }
 
 fn run_stepper(mut stepper: impl Stepper, max_steps: Option<usize>) -> Result<(), Box<dyn Error>> {

@@ -5,7 +5,7 @@
 
 pub mod bench;
 mod debug;
-mod run;
+pub mod run;
 
 pub use bench::bench;
 pub use debug::debug;

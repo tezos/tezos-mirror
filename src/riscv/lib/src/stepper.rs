@@ -4,7 +4,7 @@
 
 use crate::{
     machine_state::{bus::main_memory::MainMemoryLayout, MachineState},
-    state_backend::ManagerBase,
+    state_backend::{ManagerBase, ManagerRead},
 };
 use std::ops::{AddAssign, Bound};
 
@@ -75,7 +75,7 @@ pub trait Stepper {
     type MainMemoryLayout: MainMemoryLayout;
 
     /// State backend with which the stepper was instantiated
-    type Manager: ManagerBase;
+    type Manager: ManagerBase + ManagerRead;
 
     /// Obtain a reference to the underlying machine state.
     fn machine_state(&self) -> &MachineState<Self::MainMemoryLayout, Self::Manager>;
