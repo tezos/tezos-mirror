@@ -115,6 +115,14 @@ The OpenAPI specifications for the RPCs of the smart rollup node for the Paris
 
 - :src:`docs/api/paris-smart-rollup-node-openapi.json` (version 20.2)
 
+Quebec RPCs
+-----------
+
+The OpenAPI specifications for the RPCs of the smart rollup node for the Quebec
+(``PsquebeC``) protocol proposal can be found at:
+
+- :src:`docs/api/quebec-smart-rollup-node-openapi.json` (version 21.0~rc1)
+
 Alpha RPCs
 ----------
 
