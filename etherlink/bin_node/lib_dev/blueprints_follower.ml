@@ -55,6 +55,7 @@ let quantity_succ (Qty x) = Qty Z.(succ x)
 let[@tailrec] rec go ?remote_head ~next_blueprint_number ~first_connection
     params =
   let open Lwt_result_syntax in
+  Metrics.start_bootstrapping () ;
   let* local_head_too_old, remote_head =
     local_head_too_old
       ?remote_head
@@ -99,6 +100,7 @@ let[@tailrec] rec go ?remote_head ~next_blueprint_number ~first_connection
 
 and[@tailrec] stream_loop (Qty next_blueprint_number) params stream =
   let open Lwt_result_syntax in
+  Metrics.stop_bootstrapping () ;
   let*! candidate =
     Lwt.pick
       [

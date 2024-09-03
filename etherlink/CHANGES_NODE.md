@@ -20,6 +20,12 @@
 - Transaction validation returns the transaction execution gas limit and the
   network's limit if the transaction has too much execution gas. (!todo)
 
+#### Metrics
+
+- Add `octez_evm_node_bootstrapping` which is set to 1.0 when the node is
+  catching-up with its upstream EVM node endpoint, and 0.0 when it considers
+  itself up-to-date. (!14751)
+
 ## Version 0.1 (2024-08-28)
 
 This release concludes two months of development since the freeze of the
