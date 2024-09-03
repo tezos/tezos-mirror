@@ -1077,10 +1077,13 @@ let add_etherlink_source cloud agent ~job_name ?dal_node node sc_rollup_node
     ([node_metric_target; sc_rollup_metric_target; evm_node_metric_target]
     @ dal_node_metric_target)
 
-let init_teztale agent =
+let init_teztale cloud agent =
   if Cli.teztale then
     let* teztale = Teztale.run_server agent in
     let* () = Teztale.wait_server teztale in
+    let* () =
+      Cloud.add_service cloud ("teztale", teztale.server.conf.interface.port)
+    in
     Lwt.return_some teztale
   else Lwt.return_none
 
@@ -1883,7 +1886,7 @@ let init ~(configuration : configuration) cloud next_agent =
   let* teztale =
     match bootstrap_agent with
     | None -> Lwt.return_none
-    | Some agent -> init_teztale agent
+    | Some agent -> init_teztale cloud agent
   in
   let* ( bootstrap,
          baker_accounts,
