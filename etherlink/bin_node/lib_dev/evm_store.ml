@@ -396,6 +396,17 @@ module Q = struct
             receipt_fields
       @@ {eos|SELECT block_hash, block_number, index_, hash, from_, to_, receipt_fields FROM transactions WHERE hash = ?|eos}
 
+    let select_receipts_from_block_number =
+      level
+      ->* t6
+            block_hash
+            quantity
+            root_hash
+            address
+            (option address)
+            receipt_fields
+      @@ {eos|SELECT block_hash, index_, hash, from_, to_, receipt_fields FROM transactions WHERE block_number = ?|eos}
+
     let select_object =
       root_hash
       ->? t7
@@ -407,6 +418,10 @@ module Q = struct
             (option address)
             object_fields
       @@ {eos|SELECT block_hash, block_number, index_, hash, from_, to_, object_fields FROM transactions WHERE hash = ?|eos}
+
+    let select_objects_from_block_number =
+      (level ->* t5 quantity root_hash address (option address) object_fields)
+      @@ {eos|SELECT index_, hash, from_, to_, object_fields FROM transactions WHERE block_number = ?|eos}
 
     let clear_after =
       (level ->. unit) @@ {|DELETE FROM transactions WHERE block_number > ?|}
@@ -756,6 +771,51 @@ module Transactions = struct
           })
       receipt
 
+  let receipts_of_block_number store level =
+    let open Lwt_result_syntax in
+    with_connection store @@ fun conn ->
+    let+ rows =
+      Db.collect_list
+        conn
+        Q.Transactions.select_receipts_from_block_number
+        level
+    in
+    List.map
+      (fun ( block_hash,
+             index,
+             hash,
+             from,
+             to_,
+             Transaction_info.
+               {
+                 cumulative_gas_used;
+                 effective_gas_price;
+                 gas_used;
+                 logs;
+                 logs_bloom;
+                 type_;
+                 status;
+                 contract_address;
+               } ) ->
+        Transaction_receipt.
+          {
+            transactionHash = hash;
+            transactionIndex = index;
+            blockHash = block_hash;
+            blockNumber = level;
+            from;
+            to_;
+            cumulativeGasUsed = cumulative_gas_used;
+            effectiveGasPrice = effective_gas_price;
+            gasUsed = gas_used;
+            logs;
+            logsBloom = logs_bloom;
+            type_;
+            status;
+            contractAddress = contract_address;
+          })
+      rows
+
   let find_object store hash =
     let open Lwt_result_syntax in
     with_connection store @@ fun conn ->
@@ -797,13 +857,58 @@ module Blocks = struct
     with_connection store @@ fun conn ->
     Db.exec conn Q.Blocks.insert (block.number, block.hash, block)
 
-  let find_with_level store level =
-    with_connection store @@ fun conn ->
-    Db.find_opt conn Q.Blocks.select_with_level level
+  let block_with_objects conn block =
+    let open Lwt_result_syntax in
+    let+ rows =
+      Db.collect_list
+        conn
+        Q.Transactions.select_objects_from_block_number
+        block.Ethereum_types.number
+    in
+    let objects_ =
+      List.map
+        (fun ( index,
+               hash,
+               from,
+               to_,
+               Transaction_info.{gas; gas_price; input; nonce; value; v; r; s}
+             ) ->
+          Ethereum_types.
+            {
+              blockHash = Some block.hash;
+              blockNumber = Some block.number;
+              from;
+              gas;
+              gasPrice = gas_price;
+              hash;
+              input;
+              nonce;
+              to_;
+              transactionIndex = Some index;
+              value;
+              v;
+              r;
+              s;
+            })
+        rows
+    in
+    {block with transactions = TxFull objects_}
 
-  let find_with_hash store hash =
+  let find_with_level ~full_transaction_object store level =
+    let open Lwt_result_syntax in
     with_connection store @@ fun conn ->
-    Db.find_opt conn Q.Blocks.select_with_hash hash
+    let* block_opt = Db.find_opt conn Q.Blocks.select_with_level level in
+    if full_transaction_object then
+      Option.map_es (block_with_objects conn) block_opt
+    else return block_opt
+
+  let find_with_hash ~full_transaction_object store hash =
+    let open Lwt_result_syntax in
+    with_connection store @@ fun conn ->
+    let* block_opt = Db.find_opt conn Q.Blocks.select_with_hash hash in
+    if full_transaction_object then
+      Option.map_es (block_with_objects conn) block_opt
+    else return block_opt
 
   let find_hash_of_number store level =
     with_connection store @@ fun conn ->

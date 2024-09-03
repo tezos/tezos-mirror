@@ -123,12 +123,19 @@ end
 module Blocks : sig
   val store : conn -> Ethereum_types.block -> unit tzresult Lwt.t
 
+  (** [find_with_level ~full_transaction_object conn level] returns the block
+      if it's present in the storage. If [full_transaction_object] is set to true,
+      it will also retrieve the transactions objects part of the block. *)
   val find_with_level :
+    full_transaction_object:bool ->
     conn ->
     Ethereum_types.quantity ->
     Ethereum_types.block option tzresult Lwt.t
 
+  (** Same as {!find_with_level} but finds with the block hash instead of block
+      number. *)
   val find_with_hash :
+    full_transaction_object:bool ->
     conn ->
     Ethereum_types.block_hash ->
     Ethereum_types.block option tzresult Lwt.t
@@ -156,6 +163,11 @@ module Transactions : sig
     conn ->
     Ethereum_types.hash ->
     Ethereum_types.transaction_object option tzresult Lwt.t
+
+  (** [receipts_of_block_number conn block_number] returns all the receipts found
+      from level [block_number]. The function does not check if the block exists. *)
+  val receipts_of_block_number :
+    conn -> Ethereum_types.quantity -> Transaction_receipt.t list tzresult Lwt.t
 end
 
 module L1_l2_levels_relationships : sig

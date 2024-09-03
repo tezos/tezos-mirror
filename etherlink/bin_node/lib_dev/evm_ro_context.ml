@@ -329,8 +329,9 @@ let replay ctxt ?(log_file = "replay") ?profile
     evm_state
     blueprint.blueprint.payload
 
-let ro_backend ?evm_node_endpoint ctxt config =
-  (module Make (struct
+let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
+    =
+  let module Backend = Make (struct
     module Executor = struct
       let pvm_config = pvm_config ctxt
 
@@ -357,7 +358,58 @@ let ro_backend ?evm_node_endpoint ctxt config =
     let evm_node_endpoint = evm_node_endpoint
 
     let keep_alive = config.Configuration.keep_alive
-  end) : Services_backend_sig.S)
+  end) in
+  if ctxt.block_storage_sqlite3 then
+    (module struct
+      include Backend
+
+      module Block_storage = struct
+        (* Current block number is kept in durable storage. *)
+        let current_block_number = Block_storage.current_block_number
+
+        let nth_block ~full_transaction_object level =
+          let open Lwt_result_syntax in
+          Evm_store.use ctxt.store @@ fun conn ->
+          let* block_opt =
+            Evm_store.Blocks.find_with_level
+              ~full_transaction_object
+              conn
+              (Qty level)
+          in
+          match block_opt with
+          | None -> failwith "Block %a not found" Z.pp_print level
+          | Some block -> return block
+
+        let block_by_hash ~full_transaction_object hash =
+          let open Lwt_result_syntax in
+          Evm_store.use ctxt.store @@ fun conn ->
+          let* block_opt =
+            Evm_store.Blocks.find_with_hash ~full_transaction_object conn hash
+          in
+          match block_opt with
+          | None ->
+              failwith "Block %a not found" Ethereum_types.pp_block_hash hash
+          | Some block -> return block
+
+        let block_receipts level =
+          let open Lwt_result_syntax in
+          Evm_store.use ctxt.store @@ fun conn ->
+          let* found = Evm_store.Blocks.find_hash_of_number conn (Qty level) in
+          match found with
+          | None -> failwith "Block %a not found" Z.pp_print level
+          | Some _hash ->
+              Evm_store.Transactions.receipts_of_block_number conn (Qty level)
+
+        let transaction_receipt hash =
+          Evm_store.use ctxt.store @@ fun conn ->
+          Evm_store.Transactions.find_receipt conn hash
+
+        let transaction_object hash =
+          Evm_store.use ctxt.store @@ fun conn ->
+          Evm_store.Transactions.find_object conn hash
+      end
+    end)
+  else (module Backend)
 
 let next_blueprint_number ctxt =
   let open Lwt_result_syntax in
