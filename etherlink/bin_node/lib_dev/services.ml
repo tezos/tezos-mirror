@@ -781,7 +781,7 @@ let dispatch_private_request (rpc : Configuration.rpc)
               ~none:[error_of_fmt "missing block number"]
               block_number
           in
-          let* block = Replay.rpc block_number in
+          let* block = Backend_rpc.replay block_number in
           rpc_ok block
         in
         build ~f module_ parameters

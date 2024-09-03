@@ -13,9 +13,5 @@ val main :
   data_dir:string ->
   preimages:string ->
   preimages_endpoint:Uri.t option ->
-  ?smart_rollup_address:string ->
   Ethereum_types.quantity ->
   unit tzresult Lwt.t
-
-(** [rpc block_number] replays the block and returns the block. *)
-val rpc : Ethereum_types.quantity -> Ethereum_types.block tzresult Lwt.t
