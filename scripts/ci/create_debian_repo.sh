@@ -104,12 +104,16 @@ if [ "$CI_PROJECT_NAMESPACE" = "tezos" ] && [ "$CI_COMMIT_REF_PROTECTED" = "true
   GPG_KEY_ID="5DC80C4ED0B7C4FE"
   GPG_PRIVATE_KEY="$GPG_LINUX_PACKAGES_PRIVATE_KEY"
   GPG_PASSPHRASE="$GPG_LINUX_PACKAGES_PASSPHRASE"
+  echo "$GPG_LINUX_PACKAGES_PUBLIC_KEY" > \
+    ./scripts/packaging/package-signing-key-release.asc
+  GPG_PUBLIC_KEY="./scripts/packaging/package-signing-key-release.asc"
 else
   # This is strictly for testing
   # We embed these keys here for testing only.
   GPG_KEY_ID="CFC482F3CD08D36D"
   GPG_PASSPHRASE="07cde771b39a4ed394864baa46126b"
   GPG_PRIVATE_KEY=$(cat ./scripts/packaging/test_repo_private.key)
+  GPG_PUBLIC_KEY="./scripts/packaging/package-signing-key.asc"
 fi
 
 echo "$GPG_PRIVATE_KEY" | base64 --decode | gpg --batch --import --
@@ -122,7 +126,7 @@ for architecture in $ARCHITECTURES; do # amd64, arm64 ...
     echo "targetdir: $TARGETDIR"
 
     # create the apt repository root directory and copy the public key
-    cp scripts/packaging/package-signing-key.asc "$TARGETDIR/octez.asc"
+    cp scripts/packaging/package-signing-key.asc "$GPG_PUBLIC_KEY"
 
     target="dists/${release}/main/binary-${architecture}"
 
