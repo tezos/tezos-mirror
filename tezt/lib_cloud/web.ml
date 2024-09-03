@@ -10,6 +10,7 @@ type t = {
   dir : string;
   monitoring : bool;
   prometheus : bool;
+  mutable services : (string * int) list;
 }
 
 let pp_docker_image fmt = function
@@ -157,14 +158,29 @@ let grafana ~agents =
     Format.asprintf "# Grafana\n [Grafana dashboard](http://%s:3000)\n" domain
   else "Grafana disabled. Use `--grafana` to activate it.\n"
 
-let markdown_content ~agents =
+let service ~agents (name, port) =
+  let domain =
+    match Env.mode with
+    | `Orchestrator ->
+        Proxy.get_agent agents |> Agent.point |> Option.get |> fst
+    | `Host | `Localhost | `Cloud -> "localhost"
+  in
+  Format.asprintf
+    "# %s\n [%s](http://%s:%d)\n"
+    (String.capitalize_ascii name)
+    (String.lowercase_ascii name)
+    domain
+    port
+
+let markdown_content ~agents ~services =
   [
     configuration ~agents;
     grafana ~agents;
     prometheus ~agents;
     monitoring ~agents;
-    debugging ~agents;
   ]
+  @ List.map (service ~agents) services
+  @ [debugging ~agents]
   |> String.concat "\n"
 
 let index dir = dir // "index.md"
@@ -172,7 +188,7 @@ let index dir = dir // "index.md"
 let write t ~agents =
   (* The content is formatted in markdown and will be rendered in html via
      pandoc. *)
-  let content = markdown_content ~agents in
+  let content = markdown_content ~agents ~services:t.services in
   let dir = t.dir in
   let index = index dir in
   Base.with_open_out index (fun oc -> output_string oc content) ;
@@ -189,6 +205,10 @@ let write t ~agents =
       "index.html";
       "-s";
     ]
+
+let add_service t ~agents ~service =
+  t.services <- service :: t.services ;
+  write t ~agents
 
 let run () =
   let* () =
@@ -210,7 +230,7 @@ let run () =
         Filename.dirname index;
       ]
   in
-  Lwt.return {process; dir; monitoring; prometheus}
+  Lwt.return {process; dir; monitoring; prometheus; services = []}
 
 let start ~agents =
   let* t = run () in

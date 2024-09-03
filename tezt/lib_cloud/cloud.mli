@@ -33,3 +33,5 @@ type target = {agent : Agent.t; port : int; app_name : string}
 
 val add_prometheus_source :
   t -> ?metric_path:string -> job_name:string -> target list -> unit Lwt.t
+
+val add_service : t -> string * int -> unit Lwt.t
