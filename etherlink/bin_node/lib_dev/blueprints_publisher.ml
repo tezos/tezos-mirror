@@ -99,9 +99,16 @@ module Worker = struct
     let current = current_cooldown worker in
     if on_cooldown worker then set_cooldown worker (current - 1) else ()
 
-  let publish self payload level ~use_dal_if_enabled =
+  let publish self chunks level ~use_dal_if_enabled =
     let open Lwt_result_syntax in
     let rollup_node_endpoint = rollup_node_endpoint self in
+    let payload =
+      match chunks with
+      | Blueprints_publisher_types.Request.Blueprint {chunks = _; inbox_payload}
+        ->
+          inbox_payload
+      | Inbox payload -> payload
+    in
     (* We do not check if we succeed or not: this will be done when new L2
        heads come from the rollup node. *)
     witness_level self level ;
@@ -185,7 +192,11 @@ module Worker = struct
     let* () =
       List.iter_es
         (fun (Ethereum_types.Qty current, payload) ->
-          publish worker payload current ~use_dal_if_enabled:false)
+          publish
+            worker
+            (Blueprints_publisher_types.Request.Inbox payload)
+            current
+            ~use_dal_if_enabled:false)
         blueprints
     in
 

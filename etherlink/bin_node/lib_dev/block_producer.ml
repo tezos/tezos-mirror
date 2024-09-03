@@ -141,26 +141,33 @@ let produce_block_with_transactions ~sequencer_key ~cctxt ~timestamp
     (Blueprint_events.blueprint_production
        head_info.Evm_context.next_blueprint_number)
   @@ fun () ->
-  let* blueprint =
+  let* blueprint_chunks =
     Misc.with_timing
       (Blueprint_events.blueprint_proposal
          head_info.Evm_context.next_blueprint_number)
     @@ fun () ->
-    Sequencer_blueprint.create
+    Sequencer_blueprint.prepare
       ~sequencer_key
       ~cctxt
       ~timestamp
-      ~smart_rollup_address
       ~transactions
       ~delayed_transactions
       ~parent_hash:head_info.current_block_hash
       ~number:head_info.next_blueprint_number
   in
+  let blueprint_payload =
+    Sequencer_blueprint.create ~smart_rollup_address ~chunks:blueprint_chunks
+  in
   let* () =
-    Evm_context.apply_blueprint timestamp blueprint delayed_transactions
+    Evm_context.apply_blueprint timestamp blueprint_payload delayed_transactions
   in
   let (Qty number) = head_info.next_blueprint_number in
-  let* () = Blueprints_publisher.publish number blueprint in
+  let* () =
+    Blueprints_publisher.publish
+      number
+      (Blueprints_publisher_types.Request.Blueprint
+         {chunks = blueprint_chunks; inbox_payload = blueprint_payload})
+  in
   let*! () =
     List.iter_p
       (fun hash -> Block_producer_events.transaction_selected ~hash)

@@ -18,7 +18,8 @@ val shutdown : unit -> unit tzresult Lwt.t
 (** [publish level payload] sends a request to the publisher worker to
     forward the chunked blueprint [payload] for level [level] to the
     rollup node. *)
-val publish : Z.t -> [`External of string] list -> unit tzresult Lwt.t
+val publish :
+  Z.t -> Blueprints_publisher_types.Request.payload -> unit tzresult Lwt.t
 
 (** [new_rollup_block rollup_level] tells the worker that a new rollup
     node block. *)
