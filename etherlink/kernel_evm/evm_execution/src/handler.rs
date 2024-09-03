@@ -14,7 +14,7 @@ use crate::account_storage::{
     account_path, AccountStorageError, EthereumAccount, EthereumAccountStorage,
     CODE_HASH_DEFAULT,
 };
-use crate::storage::blocks::get_block_hash;
+use crate::storage::blocks::{get_block_hash, BLOCKS_STORED};
 use crate::storage::tracer;
 use crate::tick_model_opcodes;
 use crate::trace::{
@@ -2080,7 +2080,8 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
 
         match self.block.number.checked_sub(number) {
             Some(block_diff)
-                if block_diff <= U256::from(256) && block_diff != U256::zero() =>
+                if block_diff <= U256::from(BLOCKS_STORED)
+                    && block_diff != U256::zero() =>
             {
                 get_block_hash(self.host, number).unwrap_or_default()
             }

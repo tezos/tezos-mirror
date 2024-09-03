@@ -6,7 +6,6 @@ use crate::storage::read_h256;
 use crate::storage::read_u256_le;
 use crate::storage::write_h256;
 use crate::storage::write_u256_le;
-use evm_execution::storage::blocks::add_new_block_hash;
 use primitive_types::{H256, U256};
 use tezos_ethereum::block::L2Block;
 use tezos_ethereum::rlp_helpers::VersionedEncoding;
@@ -60,10 +59,6 @@ pub fn store_current(host: &mut impl Runtime, block: &L2Block) -> anyhow::Result
     store_current_number(host, block.number)?;
     store_current_hash(host, block.hash)?;
     store_block(host, block)?;
-    // We store the current block hash so the BLOCKHASH opcode can retrieve the block hash
-    // by its number and return it in the execution flow.
-    // The routine to clean the outdated hashes (see BLOCKHASH's spec.) is within [add_new_block_hash].
-    add_new_block_hash(host, block.number, block.hash)?;
     log!(
         host,
         Info,
