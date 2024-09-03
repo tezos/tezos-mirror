@@ -88,11 +88,8 @@ let encoding =
            with_metrics,
            verbosity ) ->
       let with_transaction =
-        (* By default, if the database uses sqlite, we want to use the
-           transaction mode in "FULL" since it is faster. For
-           Postgresql we don't want to use it by default. If the value
-           is specified by the administrator we take this one
-           instead. *)
+        (* FULL mode used by default with SQLite backend.
+           caqti-driver-sqlite3 handles URIs starting with "sqlite3://" *)
         match with_transaction with
         | None ->
             if String.starts_with ~prefix:"sqlite" db_uri then FULL else NONE
