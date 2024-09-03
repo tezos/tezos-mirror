@@ -53,6 +53,7 @@ The node provides some RPCs which are independent of the protocol.
 Their OpenAPI specification can be found at:
 
 - :src:`docs/api/rpc-openapi.json` (version 20.2)
+- :src:`docs/api/rpc-openapi-rc.json` (version 21.0~rc1)
 - :src:`docs/api/rpc-openapi-dev.json` (version master)
 
 .. TODO tezos/tezos#2170: add/remove section(s)
