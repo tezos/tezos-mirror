@@ -1473,19 +1473,19 @@ let jobs pipeline_type =
               ~name:"oc.install_python_noble"
               ~image:Images.ubuntu_noble
               ~project:"tezos/tezos"
-              ~branch:"latest-release";
+              ~branch:"master";
             job_install_python
               ~__POS__
               ~name:"oc.install_python_jammy"
               ~image:Images.ubuntu_jammy
               ~project:"tezos/tezos"
-              ~branch:"latest-release";
+              ~branch:"master";
             job_install_python
               ~__POS__
               ~name:"oc.install_python_bookworm"
               ~image:Images.debian_bookworm
               ~project:"tezos/tezos"
-              ~branch:"latest-release";
+              ~branch:"master";
           ]
       | Before_merging ->
           [

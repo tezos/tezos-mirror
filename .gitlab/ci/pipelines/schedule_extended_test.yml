@@ -2647,7 +2647,7 @@ oc.install_python_noble:
   dependencies: []
   timeout: 60 minutes
   script:
-  - ./docs/developer/install-python-debian-ubuntu.sh tezos/tezos latest-release
+  - ./docs/developer/install-python-debian-ubuntu.sh tezos/tezos master
 
 oc.install_python_jammy:
   image: public.ecr.aws/lts/ubuntu:22.04_stable
@@ -2659,7 +2659,7 @@ oc.install_python_jammy:
   dependencies: []
   timeout: 60 minutes
   script:
-  - ./docs/developer/install-python-debian-ubuntu.sh tezos/tezos latest-release
+  - ./docs/developer/install-python-debian-ubuntu.sh tezos/tezos master
 
 oc.install_python_bookworm:
   image: debian:bookworm
@@ -2671,7 +2671,7 @@ oc.install_python_bookworm:
   dependencies: []
   timeout: 60 minutes
   script:
-  - ./docs/developer/install-python-debian-ubuntu.sh tezos/tezos latest-release
+  - ./docs/developer/install-python-debian-ubuntu.sh tezos/tezos master
 
 documentation:odoc:
   image: ${ci_image_name}/test:${ci_image_tag}
