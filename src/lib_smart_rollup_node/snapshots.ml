@@ -634,6 +634,7 @@ let post_checks ?(apply_unsafe_patches = false) ~action ~message snapshot_header
     Context.load (module C) ~cache_size:100 Read_only context_dir
   in
   let* head = check_head head context in
+  let*? () = check_last_commitment head snapshot_header in
   let* check_block_data =
     match action with
     | `Export -> return check_block_data
@@ -645,7 +646,6 @@ let post_checks ?(apply_unsafe_patches = false) ~action ~message snapshot_header
                order to verify state hashes. *)
             failwith "No metadata (needs rollup kind)."
         | Some metadata ->
-            let*? () = check_last_commitment head snapshot_header in
             let* () = check_lcc metadata cctxt store head (module Plugin) in
             return
               (check_block_data_consistency
