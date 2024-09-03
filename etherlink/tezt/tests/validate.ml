@@ -411,7 +411,7 @@ let test_validate_gas_limit =
           "0x01f86982053980843b9aca008411e1a30094d77420f73b4612a7a99dba8c2afd30a1886b03448080c001a026ce5062285cd3ade072bd279e56a5ce0679cd56c8cfaf434f5d2b9a1d211c8ea06ebd07be2e0231557a0f6a3766667faa711f0675469da46e3dceb045d5558fd5"
   in
   let*@? err = Rpc.send_raw_transaction ~raw_tx:gas_limit_too_high sequencer in
-  Check.((err.message = "Gas limit for execution is too high") string)
+  Check.(err.message =~ rex "Gas limit for execution is too high")
     ~error_msg:"Gas limit too high for execution, it should fail" ;
   (* This transaction should work as it covers the gas for da_fee and not above the limit *)
   let* valid_transaction =

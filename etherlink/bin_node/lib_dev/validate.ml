@@ -80,7 +80,14 @@ let validate_gas_limit (module Backend_rpc : Services_backend_sig.S)
     else return (Error "Invalid gas_limit for da_fees")
   in
   if Z.leq execution_gas_limit maximum_gas_limit then return (Ok ())
-  else return (Error "Gas limit for execution is too high")
+  else
+    return
+      (Error
+         (Format.sprintf
+            "Gas limit for execution is too high. Maximum limit is %s, \
+             transaction has %s"
+            (Z.to_string maximum_gas_limit)
+            (Z.to_string execution_gas_limit)))
 
 let validate_sender_not_a_contract (module Backend_rpc : Services_backend_sig.S)
     caller : (unit, string) result tzresult Lwt.t =
