@@ -1815,6 +1815,7 @@ function hash() {
   commit_if_changes "docs: generate ${label}/rpc.rst"
 
   make -C docs openapi
+  rm -rf openapi-tmp
   commit_if_changes "docs: generate openapi"
 
   echo "Rehashing done"
