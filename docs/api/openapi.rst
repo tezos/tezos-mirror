@@ -138,6 +138,7 @@ The DAL node also provides RPCs.
 Their OpenAPI specification can be found at:
 
 - :src:`docs/api/dal-node-openapi.json` (version 20.2)
+- :src:`docs/api/dal-node-openapi-rc.json` (version 21.0~rc1)
 - :src:`docs/api/dal-node-openapi-dev.json` (version master)
 
 .. _openapi_generate:
