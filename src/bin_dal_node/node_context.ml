@@ -109,6 +109,8 @@ let get_plugin_for_level ctxt ~level =
 
 let get_all_plugins ctxt = Proto_plugins.to_list ctxt.proto_plugins
 
+let set_proto_plugins ctxt proto_plugins = ctxt.proto_plugins <- proto_plugins
+
 let storage_period ctxt proto_parameters =
   match ctxt.config.history_mode with
   | Full -> `Always
