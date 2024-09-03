@@ -1660,21 +1660,8 @@ function hash() {
     commit "tezt: move ${previous_tag} encoding samples to ${new_tag}"
   fi
 
-  if [[ ${is_snapshot} == true ]]; then
-    # regression_protocol_name = $short hash  minus the first 2 characters
-    regression_protocol_name=${short_hash:2}
-    # with all characters in lowercase
-    regression_protocol_name=$(tr '[:upper:]' '[:lower:]' <<< "${regression_protocol_name}")
-    # and capitalized
-    regression_protocol_name=$(tr '[:lower:]' '[:upper:]' <<< "${regression_protocol_name:0:1}")${regression_protocol_name:1}
-
-    regression_source_name=${source_short_hash:2}
-    regression_source_name=$(tr '[:upper:]' '[:lower:]' <<< "${regression_source_name}")
-    regression_source_name=$(tr '[:lower:]' '[:upper:]' <<< "${regression_source_name:0:1}")${regression_source_name:1}
-  else
-    regression_protocol_name=${capitalized_label}
-    regression_source_name=${capitalized_source}
-  fi
+  regression_protocol_name=${capitalized_label}
+  regression_source_name=${capitalized_source}
 
   while [[ ${#regression_protocol_name} -lt 5 ]]; do
     regression_protocol_name="${regression_protocol_name}-"
@@ -1814,7 +1801,7 @@ function hash() {
   make -C docs "${label}"/rpc.rst
   commit_if_changes "docs: generate ${label}/rpc.rst"
 
-  make -C docs openapi
+  make -C docs openapi || log_blue "updated openapi"
   commit_if_changes "docs: generate openapi"
 
   echo "Rehashing done"
