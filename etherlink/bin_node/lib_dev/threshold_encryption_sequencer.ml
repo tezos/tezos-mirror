@@ -82,7 +82,9 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
           ~parent_hash:Ethereum_types.genesis_parent_hash
       in
       let genesis_payload =
-        Sequencer_blueprint.create ~smart_rollup_address ~chunks:genesis_chunks
+        Sequencer_blueprint.create_inbox_payload
+          ~smart_rollup_address
+          ~chunks:genesis_chunks
       in
       let* () =
         Evm_context.apply_blueprint genesis_timestamp genesis_payload []

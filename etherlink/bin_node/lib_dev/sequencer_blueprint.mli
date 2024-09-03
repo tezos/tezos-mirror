@@ -34,10 +34,14 @@ val prepare :
   transactions:string list ->
   t list tzresult Lwt.t
 
-(** [create ~smart_rollup_address ~rlp_chunks] encodes the chunks into
-    message(s) that can be read by the kernel. *)
-val create :
+(** [create_inbox_payload ~smart_rollup_address ~chunks] encodes the chunks into
+    message(s) that can be read from the inbox by the kernel. *)
+val create_inbox_payload :
   smart_rollup_address:string -> chunks:t list -> Blueprint_types.payload
+
+(** [create_dal_payload chunk] encodes the chunk into a message that can be
+    read from a DAL slot by the kernel. *)
+val create_dal_payload : t -> string
 
 (** [maximum_usable_size_in_blueprint chunks_count] returns the available space
     for transactions in a blueprint composed of [chunks_count] chunks. *)

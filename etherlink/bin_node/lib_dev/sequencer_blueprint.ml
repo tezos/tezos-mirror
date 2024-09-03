@@ -157,9 +157,15 @@ let prepare_message smart_rollup_address kind rlp =
     Message_format.(
       frame_message smart_rollup_address kind rlp_sequencer_blueprint)
 
-let create ~smart_rollup_address ~chunks : Blueprint_types.payload =
+let create_inbox_payload ~smart_rollup_address ~chunks : Blueprint_types.payload
+    =
   List.map
     (fun chunk ->
       chunk_to_rlp chunk
       |> prepare_message smart_rollup_address Message_format.Blueprint_chunk)
     chunks
+
+let create_dal_payload chunk =
+  Message_format.(
+    frame_dal_message Blueprint_chunk
+    @@ (chunk_to_rlp chunk |> Rlp.encode |> Bytes.to_string))

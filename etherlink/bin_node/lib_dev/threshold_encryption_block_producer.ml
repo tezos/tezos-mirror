@@ -91,7 +91,9 @@ let produce_block ~sequencer_key ~cctxt ~smart_rollup_address preblock =
       ~parent_hash:previous_block_hash
       ~number:current_blueprint_number
   in
-  let payload = Sequencer_blueprint.create ~smart_rollup_address ~chunks in
+  let payload =
+    Sequencer_blueprint.create_inbox_payload ~smart_rollup_address ~chunks
+  in
   let (Qty number) = current_blueprint_number in
   let* () =
     Evm_context.apply_blueprint timestamp payload delayed_transactions
