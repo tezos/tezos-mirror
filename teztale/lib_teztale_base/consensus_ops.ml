@@ -31,11 +31,6 @@ let operation_kind_encoding =
   let open Data_encoding in
   string_enum [("Endorsement", Attestation); ("Preendorsement", Preattestation)]
 
-let pp_operation_kind ppf kind =
-  match kind with
-  | Attestation -> Format.fprintf ppf "Endorsement"
-  | Preattestation -> Format.fprintf ppf "Preendorsement"
-
 type operation = {
   hash : Operation_hash.t;
   kind : operation_kind;
