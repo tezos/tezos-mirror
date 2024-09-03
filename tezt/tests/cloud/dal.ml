@@ -96,7 +96,7 @@ module Node = struct
   include Node
 
   let init ?(arguments = []) ?data_dir ?dal_config ~name network agent =
-    toplog "Inititializing a node" ;
+    toplog "Inititializing a L1 node" ;
     match network with
     | Network.Ghostnet -> (
         match data_dir with
@@ -1382,7 +1382,7 @@ let init_baker cloud (configuration : configuration) ~bootstrap account i agent
 
 let init_producer cloud configuration ~bootstrap ~number_of_slots account i
     agent =
-  let () = toplog "Init producer" in
+  let () = toplog "Initializing a DAL producer" in
   let name = Format.asprintf "producer-node-%i" i in
   let data_dir =
     Cli.data_dir |> Option.map (fun data_dir -> data_dir // name)
@@ -1481,7 +1481,6 @@ let init_observer cloud configuration ~bootstrap ~slot_index i agent =
 let init_etherlink_operator_setup cloud configuration name ~bootstrap ~dal_slots
     account agent =
   let is_sequencer = configuration.etherlink_sequencer in
-  let () = toplog "Init Etherlink operator setup" in
   let name = Format.asprintf "etherlink-%s-node" name in
   let data_dir =
     Cli.data_dir |> Option.map (fun data_dir -> data_dir // name)
@@ -1495,9 +1494,8 @@ let init_etherlink_operator_setup cloud configuration name ~bootstrap ~dal_slots
       configuration.network
       agent
   in
-  let () = toplog "Init Etherlink operator setup: create agent" in
   let* client = Client.Agent.create ~node agent in
-  let () = toplog "Init Etherlink operator setup: import key" in
+  let () = toplog "Init Etherlink: importing the sequencer secret key" in
   let* () =
     Client.import_secret_key
       client
@@ -1505,17 +1503,14 @@ let init_etherlink_operator_setup cloud configuration name ~bootstrap ~dal_slots
       account.Account.secret_key
       ~alias:account.Account.alias
   in
-  let () = toplog "Init Etherlink operator setup: get last seen level" in
   let l = Node.get_last_seen_level node in
-  let () = toplog "Init Etherlink operator setup: reveal account" in
+  let () = toplog "Init Etherlink: revealing the sequencer account" in
   let*! () =
     Client.reveal client ~endpoint:(Node node) ~src:account.Account.alias
   in
-  let () = toplog "Init Etherlink operator setup: wait for level %d" (l + 2) in
+  let () = toplog "Init Etherlink operator: waiting for level %d" (l + 2) in
   let* _ = Node.wait_for_level node (l + 2) in
-  let () =
-    toplog "Init Etherlink operator setup: wait for level %d: done" (l + 2)
-  in
+  let () = toplog "Init Etherlink: waiting for level %d: done" (l + 2) in
   (* A configuration is generated locally by the orchestrator. The resulting
      kernel will be pushed to Etherlink. *)
   let output_config = Temp.file "config.yaml" in
@@ -1525,9 +1520,7 @@ let init_etherlink_operator_setup cloud configuration name ~bootstrap ~dal_slots
   in
   let*! () =
     let sequencer = if is_sequencer then Some account.public_key else None in
-    let () =
-      toplog "Init Etherlink operator setup: make kernel installer config"
-    in
+    let () = toplog "Init Etherlink: configuring the kernel" in
     Tezt_etherlink.Evm_node.make_kernel_installer_config
       ?sequencer
       ~bootstrap_accounts
@@ -1556,7 +1549,6 @@ let init_etherlink_operator_setup cloud configuration name ~bootstrap ~dal_slots
         let* () = Dal_node.run dal_node in
         some dal_node
   in
-  let () = toplog "Init Etherlink operator setup: create rollup node" in
   let* sc_rollup_node =
     Sc_rollup_node.Agent.create
       ~name:(Format.asprintf "etherlink-%s-rollup-node" name)
@@ -1580,7 +1572,7 @@ let init_etherlink_operator_setup cloud configuration name ~bootstrap ~dal_slots
   in
   let pvm_kind = "wasm_2_0_0" in
   let l = Node.get_last_seen_level node in
-  let () = toplog "Init Etherlink operator setup: originate rollup" in
+  let () = toplog "Init Etherlink: originating the rollup" in
   let* sc_rollup_address =
     Sc_rollup_helpers.Agent.originate_sc_rollup
       ~kind:pvm_kind
@@ -1589,16 +1581,10 @@ let init_etherlink_operator_setup cloud configuration name ~bootstrap ~dal_slots
       ~src:account.alias
       client
   in
-  let () =
-    toplog "Init Etherlink operator setup: wait again, for level %d" (l + 2)
-  in
+  let () = toplog "Init Etherlink: waiting again, for level %d" (l + 2) in
   let* _ = Node.wait_for_level node (l + 2) in
-  let () =
-    toplog
-      "Init Etherlink operator setup: wait again, for level %d: done"
-      (l + 2)
-  in
-  let () = toplog "Init Etherlink operator setup: running the rollup node" in
+  let () = toplog "Init Etherlink: waiting again, for level %d: done" (l + 2) in
+  let () = toplog "Init Etherlink: launching the rollup node" in
   let* () =
     Sc_rollup_node.run sc_rollup_node sc_rollup_address [Log_kernel_debug]
   in
@@ -1630,7 +1616,6 @@ let init_etherlink_operator_setup cloud configuration name ~bootstrap ~dal_slots
     if is_sequencer then sequencer_mode
     else Evm_node.Proxy {finalized_view = false}
   in
-  let () = toplog "Init Etherlink operator setup: init the operator agent" in
   let* evm_node =
     Tezos.Evm_node.Agent.init
       ~name:(Format.asprintf "etherlink-%s-evm-node" name)
@@ -1649,7 +1634,6 @@ let init_etherlink_operator_setup cloud configuration name ~bootstrap ~dal_slots
       sc_rollup_address;
     }
   in
-  let () = toplog "Init Etherlink operator setup: add metrics source" in
   let* () =
     add_etherlink_source
       cloud
@@ -1748,9 +1732,8 @@ let init_etherlink_producer_setup cloud operator name account ~bootstrap agent =
 
 let init_etherlink cloud configuration ~bootstrap etherlink_rollup_operator_key
     ~dal_slots next_agent =
-  let () = toplog "init_etherlink" in
+  let () = toplog "Initializing an Etherlink operator" in
   let* operator_agent = next_agent ~name:"etherlink-operator-agent" in
-  let () = toplog "init_etherlink: init operator setup" in
   let* operator =
     init_etherlink_operator_setup
       cloud
@@ -1768,7 +1751,6 @@ let init_etherlink cloud configuration ~bootstrap etherlink_rollup_operator_key
         next_agent ~name)
     |> Lwt.all
   in
-  let () = toplog "init_etherlink: init Etherlink producers" in
   let* producers =
     producers_agents
     |> List.mapi (fun i agent ->
