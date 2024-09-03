@@ -85,7 +85,8 @@ let start_server rpc directory =
 
   return finalizer
 
-let start_public_server ?evm_services (config : Configuration.t) ctxt =
+let start_public_server ?delegate_health_check_to ?evm_services
+    (config : Configuration.t) ctxt =
   let open Lwt_result_syntax in
   let register_evm_services =
     match evm_services with
@@ -98,7 +99,8 @@ let start_public_server ?evm_services (config : Configuration.t) ctxt =
           impl.time_between_blocks
   in
   let directory =
-    Services.directory config.public_rpc config ctxt |> register_evm_services
+    Services.directory ?delegate_health_check_to config.public_rpc config ctxt
+    |> register_evm_services
   in
   let* finalizer = start_server config.public_rpc directory in
   let*! () =

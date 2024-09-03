@@ -18,8 +18,11 @@
 
 #### RPCs
 
-- RPC `/configuration` returns the loaded configuration. Some sensitive/internal
+- Add `GET /configuration` that returns the loaded configuration. Some sensitive/internal
   fields are hidden from the output. (!13865)
+- Add `GET /health_check` that fails with an internal server error if the EVM
+  node is catching-up with its upstream EVM node, advertizing the RPC server
+  can return outdated results. (!14769)
 - The node in RPC mode now supports the `"finalized"` block parameter. (!14725)
 - Transaction validation returns the transaction execution gas limit and the
   network's limit if the transaction has too much execution gas. (!todo)

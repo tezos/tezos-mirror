@@ -42,6 +42,26 @@ let configuration_service =
     ~output:Data_encoding.Json.encoding
     Path.(root / "configuration")
 
+let health_check_service =
+  Service.get_service
+    ~description:"Assess the health of the RPC server"
+    ~query:Query.empty
+    ~output:Data_encoding.empty
+    Path.(root / "health_check")
+
+type error += Node_is_bootstrapping
+
+let () =
+  register_error_kind
+    `Temporary
+    ~id:"node_is_bootstrapping"
+    ~title:"Node is bootstrapping"
+    ~description:
+      "Node is bootstrapping and result from the RPC servers can be outdated"
+    Data_encoding.empty
+    (function Node_is_bootstrapping -> Some () | _ -> None)
+    (fun () -> Node_is_bootstrapping)
+
 let client_version =
   Format.sprintf
     "%s/%s-%s/%s/ocamlc.%s"
@@ -105,6 +125,29 @@ let configuration config dir =
            ~include_default_fields:`Always
            (Configuration.encoding hidden)
            config))
+
+let health_check ?delegate_to dir =
+  let handler =
+    match delegate_to with
+    | None ->
+        fun () () ->
+          let open Lwt_result_syntax in
+          let* () =
+            fail_when (Metrics.is_bootstrapping ()) Node_is_bootstrapping
+          in
+          return_unit
+    | Some evm_node_endpoint ->
+        fun () () ->
+          Rollup_services.call_service
+            ~keep_alive:false
+            ~base:evm_node_endpoint
+            ~media_types:[Media_type.json]
+            health_check_service
+            ()
+            ()
+            ()
+  in
+  Directory.register0 dir health_check_service handler
 
 (* The node can either take a single request or multiple requests at
    once. *)
@@ -827,9 +870,10 @@ let dispatch_private (rpc : Configuration.rpc) ~block_production config ctx dir
     Path.(add_suffix root "private")
     (dispatch_private_request rpc ~block_production)
 
-let directory rpc config
+let directory ?delegate_health_check_to rpc config
     ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address) =
   Directory.empty |> version |> configuration config
+  |> health_check ?delegate_to:delegate_health_check_to
   |> dispatch_public
        rpc
        config

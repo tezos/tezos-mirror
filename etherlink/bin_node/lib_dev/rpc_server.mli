@@ -41,6 +41,7 @@ val start_private_server :
     The optional argument [evm_services_methods] can be used to install
     the EVM services. *)
 val start_public_server :
+  ?delegate_health_check_to:Uri.t ->
   ?evm_services:evm_services_methods ->
   Configuration.t ->
   (module Services_backend_sig.S) * 'a ->
