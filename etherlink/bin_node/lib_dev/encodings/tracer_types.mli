@@ -76,11 +76,11 @@ module StructLogger : sig
     op : Opcode.t;
     gas : uint53;
     gas_cost : uint53;
-    memory : Hex.t list option;
+    memory : Ethereum_types.hex list option;
     mem_size : int32 option;
-    stack : Hex.t list option;
-    return_data : Hex.t option;
-    storage : (Hex.t * Hex.t) list option;
+    stack : Ethereum_types.hex list option;
+    return_data : Ethereum_types.hex option;
+    storage : (Ethereum_types.hex * Ethereum_types.hex) list option;
     depth : uint53;
     refund : uint53;
     error : string option;

@@ -43,6 +43,10 @@ let hex_of_string s =
     Hex (String.sub s 2 (n - 2))
   else Hex s
 
+let hex_encode_string s =
+  let (`Hex s) = Hex.of_string s in
+  Hex s
+
 let hex_to_bytes (Hex h) = Hex.to_bytes_exn (`Hex h) |> Bytes.to_string
 
 let hex_to_real_bytes (Hex h) = Hex.to_bytes_exn (`Hex h)
@@ -56,6 +60,11 @@ let hex_of_utf8 str =
   Hex h
 
 let hex_encoding = Data_encoding.(conv hex_to_string hex_of_string string)
+
+let hex_to_string_no0x (Hex s) = s
+
+let hex_encoding_no0x =
+  Data_encoding.(conv hex_to_string_no0x hex_of_string string)
 
 type address = Address of hex [@@ocaml.unboxed]
 
@@ -1021,3 +1030,25 @@ let hash_raw_tx raw_tx =
     Tezos_crypto.Hacl.Hash.Keccak_256.digest (String.to_bytes raw_tx)
   in
   Hash (Hex Hex.(of_bytes hash |> show))
+
+module From_rlp = struct
+  let decode_hex =
+    Rlp.decode_value (fun b ->
+        let open Result_syntax in
+        let* (`Hex s) = Result_syntax.return @@ Hex.of_bytes b in
+        return (Hex s))
+
+  let decode_string =
+    Rlp.decode_value (fun b -> Result_syntax.return @@ Bytes.to_string b)
+
+  let decode_address =
+    Rlp.decode_value (fun b -> Result_syntax.return @@ decode_address b)
+
+  let decode_z =
+    Rlp.decode_value (fun b ->
+        Result_syntax.return @@ Z.of_bits @@ Bytes.to_string b)
+
+  let decode_int =
+    Rlp.decode_value (fun b ->
+        Result_syntax.return @@ Z.to_int @@ Z.of_bits @@ Bytes.to_string b)
+end

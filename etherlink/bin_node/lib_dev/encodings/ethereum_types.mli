@@ -30,8 +30,15 @@ type hex = Hex of string [@@unboxed]
 
 val hex_encoding : hex Data_encoding.t
 
+(** version of [hex_encoding] that do not add `0x` on encoded values. *)
+val hex_encoding_no0x : hex Data_encoding.t
+
 (** Strips the [0x] prefix of a string. *)
 val hex_of_string : string -> hex
+
+(** Encodes a string into hexa. see {!Hex.of_string}
+    E.g. [hex_encode_string "Mirage OS"] is [Hex "4d69726167654f53"]*)
+val hex_encode_string : string -> hex
 
 (** [hex_to_bytes hex] transforms the [hex] to binary format. *)
 val hex_to_bytes : hex -> string
@@ -266,3 +273,15 @@ val transaction_log_body_from_rlp :
   Rlp.item -> address * hash list * hex * quantity
 
 val decode_hex : bytes -> hex
+
+module From_rlp : sig
+  val decode_address : Rlp.item -> address tzresult
+
+  val decode_string : Rlp.item -> string tzresult
+
+  val decode_int : Rlp.item -> int tzresult
+
+  val decode_z : Rlp.item -> Z.t tzresult
+
+  val decode_hex : Rlp.item -> hex tzresult
+end
