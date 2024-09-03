@@ -5,40 +5,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module type S = sig
-  module Reader : Durable_storage.READER
-
-  (** [balance address block_param] returns the [address]'s balance at block
-      [block_param]. *)
-  val balance :
-    Ethereum_types.address ->
-    Ethereum_types.Block_parameter.extended ->
-    Ethereum_types.quantity tzresult Lwt.t
-
-  (** [nonce address block_param] returns the [address]'s nonce at
-      block [block_param]. *)
-  val nonce :
-    Ethereum_types.address ->
-    Ethereum_types.Block_parameter.extended ->
-    Ethereum_types.quantity option tzresult Lwt.t
-
-  (** [code address block_param] returns the [address]'s code at block
-      [block_param]. *)
-  val code :
-    Ethereum_types.address ->
-    Ethereum_types.Block_parameter.extended ->
-    Ethereum_types.hex tzresult Lwt.t
-
-  (** [inject_transactions ~timestamp ~smart_rollup_address
-      ~transactions] crafts the hashes and chunks of each transaction
-      of [transactions]. Injects the chunks and returns the hashes of
-      injected transactions. *)
-  val inject_transactions :
-    timestamp:Time.Protocol.t ->
-    smart_rollup_address:string ->
-    transactions:(string * Ethereum_types.transaction_object) list ->
-    Ethereum_types.hash list tzresult Lwt.t
-
+module type Block_storage = sig
   (** [current_block ~full_transaction_object] returns the most recent
       processed and stored block.
 
@@ -51,14 +18,6 @@ module type S = sig
   (** [current_block_number ()] returns the most recent processed and
       stored block number. *)
   val current_block_number : unit -> Ethereum_types.quantity tzresult Lwt.t
-
-  val block_param_to_block_number :
-    Ethereum_types.Block_parameter.extended ->
-    Ethereum_types.quantity tzresult Lwt.t
-
-  (** [nth_block_hash n] returns the hash of the [n]th processed and
-      stored block. *)
-  val nth_block_hash : Z.t -> Ethereum_types.block_hash option tzresult Lwt.t
 
   (** [nth_block ~full_transaction_object n] returns the [n]th
       processed and stored block.
@@ -93,6 +52,47 @@ module type S = sig
   val transaction_object :
     Ethereum_types.hash ->
     Ethereum_types.transaction_object option tzresult Lwt.t
+end
+
+module type S = sig
+  module Reader : Durable_storage.READER
+
+  module Block_storage : Block_storage
+
+  (** [balance address block_param] returns the [address]'s balance at block
+      [block_param]. *)
+  val balance :
+    Ethereum_types.address ->
+    Ethereum_types.Block_parameter.extended ->
+    Ethereum_types.quantity tzresult Lwt.t
+
+  (** [nonce address block_param] returns the [address]'s nonce at
+      block [block_param]. *)
+  val nonce :
+    Ethereum_types.address ->
+    Ethereum_types.Block_parameter.extended ->
+    Ethereum_types.quantity option tzresult Lwt.t
+
+  (** [code address block_param] returns the [address]'s code at block
+      [block_param]. *)
+  val code :
+    Ethereum_types.address ->
+    Ethereum_types.Block_parameter.extended ->
+    Ethereum_types.hex tzresult Lwt.t
+
+  (** [inject_transactions ~timestamp ~smart_rollup_address
+      ~transactions] crafts the hashes and chunks of each transaction
+      of [transactions]. Injects the chunks and returns the hashes of
+      injected transactions. *)
+  val inject_transactions :
+    timestamp:Time.Protocol.t ->
+    smart_rollup_address:string ->
+    transactions:(string * Ethereum_types.transaction_object) list ->
+    Ethereum_types.hash list tzresult Lwt.t
+
+  val block_param_to_block_number :
+    Ethereum_types.Block_parameter.extended ->
+    Ethereum_types.quantity tzresult Lwt.t
 
   (** [chain_id ()] returns chain id defined by the rollup. *)
   val chain_id : unit -> Ethereum_types.quantity tzresult Lwt.t
@@ -181,6 +181,7 @@ end
 module Make (Backend : Backend) (Executor : Evm_execution.S) : S = struct
   module Reader = Backend.Reader
   include Durable_storage.Make (Backend.Reader)
+  module Block_storage = Durable_storage.Make_block_storage (Backend.Reader)
   include Publisher.Make (Backend.TxEncoder) (Backend.Publisher)
   include Simulator.Make (Backend.SimulatorBackend)
 
@@ -190,7 +191,7 @@ module Make (Backend : Backend) (Executor : Evm_execution.S) : S = struct
     Tracer_sig.Make
       (Executor)
       (struct
-        let transaction_receipt = transaction_receipt
+        let transaction_receipt = Block_storage.transaction_receipt
       end)
       (Backend.Tracer)
 
