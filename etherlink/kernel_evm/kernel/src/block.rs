@@ -30,7 +30,6 @@ use primitive_types::{H160, H256, U256};
 use tezos_ethereum::block::BlockFees;
 use tezos_ethereum::transaction::TransactionHash;
 use tezos_evm_logging::{log, Level::*};
-use tezos_evm_runtime::internal_runtime::InternalRuntime;
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_evm_runtime::safe_storage::SafeStorage;
 use tezos_smart_rollup::outbox::OutboxQueue;
@@ -321,7 +320,7 @@ fn compute_bip<Host: Runtime>(
 }
 
 fn revert_block<Host: Runtime>(
-    safe_host: &mut SafeStorage<&mut Host, &mut impl InternalRuntime>,
+    safe_host: &mut SafeStorage<&mut Host>,
     block_in_progress: bool,
     number: U256,
     error: anyhow::Error,
@@ -351,7 +350,7 @@ fn clean_delayed_transactions(
 }
 
 fn promote_block<Host: Runtime>(
-    safe_host: &mut SafeStorage<&mut Host, &mut impl InternalRuntime>,
+    safe_host: &mut SafeStorage<&mut Host>,
     outbox_queue: &OutboxQueue<'_, impl Path>,
     block_in_progress: bool,
     number: U256,
@@ -424,17 +423,10 @@ pub fn produce<Host: Runtime>(
 
     let at_most_one_block = host.store_has(&AT_MOST_ONE_BLOCK)?.is_some();
 
-    #[cfg(not(test))]
-    let mut internal_storage = tezos_evm_runtime::internal_runtime::InternalHost();
-    #[cfg(test)]
-    let mut internal_storage = tezos_evm_runtime::mock_internal::MockInternal();
-    let mut safe_host = SafeStorage {
-        host,
-        internal: &mut internal_storage,
-    };
+    let mut safe_host = SafeStorage { host };
     let outbox_queue = OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX)?;
     let precompiles =
-        precompiles::precompile_set::<SafeStorage<&mut Host, _>>(config.enable_fa_bridge);
+        precompiles::precompile_set::<SafeStorage<&mut Host>>(config.enable_fa_bridge);
 
     // Check if there's a BIP in storage to resume its execution
     match storage::read_block_in_progress(&safe_host)? {
@@ -614,6 +606,7 @@ mod tests {
         TransactionHash, TransactionStatus, TransactionType, TRANSACTION_HASH_SIZE,
     };
     use tezos_ethereum::tx_common::EthereumTransactionCommon;
+    use tezos_evm_runtime::runtime::KernelHost;
     use tezos_smart_rollup_encoding::timestamp::Timestamp;
     use tezos_smart_rollup_mock::MockHost;
 
