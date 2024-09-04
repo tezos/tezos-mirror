@@ -3,16 +3,23 @@
 # SPDX-License-Identifier: MIT
 
 [package]
-name = "tezos-indexable-storage"
+name = "tezos-storage"
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
 
 [dependencies]
 thiserror.workspace = true
+anyhow.workspace = true
+
+primitive-types.workspace = true
+
 rlp.workspace = true
-tezos-evm-logging.workspace = true
+hex.workspace = true
+
+tezos_crypto_rs.workspace = true
+sha3.workspace = true
+
+tezos_ethereum.workspace = true
 tezos-smart-rollup-host.workspace = true
-tezos-smart-rollup-mock.workspace = true
 tezos-smart-rollup-storage.workspace = true
-tezos-storage.workspace = true

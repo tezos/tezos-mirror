@@ -10,9 +10,7 @@ use crate::configuration::{Configuration, ConfigurationMode};
 use crate::error::{Error, StorageError};
 use crate::inbox::{Transaction, TransactionContent};
 use crate::sequencer_blueprint::{BlueprintWithDelayedHashes, SequencerBlueprint};
-use crate::storage::{
-    read_last_info_per_level_timestamp, read_rlp, store_read_slice, store_rlp,
-};
+use crate::storage::read_last_info_per_level_timestamp;
 use crate::{delayed_inbox, DelayedInbox};
 use primitive_types::U256;
 use rlp::{Decodable, DecoderError, Encodable};
@@ -24,6 +22,9 @@ use tezos_smart_rollup::types::Timestamp;
 use tezos_smart_rollup_core::MAX_INPUT_MESSAGE_SIZE;
 use tezos_smart_rollup_host::path::*;
 use tezos_smart_rollup_host::runtime::{Runtime, RuntimeError};
+use tezos_storage::{
+    error::Error as GenStorageError, read_rlp, store_read_slice, store_rlp,
+};
 
 pub const EVM_BLUEPRINTS: RefPath = RefPath::assert_from(b"/evm/blueprints");
 
@@ -135,7 +136,7 @@ pub fn store_sequencer_blueprint<Host: Runtime>(
     let blueprint_chunk_path =
         blueprint_chunk_path(&blueprint_path, blueprint.blueprint.chunk_index)?;
     let store_blueprint = StoreBlueprint::SequencerChunk(blueprint.blueprint.chunk);
-    store_rlp(&store_blueprint, host, &blueprint_chunk_path)
+    store_rlp(&store_blueprint, host, &blueprint_chunk_path).map_err(Error::from)
 }
 
 pub fn store_inbox_blueprint_by_number<Host: Runtime>(
@@ -147,7 +148,7 @@ pub fn store_inbox_blueprint_by_number<Host: Runtime>(
     store_blueprint_nb_chunks(host, &blueprint_path, 1)?;
     let chunk_path = blueprint_chunk_path(&blueprint_path, 0)?;
     let store_blueprint = StoreBlueprint::InboxBlueprint(blueprint);
-    store_rlp(&store_blueprint, host, &chunk_path)
+    store_rlp(&store_blueprint, host, &chunk_path).map_err(Error::from)
 }
 
 pub fn store_inbox_blueprint<Host: Runtime>(
@@ -162,7 +163,7 @@ pub fn store_inbox_blueprint<Host: Runtime>(
 pub fn read_next_blueprint_number<Host: Runtime>(host: &Host) -> anyhow::Result<U256> {
     match block_storage::read_current_number(host) {
         Err(err) => match err.downcast_ref() {
-            Some(Error::Storage(StorageError::Runtime(RuntimeError::PathNotFound))) => {
+            Some(GenStorageError::Runtime(RuntimeError::PathNotFound)) => {
                 Ok(U256::zero())
             }
             _ => Err(err),
@@ -181,7 +182,7 @@ pub fn store_immediate_blueprint<Host: Runtime>(
     store_blueprint_nb_chunks(host, &blueprint_path, 1)?;
     let chunk_path = blueprint_chunk_path(&blueprint_path, 0)?;
     let store_blueprint = StoreBlueprint::InboxBlueprint(blueprint);
-    store_rlp(&store_blueprint, host, &chunk_path)
+    store_rlp(&store_blueprint, host, &chunk_path).map_err(Error::from)
 }
 
 /// For the tick model we only accept blueprints where cumulative size of chunks

@@ -19,9 +19,10 @@ use tezos_smart_rollup_encoding::{
     michelson::{ticket::FA2_1Ticket, MichelsonOption, MichelsonPair},
 };
 use tezos_smart_rollup_mock::MockHost;
+use tezos_storage::read_u256_le_default;
 
 use crate::{
-    account_storage::{account_path, read_u256, EthereumAccountStorage},
+    account_storage::{account_path, EthereumAccountStorage},
     handler::{EvmHandler, ExecutionOutcome},
     precompiles::{self, precompile_set, SYSTEM_ACCOUNT_ADDRESS},
     run_transaction,
@@ -202,7 +203,7 @@ pub fn ticket_balance_get(
     let path = system
         .custom_path(&ticket_balance_path(ticket_hash, address).unwrap())
         .unwrap();
-    read_u256(host, &path, U256::zero()).unwrap()
+    read_u256_le_default(host, &path, U256::zero()).unwrap()
 }
 
 /// Get next withdrawal counter value

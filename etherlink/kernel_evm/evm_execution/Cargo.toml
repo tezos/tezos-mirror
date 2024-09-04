@@ -39,6 +39,7 @@ bn.workspace = true
 tezos_ethereum.workspace = true
 tezos-evm-logging.workspace = true
 tezos-indexable-storage.workspace = true
+tezos-storage.workspace = true
 
 tezos-smart-rollup-core.workspace = true
 tezos-smart-rollup-host.workspace = true
@@ -67,7 +68,11 @@ alloy-primitives.workspace = true
 [features]
 default = ["evm_execution"]
 testing = ["rand", "proptest", "dep:tezos-smart-rollup-mock"]
-fa_bridge_testing = ["dep:tezos-smart-rollup-mock", "dep:alloy-primitives", "dep:alloy-sol-types"]
+fa_bridge_testing = [
+    "dep:tezos-smart-rollup-mock",
+    "dep:alloy-primitives",
+    "dep:alloy-sol-types",
+]
 evm_execution = []
 debug = ["tezos-evm-logging/debug"]
 # the `benchmark` and `benchmark-opcodes` feature flags instrument the kernel for profiling

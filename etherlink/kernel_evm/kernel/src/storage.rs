@@ -14,7 +14,7 @@ use evm_execution::trace::{
 };
 use num_derive::{FromPrimitive, ToPrimitive};
 use num_traits::{FromPrimitive, ToPrimitive};
-use tezos_crypto_rs::hash::{ContractKt1Hash, HashTrait};
+use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_evm_logging::{log, Level::*};
 use tezos_indexable_storage::IndexableStorage;
 use tezos_smart_rollup_core::MAX_FILE_CHUNK_SIZE;
@@ -22,16 +22,19 @@ use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::path::*;
 use tezos_smart_rollup_host::runtime::{Runtime, ValueType};
+use tezos_storage::{
+    read_b58_kt1, read_u256_le, read_u64_le, store_read_slice, write_u256_le,
+    write_u64_le,
+};
 
-use crate::error::{Error, StorageError};
+use crate::error::Error;
 use rlp::{Decodable, Encodable, Rlp};
 use tezos_ethereum::rlp_helpers::{FromRlpBytes, VersionedEncoding};
 use tezos_ethereum::transaction::{
     TransactionHash, TransactionObject, TransactionReceipt,
 };
-use tezos_ethereum::wei::Wei;
 
-use primitive_types::{H160, H256, U256};
+use primitive_types::{H160, U256};
 
 #[derive(
     FromPrimitive, ToPrimitive, Copy, Debug, Clone, PartialEq, Eq, PartialOrd, Ord,
@@ -139,9 +142,6 @@ const EVM_DELAYED_INBOX_TIMEOUT: RefPath =
 const EVM_DELAYED_INBOX_MIN_LEVELS: RefPath =
     RefPath::assert_from(b"/evm/delayed_inbox_min_levels");
 
-/// The size of one 256 bit word. Size in bytes
-pub const WORD_SIZE: usize = 32usize;
-
 // Path to the tz1 administrating the sequencer. If there is nothing
 // at this path, the kernel is in proxy mode.
 pub const SEQUENCER: RefPath = RefPath::assert_from(b"/evm/sequencer");
@@ -166,64 +166,6 @@ const EVM_NODE_FLAG: RefPath = RefPath::assert_from(b"/__evm_node");
 const MAX_BLUEPRINT_LOOKAHEAD_IN_SECONDS: RefPath =
     RefPath::assert_from(b"/evm/max_blueprint_lookahead_in_seconds");
 
-pub fn store_read_slice<Host: Runtime, T: Path>(
-    host: &Host,
-    path: &T,
-    buffer: &mut [u8],
-    expected_size: usize,
-) -> Result<(), Error> {
-    let size = Runtime::store_read_slice(host, path, 0, buffer)?;
-    if size == expected_size {
-        Ok(())
-    } else {
-        Err(Error::Storage(StorageError::InvalidLoadValue {
-            expected: expected_size,
-            actual: size,
-        }))
-    }
-}
-
-pub fn read_h256(host: &impl Runtime, path: &impl Path) -> anyhow::Result<H256> {
-    let mut buffer = [0_u8; 32];
-    store_read_slice(host, path, &mut buffer, 32)?;
-    Ok(H256::from_slice(&buffer))
-}
-
-pub fn write_h256(
-    host: &mut impl Runtime,
-    path: &impl Path,
-    hash: H256,
-) -> anyhow::Result<()> {
-    Ok(host.store_write_all(path, hash.as_bytes())?)
-}
-
-/// Read a single unsigned 256 bit value from storage at the path given.
-pub fn read_u256_le(host: &impl Runtime, path: &OwnedPath) -> Result<U256, Error> {
-    let bytes = host.store_read(path, 0, WORD_SIZE)?;
-    Ok(Wei::from_little_endian(&bytes))
-}
-
-pub fn write_u256_le(
-    host: &mut impl Runtime,
-    path: &OwnedPath,
-    value: U256,
-) -> Result<(), Error> {
-    let mut bytes: [u8; WORD_SIZE] = value.into();
-    value.to_little_endian(&mut bytes);
-    host.store_write(path, &bytes, 0).map_err(Error::from)
-}
-
-fn read_u64(host: &impl Runtime, path: &impl Path) -> Result<u64, Error> {
-    let mut bytes = [0; std::mem::size_of::<u64>()];
-    host.store_read_slice(path, 0, bytes.as_mut_slice())?;
-    Ok(u64::from_le_bytes(bytes))
-}
-
-fn write_u64(host: &mut impl Runtime, path: &impl Path, value: u64) -> Result<(), Error> {
-    host.store_write_all(path, value.to_le_bytes().as_slice())?;
-    Ok(())
-}
-
 pub fn receipt_path(receipt_hash: &TransactionHash) -> Result<OwnedPath, Error> {
     let hash = hex::encode(receipt_hash);
     let raw_receipt_path: Vec<u8> = format!("/{}", &hash).into();
@@ -236,38 +178,6 @@ pub fn object_path(object_hash: &TransactionHash) -> Result<OwnedPath, Error> {
     let raw_object_path: Vec<u8> = format!("/{}", &hash).into();
     let object_path = OwnedPath::try_from(raw_object_path)?;
     concat(&EVM_TRANSACTIONS_OBJECTS, &object_path).map_err(Error::from)
-}
-
-pub fn store_rlp<T: Encodable, Host: Runtime>(
-    src: &T,
-    host: &mut Host,
-    path: &impl Path,
-) -> Result<(), Error> {
-    let bytes = src.rlp_bytes();
-    host.store_write_all(path, &bytes).map_err(Error::from)
-}
-
-pub fn read_rlp<T: Decodable, Host: Runtime>(
-    host: &Host,
-    path: &impl Path,
-) -> Result<T, Error> {
-    let bytes = host.store_read_all(path)?;
-    FromRlpBytes::from_rlp_bytes(&bytes).map_err(Error::from)
-}
-
-/// Read data from the durable storage under the given path.
-///
-/// If there is no data, None is returned.
-pub fn read_optional_rlp<T: Decodable>(
-    host: &impl Runtime,
-    path: &impl Path,
-) -> Result<Option<T>, anyhow::Error> {
-    if let Some(ValueType::Value) = host.store_has(path)? {
-        let elt = read_rlp(host, path)?;
-        Ok(Some(elt))
-    } else {
-        Ok(None)
-    }
 }
 
 pub fn store_simulation_result<Host: Runtime, T: Decodable + Encodable>(
@@ -523,45 +433,45 @@ pub fn store_chain_id<Host: Runtime>(
     host: &mut Host,
     chain_id: U256,
 ) -> Result<(), Error> {
-    write_u256_le(host, &EVM_CHAIN_ID.into(), chain_id)
+    write_u256_le(host, &EVM_CHAIN_ID, chain_id).map_err(Error::from)
 }
 
 pub fn read_chain_id<Host: Runtime>(host: &Host) -> Result<U256, Error> {
-    read_u256_le(host, &EVM_CHAIN_ID.into())
+    read_u256_le(host, &EVM_CHAIN_ID).map_err(Error::from)
 }
 
 pub fn store_base_fee_per_gas<Host: Runtime>(
     host: &mut Host,
     base_fee_per_gas: U256,
 ) -> Result<(), Error> {
-    write_u256_le(host, &EVM_BASE_FEE_PER_GAS.into(), base_fee_per_gas)
+    write_u256_le(host, &EVM_BASE_FEE_PER_GAS, base_fee_per_gas).map_err(Error::from)
 }
 
 pub fn read_base_fee_per_gas<Host: Runtime>(host: &mut Host) -> Result<U256, Error> {
-    read_u256_le(host, &EVM_BASE_FEE_PER_GAS.into())
+    read_u256_le(host, &EVM_BASE_FEE_PER_GAS).map_err(Error::from)
 }
 
 pub fn read_minimum_base_fee_per_gas<Host: Runtime>(host: &Host) -> Result<U256, Error> {
-    read_u256_le(host, &EVM_MINIMUM_BASE_FEE_PER_GAS.into())
+    read_u256_le(host, &EVM_MINIMUM_BASE_FEE_PER_GAS).map_err(Error::from)
 }
 
 pub fn read_tick_backlog(host: &impl Runtime) -> Result<u64, Error> {
-    read_u64(host, &TICK_BACKLOG_PATH)
+    read_u64_le(host, &TICK_BACKLOG_PATH).map_err(Error::from)
 }
 
 pub fn store_tick_backlog(host: &mut impl Runtime, value: u64) -> Result<(), Error> {
-    write_u64(host, &TICK_BACKLOG_PATH, value)
+    write_u64_le(host, &TICK_BACKLOG_PATH, value).map_err(Error::from)
 }
 
 pub fn read_tick_backlog_timestamp(host: &impl Runtime) -> Result<u64, Error> {
-    read_u64(host, &TICK_BACKLOG_TIMESTAMP_PATH)
+    read_u64_le(host, &TICK_BACKLOG_TIMESTAMP_PATH).map_err(Error::from)
 }
 
 pub fn store_tick_backlog_timestamp(
     host: &mut impl Runtime,
     value: u64,
 ) -> Result<(), Error> {
-    write_u64(host, &TICK_BACKLOG_TIMESTAMP_PATH, value)?;
+    write_u64_le(host, &TICK_BACKLOG_TIMESTAMP_PATH, value)?;
     Ok(())
 }
 
@@ -570,33 +480,33 @@ pub fn store_minimum_base_fee_per_gas<Host: Runtime>(
     host: &mut Host,
     price: U256,
 ) -> Result<(), Error> {
-    write_u256_le(host, &EVM_MINIMUM_BASE_FEE_PER_GAS.into(), price)
+    write_u256_le(host, &EVM_MINIMUM_BASE_FEE_PER_GAS, price).map_err(Error::from)
 }
 
 pub fn store_da_fee(
     host: &mut impl Runtime,
     base_fee_per_gas: U256,
 ) -> Result<(), Error> {
-    write_u256_le(host, &EVM_DA_FEE.into(), base_fee_per_gas)
+    write_u256_le(host, &EVM_DA_FEE, base_fee_per_gas).map_err(Error::from)
 }
 
 pub fn read_da_fee(host: &impl Runtime) -> Result<U256, Error> {
-    read_u256_le(host, &EVM_DA_FEE.into())
+    read_u256_le(host, &EVM_DA_FEE).map_err(Error::from)
 }
 
 pub fn update_burned_fees(
     host: &mut impl Runtime,
     burned_fee: U256,
 ) -> Result<(), Error> {
-    let path = &EVM_BURNED_FEES.into();
+    let path = &EVM_BURNED_FEES;
     let current = read_u256_le(host, path).unwrap_or_else(|_| U256::zero());
     let new = current.saturating_add(burned_fee);
-    write_u256_le(host, path, new)
+    write_u256_le(host, path, new).map_err(Error::from)
 }
 
 #[cfg(test)]
 pub fn read_burned_fees(host: &mut impl Runtime) -> U256 {
-    let path = &EVM_BURNED_FEES.into();
+    let path = &EVM_BURNED_FEES;
     read_u256_le(host, path).unwrap_or_else(|_| U256::zero())
 }
 
@@ -697,39 +607,32 @@ pub fn read_last_info_per_level_timestamp<Host: Runtime>(
     read_timestamp_path(host, &EVM_INFO_PER_LEVEL_TIMESTAMP.into())
 }
 
-fn read_b58_kt1<Host: Runtime>(host: &Host, path: &OwnedPath) -> Option<ContractKt1Hash> {
-    let mut buffer = [0; 36];
-    store_read_slice(host, path, &mut buffer, 36).ok()?;
-    let kt1_b58 = String::from_utf8(buffer.to_vec()).ok()?;
-    ContractKt1Hash::from_b58check(&kt1_b58).ok()
-}
-
 pub fn read_admin<Host: Runtime>(host: &mut Host) -> Option<ContractKt1Hash> {
-    read_b58_kt1(host, &ADMIN.into())
+    read_b58_kt1(host, &ADMIN)
 }
 
 pub fn read_sequencer_governance<Host: Runtime>(
     host: &mut Host,
 ) -> Option<ContractKt1Hash> {
-    read_b58_kt1(host, &SEQUENCER_GOVERNANCE.into())
+    read_b58_kt1(host, &SEQUENCER_GOVERNANCE)
 }
 
 pub fn read_kernel_governance<Host: Runtime>(host: &mut Host) -> Option<ContractKt1Hash> {
-    read_b58_kt1(host, &KERNEL_GOVERNANCE.into())
+    read_b58_kt1(host, &KERNEL_GOVERNANCE)
 }
 
 pub fn read_kernel_security_governance<Host: Runtime>(
     host: &mut Host,
 ) -> Option<ContractKt1Hash> {
-    read_b58_kt1(host, &KERNEL_SECURITY_GOVERNANCE.into())
+    read_b58_kt1(host, &KERNEL_SECURITY_GOVERNANCE)
 }
 
 pub fn read_maximum_allowed_ticks<Host: Runtime>(host: &mut Host) -> Option<u64> {
-    read_u64(host, &MAXIMUM_ALLOWED_TICKS).ok()
+    read_u64_le(host, &MAXIMUM_ALLOWED_TICKS).ok()
 }
 
 pub fn read_maximum_gas_per_transaction<Host: Runtime>(host: &mut Host) -> Option<u64> {
-    read_u64(host, &MAXIMUM_GAS_PER_TRANSACTION).ok()
+    read_u64_le(host, &MAXIMUM_GAS_PER_TRANSACTION).ok()
 }
 
 pub fn store_storage_version<Host: Runtime>(
@@ -1028,7 +931,7 @@ pub use internal_for_tests::*;
 pub fn read_delayed_transaction_bridge<Host: Runtime>(
     host: &Host,
 ) -> Option<ContractKt1Hash> {
-    read_b58_kt1(host, &DELAYED_BRIDGE.into())
+    read_b58_kt1(host, &DELAYED_BRIDGE)
 }
 
 #[cfg(test)]

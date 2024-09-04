@@ -16,6 +16,7 @@ use tezos_smart_rollup_encoding::entrypoint::EntrypointError;
 use tezos_smart_rollup_encoding::michelson::ticket::TicketError;
 use tezos_smart_rollup_host::path::PathError;
 use tezos_smart_rollup_host::runtime::RuntimeError;
+use tezos_storage::error::Error as GenStorageError;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -202,6 +203,24 @@ impl From<IndexableStorageError> for Error {
             IndexableStorageError::Storage(e) => Error::Storage(StorageError::Storage(e)),
             IndexableStorageError::IndexOutOfBounds => {
                 Error::Storage(StorageError::IndexOutOfBounds)
+            }
+            IndexableStorageError::RlpDecoderError(e) => Error::RlpDecoderError(e),
+            IndexableStorageError::InvalidLoadValue { expected, actual } => {
+                Error::Storage(StorageError::InvalidLoadValue { expected, actual })
+            }
+        }
+    }
+}
+
+impl From<GenStorageError> for Error {
+    fn from(e: GenStorageError) -> Self {
+        match e {
+            GenStorageError::Path(e) => Error::Storage(StorageError::Path(e)),
+            GenStorageError::Runtime(e) => Error::Storage(StorageError::Runtime(e)),
+            GenStorageError::Storage(e) => Error::Storage(StorageError::Storage(e)),
+            GenStorageError::RlpDecoderError(e) => Error::RlpDecoderError(e),
+            GenStorageError::InvalidLoadValue { expected, actual } => {
+                Error::Storage(StorageError::InvalidLoadValue { expected, actual })
             }
         }
     }

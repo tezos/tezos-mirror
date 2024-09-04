@@ -3,34 +3,16 @@
 //
 // SPDX-License-Identifier: MIT
 
+use rlp::DecoderError;
 use tezos_evm_logging::log;
 use tezos_evm_logging::Level::Error;
 use tezos_smart_rollup_host::path::{concat, OwnedPath, PathError, RefPath};
 use tezos_smart_rollup_host::runtime::{Runtime, RuntimeError};
 use tezos_smart_rollup_storage::StorageError;
+use tezos_storage::{error::Error as GenStorageError, read_u64_le, write_u64_le};
 use thiserror::Error;
 
 const LENGTH: RefPath = RefPath::assert_from(b"/length");
-
-/// Utility function to read a little_endian encoded u64 in the storage
-fn read_u64<Host: Runtime>(host: &Host, path: &OwnedPath) -> Result<u64, RuntimeError> {
-    let mut buffer = [0_u8; std::mem::size_of::<u64>()];
-    let value = host.store_read_slice(path, 0, &mut buffer)?;
-    if value != 8 {
-        Err(RuntimeError::DecodingError)
-    } else {
-        Ok(u64::from_le_bytes(buffer))
-    }
-}
-
-/// Utility function to write u64 in little endian in the storage
-fn store_u64<Host: Runtime>(
-    host: &mut Host,
-    path: &OwnedPath,
-    value: u64,
-) -> Result<(), RuntimeError> {
-    host.store_write_all(path, &value.to_le_bytes())
-}
 
 /// An indexable storage is a push-only mapping between increasing integers to
 /// bytes. It can serve as a replacement for the combination of the host
@@ -50,8 +32,28 @@ pub enum IndexableStorageError {
     Runtime(#[from] RuntimeError),
     #[error(transparent)]
     Storage(#[from] StorageError),
+    #[error("Failed to decode: {0}")]
+    RlpDecoderError(DecoderError),
+    #[error("Storage error: error while reading a value (incorrect size). Expected {expected} but got {actual}")]
+    InvalidLoadValue { expected: usize, actual: usize },
     #[error("Storage error: index out of bound")]
     IndexOutOfBounds,
+}
+
+impl From<GenStorageError> for IndexableStorageError {
+    fn from(e: GenStorageError) -> Self {
+        match e {
+            GenStorageError::Path(e) => IndexableStorageError::Path(e),
+            GenStorageError::Runtime(e) => IndexableStorageError::Runtime(e),
+            GenStorageError::Storage(e) => IndexableStorageError::Storage(e),
+            GenStorageError::RlpDecoderError(e) => {
+                IndexableStorageError::RlpDecoderError(e)
+            }
+            GenStorageError::InvalidLoadValue { expected, actual } => {
+                IndexableStorageError::InvalidLoadValue { expected, actual }
+            }
+        }
+    }
 }
 
 impl IndexableStorage {
@@ -87,22 +89,29 @@ impl IndexableStorage {
         host: &mut Host,
     ) -> Result<u64, IndexableStorageError> {
         let path = concat(&self.path, &LENGTH)?;
-        let length = read_u64(host, &path).unwrap_or(0);
-        store_u64(host, &path, length + 1)?;
+        let length = read_u64_le(host, &path).unwrap_or(0);
+        write_u64_le(host, &path, length + 1)?;
         Ok(length)
     }
 
     #[allow(dead_code)]
     /// `length` returns the number of keys in the storage. If `/length` does
     /// not exists, the storage is considered as empty and returns '0'.
-    pub fn length<Host: Runtime>(&self, host: &Host) -> Result<u64, StorageError> {
+    pub fn length<Host: Runtime>(
+        &self,
+        host: &Host,
+    ) -> Result<u64, IndexableStorageError> {
         let path = concat(&self.path, &LENGTH)?;
-        match read_u64(host, &path) {
+        match read_u64_le(host, &path) {
             Ok(l) => Ok(l),
             Err(
-                RuntimeError::PathNotFound
-                | RuntimeError::HostErr(tezos_smart_rollup_host::Error::StoreNotAValue)
-                | RuntimeError::HostErr(tezos_smart_rollup_host::Error::StoreInvalidAccess),
+                GenStorageError::Runtime(
+                    RuntimeError::PathNotFound
+                    | RuntimeError::HostErr(tezos_smart_rollup_host::Error::StoreNotAValue)
+                    | RuntimeError::HostErr(
+                        tezos_smart_rollup_host::Error::StoreInvalidAccess,
+                    ),
+                ),
                 // An InvalidAccess implies that the path does not exist at all
                 // in the storage: store_read fails because reading is out of
                 // bounds since the value has never been allocated before

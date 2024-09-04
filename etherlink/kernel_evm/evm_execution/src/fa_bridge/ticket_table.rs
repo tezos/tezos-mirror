@@ -7,16 +7,13 @@
 //! Maintains a ledger that tracks ownership of deposited tickets.
 //! Any EVM account can be ticket owner, whether it's EOA or smart contract.
 
+use crate::account_storage::{account_path, AccountStorageError, EthereumAccount};
 use primitive_types::{H160, H256, U256};
 use tezos_smart_rollup_host::{
     path::{concat, OwnedPath, RefPath},
     runtime::Runtime,
 };
-
-use crate::account_storage::{
-    account_path, path_from_h256, read_u256, write_u256, AccountStorageError,
-    EthereumAccount,
-};
+use tezos_storage::{path_from_h256, read_u256_le_default, write_u256_le};
 
 /// Path where global ticket table is stored
 const TICKET_TABLE_PATH: RefPath = RefPath::assert_from(b"/ticket_table");
@@ -58,10 +55,10 @@ impl TicketTable for EthereumAccount {
         amount: U256,
     ) -> Result<bool, AccountStorageError> {
         let path = self.custom_path(&ticket_balance_path(ticket_hash, owner)?)?;
-        let balance = read_u256(host, &path, U256::zero())?;
+        let balance = read_u256_le_default(host, &path, U256::zero())?;
 
         if let Some(new_balance) = balance.checked_add(amount) {
-            write_u256(host, &path, new_balance)?;
+            write_u256_le(host, &path, new_balance)?;
             Ok(true)
         } else {
             Ok(false)
@@ -76,10 +73,10 @@ impl TicketTable for EthereumAccount {
         amount: U256,
     ) -> Result<bool, AccountStorageError> {
         let path = self.custom_path(&ticket_balance_path(ticket_hash, owner)?)?;
-        let balance = read_u256(host, &path, U256::zero())?;
+        let balance = read_u256_le_default(host, &path, U256::zero())?;
 
         if let Some(new_balance) = balance.checked_sub(amount) {
-            write_u256(host, &path, new_balance)?;
+            write_u256_le(host, &path, new_balance)?;
             Ok(true)
         } else {
             Ok(false)
@@ -91,8 +88,9 @@ impl TicketTable for EthereumAccount {
 mod tests {
     use tezos_smart_rollup_host::path::RefPath;
     use tezos_smart_rollup_mock::MockHost;
+    use tezos_storage::read_u256_le_default;
 
-    use crate::{account_storage::read_u256, precompiles::SYSTEM_ACCOUNT_ADDRESS};
+    use crate::precompiles::SYSTEM_ACCOUNT_ADDRESS;
 
     use super::*;
 
@@ -117,7 +115,8 @@ mod tests {
             /0101010101010101010101010101010101010101010101010101010101010101\
             /0202020202020202020202020202020202020202";
         let balance =
-            read_u256(&host, &RefPath::assert_from(path), U256::zero()).unwrap();
+            read_u256_le_default(&host, &RefPath::assert_from(path), U256::zero())
+                .unwrap();
 
         assert_eq!(U256::from(84), balance);
     }
@@ -145,7 +144,8 @@ mod tests {
             /0101010101010101010101010101010101010101010101010101010101010101\
             /0202020202020202020202020202020202020202";
         let balance =
-            read_u256(&host, &RefPath::assert_from(path), U256::zero()).unwrap();
+            read_u256_le_default(&host, &RefPath::assert_from(path), U256::zero())
+                .unwrap();
 
         assert_eq!(U256::MAX, balance);
     }

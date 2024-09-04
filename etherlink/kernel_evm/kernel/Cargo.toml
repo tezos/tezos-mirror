@@ -41,6 +41,7 @@ evm-execution.workspace = true
 tezos_ethereum.workspace = true
 tezos-evm-logging.workspace = true
 tezos-indexable-storage.workspace = true
+tezos-storage.workspace = true
 
 tezos-smart-rollup.workspace = true
 tezos-smart-rollup-core.workspace = true

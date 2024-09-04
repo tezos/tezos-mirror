@@ -16,6 +16,7 @@ members = [
   "evm_evaluation",
   "indexable_storage",
   "logging",
+  "storage",
 ]
 
 [workspace.dependencies]
@@ -61,6 +62,7 @@ tezos_ethereum = { path = "./ethereum" }
 evm-execution = { path = "./evm_execution" }
 tezos-evm-logging = { path = "./logging" }
 tezos-indexable-storage = { path = "./indexable_storage" }
+tezos-storage = { path = "./storage" }
 
 # SDK
 tezos-smart-rollup = { path = "../../src/kernel_sdk/sdk" }
