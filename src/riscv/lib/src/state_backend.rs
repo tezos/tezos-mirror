@@ -55,25 +55,20 @@
 //! [Layouts]: Layout
 //! [Locations]: Location
 
-pub mod memory_backend;
-
-mod layout;
-pub use layout::*;
-
 mod alloc;
-pub use alloc::*;
-
-mod region;
-pub use region::*;
-
-mod enums;
-pub use enums::*;
-
-mod elems;
-pub use elems::*;
-
 mod effects;
+mod elems;
+mod enums;
+mod layout;
+pub mod memory_backend;
+mod region;
+
+pub use alloc::*;
 pub use effects::*;
+pub use elems::*;
+pub use enums::*;
+pub use layout::*;
+pub use region::*;
 
 /// Manager of the state backend storage
 pub trait ManagerBase {
