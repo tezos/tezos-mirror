@@ -250,6 +250,15 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::ManagerBase> MachineState<ML
         }
     }
 
+    /// Obtain a structure with references to the bound regions of this type.
+    pub fn struct_ref(&self) -> backend::AllocatedOf<MachineStateLayout<ML>, backend::Ref<'_, M>> {
+        (
+            self.hart.struct_ref(),
+            self.bus.struct_ref(),
+            self.translation_cache.struct_ref(),
+        )
+    }
+
     /// Reset the machine state.
     pub fn reset(&mut self)
     where

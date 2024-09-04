@@ -4,7 +4,7 @@
 
 use super::{
     AllocatedOf, Atom, Cell, CellBase, CellRead, CellReadWrite, CellWrite, Elem, ManagerBase,
-    ManagerRead, ManagerReadWrite, ManagerWrite,
+    ManagerRead, ManagerReadWrite, ManagerWrite, Ref,
 };
 use std::marker::PhantomData;
 
@@ -29,6 +29,11 @@ where
             cell: space,
             _pd: PhantomData,
         }
+    }
+
+    /// Obtain a structure with references to the bound regions of this type.
+    pub fn struct_ref(&self) -> AllocatedOf<EnumCellLayout<R>, Ref<'_, M>> {
+        self.cell.struct_ref()
     }
 
     /// Reset the enum cell by writing the default value of `T`.

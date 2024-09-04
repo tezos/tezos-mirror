@@ -30,6 +30,11 @@ impl<M: backend::ManagerBase> Devices<M> {
         }
     }
 
+    /// Obtain a structure with references to the bound regions of this type.
+    pub fn struct_ref(&self) -> backend::AllocatedOf<DevicesLayout, backend::Ref<'_, M>> {
+        self._placeholder.struct_ref()
+    }
+
     /// Reset the devices state.
     pub fn reset(&mut self)
     where

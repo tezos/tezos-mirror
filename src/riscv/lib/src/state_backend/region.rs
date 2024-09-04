@@ -2,7 +2,9 @@
 //
 // SPDX-License-Identifier: MIT
 
-use super::{Elem, ManagerBase, ManagerRead, ManagerReadWrite, ManagerWrite};
+use super::{
+    AllocatedOf, Array, Atom, Elem, ManagerBase, ManagerRead, ManagerReadWrite, ManagerWrite, Ref,
+};
 
 /// Single element of type `E`
 #[repr(transparent)]
@@ -15,6 +17,13 @@ impl<E: Elem, M: ManagerBase> Cell<E, M> {
     pub fn bind(region: M::Region<E, 1>) -> Self {
         Self {
             region: Cells::bind(region),
+        }
+    }
+
+    /// Obtain a structure with references to the bound regions of this type.
+    pub fn struct_ref(&self) -> AllocatedOf<Atom<E>, Ref<'_, M>> {
+        Cell {
+            region: self.region.struct_ref(),
         }
     }
 
@@ -208,6 +217,11 @@ impl<E: Elem, const LEN: usize, M: ManagerBase> Cells<E, LEN, M> {
         Self { region }
     }
 
+    /// Obtain a structure with references to the bound regions of this type.
+    pub fn struct_ref(&self) -> AllocatedOf<Array<E, LEN>, Ref<'_, M>> {
+        Cells::bind(&self.region)
+    }
+
     /// Read an element in the region.
     #[inline]
     pub fn read(&self, index: usize) -> E
@@ -281,6 +295,11 @@ impl<const LEN: usize, M: ManagerBase> DynCells<LEN, M> {
     /// Bind this state to the given dynamic region.
     pub fn bind(region: M::DynRegion<LEN>) -> Self {
         Self { region }
+    }
+
+    /// Obtain a structure with references to the bound regions of this type.
+    pub fn struct_ref(&self) -> DynCells<LEN, Ref<'_, M>> {
+        DynCells::bind(&self.region)
     }
 
     /// Read an element in the region. `address` is in bytes.

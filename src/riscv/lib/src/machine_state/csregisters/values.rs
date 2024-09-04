@@ -13,7 +13,7 @@ use crate::{
     bits::Bits64,
     state_backend::{
         AllocatedOf, Choreographer, EffectCell, EffectCellLayout, Layout, ManagerAlloc,
-        ManagerBase, ManagerRead, ManagerReadWrite, ManagerWrite, PlacedOf,
+        ManagerBase, ManagerRead, ManagerReadWrite, ManagerWrite, PlacedOf, Ref,
     },
 };
 use mstatus::MStatusLayout;
@@ -68,6 +68,15 @@ impl<M: ManagerBase> CSRValues<M> {
     /// Bind the CSR values to the given allocated regions.
     pub fn bind(space: AllocatedOf<CSRValuesLayout, M>) -> Self {
         space.map(MStatusValue::bind, EffectCell::bind, EffectCell::bind)
+    }
+
+    /// Obtain a structure with references to the bound regions of this type.
+    pub fn struct_ref(&self) -> AllocatedOf<CSRValuesLayout, Ref<'_, M>> {
+        self.as_ref().map(
+            |mstatus| mstatus.struct_ref(),
+            |raw| raw.struct_ref(),
+            |mip| mip.struct_ref(),
+        )
     }
 }
 

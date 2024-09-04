@@ -44,6 +44,17 @@ impl<M: state_backend::ManagerBase> State<M> {
         }
     }
 
+    /// Obtain a structure with references to the bound regions of this type.
+    pub fn struct_ref(&self) -> state_backend::AllocatedOf<StateLayout, state_backend::Ref<'_, M>> {
+        (
+            self.pvm.struct_ref(),
+            self.level_is_set.struct_ref(),
+            self.level.struct_ref(),
+            self.message_counter.struct_ref(),
+            self.tick.struct_ref(),
+        )
+    }
+
     pub fn reset(&mut self)
     where
         M: state_backend::ManagerWrite,

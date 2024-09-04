@@ -1635,6 +1635,11 @@ impl<M: backend::ManagerBase> CSRegisters<M> {
         }
     }
 
+    /// Obtain a structure with references to the bound regions of this type.
+    pub fn struct_ref(&self) -> backend::AllocatedOf<CSRegistersLayout, backend::Ref<'_, M>> {
+        self.registers.struct_ref()
+    }
+
     /// Reset the control and state registers.
     pub fn reset(&mut self)
     where

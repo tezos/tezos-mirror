@@ -52,6 +52,11 @@ impl<M: backend::ManagerBase> ReservationSet<M> {
         Self { start_addr: space }
     }
 
+    /// Obtain a structure with references to the bound regions of this type.
+    pub fn struct_ref(&self) -> backend::AllocatedOf<ReservationSetLayout, backend::Ref<'_, M>> {
+        self.start_addr.struct_ref()
+    }
+
     /// Unset any reservation
     pub fn reset(&mut self)
     where
