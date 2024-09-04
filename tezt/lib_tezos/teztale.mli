@@ -11,7 +11,6 @@ type user = {login : string; password : string}
 type interface = {address : string; port : int}
 
 module Server : sig
-
   (** See parameters of {!run} function for details. *)
   type conf = {
     name : string;
@@ -52,6 +51,9 @@ module Server : sig
     unit ->
     t Lwt.t
 
+  (** Wait until teztale server is listening to its defined interface *)
+  val wait_for_readiness : t -> unit Lwt.t
+
   (** [add_user server user]
       Add an archiver (its credentials) allowed to feed the database.
   *)
@@ -59,7 +61,6 @@ module Server : sig
 end
 
 module Archiver : sig
-
   (** See parameters of {!run} function for details. *)
   type conf = {name : string; user : user; feed : interface list}
 

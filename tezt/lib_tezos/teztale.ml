@@ -52,13 +52,16 @@ module Server = struct
       Format.fprintf fmt {|{"address": "%s", "port": %d}|} address port
     in
     let contents =
+      (* Verbosity needs to be set to a minimum level of INFO
+         because wait_for_readiness can't be used with a lower verbosity *)
       Format.asprintf
         {|{
   "db": "sqlite3:%s",
   "interfaces": [%a],
   "users": [%a],
   "admins": [%a],
-  "with_transaction": "FULL"
+  "with_transaction": "FULL",
+  "verbosity": "INFO"
 }|}
         db_filename
         pp_interface
@@ -95,6 +98,21 @@ module Server = struct
       Process.spawn ~name:conf.name ?runner path [filenames.conf_filename]
     in
     Lwt.return {process; filenames; conf}
+
+  let wait_for_readiness t =
+    Log.info "Wait for %s to be ready" t.conf.name ;
+    let stdout = Process.stdout t.process in
+    let suffix =
+      Printf.sprintf
+        "Server listening at %s:%d."
+        t.conf.interface.address
+        t.conf.interface.port
+    in
+    let rec wait () =
+      let* line = Lwt_io.read_line stdout in
+      if String.ends_with ~suffix line then Lwt.return_unit else wait ()
+    in
+    wait ()
 
   (** Return *)
   let add_user {conf = {interface; admin; _}; _} user =

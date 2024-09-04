@@ -265,6 +265,8 @@ module Teztale = struct
     let* server = Teztale.Server.run ~path agent () in
     Lwt.return {server; archivers = []}
 
+  let wait_server t = Teztale.Server.wait_for_readiness t.server
+
   let add_archiver
       ?(path = Uses.(path (make ~tag:"codec" ~path:"./octez-teztale-archiver")))
       t agent ~node_port =
@@ -1058,6 +1060,7 @@ let add_etherlink_source cloud agent ~job_name ?dal_node node sc_rollup_node
 let init_teztale agent node =
   if Cli.teztale then
     let* teztale = Teztale.run_server agent in
+    let* () = Teztale.wait_server teztale in
     let* () =
       Teztale.add_archiver teztale agent ~node_port:(Node.rpc_port node)
     in
