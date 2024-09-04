@@ -19,3 +19,7 @@ val register_dal_slot :
 (** [get_injection_ids ()] returns the current injection IDs known by the DAL
     injection queue.  *)
 val get_injection_ids : unit -> Injector.Inj_operation.id list tzresult
+
+(** [forget_injection_id id] removes the given injection [id] and its associated
+    information from the DAL injection queue, if it exists. *)
+val forget_injection_id : Injector_sigs.Id.t -> unit tzresult

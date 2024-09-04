@@ -814,6 +814,15 @@ module Local = struct
                (req "status" Encodings.message_status)))
       (path / "dal" / "injected" / "operations" / "statuses")
 
+  let forget_dal_injection_id =
+    Tezos_rpc.Service.post_service
+      ~description:"Forget information about the injection whose id is given"
+      ~query:Tezos_rpc.Query.empty
+      ~input:Data_encoding.unit
+      ~output:Data_encoding.unit
+      (path / "dal" / "injection"
+     /: Tezos_crypto.Hashed.Injector_operations_hash.rpc_arg / "forget")
+
   let synchronized =
     Tezos_rpc.Service.get_service
       ~description:

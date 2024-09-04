@@ -289,3 +289,9 @@ let get_injection_ids () =
   let+ w = Result.map_error TzTrace.make (Lazy.force worker) in
   let state = Worker.state w in
   Recent_dal_injections.keys state.recent_dal_injections
+
+let forget_injection_id id =
+  let open Result_syntax in
+  let+ w = Result.map_error TzTrace.make (Lazy.force worker) in
+  let state = Worker.state w in
+  Recent_dal_injections.remove state.recent_dal_injections id
