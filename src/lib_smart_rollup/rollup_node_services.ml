@@ -789,7 +789,7 @@ module Local = struct
       ~input:
         Data_encoding.(
           def "dal_slot" ~description:"Slot to inject" input_encoding)
-      ~output:Hashed.Injector_operations_hash.encoding
+      ~output:Data_encoding.unit
       (path / "dal" / "injection")
 
   let injector_operation_status =
