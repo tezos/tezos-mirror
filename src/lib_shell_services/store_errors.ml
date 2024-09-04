@@ -170,6 +170,15 @@ let () =
     (fun (checkpoint_level, given_head) ->
       Invalid_head_switch {checkpoint_level; given_head}) ;
   register_error_kind
+    `Temporary
+    ~id:"store.inconsistent_store_state"
+    ~title:"Inconsistent store state"
+    ~description:"Inconsistent store state"
+    ~pp:(fun ppf msg -> Format.fprintf ppf "Inconsistent store state: %s" msg)
+    Data_encoding.(obj1 (req "msg" string))
+    (function Inconsistent_store_state msg -> Some msg | _ -> None)
+    (fun msg -> Inconsistent_store_state msg) ;
+  register_error_kind
     `Permanent
     ~id:"snapshots.inconsistent_operation_hashes"
     ~title:"Inconsistent operation hashes"

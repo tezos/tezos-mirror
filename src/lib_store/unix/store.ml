@@ -3502,6 +3502,10 @@ let make_pp_store (store : store) =
         pp_testchain_store
         ())
 
+let stat_metadata_cycles store =
+  let chain_store = main_chain_store store in
+  Block_store.stat_metadata_cycles chain_store.block_store
+
 let v_3_1_upgrade ~store_dir genesis =
   (* Hypothesis: The node storage version is 3.0 *)
   let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
