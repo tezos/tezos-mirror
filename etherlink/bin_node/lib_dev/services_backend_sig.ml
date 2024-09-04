@@ -6,15 +6,6 @@
 (*****************************************************************************)
 
 module type Block_storage = sig
-  (** [current_block ~full_transaction_object] returns the most recent
-      processed and stored block.
-
-      If [full_transaction_object] is [true], returns the transaction objects,
-      the transactions hashes otherwise.
-    *)
-  val current_block :
-    full_transaction_object:bool -> Ethereum_types.block tzresult Lwt.t
-
   (** [current_block_number ()] returns the most recent processed and
       stored block number. *)
   val current_block_number : unit -> Ethereum_types.quantity tzresult Lwt.t

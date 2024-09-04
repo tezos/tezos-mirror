@@ -189,12 +189,6 @@ let blocks_by_number read ~full_transaction_object ~number =
       | None -> raise @@ Invalid_block_structure "Couldn't decode bytes"
       | Some block -> populate_tx_objects read ~full_transaction_object block)
 
-let current_block read ~full_transaction_object =
-  blocks_by_number
-    read
-    ~full_transaction_object
-    ~number:Durable_storage_path.Block.Current
-
 let nth_block read ~full_transaction_object n =
   blocks_by_number
     read
@@ -365,11 +359,6 @@ module Make_block_storage (Reader : READER) = struct
     let open Lwt_result_syntax in
     let* read = read_with_state () in
     transaction_receipt read tx_hash
-
-  let current_block ~full_transaction_object =
-    let open Lwt_result_syntax in
-    let* read = read_with_state () in
-    current_block read ~full_transaction_object
 
   let current_block_number () =
     let open Lwt_result_syntax in
