@@ -1441,12 +1441,9 @@ let export_store ~data_dir ~output_db_file =
   let* store = Evm_store.init ~data_dir ~perm:`Read_only () in
   Evm_store.use store @@ fun conn ->
   let* rollup_address = Evm_store.Metadata.get conn in
-  let* l1_l2_rel = Evm_store.L1_l2_levels_relationships.find conn in
-  match l1_l2_rel with
-  | None -> failwith "No L1/L2 relationship in store"
-  | Some {current_number; _} ->
-      let* () = Evm_store.vacuum ~conn ~output_db_file in
-      return {rollup_address; current_number}
+  let* current_number, _ = Evm_store.Context_hashes.get_latest conn in
+  let* () = Evm_store.vacuum ~conn ~output_db_file in
+  return {rollup_address; current_number}
 
 let start ?kernel_path ~data_dir ~preimages ~preimages_endpoint
     ?smart_rollup_address ~fail_on_missing_blueprint ~store_perm () =

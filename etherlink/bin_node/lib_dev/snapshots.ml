@@ -226,11 +226,11 @@ let check_header ~populated ~data_dir (header : Header.t) : unit tzresult Lwt.t
           Address.(header.rollup_address = r)
           (Incorrect_rollup (header.rollup_address, r))
   in
-  let* l1_l2_rel = Evm_store.L1_l2_levels_relationships.find conn in
+  let* latest_context = Evm_store.Context_hashes.find_latest conn in
   let* () =
-    match l1_l2_rel with
+    match latest_context with
     | None -> return_unit
-    | Some {current_number; _} ->
+    | Some (current_number, _) ->
         fail_when
           Z.Compare.(
             Ethereum_types.Qty.to_z header.current_level
