@@ -78,7 +78,7 @@ let add_account name : (t, t) scenarios =
       let pkh = new_account.pkh in
       let contract = Protocol.Alpha_context.Contract.Implicit pkh in
       let account_state =
-        init_account ~pkh ~contract ~parameters:default_params ()
+        init_account ~name ~pkh ~contract ~parameters:default_params ()
       in
       let state = State.update_account name account_state state in
       return state)

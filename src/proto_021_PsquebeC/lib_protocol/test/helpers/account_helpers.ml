@@ -53,13 +53,16 @@ type account_state = {
   last_active_cycle : Cycle.t;
 }
 
-let init_account ?delegate ~pkh ~contract ~parameters ?(liquid = Tez.zero)
-    ?(bonds = Tez.zero) ?(frozen_deposits = Frozen_tez.zero)
+let init_account ~name ?delegate ~pkh ~contract ~parameters ?(liquid = Tez.zero)
+    ?(bonds = Tez.zero) ?frozen_deposits
     ?(unstaked_frozen = Unstaked_frozen.zero)
     ?(unstaked_finalizable = Unstaked_finalizable.zero)
     ?(staking_delegator_numerator = Z.zero)
     ?(staking_delegate_denominator = Z.zero) ?(frozen_rights = CycleMap.empty)
     ?(slashed_cycles = []) ?(last_active_cycle = Cycle.root) () =
+  let frozen_deposits =
+    Option.value frozen_deposits ~default:(Frozen_tez.init Tez.zero name name)
+  in
   {
     pkh;
     contract;

@@ -70,14 +70,6 @@ module Frozen_tez = struct
             Format.fprintf fmt "%s: %a, " k Partial_tez.pp v))
       co_current
 
-  let zero =
-    {
-      delegate = "";
-      initial = Tez.zero;
-      self_current = Tez.zero;
-      co_current = String.Map.empty;
-    }
-
   let init amount account delegate =
     if account = delegate then
       {
