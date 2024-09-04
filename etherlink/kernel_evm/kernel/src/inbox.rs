@@ -343,7 +343,7 @@ impl InputHandler for SequencerInput {
                             slot_index,
                             published_level
                         );
-                        if let Some(seq_blueprint) =
+                        if let Some(unsigned_seq_blueprints) =
                             fetch_and_parse_sequencer_blueprint_from_dal(
                                 host,
                                 &params,
@@ -352,7 +352,9 @@ impl InputHandler for SequencerInput {
                             )
                         {
                             log!(host, Debug, "DAL slot is a blueprint chunk");
-                            handle_blueprint_chunk(host, seq_blueprint)?;
+                            for chunk in unsigned_seq_blueprints {
+                                handle_blueprint_chunk(host, chunk)?
+                            }
                         }
                     }
                 }
