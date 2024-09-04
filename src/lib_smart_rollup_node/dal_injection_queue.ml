@@ -114,6 +114,21 @@ module Events = struct
       ~pp2:Worker_types.pp_status
 end
 
+module Pending_chunks =
+  Hash_queue.Make
+    (struct
+      type t = string (* slot content or chunk *)
+
+      let equal = String.equal
+
+      let hash = Hashtbl.hash
+    end)
+    (struct
+      type t = int
+      (* This is the slot index on which we inject. It is removed
+         in the next MR. *)
+    end)
+
 module Recent_dal_injections =
   Hash_queue.Make
     (Hashed.Injector_operations_hash)
@@ -124,6 +139,7 @@ module Recent_dal_injections =
 type state = {
   node_ctxt : Node_context.ro;
   recent_dal_injections : Recent_dal_injections.t;
+  pending_chunks : Pending_chunks.t;
 }
 
 let inject_slot state ~slot_content ~slot_index =
@@ -189,6 +205,7 @@ let init_dal_worker_state node_ctxt =
   {
     node_ctxt;
     recent_dal_injections = Recent_dal_injections.create max_retained_slots_info;
+    pending_chunks = Pending_chunks.create max_retained_slots_info;
   }
 
 module Types = struct
