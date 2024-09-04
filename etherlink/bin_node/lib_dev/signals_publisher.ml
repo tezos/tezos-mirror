@@ -204,6 +204,11 @@ module Worker = struct
                    ~injector_op_hash:injection_id
                    ~published_level
                in
+               let* () =
+                 Rollup_services.forget_dal_injection_id
+                   ~rollup_node_endpoint:state.rollup_node_endpoint
+                   injection_id
+               in
                Dal_injected_slots_tracker_queue.remove
                  state.dal_injected_slots_tracker_queue
                  injection_id ;

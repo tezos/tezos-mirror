@@ -191,6 +191,15 @@ let dal_injected_operations_statuses :
              (req "status" Rollup_node_services.Encodings.message_status)))
     (open_root / "local" / "dal" / "injected" / "operations" / "statuses")
 
+let forget_dal_injection_id =
+  Tezos_rpc.Service.post_service
+    ~description:"Forget information about the injection whose id is given"
+    ~query:Tezos_rpc.Query.empty
+    ~input:Data_encoding.unit
+    ~output:Data_encoding.unit
+    (open_root / "local" / "dal" / "injection"
+   /: Tezos_crypto.Hashed.Injector_operations_hash.rpc_arg / "forget")
+
 let simulation :
     ( [`POST],
       unit,
@@ -334,6 +343,19 @@ let get_injected_dal_operations_statuses :
     ~base:rollup_node_endpoint
     dal_injected_operations_statuses
     ()
+    ()
+    ()
+
+let forget_dal_injection_id :
+    rollup_node_endpoint:Uri.t ->
+    Tezos_crypto.Hashed.Injector_operations_hash.t ->
+    unit tzresult Lwt.t =
+ fun ~rollup_node_endpoint id ->
+  call_service
+    ~keep_alive:false
+    ~base:rollup_node_endpoint
+    forget_dal_injection_id
+    ((), id)
     ()
     ()
 
