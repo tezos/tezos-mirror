@@ -13,29 +13,9 @@ type parameters = {
   max_blueprints_lag : int;
 }
 
-module Dal_injected_slots_tracker_queue = struct
-  type value = {
-    level : Z.t;
-    slot_index : Tezos_dal_node_services.Types.slot_index;
-  }
-
-  include
-    Hash_queue.Make
-      (Tezos_crypto.Hashed.Injector_operations_hash)
-      (struct
-        type t = value
-      end)
-end
-
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7453 *)
 
 let attestation_lag = 8
-
-let finalisation_delay = 2
-
-let injection_lag = 3
-
-let number_of_slots = 32
 
 module Types = struct
   type nonrec parameters = parameters
@@ -45,14 +25,6 @@ module Types = struct
     smart_rollup_address : string;
     sequencer_key : Client_keys.sk_uri;
     rollup_node_endpoint : Uri.t;
-    dal_injected_slots_tracker_queue : Dal_injected_slots_tracker_queue.t;
-        (** We remember in this bounded Hash_queue the hashes of DAL
-            slot publications that we have asked the rollup node to
-            inject. They are associated with their corresponding slot
-            index and the blueprint's level. This lets us track the
-            inclusion status of these operation which is needed to
-            signal to the kernel when it's time to import the
-            slots. *)
   }
 
   let of_parameters
@@ -61,23 +33,9 @@ module Types = struct
         smart_rollup_address;
         sequencer_key;
         rollup_node_endpoint;
-        max_blueprints_lag;
+        max_blueprints_lag = _;
       } =
-    {
-      cctxt;
-      smart_rollup_address;
-      sequencer_key;
-      rollup_node_endpoint;
-      dal_injected_slots_tracker_queue =
-        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7386
-
-           Decide of a suitable value of the cache below. *)
-        Dal_injected_slots_tracker_queue.create
-          ((injection_lag + attestation_lag + finalisation_delay)
-          * number_of_slots * max_blueprints_lag);
-      (* A size to track DAL slot publications in the structure for a few L1
-         levels. *)
-    }
+    {cctxt; smart_rollup_address; sequencer_key; rollup_node_endpoint}
 end
 
 module Name = struct
@@ -143,7 +101,7 @@ end
 module Worker = struct
   include Worker.MakeSingle (Name) (Request) (Types)
 
-  let track worker ~injection_id ~level ~slot_index =
+  let track _worker ~injection_id ~level ~slot_index =
     let open Lwt_result_syntax in
     let*! () =
       Signals_publisher_events.tracking
@@ -151,10 +109,6 @@ module Worker = struct
         ~level
         ~slot_index
     in
-    Dal_injected_slots_tracker_queue.replace
-      (state worker).dal_injected_slots_tracker_queue
-      injection_id
-      {level; slot_index} ;
     return_unit
 
   let new_rollup_block worker finalized_level =
@@ -193,12 +147,7 @@ module Worker = struct
                  op = Publish_dal_commitment {slot_index; _};
                  _;
                }
-             when finalized
-                  && is_after_attestation_period ~published_level
-                  && Dal_injected_slots_tracker_queue.find_opt
-                       state.dal_injected_slots_tracker_queue
-                       injection_id
-                     |> Option.is_some ->
+             when finalized && is_after_attestation_period ~published_level ->
                let*! () =
                  Signals_publisher_events.commited_or_included_injection_id
                    ~injector_op_hash:injection_id
@@ -209,9 +158,6 @@ module Worker = struct
                    ~rollup_node_endpoint:state.rollup_node_endpoint
                    injection_id
                in
-               Dal_injected_slots_tracker_queue.remove
-                 state.dal_injected_slots_tracker_queue
-                 injection_id ;
                let*! () =
                  Signals_publisher_events.untracking
                    ~injector_op_hash:injection_id
