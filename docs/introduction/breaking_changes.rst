@@ -109,7 +109,7 @@ Previously, the considered values corresponded to a notion of stake snapshots, r
 Breaking changes
 ~~~~~~~~~~~~~~~~
 
-Since :doc:`protocol Paris <../protocols/019_paris>`, there are no more stake snapshots, so the protocol no longer relies on stake snapshots to compute the rights.
+Since :doc:`protocol Paris <../protocols/020_paris>`, there are no more stake snapshots, so the protocol no longer relies on stake snapshots to compute the rights.
 
 Instead:
 

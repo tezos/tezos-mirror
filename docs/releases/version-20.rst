@@ -3,7 +3,7 @@ Version 20.2
 
 Version 20 contains a new version (V12) of the protocol environment,
 which is the set of functions that a protocol can call.
-This new version is used by the :doc:`Paris<../protocols/019_paris>` protocol,
+This new version is used by the :doc:`Paris<../protocols/020_paris>` protocol,
 which is the successor of :doc:`Oxford<../protocols/018_oxford>`.
 The executables associated with the Nairobi protocol have been removed as this protocol
 is now inactive.
