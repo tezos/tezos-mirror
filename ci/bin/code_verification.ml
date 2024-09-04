@@ -306,13 +306,15 @@ let jobs pipeline_type =
 
   (* Sanity jobs *)
   let sanity =
+    let stage = Stages.sanity in
+    let dependencies = dependencies_needs_start in
     let job_sanity_ci : tezos_job =
       job
         ~__POS__
         ~name:"sanity_ci"
         ~image:Images.CI.build
-        ~stage:Stages.sanity
-        ~dependencies:dependencies_needs_start
+        ~stage
+        ~dependencies
         ~before_script:(before_script ~take_ownership:true ~eval_opam:true [])
         [
           "make -C manifest check";
@@ -329,7 +331,8 @@ let jobs pipeline_type =
         ~__POS__
         ~name:"nix"
         ~image:Images.nix
-        ~stage:Stages.sanity
+        ~stage
+        ~dependencies
         ~artifacts:(artifacts ~when_:On_failure ["flake.lock"])
         ~rules:
           (make_rules
@@ -350,8 +353,9 @@ let jobs pipeline_type =
         ~rules:(make_rules ~changes:changeset_hadolint_docker_files ())
         ~__POS__
         ~name:"docker:hadolint"
+        ~dependencies
         ~image:Images.hadolint
-        ~stage:Stages.sanity
+        ~stage
         ["hadolint build.Dockerfile"; "hadolint Dockerfile"]
     in
     let mr_only_jobs =

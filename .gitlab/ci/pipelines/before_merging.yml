@@ -142,6 +142,8 @@ docker:hadolint:
     - Dockerfile
     - build.Dockerfile
     when: on_success
+  needs:
+  - trigger
   dependencies: []
   timeout: 60 minutes
   script:
@@ -159,6 +161,8 @@ nix:
     - flake.lock
     - scripts/version.sh
     when: on_success
+  needs:
+  - trigger
   dependencies: []
   timeout: 60 minutes
   cache:
