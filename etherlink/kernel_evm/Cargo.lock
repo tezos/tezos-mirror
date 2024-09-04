@@ -2199,6 +2199,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "tezos-evm-runtime"
+version = "0.1.0"
+dependencies = [
+ "tezos-smart-rollup-core",
+ "tezos-smart-rollup-debug",
+ "tezos-smart-rollup-host",
+ "tezos-smart-rollup-mock",
+]
+
+[[package]]
 name = "tezos-indexable-storage"
 version = "0.1.0"
 dependencies = [

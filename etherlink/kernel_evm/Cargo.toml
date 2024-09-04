@@ -17,6 +17,7 @@ members = [
   "indexable_storage",
   "logging",
   "storage",
+  "runtime",
 ]
 
 [workspace.dependencies]
