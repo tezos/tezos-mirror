@@ -438,7 +438,7 @@ let jobs pipeline_type =
 
   (*Build jobs *)
   let build =
-    (* TODO: The code is a bit convulted here because these jobs are
+    (* TODO: The code is a bit convoluted here because these jobs are
        either in the build or in the manual stage depending on the
        pipeline type. However, we can put them in the build stage on
        [before_merging] pipelines as long as we're careful to put
