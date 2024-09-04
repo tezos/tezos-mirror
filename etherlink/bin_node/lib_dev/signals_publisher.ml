@@ -160,13 +160,12 @@ module Worker = struct
   let new_rollup_block worker finalized_level =
     let open Lwt_result_syntax in
     let state = state worker in
-    Dal_injected_slots_tracker_queue.keys state.dal_injected_slots_tracker_queue
-    |> List.iter_es (fun injection_id ->
-           let* status =
-             Rollup_services.get_injector_operation_status
-               ~rollup_node_endpoint:state.rollup_node_endpoint
-               ~injection_id
-           in
+    let* statuses =
+      Rollup_services.get_injected_dal_operations_statuses
+        ~rollup_node_endpoint:state.rollup_node_endpoint
+    in
+    statuses
+    |> List.iter_es (fun (injection_id, status) ->
            (* [is_after_attestation_period ~published_level] is true if
               the published level is old enough, w.r.t to the last
               finalized level, to not be waiting for attestation
@@ -180,7 +179,7 @@ module Worker = struct
              <= Int32.to_int finalized_level
            in
            match status with
-           | Committed
+           | Rollup_node_services.Committed
                {
                  finalized;
                  l1_level = published_level;
@@ -194,7 +193,12 @@ module Worker = struct
                  op = Publish_dal_commitment {slot_index; _};
                  _;
                }
-             when finalized && is_after_attestation_period ~published_level ->
+             when finalized
+                  && is_after_attestation_period ~published_level
+                  && Dal_injected_slots_tracker_queue.find_opt
+                       state.dal_injected_slots_tracker_queue
+                       injection_id
+                     |> Option.is_some ->
                let*! () =
                  Signals_publisher_events.commited_or_included_injection_id
                    ~injector_op_hash:injection_id

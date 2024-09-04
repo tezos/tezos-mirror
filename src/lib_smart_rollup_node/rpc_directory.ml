@@ -535,6 +535,15 @@ let injector_operation_status node_ctxt l1_hash =
                          published_at_level;
                        }))))
 
+let dal_injected_operations_statuses node_ctxt =
+  let open Lwt_result_syntax in
+  let*? ids = Dal_injection_queue.get_injection_ids () in
+  List.map_es
+    (fun l1_hash ->
+      let* status = injector_operation_status node_ctxt l1_hash in
+      return (l1_hash, status))
+    ids
+
 let () =
   Local_directory.register1 Rollup_node_services.Local.batcher_message
   @@ fun node_ctxt hash () () ->
@@ -556,6 +565,11 @@ let () =
 let () =
   Local_directory.register1 Rollup_node_services.Local.injector_operation_status
   @@ fun node_ctxt l1_hash () () -> injector_operation_status node_ctxt l1_hash
+
+let () =
+  Local_directory.register0
+    Rollup_node_services.Local.dal_injected_operations_statuses
+  @@ fun node_ctxt () () -> dal_injected_operations_statuses node_ctxt
 
 let () =
   Admin_directory.register0 Rollup_node_services.Admin.injector_queues_total
