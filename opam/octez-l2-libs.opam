@@ -19,7 +19,7 @@ depends: [
   "octez-rust-deps" { = version }
   "index" { >= "1.6.0" & < "1.7.0" }
   "octez-internal-libs" { = version }
-  "aches-lwt" { >= "1.0.0" }
+  "aches-lwt" { >= "1.1.0" }
   "octez-riscv-pvm" { = version }
   "camlzip" { >= "1.12" & < "1.13" }
   "tar"

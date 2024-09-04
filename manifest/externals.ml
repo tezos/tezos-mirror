@@ -223,13 +223,13 @@ let re = external_lib "re" V.(at_least "1.10.0")
 
 let repr = external_lib "repr" V.True
 
-let ringo = external_lib "ringo" V.(at_least "1.0.0")
+let ringo = external_lib "ringo" V.(at_least "1.1.0")
 
 let rusage = external_lib "rusage" V.True
 
-let aches = external_lib "aches" V.(at_least "1.0.0")
+let aches = external_lib "aches" V.(at_least "1.1.0")
 
-let aches_lwt = external_lib "aches-lwt" V.(at_least "1.0.0")
+let aches_lwt = external_lib "aches-lwt" V.(at_least "1.1.0")
 
 let safepass = external_lib "safepass" V.True
 

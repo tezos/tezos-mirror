@@ -10,7 +10,7 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
-  "aches" { >= "1.0.0" }
+  "aches" { >= "1.1.0" }
   "caqti-driver-postgresql" { >= "2.0.1" }
   "caqti-driver-sqlite3" { >= "2.0.1" }
   "caqti-lwt" { >= "2.0.1" }
