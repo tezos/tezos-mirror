@@ -11,6 +11,7 @@ edition = "2021"
 tezos-smart-rollup-debug.workspace = true
 tezos-smart-rollup-core.workspace = true
 tezos-smart-rollup-host.workspace = true
+sha3.workspace = true
 
 [dev-dependencies]
 tezos-smart-rollup-mock.workspace = true

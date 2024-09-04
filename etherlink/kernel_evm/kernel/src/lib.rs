@@ -19,7 +19,6 @@ use inbox::StageOneStatus;
 use migration::MigrationStatus;
 use primitive_types::U256;
 use reveal_storage::{is_revealed_storage, reveal_storage};
-use safe_storage::WORLD_STATE_PATH;
 use storage::{
     read_base_fee_per_gas, read_chain_id, read_da_fee, read_kernel_version,
     read_last_info_per_level_timestamp, read_last_info_per_level_timestamp_stats,
@@ -30,6 +29,7 @@ use storage::{
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_ethereum::block::BlockFees;
 use tezos_evm_logging::{log, Level::*};
+use tezos_evm_runtime::safe_storage::WORLD_STATE_PATH;
 use tezos_smart_rollup::entrypoint;
 use tezos_smart_rollup::michelson::MichelsonUnit;
 use tezos_smart_rollup::outbox::{
@@ -57,13 +57,10 @@ mod fallback_upgrade;
 mod fees;
 mod gas_price;
 mod inbox;
-mod internal_storage;
 mod linked_list;
 mod migration;
-mod mock_internal;
 mod parsing;
 mod reveal_storage;
-mod safe_storage;
 mod sequencer_blueprint;
 mod simulation;
 mod stage_one;
@@ -361,9 +358,7 @@ mod tests {
     use crate::configuration::{Configuration, Limits};
     use crate::fees;
     use crate::main;
-    use crate::mock_internal::MockInternal;
     use crate::parsing::RollupType;
-    use crate::safe_storage::SafeStorage;
     use crate::storage::{
         read_transaction_receipt_status, store_chain_id, ENABLE_FA_BRIDGE,
     };
@@ -393,6 +388,8 @@ mod tests {
         transaction::{TransactionHash, TransactionType},
         tx_common::EthereumTransactionCommon,
     };
+    use tezos_evm_runtime::mock_internal::MockInternal;
+    use tezos_evm_runtime::safe_storage::SafeStorage;
 
     use tezos_smart_rollup::michelson::ticket::FA2_1Ticket;
     use tezos_smart_rollup::michelson::{

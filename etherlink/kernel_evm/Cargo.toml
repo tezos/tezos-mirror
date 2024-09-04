@@ -62,6 +62,7 @@ libsecp256k1 = { version = "0.7", default-features = false, features = [
 tezos_ethereum = { path = "./ethereum" }
 evm-execution = { path = "./evm_execution" }
 tezos-evm-logging = { path = "./logging" }
+tezos-evm-runtime = { path = "./runtime" }
 tezos-indexable-storage = { path = "./indexable_storage" }
 tezos-storage = { path = "./storage" }
 
