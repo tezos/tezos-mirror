@@ -109,7 +109,7 @@ In order to add the Tezos package repository to your machine, do:
 
     export distribution=debian
     export release=bookworm
-    export bucket="tezos-linux-repo"
+    export bucket="tezos-linux-protected-repo"
 
 and run:
 
@@ -129,7 +129,7 @@ Then, to install the binaries, run the following commands:
    :start-after: [install tezos]
    :end-before: [install octez additional packages]
 
-To remove the octez packages you can simly run the following command.
+To remove the Octez packages you can simply run the following command.
 
 .. literalinclude:: install-bin-deb.sh
    :language: shell
