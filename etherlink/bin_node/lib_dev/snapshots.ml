@@ -7,6 +7,76 @@
 
 open Snapshot_utils
 
+type error +=
+  | Data_dir_populated of string
+  | File_not_found of string
+  | Incorrect_rollup of Address.t * Address.t
+  | Outdated_snapshot of Ethereum_types.quantity * Ethereum_types.quantity
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"evm_data_dir_populated"
+    ~title:"Data dir already populated"
+    ~description:"Raise an error when the data dir is already populated"
+    ~pp:(fun ppf path ->
+      Format.fprintf
+        ppf
+        "The EVM node data directory %s is already populated."
+        path)
+    Data_encoding.(obj1 (req "data_dir_already_populated" string))
+    (function Data_dir_populated path -> Some path | _ -> None)
+    (fun path -> Data_dir_populated path) ;
+  register_error_kind
+    `Permanent
+    ~id:"file_not_found"
+    ~title:"File not found"
+    ~description:"Raise an error when a file is not found"
+    ~pp:(fun ppf file -> Format.fprintf ppf "File %s is not found" file)
+    Data_encoding.(obj1 (req "file_not_found" string))
+    (function File_not_found file -> Some file | _ -> None)
+    (fun file -> File_not_found file) ;
+  register_error_kind
+    `Permanent
+    ~id:"evm_incorrect_rollup"
+    ~title:"Snapshot for incorrect rollup"
+    ~description:"Snapshot for incorrect rollup."
+    ~pp:(fun ppf (snap_addr, exp_addr) ->
+      Format.fprintf
+        ppf
+        "The existing EVM node is for the rollup %a whereas the snapshot is \
+         for %a."
+        Address.pp
+        exp_addr
+        Address.pp
+        snap_addr)
+    Data_encoding.(
+      obj2
+        (req "evm_node_rollup" Address.encoding)
+        (req "snapshot_rollup" Address.encoding))
+    (function Incorrect_rollup (a1, a2) -> Some (a1, a2) | _ -> None)
+    (fun (a1, a2) -> Incorrect_rollup (a1, a2)) ;
+  register_error_kind
+    `Permanent
+    ~id:"evm_outdated_snapshot"
+    ~title:"Outdated snapshot"
+    ~description:"Snapshot is outdated with respect to existing data."
+    ~pp:(fun ppf (snap_level, exp_level) ->
+      Format.fprintf
+        ppf
+        "The snapshot is outdated (for level %a) while the \n\
+        \ existing EVM node is already at %a@."
+        Ethereum_types.pp_quantity
+        snap_level
+        Ethereum_types.pp_quantity
+        exp_level)
+    Data_encoding.(
+      obj2
+        (req "evm_node_level" Ethereum_types.quantity_encoding)
+        (req "snapshot_level" Ethereum_types.quantity_encoding))
+    (function Outdated_snapshot (a1, a2) -> Some (a1, a2) | _ -> None)
+    (fun (a1, a2) -> Outdated_snapshot (a1, a2))
+
 type compression = No | On_the_fly | After
 
 module Header = struct
@@ -127,3 +197,67 @@ let export ?dest ?filename ~compression ~data_dir () =
     | After -> compress ~snapshot_file:dest_file
   in
   return snapshot_file
+
+let data_dir_populated ~data_dir =
+  let open Lwt_syntax in
+  let store_file = Filename.concat data_dir Evm_store.sqlite_file_name in
+  let state_dir = Evm_context.State.store_path ~data_dir in
+  let* store_exists = Lwt_unix.file_exists store_file in
+  let* state_exists = Lwt_utils_unix.dir_exists state_dir in
+  return (store_exists || state_exists)
+
+let check_snapshot_exists snapshot_file =
+  let open Lwt_result_syntax in
+  let*! snapshot_file_exists = Lwt_unix.file_exists snapshot_file in
+  fail_when (not snapshot_file_exists) (File_not_found snapshot_file)
+
+let check_header ~populated ~data_dir (header : Header.t) : unit tzresult Lwt.t
+    =
+  let open Lwt_result_syntax in
+  when_ populated @@ fun () ->
+  let* store = Evm_store.init ~data_dir ~perm:`Read_only () in
+  Evm_store.use store @@ fun conn ->
+  let* rollup_address = Evm_store.Metadata.find conn in
+  let* () =
+    match rollup_address with
+    | None -> return_unit
+    | Some r ->
+        fail_unless
+          Address.(header.rollup_address = r)
+          (Incorrect_rollup (header.rollup_address, r))
+  in
+  let* l1_l2_rel = Evm_store.L1_l2_levels_relationships.find conn in
+  let* () =
+    match l1_l2_rel with
+    | None -> return_unit
+    | Some {current_number; _} ->
+        fail_when
+          Z.Compare.(
+            Ethereum_types.Qty.to_z header.current_level
+            <= Ethereum_types.Qty.to_z current_number)
+          (Outdated_snapshot (header.current_level, current_number))
+  in
+  return_unit
+
+let import ~force ~data_dir ~snapshot_file =
+  let open Lwt_result_syntax in
+  let*! populated = data_dir_populated ~data_dir in
+  let*? () =
+    error_when ((not force) && populated) (Data_dir_populated data_dir)
+  in
+  let* () = check_snapshot_exists snapshot_file in
+  let*! () = Lwt_utils_unix.create_dir data_dir in
+  let* () = Evm_context.lock_data_dir ~data_dir in
+  let reader =
+    if Snapshot_utils.is_compressed_snapshot snapshot_file then gzip_reader
+    else stdlib_reader
+  in
+  let* _snapshot_header, () =
+    extract
+      reader
+      stdlib_writer
+      (check_header ~populated ~data_dir)
+      ~snapshot_file
+      ~dest:data_dir
+  in
+  return_unit

@@ -2173,6 +2173,17 @@ let export_snapshot_named_command =
         (data_dir, None, compress_on_the_fly, uncompressed)
         (Some filename))
 
+let import_snapshot_command =
+  let open Tezos_clic in
+  command
+    ~desc:"Import a snapshot of the EVM node."
+    (args2
+       data_dir_arg
+       (force_arg ~doc:"Import snapshot in already populated data dir"))
+    (prefixes ["snapshot"; "import"] @@ Params.snapshot_file @@ stop)
+    (fun (data_dir, force) snapshot_file () ->
+      Evm_node_lib_dev.Snapshots.import ~force ~data_dir ~snapshot_file)
+
 let patch_state_command =
   let open Tezos_clic in
   let open Lwt_result_syntax in
@@ -2278,7 +2289,11 @@ let debug_print_store_schemas_command =
 
 (* List of commands not ready to be used by our end-users *)
 let in_development_commands =
-  [export_snapshot_auto_name_command; export_snapshot_named_command]
+  [
+    export_snapshot_auto_name_command;
+    export_snapshot_named_command;
+    import_snapshot_command;
+  ]
 
 (* List of program commands *)
 let commands =

@@ -12,6 +12,9 @@
   is printed in the standard output, which can be useful to review them
   carefully. (!14690 !14713)
 - The command `replay` does not require to stop the node anymore. (!14727)
+- Add new commands `snapshot export` to export a snapshot
+  of the EVM node current state  and `snapshot import` to bootstrap a node from
+  a snapshot. (!14255 !14280 !14281 !14325 !14372 !14333)
 
 #### RPCs
 
