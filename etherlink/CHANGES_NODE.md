@@ -27,6 +27,13 @@
   catching-up with its upstream EVM node endpoint, and 0.0 when it considers
   itself up-to-date. (!14751)
 
+#### Internal
+
+- When a kernel upgrade is detected from upstream (either a rollup
+  node for a sequencer node or an EVM node for an observer node) the
+  kernel is preemptively downloaded to reduce friction at the
+  activation of the upgrade. (!14656)
+
 ## Version 0.1 (2024-08-28)
 
 This release concludes two months of development since the freeze of the
@@ -81,7 +88,7 @@ Beta.
 - Introduce `GET /evm/time_between_blocks` to retrieve the maximum time (in
   seconds) between two blocks created by the sequencer. It is used by the nodes
   running in observer and RPC modes. (!14327)
-- Adds support for `callTracer` in `debug_traceTransaction` and 
+- Adds support for `callTracer` in `debug_traceTransaction` and
   `debug_traceCall`. (!14273)
 - Add an **unsafe** command `patch state at [path] with [value]` to patch
   the kernel state used by an EVM node. The main use case for this command

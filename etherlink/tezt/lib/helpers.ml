@@ -144,7 +144,7 @@ let upgrade ~sc_rollup_node ~sc_rollup_address ~admin ~admin_contract ~client
       client
   in
   let* _ = next_rollup_node_level ~sc_rollup_node ~client in
-  unit
+  return root_hash
 
 let check_block_consistency ~left ~right ?error_msg ~block () =
   let open Rpc.Syntax in
