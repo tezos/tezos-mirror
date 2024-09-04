@@ -426,20 +426,38 @@ let jobs pipeline_type =
         job_build_ubuntu_package_current_b,
         job_build_debian_package_current_b )
 
+let register ~auto ~description pipeline_type =
+  let pipeline_name =
+    match (pipeline_type, auto) with
+    | Partial, false -> "debian_repository_partial"
+    | Partial, true -> "debian_repository_partial_auto"
+    | Full, _ -> "debian_repository_full"
+    | Release, _ -> "debian_repository_release"
+  in
+  let jobs, _, _, _, _ = jobs pipeline_type in
+  Pipeline.register_child pipeline_name ~description ~jobs
+
 let child_pipeline_partial =
-  let jobs, _, _, _, _ = jobs Partial in
-  Pipeline.register_child
-    "debian_repository_partial"
+  register
     ~description:
       "A child pipeline of 'before_merging' (and thus 'merge_train') building \
        Debian stable .deb packages."
-    ~jobs
+    ~auto:false
+    Partial
 
 let child_pipeline_full =
-  let jobs, _, _, _, _ = jobs Full in
-  Pipeline.register_child
-    "debian_repository_full"
+  register
     ~description:
       "A child pipeline of 'schedule_extended_test' testing the build of all \
        .deb packages."
-    ~jobs
+    ~auto:false
+    Full
+
+let child_pipeline_partial_auto =
+  register
+    ~description:
+      "A child pipeline of 'before_merging' (and thus 'merge_train') building \
+       Debian stable .deb packages. Starts automatically on certain \
+       conditions."
+    ~auto:true
+    Partial

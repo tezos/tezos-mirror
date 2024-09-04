@@ -1578,6 +1578,13 @@ oc.test-liquidity-baking-scripts:
   script:
   - ./scripts/ci/test_liquidity_baking_scripts.sh
 
+trigger:debian_repository_partial_auto:
+  stage: test
+  rules:
+  - when: always
+  trigger:
+    include: .gitlab/ci/pipelines/debian_repository_partial_auto.yml
+
 test_kernels:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
   stage: test
@@ -2789,6 +2796,13 @@ documentation:linkcheck:
 trigger:debian_repository_full:
   stage: manual
   rules:
+  - changes:
+    - debian-deps-build.Dockerfile
+    - scripts/ci/build-debian-packages-dependencies.sh
+    - scripts/ci/build-debian-packages.sh
+    - scripts/ci/build-debian-packages_current.sh
+    - scripts/packaging/**/*
+    when: never
   - when: always
   needs: []
   trigger:

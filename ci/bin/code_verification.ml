@@ -696,6 +696,17 @@ let jobs pipeline_type =
 
   (*Test jobs*)
   let test =
+    (* This job triggers the debian child pipeline automatically if any
+       files in the changeset is modified. It's the same as
+       job_debian_repository_trigger that can be run manually *)
+    let job_debian_repository_trigger_auto =
+      trigger_job
+        ~__POS__
+        ~rules:(make_rules ~manual:No ~changes:changeset_debian_packages ())
+        ~stage:Stages.test
+        ~dependencies:dependencies_needs_start
+        Debian_repository.child_pipeline_partial_auto
+    in
     (* check that ksy files are still up-to-date with octez *)
     let job_kaitai_checks : tezos_job =
       job
@@ -1439,6 +1450,7 @@ let jobs pipeline_type =
         job_oc_script_test_release_versions;
         job_oc_script_b58_prefix;
         job_oc_test_liquidity_baking_scripts;
+        job_debian_repository_trigger_auto;
       ]
     in
     jobs_misc @ jobs_kernels @ jobs_unit @ jobs_install_octez @ jobs_tezt
@@ -1695,13 +1707,24 @@ let jobs pipeline_type =
 
   (* Manual jobs *)
   let manual =
-    (* On scheduled pipelines we build and test the full test matrix.
+    (* On scheduled pipelines we build and test the full packages test matrix.
        On [Before_merging] pipelines only a subset of the packages are built
-       and tested *)
+       and tested. There is a similar job job_debian_repository_trigger_auto
+       in the test stage that is started automatically if any files related to
+       packaging is changed. *)
     let job_debian_repository_trigger : tezos_job =
       trigger_job
         ~__POS__
-        ~rules:(make_rules ~manual:Yes ())
+        ~rules:
+          ([
+             (* Make sure we do not run the pipeline twice.
+                As in manual and auto *)
+             job_rule
+               ~changes:(Changeset.encode changeset_debian_packages)
+               ~when_:Never
+               ();
+           ]
+          @ make_rules ~manual:Yes ())
         ~dependencies:(Dependent [])
         ~stage:Stages.manual
         (match pipeline_type with
