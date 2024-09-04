@@ -376,7 +376,7 @@ ocaml-check:
   - eval $(opam env)
   - . ./scripts/ci/sccache-start.sh
   script:
-  - dune build @check
+  - dune build @check --stop-on-first-error
   after_script:
   - sccache --stop-server || true
   variables:
