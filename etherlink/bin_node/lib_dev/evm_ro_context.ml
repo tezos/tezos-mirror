@@ -408,6 +408,19 @@ let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
           Evm_store.use ctxt.store @@ fun conn ->
           Evm_store.Transactions.find_object conn hash
       end
+
+      let block_param_to_block_number
+          (block_param : Ethereum_types.Block_parameter.extended) =
+        let open Lwt_result_syntax in
+        match block_param with
+        | Block_hash {hash; _} -> (
+            Evm_store.use ctxt.store @@ fun conn ->
+            let* res = Evm_store.Blocks.find_number_of_hash conn hash in
+            match res with
+            | Some number -> return number
+            | None ->
+                failwith "Missing block %a" Ethereum_types.pp_block_hash hash)
+        | param -> block_param_to_block_number param
     end)
   else (module Backend)
 
