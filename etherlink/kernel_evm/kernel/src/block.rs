@@ -30,7 +30,7 @@ use primitive_types::{H160, H256, U256};
 use tezos_ethereum::block::BlockFees;
 use tezos_ethereum::transaction::TransactionHash;
 use tezos_evm_logging::{log, Level::*};
-use tezos_evm_runtime::internal_storage::InternalRuntime;
+use tezos_evm_runtime::internal_runtime::InternalRuntime;
 use tezos_evm_runtime::safe_storage::{KernelRuntime, SafeStorage};
 use tezos_smart_rollup::outbox::OutboxQueue;
 use tezos_smart_rollup_host::path::{Path, RefPath};
@@ -425,7 +425,7 @@ pub fn produce<Host: Runtime>(
     let at_most_one_block = host.store_has(&AT_MOST_ONE_BLOCK)?.is_some();
 
     #[cfg(not(test))]
-    let mut internal_storage = tezos_evm_runtime::internal_storage::InternalStorage();
+    let mut internal_storage = tezos_evm_runtime::internal_runtime::InternalHost();
     #[cfg(test)]
     let mut internal_storage = tezos_evm_runtime::mock_internal::MockInternal();
     let mut safe_host = SafeStorage {

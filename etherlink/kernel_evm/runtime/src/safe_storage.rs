@@ -5,7 +5,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::internal_storage::{ExtendedRuntime, InternalRuntime};
+use crate::internal_runtime::{ExtendedRuntime, InternalRuntime};
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
 use tezos_smart_rollup_host::dal_parameters::RollupDalParameters;
 use tezos_smart_rollup_host::{

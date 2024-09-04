@@ -2,6 +2,6 @@
 //
 // SPDX-License-Identifier: MIT
 
-pub mod internal_storage;
+pub mod internal_runtime;
 pub mod mock_internal;
 pub mod safe_storage;
