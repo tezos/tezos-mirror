@@ -39,8 +39,8 @@ use tezos_ethereum::rlp_helpers::{
 use tezos_ethereum::transaction::TransactionObject;
 use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_evm_logging::{log, Level::*};
+use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup::types::Timestamp;
-use tezos_smart_rollup_host::runtime::Runtime;
 
 // SIMULATION/SIMPLE/RLP_ENCODED_SIMULATION
 pub const SIMULATION_SIMPLE_TAG: u8 = 1;

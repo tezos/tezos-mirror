@@ -18,8 +18,9 @@ use tezos_ethereum::{
     tx_common::EthereumTransactionCommon,
 };
 use tezos_evm_logging::{log, Level::*};
+use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
-use tezos_smart_rollup_host::{path::RefPath, runtime::Runtime};
+use tezos_smart_rollup_host::path::RefPath;
 
 pub struct DelayedInbox(LinkedList<Hash, DelayedInboxItem>);
 

@@ -20,10 +20,11 @@ use sha3::{Digest, Keccak256};
 use tezos_ethereum::rlp_helpers;
 use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_evm_logging::{log, Level::*};
+use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup::types::Timestamp;
 use tezos_smart_rollup_core::MAX_INPUT_MESSAGE_SIZE;
 use tezos_smart_rollup_host::path::*;
-use tezos_smart_rollup_host::runtime::{Runtime, RuntimeError};
+use tezos_smart_rollup_host::runtime::RuntimeError;
 use tezos_storage::{
     error::Error as GenStorageError, read_rlp, store_read_slice, store_rlp,
 };

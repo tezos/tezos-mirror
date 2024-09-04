@@ -31,11 +31,10 @@ use tezos_ethereum::block::BlockFees;
 use tezos_ethereum::transaction::TransactionHash;
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::internal_runtime::InternalRuntime;
-use tezos_evm_runtime::runtime::Runtime as KernelRuntime;
+use tezos_evm_runtime::runtime::Runtime;
 use tezos_evm_runtime::safe_storage::SafeStorage;
 use tezos_smart_rollup::outbox::OutboxQueue;
 use tezos_smart_rollup_host::path::{Path, RefPath};
-use tezos_smart_rollup_host::runtime::Runtime;
 use tick_model::estimate_remaining_ticks_for_transaction_execution;
 
 use tezos_ethereum::block::BlockConstants;
@@ -252,7 +251,7 @@ fn next_bip_from_blueprints<Host: Runtime>(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn compute_bip<Host: KernelRuntime>(
+fn compute_bip<Host: Runtime>(
     host: &mut Host,
     outbox_queue: &OutboxQueue<'_, impl Path>,
     mut block_in_progress: BlockInProgress,

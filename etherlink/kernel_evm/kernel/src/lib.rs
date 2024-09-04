@@ -29,6 +29,7 @@ use storage::{
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_ethereum::block::BlockFees;
 use tezos_evm_logging::{log, Level::*};
+use tezos_evm_runtime::runtime::{KernelHost, Runtime};
 use tezos_evm_runtime::safe_storage::WORLD_STATE_PATH;
 use tezos_smart_rollup::entrypoint;
 use tezos_smart_rollup::michelson::MichelsonUnit;
@@ -37,7 +38,7 @@ use tezos_smart_rollup::outbox::{
 };
 use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
-use tezos_smart_rollup_host::runtime::{Runtime, ValueType};
+use tezos_smart_rollup_host::runtime::ValueType;
 
 mod apply;
 mod block;
@@ -257,7 +258,7 @@ pub fn main<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
     // Fetch kernel metadata:
 
     // 1. Fetch the smart rollup address via the host function, it cannot fail.
-    let smart_rollup_address = Runtime::reveal_metadata(host).raw_rollup_address;
+    let smart_rollup_address = host.reveal_metadata().raw_rollup_address;
     // 2. Fetch the per mode configuration of the kernel. Returns the default
     //    configuration if it fails.
     let mut configuration = fetch_configuration(host);
@@ -305,12 +306,22 @@ pub fn main<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
 }
 
 #[entrypoint::main]
-pub fn kernel_loop<Host: Runtime>(host: &mut Host) {
+pub fn kernel_loop<Host: tezos_smart_rollup_host::runtime::Runtime>(host: &mut Host) {
     // In order to setup the temporary directory, we need to move something
     // from /evm to /tmp, so /evm must be non empty, this only happen
     // at the first run.
 
+    // The kernel host is initialized as soon as possible. `kernel_loop`
+    // shouldn't be called in tests as it won't use `MockInternal` for the
+    // internal runtime.
+    let mut internal_storage = tezos_evm_runtime::internal_runtime::InternalHost();
+    let mut host = KernelHost {
+        host,
+        internal: &mut internal_storage,
+    };
+
     let reboot_counter = host
+        .host
         .reboot_left()
         .expect("The kernel failed to get the number of reboot left");
     if reboot_counter == 1000 {
@@ -321,17 +332,19 @@ pub fn kernel_loop<Host: Runtime>(host: &mut Host) {
     }
 
     let world_state_subkeys = host
+        .host
         .store_count_subkeys(&WORLD_STATE_PATH)
         .expect("The kernel failed to read the number of /evm/world_state subkeys");
 
     if world_state_subkeys == 0 {
-        host.store_write(&WORLD_STATE_PATH, "Un festival de GADT".as_bytes(), 0)
+        host.host
+            .store_write(&WORLD_STATE_PATH, "Un festival de GADT".as_bytes(), 0)
             .unwrap();
     }
 
-    if is_revealed_storage(host) {
+    if is_revealed_storage(&host) {
         reveal_storage(
-            host,
+            &mut host,
             option_env!("EVM_SEQUENCER").map(|s| {
                 PublicKey::from_b58check(s).expect("Failed parsing EVM_SEQUENCER")
             }),
@@ -341,10 +354,10 @@ pub fn kernel_loop<Host: Runtime>(host: &mut Host) {
         );
     }
 
-    match main(host) {
+    match main(&mut host) {
         Ok(()) => (),
         Err(err) => {
-            log!(host, Fatal, "The kernel produced an error: {:?}", err);
+            log!(&mut host, Fatal, "The kernel produced an error: {:?}", err);
         }
     }
 }

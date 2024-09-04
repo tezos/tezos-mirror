@@ -16,9 +16,9 @@ use std::ops::Add;
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_ethereum::block::L2Block;
 use tezos_evm_logging::{log, Level::*};
+use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_host::metadata::RAW_ROLLUP_ADDRESS_SIZE;
-use tezos_smart_rollup_host::runtime::Runtime;
 
 pub fn fetch_proxy_blueprints<Host: Runtime>(
     host: &mut Host,
