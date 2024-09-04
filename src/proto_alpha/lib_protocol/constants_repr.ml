@@ -340,6 +340,31 @@ let check_constants constants =
          "The number of maximum stored cemented commitments must be strictly \
           positive")
   in
+  let* () =
+    error_unless
+      Compare.Int.(
+        constants.cache_stake_distribution_cycles
+        = constants.consensus_rights_delay + max_slashing_period + 1)
+      (Invalid_protocol_constants
+         (Format.sprintf
+            "We should have cache_stake_distribution_cycles (%d) = \
+             consensus_rights_delay (%d) + max_slashing_period (%d) + 1."
+            constants.cache_stake_distribution_cycles
+            constants.consensus_rights_delay
+            max_slashing_period))
+  in
+  let* () =
+    error_unless
+      Compare.Int.(
+        constants.cache_sampler_state_cycles
+        = constants.cache_stake_distribution_cycles)
+      (Invalid_protocol_constants
+         (Format.sprintf
+            "The number cached cycles for the sampler state (%d) and for the \
+             stake distribution (%d) should currently be the same."
+            constants.cache_sampler_state_cycles
+            constants.cache_stake_distribution_cycles))
+  in
   Result.return_unit
 
 module Generated = struct
