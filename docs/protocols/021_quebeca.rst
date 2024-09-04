@@ -1,7 +1,7 @@
-Protocol Quebeca
-=================
+Protocol Quebec
+===============
 
-This page documents the changes brought by protocol Quebeca with respect
+This page documents the changes brought by protocol Quebec with respect
 to Paris (see :ref:`naming_convention`).
 
 For changes brought by Paris with respect to Oxford, see :doc:`../protocols/019_paris`.
