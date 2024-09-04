@@ -126,7 +126,7 @@ for architecture in $ARCHITECTURES; do # amd64, arm64 ...
     echo "targetdir: $TARGETDIR"
 
     # create the apt repository root directory and copy the public key
-    cp scripts/packaging/package-signing-key.asc "$GPG_PUBLIC_KEY"
+    cp "$GPG_PUBLIC_KEY" "$TARGETDIR/octez.asc"
 
     target="dists/${release}/main/binary-${architecture}"
 
