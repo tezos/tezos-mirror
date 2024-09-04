@@ -351,7 +351,12 @@ impl InputHandler for SequencerInput {
                                 published_level,
                             )
                         {
-                            log!(host, Debug, "DAL slot is a blueprint chunk");
+                            log!(
+                                host,
+                                Debug,
+                                "DAL slot is a blueprint of {} chunks",
+                                unsigned_seq_blueprints.len()
+                            );
                             for chunk in unsigned_seq_blueprints {
                                 handle_blueprint_chunk(host, chunk)?
                             }
