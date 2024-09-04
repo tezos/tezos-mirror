@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::state_backend::{self as backend, Layout, ManagerReadWrite};
+use serde::ser::SerializeTuple;
 use std::{alloc, marker::PhantomData, mem, ptr, slice};
 
 /// In-memory state backend
@@ -379,6 +380,32 @@ impl ManagerReadWrite for SliceManager<'_> {
     }
 }
 
+impl backend::ManagerSerialise for SliceManager<'_> {
+    fn serialise_region<
+        E: serde::Serialize + backend::Elem,
+        const LEN: usize,
+        S: serde::Serializer,
+    >(
+        region: &Self::Region<E, LEN>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        let mut serializer = serializer.serialize_tuple(LEN)?;
+
+        for elem in region.iter() {
+            serializer.serialize_element(elem)?;
+        }
+
+        serializer.end()
+    }
+
+    fn serialise_dyn_region<const LEN: usize, S: serde::Serializer>(
+        region: &Self::DynRegion<LEN>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        serializer.serialize_bytes(region.as_slice())
+    }
+}
+
 /// Read-only manager for in-memory backing storage
 pub struct SliceManagerRO<'backend> {
     backing_storage: usize,
@@ -505,6 +532,32 @@ impl<'backend> backend::ManagerRead for SliceManagerRO<'backend> {
         for v in values.iter_mut() {
             v.from_stored_in_place();
         }
+    }
+}
+
+impl backend::ManagerSerialise for SliceManagerRO<'_> {
+    fn serialise_region<
+        E: serde::Serialize + backend::Elem,
+        const LEN: usize,
+        S: serde::Serializer,
+    >(
+        region: &Self::Region<E, LEN>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        let mut serializer = serializer.serialize_tuple(LEN)?;
+
+        for elem in region.iter() {
+            serializer.serialize_element(elem)?;
+        }
+
+        serializer.end()
+    }
+
+    fn serialise_dyn_region<const LEN: usize, S: serde::Serializer>(
+        region: &Self::DynRegion<LEN>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        serializer.serialize_bytes(region.as_slice())
     }
 }
 
