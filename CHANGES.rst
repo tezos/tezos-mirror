@@ -117,6 +117,17 @@ Node
   are not retro-compatible with previous octez versions (MR
   :gl:`!14398`).
 
+- Environment variable ``TEZOS_USE_YES_CRYPTO_I_KNOW_WHAT_I_AM_DOING`` can be
+  set to ``yes`` or ``y`` to use yes-crypto in testing. With yes-cryptography
+  activated, signatures are faked and always considered valid. This should be
+  used for testing purposes only and/or with extreme care. This can put your
+  software at risk of being considered faulty/malicious if it fake signs
+  and exploited by attackers if it fake-checks signatures.
+
+- To avoid misusage of ``TEZOS_USE_YES_CRYPTO_I_KNOW_WHAT_I_AM_DOING``
+  environment variable, if it is set to 'yes' or 'y', nodes must explicitly be
+  launched with the ``--allow-yes-crypto`` argument to run.
+
 
 Client
 ------
