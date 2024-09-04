@@ -104,6 +104,76 @@ let test_call_state_override_balance =
 
   unit
 
+let test_call_state_override_code =
+  register
+    ~kernels:[Latest] (* Not a kernel specific test. *)
+    ~tags:["evm"; "state_override"; "code_override"; "eth_call"]
+    ~title:"Can override code in eth_call"
+  @@ fun {sequencer; _} _protocol ->
+  (*
+      This test checks that the simulation allows code override.
+      To do so we deploy a contract without any function, and call it with an
+      alternative code that does have a function.
+  *)
+  let* constant = Solidity_contracts.state_override_tester () in
+  let* constant_readable =
+    Solidity_contracts.state_override_tester_readable ()
+  in
+  let* () = Eth_cli.add_abi ~label:constant.label ~abi:constant.abi () in
+  (* Deploy the contract. *)
+  let* contract, _tx_hash =
+    send_transaction_to_sequencer
+      (fun () ->
+        Eth_cli.deploy
+          ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+          ~endpoint:(Evm_node.endpoint sequencer)
+          ~abi:constant.abi
+          ~bin:constant.bin)
+      sequencer
+  in
+  let bytecode_accessor =
+    read_file (Option.value ~default:"" constant_readable.deployed_bin)
+  in
+  let* calldata = Cast.calldata "getCount()" in
+  let call = `O [("to", `String contract); ("data", `String calldata)] in
+
+  (* Check that the contract normaly doesn't allow "getCount()" *)
+  let* call_result =
+    Evm_node.(
+      call_evm_rpc
+        sequencer
+        {method_ = "eth_call"; parameters = `A [call; `String "latest"]})
+  in
+  Check.(
+    (Evm_node.extract_error_message call_result
+    |> JSON.as_string = "execution reverted")
+      string)
+    ~error_msg:"Expected error %R but got %L " ;
+
+  (* try again with an override *)
+  let override_code =
+    `O [(contract, `O [("code", `String ("0x" ^ bytecode_accessor))])]
+  in
+  let* call_result =
+    Evm_node.(
+      call_evm_rpc
+        sequencer
+        {
+          method_ = "eth_call";
+          parameters = `A [call; `String "latest"; override_code];
+        })
+  in
+  Check.(
+    (Evm_node.extract_result call_result
+    |> JSON.as_string
+    = "0x000000000000000000000000000000000000000000000000000000000000002a")
+      string)
+    ~error_msg:"Expected result %R but got %L " ;
+
+  unit
+
 let protocols = Protocol.all
 
-let () = test_call_state_override_balance protocols
+let () =
+  test_call_state_override_code protocols ;
+  test_call_state_override_balance protocols
