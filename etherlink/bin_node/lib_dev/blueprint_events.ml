@@ -53,12 +53,15 @@ let blueprint_injection_on_inbox =
     ("level", Data_encoding.n)
 
 let blueprint_injection_on_DAL =
-  declare_1
+  declare_2
     ~section
     ~name:"blueprint_injection_on_DAL"
-    ~msg:"Injecting on the DAL a blueprint for level {level}"
+    ~msg:
+      "Injecting on the DAL a blueprint for level {level} containing \
+       {nb_chunks} chunks"
     ~level:Debug
     ("level", Data_encoding.n)
+    ("nb_chunks", Data_encoding.int31)
 
 let blueprint_injection_failure =
   declare_2
@@ -125,7 +128,8 @@ let blueprint_injected level = emit blueprint_injection level
 
 let blueprint_injected_on_inbox level = emit blueprint_injection_on_inbox level
 
-let blueprint_injected_on_DAL level = emit blueprint_injection_on_DAL level
+let blueprint_injected_on_DAL ~level ~nb_chunks =
+  emit blueprint_injection_on_DAL (level, nb_chunks)
 
 let blueprint_injection_failed level trace =
   emit blueprint_injection_failure (level, trace)

@@ -194,9 +194,11 @@ val wait_for_blueprint_invalid : ?timeout:float -> t -> unit Lwt.t
 val wait_for_blueprint_injected : ?timeout:float -> t -> int -> unit Lwt.t
 
 (** [wait_for_blueprint_injected_on_dal ~timeout evm_node level] waits until
-    [evm_node] has injected a blueprint to the DAL node. Can be used with
+    [evm_node] has injected a blueprint to the DAL node and returns the L1 level
+    of injection and the number of chunks injected. Can be used with
     [wait_for_blueprint_injected] to get the expected level. *)
-val wait_for_blueprint_injected_on_dal : ?timeout:float -> t -> unit Lwt.t
+val wait_for_blueprint_injected_on_dal :
+  ?timeout:float -> t -> (int * int) Lwt.t
 
 val wait_for_pending_upgrade : ?timeout:float -> t -> (string * string) Lwt.t
 

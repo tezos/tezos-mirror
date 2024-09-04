@@ -156,7 +156,14 @@ let test_chunked_blueprints_on_dal =
          ~data
          ~endpoint:(Evm_node.endpoint sequencer))
       sequencer
-  and* () = Evm_node.wait_for_blueprint_injected_on_dal sequencer in
+  and* _level, nb_chunks =
+    Evm_node.wait_for_blueprint_injected_on_dal sequencer
+  in
+  Check.(
+    (nb_chunks >= 2)
+      int
+      ~error_msg:
+        "The number of chunks injected should be at least %R but it is %L") ;
   (* bake until the sequencer and the rollup are in sync, to assess the input
      has been read correctly. *)
   let* () =

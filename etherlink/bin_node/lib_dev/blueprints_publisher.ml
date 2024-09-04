@@ -120,9 +120,14 @@ module Worker = struct
                 < Sequencer_blueprint.maximum_unsigned_chunks_per_dal_slot ->
           (state self).dal_last_used <- level ;
           let payload = Sequencer_blueprint.create_dal_payload chunks in
-          let*! () = Blueprint_events.blueprint_injected_on_DAL level in
+          let nb_chunks = List.length chunks in
+          let*! () =
+            Blueprint_events.blueprint_injected_on_DAL ~level ~nb_chunks
+          in
           let () =
-            Prometheus.Counter.inc_one Metrics.BlueprintChunkSent.on_dal
+            Prometheus.Counter.inc
+              Metrics.BlueprintChunkSent.on_dal
+              (Float.of_int nb_chunks)
           in
           Rollup_services.publish_on_dal ~rollup_node_endpoint payload
       | _ ->
@@ -135,7 +140,9 @@ module Worker = struct
           in
           let*! () = Blueprint_events.blueprint_injected_on_inbox level in
           let () =
-            Prometheus.Counter.inc_one Metrics.BlueprintChunkSent.on_inbox
+            Prometheus.Counter.inc
+              Metrics.BlueprintChunkSent.on_inbox
+              (Float.of_int (List.length payload))
           in
           Rollup_services.publish
             ~keep_alive:false
