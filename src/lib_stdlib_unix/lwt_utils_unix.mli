@@ -124,7 +124,8 @@ val copy_file_raw :
 val create_file :
   ?close_on_exec:bool -> ?perm:int -> string -> string -> unit Lwt.t
 
-val with_tempdir : string -> (string -> 'a Lwt.t) -> 'a Lwt.t
+val with_tempdir :
+  ?temp_dir:string -> string -> (string -> 'a Lwt.t) -> 'a Lwt.t
 
 val safe_close : Lwt_unix.file_descr -> unit tzresult Lwt.t
 

@@ -2179,7 +2179,10 @@ let import_snapshot_command =
     ~desc:"Import a snapshot of the EVM node."
     (args2
        data_dir_arg
-       (force_arg ~doc:"Import snapshot in already populated data dir"))
+       (force_arg
+          ~doc:
+            "Allow importing snapshot in already populated data dir (previous \
+             contents is removed first, even if the snapshot is corrupted)"))
     (prefixes ["snapshot"; "import"] @@ Params.snapshot_file @@ stop)
     (fun (data_dir, force) snapshot_file () ->
       Evm_node_lib_dev.Snapshots.import ~force ~data_dir ~snapshot_file)
