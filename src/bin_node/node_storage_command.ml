@@ -357,72 +357,91 @@ module Term = struct
     Logs.set_level level ;
     Logs.set_reporter (Logs_fmt.reporter ())
 
+  let integrity_check =
+    Cmd.v
+      (Cmd.info
+         ~doc:"search the store for integrity faults and corruption"
+         "integrity-check")
+      Term.(
+        ret
+          (const (fun () -> integrity_check)
+          $ setup_logs $ Shared_arg.Term.config_file $ Shared_arg.Term.data_dir
+          $ auto_repair $ block))
+
+  let stat_index =
+    Cmd.v
+      (Cmd.info
+         ~doc:"print high-level statistics about the index store"
+         "stat-index")
+      Term.(
+        ret
+          (const (fun () -> stat_index)
+          $ setup_logs $ Shared_arg.Term.config_file $ Shared_arg.Term.data_dir
+          ))
+
+  let stat_pack =
+    Cmd.v
+      (Cmd.info
+         ~doc:"print high-level statistics about the pack file"
+         "stat-pack")
+      Term.(
+        ret
+          (const (fun () -> stat_pack)
+          $ setup_logs $ Shared_arg.Term.config_file $ Shared_arg.Term.data_dir
+          ))
+
+  let reconstruct_index =
+    Cmd.v
+      (Cmd.info ~doc:"reconstruct index from pack file" "reconstruct-index")
+      Term.(
+        ret
+          (const (fun () -> reconstruct_index)
+          $ setup_logs $ Shared_arg.Term.config_file $ Shared_arg.Term.data_dir
+          $ dest $ index_log_size))
+
+  let integrity_check_inodes =
+    Cmd.v
+      (Cmd.info
+         ~doc:
+           "search the store for corrupted inodes. If no block hash is \
+            provided (through the $(b,--head) argument) then the current head \
+            is chosen as the default context to start with"
+         "integrity-check-inodes")
+      Term.(
+        ret
+          (const (fun () -> integrity_check_inodes)
+          $ setup_logs $ Shared_arg.Term.config_file $ Shared_arg.Term.data_dir
+          $ block))
+
+  let integrity_check_index =
+    Cmd.v
+      (Cmd.info ~doc:"checks the index for corruptions" "integrity-check-index")
+      Term.(
+        ret
+          (const (fun () -> check_index)
+          $ setup_logs $ Shared_arg.Term.config_file $ Shared_arg.Term.data_dir
+          $ auto_repair))
+
+  let head_commit =
+    Cmd.v
+      (Cmd.info
+         ~doc:"prints the current head's context commit hash"
+         "head-commit")
+      Term.(
+        ret
+          (const (fun () -> find_head)
+          $ setup_logs $ Shared_arg.Term.config_file $ Shared_arg.Term.data_dir
+          ))
+
   let commands =
     [
-      Cmd.v
-        (Cmd.info
-           ~doc:"search the store for integrity faults and corruption"
-           "integrity-check")
-        Term.(
-          ret
-            (const (fun () -> integrity_check)
-            $ setup_logs $ Shared_arg.Term.config_file
-            $ Shared_arg.Term.data_dir $ auto_repair $ block));
-      Cmd.v
-        (Cmd.info
-           ~doc:"print high-level statistics about the index store"
-           "stat-index")
-        Term.(
-          ret
-            (const (fun () -> stat_index)
-            $ setup_logs $ Shared_arg.Term.config_file
-            $ Shared_arg.Term.data_dir));
-      Cmd.v
-        (Cmd.info
-           ~doc:"print high-level statistics about the pack file"
-           "stat-pack")
-        Term.(
-          ret
-            (const (fun () -> stat_pack)
-            $ setup_logs $ Shared_arg.Term.config_file
-            $ Shared_arg.Term.data_dir));
-      Cmd.v
-        (Cmd.info ~doc:"reconstruct index from pack file" "reconstruct-index")
-        Term.(
-          ret
-            (const (fun () -> reconstruct_index)
-            $ setup_logs $ Shared_arg.Term.config_file
-            $ Shared_arg.Term.data_dir $ dest $ index_log_size));
-      Cmd.v
-        (Cmd.info
-           ~doc:
-             "search the store for corrupted inodes. If no block hash is \
-              provided (through the $(b,--head) argument) then the current \
-              head is chosen as the default context to start with"
-           "integrity-check-inodes")
-        Term.(
-          ret
-            (const (fun () -> integrity_check_inodes)
-            $ setup_logs $ Shared_arg.Term.config_file
-            $ Shared_arg.Term.data_dir $ block));
-      Cmd.v
-        (Cmd.info
-           ~doc:"checks the index for corruptions"
-           "integrity-check-index")
-        Term.(
-          ret
-            (const (fun () -> check_index)
-            $ setup_logs $ Shared_arg.Term.config_file
-            $ Shared_arg.Term.data_dir $ auto_repair));
-      Cmd.v
-        (Cmd.info
-           ~doc:"prints the current head's context commit hash"
-           "head-commit")
-        Term.(
-          ret
-            (const (fun () -> find_head)
-            $ setup_logs $ Shared_arg.Term.config_file
-            $ Shared_arg.Term.data_dir));
+      integrity_check;
+      stat_index;
+      stat_pack;
+      reconstruct_index;
+      integrity_check_inodes;
+      integrity_check_index;
+      head_commit;
     ]
 end
 
