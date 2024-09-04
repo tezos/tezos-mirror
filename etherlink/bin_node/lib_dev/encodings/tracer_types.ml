@@ -20,6 +20,69 @@ type error +=
   | Trace_not_found
   | Tracer_not_activated
 
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"evm_node_dev_tracer_not_supported"
+    ~title:"Tracer not supported"
+    ~description:"The tracer specified in the request in not supported"
+    ~pp:(fun ppf () ->
+      Format.fprintf ppf "The tracer specified in the request in not supported")
+    Data_encoding.empty
+    (function Not_supported -> Some () | _ -> None)
+    (fun () -> Not_supported) ;
+  register_error_kind
+    `Permanent
+    ~id:"evm_node_dev_transaction_not_found"
+    ~title:"Transaction not found"
+    ~description:"The tracer failed to find a transaction"
+    ~pp:(fun ppf tx ->
+      Format.fprintf
+        ppf
+        "The tracer failed to find the transaction %a"
+        Ethereum_types.pp_hash
+        tx)
+    Data_encoding.(obj1 (req "hash" Ethereum_types.hash_encoding))
+    (function Transaction_not_found tx -> Some tx | _ -> None)
+    (fun tx -> Transaction_not_found tx) ;
+  register_error_kind
+    `Permanent
+    ~id:"evm_node_dev_block_not_found"
+    ~title:"Block not found"
+    ~description:"The tracer failed to find a block"
+    ~pp:(fun ppf block ->
+      Format.fprintf
+        ppf
+        "The tracer failed to find the block %a"
+        Ethereum_types.pp_quantity
+        block)
+    Data_encoding.(obj1 (req "block" Ethereum_types.quantity_encoding))
+    (function Block_not_found tx -> Some tx | _ -> None)
+    (fun tx -> Block_not_found tx) ;
+  register_error_kind
+    `Permanent
+    ~id:"evm_node_dev_trace_not_found"
+    ~title:"Trace not found"
+    ~description:
+      "The tracer failed to recover the information needed to build the trace"
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "The tracer failed to recover the information needed to build the trace")
+    Data_encoding.empty
+    (function Trace_not_found -> Some () | _ -> None)
+    (fun () -> Trace_not_found) ;
+  register_error_kind
+    `Permanent
+    ~id:"evm_node_dev_tracer_not_activated"
+    ~title:"Tracer not activated"
+    ~description:"The tracer specified in the request is not activated"
+    ~pp:(fun ppf () ->
+      Format.fprintf ppf "The tracer specified in the request is not activated")
+    Data_encoding.empty
+    (function Tracer_not_activated -> Some () | _ -> None)
+    (fun () -> Tracer_not_activated)
+
 type tracer_config = {
   (* StructLogger flags *)
   enable_return_data : bool;
