@@ -9,7 +9,9 @@ use crate::blueprint::Blueprint;
 use crate::configuration::{Configuration, ConfigurationMode};
 use crate::error::{Error, StorageError};
 use crate::inbox::{Transaction, TransactionContent};
-use crate::sequencer_blueprint::{BlueprintWithDelayedHashes, SequencerBlueprint};
+use crate::sequencer_blueprint::{
+    BlueprintWithDelayedHashes, UnsignedSequencerBlueprint,
+};
 use crate::storage::read_last_info_per_level_timestamp;
 use crate::{delayed_inbox, DelayedInbox};
 use primitive_types::U256;
@@ -129,13 +131,13 @@ fn store_blueprint_nb_chunks<Host: Runtime>(
 
 pub fn store_sequencer_blueprint<Host: Runtime>(
     host: &mut Host,
-    blueprint: SequencerBlueprint,
+    blueprint: UnsignedSequencerBlueprint,
 ) -> Result<(), Error> {
-    let blueprint_path = blueprint_path(blueprint.blueprint.number)?;
-    store_blueprint_nb_chunks(host, &blueprint_path, blueprint.blueprint.nb_chunks)?;
+    let blueprint_path = blueprint_path(blueprint.number)?;
+    store_blueprint_nb_chunks(host, &blueprint_path, blueprint.nb_chunks)?;
     let blueprint_chunk_path =
-        blueprint_chunk_path(&blueprint_path, blueprint.blueprint.chunk_index)?;
-    let store_blueprint = StoreBlueprint::SequencerChunk(blueprint.blueprint.chunk);
+        blueprint_chunk_path(&blueprint_path, blueprint.chunk_index)?;
+    let store_blueprint = StoreBlueprint::SequencerChunk(blueprint.chunk);
     store_rlp(&store_blueprint, host, &blueprint_chunk_path).map_err(Error::from)
 }
 
@@ -484,12 +486,10 @@ mod tests {
     use super::*;
     use crate::configuration::{DalConfiguration, Limits, TezosContracts};
     use crate::delayed_inbox::Hash;
-    use crate::sequencer_blueprint::UnsignedSequencerBlueprint;
     use crate::storage::store_last_info_per_level_timestamp;
     use crate::Timestamp;
     use primitive_types::H256;
     use tezos_crypto_rs::hash::ContractKt1Hash;
-    use tezos_crypto_rs::hash::UnknownSignature;
     use tezos_ethereum::transaction::TRANSACTION_HASH_SIZE;
     use tezos_smart_rollup_encoding::public_key::PublicKey;
     use tezos_smart_rollup_mock::MockHost;
@@ -543,18 +543,12 @@ mod tests {
             };
         let blueprint_with_hashes_bytes =
             rlp::Encodable::rlp_bytes(&blueprint_with_invalid_hash);
-        let signature = UnknownSignature::from_base58_check(
-          "sigdGBG68q2vskMuac4AzyNb1xCJTfuU8MiMbQtmZLUCYydYrtTd5Lessn1EFLTDJzjXoYxRasZxXbx6tHnirbEJtikcMHt3"
-      ).expect("signature decoding should work");
 
-        let seq_blueprint = SequencerBlueprint {
-            blueprint: UnsignedSequencerBlueprint {
-                chunk: blueprint_with_hashes_bytes.clone().into(),
-                number: U256::from(0),
-                nb_chunks: 1u16,
-                chunk_index: 0u16,
-            },
-            signature,
+        let seq_blueprint = UnsignedSequencerBlueprint {
+            chunk: blueprint_with_hashes_bytes.clone().into(),
+            number: U256::from(0),
+            nb_chunks: 1u16,
+            chunk_index: 0u16,
         };
 
         store_last_info_per_level_timestamp(&mut host, Timestamp::from(40)).unwrap();
@@ -610,18 +604,12 @@ mod tests {
             };
         let blueprint_with_hashes_bytes =
             rlp::Encodable::rlp_bytes(&blueprint_with_invalid_parent_hash);
-        let signature = UnknownSignature::from_base58_check(
-          "sigdGBG68q2vskMuac4AzyNb1xCJTfuU8MiMbQtmZLUCYydYrtTd5Lessn1EFLTDJzjXoYxRasZxXbx6tHnirbEJtikcMHt3"
-      ).expect("signature decoding should work");
 
-        let seq_blueprint = SequencerBlueprint {
-            blueprint: UnsignedSequencerBlueprint {
-                chunk: blueprint_with_hashes_bytes.clone().into(),
-                number: U256::from(0),
-                nb_chunks: 1u16,
-                chunk_index: 0u16,
-            },
-            signature,
+        let seq_blueprint = UnsignedSequencerBlueprint {
+            chunk: blueprint_with_hashes_bytes.clone().into(),
+            number: U256::from(0),
+            nb_chunks: 1u16,
+            chunk_index: 0u16,
         };
 
         let mut delayed_inbox =

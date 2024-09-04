@@ -5,14 +5,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t =
-  | Chunk of {
-      value : bytes;
-      number : Ethereum_types.quantity;
-      nb_chunks : int;
-      chunk_index : int;
-      signature : Signature.t;
-    }
+(* A signed blueprint chunk *)
+type t
 
 val chunk_encoding : t Data_encoding.t
 

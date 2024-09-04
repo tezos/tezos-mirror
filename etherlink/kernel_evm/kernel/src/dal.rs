@@ -2,10 +2,9 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::sequencer_blueprint::SequencerBlueprint;
+use crate::sequencer_blueprint::UnsignedSequencerBlueprint;
 use rlp::{DecoderError, PayloadInfo};
 use tezos_evm_logging::{log, Level::*};
-use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_host::dal_parameters::RollupDalParameters;
 
 use tezos_smart_rollup_host::runtime::Runtime;
@@ -63,11 +62,10 @@ fn rlp_length(data: &[u8]) -> Result<usize, DecoderError> {
 
 pub fn fetch_and_parse_sequencer_blueprint_from_dal<Host: Runtime>(
     host: &mut Host,
-    sequencer: &PublicKey,
     params: &RollupDalParameters,
     slot_index: u8,
     published_level: u32,
-) -> Option<SequencerBlueprint> {
+) -> Option<UnsignedSequencerBlueprint> {
     if let Some(slot) = import_dal_slot(host, params, published_level, slot_index) {
         log!(
             host,
@@ -94,7 +92,7 @@ pub fn fetch_and_parse_sequencer_blueprint_from_dal<Host: Runtime>(
         if let Result::Ok(chunk_length) = rlp_length(&slot[TAG_SIZE..]) {
             // Padding removal
             let slot = &slot[TAG_SIZE..chunk_length + TAG_SIZE];
-            let res = crate::parsing::parse_blueprint_chunk(slot, sequencer);
+            let res = crate::parsing::parse_unsigned_blueprint_chunk(slot);
             if let Some(chunk) = res {
                 log!(
                     host,
