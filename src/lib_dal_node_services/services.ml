@@ -305,74 +305,60 @@ module P2P = struct
       ~output:Data_encoding.unit
       (open_root / "connect")
 
-  let delete_disconnect_point :
-      < meth : [`DELETE]
-      ; input : unit
-      ; output : unit
-      ; prefix : unit
-      ; params : unit * P2p_point.Id.t
-      ; query : < wait : bool > >
-      service =
-    Tezos_rpc.Service.delete_service
-      ~description:"Disconnect from a point."
-      ~query:wait_query
-      ~output:Data_encoding.unit
-      (open_root / "points" / "disconnect" /: P2p_point.Id.rpc_arg)
-
-  let delete_disconnect_peer :
-      < meth : [`DELETE]
-      ; input : unit
-      ; output : unit
-      ; prefix : unit
-      ; params : unit * P2p_peer.Id.t
-      ; query : < wait : bool > >
-      service =
-    Tezos_rpc.Service.delete_service
-      ~description:"Disconnect from a peer."
-      ~query:wait_query
-      ~output:Data_encoding.unit
-      (open_root / "peers" / "disconnect" /: P2p_peer.Id.rpc_arg)
-
-  let get_points :
-      < meth : [`GET]
-      ; input : unit
-      ; output : P2p_point.Id.t list
-      ; prefix : unit
-      ; params : unit
-      ; query : < connected : bool > >
-      service =
-    Tezos_rpc.Service.get_service
-      ~description:
-        "By default, get the list of known points. When the 'connected' flag \
-         is given, only get the connected points."
-      ~query:connected_query
-      ~output:Data_encoding.(list (obj1 (req "point" P2p_point.Id.encoding)))
-      (open_root / "points")
-
-  let get_points_info :
-      < meth : [`GET]
-      ; input : unit
-      ; output : (P2p_point.Id.t * P2p_point.Info.t) list
-      ; prefix : unit
-      ; params : unit
-      ; query : < connected : bool > >
-      service =
-    Tezos_rpc.Service.get_service
-      ~description:
-        "By default, get the list of known points and their corresponding \
-         info. When the 'connected' flag is given, then only get the connected \
-         points."
-      ~query:connected_query
-      ~output:
-        Data_encoding.(
-          list
-            (obj2
-               (req "point" P2p_point.Id.encoding)
-               (req "info" P2p_point.Info.encoding)))
-      (open_root / "points" / "info")
-
   module Points = struct
     let open_root = open_root / "points"
+
+    let delete_disconnect_point :
+        < meth : [`DELETE]
+        ; input : unit
+        ; output : unit
+        ; prefix : unit
+        ; params : unit * P2p_point.Id.t
+        ; query : < wait : bool > >
+        service =
+      Tezos_rpc.Service.delete_service
+        ~description:"Disconnect from a point."
+        ~query:wait_query
+        ~output:Data_encoding.unit
+        (open_root / "disconnect" /: P2p_point.Id.rpc_arg)
+
+    let get_points :
+        < meth : [`GET]
+        ; input : unit
+        ; output : P2p_point.Id.t list
+        ; prefix : unit
+        ; params : unit
+        ; query : < connected : bool > >
+        service =
+      Tezos_rpc.Service.get_service
+        ~description:
+          "By default, get the list of known points. When the 'connected' flag \
+           is given, only get the connected points."
+        ~query:connected_query
+        ~output:Data_encoding.(list (obj1 (req "point" P2p_point.Id.encoding)))
+        open_root
+
+    let get_points_info :
+        < meth : [`GET]
+        ; input : unit
+        ; output : (P2p_point.Id.t * P2p_point.Info.t) list
+        ; prefix : unit
+        ; params : unit
+        ; query : < connected : bool > >
+        service =
+      Tezos_rpc.Service.get_service
+        ~description:
+          "By default, get the list of known points and their corresponding \
+           info. When the 'connected' flag is given, then only get the \
+           connected points."
+        ~query:connected_query
+        ~output:
+          Data_encoding.(
+            list
+              (obj2
+                 (req "point" P2p_point.Id.encoding)
+                 (req "info" P2p_point.Info.encoding)))
+        (open_root / "info")
 
     let get_point_info :
         < meth : [`GET]
@@ -389,43 +375,57 @@ module P2P = struct
         (open_root / "by-id" /: P2p_point.Id.rpc_arg)
   end
 
-  let get_peers :
-      < meth : [`GET]
-      ; input : unit
-      ; output : P2p_peer.Id.t list
-      ; prefix : unit
-      ; params : unit
-      ; query : < connected : bool > >
-      service =
-    Tezos_rpc.Service.get_service
-      ~description:
-        "By default, get the list of known peers. When the 'connected' flag is \
-         given, then only get the connected peers."
-      ~query:connected_query
-      ~output:Data_encoding.(list (obj1 (req "peer" P2p_peer.Id.encoding)))
-      (open_root / "peers" / "list")
-
-  let get_peers_info :
-      < meth : [`GET]
-      ; input : unit
-      ; output : (P2p_peer.Id.t * P2P.Peer.Info.t) list
-      ; prefix : unit
-      ; params : unit
-      ; query : < connected : bool > >
-      service =
-    Tezos_rpc.Service.get_service
-      ~description:"Get list of known peers and their corresponding info."
-      ~query:connected_query
-      ~output:
-        Data_encoding.(
-          list
-            (obj2
-               (req "point" P2p_peer.Id.encoding)
-               (req "info" P2P.Peer.Info.encoding)))
-      (open_root / "peers" / "info")
-
   module Peers = struct
     let open_root = open_root / "peers"
+
+    let delete_disconnect_peer :
+        < meth : [`DELETE]
+        ; input : unit
+        ; output : unit
+        ; prefix : unit
+        ; params : unit * P2p_peer.Id.t
+        ; query : < wait : bool > >
+        service =
+      Tezos_rpc.Service.delete_service
+        ~description:"Disconnect from a peer."
+        ~query:wait_query
+        ~output:Data_encoding.unit
+        (open_root / "disconnect" /: P2p_peer.Id.rpc_arg)
+
+    let get_peers :
+        < meth : [`GET]
+        ; input : unit
+        ; output : P2p_peer.Id.t list
+        ; prefix : unit
+        ; params : unit
+        ; query : < connected : bool > >
+        service =
+      Tezos_rpc.Service.get_service
+        ~description:
+          "By default, get the list of known peers. When the 'connected' flag \
+           is given, then only get the connected peers."
+        ~query:connected_query
+        ~output:Data_encoding.(list (obj1 (req "peer" P2p_peer.Id.encoding)))
+        open_root
+
+    let get_peers_info :
+        < meth : [`GET]
+        ; input : unit
+        ; output : (P2p_peer.Id.t * P2P.Peer.Info.t) list
+        ; prefix : unit
+        ; params : unit
+        ; query : < connected : bool > >
+        service =
+      Tezos_rpc.Service.get_service
+        ~description:"Get list of known peers and their corresponding info."
+        ~query:connected_query
+        ~output:
+          Data_encoding.(
+            list
+              (obj2
+                 (req "peer" P2p_peer.Id.encoding)
+                 (req "info" P2P.Peer.Info.encoding)))
+        (open_root / "info")
 
     let get_peer_info :
         < meth : [`GET]

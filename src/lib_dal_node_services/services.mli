@@ -201,43 +201,34 @@ module P2P : sig
     ; query : < timeout : Ptime.Span.t option > >
     service
 
-  val delete_disconnect_point :
-    < meth : [`DELETE]
-    ; input : unit
-    ; output : unit
-    ; prefix : unit
-    ; params : unit * P2p_point.Id.t
-    ; query : < wait : bool > >
-    service
-
-  val delete_disconnect_peer :
-    < meth : [`DELETE]
-    ; input : unit
-    ; output : unit
-    ; prefix : unit
-    ; params : unit * P2p_peer.Id.t
-    ; query : < wait : bool > >
-    service
-
-  val get_points :
-    < meth : [`GET]
-    ; input : unit
-    ; output : P2p_point.Id.t list
-    ; prefix : unit
-    ; params : unit
-    ; query : < connected : bool > >
-    service
-
-  val get_points_info :
-    < meth : [`GET]
-    ; input : unit
-    ; output : (P2p_point.Id.t * P2p_point.Info.t) list
-    ; prefix : unit
-    ; params : unit
-    ; query : < connected : bool > >
-    service
-
   module Points : sig
+    val delete_disconnect_point :
+      < meth : [`DELETE]
+      ; input : unit
+      ; output : unit
+      ; prefix : unit
+      ; params : unit * P2p_point.Id.t
+      ; query : < wait : bool > >
+      service
+
+    val get_points :
+      < meth : [`GET]
+      ; input : unit
+      ; output : P2p_point.Id.t list
+      ; prefix : unit
+      ; params : unit
+      ; query : < connected : bool > >
+      service
+
+    val get_points_info :
+      < meth : [`GET]
+      ; input : unit
+      ; output : (P2p_point.Id.t * P2p_point.Info.t) list
+      ; prefix : unit
+      ; params : unit
+      ; query : < connected : bool > >
+      service
+
     val get_point_info :
       < meth : [`GET]
       ; input : unit
@@ -248,25 +239,34 @@ module P2P : sig
       service
   end
 
-  val get_peers :
-    < meth : [`GET]
-    ; input : unit
-    ; output : P2p_peer.Id.t list
-    ; prefix : unit
-    ; params : unit
-    ; query : < connected : bool > >
-    service
-
-  val get_peers_info :
-    < meth : [`GET]
-    ; input : unit
-    ; output : (P2p_peer.Id.t * Types.P2P.Peer.Info.t) list
-    ; prefix : unit
-    ; params : unit
-    ; query : < connected : bool > >
-    service
-
   module Peers : sig
+    val delete_disconnect_peer :
+      < meth : [`DELETE]
+      ; input : unit
+      ; output : unit
+      ; prefix : unit
+      ; params : unit * P2p_peer.Id.t
+      ; query : < wait : bool > >
+      service
+
+    val get_peers :
+      < meth : [`GET]
+      ; input : unit
+      ; output : P2p_peer.Id.t list
+      ; prefix : unit
+      ; params : unit
+      ; query : < connected : bool > >
+      service
+
+    val get_peers_info :
+      < meth : [`GET]
+      ; input : unit
+      ; output : (P2p_peer.Id.t * Types.P2P.Peer.Info.t) list
+      ; prefix : unit
+      ; params : unit
+      ; query : < connected : bool > >
+      service
+
     val get_peer_info :
       < meth : [`GET]
       ; input : unit
