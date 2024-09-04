@@ -641,13 +641,14 @@ let uncompressed : (bool, unit) Tezos_clic.arg =
     ~doc:"Produce an uncompressed snapshot."
     ()
 
-let snapshot_dir_arg =
+let snapshot_file_arg =
   Tezos_clic.arg
-    ~long:"dest"
+    ~long:"snapshot-file"
+    ~short:'s'
     ~placeholder:"path"
     ~doc:
-      "Directory in which to export the snapshot (defaults to current \
-       directory)"
+      "Path to the snapshot file to create. Default is located in the current \
+       directory, and the filename is based on the snapshot information"
     Params.string
 
 let start_proxy ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?rpc_batch_limit
@@ -2136,7 +2137,7 @@ let observer_command =
         ?kernel
         ())
 
-let export_snapshot (data_dir, dest, compress_on_the_fly, uncompressed) filename
+let export_snapshot (data_dir, snapshot_file, compress_on_the_fly, uncompressed)
     =
   let open Lwt_result_syntax in
   let open Evm_node_lib_dev.Snapshots in
@@ -2150,32 +2151,26 @@ let export_snapshot (data_dir, dest, compress_on_the_fly, uncompressed) filename
     | false, false -> After
     | false, true -> No
   in
-  let* snapshot_file = export ?dest ?filename ~compression ~data_dir () in
+  let* snapshot_file = export ?snapshot_file ~compression ~data_dir () in
   Format.printf "Snapshot exported to %s@." snapshot_file ;
   return_unit
 
-let export_snapshot_auto_name_command =
-  let open Tezos_clic in
-  command
-    ~desc:"Export a snapshot of the EVM node."
-    (args4 data_dir_arg snapshot_dir_arg compress_on_the_fly_arg uncompressed)
-    (prefixes ["snapshot"; "export"] @@ stop)
-    (fun params () -> export_snapshot params None)
+let snapshot_group =
+  Tezos_clic.{name = "snapshot"; title = "Snapshots commands"}
 
-let export_snapshot_named_command =
+let export_snapshot_command =
   let open Tezos_clic in
   command
-    ~desc:"Export a snapshot of the EVM node to a given file."
-    (args3 data_dir_arg compress_on_the_fly_arg uncompressed)
-    (prefixes ["snapshot"; "export"] @@ Params.snapshot_file @@ stop)
-    (fun (data_dir, compress_on_the_fly, uncompressed) filename () ->
-      export_snapshot
-        (data_dir, None, compress_on_the_fly, uncompressed)
-        (Some filename))
+    ~group:snapshot_group
+    ~desc:"Export a snapshot of the EVM node."
+    (args4 data_dir_arg snapshot_file_arg compress_on_the_fly_arg uncompressed)
+    (prefixes ["snapshot"; "export"] @@ stop)
+    (fun params () -> export_snapshot params)
 
 let import_snapshot_command =
   let open Tezos_clic in
   command
+    ~group:snapshot_group
     ~desc:"Import a snapshot of the EVM node."
     (args2
        data_dir_arg
@@ -2291,12 +2286,7 @@ let debug_print_store_schemas_command =
       return_unit)
 
 (* List of commands not ready to be used by our end-users *)
-let in_development_commands =
-  [
-    export_snapshot_auto_name_command;
-    export_snapshot_named_command;
-    import_snapshot_command;
-  ]
+let in_development_commands = []
 
 (* List of program commands *)
 let commands =
@@ -2307,6 +2297,8 @@ let commands =
     threshold_encryption_sequencer_command;
     observer_command;
     rpc_command;
+    export_snapshot_command;
+    import_snapshot_command;
     chunker_command;
     make_upgrade_command;
     make_sequencer_upgrade_command;
