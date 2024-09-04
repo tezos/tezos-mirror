@@ -94,6 +94,14 @@ module Term = struct
 
   let ( and+ ) a b = Term.(const (fun x y -> (x, y)) $ a $ b)
 
+  type resolved_parameters = {
+    genesis : Genesis.t;
+    chain_id : Chain_id.t;
+    data_dir : string;
+    context_dir : string;
+    store_dir : string;
+  }
+
   (* This is actually a weak check. The irmin command should take care
      of checking whether or not the directory is valid/initialized or
      not. *)
@@ -114,6 +122,23 @@ module Term = struct
                  {data_dir = context_dir; msg = None})
         | exc -> Lwt.reraise exc)
 
+  (* Returns the adequate config arguments given a config_file and a
+     data_dir. *)
+  let resolve_config config_file data_dir =
+    let open Lwt_result_syntax in
+    let* data_dir, node_config =
+      Shared_arg.resolve_data_dir_and_config_file ?data_dir ?config_file ()
+    in
+    let ({genesis; _} : Config_file.blockchain_network) =
+      node_config.blockchain_network
+    in
+    let chain_id = Chain_id.of_block_hash genesis.block in
+    let* () = Data_version.ensure_data_dir genesis data_dir in
+    let context_dir = Data_version.context_dir data_dir in
+    let* () = ensure_context_dir context_dir in
+    let store_dir = Data_version.store_dir data_dir in
+    return {genesis; chain_id; data_dir; context_dir; store_dir}
+
   let resolve_block chain_store block =
     let open Lwt_result_syntax in
     match block with
@@ -129,16 +154,9 @@ module Term = struct
     Shared_arg.process_command
       (let open Lwt_result_syntax in
        let*! () = Tezos_base_unix.Internal_event_unix.init () in
-       let* data_dir, node_config =
-         Shared_arg.resolve_data_dir_and_config_file ?data_dir ?config_file ()
+       let* {genesis; chain_id; context_dir; store_dir; _} =
+         resolve_config config_file data_dir
        in
-       let ({genesis; _} : Config_file.blockchain_network) =
-         node_config.blockchain_network
-       in
-       let chain_id = Chain_id.of_block_hash genesis.block in
-       let* () = Data_version.ensure_data_dir genesis data_dir in
-       let context_dir = Data_version.context_dir data_dir in
-       let store_dir = Data_version.store_dir data_dir in
        let* store =
          Store.init ~store_dir ~context_dir ~allow_testchains:false genesis
        in
@@ -181,23 +199,17 @@ module Term = struct
   let stat_index config_file data_dir =
     Shared_arg.process_command
       (let open Lwt_result_syntax in
-       let* data_dir, _ =
-         Shared_arg.resolve_data_dir_and_config_file ?data_dir ?config_file ()
-       in
-       let root = Data_version.context_dir data_dir in
-       let* () = ensure_context_dir root in
-       Tezos_context.Context.Checks.Index.Stat.run ~root ;
+       let* {context_dir; _} = resolve_config config_file data_dir in
+       Tezos_context.Context.Checks.Index.Stat.run ~root:context_dir ;
        return_unit)
 
   let stat_pack config_file data_dir =
     Shared_arg.process_command
       (let open Lwt_result_syntax in
-       let* data_dir, _ =
-         Shared_arg.resolve_data_dir_and_config_file ?data_dir ?config_file ()
+       let* {context_dir; _} = resolve_config config_file data_dir in
+       let*! () =
+         Tezos_context.Context.Checks.Pack.Stat.run ~root:context_dir
        in
-       let root = Data_version.context_dir data_dir in
-       let* () = ensure_context_dir root in
-       let*! () = Tezos_context.Context.Checks.Pack.Stat.run ~root in
        return_unit)
 
   let index_dir_exists context_dir output =
@@ -209,14 +221,10 @@ module Term = struct
   let reconstruct_index config_file data_dir output index_log_size =
     Shared_arg.process_command
       (let open Lwt_result_syntax in
-       let* data_dir, _ =
-         Shared_arg.resolve_data_dir_and_config_file ?data_dir ?config_file ()
-       in
-       let root = Data_version.context_dir data_dir in
-       let* () = ensure_context_dir root in
-       let* () = index_dir_exists root output in
+       let* {context_dir; _} = resolve_config config_file data_dir in
+       let* () = index_dir_exists context_dir output in
        Tezos_context.Context.Checks.Pack.Reconstruct_index.run
-         ~root
+         ~root:context_dir
          ~output
          ~index_log_size
          () ;
@@ -226,16 +234,9 @@ module Term = struct
     Shared_arg.process_command
       (let open Lwt_result_syntax in
        let*! () = Tezos_base_unix.Internal_event_unix.init () in
-       let* data_dir, node_config =
-         Shared_arg.resolve_data_dir_and_config_file ?data_dir ?config_file ()
+       let* {genesis; chain_id; context_dir; store_dir; _} =
+         resolve_config config_file data_dir
        in
-       let ({genesis; _} : Config_file.blockchain_network) =
-         node_config.blockchain_network
-       in
-       let chain_id = Chain_id.of_block_hash genesis.block in
-       let* () = Data_version.ensure_data_dir genesis data_dir in
-       let context_dir = Data_version.context_dir data_dir in
-       let store_dir = Data_version.store_dir data_dir in
        let* store =
          Store.init ~store_dir ~context_dir ~allow_testchains:false genesis
        in
@@ -260,13 +261,9 @@ module Term = struct
   let check_index config_file data_dir auto_repair =
     Shared_arg.process_command
       (let open Lwt_result_syntax in
-       let* data_dir, _ =
-         Shared_arg.resolve_data_dir_and_config_file ?data_dir ?config_file ()
-       in
-       let root = Data_version.context_dir data_dir in
-       let* () = ensure_context_dir root in
+       let* {context_dir; _} = resolve_config config_file data_dir in
        Tezos_context.Context.Checks.Pack.Integrity_check_index.run
-         ~root
+         ~root:context_dir
          ~auto_repair
          () ;
        return_unit)
@@ -275,16 +272,9 @@ module Term = struct
     Shared_arg.process_command
       (let open Lwt_result_syntax in
        let*! () = Tezos_base_unix.Internal_event_unix.init () in
-       let* data_dir, node_config =
-         Shared_arg.resolve_data_dir_and_config_file ?data_dir ?config_file ()
+       let* {genesis; chain_id; context_dir; store_dir; _} =
+         resolve_config config_file data_dir
        in
-       let ({genesis; _} : Config_file.blockchain_network) =
-         node_config.blockchain_network
-       in
-       let chain_id = Chain_id.of_block_hash genesis.block in
-       let* () = Data_version.ensure_data_dir genesis data_dir in
-       let context_dir = Data_version.context_dir data_dir in
-       let store_dir = Data_version.store_dir data_dir in
        let* store =
          Store.init ~store_dir ~context_dir ~allow_testchains:false genesis
        in
