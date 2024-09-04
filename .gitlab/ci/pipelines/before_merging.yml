@@ -395,8 +395,20 @@ oc.build:static-x86_64-linux-binaries:
     - tzt_reference_test_suite/**/*
     when: on_success
   needs:
-  - oc.docker:ci:amd64
-  - trigger
+  - job: oc.docker:ci:amd64
+  - job: trigger
+  - job: sanity_ci
+    optional: true
+  - job: docker:hadolint
+    optional: true
+  - job: oc.ocaml_fmt
+    optional: true
+  - job: oc.semgrep
+    optional: true
+  - job: oc.misc_checks
+    optional: true
+  - job: nix
+    optional: true
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -458,8 +470,20 @@ oc.build_x86_64-released:
     - tzt_reference_test_suite/**/*
     when: on_success
   needs:
-  - oc.docker:ci:amd64
-  - trigger
+  - job: oc.docker:ci:amd64
+  - job: trigger
+  - job: sanity_ci
+    optional: true
+  - job: docker:hadolint
+    optional: true
+  - job: oc.ocaml_fmt
+    optional: true
+  - job: oc.semgrep
+    optional: true
+  - job: oc.misc_checks
+    optional: true
+  - job: nix
+    optional: true
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -531,8 +555,20 @@ oc.build_x86_64-exp-dev-extra:
     - tzt_reference_test_suite/**/*
     when: on_success
   needs:
-  - oc.docker:ci:amd64
-  - trigger
+  - job: oc.docker:ci:amd64
+  - job: trigger
+  - job: sanity_ci
+    optional: true
+  - job: docker:hadolint
+    optional: true
+  - job: oc.ocaml_fmt
+    optional: true
+  - job: oc.semgrep
+    optional: true
+  - job: oc.misc_checks
+    optional: true
+  - job: nix
+    optional: true
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -597,8 +633,20 @@ ocaml-check:
     - tezt/**/*
     when: on_success
   needs:
-  - oc.docker:ci:amd64
-  - trigger
+  - job: oc.docker:ci:amd64
+  - job: trigger
+  - job: sanity_ci
+    optional: true
+  - job: docker:hadolint
+    optional: true
+  - job: oc.ocaml_fmt
+    optional: true
+  - job: oc.semgrep
+    optional: true
+  - job: oc.misc_checks
+    optional: true
+  - job: nix
+    optional: true
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -902,8 +950,20 @@ opam:prepare:
     when: delayed
     start_in: 1 minute
   needs:
-  - oc.docker:ci:amd64
-  - trigger
+  - job: oc.docker:ci:amd64
+  - job: trigger
+  - job: sanity_ci
+    optional: true
+  - job: docker:hadolint
+    optional: true
+  - job: oc.ocaml_fmt
+    optional: true
+  - job: oc.semgrep
+    optional: true
+  - job: oc.misc_checks
+    optional: true
+  - job: nix
+    optional: true
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -1789,8 +1849,20 @@ kaitai_checks:
     - src/**/*
     when: on_success
   needs:
-  - oc.docker:ci:amd64
-  - trigger
+  - job: oc.docker:ci:amd64
+  - job: trigger
+  - job: sanity_ci
+    optional: true
+  - job: docker:hadolint
+    optional: true
+  - job: oc.ocaml_fmt
+    optional: true
+  - job: oc.semgrep
+    optional: true
+  - job: oc.misc_checks
+    optional: true
+  - job: nix
+    optional: true
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -1863,8 +1935,20 @@ oc.check_lift_limits_patch:
     - src/proto_alpha/lib_protocol/main.ml
     when: on_success
   needs:
-  - oc.docker:ci:amd64
-  - trigger
+  - job: oc.docker:ci:amd64
+  - job: trigger
+  - job: sanity_ci
+    optional: true
+  - job: docker:hadolint
+    optional: true
+  - job: oc.ocaml_fmt
+    optional: true
+  - job: oc.semgrep
+    optional: true
+  - job: oc.misc_checks
+    optional: true
+  - job: nix
+    optional: true
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -1906,8 +1990,20 @@ oc.python_check:
     - pyproject.toml
     when: on_success
   needs:
-  - oc.docker:ci:amd64
-  - trigger
+  - job: oc.docker:ci:amd64
+  - job: trigger
+  - job: sanity_ci
+    optional: true
+  - job: docker:hadolint
+    optional: true
+  - job: oc.ocaml_fmt
+    optional: true
+  - job: oc.semgrep
+    optional: true
+  - job: oc.misc_checks
+    optional: true
+  - job: nix
+    optional: true
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -2009,8 +2105,20 @@ oc.script:test-gen-genesis:
     - tzt_reference_test_suite/**/*
     when: on_success
   needs:
-  - oc.docker:ci:amd64
-  - trigger
+  - job: oc.docker:ci:amd64
+  - job: trigger
+  - job: sanity_ci
+    optional: true
+  - job: docker:hadolint
+    optional: true
+  - job: oc.ocaml_fmt
+    optional: true
+  - job: oc.semgrep
+    optional: true
+  - job: oc.misc_checks
+    optional: true
+  - job: nix
+    optional: true
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -2131,8 +2239,20 @@ oc.script:b58_prefix:
     - scripts/b58_prefix/test_b58_prefix.py
     when: on_success
   needs:
-  - oc.docker:ci:amd64
-  - trigger
+  - job: oc.docker:ci:amd64
+  - job: trigger
+  - job: sanity_ci
+    optional: true
+  - job: docker:hadolint
+    optional: true
+  - job: oc.ocaml_fmt
+    optional: true
+  - job: oc.semgrep
+    optional: true
+  - job: oc.misc_checks
+    optional: true
+  - job: nix
+    optional: true
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -2936,7 +3056,19 @@ oc.install_opam_jammy:
   - when: manual
     allow_failure: true
   needs:
-  - trigger
+  - job: trigger
+  - job: sanity_ci
+    optional: true
+  - job: docker:hadolint
+    optional: true
+  - job: oc.ocaml_fmt
+    optional: true
+  - job: oc.semgrep
+    optional: true
+  - job: oc.misc_checks
+    optional: true
+  - job: nix
+    optional: true
   dependencies: []
   allow_failure: true
   timeout: 2 hours
@@ -2957,7 +3089,19 @@ oc.compile_sources_doc_bookworm:
   - when: manual
     allow_failure: true
   needs:
-  - trigger
+  - job: trigger
+  - job: sanity_ci
+    optional: true
+  - job: docker:hadolint
+    optional: true
+  - job: oc.ocaml_fmt
+    optional: true
+  - job: oc.semgrep
+    optional: true
+  - job: oc.misc_checks
+    optional: true
+  - job: nix
+    optional: true
   dependencies: []
   timeout: 60 minutes
   script:
@@ -3560,8 +3704,20 @@ commit_titles:
   tags:
   - gcp
   needs:
-  - oc.docker:ci:amd64
-  - trigger
+  - job: oc.docker:ci:amd64
+  - job: trigger
+  - job: sanity_ci
+    optional: true
+  - job: docker:hadolint
+    optional: true
+  - job: oc.ocaml_fmt
+    optional: true
+  - job: oc.semgrep
+    optional: true
+  - job: oc.misc_checks
+    optional: true
+  - job: nix
+    optional: true
   dependencies:
   - oc.docker:ci:amd64
   allow_failure: true
@@ -3651,7 +3807,19 @@ oc.install_python_bookworm:
   - when: manual
     allow_failure: true
   needs:
-  - trigger
+  - job: trigger
+  - job: sanity_ci
+    optional: true
+  - job: docker:hadolint
+    optional: true
+  - job: oc.ocaml_fmt
+    optional: true
+  - job: oc.semgrep
+    optional: true
+  - job: oc.misc_checks
+    optional: true
+  - job: nix
+    optional: true
   dependencies: []
   timeout: 60 minutes
   script:
@@ -3685,8 +3853,20 @@ documentation:odoc:
     - vendors/**/*
     when: on_success
   needs:
-  - oc.docker:ci:amd64
-  - trigger
+  - job: oc.docker:ci:amd64
+  - job: trigger
+  - job: sanity_ci
+    optional: true
+  - job: docker:hadolint
+    optional: true
+  - job: oc.ocaml_fmt
+    optional: true
+  - job: oc.semgrep
+    optional: true
+  - job: oc.misc_checks
+    optional: true
+  - job: nix
+    optional: true
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -3743,8 +3923,20 @@ documentation:manuals:
     - vendors/**/*
     when: on_success
   needs:
-  - oc.docker:ci:amd64
-  - trigger
+  - job: oc.docker:ci:amd64
+  - job: trigger
+  - job: sanity_ci
+    optional: true
+  - job: docker:hadolint
+    optional: true
+  - job: oc.ocaml_fmt
+    optional: true
+  - job: oc.semgrep
+    optional: true
+  - job: oc.misc_checks
+    optional: true
+  - job: nix
+    optional: true
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -3802,8 +3994,20 @@ documentation:docgen:
     - vendors/**/*
     when: on_success
   needs:
-  - oc.docker:ci:amd64
-  - trigger
+  - job: oc.docker:ci:amd64
+  - job: trigger
+  - job: sanity_ci
+    optional: true
+  - job: docker:hadolint
+    optional: true
+  - job: oc.ocaml_fmt
+    optional: true
+  - job: oc.semgrep
+    optional: true
+  - job: oc.misc_checks
+    optional: true
+  - job: nix
+    optional: true
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes

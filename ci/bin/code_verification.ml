@@ -296,18 +296,14 @@ let jobs pipeline_type =
         in
         ([job_start], make_dependencies)
   in
-  (* Short-cut for jobs that has no dependencies except [job_start]
-     on [Before_merging] pipelines. *)
-  let dependencies_needs_start =
-    make_dependencies
-      ~before_merging:(fun job_start -> Dependent [Job job_start])
-      ~schedule_extended_test:(fun () -> Staged [])
-  in
-
   (* Sanity jobs *)
   let sanity =
     let stage = Stages.sanity in
-    let dependencies = dependencies_needs_start in
+    let dependencies =
+      make_dependencies
+        ~before_merging:(fun job_start -> Dependent [Job job_start])
+        ~schedule_extended_test:(fun () -> Staged [])
+    in
     let job_sanity_ci : tezos_job =
       job
         ~__POS__
@@ -434,6 +430,17 @@ let jobs pipeline_type =
       job_oc_misc_checks;
     ]
     @ mr_only_jobs
+  in
+  (* Short-cut for jobs that have no dependencies except [job_start] on
+     [Before_merging] pipelines. These jobs must also depend on all
+     jobs in the stage [sanity], such that they do not run if this
+     stage does not succeed. Since some sanity jobs are conditional,
+     we make these dependencies optional. *)
+  let dependencies_needs_start =
+    make_dependencies
+      ~before_merging:(fun job_start ->
+        Dependent ([Job job_start] @ List.map (fun job -> Optional job) sanity))
+      ~schedule_extended_test:(fun () -> Staged [])
   in
   (* The build_x86_64 jobs are split in two to keep the artifact size
      under the 1GB hard limit set by GitLab. *)
