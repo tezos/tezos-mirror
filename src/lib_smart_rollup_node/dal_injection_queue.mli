@@ -23,3 +23,7 @@ val get_injection_ids : unit -> Injector.Inj_operation.id list tzresult
 (** [forget_injection_id id] removes the given injection [id] and its associated
     information from the DAL injection queue, if it exists. *)
 val forget_injection_id : Injector_sigs.Id.t -> unit tzresult
+
+(** [produce_dal_slots ()] produces and injects DAL slots from the pending data
+    injected to the DAL injection queue. *)
+val produce_dal_slots : unit -> unit tzresult Lwt.t

@@ -26,23 +26,36 @@ module Dal_worker_types = struct
           slot_index : int;
         }
           -> (unit, error trace) t
+      | Produce_dal_slots : (unit, error trace) t
 
     type view = View : _ t -> view
 
     let view req = View req
 
-    let encoding : view Data_encoding.t =
+    let encoding =
       let open Data_encoding in
-      conv
-        (function
-          | View (Register {slot_content; slot_index}) ->
-              ((), slot_content, slot_index))
-        (fun ((), slot_content, slot_index) ->
-          View (Register {slot_content; slot_index}))
-        (obj3
-           (req "request" (constant "register"))
-           (req "slot_content" string)
-           (req "slot_index" int31))
+      union
+        [
+          case
+            (Tag 0)
+            ~title:"Register"
+            (obj3
+               (req "request" (constant "register"))
+               (req "slot_content" string)
+               (req "slot_index" int31))
+            (function
+              | View (Register {slot_content; slot_index}) ->
+                  Some ((), slot_content, slot_index)
+              | _ -> None)
+            (fun ((), slot_content, slot_index) ->
+              View (Register {slot_content; slot_index}));
+          case
+            (Tag 1)
+            ~title:"Produce_dal_slots"
+            (obj1 (req "request" (constant "produce_dal_slots")))
+            (function View Produce_dal_slots -> Some () | _ -> None)
+            (fun () -> View Produce_dal_slots);
+        ]
 
     let pp ppf (View r) =
       match r with
@@ -51,6 +64,7 @@ module Dal_worker_types = struct
             ppf
             "register slot injection request for index %d"
             slot_index
+      | Produce_dal_slots -> Format.fprintf ppf "produce DAL slots"
   end
 end
 
@@ -158,6 +172,10 @@ let on_register state ~slot_content ~slot_index : unit tzresult Lwt.t =
   in
   inject_slot state ~slot_content ~slot_index
 
+let on_produce_dal_slots _state =
+  let open Lwt_result_syntax in
+  return_unit
+
 let init_dal_worker_state node_ctxt =
   let dal_constants =
     let open Node_context in
@@ -195,6 +213,8 @@ module Handlers = struct
     match request with
     | Request.Register {slot_content; slot_index} ->
         protect @@ fun () -> on_register state ~slot_content ~slot_index
+    | Request.Produce_dal_slots ->
+        protect @@ fun () -> on_produce_dal_slots state
 
   type launch_error = error trace
 
@@ -210,10 +230,13 @@ module Handlers = struct
     | Request.Register _ ->
         let*! () = Events.(emit request_failed) (Request.view r, st, errs) in
         return_unit
+    | Request.Produce_dal_slots ->
+        let*! () = Events.(emit request_failed) (Request.view r, st, errs) in
+        return_unit
 
   let on_completion _w r _ st =
     match Request.view r with
-    | Request.View (Register _) ->
+    | Request.View (Register _ | Produce_dal_slots) ->
         Events.(emit request_completed) (Request.view r, st)
 
   let on_no_request _ = Lwt.return_unit
@@ -282,6 +305,17 @@ let register_dal_slot ~slot_content ~slot_index =
     w
     (Request.Register {slot_content; slot_index})
   |> handle_request_error
+
+let produce_dal_slots () =
+  let open Lwt_result_syntax in
+  match Lazy.force worker with
+  | Error Rollup_node_errors.No_dal_injector ->
+      (* There is no batcher, nothing to do *)
+      return_unit
+  | Error e -> tzfail e
+  | Ok w ->
+      Worker.Queue.push_request_and_wait w Request.Produce_dal_slots
+      |> handle_request_error
 
 let get_injection_ids () =
   let open Result_syntax in
