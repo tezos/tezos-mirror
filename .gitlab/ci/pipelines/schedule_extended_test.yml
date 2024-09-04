@@ -109,7 +109,7 @@ sanity_ci:
   - ./scripts/ci/check_alpine_version.sh
   - make -C ci check
 
-docker:hadolint-schedule_extended_test:
+docker:hadolint:
   image: hadolint/hadolint:2.9.3-debian
   stage: sanity
   tags:

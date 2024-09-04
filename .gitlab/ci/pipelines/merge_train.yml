@@ -132,7 +132,7 @@ sanity_ci:
   - ./scripts/ci/check_alpine_version.sh
   - make -C ci check
 
-docker:hadolint-before_merging:
+docker:hadolint:
   image: hadolint/hadolint:2.9.3-debian
   stage: sanity
   tags:
