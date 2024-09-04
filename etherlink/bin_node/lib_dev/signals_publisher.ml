@@ -52,12 +52,6 @@ end
 
 module Request = struct
   type ('a, 'b) t =
-    | Track : {
-        injection_id : Tezos_crypto.Hashed.Injector_operations_hash.t;
-        level : Z.t;
-        slot_index : Tezos_dal_node_services.Types.slot_index;
-      }
-        -> (unit, tztrace) t
     | New_rollup_node_block : {finalized_level : int32} -> (unit, tztrace) t
 
   type view = View : _ t -> view
@@ -70,27 +64,11 @@ module Request = struct
       [
         case
           (Tag 0)
-          ~title:"Track"
-          (obj3
-             (req
-                "injection_id"
-                Tezos_crypto.Hashed.Injector_operations_hash.encoding)
-             (req "level" z)
-             (req "slot_index" int8))
-          (function
-            | View (Track {injection_id; level; slot_index}) ->
-                Some (injection_id, level, slot_index)
-            | View _ -> None)
-          (fun (injection_id, level, slot_index) ->
-            View (Track {injection_id; level; slot_index}));
-        case
-          (Tag 1)
           ~title:"New_rollup_node_block"
           (obj1 (req "finalized_level" int32))
           (function
             | View (New_rollup_node_block {finalized_level}) ->
-                Some finalized_level
-            | _ -> None)
+                Some finalized_level)
           (fun finalized_level ->
             View (New_rollup_node_block {finalized_level}));
       ]
@@ -100,16 +78,6 @@ end
 
 module Worker = struct
   include Worker.MakeSingle (Name) (Request) (Types)
-
-  let track _worker ~injection_id ~level ~slot_index =
-    let open Lwt_result_syntax in
-    let*! () =
-      Signals_publisher_events.tracking
-        ~injector_op_hash:injection_id
-        ~level
-        ~slot_index
-    in
-    return_unit
 
   let new_rollup_block worker finalized_level =
     let open Lwt_result_syntax in
@@ -196,8 +164,6 @@ module Handlers = struct
       =
    fun w request ->
     match request with
-    | Track {injection_id; level; slot_index} ->
-        protect @@ fun () -> Worker.track w ~injection_id ~level ~slot_index
     | New_rollup_node_block {finalized_level} ->
         protect @@ fun () -> Worker.new_rollup_block w finalized_level
 
@@ -270,9 +236,6 @@ let shutdown () =
   let*! () = Signals_publisher_events.publisher_shutdown () in
   let*! () = Worker.shutdown w in
   return_unit
-
-let track ~injection_id ~level ~slot_index =
-  worker_add_request ~request:(Track {injection_id; level; slot_index})
 
 let new_rollup_block ~finalized_level =
   worker_add_request ~request:(New_rollup_node_block {finalized_level})
