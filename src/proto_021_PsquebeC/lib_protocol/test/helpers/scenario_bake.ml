@@ -330,25 +330,27 @@ let bake ?baker : t -> t tzresult Lwt.t =
     State_ai_flags.AI_Activation.check_activation_cycle block state
   in
   let* state = State.apply_rewards ~baker:baker_name block state in
-  (* First block of a new cycle *)
-  let new_current_cycle = Block.current_cycle block in
-  let* state =
-    if Protocol.Alpha_context.Cycle.(current_cycle = new_current_cycle) then
-      return state
-    else (
-      Log.info
-        ~color:time_color
-        "Cycle %d"
-        (Protocol.Alpha_context.Cycle.to_int32 new_current_cycle |> Int32.to_int) ;
-      return @@ apply_new_cycle new_current_cycle state)
-  in
-  (* Dawn of a new cycle *)
+  let new_future_current_cycle = Cycle.succ (Block.current_cycle block) in
+  (* Dawn of a new cycle: apply cycle end operations *)
   let* state =
     if not (Block.last_block_of_cycle block) then return state
     else apply_end_cycle current_cycle previous_block block state
   in
   let* () = check_all_balances block state in
   let* () = check_misc block state in
+  (* Dawn of a new cycle: update finalizables *)
+  (* Note: this is done after the checks, because it is not observable by RPCs by calling
+     the previous block (which is still in the previous cycle *)
+  let* state =
+    if not (Block.last_block_of_cycle block) then return state
+    else (
+      Log.info
+        ~color:time_color
+        "Cycle %d"
+        (Protocol.Alpha_context.Cycle.to_int32 new_future_current_cycle
+        |> Int32.to_int) ;
+      return @@ apply_new_cycle new_future_current_cycle state)
+  in
   let* block, state =
     if state.force_attest_all then attest_all_ (block, state)
     else return (block, state)
