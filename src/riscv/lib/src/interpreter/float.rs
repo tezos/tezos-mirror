@@ -537,6 +537,19 @@ pub enum RoundingMode {
     RMM,
 }
 
+impl RoundingMode {
+    pub const fn from_csrrepr(value: CSRRepr) -> Result<Self, Exception> {
+        match value {
+            0b000 => Ok(Self::RNE),
+            0b001 => Ok(Self::RTZ),
+            0b010 => Ok(Self::RDN),
+            0b011 => Ok(Self::RUP),
+            0b100 => Ok(Self::RMM),
+            _ => Err(Exception::IllegalInstruction),
+        }
+    }
+}
+
 impl Display for RoundingMode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let res = match self {
@@ -555,14 +568,7 @@ impl TryFrom<CSRRepr> for RoundingMode {
     type Error = Exception;
 
     fn try_from(value: CSRRepr) -> Result<Self, Self::Error> {
-        match value {
-            0b000 => Ok(Self::RNE),
-            0b001 => Ok(Self::RTZ),
-            0b010 => Ok(Self::RDN),
-            0b011 => Ok(Self::RUP),
-            0b100 => Ok(Self::RMM),
-            _ => Err(Exception::IllegalInstruction),
-        }
+        Self::from_csrrepr(value)
     }
 }
 
