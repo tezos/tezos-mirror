@@ -438,7 +438,7 @@ let jobs pipeline_type =
 
   (*Build jobs *)
   let build =
-    (* TODO: The code is a bit convulted here because these jobs are
+    (* TODO: The code is a bit convoluted here because these jobs are
        either in the build or in the manual stage depending on the
        pipeline type. However, we can put them in the build stage on
        [before_merging] pipelines as long as we're careful to put
@@ -464,7 +464,10 @@ let jobs pipeline_type =
              ~source_version:true
              ~eval_opam:true
              [])
-        ["dune build @check"]
+        (* Stops on first error for easier detection of problems in
+           the log and to reduce time to merge of other MRs further
+           down the merge train. *)
+        ["dune build @check --stop-on-first-error"]
       |> enable_cargo_cache |> enable_sccache
     in
     let build_octez_source =
