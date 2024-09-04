@@ -297,6 +297,10 @@ Miscellaneous commands:
     --preimages-dir <_evm_installer_preimages>: Path to the preimages directory
     --preimages-endpoint <url>: The address of a service which provides pre-images for the rollup. Missing pre-images will be downloaded remotely if they are not already present on disk.
   
+  snapshot info <snapshot_file>
+    Display information about an EVM node snapshot file.
+    <snapshot_file>: Snapshot archive file
+  
   chunk data [<data or file>...] [--rollup-address <sr1...>] [--as-blueprint]
       [--timestamp <[TIMESTAMP]>] [--number <0>]
       [--parent-hash <ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff>]
