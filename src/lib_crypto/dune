@@ -17,7 +17,8 @@
   aches
   zarith
   bls12-381
-  octez-libs.bls12-381-signature)
+  octez-libs.bls12-381-signature
+  octez-libs.event-logging)
  (flags
   (:standard)
   -open Tezos_stdlib

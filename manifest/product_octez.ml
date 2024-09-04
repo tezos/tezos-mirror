@@ -712,6 +712,41 @@ let _octez_bls12_381_signature_tests =
     ~dep_globs_rec:["test_vectors/*"]
 (* See above *)
 
+let octez_event_logging =
+  octez_lib
+    "event-logging"
+    ~internal_name:"tezos_event_logging"
+    ~path:"src/lib_event_logging"
+    ~synopsis:"Octez event logging library"
+    ~deps:
+      [
+        octez_stdlib |> open_;
+        data_encoding |> open_;
+        octez_error_monad |> open_ |> open_ ~m:"TzLwtreslib";
+        octez_lwt_result_stdlib;
+        uri;
+      ]
+
+let octez_event_logging_test_helpers =
+  octez_lib
+    "event-logging-test-helpers"
+    ~internal_name:"tezos_event_logging_test_helpers"
+    ~path:"src/lib_event_logging/test_helpers"
+    ~synopsis:"Test helpers for the event logging library"
+    ~deps:
+      [
+        octez_stdlib;
+        octez_lwt_result_stdlib |> open_;
+        data_encoding;
+        octez_error_monad |> open_ |> open_ ~m:"TzLwtreslib";
+        octez_event_logging |> open_;
+        octez_test_helpers |> open_;
+        tezt_core_lib |> open_;
+        alcotezt;
+      ]
+    ~linkall:true
+    ~bisect_ppx:No
+
 let octez_crypto =
   octez_lib
     "crypto"
@@ -732,6 +767,7 @@ let octez_crypto =
         zarith;
         bls12_381;
         octez_bls12_381_signature;
+        octez_event_logging;
       ]
 
 let _octez_crypto_tests =
@@ -1365,41 +1401,6 @@ let _octez_epoxy_tx_tests =
     ~opam:"octez-libs"
     ~deps:[octez_epoxy_tx; octez_plonk_test_helpers; octez_aplonk]
     ~dune:(make_plonk_runtest_invocation ~package:"octez-libs")
-
-let octez_event_logging =
-  octez_lib
-    "event-logging"
-    ~internal_name:"tezos_event_logging"
-    ~path:"src/lib_event_logging"
-    ~synopsis:"Octez event logging library"
-    ~deps:
-      [
-        octez_stdlib |> open_;
-        data_encoding |> open_;
-        octez_error_monad |> open_ |> open_ ~m:"TzLwtreslib";
-        octez_lwt_result_stdlib;
-        uri;
-      ]
-
-let octez_event_logging_test_helpers =
-  octez_lib
-    "event-logging-test-helpers"
-    ~internal_name:"tezos_event_logging_test_helpers"
-    ~path:"src/lib_event_logging/test_helpers"
-    ~synopsis:"Test helpers for the event logging library"
-    ~deps:
-      [
-        octez_stdlib;
-        octez_lwt_result_stdlib |> open_;
-        data_encoding;
-        octez_error_monad |> open_ |> open_ ~m:"TzLwtreslib";
-        octez_event_logging |> open_;
-        octez_test_helpers |> open_;
-        tezt_core_lib |> open_;
-        alcotezt;
-      ]
-    ~linkall:true
-    ~bisect_ppx:No
 
 let octez_stdlib_unix =
   octez_lib
