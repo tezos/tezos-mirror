@@ -172,8 +172,75 @@ let test_call_state_override_code =
 
   unit
 
+let test_call_state_override_nonce =
+  register
+    ~kernels:[Latest] (* Not a kernel specific test. *)
+    ~tags:["evm"; "state_override"; "nonce_override"; "eth_call"]
+    ~title:"Can override nonce in eth_call"
+  @@ fun {sequencer; _} _protocol ->
+  (*
+      This test checks that the simulation allows nonce override.
+      To do so we deploy a contract that creates a contract and returns the
+      address of the new contract, and call it twice with different nonce.
+      The addresses should be different.
+      *)
+  let* factory = Solidity_contracts.state_override_tester () in
+  let* () = Eth_cli.add_abi ~label:factory.label ~abi:factory.abi () in
+  (* Deploy the contract. *)
+  let* contract, _tx_hash =
+    send_transaction_to_sequencer
+      (fun () ->
+        Eth_cli.deploy
+          ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+          ~endpoint:(Evm_node.endpoint sequencer)
+          ~abi:factory.abi
+          ~bin:factory.bin)
+      sequencer
+  in
+
+  let* calldata = Cast.calldata "create()" in
+  let caller_address = Eth_account.bootstrap_accounts.(0).address in
+  let call =
+    `O
+      [
+        ("from", `String caller_address);
+        ("to", `String contract);
+        ("data", `String calldata);
+      ]
+  in
+
+  (* Call a first time to have an address *)
+  let* call_result =
+    Evm_node.(
+      call_evm_rpc
+        sequencer
+        {method_ = "eth_call"; parameters = `A [call; `String "latest"]})
+  in
+  let addr1 = Evm_node.extract_result call_result |> JSON.as_string in
+
+  (* try again with an override *)
+  let override_code = `O [(contract, `O [("nonce", `String "0x2a")])] in
+  let* call_result =
+    Evm_node.(
+      call_evm_rpc
+        sequencer
+        {
+          method_ = "eth_call";
+          parameters = `A [call; `String "latest"; override_code];
+        })
+  in
+  let addr2 = Evm_node.extract_result call_result |> JSON.as_string in
+
+  (* the two address were calculated with different nonce so should be different
+     (hopefully) *)
+  Check.((addr1 <> addr2) string)
+    ~error_msg:"Address should have been different but got %R and %L" ;
+
+  unit
+
 let protocols = Protocol.all
 
 let () =
   test_call_state_override_code protocols ;
+  test_call_state_override_nonce protocols ;
   test_call_state_override_balance protocols
