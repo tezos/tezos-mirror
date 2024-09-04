@@ -186,11 +186,15 @@ let on_register state ~slot_content ~slot_index : unit tzresult Lwt.t =
     fail_unless (slot_index >= 0 && slot_index < number_of_slots)
     @@ error_of_fmt "Slot index %d out of range" slot_index
   in
-  inject_slot state ~slot_content ~slot_index
-
-let on_produce_dal_slots _state =
-  let open Lwt_result_syntax in
+  Pending_chunks.replace state.pending_chunks slot_content slot_index ;
   return_unit
+
+let on_produce_dal_slots state =
+  let open Lwt_result_syntax in
+  match Pending_chunks.take state.pending_chunks with
+  | None -> return_unit
+  | Some (slot_content, slot_index) ->
+      inject_slot state ~slot_content ~slot_index
 
 let init_dal_worker_state node_ctxt =
   let dal_constants =
