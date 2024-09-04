@@ -61,6 +61,14 @@ module Event = struct
       ("block_level", Data_encoding.int32)
       ~pp3:Context_hash.pp
       ("context_hash", Context_hash.encoding)
+
+  let stat_metadata_report_generated =
+    declare_1
+      ~section
+      ~name:"stat_metadata_report_generated"
+      ~msg:"the stat-metadata report was generated in {path}"
+      ~level:Notice
+      ("path", Data_encoding.string)
 end
 
 let () =
@@ -288,6 +296,185 @@ module Term = struct
        let () = Format.printf "%a@." Context_hash.pp head_context_hash in
        return_unit)
 
+  type cycle_stats = {
+    name : string;
+    block_count : int;
+    block_metadata_size : Int64.t;
+    operation_metadata_size : Int64.t;
+    too_large_operation_metadata_count : Int64.t;
+  }
+
+  let cycle_stats_encoding =
+    let open Data_encoding in
+    conv
+      (fun {
+             name;
+             block_count;
+             block_metadata_size;
+             operation_metadata_size;
+             too_large_operation_metadata_count;
+           } ->
+        ( name,
+          block_count,
+          block_metadata_size,
+          operation_metadata_size,
+          too_large_operation_metadata_count ))
+      (fun ( name,
+             block_count,
+             block_metadata_size,
+             operation_metadata_size,
+             too_large_operation_metadata_count ) ->
+        {
+          name;
+          block_count;
+          block_metadata_size;
+          operation_metadata_size;
+          too_large_operation_metadata_count;
+        })
+      (obj5
+         (req "name" string)
+         (req "block_count" int31)
+         (req "block_metadata_size" int64)
+         (req "operation_metadata_size" int64)
+         (req "too_large_operation_metadata_count" int64))
+
+  type overall_stats = {
+    cycle_stats : cycle_stats list;
+    block_count : int;
+    block_metadata_size : Int64.t;
+    operation_metadata_size : Int64.t;
+    too_large_operation_metadata_count : Int64.t;
+  }
+
+  let overall_stats_encoding =
+    let open Data_encoding in
+    conv
+      (fun {
+             cycle_stats;
+             block_count;
+             block_metadata_size;
+             operation_metadata_size;
+             too_large_operation_metadata_count;
+           } ->
+        ( cycle_stats,
+          block_count,
+          block_metadata_size,
+          operation_metadata_size,
+          too_large_operation_metadata_count ))
+      (fun ( cycle_stats,
+             block_count,
+             block_metadata_size,
+             operation_metadata_size,
+             too_large_operation_metadata_count ) ->
+        {
+          cycle_stats;
+          block_count;
+          block_metadata_size;
+          operation_metadata_size;
+          too_large_operation_metadata_count;
+        })
+      (obj5
+         (req "cycle_stats" (list cycle_stats_encoding))
+         (req "block_count" int31)
+         (req "block_metadata_size" int64)
+         (req "operation_metadata_size" int64)
+         (req "too_large_operation_metadata_count" int64))
+
+  let stat_metadata config_file data_dir report_path =
+    Shared_arg.process_command
+      (let open Lwt_result_syntax in
+       let*! () = Tezos_base_unix.Internal_event_unix.init () in
+       let* {genesis; context_dir; store_dir; _} =
+         resolve_config config_file data_dir
+       in
+       let* store =
+         Store.init
+           ~readonly:true
+           ~store_dir
+           ~context_dir
+           ~allow_testchains:false
+           genesis
+       in
+       let* res = Store.stat_metadata_cycles store in
+       let overall_stats =
+         List.fold_left
+           (fun {
+                  cycle_stats;
+                  block_count;
+                  block_metadata_size;
+                  operation_metadata_size;
+                  too_large_operation_metadata_count;
+                }
+                (metadata_file, cycle) ->
+             let new_cycle_stats =
+               List.fold_left
+                 (fun {
+                        name;
+                        block_count;
+                        block_metadata_size;
+                        operation_metadata_size;
+                        too_large_operation_metadata_count;
+                      }
+                      stats ->
+                   Tezos_store_shared.Store_types.
+                     {
+                       name;
+                       block_count;
+                       block_metadata_size =
+                         Int64.add block_metadata_size stats.block_metadata_size;
+                       operation_metadata_size =
+                         Int64.add
+                           operation_metadata_size
+                           stats.operation_metadata_size;
+                       too_large_operation_metadata_count =
+                         Int64.add
+                           too_large_operation_metadata_count
+                           stats.too_large_operation_metadata_count;
+                     })
+                 {
+                   name = metadata_file;
+                   block_count = List.length cycle;
+                   block_metadata_size = 0L;
+                   operation_metadata_size = 0L;
+                   too_large_operation_metadata_count = 0L;
+                 }
+                 cycle
+             in
+             {
+               cycle_stats = new_cycle_stats :: cycle_stats;
+               block_count = block_count + new_cycle_stats.block_count;
+               block_metadata_size =
+                 Int64.add
+                   block_metadata_size
+                   new_cycle_stats.block_metadata_size;
+               operation_metadata_size =
+                 Int64.add
+                   operation_metadata_size
+                   new_cycle_stats.operation_metadata_size;
+               too_large_operation_metadata_count =
+                 Int64.add
+                   too_large_operation_metadata_count
+                   new_cycle_stats.too_large_operation_metadata_count;
+             })
+           {
+             cycle_stats = [];
+             block_count = 0;
+             block_metadata_size = 0L;
+             operation_metadata_size = 0L;
+             too_large_operation_metadata_count = 0L;
+           }
+           res
+       in
+       let report =
+         Data_encoding.Json.construct overall_stats_encoding overall_stats
+       in
+       let* () =
+         Tezos_stdlib_unix.Lwt_utils_unix.Json.write_file report_path report
+       in
+       let*! () = Event.(emit stat_metadata_report_generated) report_path in
+       let*! () = Store.close_store store in
+       return_unit)
+
   let auto_repair =
     let open Cmdliner.Arg in
     value
@@ -423,6 +610,32 @@ module Term = struct
           $ setup_logs $ Shared_arg.Term.config_file $ Shared_arg.Term.data_dir
           ))
 
+  let report_path =
+    let open Cmdliner.Arg in
+    let default_path = "./report.json" in
+    value
+    & opt string default_path
+      @@ info
+           ~doc:
+             (Format.sprintf
+                "Path to the report generated by the command. Default is \"%s\""
+                default_path)
+           ~docv:"REPORT_PATH"
+           ["report-path"]
+
+  let stat_metadata =
+    Cmd.v
+      (Cmd.info
+         ~doc:
+           "displays the status of the metadata, giving useful information \
+            such as count, size, too large."
+         "stat-metadata")
+      Term.(
+        ret
+          (const (fun () -> stat_metadata)
+          $ setup_logs $ Shared_arg.Term.config_file $ Shared_arg.Term.data_dir
+          $ report_path))
+
   let commands =
     [
       integrity_check;
@@ -432,6 +645,7 @@ module Term = struct
       integrity_check_inodes;
       integrity_check_index;
       head_commit;
+      stat_metadata;
     ]
 end
 
