@@ -12,7 +12,7 @@ use tezos_smart_rollup_host::{
     input::Message,
     metadata::RollupMetadata,
     path::{concat, OwnedPath, Path, RefPath},
-    runtime::{Runtime, RuntimeError, ValueType},
+    runtime::{Runtime as SdkRuntime, RuntimeError, ValueType},
 };
 
 pub const TMP_PATH: RefPath = RefPath::assert_from(b"/tmp");
@@ -21,30 +21,13 @@ pub const TMP_WORLD_STATE_PATH: RefPath = RefPath::assert_from(b"/tmp/evm/world_
 pub const TRACE_PATH: RefPath = RefPath::assert_from(b"/evm/trace");
 pub const TMP_TRACE_PATH: RefPath = RefPath::assert_from(b"/tmp/evm/trace");
 
-// The kernel runtime requires both the standard Runtime and the
-// new Extended one.
-pub trait KernelRuntime: Runtime + ExtendedRuntime {}
-
-// Every type implementing an InternalRuntime will implement
-// the ExtendedRuntime.
-impl<T: InternalRuntime> ExtendedRuntime for T {
-    fn store_get_hash<P: Path>(&mut self, path: &P) -> Result<Vec<u8>, RuntimeError> {
-        let path = safe_path(path)?;
-        self.__internal_store_get_hash(&path)
-    }
+pub fn safe_path<T: Path>(path: &T) -> Result<OwnedPath, RuntimeError> {
+    concat(&TMP_PATH, path).map_err(|_| RuntimeError::PathNotFound)
 }
-
-// If a type implements the Runtime and InternalRuntime traits,
-// it also implements the KernelRuntime.
-impl<T: Runtime + InternalRuntime> KernelRuntime for T {}
 
 pub struct SafeStorage<Host, Internal> {
     pub host: Host,
     pub internal: Internal,
-}
-
-pub fn safe_path<T: Path>(path: &T) -> Result<OwnedPath, RuntimeError> {
-    concat(&TMP_PATH, path).map_err(|_| RuntimeError::PathNotFound)
 }
 
 impl<Host, InternalHost: InternalRuntime> InternalRuntime
@@ -58,7 +41,18 @@ impl<Host, InternalHost: InternalRuntime> InternalRuntime
     }
 }
 
-impl<Host: Runtime, InternalHost> Runtime for SafeStorage<&mut Host, &mut InternalHost> {
+impl<Host: SdkRuntime, InternalHost: InternalRuntime> ExtendedRuntime
+    for SafeStorage<&mut Host, &mut InternalHost>
+{
+    fn store_get_hash<P: Path>(&mut self, path: &P) -> Result<Vec<u8>, RuntimeError> {
+        let path = safe_path(path)?;
+        self.__internal_store_get_hash(&path)
+    }
+}
+
+impl<Host: SdkRuntime, InternalHost> SdkRuntime
+    for SafeStorage<&mut Host, &mut InternalHost>
+{
     fn write_output(&mut self, from: &[u8]) -> Result<(), RuntimeError> {
         self.host.write_output(from)
     }
@@ -212,7 +206,7 @@ impl<Host: Runtime, InternalHost> Runtime for SafeStorage<&mut Host, &mut Intern
     }
 }
 
-impl<Host: Runtime, Internal> SafeStorage<&mut Host, &mut Internal> {
+impl<Host: SdkRuntime, Internal> SafeStorage<&mut Host, &mut Internal> {
     pub fn start(&mut self) -> Result<(), RuntimeError> {
         self.host
             .store_copy(&WORLD_STATE_PATH, &TMP_WORLD_STATE_PATH)

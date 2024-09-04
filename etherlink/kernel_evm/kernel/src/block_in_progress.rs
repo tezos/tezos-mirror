@@ -26,7 +26,7 @@ use tezos_ethereum::transaction::{
 };
 use tezos_ethereum::Bloom;
 use tezos_evm_logging::{log, Level::*};
-use tezos_evm_runtime::safe_storage::KernelRuntime;
+use tezos_evm_runtime::runtime::Runtime as KernelRuntime;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::path::{concat, RefPath};
 use tezos_smart_rollup_host::runtime::Runtime;
