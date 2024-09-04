@@ -268,6 +268,9 @@ Smart Rollup node
   and port of the running node have been changed via command-line arguments. (MR
   :gl:`!14694`)
 
+- Fix an issue which could introduce a discrepancy between the snapshot header
+  and its content. (MR :gl:`!14777`)
+
 Smart Rollup WASM Debugger
 --------------------------
 
