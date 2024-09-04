@@ -13,10 +13,10 @@ type t = {
   smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
   index : Irmin_context.ro_index;
   finalized_view : bool;
+  block_storage_sqlite3 : bool;
 }
 
-let load ?smart_rollup_address ~data_dir ~preimages ?preimages_endpoint
-    ~finalized_view () =
+let load ?smart_rollup_address ~data_dir configuration =
   let open Lwt_result_syntax in
   let* store = Evm_store.init ~data_dir ~perm:`Read_only () in
   let* index =
@@ -32,10 +32,12 @@ let load ?smart_rollup_address ~data_dir ~preimages ?preimages_endpoint
     store;
     index;
     data_dir;
-    preimages;
-    preimages_endpoint;
+    preimages = configuration.Configuration.kernel_execution.preimages;
+    preimages_endpoint = configuration.kernel_execution.preimages_endpoint;
     smart_rollup_address;
-    finalized_view;
+    block_storage_sqlite3 =
+      configuration.experimental_features.block_storage_sqlite3;
+    finalized_view = configuration.finalized_view;
   }
 
 let get_evm_state ctxt hash =

@@ -77,15 +77,7 @@ let main ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync () =
       ~block_storage_sqlite3:config.experimental_features.block_storage_sqlite3
       ()
   in
-  let* ro_ctxt =
-    Evm_ro_context.load
-      ~smart_rollup_address
-      ~data_dir
-      ~preimages:config.kernel_execution.preimages
-      ?preimages_endpoint:config.kernel_execution.preimages_endpoint
-      ~finalized_view:config.finalized_view
-      ()
-  in
+  let* ro_ctxt = Evm_ro_context.load ~smart_rollup_address ~data_dir config in
 
   let evm_node_endpoint =
     match threshold_encryption_bundler_endpoint with

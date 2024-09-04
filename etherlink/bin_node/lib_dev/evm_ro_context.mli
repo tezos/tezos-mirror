@@ -13,9 +13,10 @@ type t = {
   smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
   index : Irmin_context.ro_index;
   finalized_view : bool;
+  block_storage_sqlite3 : bool;
 }
 
-(** [load ~data_dir ~preimages ()] creates a new read-only handler on the
+(** [load ~data_dir configuration] creates a new read-only handler on the
     node’s context. You can have as many read-only handlers as you want split
     over as many processes.
 
@@ -24,10 +25,7 @@ type t = {
 val load :
   ?smart_rollup_address:Address.t ->
   data_dir:string ->
-  preimages:string ->
-  ?preimages_endpoint:Uri.t ->
-  finalized_view:bool ->
-  unit ->
+  Configuration.t ->
   t tzresult Lwt.t
 
 (** [preload_known_kernels ctxt] uses [ctxt] to preload every kernel known to

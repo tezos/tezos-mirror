@@ -1433,18 +1433,22 @@ let replay_command =
         in
         init ?config ()
       in
-      let preimages =
-        match preimages with
-        | Some preimages -> preimages
-        | None -> Filename.Infix.(data_dir // "wasm_2_0_0")
+      let* configuration =
+        Cli.create_or_read_config
+          ~keep_alive:false
+          ~data_dir
+          ~verbose:false
+          ?preimages
+          ?preimages_endpoint
+          ~finalized_view:false
+          ()
       in
       Evm_node_lib_dev.Replay.main
         ~profile
         ?kernel_path
         ?kernel_verbosity
         ~data_dir
-        ~preimages
-        ~preimages_endpoint
+        configuration
         l2_level)
 
 let patch_kernel_command =
