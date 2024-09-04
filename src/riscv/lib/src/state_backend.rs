@@ -208,6 +208,15 @@ pub trait BackendFull: Backend {
     fn region_mut<E: Elem, const LEN: usize>(&mut self, loc: &Location<[E; LEN]>) -> &mut [u8];
 }
 
+/// Manager wrapper around `M` whose regions are immutable references to regions of `M`
+pub struct Ref<'backend, M>(std::marker::PhantomData<&'backend M>);
+
+impl<'backend, M: ManagerBase> ManagerBase for Ref<'backend, M> {
+    type Region<E: Elem, const LEN: usize> = &'backend M::Region<E, LEN>;
+
+    type DynRegion<const LEN: usize> = &'backend M::DynRegion<LEN>;
+}
+
 pub mod test_helpers {
     use super::{BackendFull, Layout};
     use std::fmt;
