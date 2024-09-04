@@ -16,15 +16,6 @@ val publisher_is_ready : unit -> unit Lwt.t
     shutdown and will not accept requests anymore. *)
 val publisher_shutdown : unit -> unit Lwt.t
 
-(** [tracking ~injector_op_hash] advertizes that the DAL slot
-    publication associated with the injection id [injector_op_hash] is
-    being tracked by the signal publisher. *)
-val tracking :
-  injector_op_hash:Tezos_crypto.Hashed.Injector_operations_hash.t ->
-  level:Z.t ->
-  slot_index:Tezos_dal_node_services.Types.slot_index ->
-  unit Lwt.t
-
 (** [untracking ~injector_op_hash] advertizes that the DAL slot
     publication associated with the injection id [injector_op_hash] is
     not longer tracked by the signal publisher. *)
