@@ -38,7 +38,7 @@ $0 off
 EOF
 }
 
-check() {
+check_enabled() {
   if [ -f "$target" ]; then
     cat << EOF
 Slim mode is ENABLED: old protocols will not be built by 'make'.
@@ -47,7 +47,19 @@ For more information about slim mode, run:
     scripts/slim-mode.sh
 
 EOF
+    return 0
   fi
+  return 1
+}
+
+fail() {
+  if check_enabled; then
+    exit 1
+  fi
+}
+
+check() {
+  check_enabled || true
 }
 
 on() {
@@ -70,7 +82,7 @@ EOF
 }
 
 case "$1" in
-check | on | off)
+check | fail | on | off)
   $1
   ;;
 *)

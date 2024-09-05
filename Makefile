@@ -137,17 +137,25 @@ $(ALL_EXECUTABLES): check-slim-mode check-custom-flags
 	dune build $(COVERAGE_OPTIONS) --profile=$(PROFILE) _build/install/default/bin/$@
 	cp -f _build/install/default/bin/$@ ./
 
+# If slim mode is active, kaitai updates should fail, as some protocol encoding
+# will be missing.
+# This check is disabled if file scripts/slim-mode.sh is not available,
+# which may be the case in Docker images or tarballs for instance.
+.PHONY: kaitai-fail-slim-mode
+kaitai-fail-slim-mode:
+	@if [ -f scripts/slim-mode.sh ]; then scripts/slim-mode.sh fail; fi || (echo "Cannot check kaitai struct files, slim mode is active."; exit 1)
+
 .PHONY: kaitai-struct-files-update
-kaitai-struct-files-update:
+kaitai-struct-files-update: kaitai-fail-slim-mode
 	@dune exe client-libs/bin_codec_kaitai/codec.exe dump kaitai specs in client-libs/kaitai-struct-files/files
 
 .PHONY: kaitai-struct-files
-kaitai-struct-files:
+kaitai-struct-files: kaitai-fail-slim-mode
 	@$(MAKE) kaitai-struct-files-update
 	@$(MAKE) -C client-libs/kaitai-struct-files/
 
 .PHONY: check-kaitai-struct-files
-check-kaitai-struct-files:
+check-kaitai-struct-files: kaitai-fail-slim-mode
 	@git diff --exit-code HEAD -- client-libs/kaitai-struct-files/files || (echo "Cannot check kaitai struct files, some changes are uncommitted"; exit 1)
 	@dune build client-libs/bin_codec_kaitai/codec.exe
 	@rm client-libs/kaitai-struct-files/files/*.ksy
@@ -156,7 +164,7 @@ check-kaitai-struct-files:
 	@git diff --exit-code HEAD -- client-libs/kaitai-struct-files/files/ || (echo "Kaitai struct files mismatch. Update the files with `make kaitai-struct-files-update`."; exit 1)
 
 .PHONY: validate-kaitai-struct-files
-validate-kaitai-struct-files:
+validate-kaitai-struct-files: kaitai-fail-slim-mode
 	@$(MAKE) check-kaitai-struct-files
 	@./client-libs/kaitai-struct-files/scripts/kaitai_e2e.sh client-libs/kaitai-struct-files/files 2>/dev/null || \
 	 (echo "To see the full log run: \"./client-libs/kaitai-struct-files/scripts/kaitai_e2e.sh client-libs/kaitai-struct-files/files client-libs/kaitai-struct-files/input\""; exit 1)
