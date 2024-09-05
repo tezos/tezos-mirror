@@ -30,9 +30,9 @@ let assert_ok ~msg = function
       Format.eprintf "%s:@.%a@." msg pp_print_trace errs ;
       exit 1
 
-let prepare_genesis base_dir =
+let prepare_genesis context_dir =
   let open Lwt_result_syntax in
-  let*! index = Tezos_context.Context.init ~readonly:false base_dir in
+  let*! index = Tezos_context.Context.init ~readonly:false context_dir in
   let genesis_block =
     Block_hash.of_b58check_exn
       "BLockGenesisGenesisGenesisGenesisGenesisGeneskvg68z"
@@ -67,9 +67,9 @@ let flush context =
   let+ context = Tezos_context.Context.flush context in
   Tezos_shell_context.Shell_context.wrap_disk_context context
 
-let prepare_empty_context base_dir =
+let prepare_empty_context context_dir =
   let open Lwt_result_syntax in
-  let* index, context, _context_hash = prepare_genesis base_dir in
+  let* index, context, _context_hash = prepare_genesis context_dir in
   let*! context_hash = commit context in
   let*! () = Tezos_context.Context.close index in
   return context_hash
@@ -79,11 +79,13 @@ let purge_disk_cache () =
   let command = "./purge_disk_cache.exe" in
   match Sys.command command with
   | 0 -> ()
-  | n -> Format.eprintf "Warning: failed to execute %s: code: %d" command n
+  | n ->
+      Stdlib.failwith
+        (Printf.sprintf "Error: failed to execute %s: code: %d" command n)
 
-let load_context_from_disk_lwt base_dir context_hash =
+let load_context_from_disk_lwt context_dir context_hash =
   let open Lwt_syntax in
-  let* index = Tezos_context.Context.init ~readonly:false base_dir in
+  let* index = Tezos_context.Context.init ~readonly:false context_dir in
   let* o = Tezos_context.Context.checkout index context_hash in
   match o with
   | None -> assert false
@@ -91,28 +93,28 @@ let load_context_from_disk_lwt base_dir context_hash =
       Lwt.return
         (Tezos_shell_context.Shell_context.wrap_disk_context context, index)
 
-let load_context_from_disk base_dir context_hash =
-  Lwt_main.run (load_context_from_disk_lwt base_dir context_hash)
+let load_context_from_disk context_dir context_hash =
+  Lwt_main.run (load_context_from_disk_lwt context_dir context_hash)
 
-let with_context ~base_dir ~context_hash f =
-  let context, index = load_context_from_disk base_dir context_hash in
+let with_context ~context_dir ~context_hash f =
+  let context, index = load_context_from_disk context_dir context_hash in
   Lwt_main.run
     (let open Lwt_syntax in
      let* res = f context in
      let* () = Tezos_context.Context.close index in
      Lwt.return res)
 
-let prepare_base_dir base_dir = Unix.unlink base_dir
+let prepare_context_dir context_dir = Unix.unlink context_dir
 
 let initialize_key rng_state context path storage_size =
   let bytes = Base_samplers.uniform_bytes rng_state ~nbytes:storage_size in
   Tezos_protocol_environment.Context.add context path bytes
 
-let commit_and_reload base_dir index context =
+let commit_and_reload context_dir index context =
   let open Lwt_syntax in
   let* context_hash = commit context in
   let* () = Tezos_context.Context.close index in
-  load_context_from_disk_lwt base_dir context_hash
+  load_context_from_disk_lwt context_dir context_hash
 
 module Key_map = struct
   module String_map = String.Map
@@ -308,11 +310,10 @@ let rec copy_rec source dest =
   | _ -> prerr_endline ("Can't cope with special file " ^ source)
 
 let split_absolute_path s =
-  (* Must start with / *)
-  if s = "" || s.[0] <> '/' then None
+  if Filename.is_relative s then None
   else
     let ss = String.split_no_empty '/' s in
-    (* Must not contain ., .. *)
+    (* Must not contain . and .. *)
     if List.exists (function "." | ".." -> true | _ -> false) ss then None
     else Some ss
 
@@ -323,9 +324,7 @@ let load_head_block data_dir =
       let fn_config =
         Printf.sprintf "%s/store/chain_%s/config.json" data_dir chain_id
       in
-      let config =
-        Lwt_main.run @@ Tezos_stdlib_unix.Lwt_utils_unix.read_file fn_config
-      in
+      let config = In_channel.(with_open_text fn_config input_all) in
       match Data_encoding.Json.from_string config with
       | Error s -> Stdlib.failwith s
       | Ok config ->
@@ -373,13 +372,12 @@ module Meminfo = struct
       swapTotal
 
   let get () =
-    let ic = open_in "/proc/meminfo" in
+    let open In_channel in
+    with_open_text "/proc/meminfo" @@ fun ic ->
     let rec loop acc =
       match input_line ic with
-      | exception End_of_file ->
-          close_in ic ;
-          acc
-      | s ->
+      | None -> acc
+      | Some s ->
           let acc =
             try
               let n = String.index s ':' in
@@ -495,10 +493,14 @@ let fill_disk_cache ~rng ~restrict_memory context keys_list =
     restrict_memory () ;
     let meminfo = Meminfo.get () in
     match cond with
-    | `End_in 0 -> Lwt.return_unit
+    | `End_in 0 ->
+        Format.eprintf "Filled the disk cache: (%d KiB cached)@." meminfo.cached ;
+        Lwt.return_unit
     | `End_in m -> loop context (`End_in (m - 1)) (n + 1)
-    | `Caching _ when n >= 20 ->
-        Format.eprintf "Filling the disk cache: enough tried@." ;
+    | `Caching _ when n >= 30 ->
+        Format.eprintf
+          "Filling the disk cache: enough tried (%d KiB cached)@."
+          meminfo.cached ;
         Lwt.return_unit
     | `Caching _
       when meminfo.memAvailable - meminfo.buffers - meminfo.cached
@@ -513,3 +515,14 @@ let fill_disk_cache ~rng ~restrict_memory context keys_list =
   let meminfo = Meminfo.get () in
   Format.eprintf "%a@." Meminfo.pp meminfo ;
   Lwt.return_unit
+
+let get_head_block_from_context_dir data_dir =
+  match Lwt_main.run @@ load_head_block data_dir with
+  | Error e ->
+      Format.eprintf
+        "Error: %a@."
+        Tezos_error_monad.Error_monad.pp_print_trace
+        e ;
+      Format.eprintf "Failed to find a Tezos context at %s@." data_dir ;
+      exit 1
+  | Ok res -> res

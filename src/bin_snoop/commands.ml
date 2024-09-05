@@ -844,7 +844,7 @@ module Codegen_check_definitions_cmd = struct
 
   let params =
     Tezos_clic.(
-      prefixes ["check"; "definitions"; "of"]
+      prefixes ["check"; "definitions"; "in"; "generated"; "files"]
       @@ seq_of_param
            (string
               ~name:"MLFILE"
@@ -854,7 +854,7 @@ module Codegen_check_definitions_cmd = struct
     Tezos_clic.(
       command
         ~group
-        ~desc:"Check cost functions defined in the given .ml files"
+        ~desc:"Check cost functions defined in the given generated .ml files"
         no_options
         params
         codegen_check_definitions_handler)
@@ -866,6 +866,7 @@ module Auto_build_cmd = struct
         destination_directory,
         nsamples,
         bench_number,
+        config_file,
         print_problem,
         plot,
         override_files,
@@ -888,6 +889,7 @@ module Auto_build_cmd = struct
         opts with
         nsamples = Option.value nsamples ~default:opts.nsamples;
         bench_number = Option.value bench_number ~default:opts.bench_number;
+        config_file;
       }
     in
     (split, {destination_directory; infer_parameters; measure_options})
@@ -932,11 +934,12 @@ module Auto_build_cmd = struct
       ()
 
   let options =
-    Tezos_clic.args10
+    Tezos_clic.args11
       switch
       destination_directory_arg
       Benchmark_cmd.Options.nsamples_arg
       Benchmark_cmd.Options.bench_number_arg
+      Benchmark_cmd.Options.config_file_arg
       Infer_cmd.Options.print_problem
       Infer_cmd.Options.plot_arg
       Infer_cmd.Options.override_arg

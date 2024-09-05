@@ -62,3 +62,14 @@ let _benchmark_tools_purge_disk_cache =
     ~deps:[]
     ~static:false
     ~bisect_ppx:No
+
+let _benchmark_tools_occupy_memory =
+  public_exe
+    "occupy_memory"
+    ~path:"devtools/benchmarks-tools/occupy_memory"
+    ~internal_name:"occupy_memory"
+    ~opam:"tezos-tooling"
+    ~release_status:Unreleased
+    ~deps:[]
+    ~static:false
+    ~bisect_ppx:No

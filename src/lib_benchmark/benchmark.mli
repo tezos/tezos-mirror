@@ -30,7 +30,7 @@
       with simpler parameters. Registration functions in {!Registration} will
       convert these simple interfaces back to [S].
     * All the common parameters for these signatures are declared in
-      [Benchmark_base]. 
+      [Benchmark_base].
       *)
 
 (** Some benchmarks depend on others, and some are for generic parameters that
@@ -47,7 +47,7 @@
     * [Generic]: for generic parameters only. *)
 type group = Standalone | Group of string | Generic
 
-(** Described the purpose of the benchmark.
+(** Describes the purpose of the benchmark.
       * [Generate_code of destination]: generates code at the given
         [destination] file, prefixed by "src/proto_alpha/lib_protocol/" and
         suffixed by "_costs_generated.ml".
@@ -69,10 +69,7 @@ module type Benchmark_base = sig
   (** File where the benchmark module is defined *)
   val module_filename : string
 
-  (** Described the purpose of the benchmark.
-      * [Generate_code of destination]: generates code at the given [destination] file.
-      * [Other_purpose of purpose]: any other purpose. The goal is to explain why the function is benchmarked since it does not produce a cost function.
-  *)
+  (** Describes the purpose of the benchmark. See [purpose] above. *)
   val purpose : purpose
 
   (** Tags of the benchmark *)
