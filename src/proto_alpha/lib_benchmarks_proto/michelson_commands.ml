@@ -74,8 +74,8 @@ module Michelson_gen_cmd = struct
   let lift_opt f opt_arg state =
     match opt_arg with None -> state | Some arg -> f arg state
 
-  let handler (min_size, max_size, burn_in, seed) terms_count terms_kind
-      filename () =
+  let handler (min_size, max_size, burn_in, seed, verbose) terms_count
+      terms_kind filename () =
     let open Lwt_result_syntax in
     let default = Michelson_generation.default_generator_config in
     let min = Option.value ~default:default.target_size.min min_size in
@@ -189,7 +189,15 @@ module Michelson_gen_cmd = struct
     in
     Tezos_clic.arg ~doc:"RNG seed" ~long:"seed" ~placeholder:"int" seed
 
-  let options = Tezos_clic.args4 min_size_arg max_size_arg burn_in_arg seed_arg
+  let verbose_arg =
+    Tezos_clic.switch
+      ~doc:"Print the generated terms in the standard output"
+      ~long:"verbose"
+      ~short:'v'
+      ()
+
+  let options =
+    Tezos_clic.args5 min_size_arg max_size_arg burn_in_arg seed_arg verbose_arg
 
   let params =
     Tezos_clic.(

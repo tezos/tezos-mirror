@@ -72,7 +72,7 @@ module Michelson_base_samplers = Samplers.Michelson_base
 
 (* ----------------------------------------------------------------------- *)
 
-let make_data_sampler rng_state config =
+let make_data_sampler ?(verbose = false) rng_state config =
   let target_size =
     Base_samplers.sample_in_interval rng_state ~range:config.target_size
   in
@@ -90,9 +90,11 @@ let make_data_sampler rng_state config =
   in
   let burn_in = target_size * config.burn_in_multiplier in
   let generator = Data.generator ~burn_in rng_state in
-  generator rng_state
+  let r = generator rng_state in
+  if verbose then Format.printf "%a@." Michelson_v1_printer.print_expr r.term ;
+  r
 
-let make_code_sampler rng_state config =
+let make_code_sampler ?(verbose = false) rng_state config =
   let target_size =
     Base_samplers.sample_in_interval rng_state ~range:config.target_size
   in
@@ -110,4 +112,6 @@ let make_code_sampler rng_state config =
   in
   let burn_in = target_size * config.burn_in_multiplier in
   let generator = Code.generator ~burn_in rng_state in
-  generator rng_state
+  let r = generator rng_state in
+  if verbose then Format.printf "%a@." Michelson_v1_printer.print_expr r.term ;
+  r
