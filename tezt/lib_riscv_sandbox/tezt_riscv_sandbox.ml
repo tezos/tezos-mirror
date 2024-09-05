@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2023 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2023-2024 TriliTech <contact@trili.tech>                    *)
 (* Copyright (c) 2024 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -35,7 +35,8 @@ let _ = Uses.make ~tag:"riscv_sandbox" ~path:"./src/riscv/"
 
 type vm_kind = Pvm | Test
 
-let run ~kind ~input ?inbox ?(max_steps = Int64.max_int) ?initrd () =
+let run ~kind ~input ?inbox ?(max_steps = Int64.max_int) ?initrd
+    ?(print_steps = false) () =
   let process =
     Process.spawn
       ~hooks:Tezt_tezos.Tezos_regression.hooks
@@ -52,7 +53,7 @@ let run ~kind ~input ?inbox ?(max_steps = Int64.max_int) ?initrd () =
       @
       match kind with
       | Test -> ["--posix-exit-mode"; "machine"]
-      | Pvm -> ["--pvm"])
+      | Pvm -> ["--pvm"] @ if print_steps then ["--print-steps"] else [])
   in
   Process.check process
 

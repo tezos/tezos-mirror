@@ -22,13 +22,19 @@ pub fn run(opts: RunOptions) -> Result<(), Box<dyn Error>> {
 
     struct Runner<'a>(&'a RunOptions);
 
-    impl UseStepper<Result<(), Box<dyn Error>>> for Runner<'_> {
-        fn advance<S: Stepper>(self, stepper: S) -> Result<(), Box<dyn Error>> {
+    impl UseStepper<Result<usize, Box<dyn Error>>> for Runner<'_> {
+        fn advance<S: Stepper>(self, stepper: S) -> Result<usize, Box<dyn Error>> {
             run_stepper(stepper, self.0.common.max_steps)
         }
     }
 
-    general_run(&opts.common, program, initrd, Runner(&opts))?
+    let steps = general_run(&opts.common, program, initrd, Runner(&opts))??;
+
+    if opts.print_steps {
+        println!("Run consumed {steps} steps.");
+    }
+
+    Ok(())
 }
 
 /// XXX: Trait used to pass a function for using the generic stepper.
@@ -108,7 +114,10 @@ fn run_pvm<R>(
     Ok(f_stepper(stepper))
 }
 
-fn run_stepper(mut stepper: impl Stepper, max_steps: Option<usize>) -> Result<(), Box<dyn Error>> {
+fn run_stepper(
+    mut stepper: impl Stepper,
+    max_steps: Option<usize>,
+) -> Result<usize, Box<dyn Error>> {
     let max_steps = match max_steps {
         Some(max_steps) => Bound::Included(max_steps),
         None => Bound::Unbounded,
@@ -117,7 +126,11 @@ fn run_stepper(mut stepper: impl Stepper, max_steps: Option<usize>) -> Result<()
     let result = stepper.step_max(max_steps);
 
     match result.to_stepper_status() {
-        StepperStatus::Exited { success: true, .. } => Ok(()),
+        StepperStatus::Exited {
+            success: true,
+            steps,
+            ..
+        } => Ok(steps),
         result => Err(format!("{result:?}").into()),
     }
 }
