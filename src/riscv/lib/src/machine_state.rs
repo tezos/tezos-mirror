@@ -347,7 +347,7 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::ManagerBase> MachineState<ML
     }
 
     /// Advance [`MachineState`] by executing an [`Instr`]
-    fn run_instr(&mut self, instr: Instr) -> Result<ProgramCounterUpdate, Exception>
+    fn run_instr(&mut self, instr: &Instr) -> Result<ProgramCounterUpdate, Exception>
     where
         M: backend::ManagerReadWrite,
     {
@@ -548,7 +548,7 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::ManagerBase> MachineState<ML
             Instr::Wfi => run_no_args_instr!(self, instr, run_wfi),
             // Supervisor Memory-Management
             Instr::SFenceVma { asid, vaddr } => {
-                self.run_sfence_vma(asid, vaddr)?;
+                self.run_sfence_vma(*asid, *vaddr)?;
                 Ok(ProgramCounterUpdate::Add(instr.width()))
             }
 
@@ -617,10 +617,8 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::ManagerBase> MachineState<ML
     where
         M: backend::ManagerReadWrite,
     {
-        match self.fetch_instr(current_mode, satp, instr_pc, phys_addr) {
-            Ok(instr) => self.run_instr(instr),
-            Err(e) => Err(e),
-        }
+        self.fetch_instr(current_mode, satp, instr_pc, phys_addr)
+            .and_then(|instr| self.run_instr(&instr))
     }
 
     /// Handle interrupts (also known as asynchronous exceptions)
