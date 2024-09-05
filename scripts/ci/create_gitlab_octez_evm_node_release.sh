@@ -63,6 +63,10 @@ gitlab_upload() {
   exit 1
 }
 
+sha512sum() {
+  sha512sum "$1" | cut -d " " -f 1 > "$1".sha512
+}
+
 echo "Create GitLab package"
 
 # We only support one OS for now
@@ -91,6 +95,13 @@ for architecture in ${architectures}; do
     "octez-evm-node-$os-${architecture}.tar.gz" \
     "${gitlab_octez_binaries_package_name}-$os-${architecture}.tar.gz"
   cd ..
+
+  echo "Upload checksum"
+
+  sha512sum "octez-binaries/${architecture}/octez-evm-node"
+  gitlab_upload \
+    "octez-binaries/${architecture}/octez-evm-node.sha512" \
+    "$os-${architecture}-octez-evm-node.sha512"
 done
 
 echo "Query GitLab to get generic package URL"
