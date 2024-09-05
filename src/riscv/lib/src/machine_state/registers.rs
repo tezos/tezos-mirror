@@ -335,7 +335,16 @@ impl fmt::Display for FRegister {
 /// Floating-point number register value
 #[repr(transparent)]
 #[derive(
-    Clone, Copy, PartialEq, PartialOrd, Default, Debug, derive_more::From, derive_more::Into,
+    Clone,
+    Copy,
+    PartialEq,
+    PartialOrd,
+    Default,
+    Debug,
+    derive_more::From,
+    derive_more::Into,
+    serde::Serialize,
+    serde::Deserialize,
 )]
 pub struct FValue(u64);
 

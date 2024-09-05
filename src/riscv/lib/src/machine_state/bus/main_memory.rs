@@ -3,7 +3,8 @@
 // SPDX-License-Identifier: MIT
 
 use super::{Address, AddressableRead, AddressableWrite};
-use crate::state_backend::{self as backend};
+use crate::state_backend::{self as backend, ManagerDeserialise, ManagerSerialise};
+use serde::{Deserialize, Serialize};
 use std::mem;
 
 /// Configuration object for memory size
@@ -74,6 +75,17 @@ pub trait MainMemoryLayout: backend::Layout {
         address: usize,
         values: &[E],
     );
+
+    /// Serialise main memory's dynamic region.
+    fn serialise_data<M: ManagerSerialise, S: serde::Serializer>(
+        data: &Self::Data<M>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>;
+
+    /// Deserialise main memory's dynamic region.
+    fn deserialise_data<'de, M: ManagerDeserialise, D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<Self::Data<M>, D::Error>;
 }
 
 impl<const BYTES: usize> MainMemoryLayout for Sizes<BYTES> {
@@ -122,6 +134,19 @@ impl<const BYTES: usize> MainMemoryLayout for Sizes<BYTES> {
         values: &[E],
     ) {
         data.write_all(address, values);
+    }
+
+    fn serialise_data<M: ManagerSerialise, S: serde::Serializer>(
+        data: &Self::Data<M>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        data.serialize(serializer)
+    }
+
+    fn deserialise_data<'de, M: ManagerDeserialise, D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<Self::Data<M>, D::Error> {
+        serde::Deserialize::deserialize(deserializer)
     }
 }
 
@@ -222,6 +247,29 @@ impl<E: backend::Elem, L: MainMemoryLayout, M: backend::ManagerWrite> Addressabl
         L::data_write_all(&mut self.data, addr, values);
 
         Ok(())
+    }
+}
+
+impl<L: MainMemoryLayout, M: ManagerSerialise> Serialize for MainMemory<L, M> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        L::serialise_data(&self.data, serializer)
+    }
+}
+
+impl<'de, L, M> Deserialize<'de> for MainMemory<L, M>
+where
+    L: MainMemoryLayout,
+    M: ManagerDeserialise,
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let data = L::deserialise_data(deserializer)?;
+        Ok(Self { data })
     }
 }
 

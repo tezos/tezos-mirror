@@ -3,7 +3,8 @@
 // SPDX-License-Identifier: MIT
 
 use super::{
-    AllocatedOf, Array, Atom, Elem, ManagerBase, ManagerRead, ManagerReadWrite, ManagerWrite, Ref,
+    AllocatedOf, Array, Atom, Elem, ManagerBase, ManagerDeserialise, ManagerRead, ManagerReadWrite,
+    ManagerSerialise, ManagerWrite, Ref,
 };
 
 /// Single element of type `E`
@@ -52,6 +53,27 @@ impl<E: Elem, M: ManagerBase> Cell<E, M> {
         M: ManagerReadWrite,
     {
         self.region.replace(0, value)
+    }
+}
+
+impl<E: serde::Serialize + Elem, M: ManagerSerialise> serde::Serialize for Cell<E, M> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.region.serialize(serializer)
+    }
+}
+
+impl<'de, E: serde::Deserialize<'de> + Elem, M: ManagerDeserialise> serde::Deserialize<'de>
+    for Cell<E, M>
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let region = Cells::deserialize(deserializer)?;
+        Ok(Self { region })
     }
 }
 
@@ -305,6 +327,29 @@ impl<E: Elem, const LEN: usize, M: ManagerBase> Cells<E, LEN, M> {
     }
 }
 
+impl<E: serde::Serialize + Elem, const LEN: usize, M: ManagerSerialise> serde::Serialize
+    for Cells<E, LEN, M>
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        M::serialise_region(&self.region, serializer)
+    }
+}
+
+impl<'de, E: serde::Deserialize<'de> + Elem, const LEN: usize, M: ManagerDeserialise>
+    serde::Deserialize<'de> for Cells<E, LEN, M>
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let region = M::deserialise_region(deserializer)?;
+        Ok(Self { region })
+    }
+}
+
 /// Multiple elements of an unspecified type
 pub struct DynCells<const LEN: usize, M: ManagerBase + ?Sized> {
     region: M::DynRegion<LEN>,
@@ -355,6 +400,25 @@ impl<const LEN: usize, M: ManagerBase> DynCells<LEN, M> {
         M: ManagerWrite,
     {
         M::dyn_region_write_all(&mut self.region, address, values)
+    }
+}
+
+impl<const LEN: usize, M: ManagerSerialise> serde::Serialize for DynCells<LEN, M> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        M::serialise_dyn_region(&self.region, serializer)
+    }
+}
+
+impl<'de, const LEN: usize, M: ManagerDeserialise> serde::Deserialize<'de> for DynCells<LEN, M> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let region = M::deserialise_dyn_region(deserializer)?;
+        Ok(DynCells { region })
     }
 }
 
