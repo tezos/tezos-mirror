@@ -7477,7 +7477,7 @@ let rollup_node_injects_dal_slots _protocol parameters dal_node sc_node
     sc_rollup_address node client _pvm_name =
   let client = Client.with_dal_node client ~dal_node in
   let* () = Sc_rollup_node.run sc_node sc_rollup_address [] in
-  let* id =
+  let* () =
     Sc_rollup_node.RPC.call sc_node
     @@ Sc_rollup_rpc.post_local_dal_injection
          ~slot_content:"Hello DAL from a Smart Rollup"
@@ -7518,17 +7518,24 @@ let rollup_node_injects_dal_slots _protocol parameters dal_node sc_node
     (expected_dal_attestation = obtained_dal_attestation)
       (array bool)
       ~error_msg:"Expected attestation bitset %L, got %R") ;
-  let* status =
+  let* statuses =
     Sc_rollup_node.RPC.call sc_node
-    @@ Sc_rollup_rpc.get_injector_operation_status ~id
+    @@ Sc_rollup_rpc.get_dal_injected_operations_statuses ()
   in
-  let status_str = JSON.(status |-> "status" |> as_string) in
-  if status_str <> "included" && status_str <> "committed" then
-    Test.fail
-      "Unexpected injector operation status %s. Expecting 'included' or \
-       'committed'"
-      status_str ;
-  unit
+  match statuses with
+  | [status_with_hash] ->
+      let status = JSON.get "status" status_with_hash in
+      let status_str = JSON.(status |-> "status" |> as_string) in
+      if status_str <> "included" && status_str <> "committed" then
+        Test.fail
+          "Unexpected injector operation status %s. Expecting 'included' or \
+           'committed'"
+          status_str ;
+      unit
+  | _ ->
+      Test.fail
+        "Expecting a status for 1 operation, got %d@."
+        (List.length statuses)
 
 let slot_producer ~slot_index ~slot_size ~from ~into dal_node l1_node l1_client
     =

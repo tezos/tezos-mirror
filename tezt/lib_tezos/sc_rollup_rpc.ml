@@ -267,8 +267,8 @@ let post_local_dal_injection ~slot_content ~slot_index =
     ~data:(Data data)
     as_empty_object_or_fail
 
-let get_injector_operation_status ~id =
-  make GET ["local"; "injector"; "operation"; id; "status"] Fun.id
+let get_dal_injected_operations_statuses () =
+  make GET ["local"; "dal"; "injected"; "operations"; "statuses"] JSON.as_list
 
 type outbox_proof = {commitment_hash : string; proof : string}
 
