@@ -248,6 +248,11 @@ let post_local_batcher_injection ?drop_duplicate ~messages () =
     ~data
     JSON.(fun json -> as_list json |> List.map as_string)
 
+let as_empty_object_or_fail t =
+  match JSON.as_object t with
+  | [] -> ()
+  | _ -> JSON.error t "Not an empty object"
+
 let post_local_dal_injection ~slot_content ~slot_index =
   let data =
     `O
@@ -256,7 +261,11 @@ let post_local_dal_injection ~slot_content ~slot_index =
         ("slot_index", `Float (float_of_int slot_index));
       ]
   in
-  make POST ["local"; "dal"; "injection"] ~data:(Data data) JSON.as_string
+  make
+    POST
+    ["local"; "dal"; "injection"]
+    ~data:(Data data)
+    as_empty_object_or_fail
 
 let get_injector_operation_status ~id =
   make GET ["local"; "injector"; "operation"; id; "status"] Fun.id
