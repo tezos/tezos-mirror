@@ -809,9 +809,9 @@ module Local = struct
       ~output:
         Data_encoding.(
           list
-            (tup2
-               Tezos_crypto.Hashed.Injector_operations_hash.encoding
-               Encodings.message_status))
+            (obj2
+               (req "id" Tezos_crypto.Hashed.Injector_operations_hash.encoding)
+               (req "status" Encodings.message_status)))
       (path / "dal" / "injected" / "operations" / "statuses")
 
   let synchronized =

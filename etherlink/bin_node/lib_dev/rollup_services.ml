@@ -186,9 +186,9 @@ let dal_injected_operations_statuses :
     ~output:
       Data_encoding.(
         list
-          (tup2
-             Tezos_crypto.Hashed.Injector_operations_hash.encoding
-             Rollup_node_services.Encodings.message_status))
+          (obj2
+             (req "id" Tezos_crypto.Hashed.Injector_operations_hash.encoding)
+             (req "status" Rollup_node_services.Encodings.message_status)))
     (open_root / "local" / "dal" / "injected" / "operations" / "statuses")
 
 let simulation :
