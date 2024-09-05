@@ -5,49 +5,33 @@
 //
 // SPDX-License-Identifier: MIT
 
+// The kernel runtime requires both the standard Runtime and the
+// new Extended one.
+
 use crate::internal_runtime::{ExtendedRuntime, InternalRuntime};
-use crate::runtime::Runtime;
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
-use tezos_smart_rollup_host::dal_parameters::RollupDalParameters;
 use tezos_smart_rollup_host::{
+    dal_parameters::RollupDalParameters,
     input::Message,
     metadata::RollupMetadata,
-    path::{concat, OwnedPath, Path, RefPath},
+    path::Path,
     runtime::{Runtime as SdkRuntime, RuntimeError, ValueType},
 };
 
-pub const TMP_PATH: RefPath = RefPath::assert_from(b"/tmp");
-pub const WORLD_STATE_PATH: RefPath = RefPath::assert_from(b"/evm/world_state");
-pub const TMP_WORLD_STATE_PATH: RefPath = RefPath::assert_from(b"/tmp/evm/world_state");
-pub const TRACE_PATH: RefPath = RefPath::assert_from(b"/evm/trace");
-pub const TMP_TRACE_PATH: RefPath = RefPath::assert_from(b"/tmp/evm/trace");
+pub trait Runtime: SdkRuntime + InternalRuntime + ExtendedRuntime {}
 
-pub fn safe_path<T: Path>(path: &T) -> Result<OwnedPath, RuntimeError> {
-    concat(&TMP_PATH, path).map_err(|_| RuntimeError::PathNotFound)
+// If a type implements the Runtime, InternalRuntime and ExtendedRuntime traits,
+// it also implements the kernel Runtime.
+impl<T: SdkRuntime + InternalRuntime + ExtendedRuntime> Runtime for T {}
+
+pub struct KernelHost<Host, Internal> {
+    pub host: Host,
+    pub internal: Internal,
 }
 
-pub struct SafeStorage<Runtime> {
-    pub host: Runtime,
-}
-
-impl<Host: Runtime> InternalRuntime for SafeStorage<&mut Host> {
-    fn __internal_store_get_hash<T: Path>(
-        &mut self,
-        path: &T,
-    ) -> Result<Vec<u8>, RuntimeError> {
-        self.host.__internal_store_get_hash(path)
-    }
-}
-
-impl<Host: Runtime> ExtendedRuntime for SafeStorage<&mut Host> {
-    #[inline(always)]
-    fn store_get_hash<P: Path>(&mut self, path: &P) -> Result<Vec<u8>, RuntimeError> {
-        let path = safe_path(path)?;
-        self.__internal_store_get_hash(&path)
-    }
-}
-
-impl<Host: Runtime> SdkRuntime for SafeStorage<&mut Host> {
+impl<Host: SdkRuntime, Internal: InternalRuntime> SdkRuntime
+    for KernelHost<&mut Host, &mut Internal>
+{
     #[inline(always)]
     fn write_output(&mut self, from: &[u8]) -> Result<(), RuntimeError> {
         self.host.write_output(from)
@@ -65,8 +49,7 @@ impl<Host: Runtime> SdkRuntime for SafeStorage<&mut Host> {
 
     #[inline(always)]
     fn store_has<T: Path>(&self, path: &T) -> Result<Option<ValueType>, RuntimeError> {
-        let path = safe_path(path)?;
-        self.host.store_has(&path)
+        self.host.store_has(path)
     }
 
     #[inline(always)]
@@ -76,8 +59,7 @@ impl<Host: Runtime> SdkRuntime for SafeStorage<&mut Host> {
         from_offset: usize,
         max_bytes: usize,
     ) -> Result<Vec<u8>, RuntimeError> {
-        let path = safe_path(path)?;
-        self.host.store_read(&path, from_offset, max_bytes)
+        self.host.store_read(path, from_offset, max_bytes)
     }
 
     #[inline(always)]
@@ -87,14 +69,12 @@ impl<Host: Runtime> SdkRuntime for SafeStorage<&mut Host> {
         from_offset: usize,
         buffer: &mut [u8],
     ) -> Result<usize, RuntimeError> {
-        let path = safe_path(path)?;
-        self.host.store_read_slice(&path, from_offset, buffer)
+        self.host.store_read_slice(path, from_offset, buffer)
     }
 
     #[inline(always)]
     fn store_read_all(&self, path: &impl Path) -> Result<Vec<u8>, RuntimeError> {
-        let path = safe_path(path)?;
-        self.host.store_read_all(&path)
+        self.host.store_read_all(path)
     }
 
     #[inline(always)]
@@ -104,8 +84,7 @@ impl<Host: Runtime> SdkRuntime for SafeStorage<&mut Host> {
         src: &[u8],
         at_offset: usize,
     ) -> Result<(), RuntimeError> {
-        let path = safe_path(path)?;
-        self.host.store_write(&path, src, at_offset)
+        self.host.store_write(path, src, at_offset)
     }
 
     #[inline(always)]
@@ -114,26 +93,22 @@ impl<Host: Runtime> SdkRuntime for SafeStorage<&mut Host> {
         path: &T,
         src: &[u8],
     ) -> Result<(), RuntimeError> {
-        let path = safe_path(path)?;
-        self.host.store_write_all(&path, src)
+        self.host.store_write_all(path, src)
     }
 
     #[inline(always)]
     fn store_delete<T: Path>(&mut self, path: &T) -> Result<(), RuntimeError> {
-        let path = safe_path(path)?;
-        self.host.store_delete(&path)
+        self.host.store_delete(path)
     }
 
     #[inline(always)]
     fn store_delete_value<T: Path>(&mut self, path: &T) -> Result<(), RuntimeError> {
-        let path = safe_path(path)?;
-        self.host.store_delete_value(&path)
+        self.host.store_delete_value(path)
     }
 
     #[inline(always)]
     fn store_count_subkeys<T: Path>(&self, prefix: &T) -> Result<u64, RuntimeError> {
-        let prefix = safe_path(prefix)?;
-        self.host.store_count_subkeys(&prefix)
+        self.host.store_count_subkeys(prefix)
     }
 
     #[inline(always)]
@@ -142,9 +117,7 @@ impl<Host: Runtime> SdkRuntime for SafeStorage<&mut Host> {
         from_path: &impl Path,
         to_path: &impl Path,
     ) -> Result<(), RuntimeError> {
-        let from_path = safe_path(from_path)?;
-        let to_path = safe_path(to_path)?;
-        self.host.store_move(&from_path, &to_path)
+        self.host.store_move(from_path, to_path)
     }
 
     #[inline(always)]
@@ -153,9 +126,7 @@ impl<Host: Runtime> SdkRuntime for SafeStorage<&mut Host> {
         from_path: &impl Path,
         to_path: &impl Path,
     ) -> Result<(), RuntimeError> {
-        let from_path = safe_path(from_path)?;
-        let to_path = safe_path(to_path)?;
-        self.host.store_copy(&from_path, &to_path)
+        self.host.store_copy(from_path, to_path)
     }
 
     #[inline(always)]
@@ -169,8 +140,7 @@ impl<Host: Runtime> SdkRuntime for SafeStorage<&mut Host> {
 
     #[inline(always)]
     fn store_value_size(&self, path: &impl Path) -> Result<usize, RuntimeError> {
-        let path = safe_path(path)?;
-        self.host.store_value_size(&path)
+        self.host.store_value_size(path)
     }
 
     #[inline(always)]
@@ -226,27 +196,23 @@ impl<Host: Runtime> SdkRuntime for SafeStorage<&mut Host> {
     }
 }
 
-impl<Host: Runtime> SafeStorage<&mut Host> {
-    pub fn start(&mut self) -> Result<(), RuntimeError> {
-        self.host
-            .store_copy(&WORLD_STATE_PATH, &TMP_WORLD_STATE_PATH)
+impl<Host: SdkRuntime, Internal: InternalRuntime> InternalRuntime
+    for KernelHost<&mut Host, &mut Internal>
+{
+    #[inline(always)]
+    fn __internal_store_get_hash<T: Path>(
+        &mut self,
+        path: &T,
+    ) -> Result<Vec<u8>, RuntimeError> {
+        self.internal.__internal_store_get_hash(path)
     }
+}
 
-    pub fn promote(&mut self) -> Result<(), RuntimeError> {
-        self.host
-            .store_move(&TMP_WORLD_STATE_PATH, &WORLD_STATE_PATH)
-    }
-
-    // Only used in tracing mode, so that the trace doesn't polute the world
-    // state but is still promoted at the end and accessible from the node.
-    pub fn promote_trace(&mut self) -> Result<(), RuntimeError> {
-        if let Ok(Some(_)) = self.host.store_has(&TMP_TRACE_PATH) {
-            self.host.store_move(&TMP_TRACE_PATH, &TRACE_PATH)?
-        }
-        Ok(())
-    }
-
-    pub fn revert(&mut self) -> Result<(), RuntimeError> {
-        self.host.store_delete(&TMP_PATH)
+impl<Host: SdkRuntime, Internal: InternalRuntime> ExtendedRuntime
+    for KernelHost<&mut Host, &mut Internal>
+{
+    #[inline(always)]
+    fn store_get_hash<T: Path>(&mut self, path: &T) -> Result<Vec<u8>, RuntimeError> {
+        self.__internal_store_get_hash(path)
     }
 }

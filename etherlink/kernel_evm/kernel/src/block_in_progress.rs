@@ -26,10 +26,9 @@ use tezos_ethereum::transaction::{
 };
 use tezos_ethereum::Bloom;
 use tezos_evm_logging::{log, Level::*};
-use tezos_evm_runtime::safe_storage::KernelRuntime;
+use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::path::{concat, RefPath};
-use tezos_smart_rollup_host::runtime::Runtime;
 
 #[derive(Debug, PartialEq, Clone)]
 /// Container for all data needed during block computation
@@ -310,7 +309,7 @@ impl BlockInProgress {
         self.add_ticks(tick_model::ticks_of_invalid_transaction(tx_data_size));
     }
 
-    fn safe_store_get_hash<Host: KernelRuntime>(
+    fn safe_store_get_hash<Host: Runtime>(
         host: &mut Host,
         path: &RefPath,
     ) -> Result<Vec<u8>, anyhow::Error> {
@@ -326,7 +325,7 @@ impl BlockInProgress {
 
     fn receipts_root(
         &self,
-        host: &mut impl KernelRuntime,
+        host: &mut impl Runtime,
         previous_receipts_root: Vec<u8>,
     ) -> anyhow::Result<Vec<u8>> {
         if self.valid_txs.is_empty() {
@@ -350,7 +349,7 @@ impl BlockInProgress {
 
     fn transactions_root(
         &self,
-        host: &mut impl KernelRuntime,
+        host: &mut impl Runtime,
         previous_transactions_root: Vec<u8>,
     ) -> anyhow::Result<Vec<u8>> {
         if self.valid_txs.is_empty() {
@@ -372,7 +371,7 @@ impl BlockInProgress {
     }
 
     #[cfg_attr(feature = "benchmark", inline(never))]
-    pub fn finalize_and_store<Host: KernelRuntime>(
+    pub fn finalize_and_store<Host: Runtime>(
         self,
         host: &mut Host,
         block_constants: &BlockConstants,

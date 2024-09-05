@@ -30,11 +30,10 @@ use primitive_types::{H160, H256, U256};
 use tezos_ethereum::block::BlockFees;
 use tezos_ethereum::transaction::TransactionHash;
 use tezos_evm_logging::{log, Level::*};
-use tezos_evm_runtime::internal_runtime::InternalRuntime;
-use tezos_evm_runtime::safe_storage::{KernelRuntime, SafeStorage};
+use tezos_evm_runtime::runtime::Runtime;
+use tezos_evm_runtime::safe_storage::SafeStorage;
 use tezos_smart_rollup::outbox::OutboxQueue;
 use tezos_smart_rollup_host::path::{Path, RefPath};
-use tezos_smart_rollup_host::runtime::Runtime;
 use tick_model::estimate_remaining_ticks_for_transaction_execution;
 
 use tezos_ethereum::block::BlockConstants;
@@ -251,7 +250,7 @@ fn next_bip_from_blueprints<Host: Runtime>(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn compute_bip<Host: KernelRuntime>(
+fn compute_bip<Host: Runtime>(
     host: &mut Host,
     outbox_queue: &OutboxQueue<'_, impl Path>,
     mut block_in_progress: BlockInProgress,
@@ -321,7 +320,7 @@ fn compute_bip<Host: KernelRuntime>(
 }
 
 fn revert_block<Host: Runtime>(
-    safe_host: &mut SafeStorage<&mut Host, &mut impl InternalRuntime>,
+    safe_host: &mut SafeStorage<&mut Host>,
     block_in_progress: bool,
     number: U256,
     error: anyhow::Error,
@@ -351,7 +350,7 @@ fn clean_delayed_transactions(
 }
 
 fn promote_block<Host: Runtime>(
-    safe_host: &mut SafeStorage<&mut Host, &mut impl InternalRuntime>,
+    safe_host: &mut SafeStorage<&mut Host>,
     outbox_queue: &OutboxQueue<'_, impl Path>,
     block_in_progress: bool,
     number: U256,
@@ -424,17 +423,10 @@ pub fn produce<Host: Runtime>(
 
     let at_most_one_block = host.store_has(&AT_MOST_ONE_BLOCK)?.is_some();
 
-    #[cfg(not(test))]
-    let mut internal_storage = tezos_evm_runtime::internal_runtime::InternalHost();
-    #[cfg(test)]
-    let mut internal_storage = tezos_evm_runtime::mock_internal::MockInternal();
-    let mut safe_host = SafeStorage {
-        host,
-        internal: &mut internal_storage,
-    };
+    let mut safe_host = SafeStorage { host };
     let outbox_queue = OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX)?;
     let precompiles =
-        precompiles::precompile_set::<SafeStorage<&mut Host, _>>(config.enable_fa_bridge);
+        precompiles::precompile_set::<SafeStorage<&mut Host>>(config.enable_fa_bridge);
 
     // Check if there's a BIP in storage to resume its execution
     match storage::read_block_in_progress(&safe_host)? {
@@ -614,7 +606,10 @@ mod tests {
         TransactionHash, TransactionStatus, TransactionType, TRANSACTION_HASH_SIZE,
     };
     use tezos_ethereum::tx_common::EthereumTransactionCommon;
+    use tezos_evm_runtime::mock_internal::MockInternal;
+    use tezos_evm_runtime::runtime::{KernelHost, Runtime};
     use tezos_smart_rollup_encoding::timestamp::Timestamp;
+    use tezos_smart_rollup_host::runtime::Runtime as SdkRuntime;
     use tezos_smart_rollup_mock::MockHost;
 
     fn blueprint(transactions: Vec<Transaction>) -> Blueprint {
@@ -844,6 +839,11 @@ mod tests {
     // Test if the invalid transactions are producing receipts
     fn test_invalid_transactions_receipt_status() {
         let mut host = MockHost::default();
+        let mut internal = MockInternal();
+        let mut host = KernelHost {
+            host: &mut host,
+            internal: &mut internal,
+        };
         crate::storage::store_minimum_base_fee_per_gas(
             &mut host,
             DUMMY_BASE_FEE_PER_GAS.into(),
@@ -888,6 +888,11 @@ mod tests {
     // Test if a valid transaction is producing a receipt with a success status
     fn test_valid_transactions_receipt_status() {
         let mut host = MockHost::default();
+        let mut internal = MockInternal();
+        let mut host = KernelHost {
+            host: &mut host,
+            internal: &mut internal,
+        };
         crate::storage::store_minimum_base_fee_per_gas(
             &mut host,
             DUMMY_BASE_FEE_PER_GAS.into(),
@@ -932,6 +937,11 @@ mod tests {
     // Test if a valid transaction is producing a receipt with a contract address
     fn test_valid_transactions_receipt_contract_address() {
         let mut host = MockHost::default();
+        let mut internal = MockInternal();
+        let mut host = KernelHost {
+            host: &mut host,
+            internal: &mut internal,
+        };
         crate::storage::store_minimum_base_fee_per_gas(
             &mut host,
             DUMMY_BASE_FEE_PER_GAS.into(),
@@ -987,6 +997,11 @@ mod tests {
     // Test if several valid transactions can be performed
     fn test_several_valid_transactions() {
         let mut host = MockHost::default();
+        let mut internal = MockInternal();
+        let mut host = KernelHost {
+            host: &mut host,
+            internal: &mut internal,
+        };
         crate::storage::store_minimum_base_fee_per_gas(
             &mut host,
             DUMMY_BASE_FEE_PER_GAS.into(),
@@ -1009,6 +1024,11 @@ mod tests {
     // Test if several valid proposals can produce valid blocks
     fn test_several_valid_proposals() {
         let mut host = MockHost::default();
+        let mut internal = MockInternal();
+        let mut host = KernelHost {
+            host: &mut host,
+            internal: &mut internal,
+        };
         crate::storage::store_minimum_base_fee_per_gas(
             &mut host,
             DUMMY_BASE_FEE_PER_GAS.into(),
@@ -1064,6 +1084,11 @@ mod tests {
     // Test transfers gas consumption consistency
     fn test_cumulative_transfers_gas_consumption() {
         let mut host = MockHost::default();
+        let mut internal = MockInternal();
+        let mut host = KernelHost {
+            host: &mut host,
+            internal: &mut internal,
+        };
 
         let base_gas = U256::from(21000);
         crate::storage::store_minimum_base_fee_per_gas(&mut host, base_gas).unwrap();
@@ -1127,6 +1152,11 @@ mod tests {
     // a block production
     fn test_read_storage_current_block_after_block_production_with_filled_queue() {
         let mut host = MockHost::default();
+        let mut internal = MockInternal();
+        let mut host = KernelHost {
+            host: &mut host,
+            internal: &mut internal,
+        };
 
         let mut evm_account_storage = init_account_storage().unwrap();
 
@@ -1139,6 +1169,11 @@ mod tests {
     // Test that the same transaction can not be replayed twice
     fn test_replay_attack() {
         let mut host = MockHost::default();
+        let mut internal = MockInternal();
+        let mut host = KernelHost {
+            host: &mut host,
+            internal: &mut internal,
+        };
         crate::storage::store_minimum_base_fee_per_gas(
             &mut host,
             DUMMY_BASE_FEE_PER_GAS.into(),
@@ -1199,6 +1234,11 @@ mod tests {
     #[test]
     fn test_blocks_are_indexed() {
         let mut host = MockHost::default();
+        let mut internal = MockInternal();
+        let mut host = KernelHost {
+            host: &mut host,
+            internal: &mut internal,
+        };
         crate::storage::store_minimum_base_fee_per_gas(
             &mut host,
             DUMMY_BASE_FEE_PER_GAS.into(),
@@ -1265,6 +1305,11 @@ mod tests {
     fn test_stop_computation() {
         // init host
         let mut host = MockHost::default();
+        let mut internal = MockInternal();
+        let mut host = KernelHost {
+            host: &mut host,
+            internal: &mut internal,
+        };
 
         let block_constants = first_block(&mut host);
         let precompiles = precompiles::precompile_set(false);
@@ -1343,6 +1388,11 @@ mod tests {
     #[test]
     fn invalid_transaction_should_bump_nonce() {
         let mut host = MockHost::default();
+        let mut internal = MockInternal();
+        let mut host = KernelHost {
+            host: &mut host,
+            internal: &mut internal,
+        };
 
         let mut evm_account_storage = init_account_storage().unwrap();
 
@@ -1415,6 +1465,11 @@ mod tests {
     #[test]
     fn test_first_blocks() {
         let mut host = MockHost::default();
+        let mut internal = MockInternal();
+        let mut host = KernelHost {
+            host: &mut host,
+            internal: &mut internal,
+        };
 
         // first block should be 0
         let blueprint = almost_empty_blueprint();
@@ -1528,6 +1583,11 @@ mod tests {
     fn test_reboot_many_tx_one_proposal() {
         // init host
         let mut host = MockHost::default();
+        let mut internal = MockInternal();
+        let mut host = KernelHost {
+            host: &mut host,
+            internal: &mut internal,
+        };
         crate::storage::store_minimum_base_fee_per_gas(
             &mut host,
             DUMMY_BASE_FEE_PER_GAS.into(),
@@ -1614,6 +1674,11 @@ mod tests {
     fn test_reboot_many_tx_many_proposal() {
         // init host
         let mut host = MockHost::default();
+        let mut internal = MockInternal();
+        let mut host = KernelHost {
+            host: &mut host,
+            internal: &mut internal,
+        };
 
         crate::storage::store_minimum_base_fee_per_gas(
             &mut host,
@@ -1697,11 +1762,7 @@ mod tests {
         matches!(computation_result, ComputationResult::RebootNeeded);
 
         // The block is in progress, therefore it is in the safe storage.
-        let mut mock_internal = MockHost::default();
-        let safe_host = SafeStorage {
-            host: &mut host,
-            internal: &mut mock_internal,
-        };
+        let safe_host = SafeStorage { host: &mut host };
         let bip = read_block_in_progress(&safe_host)
             .expect("Should be able to read the block in progress")
             .expect("The reboot context should have a block in progress");
@@ -1730,6 +1791,11 @@ mod tests {
 
         // init host
         let mut host = MockHost::default();
+        let mut internal = MockInternal();
+        let mut host = KernelHost {
+            host: &mut host,
+            internal: &mut internal,
+        };
         // ensure we're using the default block fees to test.
         let block_fees = crate::retrieve_block_fees(&mut host).unwrap();
 
@@ -1794,6 +1860,11 @@ mod tests {
     fn test_non_retriable_transaction_are_marked_as_failed() {
         // init host
         let mut host = MockHost::default();
+        let mut internal = MockInternal();
+        let mut host = KernelHost {
+            host: &mut host,
+            internal: &mut internal,
+        };
         crate::storage::store_minimum_base_fee_per_gas(
             &mut host,
             DUMMY_BASE_FEE_PER_GAS.into(),
@@ -1917,6 +1988,11 @@ mod tests {
     // Test if a valid transaction is producing a receipt with a success status
     fn test_type_propagation() {
         let mut host = MockHost::default();
+        let mut internal = MockInternal();
+        let mut host = KernelHost {
+            host: &mut host,
+            internal: &mut internal,
+        };
         crate::storage::store_minimum_base_fee_per_gas(
             &mut host,
             DUMMY_BASE_FEE_PER_GAS.into(),

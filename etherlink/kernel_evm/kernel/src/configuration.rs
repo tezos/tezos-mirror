@@ -13,7 +13,7 @@ use crate::{
 use evm_execution::read_ticketer;
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_evm_logging::{log, Level::*};
-use tezos_smart_rollup_debug::Runtime;
+use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_encoding::public_key::PublicKey;
 
 #[derive(Debug, Clone, Default)]

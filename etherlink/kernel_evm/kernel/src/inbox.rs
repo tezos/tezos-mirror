@@ -38,8 +38,8 @@ use tezos_ethereum::transaction::{
 };
 use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_evm_logging::{log, Level::*};
+use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_encoding::public_key::PublicKey;
-use tezos_smart_rollup_host::runtime::Runtime;
 
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, PartialEq, Clone)]
@@ -714,6 +714,8 @@ mod tests {
     use tezos_crypto_rs::hash::UnknownSignature;
     use tezos_data_encoding::types::Bytes;
     use tezos_ethereum::transaction::TRANSACTION_HASH_SIZE;
+    use tezos_evm_runtime::mock_internal::MockInternal;
+    use tezos_evm_runtime::runtime::KernelHost;
     use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
     use tezos_smart_rollup_encoding::contract::Contract;
     use tezos_smart_rollup_encoding::inbox::ExternalMessageFrame;
@@ -832,6 +834,11 @@ mod tests {
     #[test]
     fn parse_valid_simple_transaction() {
         let mut host = MockHost::default();
+        let mut internal = MockInternal();
+        let mut host = KernelHost {
+            host: &mut host,
+            internal: &mut internal,
+        };
 
         let tx_bytes = &hex::decode("f86d80843b9aca00825208940b52d4d3be5d18a7ab5e4476a2f5382bbf2b38d888016345785d8a000080820a95a0d9ef1298c18c88604e3f08e14907a17dfa81b1dc6b37948abe189d8db5cb8a43a06fc7040a71d71d3cb74bd05ead7046b10668ad255da60391c017eea31555f156").unwrap();
         let tx = EthereumTransactionCommon::from_bytes(tx_bytes).unwrap();
@@ -842,7 +849,8 @@ mod tests {
                 content: Ethereum(tx.clone()),
             })));
 
-        host.add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, input)));
+        host.host
+            .add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, input)));
 
         let inbox_content = read_proxy_inbox(
             &mut host,
@@ -863,6 +871,11 @@ mod tests {
     fn parse_valid_chunked_transaction() {
         let address = smart_rollup_address();
         let mut host = MockHost::with_address(&address);
+        let mut internal = MockInternal();
+        let mut host = KernelHost {
+            host: &mut host,
+            internal: &mut internal,
+        };
 
         let (data, tx) = large_transaction();
         let tx_hash: [u8; TRANSACTION_HASH_SIZE] = Keccak256::digest(data.clone()).into();
@@ -870,7 +883,8 @@ mod tests {
         let inputs = make_chunked_transactions(tx_hash, data);
 
         for input in inputs {
-            host.add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, input)))
+            host.host
+                .add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, input)))
         }
 
         let inbox_content = read_proxy_inbox(
@@ -891,6 +905,11 @@ mod tests {
     #[test]
     fn parse_valid_kernel_upgrade() {
         let mut host = MockHost::default();
+        let mut internal = MockInternal();
+        let mut host = KernelHost {
+            host: &mut host,
+            internal: &mut internal,
+        };
 
         // Prepare the upgrade's payload
         let preimage_hash: [u8; PREIMAGE_HASH_SIZE] = hex::decode(
@@ -921,7 +940,7 @@ mod tests {
             MichelsonOr::Right(MichelsonBytes(kernel_upgrade_payload));
 
         let transfer_metadata = TransferMetadata::new(sender.clone(), source);
-        host.add_transfer(payload, &transfer_metadata);
+        host.host.add_transfer(payload, &transfer_metadata);
         let _inbox_content = read_proxy_inbox(
             &mut host,
             [0; 20],
@@ -950,6 +969,11 @@ mod tests {
     // the first `NewChunkedTransaction` should be considered.
     fn recreate_chunked_transaction() {
         let mut host = MockHost::default();
+        let mut internal = MockInternal();
+        let mut host = KernelHost {
+            host: &mut host,
+            internal: &mut internal,
+        };
 
         let chunk_hashes = vec![[1; TRANSACTION_HASH_SIZE], [2; TRANSACTION_HASH_SIZE]];
         let tx_hash = [0; TRANSACTION_HASH_SIZE];
@@ -964,11 +988,11 @@ mod tests {
             chunk_hashes,
         });
 
-        host.add_external(Bytes::from(input_to_bytes(
+        host.host.add_external(Bytes::from(input_to_bytes(
             SMART_ROLLUP_ADDRESS,
             new_chunk1,
         )));
-        host.add_external(Bytes::from(input_to_bytes(
+        host.host.add_external(Bytes::from(input_to_bytes(
             SMART_ROLLUP_ADDRESS,
             new_chunk2,
         )));
@@ -992,6 +1016,11 @@ mod tests {
     // not make the kernel fail.
     fn out_of_bound_chunk_is_ignored() {
         let mut host = MockHost::default();
+        let mut internal = MockInternal();
+        let mut host = KernelHost {
+            host: &mut host,
+            internal: &mut internal,
+        };
 
         let (data, _tx) = large_transaction();
         let tx_hash = ZERO_TX_HASH;
@@ -1001,7 +1030,8 @@ mod tests {
         let chunk = inputs.remove(0);
 
         // Announce a chunked transaction.
-        host.add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, new_chunk)));
+        host.host
+            .add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, new_chunk)));
 
         // Give a chunk with an invalid `i`.
         let out_of_bound_i = 42;
@@ -1019,7 +1049,8 @@ mod tests {
             }),
             _ => panic!("Expected a transaction chunk"),
         };
-        host.add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, chunk)));
+        host.host
+            .add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, chunk)));
 
         let _inbox_content = read_proxy_inbox(
             &mut host,
@@ -1043,6 +1074,11 @@ mod tests {
     // not make the kernel fail.
     fn unknown_chunk_is_ignored() {
         let mut host = MockHost::default();
+        let mut internal = MockInternal();
+        let mut host = KernelHost {
+            host: &mut host,
+            internal: &mut internal,
+        };
 
         let (data, _tx) = large_transaction();
         let tx_hash = ZERO_TX_HASH;
@@ -1056,7 +1092,8 @@ mod tests {
             _ => panic!("Expected a transaction chunk"),
         };
 
-        host.add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, chunk)));
+        host.host
+            .add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, chunk)));
 
         let _inbox_content = read_proxy_inbox(
             &mut host,
@@ -1095,6 +1132,11 @@ mod tests {
     // |--> Fails because the chunk is unknown
     fn transaction_is_complete_when_each_chunk_is_stored() {
         let mut host = MockHost::default();
+        let mut internal = MockInternal();
+        let mut host = KernelHost {
+            host: &mut host,
+            internal: &mut internal,
+        };
 
         let (data, tx) = large_transaction();
         let tx_hash: [u8; TRANSACTION_HASH_SIZE] = Keccak256::digest(data.clone()).into();
@@ -1107,9 +1149,11 @@ mod tests {
         let new_chunk = inputs[0].clone();
         let chunk0 = inputs[1].clone();
 
-        host.add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, new_chunk)));
+        host.host
+            .add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, new_chunk)));
 
-        host.add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, chunk0)));
+        host.host
+            .add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, chunk0)));
 
         let inbox_content = read_proxy_inbox(
             &mut host,
@@ -1128,7 +1172,8 @@ mod tests {
 
         // On the next level, try to re-give the chunks, but this time in full:
         for input in inputs {
-            host.add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, input)))
+            host.host
+                .add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, input)))
         }
         let inbox_content = read_proxy_inbox(
             &mut host,
@@ -1153,6 +1198,11 @@ mod tests {
         let address = smart_rollup_address();
 
         let mut host = MockHost::with_address(&address);
+        let mut internal = MockInternal();
+        let mut host = KernelHost {
+            host: &mut host,
+            internal: &mut internal,
+        };
 
         let tx_bytes = &hex::decode("f86d80843b9aca00825208940b52d4d3be5d18a7ab5\
         e4476a2f5382bbf2b38d888016345785d8a000080820a95a0d9ef1298c18c88604e3f08e14907a17dfa81b1dc6b37948abe189d8db5cb8a43a06\
@@ -1189,7 +1239,7 @@ mod tests {
             contents: buffer,
         };
 
-        host.add_external(framed);
+        host.host.add_external(framed);
 
         let inbox_content = read_proxy_inbox(
             &mut host,
@@ -1209,11 +1259,16 @@ mod tests {
     #[test]
     fn empty_inbox_returns_none() {
         let mut host = MockHost::default();
+        let mut internal = MockInternal();
+        let mut host = KernelHost {
+            host: &mut host,
+            internal: &mut internal,
+        };
 
         // Even reading the inbox with only the default elements returns
         // an empty inbox content. As we test in isolation there is nothing
         // in the inbox, we mock it by adding a single input.
-        host.add_external(Bytes::from(vec![]));
+        host.host.add_external(Bytes::from(vec![]));
         let inbox_content = read_proxy_inbox(
             &mut host,
             SMART_ROLLUP_ADDRESS,

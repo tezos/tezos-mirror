@@ -20,10 +20,11 @@ use sha3::{Digest, Keccak256};
 use tezos_ethereum::rlp_helpers;
 use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_evm_logging::{log, Level::*};
+use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup::types::Timestamp;
 use tezos_smart_rollup_core::MAX_INPUT_MESSAGE_SIZE;
 use tezos_smart_rollup_host::path::*;
-use tezos_smart_rollup_host::runtime::{Runtime, RuntimeError};
+use tezos_smart_rollup_host::runtime::RuntimeError;
 use tezos_storage::{
     error::Error as GenStorageError, read_rlp, store_read_slice, store_rlp,
 };
@@ -491,11 +492,19 @@ mod tests {
     use primitive_types::H256;
     use tezos_crypto_rs::hash::ContractKt1Hash;
     use tezos_ethereum::transaction::TRANSACTION_HASH_SIZE;
+    use tezos_evm_runtime::mock_internal::MockInternal;
+    use tezos_evm_runtime::runtime::KernelHost;
     use tezos_smart_rollup_encoding::public_key::PublicKey;
+    use tezos_smart_rollup_host::runtime::Runtime;
     use tezos_smart_rollup_mock::MockHost;
 
     fn test_invalid_sequencer_blueprint_is_removed(enable_dal: bool) {
         let mut host = MockHost::default();
+        let mut internal = MockInternal();
+        let mut host = KernelHost {
+            host: &mut host,
+            internal: &mut internal,
+        };
         let delayed_inbox =
             DelayedInbox::new(&mut host).expect("Delayed inbox should be created");
         let delayed_bridge: ContractKt1Hash =
