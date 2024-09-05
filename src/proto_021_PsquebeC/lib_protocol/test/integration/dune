@@ -12,7 +12,8 @@
   tezos-protocol-021-PsquebeC.protocol
   tezos-protocol-021-PsquebeC.parameters
   octez-protocol-021-PsquebeC-libs.test-helpers
-  octez-libs.base-test-helpers)
+  octez-libs.base-test-helpers
+  octez-protocol-021-PsquebeC-libs.plugin)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -23,7 +24,8 @@
   -open Tezos_protocol_021_PsquebeC
   -open Tezos_protocol_021_PsquebeC_parameters
   -open Tezos_021_PsquebeC_test_helpers
-  -open Tezos_base_test_helpers)
+  -open Tezos_base_test_helpers
+  -open Tezos_protocol_plugin_021_PsquebeC)
  (modules
   test_constants
   test_frozen_bonds

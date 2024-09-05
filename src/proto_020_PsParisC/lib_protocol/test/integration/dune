@@ -12,7 +12,8 @@
   tezos-protocol-020-PsParisC.protocol
   tezos-protocol-020-PsParisC.parameters
   octez-protocol-020-PsParisC-libs.test-helpers
-  octez-libs.base-test-helpers)
+  octez-libs.base-test-helpers
+  octez-protocol-020-PsParisC-libs.plugin)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -23,7 +24,8 @@
   -open Tezos_protocol_020_PsParisC
   -open Tezos_protocol_020_PsParisC_parameters
   -open Tezos_020_PsParisC_test_helpers
-  -open Tezos_base_test_helpers)
+  -open Tezos_base_test_helpers
+  -open Tezos_protocol_plugin_020_PsParisC)
  (modules
   test_constants
   test_frozen_bonds

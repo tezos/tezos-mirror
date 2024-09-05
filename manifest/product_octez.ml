@@ -5381,6 +5381,7 @@ end = struct
               parameters |> if_some |> open_;
               test_helpers |> if_some |> open_;
               octez_base_test_helpers |> open_;
+              plugin |> if_some |> open_;
             ]
           ~dep_globs:(if N.(number >= 015) then ["wasm_kernel/*.wasm"] else [])
       in

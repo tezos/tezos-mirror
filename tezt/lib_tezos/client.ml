@@ -4441,27 +4441,15 @@ end
 let bake_until_cycle ~target_cycle ?keys ?node client =
   let* constants = RPC.call client @@ R.get_chain_block_context_constants () in
   let blocks_per_cycle = JSON.(constants |-> "blocks_per_cycle" |> as_int) in
-  Log.info
-    "Bake until cycle %d (level %d)"
-    target_cycle
-    (target_cycle * blocks_per_cycle) ;
+  let target_level = target_cycle * blocks_per_cycle in
+  Log.info "Bake until cycle %d (level %d)" target_cycle target_level ;
 
-  bake_until_level
-    ~target_level:(target_cycle * blocks_per_cycle)
-    ?keys
-    ?node
-    client
+  bake_until_level ~target_level ?keys ?node client
 
 let bake_until_cycle_end ~target_cycle ?keys ?node client =
   let* constants = RPC.call client @@ R.get_chain_block_context_constants () in
   let blocks_per_cycle = JSON.(constants |-> "blocks_per_cycle" |> as_int) in
-  Log.info
-    "Bake until cycle %d (level %d)"
-    target_cycle
-    (target_cycle * blocks_per_cycle) ;
+  let target_level = ((target_cycle + 1) * blocks_per_cycle) - 1 in
+  Log.info "Bake until cycle end %d (level %d)" target_cycle target_level ;
 
-  bake_until_level
-    ~target_level:(((target_cycle + 1) * blocks_per_cycle) - 1)
-    ?keys
-    ?node
-    client
+  bake_until_level ~target_level ?keys ?node client
