@@ -854,6 +854,21 @@ const fn parse_uncompressed_instruction(instr: u32) -> Instr {
     }
 }
 
+const NUM_COMPRESSED_INSTRUCTIONS: usize = (u16::MAX as usize) + 1;
+
+static COMPRESSED_JUMP_TABLE: [Instr; NUM_COMPRESSED_INSTRUCTIONS] = {
+    let mut table = [Instr::Unknown { instr: 0 }; NUM_COMPRESSED_INSTRUCTIONS];
+    let mut i = 0;
+
+    while i < u16::MAX {
+        table[i as usize] = parse_compressed_instruction_inner(i);
+        i += 1;
+    }
+    table[i as usize] = parse_compressed_instruction_inner(i);
+
+    table
+};
+
 macro_rules! cr_instr {
     ($enum_variant:ident, $instr:expr) => {
         $enum_variant(CRTypeArgs {
@@ -1074,7 +1089,7 @@ const C_Q1_2: u16 = 0b10;
 const C_Q1_3: u16 = 0b11;
 
 #[inline]
-const fn parse_compressed_instruction(instr: u16) -> Instr {
+const fn parse_compressed_instruction_inner(instr: u16) -> Instr {
     use Instr::*;
     match c_opcode(instr) {
         OP_C0 => match c_funct3(instr) {
@@ -1222,6 +1237,11 @@ const fn parse_compressed_instruction(instr: u16) -> Instr {
     }
 }
 
+#[inline(always)]
+fn parse_compressed_instruction(bytes: u16) -> Instr {
+    COMPRESSED_JUMP_TABLE[bytes as usize]
+}
+
 /// Attempt to parse `bytes` into an instruction. If `bytes` encodes a 2-byte
 /// compressed instruction, parse it immediately. If it encodes a 4-byte
 /// uncompressed instruction, request 2 extra bytes via `more`.
@@ -1258,65 +1278,19 @@ pub fn parse_segment(contents: &[u8], range: Range<usize>) -> Vec<Instr> {
     parse_block(&contents[range])
 }
 
-/// A faster parser that leverages jump-tables where possible.
-pub struct Parser {
-    u16_jump_table: Box<[Instr; (u16::MAX as usize) + 1]>,
-}
-
-impl Parser {
-    /// Creates a new parser.
-    ///
-    /// *NB* this initialises an internal compressed instruction
-    /// jump table.
-    pub fn new() -> Self {
-        let u16_jump_table = (0..=u16::MAX)
-            .map(parse_compressed_instruction)
-            .collect::<Vec<_>>()
-            .try_into()
-            .unwrap();
-
-        Self { u16_jump_table }
-    }
-
-    /// Attempt to parse `bytes` into an instruction. If `bytes` encodes a 2-byte
-    /// compressed instruction, parse it immediately. If it encodes a 4-byte
-    /// uncompressed instruction, request 2 extra bytes via `more`.
-    ///
-    /// Behaves identically to [`parse`], but more optimally.
-    #[inline(always)]
-    pub fn parse<E>(&self, bytes: u16, more: impl FnOnce() -> Result<u16, E>) -> Result<Instr, E> {
-        if bytes & 0b11 != 0b11 {
-            Ok(self.parse_compressed(bytes))
-        } else {
-            let upper = more()?;
-            let combined = (upper as u32) << 16 | (bytes as u32);
-            Ok(parse_uncompressed_instruction(combined))
-        }
-    }
-
-    #[inline(always)]
-    const fn parse_compressed(&self, bytes: u16) -> Instr {
-        self.u16_jump_table[bytes as usize]
-    }
-}
-
-impl Default for Parser {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::{
         instruction::{CsrArgs, ITypeArgs, Instr::*, SBTypeArgs, UJTypeArgs},
-        parse, parse_block, Parser,
+        parse_block,
     };
     use crate::{
         machine_state::{csregisters::CSRegister::mcause, registers::XRegister::*},
-        parser::{instruction::CIBTypeArgs, parse_compressed_instruction},
+        parser::{
+            instruction::CIBTypeArgs, parse_compressed_instruction,
+            parse_compressed_instruction_inner,
+        },
     };
-    use proptest::prelude::*;
 
     // rv64ui-p-addiw
     // 0000000080000000 <_start>:
@@ -1455,25 +1429,10 @@ mod tests {
     // Ensure the u16 jump table is initialised correctly.
     #[test]
     fn parser_compressed() {
-        let parser = Parser::new();
-
         for i in 0..=u16::MAX {
-            assert_eq!(parser.parse_compressed(i), parse_compressed_instruction(i));
-        }
-    }
-
-    proptest! {
-        // Ensure the optimised parser behaves the same on inputs
-        #[test]
-        fn fast_parser(
-            first_halfword in any::<u16>(),
-            second_halfword in any::<Option<u16>>())
-        {
-            let parser = Parser::new();
-
             assert_eq!(
-                parse(first_halfword, || second_halfword.ok_or(())),
-                parser.parse(first_halfword, || second_halfword.ok_or(()))
+                parse_compressed_instruction(i),
+                parse_compressed_instruction_inner(i)
             );
         }
     }

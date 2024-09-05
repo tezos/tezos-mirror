@@ -1343,7 +1343,6 @@ dependencies = [
  "num_enum",
  "ocaml",
  "ocaml-build",
- "once_cell",
  "paste",
  "proptest",
  "rand 0.8.5",

@@ -2229,7 +2229,6 @@ dependencies = [
  "num_enum",
  "ocaml",
  "ocaml-build",
- "once_cell",
  "paste",
  "rustc_apfloat",
  "serde",
