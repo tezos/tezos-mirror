@@ -329,6 +329,10 @@ to ``"peer"``. (MR :gl:`!14521`)
 
 A new RPC ``GET /health`` has been added to check the status on the node (MR :gl:`!14670`).
 
+An optional ``slot_index`` numerical query argument has been added to
+RPC ``POST /slots``. When provided, the DAL node checks that its
+profile allows to publish data on the given slot index (MR :gl:`!14825`).
+
 Miscellaneous
 -------------
 
