@@ -343,27 +343,28 @@ let replay ctxt ?(log_file = "replay") ?profile
 
 let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
     =
+  let module Executor = struct
+    let pvm_config = pvm_config ctxt
+
+    let replay = replay ctxt
+
+    let execute ?(alter_evm_state = Lwt_result_syntax.return) input block =
+      let open Lwt_result_syntax in
+      let message =
+        List.map (fun s -> `Input s) Simulation.Encodings.(input.messages)
+      in
+      let* hash = find_irmin_hash ctxt block in
+      let* evm_state = get_evm_state ctxt hash in
+      let* evm_state = alter_evm_state evm_state in
+      Evm_state.execute
+        ?log_file:input.log_kernel_debug_file
+        ~data_dir:ctxt.data_dir
+        ~config:pvm_config
+        evm_state
+        message
+  end in
   let module Backend = Make (struct
-    module Executor = struct
-      let pvm_config = pvm_config ctxt
-
-      let replay = replay ctxt
-
-      let execute ?(alter_evm_state = Lwt_result_syntax.return) input block =
-        let open Lwt_result_syntax in
-        let message =
-          List.map (fun s -> `Input s) Simulation.Encodings.(input.messages)
-        in
-        let* hash = find_irmin_hash ctxt block in
-        let* evm_state = get_evm_state ctxt hash in
-        let* evm_state = alter_evm_state evm_state in
-        Evm_state.execute
-          ?log_file:input.log_kernel_debug_file
-          ~data_dir:ctxt.data_dir
-          ~config:pvm_config
-          evm_state
-          message
-    end
+    module Executor = Executor
 
     let ctxt = ctxt
 
@@ -433,6 +434,14 @@ let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
             | None ->
                 failwith "Missing block %a" Ethereum_types.pp_block_hash hash)
         | param -> block_param_to_block_number param
+
+      include
+        Tracer_sig.Make
+          (Executor)
+          (struct
+            let transaction_receipt = Block_storage.transaction_receipt
+          end)
+          (Tracer)
     end)
   else (module Backend)
 
