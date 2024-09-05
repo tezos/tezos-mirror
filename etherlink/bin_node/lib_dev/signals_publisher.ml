@@ -10,7 +10,6 @@ type parameters = {
   smart_rollup_address : string;
   sequencer_key : Client_keys.sk_uri;
   rollup_node_endpoint : Uri.t;
-  max_blueprints_lag : int;
 }
 
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7453 *)
@@ -28,13 +27,8 @@ module Types = struct
   }
 
   let of_parameters
-      {
-        cctxt;
-        smart_rollup_address;
-        sequencer_key;
-        rollup_node_endpoint;
-        max_blueprints_lag = _;
-      } =
+      ({cctxt; smart_rollup_address; sequencer_key; rollup_node_endpoint} :
+        parameters) : state =
     {cctxt; smart_rollup_address; sequencer_key; rollup_node_endpoint}
 end
 
@@ -213,17 +207,10 @@ let worker_add_request ~request =
   let*! (_pushed : bool) = Worker.Queue.push_request w request in
   return_unit
 
-let start ~cctxt ~smart_rollup_address ~sequencer_key ~rollup_node_endpoint
-    ~max_blueprints_lag () =
+let start ~cctxt ~smart_rollup_address ~sequencer_key ~rollup_node_endpoint () =
   let open Lwt_result_syntax in
   let parameters =
-    {
-      cctxt;
-      smart_rollup_address;
-      sequencer_key;
-      rollup_node_endpoint;
-      max_blueprints_lag;
-    }
+    {cctxt; smart_rollup_address; sequencer_key; rollup_node_endpoint}
   in
   let* worker = Worker.launch table () parameters (module Handlers) in
   let*! () = Signals_publisher_events.publisher_is_ready () in

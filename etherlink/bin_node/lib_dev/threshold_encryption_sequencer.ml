@@ -53,9 +53,6 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
           ~smart_rollup_address
           ~sequencer_key:threshold_encryption_sequencer_config.sequencer
           ~rollup_node_endpoint
-          ~max_blueprints_lag:
-            threshold_encryption_sequencer_config.blueprints_publisher_config
-              .max_blueprints_lag
           ())
       threshold_encryption_sequencer_config.blueprints_publisher_config
         .dal_slots
