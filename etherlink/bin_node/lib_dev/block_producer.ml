@@ -14,7 +14,7 @@ type parameters = {
 
 (* The size of a delayed transaction is overapproximated to the maximum size
    of an inbox message, as chunks are not supported in the delayed bridge. *)
-let maximum_delayed_transaction_size = 4096
+let _maximum_delayed_transaction_size = 1
 
 (*
    The legacy transactions are as follows:
@@ -108,23 +108,26 @@ module Worker = Worker.MakeSingle (Name) (Request) (Types)
 
 type worker = Worker.infinite Worker.queue Worker.t
 
-let take_delayed_transactions maximum_number_of_chunks =
+let take_delayed_transactions _maximum_number_of_chunks =
   let open Lwt_result_syntax in
-  let maximum_cumulative_size =
-    Sequencer_blueprint.maximum_usable_space_in_blueprint
-      maximum_number_of_chunks
-  in
-  let maximum_delayed_transactions =
-    maximum_cumulative_size / maximum_delayed_transaction_size
-  in
+  (* let maximum_cumulative_size = *)
+  (*   Sequencer_blueprint.maximum_usable_space_in_blueprint *)
+  (*     maximum_number_of_chunks *)
+  (* in *)
+  (* let maximum_delayed_transactions = *)
+  (*   maximum_cumulative_size / maximum_delayed_transaction_size *)
+  (* in *)
   let* delayed_transactions = Evm_context.delayed_inbox_hashes () in
-  let delayed_transactions =
-    List.take_n maximum_delayed_transactions delayed_transactions
-  in
-  let remaining_cumulative_size =
-    maximum_cumulative_size - (List.length delayed_transactions * 4096)
-  in
-  return (delayed_transactions, remaining_cumulative_size)
+
+  (* let delayed_transactions = *)
+  (*   List.take_n maximum_delayed_transactions delayed_transactions *)
+  (* in *)
+  (* let remaining_cumulative_size = *)
+  (*   maximum_cumulative_size - (List.length delayed_transactions * 4096) *)
+  (* in *)
+
+  (* No more space remaining *)
+  return (delayed_transactions, 0)
 
 let produce_block_with_transactions ~sequencer_key ~cctxt ~timestamp
     ~smart_rollup_address ~transactions_and_objects ~delayed_transactions
