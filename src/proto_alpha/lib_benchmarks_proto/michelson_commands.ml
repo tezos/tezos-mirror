@@ -83,6 +83,9 @@ module Michelson_gen_cmd = struct
     let burn_in_multiplier =
       Option.value ~default:default.burn_in_multiplier burn_in
     in
+    if Sys.file_exists filename then (
+      Format.eprintf "File %s already exists, exiting@." filename ;
+      exit 1) ;
     let rng_state =
       match seed with
       | None ->
@@ -114,23 +117,22 @@ module Michelson_gen_cmd = struct
         terms_count
         "Generating term"
     in
-    let terms =
-      match terms_kind with
-      | "data" ->
-          Stdlib.List.init terms_count (fun _i ->
-              progress () ;
-              Michelson_mcmc_samplers.Data
-                (Michelson_generation.make_data_sampler rng_state cfg))
-      | "code" ->
-          Stdlib.List.init terms_count (fun _i ->
-              progress () ;
-              Michelson_mcmc_samplers.Code
-                (Michelson_generation.make_code_sampler rng_state cfg))
-      | _ ->
-          Format.eprintf "Term kind must be either \"data\" or \"code\"@." ;
-          exit 1
-    in
-    Michelson_mcmc_samplers.save ~filename ~terms ;
+    for _ = 1 to terms_count do
+      progress () ;
+      let s =
+        match terms_kind with
+        | "data" ->
+            Michelson_mcmc_samplers.Data
+              (Michelson_generation.make_data_sampler ~verbose rng_state cfg)
+        | "code" ->
+            Michelson_mcmc_samplers.Code
+              (Michelson_generation.make_code_sampler ~verbose rng_state cfg)
+        | _ ->
+            Format.eprintf "Term kind must be either \"data\" or \"code\"@." ;
+            exit 1
+      in
+      Michelson_mcmc_samplers.append ~filename ~terms:[s]
+    done ;
     return_unit
 
   let min_size_arg =
