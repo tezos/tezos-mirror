@@ -11,6 +11,16 @@ set -eu
 # shellcheck source=./scripts/ci/octez-release.sh
 . ./scripts/ci/octez-release.sh
 
+# Checks if running in dry-mode
+for arg in "$@"; do
+  case $arg in
+  "--dry-run")
+    dry_run="--dry-run"
+    echo "Running in dry-run mode. Nothing will be uploaded."
+    ;;
+  esac
+done
+
 debian_bookworm_packages="$(find packages/debian/bookworm/ -maxdepth 1 -name octez-\*.deb 2> /dev/null || printf '')"
 ubuntu_noble_packages="$(find packages/ubuntu/noble/ -maxdepth 1 -name octez-\*.deb 2> /dev/null || printf '')"
 ubuntu_jammy_packages="$(find packages/ubuntu/jammy/ -maxdepth 1 -name octez-\*.deb 2> /dev/null || printf '')"
@@ -34,32 +44,39 @@ gitlab_upload() {
   local_path="${1}"
   remote_file="${2}"
   url="${3-${gitlab_octez_package_url}}"
-  echo "Upload to ${url}/${remote_file}"
 
-  i=0
-  max_attempts=10
+  # Upload only if not running in dry-run
+  if [ -z "$dry_run" ]; then
 
-  # Retry because gitlab.com is flaky sometimes, curl upload fails with http status code 524 (timeout)
-  while [ "${i}" != "${max_attempts}" ]; do
-    i=$((i + 1))
-    http_code=$(curl -fsSL -o /dev/null -w "%{http_code}" \
-      -H "JOB-TOKEN: ${CI_JOB_TOKEN}" \
-      -T "${local_path}" \
-      "${url}/${remote_file}")
+    echo "Upload to ${url}/${remote_file}"
 
-    # Success
-    [ "${http_code}" = '201' ] && return
-    # Failure
-    echo "Error: HTTP response code ${http_code}, expected 201"
-    # Do not backoff after last attempt
-    [ "${i}" = "${max_attempts}" ] && break
-    # Backoff
-    echo "Retry (${i}) in one minute..."
-    sleep 60s
-  done
+    i=0
+    max_attempts=10
 
-  echo "Error: maximum attempts exhausted (${max_attempts})"
-  exit 1
+    # Retry because gitlab.com is flaky sometimes, curl upload fails with http status code 524 (timeout)
+    while [ "${i}" != "${max_attempts}" ]; do
+      i=$((i + 1))
+      http_code=$(curl -fsSL -o /dev/null -w "%{http_code}" \
+        -H "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+        -T "${local_path}" \
+        "${url}/${remote_file}")
+
+      # Success
+      [ "${http_code}" = '201' ] && return
+      # Failure
+      echo "Error: HTTP response code ${http_code}, expected 201"
+      # Do not backoff after last attempt
+      [ "${i}" = "${max_attempts}" ] && break
+      # Backoff
+      echo "Retry (${i}) in one minute..."
+      sleep 60s
+    done
+
+    echo "Error: maximum attempts exhausted (${max_attempts})"
+    exit 1
+  else
+    echo "The following file would be uploaded if not running in dry-run mode: ${url}/${remote_file}"
+  fi
 }
 
 # Loop over architectures
@@ -127,7 +144,7 @@ git --version
 git describe --tags
 
 # shellcheck source=./scripts/ci/create_octez_tarball.sh
-. ./scripts/ci/create_octez_tarball.sh
+./scripts/ci/create_octez_tarball.sh
 
 # Verify git expanded placeholders in archive
 tar -Oxf "${source_tarball}" "${gitlab_octez_source_package_name}/src/lib_version/exe/get_git_info.ml" | grep "let raw_current_version = \"${CI_COMMIT_TAG}\""
