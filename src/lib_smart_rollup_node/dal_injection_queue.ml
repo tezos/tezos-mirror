@@ -111,6 +111,14 @@ module Events = struct
       ("errors", Error_monad.trace_encoding)
       ~pp3:Error_monad.pp_print_trace
 
+  let no_dal_slot_indices_set =
+    declare_0
+      ~section
+      ~name:"no_dal_slot_index_set"
+      ~msg:"Cannot inject slot as no DAL slot index is set"
+      ~level:Error
+      ()
+
   let request_completed =
     declare_2
       ~section
@@ -158,7 +166,8 @@ let inject_slot state ~slot_content =
   let open Lwt_result_syntax in
   let {Node_context.dal_cctxt; _} = state.node_ctxt in
   if Queue.is_empty state.dal_slot_indices then
-    (* No provided slot indices, no injection*)
+    (* No provided slot indices, no injection *)
+    let*! () = Events.(emit no_dal_slot_indices_set) () in
     return_unit
   else
     (* The pop followed by a push is cycle through slot indices. *)
