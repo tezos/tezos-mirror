@@ -131,7 +131,8 @@ module Michelson_gen_cmd = struct
             Format.eprintf "Term kind must be either \"data\" or \"code\"@." ;
             exit 1
       in
-      Michelson_mcmc_samplers.append ~filename ~terms:[s]
+      Michelson_mcmc_samplers.append ~filename ~terms:[s] ;
+      Type.clear_tables ()
     done ;
     return_unit
 
