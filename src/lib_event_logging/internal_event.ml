@@ -357,7 +357,6 @@ module All_sinks = struct
             (fun (TopLevel (ev, x)) -> handle ev None x)
             (List.rev !top_level_events)
         in
-        top_level_events := [] ;
         return_unit
 
   let close ?(except = fun _ -> false) () =

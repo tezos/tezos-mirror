@@ -18,6 +18,3 @@ make lint-tests-pkg
 #- ODOC_WARN_ERROR=true dune build @src/proto_alpha/lib_protocol/doc
 # check that the hack-module patch applies cleanly
 git apply devtools/protocol-print/add-hack-module.patch
-
-# check that the patch-yes_node.sh applies correctly
-scripts/patch-yes_node.sh --dry-run

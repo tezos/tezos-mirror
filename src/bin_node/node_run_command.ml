@@ -823,7 +823,7 @@ let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
   Lwt_utils.never_ending ()
 
 let process sandbox verbosity target singleprocess force_history_mode_switch
-    args =
+    allow_yes_crypto args =
   let open Lwt_result_syntax in
   let verbosity =
     let open Internal_event in
@@ -839,6 +839,13 @@ let process sandbox verbosity target singleprocess force_history_mode_switch
           cli_warnings := event :: !cli_warnings ;
           Lwt.return_unit)
         args
+    in
+    let* () =
+      if Tezos_crypto.Helpers.is_yes_crypto_enabled && not allow_yes_crypto then
+        failwith
+          "Yes crypto is enabled but the option '--allow-yes-crypto' was not \
+           provided."
+      else return_unit
     in
     let* () =
       match sandbox with
@@ -970,11 +977,25 @@ module Term = struct
           ~doc
           ["force-history-mode-switch"])
 
+  let allow_yes_crypto =
+    let open Cmdliner in
+    let doc =
+      Format.sprintf
+        "Allow usage of yes cryptography. This is used conjointly with the \
+         `TEZOS_USE_YES_CRYPTO_I_KNOW_WHAT_I_AM_DOING` environment variable. \
+         To actually enable yes crypto this option must be used and the \
+         environment variable must be set to `true`. If only the environment \
+         variable is set, the node will refuse to start."
+    in
+    Arg.(
+      value & flag
+      & info ~docs:Shared_arg.Manpage.misc_section ~doc ["allow-yes-crypto"])
+
   let term =
     Cmdliner.Term.(
       ret
         (const process $ sandbox $ verbosity $ target $ singleprocess
-       $ force_history_mode_switch $ Shared_arg.Term.args))
+       $ force_history_mode_switch $ allow_yes_crypto $ Shared_arg.Term.args))
 end
 
 module Manpage = struct

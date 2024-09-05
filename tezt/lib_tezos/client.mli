@@ -873,6 +873,7 @@ val transfer :
 
 (** Same as [transfer], but do not wait for the process to exit. *)
 val spawn_transfer :
+  ?env:string String_map.t ->
   ?hooks:Process.hooks ->
   ?log_output:bool ->
   ?endpoint:endpoint ->

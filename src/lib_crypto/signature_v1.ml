@@ -817,6 +817,75 @@ let check ?watermark public_key signature message =
       Bls.check ?watermark pk signature message
   | _ -> false
 
+let fake_sign_from_pk pk msg =
+  let pk_bytes = Data_encoding.Binary.to_bytes_exn Public_key.encoding pk in
+  let size = Ed25519.size in
+  let msg = Blake2B.to_bytes @@ Blake2B.hash_bytes [msg] in
+  let half = size / 2 in
+  let tmp = Bytes.init size (fun _ -> '0') in
+  let all_or_half buf = Stdlib.min (Bytes.length buf) half in
+  Bytes.blit pk_bytes 0 tmp 0 (all_or_half pk_bytes) ;
+  Bytes.blit msg 0 tmp half (all_or_half msg) ;
+  of_bytes_exn tmp
+
+type algo = Ed25519 | Secp256k1 | P256 | Bls
+
+let fake_sign ?watermark:_ secret_key msg =
+  let pk = Secret_key.to_public_key secret_key in
+  fake_sign_from_pk pk msg
+
+let hardcoded_sk algo : secret_key =
+  match algo with
+  | Ed25519 ->
+      Secret_key.of_b58check_exn
+        "edsk3gUfUPyBSfrS9CCgmCiQsTCHGkviBDusMxDJstFtojtc1zcpsh"
+  | Secp256k1 ->
+      Secret_key.of_b58check_exn
+        "spsk2XJu4wuYsHeuDaCktD3ECnnpn574ceSWHEJVvXTt7JP6ztySCL"
+  | P256 ->
+      Secret_key.of_b58check_exn
+        "p2sk2k6YAkNJ8CySZCS3vGA5Ht6Lj6LXG3yb8UrHvMKZy7Ab8JUtWh"
+  | Bls ->
+      Secret_key.of_b58check_exn
+        "BLsk1hfuv6V8JJRaLDBJgPTRGLKusTZnTmWGrvSKYzUaMuzvPLmeGG"
+
+let hardcoded_pk =
+  (* precompute signatures *)
+  let ed, secp, p, bls =
+    ( Secret_key.to_public_key (hardcoded_sk Ed25519),
+      Secret_key.to_public_key (hardcoded_sk Secp256k1),
+      Secret_key.to_public_key (hardcoded_sk P256),
+      Secret_key.to_public_key (hardcoded_sk Bls) )
+  in
+  function Ed25519 -> ed | Secp256k1 -> secp | P256 -> p | Bls -> bls
+
+let hardcoded_msg = Bytes.of_string "Cheers"
+
+let hardcoded_sig =
+  (* precompute signatures *)
+  let ed, secp, p, bls =
+    ( sign (hardcoded_sk Ed25519) hardcoded_msg,
+      sign (hardcoded_sk Secp256k1) hardcoded_msg,
+      sign (hardcoded_sk P256) hardcoded_msg,
+      sign (hardcoded_sk Bls) hardcoded_msg )
+  in
+  function Ed25519 -> ed | Secp256k1 -> secp | P256 -> p | Bls -> bls
+
+let algo_of_pk (pk : Public_key.t) =
+  match pk with
+  | Ed25519 _ -> Ed25519
+  | Secp256k1 _ -> Secp256k1
+  | P256 _ -> P256
+  | Bls _ -> Bls
+
+let fast_fake_sign ?watermark:_ sk _msg =
+  let pk = Secret_key.to_public_key sk in
+  hardcoded_sig (algo_of_pk pk)
+
+let check_harcoded_signature pk =
+  let algo = algo_of_pk pk in
+  check (hardcoded_pk algo) (hardcoded_sig algo) hardcoded_msg
+
 (* The following cache is a hack to work around a quadratic algorithm
    in Tezos Mainnet protocols up to Edo. *)
 
@@ -859,13 +928,44 @@ let check ?watermark public_key signature message =
           res)
   | _ -> check ?watermark public_key signature message
 
+let fake_check ?watermark:_ pk _signature msg =
+  (* computing the fake signature do hash the message,
+     this operation is linear in the size of the message *)
+  ignore (fake_sign_from_pk pk msg) ;
+  (* checking a valid, harcoded signature, to do at least once the crypto maths *)
+  let _ = check_harcoded_signature pk in
+  true
+
+(* Fast checking does not simulate computation and directly returns true*)
+let fast_fake_check ?watermark:_ _pk _signature _msg = true
+
+let sign =
+  match Helpers.yes_crypto_kind with
+  | Fast -> fast_fake_sign
+  | Yes -> fake_sign
+  | No -> sign
+
+let check =
+  match Helpers.yes_crypto_kind with
+  | Fast -> fast_fake_check
+  | Yes -> fake_check
+  | No -> check
+
 let append ?watermark sk msg = Bytes.cat msg (to_bytes (sign ?watermark sk msg))
 
 let concat msg signature = Bytes.cat msg (to_bytes signature)
 
-type algo = Ed25519 | Secp256k1 | P256 | Bls
-
 let algos = [Ed25519; Secp256k1; P256; Bls]
+
+let fake_generate_key (pkh, pk, _) =
+  let sk_of_pk (pk : public_key) : secret_key =
+    let pk_b = Data_encoding.Binary.to_bytes_exn Public_key.encoding pk in
+    let sk_b = Bytes.sub pk_b 0 33 in
+    let sk = Data_encoding.Binary.of_bytes_exn Secret_key.encoding sk_b in
+    sk
+  in
+  let fake_sk = sk_of_pk pk in
+  (pkh, pk, fake_sk)
 
 let generate_key ?(algo = Ed25519) ?seed () =
   match algo with
@@ -883,6 +983,18 @@ let generate_key ?(algo = Ed25519) ?seed () =
   | Bls ->
       let pkh, pk, sk = Bls.generate_key ?seed () in
       (Public_key_hash.Bls pkh, Public_key.Bls pk, Secret_key.Bls sk)
+
+let fake_generate_key ?(algo = Ed25519) ?seed () =
+  let true_keys = generate_key ~algo ?seed () in
+  fake_generate_key true_keys
+
+let generate_key =
+  match Helpers.yes_crypto_kind with
+  | Fast | Yes ->
+      (* We keep the original keys generation to stay as close as possible of the
+               initial performance. *)
+      fake_generate_key
+  | No -> generate_key
 
 let deterministic_nonce sk msg =
   match sk with
