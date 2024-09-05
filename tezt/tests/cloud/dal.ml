@@ -1039,7 +1039,7 @@ let init_ghostnet cloud (configuration : configuration) agent =
         let dal_node = None in
         (* Taken from ghostnet configuration. *)
         let node_p2p_endpoint = "ghostnet.tzinit.org" in
-        let dal_node_p2p_endpoint = "dalboot.ghostnet.tzinit.org" in
+        let dal_node_p2p_endpoint = "dalboot.ghostnet.tzboot.net" in
         let node_rpc_endpoint =
           Endpoint.
             {scheme = "https"; host = "rpc.ghostnet.teztnets.com"; port = 443}
