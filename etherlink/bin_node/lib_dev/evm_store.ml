@@ -449,6 +449,10 @@ module Q = struct
 
     let clear_after = (level ->. unit) @@ {|DELETE FROM blocks WHERE level > ?|}
   end
+
+  let context_hash_of_block_hash =
+    (block_hash ->? context_hash)
+    @@ {eos|SELECT c.context_hash from Context_hashes c JOIN Blocks b on c.id = b.level WHERE hash = ?|eos}
 end
 
 module Schemas = struct
@@ -921,6 +925,10 @@ module Blocks = struct
   let clear_after store level =
     with_connection store @@ fun conn -> Db.exec conn Q.Blocks.clear_after level
 end
+
+let context_hash_of_block_hash store hash =
+  with_connection store @@ fun conn ->
+  Db.find_opt conn Q.context_hash_of_block_hash hash
 
 let reset store ~l2_level =
   let open Lwt_result_syntax in

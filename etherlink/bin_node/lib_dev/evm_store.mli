@@ -153,6 +153,9 @@ module Blocks : sig
   val clear_after : conn -> Ethereum_types.quantity -> unit tzresult Lwt.t
 end
 
+val context_hash_of_block_hash :
+  conn -> Ethereum_types.block_hash -> Irmin_context.hash option tzresult Lwt.t
+
 module Transactions : sig
   val store : conn -> Transaction_info.t -> unit tzresult Lwt.t
 

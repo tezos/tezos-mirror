@@ -74,6 +74,20 @@ let find_irmin_hash_from_number ctxt number =
         Ethereum_types.pp_quantity
         number
 
+let find_irmin_hash_from_block_hash ctxt hash =
+  let open Lwt_result_syntax in
+  (* we use the latest state to read the contents of the block *)
+  let* latest_hash = find_latest_hash ctxt in
+  let* evm_tree = get_evm_state ctxt latest_hash in
+  let*! res =
+    Evm_state.inspect evm_tree Durable_storage_path.Block.(by_hash hash)
+  in
+  match res with
+  | Some block_bytes ->
+      let block = Ethereum_types.block_from_rlp block_bytes in
+      find_irmin_hash_from_number ctxt block.number
+  | None -> failwith "Unknown block %a" Ethereum_types.pp_block_hash hash
+
 let find_irmin_hash ctxt (block : Ethereum_types.Block_parameter.extended) =
   let open Lwt_result_syntax in
   match block with
@@ -98,18 +112,16 @@ let find_irmin_hash ctxt (block : Ethereum_types.Block_parameter.extended) =
             "No state available for block %a"
             Ethereum_types.pp_quantity
             number)
-  | Block_hash {hash; require_canonical = _} -> (
-      (* we use the latest state to read the contents of the block *)
-      let* latest_hash = find_latest_hash ctxt in
-      let* evm_tree = get_evm_state ctxt latest_hash in
-      let*! res =
-        Evm_state.inspect evm_tree Durable_storage_path.Block.(by_hash hash)
-      in
-      match res with
-      | Some block_bytes ->
-          let block = Ethereum_types.block_from_rlp block_bytes in
-          find_irmin_hash_from_number ctxt block.number
-      | None -> failwith "Unknown block %a" Ethereum_types.pp_block_hash hash)
+  | Block_hash {hash; require_canonical = _} ->
+      if ctxt.block_storage_sqlite3 then
+        Evm_store.use ctxt.store @@ fun conn ->
+        let* context_hash_opt =
+          Evm_store.context_hash_of_block_hash conn hash
+        in
+        match context_hash_opt with
+        | Some context_hash -> return context_hash
+        | None -> failwith "Unknown block %a" Ethereum_types.pp_block_hash hash
+      else find_irmin_hash_from_block_hash ctxt hash
 
 module MakeBackend (Ctxt : sig
   val ctxt : t
