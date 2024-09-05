@@ -160,6 +160,11 @@ type state = {
   node_ctxt : Node_context.ro;
   recent_dal_injections : Recent_dal_injections.t;
   pending_chunks : Pending_chunks.t;
+  dal_slot_indices : Tezos_dal_node_services.Types.slot_index Queue.t;
+      (* We use a queue here to easily cycle through
+         the slots and use different ones from a
+         level to another (in case we have less data
+         to publish than available slot indices). *)
 }
 
 let inject_slot state ~slot_content ~slot_index =
@@ -216,8 +221,24 @@ let on_produce_dal_slots state =
   | Some (slot_content, slot_index) ->
       inject_slot state ~slot_content ~slot_index
 
-let on_set_dal_slot_indices _state _idx =
+let on_set_dal_slot_indices state idx =
   let open Lwt_result_syntax in
+  let module SI = Set.Make (Int) in
+  (* remove duplicates *)
+  let idx = SI.of_list idx in
+  let number_of_slots =
+    (Reference.get state.node_ctxt.current_protocol).constants.dal
+      .number_of_slots
+  in
+  let* () =
+    SI.iter_es
+      (fun slot_index ->
+        fail_unless (slot_index >= 0 && slot_index < number_of_slots)
+        @@ error_of_fmt "Slot index %d out of range" slot_index)
+      idx
+  in
+  Queue.clear state.dal_slot_indices ;
+  SI.iter (fun id -> Queue.push id state.dal_slot_indices) idx ;
   return_unit
 
 let init_dal_worker_state node_ctxt =
@@ -234,6 +255,7 @@ let init_dal_worker_state node_ctxt =
     node_ctxt;
     recent_dal_injections = Recent_dal_injections.create max_retained_slots_info;
     pending_chunks = Pending_chunks.create max_retained_slots_info;
+    dal_slot_indices = Queue.create ();
   }
 
 module Types = struct
