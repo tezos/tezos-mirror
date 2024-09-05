@@ -1555,6 +1555,13 @@ let get_chain_block_context_total_frozen_stake ?(chain = "main")
     ["chains"; chain; "blocks"; block; "context"; "total_frozen_stake"]
     Fun.id
 
+let get_chain_block_context_total_currently_staked ?(chain = "main")
+    ?(block = "head") () =
+  make
+    GET
+    ["chains"; chain; "blocks"; block; "context"; "total_currently_staked"]
+    Fun.id
+
 let get_chain_block_context_issuance_current_yearly_rate ?(chain = "main")
     ?(block = "head") () =
   make
