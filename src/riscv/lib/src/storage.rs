@@ -3,6 +3,8 @@
 //
 // SPDX-License-Identifier: MIT
 
+mod chunked_io;
+
 use bincode::{deserialize, serialize};
 use std::{
     io::{self, Write},
@@ -141,6 +143,22 @@ impl Repo {
         self.backend.store(&commit_bytes)
     }
 
+    /// Commit something serialisable and return the commit ID.
+    pub fn commit_serialised(
+        &mut self,
+        subject: &impl serde::Serialize,
+    ) -> Result<Hash, StorageError> {
+        let chunk_hashes = {
+            let mut writer = chunked_io::ChunkWriter::new(&mut self.backend);
+            bincode::serialize_into(&mut writer, subject)?;
+            writer.finalise()?
+        };
+
+        // A commit contains the list of all chunks needed to reconstruct the underlying data.
+        let commit_bytes = serialize(&chunk_hashes)?;
+        self.backend.store(&commit_bytes)
+    }
+
     /// Checkout the bytes committed under `id`, if the commit exists.
     pub fn checkout(&self, id: &Hash) -> Result<Vec<u8>, StorageError> {
         let bytes = self.backend.load(id)?;
@@ -157,6 +175,15 @@ impl Repo {
             bytes.append(&mut chunk);
         }
         Ok(bytes)
+    }
+
+    /// Checkout something deserialisable from the store.
+    pub fn checkout_serialised<S: serde::de::DeserializeOwned>(
+        &self,
+        id: &Hash,
+    ) -> Result<S, StorageError> {
+        let reader = chunked_io::ChunkedReader::new(&self.backend, id)?;
+        Ok(bincode::deserialize_from(reader)?)
     }
 
     /// A snapshot is a new repo to which only `id` has been committed.
