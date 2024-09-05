@@ -49,6 +49,7 @@ let main ~data_dir ~evm_node_endpoint ~(config : Configuration.t) =
 
   let* server_public_finalizer =
     Rpc_server.start_public_server
+      ~delegate_health_check_to:evm_node_endpoint
       ~evm_services:
         Evm_ro_context.(evm_services_methods ctxt time_between_blocks)
       config

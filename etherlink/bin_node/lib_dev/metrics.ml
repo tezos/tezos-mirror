@@ -266,6 +266,11 @@ let start_bootstrapping () = Gauge.set metrics.health.bootstrapping 1.
 
 let stop_bootstrapping () = Gauge.set metrics.health.bootstrapping 0.
 
+let is_bootstrapping () =
+  (* [bootstrapping] is set to 1.0 when bootstrapping, and 0.0 otherwise. To
+     [> 0.5] allows to distinguish between the two states. *)
+  Gauge.read metrics.health.bootstrapping > 0.5
+
 let set_block ~time_processed ~transactions =
   let pt = Ptime.Span.to_float_s time_processed in
   Block.(Process_time_histogram.(observe process_time_histogram pt)) ;

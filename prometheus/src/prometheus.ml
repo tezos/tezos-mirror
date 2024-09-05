@@ -294,6 +294,8 @@ module Gauge = struct
     let validate_label _ = ()
   end)
 
+  let read t = !t
+
   let inc t v = t := !t +. v
 
   let inc_one t = inc t 1.0

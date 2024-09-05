@@ -165,6 +165,8 @@ end
 module Gauge : sig
   include METRIC
 
+  val read : t -> float
+
   val inc_one : t -> unit
 
   (** [inc t v] increases the current value of the guage by [v]. *)
