@@ -22,6 +22,8 @@
   octez-libs.tezos-context-brassaia.memory
   octez-l2-libs.scoru-wasm
   octez-libs.event-logging)
+ (preprocess (pps octez-libs.ppx_profiler))
+ (preprocessor_deps (env_var TEZOS_PPX_PROFILER))
  (flags
   (:standard)
   -open Plonk
