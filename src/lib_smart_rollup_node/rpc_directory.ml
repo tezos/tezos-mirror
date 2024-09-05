@@ -572,6 +572,11 @@ let () =
   @@ fun node_ctxt () () -> dal_injected_operations_statuses node_ctxt
 
 let () =
+  Local_directory.register1 Rollup_node_services.Local.forget_dal_injection_id
+  @@ fun _node_ctxt id () () ->
+  Lwt.return @@ Dal_injection_queue.forget_injection_id id
+
+let () =
   Admin_directory.register0 Rollup_node_services.Admin.injector_queues_total
   @@ fun _node_ctxt () () ->
   let open Lwt_result_syntax in

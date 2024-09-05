@@ -25,7 +25,7 @@ module Dal_worker_types = struct
           slot_content : string;
           slot_index : int;
         }
-          -> (Injector_sigs.Id.t, error trace) t
+          -> (unit, error trace) t
 
     type view = View : _ t -> view
 
@@ -144,10 +144,9 @@ let inject_slot state ~slot_content ~slot_index =
   in
   let*! () = Events.(emit injected) (commitment, slot_index, l1_hash) in
   Recent_dal_injections.replace state.recent_dal_injections l1_hash () ;
-  return l1_hash
+  return_unit
 
-let on_register state ~slot_content ~slot_index :
-    Injector_sigs.Id.t tzresult Lwt.t =
+let on_register state ~slot_content ~slot_index : unit tzresult Lwt.t =
   let open Lwt_result_syntax in
   let number_of_slots =
     (Reference.get state.node_ctxt.current_protocol).constants.dal
@@ -289,3 +288,9 @@ let get_injection_ids () =
   let+ w = Result.map_error TzTrace.make (Lazy.force worker) in
   let state = Worker.state w in
   Recent_dal_injections.keys state.recent_dal_injections
+
+let forget_injection_id id =
+  let open Result_syntax in
+  let+ w = Result.map_error TzTrace.make (Lazy.force worker) in
+  let state = Worker.state w in
+  Recent_dal_injections.remove state.recent_dal_injections id

@@ -124,13 +124,10 @@ module Worker = struct
           let () =
             Prometheus.Counter.inc_one Metrics.BlueprintChunkSent.on_dal
           in
-          let* injection_id =
-            Rollup_services.publish_on_dal
-              ~rollup_node_endpoint
-              ~slot_index
-              payload
-          in
-          Signals_publisher.track ~injection_id ~level ~slot_index
+          Rollup_services.publish_on_dal
+            ~rollup_node_endpoint
+            ~slot_index
+            payload
       | _ ->
           let payload =
             match chunks with

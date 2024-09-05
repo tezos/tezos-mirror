@@ -789,7 +789,7 @@ module Local = struct
       ~input:
         Data_encoding.(
           def "dal_slot" ~description:"Slot to inject" input_encoding)
-      ~output:Hashed.Injector_operations_hash.encoding
+      ~output:Data_encoding.unit
       (path / "dal" / "injection")
 
   let injector_operation_status =
@@ -809,10 +809,19 @@ module Local = struct
       ~output:
         Data_encoding.(
           list
-            (tup2
-               Tezos_crypto.Hashed.Injector_operations_hash.encoding
-               Encodings.message_status))
+            (obj2
+               (req "id" Tezos_crypto.Hashed.Injector_operations_hash.encoding)
+               (req "status" Encodings.message_status)))
       (path / "dal" / "injected" / "operations" / "statuses")
+
+  let forget_dal_injection_id =
+    Tezos_rpc.Service.post_service
+      ~description:"Forget information about the injection whose id is given"
+      ~query:Tezos_rpc.Query.empty
+      ~input:Data_encoding.unit
+      ~output:Data_encoding.unit
+      (path / "dal" / "injection"
+     /: Tezos_crypto.Hashed.Injector_operations_hash.rpc_arg / "forget")
 
   let synchronized =
     Tezos_rpc.Service.get_service
