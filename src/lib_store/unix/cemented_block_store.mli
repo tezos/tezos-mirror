@@ -310,8 +310,13 @@ val check_indexes_consistency :
   t ->
   unit tzresult Lwt.t
 
-(** [get_and_upgrade_offsets fd nb_blocks] obtains the list of [nb_blocks] offsets from the 
-    beginning of the file given by file descriptor [fd] and upgrades their sizes from 32-bits to 
+(** Utility function that aims to give an overview of the shape of the
+    store's metadata. *)
+val stat_metadata_cycles :
+  t -> (string * Store_types.metadata_stat list) list tzresult Lwt.t
+
+(** [get_and_upgrade_offsets fd nb_blocks] obtains the list of [nb_blocks] offsets from the
+    beginning of the file given by file descriptor [fd] and upgrades their sizes from 32-bits to
     64-bits, adjusting their values for the following blocks in the cemented blocks file. *)
 val get_and_upgrade_offsets : Lwt_unix.file_descr -> int -> bytes Lwt.t
 

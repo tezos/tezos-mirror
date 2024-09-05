@@ -182,3 +182,10 @@ module Protocol_levels : sig
     val encoding : activation_block t Data_encoding.t
   end
 end
+
+type metadata_stat = {
+  block_metadata_size : Int64.t;
+  operation_metadata_arity : int list;
+  operation_metadata_size : Int64.t;
+  too_large_operation_metadata_count : Int64.t;
+}

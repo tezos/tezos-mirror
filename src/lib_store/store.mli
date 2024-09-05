@@ -1039,6 +1039,11 @@ module Chain_traversal : sig
     (Block.t * Block.t list) Lwt.t
 end
 
+(** Store utility function that aims to give an overview of the shape
+    of the store's metadata. *)
+val stat_metadata_cycles :
+  t -> (string * metadata_stat list) list tzresult Lwt.t
+
 val v_3_1_upgrade : store_dir:string -> Genesis.t -> unit tzresult Lwt.t
 
 val v_3_2_upgrade : store_dir:string -> Genesis.t -> unit tzresult Lwt.t

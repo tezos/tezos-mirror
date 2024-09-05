@@ -351,3 +351,10 @@ module Protocol_levels = struct
         Data_encoding.(list (tup2 uint8 legacy_activation_block_encoding))
   end
 end
+
+type metadata_stat = {
+  block_metadata_size : Int64.t;
+  operation_metadata_arity : int list;
+  operation_metadata_size : Int64.t;
+  too_large_operation_metadata_count : Int64.t;
+}

@@ -1910,6 +1910,9 @@ let close block_store =
     Floating_block_store.close
     (block_store.rw_floating_block_store :: block_store.ro_floating_block_stores)
 
+let stat_metadata_cycles block_store =
+  Cemented_block_store.stat_metadata_cycles block_store.cemented_store
+
 (***************** Upgrade to V3.1 *****************)
 
 let v_3_1_upgrade chain_dir =

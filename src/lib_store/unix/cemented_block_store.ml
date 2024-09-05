@@ -1079,6 +1079,93 @@ let check_indexes_consistency ?(post_step = fun () -> Lwt.return_unit)
       in
       return_unit
 
+(* For each given block metadata, returns the
+   Store_types.metadata_stat of it. *)
+let stat_metadata (metadata : Block_repr.metadata option) =
+  let open Lwt_result_syntax in
+  match metadata with
+  | Some metadata ->
+      let block_metadata_size =
+        Int64.of_int (Bytes.length metadata.block_metadata)
+      in
+      let operation_metadata_arity =
+        List.map List.length metadata.operations_metadata
+      in
+      let operation_metadata_size, too_large_operation_metadata_count =
+        List.fold_left
+          (fun (acc_size, acc_count) pass ->
+            let sum_size, sum_count =
+              List.fold_left
+                (fun (size, too_large_count) opm ->
+                  match opm with
+                  | Block_validation.Metadata bytes ->
+                      Int64.
+                        (add size (of_int (Bytes.length bytes)), too_large_count)
+                  | Too_large_metadata -> (size, Int64.(add too_large_count one)))
+                (0L, 0L)
+                pass
+            in
+            Int64.(add acc_size sum_size, add acc_count sum_count))
+          (0L, 0L)
+          metadata.operations_metadata
+      in
+      return
+        Store_types.
+          {
+            block_metadata_size;
+            operation_metadata_arity;
+            operation_metadata_size;
+            too_large_operation_metadata_count;
+          }
+  | None -> tzfail (Inconsistent_store_state "cannot read metadata")
+
+(* [map_over_metadata_file cemented_blocks_dir_path cemented_cycle ~f]
+   applies [f] of the given [cemented_cycle]. *)
+let map_over_metadata_file cemented_blocks_dir_path
+    {start_level; end_level; file}
+    ~(f :
+       Block_repr.metadata option -> Store_types.metadata_stat tzresult Lwt.t) =
+  let open Lwt_result_syntax in
+  let metadata_file =
+    Naming.(
+      cemented_blocks_dir_path |> cemented_blocks_metadata_dir |> fun d ->
+      cemented_blocks_metadata_file d file |> file_path)
+  in
+  let*! b = Lwt_unix.file_exists metadata_file in
+  if b then
+    let fd = Zip.open_in metadata_file in
+    let rec loop level acc =
+      if level > end_level then return (List.rev acc)
+      else
+        let entry = Zip.find_entry fd (Int32.to_string level) in
+        let metadata = Zip.read_entry fd entry in
+        let* app = f (Block_repr.decode_metadata metadata) in
+        loop Int32.(add level one) (app :: acc)
+    in
+    let* res = loop start_level [] in
+    let () = Zip.close_in fd in
+    return res
+  else return_nil
+
+(* Computes the metadata stats for each cemented metadata available in
+   the store. *)
+let stat_metadata_cycles cemented_store =
+  let open Lwt_result_syntax in
+  match cemented_store.cemented_blocks_files with
+  | Some files ->
+      let files = Array.to_list files in
+      List.map_es
+        (fun metadata_file ->
+          let* res =
+            map_over_metadata_file
+              cemented_store.cemented_blocks_dir
+              metadata_file
+              ~f:stat_metadata
+          in
+          return (Naming.(metadata_file.file |> file_path), res))
+        files
+  | None -> tzfail (Inconsistent_store_state "cannot find any metadata file")
+
 let get_and_upgrade_offsets fd nb_blocks =
   let open Lwt_syntax in
   (* Obtain the list of offsets (32-bit format) *)
@@ -1103,10 +1190,10 @@ let get_and_upgrade_offsets fd nb_blocks =
        Data_encoding.(Variable.array ~max_length:nb_blocks int64)
        offsets_64_bits
 
-(** [is_using_32_bit_offsets fd nb_blocks] checks whether the cemented file 
+(** [is_using_32_bit_offsets fd nb_blocks] checks whether the cemented file
     given by [fd] is formatted with 32 bit offsets; the decision
     is taken based on whether the first offset points correctly to the first
-    block in the file or not; 
+    block in the file or not;
     - offset = first 32 bits decoded as an int32
     - first_block_offset = 4 (bytes) * [nb_blocks] (first block offset, given
       that the file has 32-bit offsets)

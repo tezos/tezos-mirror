@@ -396,5 +396,10 @@ val close : block_store -> unit Lwt.t
    [block_store] where the merge procedure was interrupted. *)
 val may_recover_merge : block_store -> unit tzresult Lwt.t
 
+(** Utility function that aims to give an overview of the shape of the
+    store's metadata. *)
+val stat_metadata_cycles :
+  t -> (string * metadata_stat list) list tzresult Lwt.t
+
 (** Upgrade the block_store_status *)
 val v_3_1_upgrade : [`Chain_dir] Naming.directory -> unit tzresult Lwt.t
