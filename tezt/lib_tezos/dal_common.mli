@@ -112,9 +112,11 @@ module Helpers : sig
       DAL node to compute and store the corresponding commitment and shards by
       calling relevant RPCs. It returns the commitment and its proof. *)
 
-  val store_slot : Dal_node.t -> slot -> (string * string) Lwt.t
+  val store_slot :
+    Dal_node.t -> slot_index:int -> slot -> (string * string) Lwt.t
 
-  val store_slot_uri : Endpoint.t -> slot -> (string * string) Lwt.t
+  val store_slot_uri :
+    Endpoint.t -> slot_index:int -> slot -> (string * string) Lwt.t
 
   (* Publish and store the slot on the corresponding DAL node. *)
   val publish_and_store_slot :

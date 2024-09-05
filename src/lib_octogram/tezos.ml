@@ -3286,7 +3286,7 @@ module Publish_dal_slot : Remote_procedure.S = struct
     let* commitment, proof =
       Dal_common.Helpers.(
         make_slot ~slot_size:(positive_int_of_string slot_size) payload
-        |> store_slot_uri dal_endpoint)
+        |> store_slot_uri ~slot_index:(int_of_string slot_index) dal_endpoint)
     in
 
     let* publish_to_l1 =

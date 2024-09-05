@@ -1526,7 +1526,9 @@ let () =
 let publish_store_and_wait_slot ?counter ?force ?(fee = 1_200) node client
     slot_producer_dal_node source ~index ~wait_slot
     ~number_of_extra_blocks_to_bake content =
-  let* commitment, proof = Helpers.store_slot slot_producer_dal_node content in
+  let* commitment, proof =
+    Helpers.store_slot slot_producer_dal_node ~slot_index:index content
+  in
   let* first_level = Client.level client in
   let published_level = first_level + 1 in
   let p = wait_slot ~published_level ~slot_index:index in
@@ -1702,7 +1704,7 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
   let* slot3 = publish Constant.bootstrap5 ~index:5 ~fee:1 "test5" in
   let* slot4 =
     let slot = Helpers.make_slot ~slot_size "never associated to a slot_id" in
-    let* commit, _proof = Helpers.store_slot dal_node slot in
+    let* commit, _proof = Helpers.store_slot dal_node ~slot_index:6 slot in
     return (6, commit)
   in
 
@@ -2050,7 +2052,7 @@ let test_dal_node_import_snapshot _protocol parameters _cryptobox node client
     dal_node =
   let* commitment, proof =
     Helpers.(
-      store_slot dal_node
+      store_slot dal_node ~slot_index:0
       @@ make_slot
            ~slot_size:parameters.Dal_common.Parameters.cryptobox.slot_size
            "content1")
@@ -2172,17 +2174,17 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
   *)
   let slot_size = parameters.Dal.Parameters.cryptobox.slot_size in
   let page_size = parameters.Dal.Parameters.cryptobox.page_size in
-  let store_slot content =
-    Helpers.(store_slot dal_node @@ make_slot ~slot_size content)
+  let store_slot ~slot_index content =
+    Helpers.(store_slot ~slot_index dal_node @@ make_slot ~slot_size content)
   in
   Log.info
     "Step 1: send three slots to DAL node and obtain corresponding headers" ;
   let slot_contents_0 = " 10 " in
-  let* commitment_0, proof_0 = store_slot slot_contents_0 in
+  let* commitment_0, proof_0 = store_slot ~slot_index:0 slot_contents_0 in
   let slot_contents_1 = " 200 " in
-  let* commitment_1, proof_1 = store_slot slot_contents_1 in
+  let* commitment_1, proof_1 = store_slot ~slot_index:1 slot_contents_1 in
   let slot_contents_2 = " 400 " in
-  let* commitment_2, proof_2 = store_slot slot_contents_2 in
+  let* commitment_2, proof_2 = store_slot ~slot_index:2 slot_contents_2 in
 
   Log.info "Step 2: run rollup node for an originated rollup" ;
   let* genesis_info =
@@ -2621,14 +2623,16 @@ let test_dal_node_get_assigned_shard_indices _protocol _parameters _cryptobox
 let test_dal_node_get_attestable_slots _protocol parameters cryptobox node
     client dal_node =
   let slot_size = parameters.Dal.Parameters.cryptobox.slot_size in
-  let store_slot s = Helpers.(store_slot dal_node @@ make_slot ~slot_size s) in
+  let store_slot ~slot_index s =
+    Helpers.(store_slot dal_node ~slot_index @@ make_slot ~slot_size s)
+  in
   let number_of_slots = parameters.Dal.Parameters.number_of_slots in
   Log.info "Inject the shards of slots 1 and 3." ;
   let slot1_content = "slot 1" in
   let slot2_content = "slot 2" in
   let slot3_content = "slot 3" in
-  let* _commitment, _proof = store_slot slot1_content in
-  let* _commitment, _proof = store_slot slot3_content in
+  let* _commitment, _proof = store_slot ~slot_index:0 slot1_content in
+  let* _commitment, _proof = store_slot ~slot_index:2 slot3_content in
   Log.info "Publish slots 1 and 2 (inject and bake two blocks)." ;
   let* level = next_level node in
   let publish source ~index message =
@@ -2727,7 +2731,9 @@ let test_attester_with_daemon protocol parameters cryptobox node client dal_node
     in
     let* () = publish source ~index slot_content in
     let* _commitment, _proof =
-      Helpers.(store_slot dal_node @@ make_slot ~slot_size slot_content)
+      Helpers.(
+        store_slot dal_node ~slot_index:index
+        @@ make_slot ~slot_size slot_content)
     in
     unit
   in
@@ -2910,7 +2916,9 @@ let test_attester_with_bake_for _protocol parameters cryptobox node client
     in
     let* () = publish source ~index slot_content in
     let* _commitment, _proof =
-      Helpers.(store_slot dal_node @@ make_slot ~slot_size slot_content)
+      Helpers.(
+        store_slot dal_node ~slot_index:index
+        @@ make_slot ~slot_size slot_content)
     in
     Log.info "Slot with %d index (normally) published at level %d" index level ;
     unit
@@ -7869,7 +7877,7 @@ let register ~protocols =
     test_dal_node_slot_management
     protocols ;
   scenario_with_layer1_and_dal_nodes
-    ~producer_profiles:[0]
+    ~producer_profiles:[0; 1; 2; 3; 4; 5; 6]
     "dal node slot headers tracking"
     test_dal_node_slots_headers_tracking
     protocols ;
@@ -7909,13 +7917,14 @@ let register ~protocols =
   scenario_with_layer1_and_dal_nodes
     "dal node GET \
      /profiles/<public_key_hash>/attested_levels/<level>/attestable_slots"
-    ~producer_profiles:[0]
+    ~producer_profiles:[0; 1; 2]
     ~prover:false
     test_dal_node_get_attestable_slots
     protocols ;
   scenario_with_layer1_and_dal_nodes
     ~attestation_threshold:100
-    ~producer_profiles:[0]
+    ~number_of_slots:8
+    ~producer_profiles:[0; 1; 2; 3; 4; 5; 6; 7]
     "dal attester with bake for"
     test_attester_with_bake_for
     protocols ;
@@ -7924,7 +7933,8 @@ let register ~protocols =
     ~attestation_threshold:100
     ~attestation_lag:16
     ~activation_timestamp:Now
-    ~producer_profiles:[0]
+    ~number_of_slots:8
+    ~producer_profiles:[0; 1; 2; 3; 4; 5; 6; 7]
     "dal attester with baker daemon"
     test_attester_with_daemon
     protocols ;
@@ -7962,7 +7972,8 @@ let register ~protocols =
     protocols ;
   scenario_with_layer1_and_dal_nodes
     ~tags:["gossipsub"; Tag.ci_disabled]
-    ~producer_profiles:[0]
+    ~number_of_slots:8
+    ~producer_profiles:[0; 1; 2; 3; 4; 5; 6; 7]
     "GS prune due to negative score, and ihave"
     test_gs_prune_and_ihave
     protocols ;
@@ -8013,7 +8024,7 @@ let register ~protocols =
     protocols ;
   scenario_with_layer1_and_dal_nodes
     ~tags:["rpc"; "skip_list"]
-    ~producer_profiles:[15]
+    ~producer_profiles:[3; 15]
     "commitments history RPCs"
     History_rpcs.test_commitments_history_rpcs
     protocols ;
@@ -8096,12 +8107,12 @@ let register ~protocols =
 
   (* Tests with all nodes *)
   scenario_with_all_nodes
-    ~producer_profiles:[0]
+    ~producer_profiles:[0; 1; 2; 3; 4; 5; 6]
     "rollup_node_downloads_slots"
     rollup_node_stores_dal_slots
     protocols ;
   scenario_with_all_nodes
-    ~producer_profiles:[0]
+    ~producer_profiles:[0; 1; 2; 3; 4; 5; 6]
     "rollup_node_applies_dal_pages"
     (rollup_node_stores_dal_slots ~expand_test:rollup_node_interprets_dal_pages)
     protocols ;
