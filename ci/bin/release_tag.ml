@@ -39,6 +39,7 @@ type release_tag_pipeline_type =
   | Release_tag
   | Beta_release_tag
   | Non_release_tag
+  | Schedule_test
 
 (** Create an Octez release tag pipeline of type {!release_tag_pipeline_type}.
 
@@ -48,6 +49,11 @@ type release_tag_pipeline_type =
 
     On release pipelines these jobs can start immediately *)
 let octez_jobs ?(test = false) release_tag_pipeline_type =
+  let variables =
+    match release_tag_pipeline_type with
+    | Schedule_test -> Some [("CI_COMMIT_TAG", "octez-v0.0")]
+    | _ -> None
+  in
   let job_docker_amd64 =
     job_docker_build
       ~dependencies:(Dependent [])
@@ -95,20 +101,34 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
       ~interruptible:false
       ~dependencies
       ~name:"gitlab:release"
+      ?variables
       [
         "./scripts/ci/restrict_export_to_octez_source.sh";
         "./scripts/ci/gitlab-release.sh";
       ]
   in
-  let job_gitlab_publish ~dependencies : Tezos_ci.tezos_job =
+  let job_gitlab_publish ~dependencies () : Tezos_ci.tezos_job =
+    let before_script =
+      match release_tag_pipeline_type with
+      | Schedule_test -> Some ["git tag octez-v0.0"]
+      | _ -> None
+    in
     job
       ~__POS__
       ~image:Images.ci_release
       ~stage:Stages.publish_package_gitlab
       ~interruptible:false
       ~dependencies
+      ?before_script
+      ?variables
       ~name:"gitlab:publish"
-      ["${CI_PROJECT_DIR}/scripts/ci/create_gitlab_package.sh"]
+      [
+        ("${CI_PROJECT_DIR}/scripts/ci/create_gitlab_package.sh"
+        ^
+        match release_tag_pipeline_type with
+        | Schedule_test -> " --dry-run"
+        | _ -> "");
+      ]
   in
   let job_build_rpm_amd64 = job_build_rpm_amd64 () in
   let ( jobs_debian_repository,
@@ -132,7 +152,7 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
         ]
     in
     match release_tag_pipeline_type with
-    | Non_release_tag -> job_gitlab_publish ~dependencies
+    | Non_release_tag | Schedule_test -> job_gitlab_publish ~dependencies ()
     | _ -> job_gitlab_release ~dependencies
   in
   let job_opam_release ?(dry_run = false) () : Tezos_ci.tezos_job =
@@ -141,6 +161,7 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
       ~image:Images.CI.prebuild
       ~stage:Stages.publish_release
       ~interruptible:false
+      ?variables
       ~name:"opam:release"
       [("./scripts/ci/opam-release.sh" ^ if dry_run then " --dry-run" else "")]
   in
