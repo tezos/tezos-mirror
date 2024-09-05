@@ -470,12 +470,25 @@ let use (Pool {db_pool}) k =
 
 type error += File_already_exists of string
 
+let uri path perm =
+  let write_perm =
+    match perm with `Read_only -> false | `Read_write -> true
+  in
+  Uri.of_string Format.(sprintf "sqlite3:%s?write=%b" path write_perm)
+
 let vacuum ~conn ~output_db_file =
   let open Lwt_result_syntax in
   let*! exists = Lwt_unix.file_exists output_db_file in
   let*? () = error_when exists (File_already_exists output_db_file) in
-  with_connection conn @@ fun conn ->
-  Db.exec conn Q.vacuum_request output_db_file
+  let* () =
+    with_connection conn @@ fun conn ->
+    Db.exec conn Q.vacuum_request output_db_file
+  in
+  let* db_pool =
+    Db.caqti' @@ Caqti_lwt_unix.connect_pool (uri output_db_file `Read_write)
+  in
+  let* () = use (Pool {db_pool}) Journal_mode.set_wal_journal_mode in
+  return_unit
 
 let sqlite_file_name = "store.sqlite"
 
@@ -483,13 +496,7 @@ let init ~data_dir ~perm () =
   let open Lwt_result_syntax in
   let path = data_dir // sqlite_file_name in
   let*! exists = Lwt_unix.file_exists path in
-  let write_perm =
-    match perm with `Read_only -> false | `Read_write -> true
-  in
-  let uri =
-    Uri.of_string Format.(sprintf "sqlite3:%s?write=%b" path write_perm)
-  in
-  let* db_pool = Db.caqti' @@ Caqti_lwt_unix.connect_pool uri in
+  let* db_pool = Db.caqti' @@ Caqti_lwt_unix.connect_pool (uri path perm) in
   let store = Pool {db_pool} in
   use store @@ fun conn ->
   let* () = Journal_mode.set_wal_journal_mode conn in
