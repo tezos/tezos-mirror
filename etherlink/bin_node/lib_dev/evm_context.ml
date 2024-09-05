@@ -1504,9 +1504,10 @@ let init_store_from_rollup_node ~data_dir ~evm_state ~irmin_context =
   let open Lwt_result_syntax in
   (* Tell the kernel that it is executed by an EVM node *)
   let*! evm_state = Evm_state.flag_local_exec evm_state in
+
   (* We remove the delayed inbox from the EVM state. Its contents will be
      retrieved by the sequencer by inspecting the evm events. *)
-  let*! evm_state = Evm_state.clear_delayed_inbox evm_state in
+  (* let*! evm_state = Evm_state.clear_delayed_inbox evm_state in *)
 
   (* For changes made to [evm_state] to take effect, we commit the result *)
   let*! evm_node_context = Irmin_context.PVMState.set irmin_context evm_state in
