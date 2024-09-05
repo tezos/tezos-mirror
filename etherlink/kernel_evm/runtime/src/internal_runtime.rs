@@ -34,9 +34,9 @@ pub trait ExtendedRuntime {
     fn store_get_hash<T: Path>(&mut self, path: &T) -> Result<Vec<u8>, RuntimeError>;
 }
 
-pub struct InternalStorage();
+pub struct InternalHost();
 
-impl InternalRuntime for InternalStorage {
+impl InternalRuntime for InternalHost {
     fn __internal_store_get_hash<T: Path>(
         &mut self,
         path: &T,

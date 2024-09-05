@@ -785,6 +785,7 @@ dependencies = [
  "sha3",
  "softfloat",
  "tezos-evm-logging",
+ "tezos-evm-runtime",
  "tezos-indexable-storage",
  "tezos-smart-rollup",
  "tezos-smart-rollup-core",
@@ -2196,6 +2197,17 @@ name = "tezos-evm-logging"
 version = "0.1.0"
 dependencies = [
  "tezos-smart-rollup-debug",
+]
+
+[[package]]
+name = "tezos-evm-runtime"
+version = "0.1.0"
+dependencies = [
+ "sha3",
+ "tezos-smart-rollup-core",
+ "tezos-smart-rollup-debug",
+ "tezos-smart-rollup-host",
+ "tezos-smart-rollup-mock",
 ]
 
 [[package]]

@@ -1,0 +1,17 @@
+# SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>
+#
+# SPDX-License-Identifier: MIT
+
+[package]
+name = "tezos-evm-runtime"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tezos-smart-rollup-debug.workspace = true
+tezos-smart-rollup-core.workspace = true
+tezos-smart-rollup-host.workspace = true
+sha3.workspace = true
+
+[dev-dependencies]
+tezos-smart-rollup-mock.workspace = true

@@ -11,7 +11,6 @@ use crate::error::Error;
 use crate::error::TransferError::CumulativeGasUsedOverflow;
 use crate::gas_price::base_fee_per_gas;
 use crate::inbox::Transaction;
-use crate::safe_storage::KernelRuntime;
 use crate::storage::{self, object_path, receipt_path};
 use crate::tick_model;
 use anyhow::Context;
@@ -27,6 +26,7 @@ use tezos_ethereum::transaction::{
 };
 use tezos_ethereum::Bloom;
 use tezos_evm_logging::{log, Level::*};
+use tezos_evm_runtime::safe_storage::KernelRuntime;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::path::{concat, RefPath};
 use tezos_smart_rollup_host::runtime::Runtime;
