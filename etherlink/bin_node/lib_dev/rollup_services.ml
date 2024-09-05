@@ -163,6 +163,19 @@ let dal_injection =
     ~output:Data_encoding.unit
     (open_root / "local" / "dal" / "injection")
 
+let dal_slot_indices =
+  let input_encoding = Data_encoding.(obj1 (req "indices" (list uint8))) in
+  Tezos_rpc.Service.post_service
+    ~description:
+      "Provide the (new) list of slot indices to use to the rollup node's DAL \
+       injector"
+    ~query:Tezos_rpc.Query.empty
+    ~input:
+      Data_encoding.(
+        def "slot_indices" ~description:"Slot indices to set" input_encoding)
+    ~output:Data_encoding.unit
+    (open_root / "local" / "dal" / "slot" / "indices")
+
 let dal_injected_operations_statuses :
     ( [`GET],
       unit,
@@ -339,6 +352,19 @@ let get_injected_dal_operations_statuses :
     ()
     ()
     ()
+
+let set_dal_slot_indices :
+    rollup_node_endpoint:Uri.t ->
+    slot_indices:Tezos_dal_node_services.Types.slot_index list ->
+    unit tzresult Lwt.t =
+ fun ~rollup_node_endpoint ~slot_indices ->
+  call_service
+    ~keep_alive:false
+    ~base:rollup_node_endpoint
+    dal_slot_indices
+    ()
+    ()
+    slot_indices
 
 let forget_dal_injection_id :
     rollup_node_endpoint:Uri.t ->

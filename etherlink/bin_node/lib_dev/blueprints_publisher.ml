@@ -248,6 +248,14 @@ module Handlers = struct
        } :
         Types.parameters) =
     let open Lwt_result_syntax in
+    let* () =
+      match dal_slots with
+      | None -> return_unit
+      | Some dal_slots ->
+          Rollup_services.set_dal_slot_indices
+            ~rollup_node_endpoint
+            ~slot_indices:dal_slots
+    in
     return
       {
         latest_level_confirmed =
