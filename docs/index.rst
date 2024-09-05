@@ -185,7 +185,7 @@ Platform developers are also provided reference materials for internal APIs of O
    :hidden:
 
    Paris Protocol Reference <active/index>
-   Quebeca Protocol Reference <quebeca/index>
+   Quebec Protocol Reference <quebeca/index>
    Alpha Dev Protocol Reference <alpha/index>
 
 .. toctree::
@@ -212,7 +212,7 @@ Platform developers are also provided reference materials for internal APIs of O
    :hidden:
 
    protocols/naming
-   protocols/019_paris
+   protocols/020_paris
    protocols/021_quebeca
    protocols/alpha
    protocols/history
