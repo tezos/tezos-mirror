@@ -96,7 +96,11 @@ Available services:
   - POST /slots
       Post a slot to the DAL node, computes its commitment and commitment
       proof, then computes the correspoding shards with their proof. The
-      result of this RPC can be directly used to publish a slot header. 
+      result of this RPC can be directly used to publish a slot header. If
+      the sent data is smaller than the size of a DAL slot, it is padded with
+      the character provided as padding query parameter (defaults to \000).
+      If the slot_index query parameter is provided, the DAL node checks that
+      its profile allows to publish data on the given slot index. 
   - GET /version
       version 
 

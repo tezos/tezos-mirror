@@ -149,7 +149,7 @@ let inject_slot state ~slot_content ~slot_index =
     match dal_cctxt with
     | Some dal_cctxt ->
         let* commitment, commitment_proof =
-          Dal_node_client.post_slot dal_cctxt slot_content
+          Dal_node_client.post_slot dal_cctxt ~slot_index slot_content
         in
         return
           ( commitment,

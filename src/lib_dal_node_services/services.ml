@@ -59,13 +59,17 @@ let post_slot :
     ; output : Cryptobox.commitment * Cryptobox.commitment_proof
     ; prefix : unit
     ; params : unit
-    ; query : < padding : char > >
+    ; query : < padding : char ; slot_index : Types.slot_index option > >
     service =
   Tezos_rpc.Service.post_service
     ~description:
       "Post a slot to the DAL node, computes its commitment and commitment \
        proof, then computes the correspoding shards with their proof. The \
-       result of this RPC can be directly used to publish a slot header."
+       result of this RPC can be directly used to publish a slot header. If \
+       the sent data is smaller than the size of a DAL slot, it is padded with \
+       the character provided as padding query parameter (defaults to \\000). \
+       If the slot_index query parameter is provided, the DAL node checks that \
+       its profile allows to publish data on the given slot index."
     ~query:Types.slot_query
       (* With [Data_encoding.string], the body of the HTTP request contains
          two length prefixes: one for the full body, and one for the string.

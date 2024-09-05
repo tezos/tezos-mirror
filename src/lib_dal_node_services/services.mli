@@ -60,7 +60,7 @@ val post_slot :
   ; output : Cryptobox.commitment * Cryptobox.commitment_proof
   ; prefix : unit
   ; params : unit
-  ; query : < padding : char > >
+  ; query : < padding : char ; slot_index : Types.slot_index option > >
   service
 
 (** Associate a commitment to a level and a slot index. See {!val:
