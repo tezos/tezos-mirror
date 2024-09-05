@@ -138,7 +138,7 @@ end
 
 open Snapshot_utils.Make (Header)
 
-let export ?dest ?filename ~compression ~data_dir () =
+let export ?snapshot_file ~compression ~data_dir () =
   let open Lwt_result_syntax in
   let* () = Evm_context.lock_data_dir ~data_dir in
   let evm_state_path = Evm_context.State.store_path ~data_dir in
@@ -165,8 +165,8 @@ let export ?dest ?filename ~compression ~data_dir () =
       | On_the_fly -> gzip_writer
       | No | After -> stdlib_writer
     in
-    let dest_file_name =
-      match filename with
+    let dest_file =
+      match snapshot_file with
       | Some f -> f
       | None ->
           let suffix =
@@ -181,11 +181,6 @@ let export ?dest ?filename ~compression ~data_dir () =
             Ethereum_types.pp_quantity
             header.current_level
             suffix
-    in
-    let dest_file =
-      match dest with
-      | Some dest -> Filename.concat dest dest_file_name
-      | None -> dest_file_name
     in
     let*! () = Lwt_utils_unix.create_dir (Filename.dirname dest_file) in
     create stdlib_reader writer header ~files ~dest:dest_file ;

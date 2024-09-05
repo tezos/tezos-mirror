@@ -33,14 +33,13 @@ module Header : sig
   val encoding : t Data_encoding.t
 end
 
-(** [export ?dest ?filename ~compression ~data_dir () ] creates a
-    tar gzipped archive with name [filename] (or a generated name) in [dest] (or
-    the current directory) containing a snapshot of the data of the rollup node
+(** [export ?snapshot_file ~compression ~data_dir () ] creates a
+    tar gzipped archive with name [snapshot_file] (or a generated name in the
+    current directory) containing a snapshot of the data of the rollup node
     with data directory [data_dir]. The path of the snapshot archive is
     returned.  *)
 val export :
-  ?dest:string ->
-  ?filename:string ->
+  ?snapshot_file:string ->
   compression:compression ->
   data_dir:string ->
   unit ->
