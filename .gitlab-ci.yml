@@ -74,6 +74,10 @@ workflow:
     variables:
       PIPELINE_TYPE: schedule_extended_validation_test
     when: always
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "TEST_RELEASE"
+    variables:
+      PIPELINE_TYPE: schedule_master_test_release
+    when: always
 
 default:
   interruptible: true
@@ -171,4 +175,8 @@ include:
 - local: .gitlab/ci/pipelines/schedule_extended_validation_test.yml
   rules:
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_VALIDATION_TESTS"
+    when: always
+- local: .gitlab/ci/pipelines/schedule_master_test_release.yml
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "TEST_RELEASE"
     when: always
