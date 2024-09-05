@@ -360,6 +360,14 @@ val current_level : block -> int32
 
 val current_cycle : block -> Cycle.t
 
+val first_level_of_cycle : Constants.Parametric.t -> level:int32 -> bool
+
+val first_block_of_cycle : block -> bool
+
+val last_but_one_level_of_cycle : Constants.Parametric.t -> level:int32 -> bool
+
+val last_but_one_block_of_cycle : block -> bool
+
 val last_level_of_cycle : Constants.Parametric.t -> level:int32 -> bool
 
 val last_block_of_cycle : block -> bool
