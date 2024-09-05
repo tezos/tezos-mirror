@@ -455,6 +455,9 @@ module Dal_reverse_proxy = struct
       |> Process.check
     in
 
+    (* Check the NginX configuration *)
+    let* () = Process.spawn ?runner "nginx" ["-t"] |> Process.check in
+
     (* Start the NginX service *)
     let* () =
       Process.spawn ?runner "service" ["nginx"; "restart"] |> Process.check
