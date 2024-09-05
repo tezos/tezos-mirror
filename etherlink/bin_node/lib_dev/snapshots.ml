@@ -241,6 +241,7 @@ let check_header ~populated ~data_dir (header : Header.t) : unit tzresult Lwt.t
 
 let import ~force ~data_dir ~snapshot_file =
   let open Lwt_result_syntax in
+  let open Filename.Infix in
   let*! populated = data_dir_populated ~data_dir in
   let*? () =
     error_when ((not force) && populated) (Data_dir_populated data_dir)
@@ -248,16 +249,37 @@ let import ~force ~data_dir ~snapshot_file =
   let* () = check_snapshot_exists snapshot_file in
   let*! () = Lwt_utils_unix.create_dir data_dir in
   let* () = Evm_context.lock_data_dir ~data_dir in
+  let* () =
+    (* This is safe because we took the lock. This cannot be moved before
+       `Evm_context.lock_data_dir`. *)
+    when_ populated @@ fun () ->
+    Format.printf "Delete previous contents from the data-dir\n%!" ;
+    let*! () =
+      Lwt_utils_unix.remove_dir (Evm_context.State.store_path ~data_dir)
+    in
+    return_unit
+  in
   let reader =
     if Snapshot_utils.is_compressed_snapshot snapshot_file then gzip_reader
     else stdlib_reader
   in
-  let* _snapshot_header, () =
-    extract
-      reader
-      stdlib_writer
-      (check_header ~populated ~data_dir)
-      ~snapshot_file
-      ~dest:data_dir
+  let* () =
+    Lwt_utils_unix.with_tempdir ~temp_dir:data_dir ".octez_evm_node_import_"
+    @@ fun dest ->
+    let* _snapshot_header, () =
+      extract
+        reader
+        stdlib_writer
+        (check_header ~populated ~data_dir)
+        ~snapshot_file
+        ~dest
+    in
+    Unix.rename
+      (Evm_context.State.store_path ~data_dir:dest)
+      (Evm_context.State.store_path ~data_dir) ;
+    Unix.rename
+      (dest // Evm_store.sqlite_file_name)
+      (data_dir // Evm_store.sqlite_file_name) ;
+    return_unit
   in
   return_unit
