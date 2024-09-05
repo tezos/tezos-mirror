@@ -742,35 +742,56 @@ let usage_internal ppf ~executable_name ~global_options ?(highlights = [])
       (print_group (fun ppf (Ex command) ->
            print_command ?prefix:None ~highlights ppf command))
   in
+  let pp_print_global_options ppf = function
+    | Constant _ -> ()
+    | global_options ->
+        Format.fprintf
+          ppf
+          "@{<title>Global options (must come before the command)@}@,\
+           @{<commanddoc>%a@}%a"
+          print_options_detailed
+          global_options
+          (fun ppf () -> if by_group <> [] then Format.fprintf ppf "@,@,")
+          ()
+  in
+  let pp_print_global_options_usage ppf = function
+    | Constant _ -> ()
+    | _ -> Format.fprintf ppf " [@{<opt>global options@}]"
+  in
   Format.fprintf
     ppf
     "@{<document>@{<title>Usage@}@,\
-     @{<list>@{<command>@{<commandline>%s [@{<opt>global options@}] \
-     @{<kwd>command@} [@{<opt>command options@}]@}@}@,\
+     @{<list>@{<command>@{<commandline>%s%a @{<kwd>command@} [@{<opt>command \
+     options@}]@}@}@,\
      @{<command>@{<commandline>%s @{<opt>--help@} (for global options)@}@}@,\
-     @{<command>@{<commandline>%s [@{<opt>global options@}] @{<kwd>command@} \
-     @{<opt>--help@} (for command options)@}@}@,\
+     @{<command>@{<commandline>%s%a @{<kwd>command@} @{<opt>--help@} (for \
+     command options)@}@}@,\
      @{<command>@{<commandline>%s @{<opt>--version@} (for version \
      information)@}@}@}@,\
      @,\
      @{<title>To browse the documentation@}@,\
-     @{<list>@{<command>@{<commandline>%s [@{<opt>global options@}] \
-     @{<kwd>man@} (for a list of commands)@}@}@,\
-     @{<command>@{<commandline>%s [@{<opt>global options@}] @{<kwd>man@} \
-     @{<opt>-v 3@} (for the full manual)@}@}@}@,\
+     @{<list>@{<command>@{<commandline>%s%a @{<kwd>man@} (for a list of \
+     commands)@}@}@,\
+     @{<command>@{<commandline>%s%a @{<kwd>man@} @{<opt>-v 3@} (for the full \
+     manual)@}@}@}@,\
      @,\
-     @{<title>Global options (must come before the command)@}@,\
-     @{<commanddoc>%a@}%a%a@}@."
+     %a%a@}@."
     executable_name
-    executable_name
-    executable_name
-    executable_name
-    executable_name
-    executable_name
-    print_options_detailed
+    pp_print_global_options_usage
     global_options
-    (fun ppf () -> if by_group <> [] then Format.fprintf ppf "@,@,")
-    ()
+    executable_name
+    executable_name
+    pp_print_global_options_usage
+    global_options
+    executable_name
+    executable_name
+    pp_print_global_options_usage
+    global_options
+    executable_name
+    pp_print_global_options_usage
+    global_options
+    pp_print_global_options
+    global_options
     print_groups
     by_group
 

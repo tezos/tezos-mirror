@@ -1,17 +1,14 @@
 
 ./octez-evm-node man
 Usage:
-  octez-evm-node [global options] command [command options]
+  octez-evm-node command [command options]
   octez-evm-node --help (for global options)
-  octez-evm-node [global options] command --help (for command options)
+  octez-evm-node command --help (for command options)
   octez-evm-node --version (for version information)
 
 To browse the documentation:
-  octez-evm-node [global options] man (for a list of commands)
-  octez-evm-node [global options] man -v 3 (for the full manual)
-
-Global options (must come before the command):
-  
+  octez-evm-node man (for a list of commands)
+  octez-evm-node man -v 3 (for the full manual)
 
 Access the documentation:
 
