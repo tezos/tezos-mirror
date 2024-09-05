@@ -34,13 +34,25 @@ let fetch_dal_config cctxt =
         [RPC_client_errors.(Request_failed {error = Connection_failed _; _})] ->
         let delay = min delay_max (delay *. 2.) in
         let* () =
-          Event.(
-            emit retry_fetching_node_config (Uri.to_string cctxt#base, delay))
+          if delay < delay_max then
+            Event.(
+              emit
+                retry_fetching_node_config_notice
+                (Uri.to_string cctxt#base, delay))
+          else
+            Event.(
+              emit
+                retry_fetching_node_config_warning
+                (Uri.to_string cctxt#base, delay))
         in
         let* () = Lwt_unix.sleep delay in
         retry delay
     | Error err -> return_error err
-    | Ok dal_config -> return_ok dal_config
+    | Ok dal_config ->
+        let* () =
+          Event.(emit fetched_config_success (Uri.to_string cctxt#base))
+        in
+        return_ok dal_config
   in
   retry delay
 
