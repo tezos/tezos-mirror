@@ -277,6 +277,7 @@ oc.docker-build-debian-dependencies:
   variables:
     DOCKER_VERSION: 24.0.7
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: debian
   parallel:
     matrix:
@@ -301,6 +302,7 @@ oc.build-debian:
   - ./scripts/ci/build-debian-packages.sh binaries
   variables:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: debian
   artifacts:
     paths:
@@ -332,6 +334,7 @@ oc.build-debian-current_a:
   - ./scripts/ci/build-debian-packages_current.sh A
   variables:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: debian
   artifacts:
     paths:
@@ -363,6 +366,7 @@ oc.build-debian-current_b:
   - ./scripts/ci/build-debian-packages_current.sh B
   variables:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: debian
   artifacts:
     paths:
@@ -394,6 +398,7 @@ oc.build-data_packages:
   - ./scripts/ci/build-debian-packages.sh zcash
   variables:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: debian
     RELEASE: bookworm
     TAGS: gcp
@@ -460,6 +465,7 @@ oc.docker-build-ubuntu-dependencies:
   variables:
     DOCKER_VERSION: 24.0.7
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: ubuntu
   parallel:
     matrix:
@@ -484,6 +490,7 @@ oc.build-ubuntu:
   - ./scripts/ci/build-debian-packages.sh binaries
   variables:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: ubuntu
   artifacts:
     paths:
@@ -515,6 +522,7 @@ oc.build-ubuntu-current_a:
   - ./scripts/ci/build-debian-packages_current.sh A
   variables:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: ubuntu
   artifacts:
     paths:
@@ -546,6 +554,7 @@ oc.build-ubuntu-current_b:
   - ./scripts/ci/build-debian-packages_current.sh B
   variables:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: ubuntu
   artifacts:
     paths:
