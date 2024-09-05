@@ -209,7 +209,10 @@ module RPC : sig
 
   (** Call RPC "POST /slots" to store a slot and return the commitment
         and its proof in case of success. *)
-  val post_slot : Helpers.slot -> (commitment * commitment_proof) RPC_core.t
+  val post_slot :
+    ?slot_index:int ->
+    Helpers.slot ->
+    (commitment * commitment_proof) RPC_core.t
 
   (** Call RPC "GET /levels/<slot_level>/slot/<slot_index>/content" to retrieve the slot
         content associated with the given level and index. *)

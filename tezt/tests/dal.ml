@@ -1941,19 +1941,15 @@ let test_dal_node_test_post_slot _protocol parameters cryptobox _node client
   let mk_slot size =
     Helpers.make_slot ~padding:false ~slot_size (generate_dummy_slot size)
   in
-  let failing_post_slot_rpc slot =
-    let* response = Dal_RPC.(call_raw dal_node @@ post_slot slot) in
-    return
-    @@ RPC_core.check_string_response
-         ~body_rex:"post_slot_too_large"
-         ~code:500
-         response
+  let failing_post_slot_rpc ?slot_index ~body_rex slot =
+    let* response = Dal_RPC.(call_raw dal_node @@ post_slot ?slot_index slot) in
+    return @@ RPC_core.check_string_response ~body_rex ~code:500 response
   in
   let size = parameters.Dal.Parameters.cryptobox.slot_size in
   let slot_big = mk_slot (size + 1) in
   let slot_small = mk_slot (size - 1) in
   let slot_ok = mk_slot size in
-  let* () = failing_post_slot_rpc slot_big in
+  let* () = failing_post_slot_rpc ~body_rex:"post_slot_too_large" slot_big in
   let* commitment1, _proof = Dal_RPC.(call dal_node @@ post_slot slot_ok) in
   let* commitment2, _proof = Dal_RPC.(call dal_node @@ post_slot slot_ok) in
   (* TODO/DAL: https://gitlab.com/tezos/tezos/-/issues/4250
@@ -1965,11 +1961,21 @@ let test_dal_node_test_post_slot _protocol parameters cryptobox _node client
     ~error_msg:
       "Storing a slot twice should return the same commitment (current = %L, \
        expected = %R)" ;
-  let* commitment3, proof3 = Dal_RPC.(call dal_node @@ post_slot slot_small) in
+
+  (* The DAL node of this test can only publish on slot index 0. *)
+  let* () =
+    failing_post_slot_rpc
+      ~slot_index:1
+      ~body_rex:"cannot_publish_on_slot_index"
+      slot_small
+  in
+  let slot_index = 0 in
+  let* commitment3, proof3 =
+    Dal_RPC.(call dal_node @@ post_slot ~slot_index slot_small)
+  in
   (* To retrieve the content of the slot corresponding to commitment3,
      we need to publish the commitment on the L1 and bake some blocks
      to finalize the publication. *)
-  let slot_index = 0 in
   let* _ =
     Dal.Helpers.publish_commitment
       ~source:Constant.bootstrap1

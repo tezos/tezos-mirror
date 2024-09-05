@@ -243,10 +243,14 @@ module Dal_RPC = struct
     in
     `O [("invalid_utf8_string", `A l)]
 
-  let post_slot slot =
+  let post_slot ?slot_index slot =
     let data : RPC_core.data = Data (unistring_to_json slot) in
     make
       ~data
+      ?query_string:
+        (Option.map
+           (fun slot_index -> [("slot_index", string_of_int slot_index)])
+           slot_index)
       POST
       ["slots"]
       JSON.(
