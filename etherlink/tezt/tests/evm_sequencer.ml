@@ -1721,6 +1721,7 @@ let test_fa_withdrawal_is_included =
 
 let test_delayed_deposit_from_init_rollup_node =
   register_all
+    ~block_storage_sqlite3:false (* The test uses init from rollup node. *)
     ~da_fee:arb_da_fee_for_delayed_inbox
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "delayed_inbox"; "init"]
@@ -1797,6 +1798,7 @@ let test_init_from_rollup_node_data_dir =
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/7285
      Replace by [Any] after the next upgrade
   *)
+    ~block_storage_sqlite3:false (* The test uses init from rollup node. *)
     ~kernels:[Latest]
     ~time_between_blocks:Nothing
     ~tags:["evm"; "rollup_node"; "init"; "reconstruct"]
@@ -1869,6 +1871,7 @@ let test_init_from_rollup_node_data_dir =
 
 let test_init_from_rollup_node_with_delayed_inbox =
   register_all
+    ~block_storage_sqlite3:false (* The test uses init from rollup node. *)
     ~time_between_blocks:Nothing
     ~kernels:[Kernel.Latest]
     ~tags:["evm"; "rollup_node"; "init"; "delayed_inbox"; "omit"]
@@ -2121,6 +2124,7 @@ let test_observer_applies_blueprint_when_restarted =
 
 let test_get_balance_block_param =
   register_all
+    ~block_storage_sqlite3:false (* The test uses init from rollup node. *)
     ~tags:["evm"; "sequencer"; "rpc"; "get_balance"; "block_param"]
     ~title:"RPC method getBalance uses block parameter"
     ~time_between_blocks:Nothing
@@ -2212,6 +2216,7 @@ let test_get_balance_block_param =
 
 let test_get_block_by_number_block_param =
   register_all
+    ~block_storage_sqlite3:false (* The test uses init from rollup node. *)
     ~tags:["evm"; "sequencer"; "rpc"; "get_block_by_number"; "block_param"]
     ~title:"RPC method getBlockByNumber uses block parameter"
     ~time_between_blocks:Nothing
@@ -4506,6 +4511,7 @@ let test_preimages_endpoint =
   in
   let activation_timestamp = "2020-01-01T00:00:10Z" in
   register_all
+    ~block_storage_sqlite3:false (* The test uses init from rollup node. *)
     ~sequencer:Constant.bootstrap1
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "preimages_endpoint"]
