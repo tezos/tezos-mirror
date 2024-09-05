@@ -170,6 +170,7 @@ mod tests {
     use primitive_types::U256;
     use tezos_crypto_rs::hash::HashTrait;
     use tezos_data_encoding::types::Bytes;
+    use tezos_evm_runtime::{mock_internal::MockInternal, runtime::KernelHost};
     use tezos_smart_rollup::{
         michelson::{
             ticket::FA2_1Ticket, MichelsonBytes, MichelsonOption, MichelsonOr,
@@ -189,6 +190,11 @@ mod tests {
 
     fn dummy_sequencer_config(enable_dal: bool) -> Configuration {
         let mut host = MockHost::default();
+        let mut internal = MockInternal();
+        let mut host = KernelHost {
+            host: &mut host,
+            internal: &mut internal,
+        };
         let delayed_inbox =
             DelayedInbox::new(&mut host).expect("Delayed inbox should be created");
         let delayed_bridge: ContractKt1Hash =
@@ -300,7 +306,13 @@ mod tests {
     #[test]
     fn test_parsing_proxy_transaction() {
         let mut host = MockHost::default();
-        host.add_external(Bytes::from(hex::decode(DUMMY_TRANSACTION).unwrap()));
+        let mut internal = MockInternal();
+        let mut host = KernelHost {
+            host: &mut host,
+            internal: &mut internal,
+        };
+        host.host
+            .add_external(Bytes::from(hex::decode(DUMMY_TRANSACTION).unwrap()));
         let mut conf = dummy_proxy_configuration();
         fetch_blueprints(&mut host, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
 
@@ -316,9 +328,17 @@ mod tests {
     #[test]
     fn test_parsing_proxy_chunked_transaction() {
         let mut host = MockHost::default();
-        host.add_external(Bytes::from(hex::decode(DUMMY_NEW_CHUNKED_TX).unwrap()));
-        host.add_external(Bytes::from(hex::decode(DUMMY_CHUNK1).unwrap()));
-        host.add_external(Bytes::from(hex::decode(DUMMY_CHUNK2).unwrap()));
+        let mut internal = MockInternal();
+        let mut host = KernelHost {
+            host: &mut host,
+            internal: &mut internal,
+        };
+        host.host
+            .add_external(Bytes::from(hex::decode(DUMMY_NEW_CHUNKED_TX).unwrap()));
+        host.host
+            .add_external(Bytes::from(hex::decode(DUMMY_CHUNK1).unwrap()));
+        host.host
+            .add_external(Bytes::from(hex::decode(DUMMY_CHUNK2).unwrap()));
         let mut conf = dummy_proxy_configuration();
         fetch_blueprints(&mut host, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
 
@@ -333,7 +353,13 @@ mod tests {
 
     fn test_sequencer_reject_proxy_transactions(enable_dal: bool) {
         let mut host = MockHost::default();
-        host.add_external(Bytes::from(hex::decode(DUMMY_TRANSACTION).unwrap()));
+        let mut internal = MockInternal();
+        let mut host = KernelHost {
+            host: &mut host,
+            internal: &mut internal,
+        };
+        host.host
+            .add_external(Bytes::from(hex::decode(DUMMY_TRANSACTION).unwrap()));
         let mut conf = dummy_sequencer_config(enable_dal);
         fetch_blueprints(&mut host, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
 
@@ -358,9 +384,17 @@ mod tests {
 
     fn test_sequencer_reject_proxy_chunked_transactions(enable_dal: bool) {
         let mut host = MockHost::default();
-        host.add_external(Bytes::from(hex::decode(DUMMY_NEW_CHUNKED_TX).unwrap()));
-        host.add_external(Bytes::from(hex::decode(DUMMY_CHUNK1).unwrap()));
-        host.add_external(Bytes::from(hex::decode(DUMMY_CHUNK2).unwrap()));
+        let mut internal = MockInternal();
+        let mut host = KernelHost {
+            host: &mut host,
+            internal: &mut internal,
+        };
+        host.host
+            .add_external(Bytes::from(hex::decode(DUMMY_NEW_CHUNKED_TX).unwrap()));
+        host.host
+            .add_external(Bytes::from(hex::decode(DUMMY_CHUNK1).unwrap()));
+        host.host
+            .add_external(Bytes::from(hex::decode(DUMMY_CHUNK2).unwrap()));
         let mut conf = dummy_sequencer_config(enable_dal);
         fetch_blueprints(&mut host, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
 
@@ -385,7 +419,12 @@ mod tests {
 
     fn test_parsing_valid_sequencer_chunk(enable_dal: bool) {
         let mut host = MockHost::default();
-        host.add_external(Bytes::from(
+        let mut internal = MockInternal();
+        let mut host = KernelHost {
+            host: &mut host,
+            internal: &mut internal,
+        };
+        host.host.add_external(Bytes::from(
             hex::decode(DUMMY_BLUEPRINT_CHUNK_NUMBER_10).unwrap(),
         ));
         let mut conf = dummy_sequencer_config(enable_dal);
@@ -414,7 +453,12 @@ mod tests {
 
     fn test_parsing_invalid_sequencer_chunk(enable_dal: bool) {
         let mut host = MockHost::default();
-        host.add_external(Bytes::from(
+        let mut internal = MockInternal();
+        let mut host = KernelHost {
+            host: &mut host,
+            internal: &mut internal,
+        };
+        host.host.add_external(Bytes::from(
             hex::decode(DUMMY_BLUEPRINT_CHUNK_UNPARSABLE).unwrap(),
         ));
         let mut conf = dummy_sequencer_config(enable_dal);
@@ -441,7 +485,12 @@ mod tests {
 
     fn test_proxy_rejects_sequencer_chunk(enable_dal: bool) {
         let mut host = MockHost::default();
-        host.add_external(Bytes::from(
+        let mut internal = MockInternal();
+        let mut host = KernelHost {
+            host: &mut host,
+            internal: &mut internal,
+        };
+        host.host.add_external(Bytes::from(
             hex::decode(DUMMY_BLUEPRINT_CHUNK_NUMBER_10).unwrap(),
         ));
         let mut conf = dummy_sequencer_config(enable_dal);
@@ -485,12 +534,18 @@ mod tests {
 
     fn test_parsing_delayed_inbox(enable_dal: bool) {
         let mut host = MockHost::default();
+        let mut internal = MockInternal();
+        let mut host = KernelHost {
+            host: &mut host,
+            internal: &mut internal,
+        };
         let mut conf = dummy_sequencer_config(enable_dal);
         let metadata = TransferMetadata::new(
             delayed_bridge(&conf),
             PublicKeyHash::from_b58check("tz1NiaviJwtMbpEcNqSP6neeoBYj8Brb3QPv").unwrap(),
         );
-        host.add_transfer(dummy_delayed_transaction(), &metadata);
+        host.host
+            .add_transfer(dummy_delayed_transaction(), &metadata);
         fetch_blueprints(&mut host, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
 
         if read_next_blueprint(&mut host, &mut conf)
@@ -518,12 +573,18 @@ mod tests {
 
     fn test_parsing_l1_contract_inbox(enable_dal: bool) {
         let mut host = MockHost::default();
+        let mut internal = MockInternal();
+        let mut host = KernelHost {
+            host: &mut host,
+            internal: &mut internal,
+        };
         let mut conf = dummy_sequencer_config(enable_dal);
         let metadata = TransferMetadata::new(
             ContractKt1Hash::from_b58check(DUMMY_INVALID_TICKETER).unwrap(),
             PublicKeyHash::from_b58check("tz1NiaviJwtMbpEcNqSP6neeoBYj8Brb3QPv").unwrap(),
         );
-        host.add_transfer(dummy_delayed_transaction(), &metadata);
+        host.host
+            .add_transfer(dummy_delayed_transaction(), &metadata);
         fetch_blueprints(&mut host, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
 
         if read_next_blueprint(&mut host, &mut conf)
@@ -552,12 +613,18 @@ mod tests {
     #[test]
     fn test_parsing_delayed_inbox_rejected_in_proxy() {
         let mut host = MockHost::default();
+        let mut internal = MockInternal();
+        let mut host = KernelHost {
+            host: &mut host,
+            internal: &mut internal,
+        };
         let mut conf = dummy_proxy_configuration();
         let metadata = TransferMetadata::new(
             ContractKt1Hash::from_b58check(DUMMY_INVALID_TICKETER).unwrap(),
             PublicKeyHash::from_b58check("tz1NiaviJwtMbpEcNqSP6neeoBYj8Brb3QPv").unwrap(),
         );
-        host.add_transfer(dummy_delayed_transaction(), &metadata);
+        host.host
+            .add_transfer(dummy_delayed_transaction(), &metadata);
         fetch_blueprints(&mut host, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
 
         match read_next_blueprint(&mut host, &mut conf)
@@ -573,12 +640,17 @@ mod tests {
     #[test]
     fn test_deposit_in_proxy_mode() {
         let mut host = MockHost::default();
+        let mut internal = MockInternal();
+        let mut host = KernelHost {
+            host: &mut host,
+            internal: &mut internal,
+        };
         let mut conf = dummy_proxy_configuration();
         let metadata = TransferMetadata::new(
             conf.tezos_contracts.ticketer.clone().unwrap(),
             PublicKeyHash::from_b58check("tz1NiaviJwtMbpEcNqSP6neeoBYj8Brb3QPv").unwrap(),
         );
-        host.add_transfer(
+        host.host.add_transfer(
             dummy_deposit(conf.tezos_contracts.ticketer.clone().unwrap()),
             &metadata,
         );
@@ -600,12 +672,17 @@ mod tests {
     #[test]
     fn test_deposit_with_invalid_ticketer() {
         let mut host = MockHost::default();
+        let mut internal = MockInternal();
+        let mut host = KernelHost {
+            host: &mut host,
+            internal: &mut internal,
+        };
         let mut conf = dummy_proxy_configuration();
         let metadata = TransferMetadata::new(
             ContractKt1Hash::from_b58check(DUMMY_INVALID_TICKETER).unwrap(),
             PublicKeyHash::from_b58check("tz1NiaviJwtMbpEcNqSP6neeoBYj8Brb3QPv").unwrap(),
         );
-        host.add_transfer(
+        host.host.add_transfer(
             dummy_deposit(
                 ContractKt1Hash::from_b58check(DUMMY_INVALID_TICKETER).unwrap(),
             ),
@@ -628,12 +705,17 @@ mod tests {
 
     fn test_deposit_in_sequencer_mode(enable_dal: bool) {
         let mut host = MockHost::default();
+        let mut internal = MockInternal();
+        let mut host = KernelHost {
+            host: &mut host,
+            internal: &mut internal,
+        };
         let mut conf = dummy_sequencer_config(enable_dal);
         let metadata = TransferMetadata::new(
             conf.tezos_contracts.ticketer.clone().unwrap(),
             PublicKeyHash::from_b58check("tz1NiaviJwtMbpEcNqSP6neeoBYj8Brb3QPv").unwrap(),
         );
-        host.add_transfer(
+        host.host.add_transfer(
             dummy_deposit(conf.tezos_contracts.ticketer.clone().unwrap()),
             &metadata,
         );
