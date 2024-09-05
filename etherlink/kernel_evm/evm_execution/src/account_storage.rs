@@ -15,13 +15,10 @@ use tezos_storage::helpers::bytes_hash;
 use tezos_storage::{
     error::Error as GenStorageError, read_u256_le_default, read_u64_le_default,
 };
-use tezos_storage::{path_from_h256, read_h256_be_default};
+use tezos_storage::{path_from_h256, read_h256_be_default, WORD_SIZE};
 use thiserror::Error;
 
 use crate::DurableStorageError;
-
-/// The size of one 256 bit word. Size in bytes
-pub const WORD_SIZE: usize = 32_usize;
 
 /// All errors that may happen as result of using the Ethereum account
 /// interface.
