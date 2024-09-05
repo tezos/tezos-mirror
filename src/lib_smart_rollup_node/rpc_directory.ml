@@ -415,6 +415,11 @@ let () =
   Dal_injection_queue.register_dal_slot ~slot_content ~slot_index
 
 let () =
+  Local_directory.register0 Rollup_node_services.Local.dal_slot_indices
+  @@ fun _node_ctxt () slot_indices ->
+  Dal_injection_queue.set_dal_slot_indices slot_indices
+
+let () =
   Local_directory.register0 Rollup_node_services.Local.batcher_queue
   @@ fun _node_ctxt () () ->
   let open Lwt_result_syntax in
