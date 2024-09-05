@@ -334,3 +334,19 @@ let yes_crypto_kind =
 
 let is_yes_crypto_enabled =
   match yes_crypto_kind with Yes | Fast -> true | No -> false
+
+module Events = struct
+  include Tezos_event_logging.Internal_event.Simple
+
+  let yes_crypto_is_enabled =
+    declare_0
+      ~level:Warning
+      ~section:["crypto"]
+      ~name:"yes_crypto_is_enabled"
+      ~msg:"yes-cryptography is enabled"
+      ()
+end
+
+let () =
+  if is_yes_crypto_enabled then
+    Events.(emit_at_top_level yes_crypto_is_enabled ())
