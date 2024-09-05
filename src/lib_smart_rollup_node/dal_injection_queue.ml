@@ -27,6 +27,9 @@ module Dal_worker_types = struct
         }
           -> (unit, error trace) t
       | Produce_dal_slots : (unit, error trace) t
+      | Set_dal_slot_indices :
+          Tezos_dal_node_services.Types.slot_index list
+          -> (unit, error trace) t
 
     type view = View : _ t -> view
 
@@ -55,6 +58,15 @@ module Dal_worker_types = struct
             (obj1 (req "request" (constant "produce_dal_slots")))
             (function View Produce_dal_slots -> Some () | _ -> None)
             (fun () -> View Produce_dal_slots);
+          case
+            (Tag 2)
+            ~title:"Set_dal_slot_indices"
+            (obj2
+               (req "request" (constant "set_dal_slot_indices"))
+               (req "indices" (list uint8)))
+            (function
+              | View (Set_dal_slot_indices ids) -> Some ((), ids) | _ -> None)
+            (fun ((), ids) -> View (Set_dal_slot_indices ids));
         ]
 
     let pp ppf (View r) =
@@ -65,6 +77,14 @@ module Dal_worker_types = struct
             "register slot injection request for index %d"
             slot_index
       | Produce_dal_slots -> Format.fprintf ppf "produce DAL slots"
+      | Set_dal_slot_indices idx ->
+          Format.fprintf
+            ppf
+            "set slot indices %a"
+            (Format.pp_print_list
+               ~pp_sep:(fun fmt () -> Format.fprintf fmt ", ")
+               (fun fmt id -> Format.fprintf fmt "%d" id))
+            idx
   end
 end
 
@@ -196,6 +216,10 @@ let on_produce_dal_slots state =
   | Some (slot_content, slot_index) ->
       inject_slot state ~slot_content ~slot_index
 
+let on_set_dal_slot_indices _state _idx =
+  let open Lwt_result_syntax in
+  return_unit
+
 let init_dal_worker_state node_ctxt =
   let dal_constants =
     let open Node_context in
@@ -236,6 +260,8 @@ module Handlers = struct
         protect @@ fun () -> on_register state ~slot_content ~slot_index
     | Request.Produce_dal_slots ->
         protect @@ fun () -> on_produce_dal_slots state
+    | Request.Set_dal_slot_indices idx ->
+        protect @@ fun () -> on_set_dal_slot_indices state idx
 
   type launch_error = error trace
 
@@ -254,10 +280,13 @@ module Handlers = struct
     | Request.Produce_dal_slots ->
         let*! () = Events.(emit request_failed) (Request.view r, st, errs) in
         return_unit
+    | Request.Set_dal_slot_indices _ ->
+        let*! () = Events.(emit request_failed) (Request.view r, st, errs) in
+        return_unit
 
   let on_completion _w r _ st =
     match Request.view r with
-    | Request.View (Register _ | Produce_dal_slots) ->
+    | Request.View (Register _ | Produce_dal_slots | Set_dal_slot_indices _) ->
         Events.(emit request_completed) (Request.view r, st)
 
   let on_no_request _ = Lwt.return_unit
@@ -301,7 +330,7 @@ let init (node_ctxt : _ Node_context.t) =
       then start node_ctxt
       else return_unit
 
-(* This is a DAL inection worker for a single scoru *)
+(* This is a DAL injection worker for a single scoru *)
 let worker =
   lazy
     (match Lwt.state worker_promise with
@@ -337,6 +366,12 @@ let produce_dal_slots () =
   | Ok w ->
       Worker.Queue.push_request_and_wait w Request.Produce_dal_slots
       |> handle_request_error
+
+let set_dal_slot_indices idx =
+  let open Lwt_result_syntax in
+  let* w = lwt_map_error TzTrace.make (Lwt.return (Lazy.force worker)) in
+  Worker.Queue.push_request_and_wait w Request.(Set_dal_slot_indices idx)
+  |> handle_request_error
 
 let get_injection_ids () =
   let open Result_syntax in
