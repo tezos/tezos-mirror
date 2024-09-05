@@ -1585,7 +1585,7 @@ let get_evm_events_from_rollup_node_state ~omit_delayed_tx_events evm_state =
   @ new_delayed_transactions
 
 let apply_evm_events ?finalized_level events =
-  worker_add_request ~request:(Apply_evm_events {finalized_level; events})
+  worker_wait_for_request (Apply_evm_events {finalized_level; events})
 
 let reconstruct ~reconstruct_from_boot_sector ~rollup_node_data_dir
     ~genesis_level ~finalized_level ~levels_to_hashes ~l2_blocks =
