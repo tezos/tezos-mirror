@@ -19,7 +19,7 @@ use tezos_smart_rollup_host::path::*;
 use tezos_smart_rollup_host::runtime::{Runtime, RuntimeError, ValueType};
 
 /// The size of one 256 bit word. Size in bytes.
-const WORD_SIZE: usize = 32usize;
+pub const WORD_SIZE: usize = 32usize;
 
 /// Return up to buffer.len() from the given path in storage and
 /// store the read slice in `buffer`.
