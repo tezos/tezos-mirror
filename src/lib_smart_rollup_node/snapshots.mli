@@ -35,13 +35,16 @@ module Header : sig
   val encoding : t Data_encoding.t
 end
 
-(** [export cctxt ~no_checks ~compression ~data_dir ~dest ~filename] creates a
-    tar gzipped archive with name [filename] (or a generated name) in [dest] (or
-    the current directory) containing a snapshot of the data of the rollup node
-    with data directory [data_dir]. The path of the snapshot archive is
-    returned. If [no_checks] is [true], the integrity of the snapshot is not
-    checked at the end. *)
+(** [export ?rollup_node_endpoint cctxt ~no_checks ~compression ~data_dir ~dest
+    ~filename] creates a tar gzipped archive with name [filename] (or a
+    generated name) in [dest] (or the current directory) containing a snapshot
+    of the data of the rollup node with data directory [data_dir]. The path of
+    the snapshot archive is returned. If [no_checks] is [true], the integrity of
+    the snapshot is not checked at the end. This function will first try to
+    cancel any GC on the target node, [rollup_node_endpoint] can be specified to
+    communicate with it. *)
 val export :
+  ?rollup_node_endpoint:Uri.t ->
   #Client_context.full ->
   no_checks:bool ->
   compression:compression ->

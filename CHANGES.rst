@@ -263,6 +263,11 @@ Smart Rollup node
   wasteful on resources. Gc is not run anymore after importing an archive
   snapshot in a full node. (MR :gl:`!14717`)
 
+- The command ``snapshot export`` tries to cancel ongoing GC, if any. Add
+  ``--rollup-node-endpoint`` to specify the RPC server endpoint, if the address
+  and port of the running node have been changed via command-line arguments. (MR
+  :gl:`!14694`)
+
 Smart Rollup WASM Debugger
 --------------------------
 

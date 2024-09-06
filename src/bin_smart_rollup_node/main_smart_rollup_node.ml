@@ -454,8 +454,13 @@ let patch_durable_storage =
            procedure.")
 
 let export_snapshot
-    (data_dir, dest, no_checks, compress_on_the_fly, uncompressed, compact)
-    filename (cctxt : Client_context.full) =
+    ( data_dir,
+      dest,
+      no_checks,
+      compress_on_the_fly,
+      uncompressed,
+      compact,
+      rollup_node_endpoint ) filename (cctxt : Client_context.full) =
   let open Lwt_result_syntax in
   let*! compression =
     match (compress_on_the_fly, uncompressed) with
@@ -466,13 +471,23 @@ let export_snapshot
     | false, true -> Lwt.return Snapshots.No
   in
   let* snapshot_file =
-    (if compact then Snapshots.export_compact else Snapshots.export)
-      cctxt
-      ~no_checks
-      ~compression
-      ~data_dir
-      ~dest
-      ~filename
+    if compact then
+      Snapshots.export_compact
+        cctxt
+        ~no_checks
+        ~compression
+        ~data_dir
+        ~dest
+        ~filename
+    else
+      Snapshots.export
+        ?rollup_node_endpoint
+        cctxt
+        ~no_checks
+        ~compression
+        ~data_dir
+        ~dest
+        ~filename
   in
   let*! () = cctxt#message "Snapshot exported to %s@." snapshot_file in
   return_unit
@@ -482,13 +497,14 @@ let export_snapshot_auto_name =
   command
     ~group
     ~desc:"Export a snapshot of the rollup node state."
-    (args6
+    (args7
        data_dir_arg
        Cli.snapshot_dir_arg
        Cli.no_checks_arg
        Cli.compress_on_the_fly_arg
        Cli.uncompressed
-       Cli.compact)
+       Cli.compact
+       Cli.rollup_node_endpoint_arg)
     (prefixes ["snapshot"; "export"] @@ stop)
     (fun params cctxt -> export_snapshot params None cctxt)
 
@@ -497,18 +513,30 @@ let export_snapshot_named =
   command
     ~group
     ~desc:"Export a snapshot of the rollup node state to a given file."
-    (args5
+    (args6
        data_dir_arg
        Cli.no_checks_arg
        Cli.compress_on_the_fly_arg
        Cli.uncompressed
-       Cli.compact)
+       Cli.compact
+       Cli.rollup_node_endpoint_arg)
     (prefixes ["snapshot"; "export"] @@ Cli.snapshot_file_param @@ stop)
-    (fun (data_dir, no_checks, compress_on_the_fly, uncompressed, compact)
+    (fun ( data_dir,
+           no_checks,
+           compress_on_the_fly,
+           uncompressed,
+           compact,
+           rollup_node_endpoint )
          filename
          cctxt ->
       export_snapshot
-        (data_dir, None, no_checks, compress_on_the_fly, uncompressed, compact)
+        ( data_dir,
+          None,
+          no_checks,
+          compress_on_the_fly,
+          uncompressed,
+          compact,
+          rollup_node_endpoint )
         (Some filename)
         cctxt)
 
