@@ -1,7 +1,7 @@
 # TODO #2170: search for old/preceding protocol name AND number, and adapt
 
 # You can set these variables from the command line.
-SPHINXOPTS    = --write-all --fresh-env --nitpicky --fail-on-warning --keep-going
+SPHINXOPTS    = --write-all --fresh-env --nitpicky --fail-on-warning --keep-going --quiet
 SPHINXBUILD   = poetry run sphinx-build
 SOURCEDIR     = .
 TMPDOCDIR     = /tmp/octezdoc
