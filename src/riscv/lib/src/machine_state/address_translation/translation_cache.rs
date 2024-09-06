@@ -40,6 +40,7 @@ use crate::{
     machine_state::{bus::Address, csregisters::CSRRepr, mode::Mode},
     state_backend::{
         AllocatedOf, Atom, Cell, ManagerBase, ManagerRead, ManagerReadWrite, ManagerWrite, Many,
+        Ref,
     },
 };
 use strum::EnumCount;
@@ -93,6 +94,17 @@ impl<M: ManagerBase> Cached<M> {
             virt_page: space.3,
             phys_page: space.4,
         }
+    }
+
+    /// Obtain a structure with references to the bound regions of this type.
+    pub fn struct_ref(&self) -> AllocatedOf<CachedLayout, Ref<'_, M>> {
+        (
+            self.mode.struct_ref(),
+            self.fence_counter.struct_ref(),
+            self.satp.struct_ref(),
+            self.virt_page.struct_ref(),
+            self.phys_page.struct_ref(),
+        )
     }
 
     /// Reset the underlying storage.
@@ -188,6 +200,14 @@ impl<M: ManagerBase> AccessCache<M> {
                 .map_err(|_| "mismatching vector lengths for address translation cache pages")
                 .unwrap(),
         }
+    }
+
+    /// Obtain a structure with references to the bound regions of this type.
+    pub fn struct_ref(&self) -> AllocatedOf<AccessCacheLayout, Ref<'_, M>> {
+        (
+            self.fence_counter.struct_ref(),
+            self.entries.iter().map(Cached::struct_ref).collect(),
+        )
     }
 
     /// Reset the underlying storage.
@@ -293,6 +313,15 @@ impl<M: ManagerBase> TranslationCache<M> {
         Self {
             entries: space.map(AccessCache::bind),
         }
+    }
+
+    /// Obtain a structure with references to the bound regions of this type.
+    pub fn struct_ref(&self) -> AllocatedOf<TranslationCacheLayout, Ref<'_, M>> {
+        [
+            self.entries[0].struct_ref(),
+            self.entries[1].struct_ref(),
+            self.entries[2].struct_ref(),
+        ]
     }
 
     /// Reset the underlying state.

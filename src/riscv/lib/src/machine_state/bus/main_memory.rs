@@ -43,6 +43,11 @@ pub trait MainMemoryLayout: backend::Layout {
 
     fn refl<M: backend::ManagerBase>(space: backend::AllocatedOf<Self, M>) -> MainMemory<Self, M>;
 
+    /// Obtain a reference to the region(s) used for main memory.
+    fn data_struct_ref<M: backend::ManagerBase>(
+        data: &Self::Data<M>,
+    ) -> backend::AllocatedOf<Self, backend::Ref<'_, M>>;
+
     /// Read an element in the region. `address` is in bytes.
     fn data_read<E: backend::Elem, M: backend::ManagerRead>(
         data: &Self::Data<M>,
@@ -78,6 +83,14 @@ impl<const BYTES: usize> MainMemoryLayout for Sizes<BYTES> {
 
     fn refl<M: backend::ManagerBase>(space: backend::AllocatedOf<Self, M>) -> MainMemory<Self, M> {
         space
+    }
+
+    fn data_struct_ref<M: backend::ManagerBase>(
+        data: &Self::Data<M>,
+    ) -> backend::AllocatedOf<Self, backend::Ref<'_, M>> {
+        MainMemory {
+            data: data.struct_ref(),
+        }
     }
 
     fn data_read<E: backend::Elem, M: backend::ManagerRead>(
@@ -144,6 +157,11 @@ impl<L: MainMemoryLayout, M: backend::ManagerBase> MainMemory<L, M> {
     /// Bind the main memory state to the given allocated space.
     pub fn bind(space: backend::AllocatedOf<L, M>) -> Self {
         L::refl(space)
+    }
+
+    /// Obtain a structure with references to the bound regions of this type.
+    pub fn struct_ref(&self) -> backend::AllocatedOf<L, backend::Ref<'_, M>> {
+        L::data_struct_ref(&self.data)
     }
 
     /// Reset to the initial state.

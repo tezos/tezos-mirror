@@ -11,7 +11,7 @@ use crate::{
     },
     state_backend::{
         AllocatedOf, Atom, Cell, EffectCell, EnumCell, EnumCellLayout, ManagerBase, ManagerRead,
-        ManagerReadWrite, ManagerWrite,
+        ManagerReadWrite, ManagerWrite, Ref,
     },
     struct_layout,
 };
@@ -67,6 +67,31 @@ impl<M: ManagerBase> MStatusValue<M> {
             sxl: EnumCell::bind(space.sxl),
             sbe: space.sbe,
             mbe: space.mbe,
+        }
+    }
+
+    /// Obtain a structure with references to the bound regions of this type.
+    pub fn struct_ref(&self) -> AllocatedOf<MStatusLayout, Ref<'_, M>> {
+        MStatusLayoutAllocated {
+            sie: self.sie.struct_ref(),
+            mie: self.mie.struct_ref(),
+            spie: self.spie.struct_ref(),
+            ube: self.ube.struct_ref(),
+            mpie: self.mpie.struct_ref(),
+            spp: self.spp.struct_ref(),
+            mpp: self.mpp.struct_ref(),
+            fs: self.fs.struct_ref(),
+            xs: self.xs.struct_ref(),
+            mprv: self.mprv.struct_ref(),
+            sum: self.sum.struct_ref(),
+            mxr: self.mxr.struct_ref(),
+            tvm: self.tvm.struct_ref(),
+            tw: self.tw.struct_ref(),
+            tsr: self.tsr.struct_ref(),
+            uxl: self.uxl.struct_ref(),
+            sxl: self.sxl.struct_ref(),
+            sbe: self.sbe.struct_ref(),
+            mbe: self.mbe.struct_ref(),
         }
     }
 }

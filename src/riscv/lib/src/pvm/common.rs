@@ -118,6 +118,17 @@ impl<ML: main_memory::MainMemoryLayout, M: state_backend::ManagerBase> Pvm<ML, M
         }
     }
 
+    /// Obtain a structure with references to the bound regions of this type.
+    pub fn struct_ref(
+        &self,
+    ) -> state_backend::AllocatedOf<PvmLayout<ML>, state_backend::Ref<'_, M>> {
+        (
+            self.version.struct_ref(),
+            self.machine_state.struct_ref(),
+            self.status.struct_ref(),
+        )
+    }
+
     /// Reset the PVM state.
     pub fn reset(&mut self)
     where

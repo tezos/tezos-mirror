@@ -165,6 +165,11 @@ impl<M: backend::ManagerBase> XRegisters<M> {
         XRegisters { registers: space }
     }
 
+    /// Obtain a structure with references to the bound regions of this type.
+    pub fn struct_ref(&self) -> backend::AllocatedOf<XRegistersLayout, backend::Ref<'_, M>> {
+        self.registers.struct_ref()
+    }
+
     /// Read an integer from the registers.
     #[inline]
     pub fn read(&self, reg: XRegister) -> XValue
@@ -364,6 +369,11 @@ impl<M: backend::ManagerBase> FRegisters<M> {
     /// Bind the floating-point register space to the allocated space.
     pub fn bind(space: backend::AllocatedOf<FRegistersLayout, M>) -> Self {
         FRegisters { registers: space }
+    }
+
+    /// Obtain a structure with references to the bound regions of this type.
+    pub fn struct_ref(&self) -> backend::AllocatedOf<FRegistersLayout, backend::Ref<'_, M>> {
+        self.registers.struct_ref()
     }
 
     /// Reset the floating-point registers.

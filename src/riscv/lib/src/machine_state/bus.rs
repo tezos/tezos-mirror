@@ -102,6 +102,11 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::ManagerBase> Bus<ML, M> {
         }
     }
 
+    /// Obtain a structure with references to the bound regions of this type.
+    pub fn struct_ref(&self) -> backend::AllocatedOf<BusLayout<ML>, backend::Ref<'_, M>> {
+        (self.devices.struct_ref(), self.memory.struct_ref())
+    }
+
     /// Reset the bus state.
     pub fn reset(&mut self)
     where

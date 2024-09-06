@@ -5,7 +5,7 @@
 use std::marker::PhantomData;
 
 use super::{
-    AllocatedOf, Atom, Cell, Elem, ManagerBase, ManagerRead, ManagerReadWrite, ManagerWrite,
+    AllocatedOf, Atom, Cell, Elem, ManagerBase, ManagerRead, ManagerReadWrite, ManagerWrite, Ref,
 };
 
 /// XXX: Workaround trait for not having enum variants as const-generics
@@ -30,6 +30,11 @@ impl<T: Elem, EG: EffectGetter, M: ManagerBase> EffectCell<T, EG, M> {
             inner: space,
             _pd: PhantomData,
         }
+    }
+
+    /// Obtain a structure with references to the bound regions of this type.
+    pub fn struct_ref(&self) -> AllocatedOf<EffectCellLayout<T>, Ref<'_, M>> {
+        self.inner.struct_ref()
     }
 
     #[inline(always)]

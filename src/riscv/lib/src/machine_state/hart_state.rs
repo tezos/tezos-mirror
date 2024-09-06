@@ -64,6 +64,18 @@ impl<M: backend::ManagerBase> HartState<M> {
         }
     }
 
+    /// Obtain a structure with references to the bound regions of this type.
+    pub fn struct_ref(&self) -> backend::AllocatedOf<HartStateLayout, backend::Ref<'_, M>> {
+        (
+            self.xregisters.struct_ref(),
+            self.fregisters.struct_ref(),
+            self.csregisters.struct_ref(),
+            self.mode.struct_ref(),
+            self.pc.struct_ref(),
+            self.reservation_set.struct_ref(),
+        )
+    }
+
     /// Reset the hart state.
     pub fn reset(&mut self, pc: Address)
     where
