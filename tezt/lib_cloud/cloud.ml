@@ -30,26 +30,38 @@ let sigint =
 module Input : sig
   (** This module should be the only one that reads on [stdin]. *)
 
-  (** [next ()] returns the next line on stdin. *)
-  val next : unit -> string Lwt.t
+  (** [next ()] returns the next line on stdin or none if stdin is closed. *)
+  val next : unit -> string option Lwt.t
 end = struct
-  type t = {mutable resolvers : string Lwt.u list}
+  type t = {
+    mutable resolvers : string option Lwt.u list;
+    mutable stdin_closed : bool;
+  }
 
-  let state = {resolvers = []}
+  let state = {resolvers = []; stdin_closed = false}
 
   let next () =
-    let t, u = Lwt.task () in
-    state.resolvers <- u :: state.resolvers ;
-    t
+    if state.stdin_closed then Lwt.return_none
+    else
+      let t, u = Lwt.task () in
+      state.resolvers <- u :: state.resolvers ;
+      t
 
   let rec loop () =
     let* input = Lwt_io.read_line Lwt_io.stdin in
     state.resolvers
-    |> List.iter (fun resolver -> Lwt.wakeup_later resolver input) ;
+    |> List.iter (fun resolver -> Lwt.wakeup_later resolver (Some input)) ;
     state.resolvers <- [] ;
     loop ()
 
-  let _ = loop ()
+  let _ =
+    Lwt.catch
+      (fun () -> loop ())
+      (fun _exn ->
+        state.resolvers
+        |> List.iter (fun resolver -> Lwt.wakeup_later resolver None) ;
+        state.stdin_closed <- true ;
+        Lwt.return_unit)
 end
 
 let eof =
@@ -57,8 +69,12 @@ let eof =
   Lwt.dont_wait
     (fun () ->
       let rec loop () =
-        let* _ = Input.next () in
-        loop ()
+        let* input = Input.next () in
+        match input with
+        | None ->
+            Lwt.wakeup resolver () ;
+            Lwt.return_unit
+        | Some _ -> loop ()
       in
       loop ())
     (fun _ -> Lwt.wakeup resolver ()) ;
@@ -93,19 +109,21 @@ let shutdown ?exn t =
             let agents = Deployement.agents deployement in
             agents
             |> List.map (fun agent ->
-                   let point = Agent.point agent in
-                   Process.run
-                     "ssh"
-                     [
-                       "-S";
-                       Format.asprintf
-                         "~/.ssh/sockets/root@%s-%d"
-                         (fst point)
-                         (snd point);
-                       "-O";
-                       "exit";
-                       Format.asprintf "root@%s" (fst point);
-                     ])
+                   match Agent.point agent with
+                   | None -> Lwt.return_unit
+                   | Some point ->
+                       Process.run
+                         "ssh"
+                         [
+                           "-S";
+                           Format.asprintf
+                             "~/.ssh/sockets/root@%s-%d"
+                             (fst point)
+                             (snd point);
+                           "-O";
+                           "exit";
+                           Format.asprintf "root@%s" (fst point);
+                         ])
             |> Lwt.join)
       (fun _exn -> Lwt.return_unit)
   in
@@ -160,18 +178,22 @@ let shutdown ?exn t =
 
 (* This function is used to ensure we can connect to the docker image on the VM. *)
 let wait_ssh_server_running agent =
-  let runner = Agent.runner agent in
   if (Agent.configuration agent).os = "debian" then Lwt.return_unit
   else
-    let is_ready _output = true in
-    let run () =
-      let cmd, args =
-        Runner.wrap_with_ssh runner (Runner.Shell.cmd [] "echo" ["-n"; "check"])
-      in
-      Process.spawn cmd (["-o"; "StrictHostKeyChecking=no"] @ args)
-    in
-    let* _ = Env.wait_process ~is_ready ~run () in
-    Lwt.return_unit
+    match Agent.runner agent with
+    | None -> Lwt.return_unit
+    | Some runner ->
+        let is_ready _output = true in
+        let run () =
+          let cmd, args =
+            Runner.wrap_with_ssh
+              runner
+              (Runner.Shell.cmd [] "echo" ["-n"; "check"])
+          in
+          Process.spawn cmd (["-o"; "StrictHostKeyChecking=no"] @ args)
+        in
+        let* _ = Env.wait_process ~is_ready ~run () in
+        Lwt.return_unit
 
 let orchestrator deployement f =
   let agents = Deployement.agents deployement in
@@ -222,7 +244,8 @@ let orchestrator deployement f =
   shutdown ?exn t
 
 let attach agent =
-  let runner = Agent.runner agent in
+  (* The proxy agent has to have a runner attached to it. *)
+  let runner = Agent.runner agent |> Option.get in
   let hooks =
     Process.
       {
@@ -285,7 +308,11 @@ let attach agent =
             Gcloud.DNS.get_domain ~tezt_cloud:Env.tezt_cloud ~zone:"tezt-cloud"
           in
           Lwt.return (Format.asprintf "http://%s" domain)
-        else Lwt.return (Format.asprintf "http://%s" (Agent.point agent |> fst))
+        else
+          Lwt.return
+            (Format.asprintf
+               "http://%s"
+               (Agent.point agent |> Option.get |> fst))
       in
       Log.info "Deployement website can be accessed here: %s" uri ;
       Lwt.return_unit
@@ -344,7 +371,7 @@ let try_reattach () =
           (fun () ->
             let* status =
               Process.spawn
-                ~runner:(Agent.runner proxy_agent)
+                ?runner:(Agent.runner proxy_agent)
                 "ls"
                 ["screenlog.0"]
               |> Process.wait
@@ -394,13 +421,13 @@ let init_proxy ?(proxy_files = []) deployement =
   let runner = Agent.runner proxy_agent in
   let* () =
     (* This should not be necessary, this is to ensure there is no [screen] leftover. *)
-    let process = Process.spawn ~runner "pkill" ["screen"] in
+    let process = Process.spawn ?runner "pkill" ["screen"] in
     let* _ = Process.wait process in
     Lwt.return_unit
   in
   let* () =
     (* We start a screen session in detached mode. The orchestrator will run in this session. *)
-    Process.spawn ~runner "screen" ["-S"; "tezt-cloud"; "-d"; "-m"]
+    Process.spawn ?runner "screen" ["-S"; "tezt-cloud"; "-d"; "-m"]
     |> Process.check
   in
   let process =
@@ -446,18 +473,31 @@ let register ?proxy_files ?vms ~__FILE__ ~title ~tags ?seed f =
     (* The Cli arguments by-pass the argument given here. This enable the user
        to always have decide precisely the number of vms to be run. *)
     match (vms, Env.vms) with
-    | None, None -> None
+    | None, None | None, Some 0 -> None
+    | Some _, Some 0 when Env.mode = `Localhost || Env.mode = `Cloud ->
+        (* We don't want to go here when using the proxy mode. *)
+        None
     | None, Some i | Some _, Some i ->
         let vms = List.init i (fun _ -> Configuration.make ()) in
         Some vms
     | Some vms, None -> Some vms
   in
   match vms with
-  | None | Some [] ->
-      (* If there is no configuration, it is a similar scenario as if there were not agent. *)
+  | None ->
+      let default_agent =
+        Agent.make
+          ~configuration:(Configuration.make ())
+          ~next_available_port:
+            (let cpt = ref 30_000 in
+             fun () ->
+               incr cpt ;
+               !cpt)
+          ~name:"default agent"
+          ()
+      in
       f
         {
-          agents = [];
+          agents = [default_agent];
           website = None;
           grafana = None;
           prometheus = None;
@@ -518,11 +558,27 @@ let register ?proxy_files ?vms ~__FILE__ ~title ~tags ?seed f =
 
 let agents t =
   match Env.mode with
-  | `Orchestrator ->
+  | `Orchestrator -> (
       let proxy_agent = Proxy.get_agent t.agents in
       let proxy_vm_name = Agent.vm_name proxy_agent in
-      t.agents
-      |> List.filter (fun agent -> Agent.vm_name agent <> proxy_vm_name)
+      match
+        t.agents
+        |> List.filter (fun agent -> Agent.vm_name agent <> proxy_vm_name)
+      with
+      | [] ->
+          let default_agent =
+            Agent.make
+              ~configuration:(Configuration.make ())
+              ~next_available_port:
+                (let cpt = ref 30_000 in
+                 fun () ->
+                   incr cpt ;
+                   !cpt)
+              ~name:"default agent"
+              ()
+          in
+          [default_agent]
+      | agents -> agents)
   | `Host | `Cloud | `Localhost -> t.agents
 
 let get_configuration = Agent.configuration
@@ -550,7 +606,7 @@ let add_prometheus_source t ?metric_path ~job_name targets =
   | None -> Lwt.return_unit
   | Some prometheus ->
       let prometheus_target {agent; port; app_name} =
-        let address = agent |> Agent.runner |> Option.some |> Runner.address in
+        let address = agent |> Agent.runner |> Runner.address in
         Prometheus.{address; port; app_name}
       in
       let targets = List.map prometheus_target targets in

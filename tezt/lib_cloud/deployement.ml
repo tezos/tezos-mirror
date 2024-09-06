@@ -169,9 +169,7 @@ module Remote = struct
              agents
              |> List.iter (fun agent ->
                     (* We index the table per address to identify uniquely the agent. *)
-                    let address =
-                      agent |> Agent.runner |> Option.some |> Runner.address
-                    in
+                    let address = agent |> Agent.runner |> Runner.address in
                     Hashtbl.add
                       agents_info
                       address
@@ -198,7 +196,7 @@ module Remote = struct
             Gcloud.DNS.add
               ~tezt_cloud:Env.tezt_cloud
               ~zone:"tezt-cloud"
-              ~ip:(Agent.point agent |> fst)
+              ~ip:(Agent.point agent |> Option.get |> fst)
           else Lwt.return_unit
         in
         Lwt.return {agents = agent :: agents}

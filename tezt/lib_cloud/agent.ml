@@ -10,8 +10,8 @@ type t = {
   mutable name : string;
   vm_name : string;
   zone : string option;
-  point : string * int;
-  runner : Runner.t;
+  point : (string * int) option;
+  runner : Runner.t option;
   next_available_port : unit -> int;
   configuration : Configuration.t;
 }
@@ -66,17 +66,19 @@ let encoding =
          } ->
       (name, vm_name, zone, point, next_available_port (), configuration))
     (fun (name, vm_name, zone, point, next_available_port, configuration) ->
-      let ssh_port = snd point in
-      let address = fst point in
-      let ssh_id = ssh_id () in
-      let runner =
-        Runner.create ~ssh_user:"root" ~ssh_id ~ssh_port ~address ()
-      in
       let next_available_port =
         let current_port = ref (next_available_port - 1) in
         fun () ->
           incr current_port ;
           !current_port
+      in
+      let runner =
+        match point with
+        | None -> None
+        | Some (address, ssh_port) ->
+            let ssh_id = ssh_id () in
+            Runner.create ~ssh_user:"root" ~ssh_id ~ssh_port ~address ()
+            |> Option.some
       in
       {name; vm_name; zone; point; runner; next_available_port; configuration})
     (obj6
@@ -85,14 +87,21 @@ let encoding =
        (req "zone" (Data_encoding.option Data_encoding.string))
        (req
           "point"
-          (Data_encoding.tup2 Data_encoding.string Data_encoding.int31))
+          (Data_encoding.option
+             (Data_encoding.tup2 Data_encoding.string Data_encoding.int31)))
        (req "next_available_port" Data_encoding.int31)
        (req "configuration" configuration_encoding))
 
-let make ?zone ~ssh_id ~point:((address, ssh_port) as point) ~configuration
-    ~next_available_port ~name () =
+let make ?zone ?ssh_id ?point ~configuration ~next_available_port ~name () =
   let ssh_user = "root" in
-  let runner = Runner.create ~ssh_user ~ssh_id ~ssh_port ~address () in
+  let runner =
+    match (point, ssh_id) with
+    | None, None -> None
+    | Some _, None | None, Some _ ->
+        Test.fail "Agent.make was not initialized correctly"
+    | Some (address, ssh_port), Some ssh_id ->
+        Runner.create ~ssh_user ~ssh_id ~ssh_port ~address () |> Option.some
+  in
   {
     point;
     runner;
@@ -131,32 +140,25 @@ let host_run_command agent cmd args =
       Process.spawn cmd_wrapper.Gcloud.cmd (cmd_wrapper.args @ [cmd] @ args)
 
 let docker_run_command agent cmd args =
-  let cmd, args =
-    Runner.wrap_with_ssh agent.runner (Runner.Shell.cmd [] cmd args)
-  in
-  (* The host check is very not convenient at all for this setting. This makes
-     tezt cloud sensible to man in the middle attacks. There are other options
-     like doing the check the first time only etc... But they all fail at some
-     point. I think the issue is that:
+  match agent.runner with
+  | None -> Process.spawn cmd args
+  | Some runner ->
+      let cmd, args =
+        Runner.wrap_with_ssh runner (Runner.Shell.cmd [] cmd args)
+      in
+      (* The host check is very not convenient at all for this setting. This makes
+         tezt cloud sensible to man in the middle attacks. There are other options
+         like doing the check the first time only etc... But they all fail at some
+         point. I think the issue is that:
 
-      - GCP may reuse IP addresses
-      - The docker image generates new key anytime it is generated
+          - GCP may reuse IP addresses
+          - The docker image generates new key anytime it is generated
 
-      I don't have a good proposition that keeps a nice UX and is secure at the moment.
-  *)
-  Process.spawn cmd (["-o"; "StrictHostKeyChecking=no"] @ args)
+          I don't have a good proposition that keeps a nice UX and is secure at the moment.
+      *)
+      Process.spawn cmd (["-o"; "StrictHostKeyChecking=no"] @ args)
 
 let copy agent ~source ~destination =
-  let runner = agent.runner in
-  let identity =
-    Option.fold ~none:[] ~some:(fun i -> ["-i"; i]) runner.ssh_id
-  in
-  let port =
-    Option.fold
-      ~none:[]
-      ~some:(fun p -> ["-P"; Format.sprintf "%d" p])
-      runner.ssh_port
-  in
   let* exists =
     let process = docker_run_command agent "ls" [destination] in
     let* status = process |> Process.wait in
@@ -190,25 +192,39 @@ let copy agent ~source ~destination =
   in
   if exists then Lwt.return_unit
   else
-    let destination =
-      Format.sprintf
-        "%s%s:%s"
-        (Option.fold
-           ~none:""
-           ~some:(fun u -> Format.sprintf "%s@" u)
-           runner.ssh_user)
-        runner.address
-        destination
-    in
-    let* () =
-      (* FIXME: I forgot why we enforce [-0]. *)
-      Process.run
-        "scp"
-        (["-O"]
-        @ ["-o"; "StrictHostKeyChecking=no"]
-        @ identity @ port @ [source] @ [destination])
-    in
-    Lwt.return_unit
+    match agent.runner with
+    | None ->
+        if source <> destination then Process.run "cp" [source; destination]
+        else Lwt.return_unit
+    | Some runner ->
+        let destination =
+          Format.sprintf
+            "%s%s:%s"
+            (Option.fold
+               ~none:""
+               ~some:(fun u -> Format.sprintf "%s@" u)
+               runner.Runner.ssh_user)
+            runner.address
+            destination
+        in
+        let identity =
+          Option.fold ~none:[] ~some:(fun i -> ["-i"; i]) runner.Runner.ssh_id
+        in
+        let port =
+          Option.fold
+            ~none:[]
+            ~some:(fun p -> ["-P"; Format.sprintf "%d" p])
+            runner.Runner.ssh_port
+        in
+        let* () =
+          (* FIXME: I forgot why we enforce [-0]. *)
+          Process.run
+            "scp"
+            (["-O"]
+            @ ["-o"; "StrictHostKeyChecking=no"]
+            @ identity @ port @ [source] @ [destination])
+        in
+        Lwt.return_unit
 
 let is_binary file =
   let* output = Process.run_and_read_stdout "file" [file] in

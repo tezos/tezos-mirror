@@ -71,7 +71,7 @@ let copy_files proxy_agent ~scenario_files ~proxy_deployement =
   *)
   let* output =
     Process.spawn
-      ~runner:(Agent.runner proxy_agent)
+      ?runner:(Agent.runner proxy_agent)
       "ls"
       [Path.default_binaries_path ()]
     |> Process.check_and_read_stdout
@@ -81,7 +81,7 @@ let copy_files proxy_agent ~scenario_files ~proxy_deployement =
     files
     |> List.map (fun file ->
            Process.spawn
-             ~runner:(Agent.runner proxy_agent)
+             ?runner:(Agent.runner proxy_agent)
              "ln"
              ["-s"; Path.default_binaries_path () // file; file; "-f"]
            |> Process.check)

@@ -22,7 +22,7 @@ let netdata_source_of_agents agents =
   let metric_path = "/api/v1/allmetrics?format=prometheus&help=yes" in
   let target agent =
     let app_name = Agent.name agent in
-    let address = agent |> Agent.runner |> Option.some |> Runner.address in
+    let address = agent |> Agent.runner |> Runner.address in
     {address; port = 19999; app_name}
   in
   let targets = List.map target agents in

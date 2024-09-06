@@ -121,7 +121,7 @@ module Node = struct
             toplog "Downloading a rolling snapshot" ;
             let* () =
               Process.spawn
-                ~runner:(runner_of_agent agent)
+                ?runner:(runner_of_agent agent)
                 "wget"
                 [
                   "-O";
@@ -231,15 +231,22 @@ module Teztale = struct
     in
     let port = Agent.next_available_port agent in
     let configuration = make_configuration ~port in
-    let cmd =
-      Runner.Shell.(
-        redirect_stdout (cmd [] "echo" [configuration]) configuration_file)
+    let* () =
+      match runner with
+      | None ->
+          write_file configuration_file ~contents:configuration ;
+          Lwt.return_unit
+      | Some runner ->
+          let cmd =
+            Runner.Shell.(
+              redirect_stdout (cmd [] "echo" [configuration]) configuration_file)
+          in
+          let cmd, args = Runner.wrap_with_ssh runner cmd in
+          Process.spawn cmd args |> Process.check
     in
-    let cmd, args = Runner.wrap_with_ssh runner cmd in
-    let* () = Process.spawn cmd args |> Process.check in
     let* path = Agent.copy agent ~source:path in
     let server_daemon =
-      Process.spawn ~name:"teztale-server" ~runner path [configuration_file]
+      Process.spawn ~name:"teztale-server" ?runner path [configuration_file]
     in
     (* Wait a bit it starts. *)
     let* () = Lwt_unix.sleep 0.5 in
@@ -257,7 +264,7 @@ module Teztale = struct
     let archiver_daemon =
       Process.spawn
         ~name:"teztale-archiver"
-        ~runner
+        ?runner
         path
         ["--endpoint"; node_endpoint; "feed"; teztale_endpoint]
     in
@@ -1084,7 +1091,10 @@ let init_ghostnet cloud (configuration : configuration) agent =
           Endpoint.
             {
               scheme = "http";
-              host = Agent.point agent |> fst;
+              host =
+                (match Agent.point agent with
+                | None -> "127.0.0.1"
+                | Some point -> fst point);
               port = Node.rpc_port node;
             }
         in
@@ -1273,7 +1283,10 @@ let init_bootstrap_and_activate_protocol cloud (configuration : configuration)
     Endpoint.
       {
         scheme = "http";
-        host = Agent.point agent |> fst;
+        host =
+          (match Agent.point agent with
+          | None -> "127.0.0.1"
+          | Some point -> fst point);
         port = Node.rpc_port bootstrap_node;
       }
   in
