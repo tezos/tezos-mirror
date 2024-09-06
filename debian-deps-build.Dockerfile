@@ -42,7 +42,6 @@ RUN opam init --bare --disable-sandboxing
 # we do not need everything to run build-deps
 # we copy the mininum amount of files to use
 # the caching mechanism more efficiently
-COPY scripts/version.sh /tmp/
 COPY --link scripts/install_build_deps.sh /root/tezos/scripts/
 COPY --link scripts/install_build_deps.rust.sh /root/tezos/scripts/
 COPY --link scripts/install_dal_trusted_setup.sh /root/tezos/scripts/
@@ -52,9 +51,16 @@ COPY --link opam/virtual/octez-deps.opam.locked /root/tezos/opam/virtual/
 COPY --link opam /root/tezos/
 
 WORKDIR /root/tezos
+
+# we download and copy the zcash params in a separate directory
+# and before the make build-deps to create a second docker layer and
+# optimize caching
+RUN DAL_TRUSTED_SETUP="/root/tezos/dal-trusted-setup" \
+    scripts/install_dal_trusted_setup.sh
+
 #hadolint ignore=SC2154, SC1091
-RUN . /tmp/version.sh && \
+RUN . ./scripts/version.sh && \
     eval $(opam env) && \
     . "/root/.cargo/env" && \
     make build-deps && \
-    scripts/install_dal_trusted_setup.sh
+    mv dal-trusted-setup _opam/share/dal-trusted-setup
