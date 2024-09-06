@@ -51,6 +51,12 @@ let is_attester_only_profile = function
   | Types.Random_observer -> false
   | Types.Operator p -> Operator_profile.(attester_only p)
 
+let can_publish_on_slot_index slot_index = function
+  | Types.Bootstrap -> false
+  | Types.Random_observer -> false
+  | Types.Operator p ->
+      Operator_profile.(can_publish_on_slot_index slot_index p)
+
 let merge_profiles ~lower_prio ~higher_prio =
   match (lower_prio, higher_prio) with
   | Types.Bootstrap, Types.Bootstrap -> Types.Bootstrap

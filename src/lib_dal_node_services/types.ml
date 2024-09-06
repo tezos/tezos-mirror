@@ -453,13 +453,27 @@ let char =
     ~construct:(fun c -> String.make 1 c)
     ()
 
+let option_int =
+  Resto.Arg.make
+    ~name:"optional int"
+    ~destruct:(function
+      | "" -> Ok None
+      | str -> (
+          try Ok (Some (int_of_string str))
+          with Failure _ -> Error "int expected"))
+    ~construct:(function None -> "" | Some i -> string_of_int i)
+    ()
+
 let slot_query =
   let open Tezos_rpc.Query in
-  query (fun padding ->
+  query (fun padding slot_index ->
       object
         method padding = padding
+
+        method slot_index = slot_index
       end)
   |+ field "padding" char '\x00' (fun obj -> obj#padding)
+  |+ field "slot_index" option_int None (fun obj -> obj#slot_index)
   |> seal
 
 let wait_query =

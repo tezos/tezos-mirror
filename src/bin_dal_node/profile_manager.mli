@@ -43,6 +43,11 @@ val is_prover_profile : t -> bool
     observer roles. *)
 val is_attester_only_profile : t -> bool
 
+(** [can_publish_on_slot_index slot_index profile] returns [true] if
+    the node has either the producer or the observer profile of the
+    given slot index. *)
+val can_publish_on_slot_index : Types.slot_index -> t -> bool
+
 val encoding : t Data_encoding.t
 
 (** The empty profile manager context. *)

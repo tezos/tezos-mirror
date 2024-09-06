@@ -54,7 +54,7 @@ let publish_slot dal_node client source ~slot_size ~level ~slot_index =
   in
   Log.info "Publishing slot data '%s'..." slot_content ;
   let slot = Dal.Helpers.make_slot ~slot_size slot_content in
-  let* commitment, proof = Dal.Helpers.store_slot dal_node slot in
+  let* commitment, proof = Dal.Helpers.store_slot ~slot_index dal_node slot in
   let commitment_hash =
     match Dal.Cryptobox.Commitment.of_b58check_opt commitment with
     | None -> assert false

@@ -332,7 +332,9 @@ let slots_injector_scenario ?publisher_sk ~airdropper_alias client dal_node
       sf "slot=%d/payload=%d" slot_index level
       |> Dal_common.Helpers.make_slot ~slot_size
     in
-    let* commitment, proof = Dal_common.Helpers.store_slot dal_node slot in
+    let* commitment, proof =
+      Dal_common.Helpers.store_slot dal_node ~slot_index slot
+    in
     let* level = Node.wait_for_level l1_node (level + 1) in
     let*! () =
       Client.publish_dal_commitment

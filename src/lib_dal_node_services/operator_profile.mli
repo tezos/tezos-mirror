@@ -68,6 +68,11 @@ val producer_slot_out_of_bounds : int -> t -> int option
     observer for slot index [i] *)
 val is_observed_slot : int -> t -> bool
 
+(** [can_publish_on_slot_index slot_index op] returns true if and only
+    if [op] contains an observer or a producet for slot index
+    [slot_index] *)
+val can_publish_on_slot_index : int -> t -> bool
+
 (** Returns all slot indexes used in the profile, whether they are for producer
     or observer *)
 val get_all_slot_indexes : t -> int list

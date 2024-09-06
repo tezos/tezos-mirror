@@ -53,6 +53,9 @@ let producer_slot_out_of_bounds number_of_slots op =
 let is_observed_slot slot_index {observers; _} =
   Slot_set.mem slot_index observers
 
+let can_publish_on_slot_index slot_index {observers; producers; _} =
+  Slot_set.mem slot_index observers || Slot_set.mem slot_index producers
+
 let get_all_slot_indexes {producers; observers; _} =
   Slot_set.(union producers observers |> to_seq) |> List.of_seq
 
