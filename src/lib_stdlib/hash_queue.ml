@@ -45,7 +45,7 @@ struct
       queue and calls [f] on the bindings for these elements. The elements are
       returned from oldest to newest. *)
   let oldest_elements q n action =
-    let exception Elements of V.t list in
+    let exception Elements of (K.t * V.t) list in
     let rev_elts =
       try
         Cache.fold_oldest_first
@@ -53,7 +53,7 @@ struct
             if count >= n then raise (Elements acc)
             else (
               action k v q ;
-              (count + 1, v :: acc)))
+              (count + 1, (k, v) :: acc)))
           q
           (0, [])
         |> snd
@@ -92,22 +92,19 @@ struct
   let peek q =
     match oldest_elements q 1 (fun _ _ _ -> ()) with
     | [] -> None
-    | [x] -> Some x
+    | [(k, x)] -> Some (k, x)
     | _ -> assert false
 
   let take q =
     match oldest_elements q 1 (fun k _ q -> remove q k) with
     | [] -> None
-    | [x] -> Some x
+    | [(k, x)] -> Some (k, x)
     | _ -> assert false
 
   let peek_at_most q n = oldest_elements q n (fun _ _ _ -> ())
 
   let take_at_most q n =
-    (* Removing the keys during the fold does not work, accumulating the keys
-       then removing them does the trick. *)
-    let keys = ref [] in
-    let values = oldest_elements q n (fun k _ _ -> keys := k :: !keys) in
-    List.iter (remove q) !keys ;
-    values
+    let keys_and_values = oldest_elements q n (fun _ _ _ -> ()) in
+    List.iter (fun (k, _v) -> remove q k) keys_and_values ;
+    keys_and_values
 end
