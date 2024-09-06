@@ -104,14 +104,10 @@ let maybe_split_context node_ctxt commitment_hash head_level =
   when_ commit_is_gc_candidate @@ fun () ->
   let* last = Node_context.get_last_context_split_level node_ctxt in
   let last = Option.value last ~default:node_ctxt.genesis_info.level in
-  let splitting_period =
-    Option.value
-      node_ctxt.config.gc_parameters.context_splitting_period
-      ~default:
-        (Reference.get node_ctxt.current_protocol).constants.sc_rollup
-          .challenge_window_in_blocks
-  in
-  if Int32.(to_int @@ sub head_level last) >= splitting_period then (
+  if
+    Int32.(to_int @@ sub head_level last)
+    >= Node_context.splitting_period node_ctxt
+  then (
     Context.split node_ctxt.context ;
     Node_context.save_context_split_level node_ctxt head_level)
   else return_unit
@@ -632,8 +628,8 @@ let run ({node_ctxt; configuration; plugin; _} as state) =
     ~pvm_kind:(Octez_smart_rollup.Kind.to_string node_ctxt.kind)
     ~history_mode ;
   Metrics.Info.set_proto_info current_protocol.hash current_protocol.constants ;
-  let* gc_info = Node_context.get_gc_levels node_ctxt in
-  Metrics.GC.set_oldest_available_level gc_info.first_available_level ;
+  let* first_available_level = Node_context.first_available_level node_ctxt in
+  Metrics.GC.set_oldest_available_level first_available_level ;
   if configuration.performance_metrics then performance_metrics state ;
   let signers = make_signers_for_injector node_ctxt.config.operators in
   let* () =

@@ -259,6 +259,10 @@ Smart Rollup node
 - New RPC ``GET /admin/cancel_gc`` to cancel any on-going garbage collection in
   the rollup node. (MR :gl:`!14693`)
 
+- Refined GC for rollup node is now triggered every ~3 days to make it less
+  wasteful on resources. Gc is not run anymore after importing an archive
+  snapshot in a full node. (MR :gl:`!14717`)
+
 Smart Rollup WASM Debugger
 --------------------------
 

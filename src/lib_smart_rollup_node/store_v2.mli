@@ -131,6 +131,7 @@ type +'a store = {
   protocols : 'a Protocols.t;
   irmin_store : 'a Irmin_store.t;
   gc_levels : 'a Gc_levels.t;
+  successful_gc_levels : 'a Gc_levels.t;
   last_context_split_level : 'a Last_context_split.t;
   history_mode : 'a History_mode.t;
 }

@@ -56,25 +56,19 @@ let smart_rollup_address :
     ~output:(Data_encoding.Fixed.bytes 20)
     (open_root / "global" / "smart_rollup_address")
 
-let gc_info_encoding =
-  Data_encoding.(
-    obj3
-      (req "last_gc_level" int32)
-      (req "first_available_level" int32)
-      (opt "last_context_split_level" int32))
+let first_available_level_from_gc_info_encoding =
+  (* We only care about first available level *)
+  (* NOTE: This encoding is meant to be used with JSON only to remain compatible
+     with previous versions of the rollup node. *)
+  let open Data_encoding in
+  merge_objs (obj1 (req "first_available_level" int32)) unit
 
-let gc_info :
-    ( [`GET],
-      unit,
-      unit,
-      unit,
-      unit,
-      int32 * int32 * int32 option )
-    Service.service =
+let first_available_level :
+    ([`GET], unit, unit, unit, unit, int32 * unit) Service.service =
   Service.get_service
     ~description:"Smart rollup address"
     ~query:Query.empty
-    ~output:gc_info_encoding
+    ~output:first_available_level_from_gc_info_encoding
     (open_root / "local" / "gc_info")
 
 type state_value_query = {key : string}
@@ -397,20 +391,19 @@ let smart_rollup_address ~keep_alive base =
 
 let oldest_known_l1_level ~keep_alive base =
   let open Lwt_result_syntax in
-  let*! answer =
+  let+ level, () =
     call_service
       ~keep_alive
       ~base
-      ~media_types:[Media_type.octet_stream]
-      gc_info
+      ~media_types:[Media_type.json]
+        (* Only JSON, we just look at a single field to be compatible with all
+           rollup node versions. *)
+      first_available_level
       ()
       ()
       ()
   in
-  match answer with
-  | Ok (_last_gc_level, first_available_level, _last_context_split) ->
-      return first_available_level
-  | Error trace -> fail trace
+  level
 
 (** [tezos_level base] asks for the smart rollup node's
     latest l1 level, using the endpoint [base]. *)

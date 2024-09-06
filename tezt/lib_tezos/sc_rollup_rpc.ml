@@ -191,13 +191,22 @@ let get_local_last_published_commitment () =
 let get_local_commitments ~commitment_hash () =
   make GET ["local"; "commitments"; commitment_hash] commitment_info_from_json
 
-type gc_info = {last_gc_level : int; first_available_level : int}
+type gc_info = {
+  first_available_level : int;
+  last_gc_started_at : int option;
+  last_context_split_level : int option;
+  last_successful_gc_target : int option;
+}
 
 let get_local_gc_info () =
   make GET ["local"; "gc_info"] (fun obj ->
       {
-        last_gc_level = JSON.(obj |-> "last_gc_level" |> as_int);
         first_available_level = JSON.(obj |-> "first_available_level" |> as_int);
+        last_gc_started_at = JSON.(obj |-> "last_gc_level" |> as_int_opt);
+        last_context_split_level =
+          JSON.(obj |-> "last_context_split_level" |> as_int_opt);
+        last_successful_gc_target =
+          JSON.(obj |-> "last_successful_gc_target" |> as_int_opt);
       })
 
 let get_global_block_state ?(block = "head") ~key () =

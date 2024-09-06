@@ -70,7 +70,8 @@ type injector = {
 type fee_parameters = Injector_common.fee_parameter Operation_kind.Map.t
 
 type gc_parameters = {
-  frequency_in_blocks : int32;  (** Frequency at which the GC is triggered. *)
+  frequency_in_blocks : int32 option;
+      (** Frequency at which the GC is triggered. *)
   context_splitting_period : int option;
       (** Number of blocks before splitting the context. *)
 }

@@ -568,9 +568,7 @@ let with_modify_data_dir cctxt ~data_dir ~apply_unsafe_patches
 let reconstruct_context_from_first_available_level
     (node_ctxt : _ Node_context.t) ~(head : Sc_rollup_block.t) =
   let open Lwt_result_syntax in
-  let* {first_available_level = first_level; _} =
-    Node_context.get_gc_levels node_ctxt
-  in
+  let* first_level = Node_context.first_available_level node_ctxt in
   let total = Int32.sub head.header.level first_level in
   let progress_bar =
     Progress_bar.progress_bar
@@ -953,7 +951,7 @@ let check_data_dir_unpopulated data_dir () =
       data_dir
   else return_unit
 
-let maybe_gc_after_import cctxt ~data_dir (snapshot_header : Header.t)
+let correct_history_mode ~data_dir (snapshot_header : Header.t)
     (original_history_mode : Configuration.history_mode option) =
   let open Lwt_result_syntax in
   match (original_history_mode, snapshot_header.history_mode) with
@@ -963,29 +961,15 @@ let maybe_gc_after_import cctxt ~data_dir (snapshot_header : Header.t)
       assert false
   | Some Archive, Archive | Some Full, Full -> return_unit
   | Some Full, Archive ->
-      (* no need to apply unsafe patche here because gc don't run the
-         rollup *)
-      with_modify_data_dir cctxt ~data_dir ~apply_unsafe_patches:false
-      @@ fun node_ctxt ~head ->
-      let* () =
-        Node_context.Node_store.check_and_set_history_mode
+      let* hist_store =
+        Store.History_mode.load
+          ~path:
+            (Filename.concat
+               (Configuration.default_storage_dir data_dir)
+               "history_mode")
           Read_write
-          node_ctxt.store
-          (Some Full)
       in
-      Format.eprintf
-        "Running garbage collection to convert rollup node data to full \
-         mode... %!" ;
-      let start = Time.System.now () in
-      let* () =
-        Node_context.gc
-          ~force:true
-          ~wait_finished:true
-          node_ctxt
-          ~level:head.header.level
-      in
-      let elapsed = Ptime.diff (Time.System.now ()) start in
-      Format.eprintf "Done (%a)@." Ptime.Span.pp elapsed ;
+      let* () = Store.History_mode.write hist_store Full in
       return_unit
 
 let import ~apply_unsafe_patches ~no_checks ~force cctxt ~data_dir
@@ -1012,7 +996,7 @@ let import ~apply_unsafe_patches ~no_checks ~force cctxt ~data_dir
   in
   let* () = maybe_reconstruct_context cctxt ~data_dir ~apply_unsafe_patches in
   let* () =
-    maybe_gc_after_import cctxt ~data_dir snapshot_header original_history_mode
+    correct_history_mode ~data_dir snapshot_header original_history_mode
   in
   unless no_checks @@ fun () ->
   post_checks

@@ -47,7 +47,7 @@ type injector = {retention_period : int; attempts : int; injection_ttl : int}
 type fee_parameters = Injector_common.fee_parameter Operation_kind.Map.t
 
 type gc_parameters = {
-  frequency_in_blocks : int32;
+  frequency_in_blocks : int32 option;
   context_splitting_period : int option;
 }
 
@@ -231,7 +231,7 @@ let default_l1_rpc_timeout = 60. (* seconds *)
 let default_loop_retry_delay = 10. (* seconds *)
 
 let default_gc_parameters =
-  {frequency_in_blocks = 1000l; context_splitting_period = None}
+  {frequency_in_blocks = None; context_splitting_period = None}
 
 let default_history_mode = Full
 
@@ -394,9 +394,7 @@ let gc_parameters_encoding : gc_parameters Data_encoding.t =
       (frequency_in_blocks, context_splitting_period))
     (fun (frequency_in_blocks, context_splitting_period) ->
       {frequency_in_blocks; context_splitting_period})
-  @@ obj2
-       (dft "frequency" int32 default_gc_parameters.frequency_in_blocks)
-       (opt "context_splitting_period" int31)
+  @@ obj2 (opt "frequency" int32) (opt "context_splitting_period" int31)
 
 let history_mode_encoding : history_mode Data_encoding.t =
   Data_encoding.string_enum [("archive", Archive); ("full", Full)]
@@ -812,13 +810,7 @@ module Cli = struct
         log_kernel_debug;
         no_degraded;
         gc_parameters =
-          {
-            frequency_in_blocks =
-              Option.value
-                ~default:default_gc_parameters.frequency_in_blocks
-                gc_frequency;
-            context_splitting_period = None;
-          };
+          {frequency_in_blocks = gc_frequency; context_splitting_period = None};
         history_mode;
         cors =
           Resto_cohttp.Cors.
@@ -907,9 +899,9 @@ module Cli = struct
         gc_parameters =
           {
             frequency_in_blocks =
-              Option.value
-                ~default:configuration.gc_parameters.frequency_in_blocks
-                gc_frequency;
+              Option.either
+                gc_frequency
+                configuration.gc_parameters.frequency_in_blocks;
             context_splitting_period =
               configuration.gc_parameters.context_splitting_period;
           };
