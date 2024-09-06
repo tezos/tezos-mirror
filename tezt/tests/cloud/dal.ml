@@ -213,7 +213,7 @@ module Node = struct
         match data_dir with
         | None ->
             let* node = Node.Agent.create ~name agent in
-            let* () = Node.config_init node [] in
+            let* () = Node.config_init node [Cors_origin "*"] in
             let* () =
               match dal_config with
               | None -> Lwt.return_unit
