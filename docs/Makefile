@@ -1,7 +1,7 @@
 # TODO #2170: search for old/preceding protocol name AND number, and adapt
 
 # You can set these variables from the command line.
-SPHINXOPTS    = -aE -n -W --keep-going
+SPHINXOPTS    = --write-all --fresh-env --nitpicky --fail-on-warning --keep-going
 SPHINXBUILD   = poetry run sphinx-build
 SOURCEDIR     = .
 TMPDOCDIR     = /tmp/octezdoc
@@ -107,7 +107,7 @@ odoc-raw:
 # Run this after make html
 linkcheck:
 	@echo "Running linkcheck, outputs messages to $(BUILDDIR)/output.txt"
-	@$(SPHINXBUILD) -b linkcheck "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) >$@;\
+	@$(SPHINXBUILD) --builder linkcheck "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) >$@;\
 		RESULT=$$?; cat $(BUILDDIR)/output.txt; exit $$RESULT
 
 .PHONY: fixlinkcheck
@@ -205,7 +205,7 @@ docexes-gen: api/errors.rst p2p rpc
 .PHONY: sphinx
 sphinx: install-dependencies
 	(echo ':orphan:'; echo ''; cat ../CHANGES.rst) > CHANGES-dev.rst
-	@$(SPHINXBUILD) -b html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS)
+	@$(SPHINXBUILD) --builder html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS)
 	@ln -s active "$(BUILDDIR)/paris" || true
 
 # pylint does not support pyproject.toml configuration for now
