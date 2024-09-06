@@ -1059,14 +1059,16 @@ let gc ?(wait_finished = false) ?(force = false) node_ctxt ~(level : int32) =
           let* () = Store.gc node_ctxt.store ~level:gc_level in
           let gc_waiter () =
             let open Lwt_syntax in
-            let* () = Context.wait_gc_completion node_ctxt.context
-            and* () = Store.wait_gc_completion node_ctxt.store in
-            Metrics.wrap (fun () ->
-                let stop_timestamp = Time.System.now () in
-                Metrics.GC.set_process_time
-                @@ Ptime.diff stop_timestamp start_timestamp) ;
-            let* () = Event.gc_finished ~gc_level ~head_level:level in
-            Lwt_lock_file.unlock gc_lockfile
+            Lwt.finalize
+              (fun () ->
+                let* () = Context.wait_gc_completion node_ctxt.context
+                and* () = Store.wait_gc_completion node_ctxt.store in
+                Metrics.wrap (fun () ->
+                    let stop_timestamp = Time.System.now () in
+                    Metrics.GC.set_process_time
+                    @@ Ptime.diff stop_timestamp start_timestamp) ;
+                Event.gc_finished ~gc_level ~head_level:level)
+              (fun () -> Lwt_lock_file.unlock gc_lockfile)
           in
           if wait_finished then
             let*! () = gc_waiter () in
@@ -1075,6 +1077,12 @@ let gc ?(wait_finished = false) ?(force = false) node_ctxt ~(level : int32) =
             Lwt.dont_wait gc_waiter (fun _exn -> ()) ;
             return_unit))
   | _ -> return_unit
+
+let cancel_gc node_ctxt =
+  let open Lwt_syntax in
+  let canceled_context_gc = Context.cancel_gc node_ctxt.context in
+  let+ canceled_store_gc = Store.cancel_gc node_ctxt.store in
+  canceled_context_gc || canceled_store_gc
 
 let check_level_available node_ctxt accessed_level =
   let open Lwt_result_syntax in

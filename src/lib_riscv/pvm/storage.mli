@@ -37,6 +37,8 @@ val commit : ?message:string -> Repo.t -> State.t -> Id.t Lwt.t
 
 val is_gc_finished : Repo.t -> bool
 
+val cancel_gc : Repo.t -> bool
+
 val split : Repo.t -> unit
 
 val gc : Repo.t -> ?callback:(unit -> unit Lwt.t) -> Id.t -> unit Lwt.t

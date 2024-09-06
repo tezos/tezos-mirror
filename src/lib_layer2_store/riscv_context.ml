@@ -63,6 +63,8 @@ let commit ?message ctxt = Storage.commit ?message ctxt.index.repo ctxt.tree
 
 let is_gc_finished index = Storage.is_gc_finished index.repo
 
+let cancel_gc index = Storage.cancel_gc index.repo
+
 let split index = Storage.split index.repo
 
 let gc index ?(callback : unit -> unit Lwt.t = fun () -> Lwt.return ())

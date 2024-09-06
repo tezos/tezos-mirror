@@ -198,6 +198,8 @@ let wait_gc_completion index =
 
 let is_gc_finished index = IStore.Gc.is_finished index.repo
 
+let cancel_gc index = IStore.Gc.cancel index.repo
+
 let index context = context.index
 
 let export_snapshot {path = _; repo} hash ~path =

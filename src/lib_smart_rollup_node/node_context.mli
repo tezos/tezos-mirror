@@ -563,6 +563,10 @@ val gc :
   level:int32 ->
   unit tzresult Lwt.t
 
+(** [cancel_gc t] stops any currently ongoing GC. It returns [true] if a GC was
+    canceled. *)
+val cancel_gc : rw -> bool Lwt.t
+
 (** [get_gc_levels node_ctxt] returns information about the garbage collected
     levels. *)
 val get_gc_levels : _ t -> Store.Gc_levels.levels tzresult Lwt.t

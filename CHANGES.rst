@@ -249,6 +249,9 @@ Smart Rollup node
 
 - Introduce the 6th version of the WASM PVM. (MR :gl:`!14493`)
 
+- New RPC ``GET /admin/cancel_gc`` to cancel any on-going garbage collection in
+  the rollup node. (MR :gl:`!14693`)
+
 Smart Rollup WASM Debugger
 --------------------------
 

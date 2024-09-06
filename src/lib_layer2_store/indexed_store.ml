@@ -107,6 +107,8 @@ module type INDEXABLE_STORE = sig
   val wait_gc_completion : 'a t -> unit Lwt.t
 
   val is_gc_finished : 'a t -> bool
+
+  val cancel_gc : 'a t -> bool Lwt.t
 end
 
 module type INDEXABLE_REMOVABLE_STORE = sig
@@ -158,6 +160,8 @@ module type INDEXED_FILE = sig
   val wait_gc_completion : 'a t -> unit Lwt.t
 
   val is_gc_finished : 'a t -> bool
+
+  val cancel_gc : 'a t -> bool Lwt.t
 end
 
 module type SIMPLE_INDEXED_FILE = sig
@@ -252,7 +256,7 @@ module Make_indexable (N : NAME) (K : INDEX_KEY) (V : Index.Value.S) = struct
 
   type gc_status =
     | No_gc
-    | Ongoing of {tmp_index : internal_index; promise : unit Lwt.t}
+    | Ongoing of {promise : unit Lwt.t; canceler : Lwt_canceler.t}
 
   (** In order to periodically clean up the store with the {!gc} function, each
       pure index store is split in multiple indexes: one fresh index and
@@ -386,16 +390,15 @@ module Make_indexable (N : NAME) (K : INDEX_KEY) (V : Index.Value.S) = struct
     protect @@ fun () ->
     Lwt_idle_waiter.force_idle store.scheduler @@ fun () ->
     let open Lwt_result_syntax in
-    (match store.gc_status with
-    | Ongoing {promise; _} -> Lwt.cancel promise
-    | No_gc -> ()) ;
+    let* () =
+      Lwt_result.map_error (fun tr -> List.map (fun e -> Exn e) tr)
+      @@
+      match store.gc_status with
+      | Ongoing {canceler; _} -> Lwt_canceler.cancel canceler
+      | No_gc -> return_unit
+    in
     close_internal_index store.fresh ;
     List.iter close_internal_index store.stales ;
-    let*! () =
-      match store.gc_status with
-      | No_gc -> Lwt.return_unit
-      | Ongoing {tmp_index; _} -> rm_internal_index tmp_index
-    in
     return_unit
 
   let readonly x = (x :> [`Read] t)
@@ -428,20 +431,20 @@ module Make_indexable (N : NAME) (K : INDEX_KEY) (V : Index.Value.S) = struct
     store.fresh <- new_index_fresh ;
     store.stales <- new_index_stale :: store.stales ;
     let promise, resolve = Lwt.task () in
-    store.gc_status <- Ongoing {tmp_index; promise} ;
-    return (tmp_index, promise, resolve)
+    let canceler = Lwt_canceler.create () in
+    store.gc_status <- Ongoing {promise; canceler} ;
+    return (tmp_index, promise, resolve, canceler)
 
   (** If a gc operation fails, reverting simply consists in removing the
       temporary index. We keep the two stale indexes as is, they will be merged
       by the next successful gc.  *)
-  let revert_failed_gc store =
+  let cancel_gc store =
     let open Lwt_syntax in
     match store.gc_status with
-    | No_gc -> return_unit
-    | Ongoing {tmp_index; promise} ->
-        Lwt.cancel promise ;
-        store.gc_status <- No_gc ;
-        rm_internal_index tmp_index
+    | No_gc -> return_false
+    | Ongoing {canceler; _} ->
+        let* _res = Lwt_canceler.cancel canceler in
+        return_true
 
   (** When the gc operation finishes, i.e. we have copied all elements to retain
       to the temporary index, we can replace all the stale indexes by the
@@ -470,12 +473,15 @@ module Make_indexable (N : NAME) (K : INDEX_KEY) (V : Index.Value.S) = struct
       [tmp_index]. While this is happening, the stale indexes can still be
       queried and new bindings can still be added to the store because only the
       fresh index is modified. *)
-  let gc_background_task store tmp_index filter resolve =
+  let gc_background_task store tmp_index filter resolve canceler =
     let open Lwt_syntax in
+    Lwt_canceler.on_cancel canceler (fun () ->
+        store.gc_status <- No_gc ;
+        rm_internal_index tmp_index) ;
     Lwt.dont_wait
       (fun () ->
         let* res =
-          trace (Gc_failed N.name) @@ protect
+          trace (Gc_failed N.name) @@ protect ~canceler
           @@ fun () ->
           let open Lwt_result_syntax in
           let process_key_value (k, v) =
@@ -499,7 +505,8 @@ module Make_indexable (N : NAME) (K : INDEX_KEY) (V : Index.Value.S) = struct
           | Ok () -> return_unit
           | Error error ->
               let* () = Store_events.failed_gc N.name error in
-              revert_failed_gc store
+              let* (_canceled : bool) = cancel_gc store in
+              return_unit
         in
         Lwt.wakeup_later resolve () ;
         return_unit)
@@ -515,8 +522,8 @@ module Make_indexable (N : NAME) (K : INDEX_KEY) (V : Index.Value.S) = struct
     match store.gc_status with
     | Ongoing _ -> Store_events.ignore_gc N.name
     | No_gc ->
-        let* tmp_index, promise, resolve = initiate_gc store in
-        gc_background_task store tmp_index filter resolve ;
+        let* tmp_index, promise, resolve, canceler = initiate_gc store in
+        gc_background_task store tmp_index filter resolve canceler ;
         if async then return_unit
         else
           Lwt.catch
@@ -771,7 +778,7 @@ struct
 
   type gc_status =
     | No_gc
-    | Ongoing of {tmp_store : internal_store; promise : unit Lwt.t}
+    | Ongoing of {promise : unit Lwt.t; canceler : Lwt_canceler.t}
 
   (** In order to periodically clean up the store with the {!gc} function, each
       store is split in multiple stores: one fresh store and multiple stale
@@ -994,16 +1001,15 @@ struct
     protect @@ fun () ->
     Lwt_idle_waiter.force_idle store.scheduler @@ fun () ->
     let open Lwt_result_syntax in
-    (match store.gc_status with
-    | Ongoing {promise; _} -> Lwt.cancel promise
-    | No_gc -> ()) ;
-    let* () = close_internal_store store.fresh
-    and* () = List.iter_ep close_internal_store store.stales
-    and* () =
+    let* () =
+      Lwt_result.map_error (fun tr -> List.map (fun e -> Exn e) tr)
+      @@
       match store.gc_status with
+      | Ongoing {canceler; _} -> Lwt_canceler.cancel canceler
       | No_gc -> return_unit
-      | Ongoing {tmp_store; _} -> rm_internal_store tmp_store
     in
+    let* () = close_internal_store store.fresh
+    and* () = List.iter_ep close_internal_store store.stales in
     return_unit
 
   let readonly x = (x :> [`Read] t)
@@ -1037,22 +1043,20 @@ struct
     store.fresh <- new_store_fresh ;
     store.stales <- new_store_stale :: store.stales ;
     let promise, resolve = Lwt.task () in
-    store.gc_status <- Ongoing {tmp_store; promise} ;
-    return (tmp_store, promise, resolve)
+    let canceler = Lwt_canceler.create () in
+    store.gc_status <- Ongoing {promise; canceler} ;
+    return (tmp_store, promise, resolve, canceler)
 
   (** If a gc operation fails, reverting simply consists in removing the
       temporary store. We keep the two stale stores as is, they will be merged
       by the next successful gc.  *)
-  let revert_failed_gc store =
+  let cancel_gc store =
     let open Lwt_syntax in
     match store.gc_status with
-    | No_gc -> return_unit
-    | Ongoing {tmp_store; promise} -> (
-        Lwt.cancel promise ;
-        let+ res = rm_internal_store tmp_store in
-        match res with
-        | Ok () -> ()
-        | Error _e -> (* ignore error when reverting *) ())
+    | No_gc -> return_false
+    | Ongoing {canceler; _} ->
+        let* _res = Lwt_canceler.cancel canceler in
+        return_true
 
   (** When the gc operation finishes, i.e. we have copied all elements to retain
       to the temporary store, we can replace all the stale stores by the
@@ -1082,12 +1086,16 @@ struct
       [tmp_store]. While this is happening, the stale stores can still be
       queried and new bindings can still be added to the store because only the
       fresh store is modified. *)
-  let gc_background_task store tmp_store filter resolve =
+  let gc_background_task store tmp_store filter resolve canceler =
     let open Lwt_result_syntax in
+    Lwt_canceler.on_cancel canceler (fun () ->
+        let*! _res = rm_internal_store tmp_store in
+        store.gc_status <- No_gc ;
+        Lwt.return_unit) ;
     Lwt.dont_wait
       (fun () ->
         let*! res =
-          trace (Gc_failed N.name) @@ protect
+          trace (Gc_failed N.name) @@ protect ~canceler
           @@ fun () ->
           let process_key_header internal_store (key, {IHeader.offset; header})
               =
@@ -1115,7 +1123,8 @@ struct
           | Ok () -> return_unit
           | Error error ->
               let* () = Store_events.failed_gc N.name error in
-              revert_failed_gc store
+              let* (_canceled : bool) = cancel_gc store in
+              return_unit
         in
         Lwt.wakeup_later resolve () ;
         Lwt.return_unit)
@@ -1132,8 +1141,8 @@ struct
         let*! () = Store_events.ignore_gc N.name in
         return_unit
     | No_gc ->
-        let* tmp_store, promise, resolve = initiate_gc store in
-        gc_background_task store tmp_store filter resolve ;
+        let* tmp_store, promise, resolve, canceler = initiate_gc store in
+        gc_background_task store tmp_store filter resolve canceler ;
         if async then return_unit
         else
           Lwt.catch

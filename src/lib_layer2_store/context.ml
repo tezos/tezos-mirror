@@ -119,6 +119,11 @@ let is_gc_finished
       [> `Write] t) =
   Pvm_Context_Impl.is_gc_finished index
 
+let cancel_gc
+    (Context {pvm_context_impl = (module Pvm_Context_Impl); index; _} :
+      [> `Write] t) =
+  Pvm_Context_Impl.cancel_gc index
+
 let split (type a)
     (Context {pvm_context_impl = (module Pvm_Context_Impl); index; _} : a t) =
   Pvm_Context_Impl.split index

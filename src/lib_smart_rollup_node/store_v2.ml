@@ -601,3 +601,36 @@ let is_gc_finished
   && Commitments_published_at_level.is_gc_finished
        commitments_published_at_level
   && Levels_to_hashes.is_gc_finished levels_to_hashes
+
+let cancel_gc
+    ({
+       l2_blocks;
+       messages;
+       inboxes;
+       commitments;
+       commitments_published_at_level;
+       l2_head = _;
+       last_finalized_level = _;
+       lcc = _;
+       lpc = _;
+       levels_to_hashes;
+       irmin_store = _;
+       protocols = _;
+       gc_levels = _;
+       last_context_split_level = _;
+       history_mode = _;
+     } :
+      _ t) =
+  let open Lwt_syntax in
+  let+ canceled =
+    Lwt.all
+      [
+        L2_blocks.cancel_gc l2_blocks;
+        Messages.cancel_gc messages;
+        Inboxes.cancel_gc inboxes;
+        Commitments.cancel_gc commitments;
+        Commitments_published_at_level.cancel_gc commitments_published_at_level;
+        Levels_to_hashes.cancel_gc levels_to_hashes;
+      ]
+  in
+  List.exists Fun.id canceled
