@@ -1,6 +1,14 @@
 # Changelog
 
-## Unreleased
+## Version 0.2 (2024-09-05)
+
+This release introduces a number of quality of life improvements for operators
+running the Octez EVM Node in production. Most notably, a long awaited support
+for snapshots (export and import) is introduced. Note that exporting a snapshot
+requires to stop the node for now.
+
+This version is compatible with every kernel deployed on Etherlink Mainnet
+Beta.
 
 ### Features
 
