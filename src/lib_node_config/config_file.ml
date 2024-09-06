@@ -140,7 +140,11 @@ let blockchain_network_mainnet =
       {
         activated = true;
         bootstrap_peers =
-          ["dalboot.mainnet.tzinit.org"; "dalboot.mainnet.tzboot.net"];
+          [
+            "dalboot.mainnet.tzinit.org";
+            "dalboot.mainnet.tzboot.net";
+            "mainnet.bootstrap.dal.nomadic-labs.com";
+          ];
       }
 
 let blockchain_network_ghostnet =
@@ -188,7 +192,11 @@ let blockchain_network_ghostnet =
       {
         activated = true;
         bootstrap_peers =
-          ["dalboot.ghostnet.tzinit.org"; "dalboot.ghostnet.tzboot.net"];
+          [
+            "dalboot.ghostnet.tzinit.org";
+            "dalboot.ghostnet.tzboot.net";
+            "ghostnet.bootstrap.dal.nomadic-labs.com";
+          ];
       }
 
 let blockchain_network_sandbox =
