@@ -612,7 +612,7 @@ let add_prometheus_source t ?metric_path ~job_name targets =
       let targets = List.map prometheus_target targets in
       Prometheus.add_source prometheus ?metric_path ~job_name targets
 
-let add_service t service =
+let add_service t ~name ~url =
   match t.website with
   | None -> Lwt.return_unit
-  | Some web -> Web.add_service web ~agents:t.agents ~service
+  | Some web -> Web.add_service web ~agents:t.agents {name; url}

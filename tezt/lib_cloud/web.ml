@@ -5,12 +5,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type service = {name : string; url : string}
+
 type t = {
   process : Process.t;
   dir : string;
   monitoring : bool;
   prometheus : bool;
-  mutable services : (string * int) list;
+  mutable services : service list;
 }
 
 let pp_docker_image fmt = function
@@ -158,19 +160,12 @@ let grafana ~agents =
     Format.asprintf "# Grafana\n [Grafana dashboard](http://%s:3000)\n" domain
   else "Grafana disabled. Use `--grafana` to activate it.\n"
 
-let service ~agents (name, port) =
-  let domain =
-    match Env.mode with
-    | `Orchestrator ->
-        Proxy.get_agent agents |> Agent.point |> Option.get |> fst
-    | `Host | `Localhost | `Cloud -> "localhost"
-  in
+let service {name; url} =
   Format.asprintf
-    "# %s\n [%s](http://%s:%d)\n"
+    "# %s\n [%s](%s)\n"
     (String.capitalize_ascii name)
     (String.lowercase_ascii name)
-    domain
-    port
+    url
 
 let markdown_content ~agents ~services =
   [
@@ -179,7 +174,7 @@ let markdown_content ~agents ~services =
     prometheus ~agents;
     monitoring ~agents;
   ]
-  @ List.map (service ~agents) services
+  @ List.map service services
   @ [debugging ~agents]
   |> String.concat "\n"
 
@@ -206,7 +201,7 @@ let write t ~agents =
       "-s";
     ]
 
-let add_service t ~agents ~service =
+let add_service t ~agents service =
   t.services <- service :: t.services ;
   write t ~agents
 

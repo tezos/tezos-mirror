@@ -81,7 +81,7 @@ module Cloud : sig
   val add_prometheus_source :
     t -> ?metric_path:string -> job_name:string -> target list -> unit Lwt.t
 
-  val add_service : t -> string * int -> unit Lwt.t
+  val add_service : t -> name:string -> url:string -> unit Lwt.t
 end
 
 (** [register ~tags] register a set of jobs that can be used for setting
