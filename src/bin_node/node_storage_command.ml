@@ -465,11 +465,15 @@ module Term = struct
            }
            res
        in
-       let report =
-         Data_encoding.Json.construct overall_stats_encoding overall_stats
-       in
        let* () =
-         Tezos_stdlib_unix.Lwt_utils_unix.Json.write_file report_path report
+         Animation.three_dots
+           ~progress_display_mode:Always
+           ~msg:"Generating report"
+           (fun () ->
+             let report =
+               Data_encoding.Json.construct overall_stats_encoding overall_stats
+             in
+             Tezos_stdlib_unix.Lwt_utils_unix.Json.write_file report_path report)
        in
        let*! () = Event.(emit stat_metadata_report_generated) report_path in
        let*! () = Store.close_store store in

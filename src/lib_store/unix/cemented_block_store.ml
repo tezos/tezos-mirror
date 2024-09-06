@@ -1172,16 +1172,26 @@ let stat_metadata_cycles cemented_store =
   match cemented_store.cemented_blocks_files with
   | Some files ->
       let files = Array.to_list files in
-      List.map_es
-        (fun metadata_file ->
-          let* res =
-            map_over_metadata_file
-              cemented_store.cemented_blocks_dir
-              metadata_file
-              ~f:stat_metadata
-          in
-          return (Naming.(metadata_file.file |> file_path), res))
-        files
+      let nb_cycles = List.length files in
+      let* res =
+        Animation.display_progress
+          ~pp_print_step:(fun fmt i ->
+            Format.fprintf fmt "Processing metadata %d/%d" i nb_cycles)
+          ~progress_display_mode:Always
+          (fun notify ->
+            List.map_es
+              (fun metadata_file ->
+                let*! () = notify () in
+                let* res =
+                  map_over_metadata_file
+                    cemented_store.cemented_blocks_dir
+                    metadata_file
+                    ~f:stat_metadata
+                in
+                return (Naming.(metadata_file.file |> file_path), res))
+              files)
+      in
+      return res
   | None -> tzfail (Inconsistent_store_state "cannot find any metadata file")
 
 let get_and_upgrade_offsets fd nb_blocks =
