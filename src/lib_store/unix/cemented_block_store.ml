@@ -1099,7 +1099,7 @@ let check_indexes_consistency ?(post_step = fun () -> Lwt.return_unit)
 
 (* For each given block metadata, returns the
    Store_types.metadata_stat of it. *)
-let stat_metadata (metadata : Block_repr.metadata option) =
+let stat_metadata ~block_level (metadata : Block_repr.metadata option) =
   let open Lwt_result_syntax in
   match metadata with
   | Some metadata ->
@@ -1127,12 +1127,25 @@ let stat_metadata (metadata : Block_repr.metadata option) =
           (0L, 0L)
           metadata.operations_metadata
       in
+      let* manager_operation_metadata_sizes =
+        match metadata.operations_metadata with
+        | [_; _; _; manager] ->
+            return
+            @@ List.map
+                 (function
+                   | Block_validation.Metadata bytes -> Bytes.length bytes
+                   | Block_validation.Too_large_metadata -> 0)
+                 manager
+        | _ -> return_nil
+      in
       return
         Store_types.
           {
+            block_level;
             block_metadata_size;
             operation_metadata_arity;
             operation_metadata_size;
+            manager_operation_metadata_sizes;
             too_large_operation_metadata_count;
           }
   | None -> tzfail (Inconsistent_store_state "cannot read metadata")
@@ -1142,7 +1155,9 @@ let stat_metadata (metadata : Block_repr.metadata option) =
 let map_over_metadata_file cemented_blocks_dir_path
     {start_level; end_level; file}
     ~(f :
-       Block_repr.metadata option -> Store_types.metadata_stat tzresult Lwt.t) =
+       block_level:Int32.t ->
+       Block_repr.metadata option ->
+       Store_types.metadata_stat tzresult Lwt.t) =
   let open Lwt_result_syntax in
   let metadata_file =
     Naming.(
@@ -1157,7 +1172,7 @@ let map_over_metadata_file cemented_blocks_dir_path
       else
         let entry = Zip.find_entry fd (Int32.to_string level) in
         let metadata = Zip.read_entry fd entry in
-        let* app = f (Block_repr.decode_metadata metadata) in
+        let* app = f ~block_level:level (Block_repr.decode_metadata metadata) in
         loop Int32.(add level one) (app :: acc)
     in
     let* res = loop start_level [] in

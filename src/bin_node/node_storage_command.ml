@@ -296,9 +296,46 @@ module Term = struct
        let () = Format.printf "%a@." Context_hash.pp head_context_hash in
        return_unit)
 
+  type block_stats = {
+    level : Int32.t;
+    block_metadata_size : Int64.t;
+    manager_operation_metadata_sizes : int list;
+    too_large_operation_metadata : bool;
+  }
+
+  let block_stats_encoding =
+    let open Data_encoding in
+    conv
+      (fun {
+             level;
+             block_metadata_size;
+             manager_operation_metadata_sizes;
+             too_large_operation_metadata;
+           } ->
+        ( level,
+          block_metadata_size,
+          manager_operation_metadata_sizes,
+          too_large_operation_metadata ))
+      (fun ( level,
+             block_metadata_size,
+             manager_operation_metadata_sizes,
+             too_large_operation_metadata ) ->
+        {
+          level;
+          block_metadata_size;
+          manager_operation_metadata_sizes;
+          too_large_operation_metadata;
+        })
+      (obj4
+         (req "level" int32)
+         (req "block_metadata_size" int64)
+         (req "manager_operation_metadata_sizes" (list int31))
+         (req "too_large_operation_metadata" bool))
+
   type cycle_stats = {
     name : string;
     block_count : int;
+    block_stats : block_stats list;
     block_metadata_size : Int64.t;
     operation_metadata_size : Int64.t;
     too_large_operation_metadata_count : Int64.t;
@@ -310,30 +347,35 @@ module Term = struct
       (fun {
              name;
              block_count;
+             block_stats;
              block_metadata_size;
              operation_metadata_size;
              too_large_operation_metadata_count;
            } ->
         ( name,
           block_count,
+          block_stats,
           block_metadata_size,
           operation_metadata_size,
           too_large_operation_metadata_count ))
       (fun ( name,
              block_count,
+             block_stats,
              block_metadata_size,
              operation_metadata_size,
              too_large_operation_metadata_count ) ->
         {
           name;
           block_count;
+          block_stats;
           block_metadata_size;
           operation_metadata_size;
           too_large_operation_metadata_count;
         })
-      (obj5
+      (obj6
          (req "name" string)
          (req "block_count" int31)
+         (req "block_stats" (list block_stats_encoding))
          (req "block_metadata_size" int64)
          (req "operation_metadata_size" int64)
          (req "too_large_operation_metadata_count" int64))
@@ -411,15 +453,30 @@ module Term = struct
                  (fun {
                         name;
                         block_count;
+                        block_stats;
                         block_metadata_size;
                         operation_metadata_size;
                         too_large_operation_metadata_count;
                       }
-                      stats ->
+                      (stats : Tezos_store_shared.Store_types.metadata_stat) ->
+                   let new_block_stats =
+                     {
+                       level = stats.block_level;
+                       block_metadata_size = stats.operation_metadata_size;
+                       manager_operation_metadata_sizes =
+                         stats.manager_operation_metadata_sizes;
+                       too_large_operation_metadata =
+                         not
+                           (Int64.equal
+                              stats.too_large_operation_metadata_count
+                              0L);
+                     }
+                   in
                    Tezos_store_shared.Store_types.
                      {
                        name;
                        block_count;
+                       block_stats = new_block_stats :: block_stats;
                        block_metadata_size =
                          Int64.add block_metadata_size stats.block_metadata_size;
                        operation_metadata_size =
@@ -434,6 +491,7 @@ module Term = struct
                  {
                    name = metadata_file;
                    block_count = List.length cycle;
+                   block_stats = [];
                    block_metadata_size = 0L;
                    operation_metadata_size = 0L;
                    too_large_operation_metadata_count = 0L;

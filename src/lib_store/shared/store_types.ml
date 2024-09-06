@@ -353,8 +353,10 @@ module Protocol_levels = struct
 end
 
 type metadata_stat = {
+  block_level : Int32.t;
   block_metadata_size : Int64.t;
   operation_metadata_arity : int list;
   operation_metadata_size : Int64.t;
+  manager_operation_metadata_sizes : int list;
   too_large_operation_metadata_count : Int64.t;
 }
