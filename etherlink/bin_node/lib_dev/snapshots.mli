@@ -50,3 +50,7 @@ val export :
     if [data_dir] is already populated unless [force] is set to [true]. *)
 val import :
   force:bool -> data_dir:string -> snapshot_file:string -> unit tzresult Lwt.t
+
+(** [info ~snapshot_file] returns information that can be used to inspect the
+    snapshot file. *)
+val info : snapshot_file:string -> Header.t * [`Compressed | `Uncompressed]

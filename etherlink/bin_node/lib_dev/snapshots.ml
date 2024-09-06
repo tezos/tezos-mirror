@@ -278,3 +278,9 @@ let import ~force ~data_dir ~snapshot_file =
     return_unit
   in
   return_unit
+
+let info ~snapshot_file =
+  let compressed = is_compressed_snapshot snapshot_file in
+  let reader = if compressed then gzip_reader else stdlib_reader in
+  let snapshot_header = read_header reader ~snapshot_file in
+  (snapshot_header, if compressed then `Compressed else `Uncompressed)

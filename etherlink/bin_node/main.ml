@@ -2182,6 +2182,31 @@ let import_snapshot_command =
     (fun (data_dir, force) snapshot_file () ->
       Evm_node_lib_dev.Snapshots.import ~force ~data_dir ~snapshot_file)
 
+let snapshot_info_command =
+  let open Tezos_clic in
+  command
+    ~desc:"Display information about an EVM node snapshot file."
+    no_options
+    (prefixes ["snapshot"; "info"] @@ Params.snapshot_file @@ stop)
+    (fun () snapshot_file () ->
+      let open Lwt_result_syntax in
+      let ( Evm_node_lib_dev.Snapshots.Header.
+              {version = _; rollup_address; current_level},
+            compressed ) =
+        Evm_node_lib_dev.Snapshots.info ~snapshot_file
+      in
+      Format.printf
+        "@[<v 0>Valid EVM node snapshot.@,\
+         Format:          %scompressed@,\
+         Rollup address:  %a@,\
+         Current level:   %a@]"
+        (match compressed with `Compressed -> "" | `Uncompressed -> "un")
+        Octez_smart_rollup.Address.pp
+        rollup_address
+        Evm_node_lib_dev_encoding.Ethereum_types.pp_quantity
+        current_level ;
+      return_unit)
+
 let patch_state_command =
   let open Tezos_clic in
   let open Lwt_result_syntax in
@@ -2297,6 +2322,7 @@ let commands =
     threshold_encryption_sequencer_command;
     observer_command;
     rpc_command;
+    snapshot_info_command;
     export_snapshot_command;
     import_snapshot_command;
     chunker_command;
