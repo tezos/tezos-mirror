@@ -109,12 +109,7 @@ module Worker = struct
       (* We do not check if we succeed or not: this will be done when new L2
          heads come from the rollup node. *)
       match (state self, chunks) with
-      | ( {
-            enable_dal = true;
-            dal_slots = Some (slot_index :: _);
-            dal_last_used;
-            _;
-          },
+      | ( {enable_dal = true; dal_last_used; _},
           Blueprints_publisher_types.Request.Blueprint
             {chunks = [chunk]; inbox_payload = _} )
         when use_dal_if_enabled && dal_last_used < level ->
@@ -124,10 +119,7 @@ module Worker = struct
           let () =
             Prometheus.Counter.inc_one Metrics.BlueprintChunkSent.on_dal
           in
-          Rollup_services.publish_on_dal
-            ~rollup_node_endpoint
-            ~slot_index
-            payload
+          Rollup_services.publish_on_dal ~rollup_node_endpoint payload
       | _ ->
           let payload =
             match chunks with

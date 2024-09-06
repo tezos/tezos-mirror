@@ -21,11 +21,7 @@ end
 module Dal_worker_types = struct
   module Request = struct
     type ('a, 'b) t =
-      | Register : {
-          slot_content : string;
-          slot_index : int;
-        }
-          -> (unit, error trace) t
+      | Register : {slot_content : string} -> (unit, error trace) t
       | Produce_dal_slots : (unit, error trace) t
       | Set_dal_slot_indices :
           Tezos_dal_node_services.Types.slot_index list
@@ -42,16 +38,13 @@ module Dal_worker_types = struct
           case
             (Tag 0)
             ~title:"Register"
-            (obj3
+            (obj2
                (req "request" (constant "register"))
-               (req "slot_content" string)
-               (req "slot_index" int31))
+               (req "slot_content" string))
             (function
-              | View (Register {slot_content; slot_index}) ->
-                  Some ((), slot_content, slot_index)
+              | View (Register {slot_content}) -> Some ((), slot_content)
               | _ -> None)
-            (fun ((), slot_content, slot_index) ->
-              View (Register {slot_content; slot_index}));
+            (fun ((), slot_content) -> View (Register {slot_content}));
           case
             (Tag 1)
             ~title:"Produce_dal_slots"
@@ -71,11 +64,7 @@ module Dal_worker_types = struct
 
     let pp ppf (View r) =
       match r with
-      | Register {slot_content = _; slot_index} ->
-          Format.fprintf
-            ppf
-            "register slot injection request for index %d"
-            slot_index
+      | Register _ -> Format.fprintf ppf "register slot injection request"
       | Produce_dal_slots -> Format.fprintf ppf "produce DAL slots"
       | Set_dal_slot_indices idx ->
           Format.fprintf
@@ -144,9 +133,7 @@ module Pending_chunks =
       let hash = Hashtbl.hash
     end)
     (struct
-      type t = int
-      (* This is the slot index on which we inject. It is removed
-         in the next MR. *)
+      type t = unit
     end)
 
 module Recent_dal_injections =
@@ -167,7 +154,7 @@ type state = {
          to publish than available slot indices). *)
 }
 
-let inject_slot state ~slot_content ~slot_index:_ =
+let inject_slot state ~slot_content =
   let open Lwt_result_syntax in
   let {Node_context.dal_cctxt; _} = state.node_ctxt in
   if Queue.is_empty state.dal_slot_indices then
@@ -208,25 +195,16 @@ let inject_slot state ~slot_content ~slot_index:_ =
     Recent_dal_injections.replace state.recent_dal_injections l1_hash () ;
     return_unit
 
-let on_register state ~slot_content ~slot_index : unit tzresult Lwt.t =
+let on_register state ~slot_content : unit tzresult Lwt.t =
   let open Lwt_result_syntax in
-  let number_of_slots =
-    (Reference.get state.node_ctxt.current_protocol).constants.dal
-      .number_of_slots
-  in
-  let* () =
-    fail_unless (slot_index >= 0 && slot_index < number_of_slots)
-    @@ error_of_fmt "Slot index %d out of range" slot_index
-  in
-  Pending_chunks.replace state.pending_chunks slot_content slot_index ;
+  Pending_chunks.replace state.pending_chunks slot_content () ;
   return_unit
 
 let on_produce_dal_slots state =
   let open Lwt_result_syntax in
   match Pending_chunks.take state.pending_chunks with
   | None -> return_unit
-  | Some (slot_content, slot_index) ->
-      inject_slot state ~slot_content ~slot_index
+  | Some (slot_content, ()) -> inject_slot state ~slot_content
 
 let on_set_dal_slot_indices state idx =
   let open Lwt_result_syntax in
@@ -285,8 +263,8 @@ module Handlers = struct
    fun w request ->
     let state = Worker.state w in
     match request with
-    | Request.Register {slot_content; slot_index} ->
-        protect @@ fun () -> on_register state ~slot_content ~slot_index
+    | Request.Register {slot_content} ->
+        protect @@ fun () -> on_register state ~slot_content
     | Request.Produce_dal_slots ->
         protect @@ fun () -> on_produce_dal_slots state
     | Request.Set_dal_slot_indices idx ->
@@ -377,12 +355,10 @@ let handle_request_error rq =
   | Error (Closed (Some errs)) -> Lwt.return_error errs
   | Error (Any exn) -> Lwt.return_error [Exn exn]
 
-let register_dal_slot ~slot_content ~slot_index =
+let register_dal_slot ~slot_content =
   let open Lwt_result_syntax in
   let* w = lwt_map_error TzTrace.make (Lwt.return (Lazy.force worker)) in
-  Worker.Queue.push_request_and_wait
-    w
-    (Request.Register {slot_content; slot_index})
+  Worker.Queue.push_request_and_wait w (Request.Register {slot_content})
   |> handle_request_error
 
 let produce_dal_slots () =
