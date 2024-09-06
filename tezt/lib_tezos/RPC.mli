@@ -1142,6 +1142,14 @@ val get_chain_block_context_delegate_full_balance :
 val get_chain_block_context_delegate_grace_period :
   ?chain:string -> ?block:string -> string -> JSON.t t
 
+(** RPC:
+    [GET /chains/<chain>/blocks/<block>/context/delegates/<pkh>/min_delegated_in_current_cycle]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val get_chain_block_context_delegate_min_delegated_in_current_cycle :
+  ?chain:string -> ?block:string -> string -> JSON.t t
+
 (** RPC: [GET /chains/<chain>/blocks/<block>/context/delegates/<pkh>/participation]
 
     [chain] defaults to ["main"].

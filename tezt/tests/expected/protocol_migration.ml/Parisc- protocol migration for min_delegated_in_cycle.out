@@ -1,0 +1,304 @@
+
+./octez-client rpc get '/chains/main/blocks/head/context/raw/json/staking_balance/[PUBLIC_KEY_HASH]'
+{ "own_frozen": "0", "staked_frozen": "0", "delegated": "11999999566",
+  "min_delegated_in_cycle_and_level":
+    { "min_delegated_in_cycle": "11999999566",
+      "level_of_min_delegated":
+        { "level": 3, "level_position": 2, "cycle": 0, "cycle_position": 2,
+          "expected_commitment": false } } }
+
+./octez-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/min_delegated_in_current_cycle'
+{ "amount": "11999999566",
+  "level":
+    { "level": 3, "level_position": 2, "cycle": 0, "cycle_position": 2,
+      "expected_commitment": false } }
+
+./octez-client rpc get '/chains/main/blocks/head/context/raw/json/staking_balance/[PUBLIC_KEY_HASH]'
+{ "own_frozen": "0", "staked_frozen": "0", "delegated": "23999999132",
+  "min_delegated_in_cycle_and_level":
+    { "min_delegated_in_cycle": "11999999566",
+      "level_of_min_delegated":
+        { "level": 3, "level_position": 2, "cycle": 0, "cycle_position": 2,
+          "expected_commitment": false } } }
+
+./octez-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/min_delegated_in_current_cycle'
+{ "amount": "11999999566",
+  "level":
+    { "level": 3, "level_position": 2, "cycle": 0, "cycle_position": 2,
+      "expected_commitment": false } }
+
+./octez-client rpc get '/chains/main/blocks/head/context/raw/json/staking_balance/[PUBLIC_KEY_HASH]'
+{ "own_frozen": "0", "staked_frozen": "0", "delegated": "23999999132",
+  "min_delegated_in_cycle_and_level":
+    { "min_delegated_in_cycle": "11999999566",
+      "level_of_min_delegated":
+        { "level": 3, "level_position": 2, "cycle": 0, "cycle_position": 2,
+          "expected_commitment": false } } }
+
+./octez-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/min_delegated_in_current_cycle'
+{ "amount": "23999999132" }
+
+./octez-client rpc get '/chains/main/blocks/head/context/raw/json/staking_balance/[PUBLIC_KEY_HASH]'
+{ "own_frozen": "0", "staked_frozen": "0", "delegated": "23999998863",
+  "min_delegated_in_cycle_and_level":
+    { "min_delegated_in_cycle": "23499998863",
+      "level_of_min_delegated":
+        { "level": 10, "level_position": 9, "cycle": 1, "cycle_position": 1,
+          "expected_commitment": false } } }
+
+./octez-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/min_delegated_in_current_cycle'
+{ "amount": "23499998863",
+  "level":
+    { "level": 10, "level_position": 9, "cycle": 1, "cycle_position": 1,
+      "expected_commitment": false } }
+
+./octez-client rpc get '/chains/main/blocks/head/context/raw/json/staking_balance/[PUBLIC_KEY_HASH]'
+{ "own_frozen": "0", "staked_frozen": "0", "delegated": "23499998594",
+  "min_delegated_in_cycle_and_level":
+    { "min_delegated_in_cycle": "23499998594",
+      "level_of_min_delegated":
+        { "level": 11, "level_position": 10, "cycle": 1, "cycle_position": 2,
+          "expected_commitment": false } } }
+
+./octez-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/min_delegated_in_current_cycle'
+{ "amount": "23499998594",
+  "level":
+    { "level": 11, "level_position": 10, "cycle": 1, "cycle_position": 2,
+      "expected_commitment": false } }
+
+./octez-client rpc get '/chains/main/blocks/head/context/raw/json/staking_balance/[PUBLIC_KEY_HASH]'
+{ "own_frozen": "0", "staked_frozen": "0", "delegated": "12499999566",
+  "min_delegated_in_cycle_and_level":
+    { "min_delegated_in_cycle": "12499999566",
+      "level_of_min_delegated":
+        { "level": 12, "level_position": 11, "cycle": 1, "cycle_position": 3,
+          "expected_commitment": true } } }
+
+./octez-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/min_delegated_in_current_cycle'
+{ "amount": "12499999566",
+  "level":
+    { "level": 12, "level_position": 11, "cycle": 1, "cycle_position": 3,
+      "expected_commitment": true } }
+
+./octez-client rpc get '/chains/main/blocks/head/context/raw/json/staking_balance/[PUBLIC_KEY_HASH]'
+{ "own_frozen": "0", "staked_frozen": "0", "delegated": "23499998594",
+  "min_delegated_in_cycle":
+    { "previous_min_value": "0", "previous_min_level": null,
+      "last_modified_level":
+        { "level": 0, "level_position": 0, "cycle": 0, "cycle_position": 0,
+          "expected_commitment": false } } }
+
+./octez-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/min_delegated_in_current_cycle'
+{ "amount": "23499998594",
+  "level":
+    { "level": 17, "level_position": 16, "cycle": 2, "cycle_position": 0,
+      "expected_commitment": false } }
+
+./octez-client rpc get '/chains/main/blocks/head/context/raw/json/staking_balance/[PUBLIC_KEY_HASH]'
+{ "own_frozen": "0", "staked_frozen": "0", "delegated": "12499999566",
+  "min_delegated_in_cycle":
+    { "previous_min_value": "0", "previous_min_level": null,
+      "last_modified_level":
+        { "level": 0, "level_position": 0, "cycle": 0, "cycle_position": 0,
+          "expected_commitment": false } } }
+
+./octez-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/min_delegated_in_current_cycle'
+{ "amount": "12499999566",
+  "level":
+    { "level": 17, "level_position": 16, "cycle": 2, "cycle_position": 0,
+      "expected_commitment": false } }
+
+./octez-client rpc get '/chains/main/blocks/head/context/raw/json/staking_balance/[PUBLIC_KEY_HASH]'
+{ "own_frozen": "0", "staked_frozen": "0", "delegated": "23499998594",
+  "min_delegated_in_cycle":
+    { "previous_min_value": "0", "previous_min_level": null,
+      "last_modified_level":
+        { "level": 0, "level_position": 0, "cycle": 0, "cycle_position": 0,
+          "expected_commitment": false } } }
+
+./octez-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/min_delegated_in_current_cycle'
+{ "amount": "23499998594",
+  "level":
+    { "level": 25, "level_position": 24, "cycle": 3, "cycle_position": 0,
+      "expected_commitment": false } }
+
+./octez-client rpc get '/chains/main/blocks/head/context/raw/json/staking_balance/[PUBLIC_KEY_HASH]'
+{ "own_frozen": "0", "staked_frozen": "0", "delegated": "12499999566",
+  "min_delegated_in_cycle":
+    { "previous_min_value": "0", "previous_min_level": null,
+      "last_modified_level":
+        { "level": 0, "level_position": 0, "cycle": 0, "cycle_position": 0,
+          "expected_commitment": false } } }
+
+./octez-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/min_delegated_in_current_cycle'
+{ "amount": "12499999566",
+  "level":
+    { "level": 25, "level_position": 24, "cycle": 3, "cycle_position": 0,
+      "expected_commitment": false } }
+
+./octez-client rpc get '/chains/main/blocks/head/context/raw/json/staking_balance/[PUBLIC_KEY_HASH]'
+{ "own_frozen": "0", "staked_frozen": "0", "delegated": "23499998325",
+  "min_delegated_in_cycle":
+    { "previous_min_value": "23499998594",
+      "previous_min_level":
+        { "level": 25, "level_position": 24, "cycle": 3, "cycle_position": 0,
+          "expected_commitment": false },
+      "last_modified_level":
+        { "level": 26, "level_position": 25, "cycle": 3, "cycle_position": 1,
+          "expected_commitment": false } } }
+
+./octez-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/min_delegated_in_current_cycle'
+{ "amount": "23499998325",
+  "level":
+    { "level": 26, "level_position": 25, "cycle": 3, "cycle_position": 1,
+      "expected_commitment": false } }
+
+./octez-client rpc get '/chains/main/blocks/head/context/raw/json/staking_balance/[PUBLIC_KEY_HASH]'
+{ "own_frozen": "0", "staked_frozen": "0", "delegated": "12499999566",
+  "min_delegated_in_cycle":
+    { "previous_min_value": "0", "previous_min_level": null,
+      "last_modified_level":
+        { "level": 0, "level_position": 0, "cycle": 0, "cycle_position": 0,
+          "expected_commitment": false } } }
+
+./octez-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/min_delegated_in_current_cycle'
+{ "amount": "12499999566",
+  "level":
+    { "level": 25, "level_position": 24, "cycle": 3, "cycle_position": 0,
+      "expected_commitment": false } }
+
+./octez-client rpc get '/chains/main/blocks/head/context/raw/json/staking_balance/[PUBLIC_KEY_HASH]'
+{ "own_frozen": "0", "staked_frozen": "0", "delegated": "22999998056",
+  "min_delegated_in_cycle":
+    { "previous_min_value": "23499998325",
+      "previous_min_level":
+        { "level": 26, "level_position": 25, "cycle": 3, "cycle_position": 1,
+          "expected_commitment": false },
+      "last_modified_level":
+        { "level": 27, "level_position": 26, "cycle": 3, "cycle_position": 2,
+          "expected_commitment": false } } }
+
+./octez-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/min_delegated_in_current_cycle'
+{ "amount": "22999998056",
+  "level":
+    { "level": 27, "level_position": 26, "cycle": 3, "cycle_position": 2,
+      "expected_commitment": false } }
+
+./octez-client rpc get '/chains/main/blocks/head/context/raw/json/staking_balance/[PUBLIC_KEY_HASH]'
+{ "own_frozen": "0", "staked_frozen": "0", "delegated": "12999999566",
+  "min_delegated_in_cycle":
+    { "previous_min_value": "12499999566",
+      "previous_min_level":
+        { "level": 25, "level_position": 24, "cycle": 3, "cycle_position": 0,
+          "expected_commitment": false },
+      "last_modified_level":
+        { "level": 27, "level_position": 26, "cycle": 3, "cycle_position": 2,
+          "expected_commitment": false } } }
+
+./octez-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/min_delegated_in_current_cycle'
+{ "amount": "12499999566",
+  "level":
+    { "level": 25, "level_position": 24, "cycle": 3, "cycle_position": 0,
+      "expected_commitment": false } }
+
+./octez-client rpc get '/chains/main/blocks/head/context/raw/json/staking_balance/[PUBLIC_KEY_HASH]'
+{ "own_frozen": "0", "staked_frozen": "0", "delegated": "22999998056",
+  "min_delegated_in_cycle":
+    { "previous_min_value": "23499998325",
+      "previous_min_level":
+        { "level": 26, "level_position": 25, "cycle": 3, "cycle_position": 1,
+          "expected_commitment": false },
+      "last_modified_level":
+        { "level": 27, "level_position": 26, "cycle": 3, "cycle_position": 2,
+          "expected_commitment": false } } }
+
+./octez-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/min_delegated_in_current_cycle'
+{ "amount": "22999998056",
+  "level":
+    { "level": 33, "level_position": 32, "cycle": 4, "cycle_position": 0,
+      "expected_commitment": false } }
+
+./octez-client rpc get '/chains/main/blocks/head/context/raw/json/staking_balance/[PUBLIC_KEY_HASH]'
+{ "own_frozen": "0", "staked_frozen": "0", "delegated": "12999999566",
+  "min_delegated_in_cycle":
+    { "previous_min_value": "12499999566",
+      "previous_min_level":
+        { "level": 25, "level_position": 24, "cycle": 3, "cycle_position": 0,
+          "expected_commitment": false },
+      "last_modified_level":
+        { "level": 27, "level_position": 26, "cycle": 3, "cycle_position": 2,
+          "expected_commitment": false } } }
+
+./octez-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/min_delegated_in_current_cycle'
+{ "amount": "12999999566",
+  "level":
+    { "level": 33, "level_position": 32, "cycle": 4, "cycle_position": 0,
+      "expected_commitment": false } }
+
+./octez-client rpc get '/chains/main/blocks/head/context/raw/json/staking_balance/[PUBLIC_KEY_HASH]'
+{ "own_frozen": "0", "staked_frozen": "0", "delegated": "22999997787",
+  "min_delegated_in_cycle":
+    { "previous_min_value": "22999998056",
+      "previous_min_level":
+        { "level": 33, "level_position": 32, "cycle": 4, "cycle_position": 0,
+          "expected_commitment": false },
+      "last_modified_level":
+        { "level": 36, "level_position": 35, "cycle": 4, "cycle_position": 3,
+          "expected_commitment": true } } }
+
+./octez-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/min_delegated_in_current_cycle'
+{ "amount": "22999997787",
+  "level":
+    { "level": 36, "level_position": 35, "cycle": 4, "cycle_position": 3,
+      "expected_commitment": true } }
+
+./octez-client rpc get '/chains/main/blocks/head/context/raw/json/staking_balance/[PUBLIC_KEY_HASH]'
+{ "own_frozen": "0", "staked_frozen": "0", "delegated": "12999999566",
+  "min_delegated_in_cycle":
+    { "previous_min_value": "12499999566",
+      "previous_min_level":
+        { "level": 25, "level_position": 24, "cycle": 3, "cycle_position": 0,
+          "expected_commitment": false },
+      "last_modified_level":
+        { "level": 27, "level_position": 26, "cycle": 3, "cycle_position": 2,
+          "expected_commitment": false } } }
+
+./octez-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/min_delegated_in_current_cycle'
+{ "amount": "12999999566",
+  "level":
+    { "level": 33, "level_position": 32, "cycle": 4, "cycle_position": 0,
+      "expected_commitment": false } }
+
+./octez-client rpc get '/chains/main/blocks/head/context/raw/json/staking_balance/[PUBLIC_KEY_HASH]'
+{ "own_frozen": "0", "staked_frozen": "0", "delegated": "22499997518",
+  "min_delegated_in_cycle":
+    { "previous_min_value": "22999997787",
+      "previous_min_level":
+        { "level": 36, "level_position": 35, "cycle": 4, "cycle_position": 3,
+          "expected_commitment": true },
+      "last_modified_level":
+        { "level": 37, "level_position": 36, "cycle": 4, "cycle_position": 4,
+          "expected_commitment": false } } }
+
+./octez-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/min_delegated_in_current_cycle'
+{ "amount": "22499997518",
+  "level":
+    { "level": 37, "level_position": 36, "cycle": 4, "cycle_position": 4,
+      "expected_commitment": false } }
+
+./octez-client rpc get '/chains/main/blocks/head/context/raw/json/staking_balance/[PUBLIC_KEY_HASH]'
+{ "own_frozen": "0", "staked_frozen": "0", "delegated": "13499999566",
+  "min_delegated_in_cycle":
+    { "previous_min_value": "12999999566",
+      "previous_min_level":
+        { "level": 33, "level_position": 32, "cycle": 4, "cycle_position": 0,
+          "expected_commitment": false },
+      "last_modified_level":
+        { "level": 37, "level_position": 36, "cycle": 4, "cycle_position": 4,
+          "expected_commitment": false } } }
+
+./octez-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/min_delegated_in_current_cycle'
+{ "amount": "12999999566",
+  "level":
+    { "level": 33, "level_position": 32, "cycle": 4, "cycle_position": 0,
+      "expected_commitment": false } }

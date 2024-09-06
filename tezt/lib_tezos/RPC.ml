@@ -1425,6 +1425,22 @@ let get_chain_block_context_delegate_grace_period ?(chain = "main")
     ]
     Fun.id
 
+let get_chain_block_context_delegate_min_delegated_in_current_cycle
+    ?(chain = "main") ?(block = "head") pkh =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "delegates";
+      pkh;
+      "min_delegated_in_current_cycle";
+    ]
+    Fun.id
+
 let get_chain_block_context_delegate_participation ?(chain = "main")
     ?(block = "head") pkh =
   make
