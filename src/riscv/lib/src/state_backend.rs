@@ -61,6 +61,7 @@ mod elems;
 mod enums;
 mod layout;
 pub mod memory_backend;
+pub mod owned_backend;
 mod region;
 
 pub use alloc::*;
