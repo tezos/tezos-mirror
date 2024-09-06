@@ -89,7 +89,7 @@ let debugging ~agents =
                {|
 ```bash
 %s
-```            
+```
             |}
                (string_vm_command agent)
            in
@@ -102,9 +102,9 @@ let debugging ~agents =
            in
            Printf.sprintf
              {|
-## %s 
+## %s
 Connect on the VM:
-%s 
+%s
 
 Connect on the Docker:
 %s
