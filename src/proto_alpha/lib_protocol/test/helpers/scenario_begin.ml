@@ -143,6 +143,7 @@ let begin_test ?(burn_rewards = false) ?(force_attest_all = false)
             let pkh = Context.Contract.pkh contract in
             let account =
               init_account
+                ~name
                 ~delegate:name
                 ~pkh
                 ~contract
