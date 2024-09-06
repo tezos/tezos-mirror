@@ -21,7 +21,6 @@ tezos-admin-client
 tezos-baker-*
 tezos-endorser-*
 tezos-accuser-*
-tezos-proxy-server
 tezos-signer
 tezos-smart-rollup-node-*
 tezos-smart-rollup-client-*
@@ -33,7 +32,6 @@ octez-admin-client
 octez-baker-*
 octez-endorser-*
 octez-accuser-*
-octez-proxy-server
 octez-signer
 octez-smart-rollup-node*
 octez-smart-rollup-client-*

@@ -386,21 +386,10 @@ module Location = struct
   type clients = {vanilla : Client.t; alternative : Client.t}
 
   type alt_mode =
-    | Vanilla_proxy_server
-        (** A vanilla client ([--mode client]) but whose [--endpoint] is
-        a [octez-proxy-server] *)
     | Light  (** A light client ([--mode light]) *)
     | Proxy  (** A proxy client ([--mode proxy]) *)
 
-  (** Whether an alternative client is expected to execute RPCs locally *)
-  let executes_locally = function
-    | Vanilla_proxy_server -> false
-    | Light | Proxy -> true
-
-  let alt_mode_to_string = function
-    | Vanilla_proxy_server -> "vanilla_proxy_server_endpoint"
-    | Light -> "light"
-    | Proxy -> "proxy"
+  let alt_mode_to_string = function Light -> "light" | Proxy -> "proxy"
 
   let chain_id = "main"
 
@@ -562,9 +551,12 @@ module Location = struct
         (* Unknown matches on the left-hand side: there should be no match
            in the vanilla output, because the vanilla client doesn't deal
            with alternative stuff. That is why [Unknown] is matched here. *)
-        | Unknown, Unknown when not (executes_locally alt_mode) ->
-            log_same_answer () ;
-            Lwt.return_unit
+        | Unknown, Unknown ->
+            (* Not expected as RPCs are executed locally for all
+               existing clients. *)
+            Test.fail
+              "%s client is expected to execute RPC locally"
+              alt_mode_string
         | Unknown, Local ->
             log_same_answer () ;
             Log.info

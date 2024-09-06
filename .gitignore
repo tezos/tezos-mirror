@@ -34,8 +34,6 @@ __pycache__
 /octez-endorser-*
 /tezos-accuser-*
 /octez-accuser-*
-/tezos-proxy-server
-/octez-proxy-server
 /tezos-signer
 /octez-signer
 /tezos-sandbox

@@ -31,7 +31,6 @@ module Time = Tezos_base.Time.System
 (** Values that can be passed to the client's [--endpoint] argument *)
 type endpoint =
   | Node of Node.t  (** A full-fledged node *)
-  | Proxy_server of Proxy_server.t  (** A proxy server *)
   | Foreign_endpoint of Endpoint.t  (** A service not managed by Tezt *)
 
 (** Values that can be passed to the client's [--adaptive-issuance-vote] argument *)

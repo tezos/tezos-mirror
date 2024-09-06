@@ -23,7 +23,6 @@ After a successful compilation, you should have the following binaries:
   (see :ref:`signer`);
 - ``octez-smart-rollup-node``: executable for using and running a smart rollup node as Layer 2 (see :doc:`../shell/smart_rollup_node`);
 - ``octez-smart-rollup-wasm-debugger``: debugger for smart rollup kernels (see :doc:`../shell/smart_rollup_node`)
-- ``octez-proxy-server``: a readonly frontend to ``octez-node`` designed to lower the load of full nodes (see :doc:`../user/proxy-server`)
 - ``octez-codec``: a utility for documenting the data encodings and for performing data encoding/decoding (see `Codec`_)
 - ``octez-protocol-compiler``: a domain-specific compiler for Tezos protocols (see `Protocol compiler`_)
 - ``octez-snoop``: a tool for modeling the performance of any piece of OCaml code, based on benchmarking (see :doc:`../developer/snoop`)

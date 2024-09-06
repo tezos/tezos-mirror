@@ -128,6 +128,8 @@ Node
   environment variable, if it is set to 'yes' or 'y', nodes must explicitly be
   launched with the ``--allow-yes-crypto`` argument to run.
 
+- **Breaking change** removed the ``octez-proxy-server`` binary. The
+  feature is subsumed by the external RPC server.
 
 Client
 ------

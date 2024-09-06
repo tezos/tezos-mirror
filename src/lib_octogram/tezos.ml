@@ -200,9 +200,6 @@ let wait_for_l1_level_on_endpoint target_level endpoint =
 let wait_for_l1_level cli_endpoint level =
   match cli_endpoint with
   | Client.Node node -> Node.wait_for_level node level
-  | Client.Proxy_server proxy_server ->
-      Proxy_server.as_rpc_endpoint proxy_server
-      |> wait_for_l1_level_on_endpoint level
   | Client.Foreign_endpoint endpoint ->
       wait_for_l1_level_on_endpoint level endpoint
 
@@ -3063,8 +3060,6 @@ module Start_octez_baker = struct
           Lwt.return (node_data_dir, fe)
       | None, Client.Node node ->
           Lwt.return (Node.data_dir node, Node.as_rpc_endpoint node)
-      | _, Client.Proxy_server _ ->
-          Test.fail "Proxy_server not supported as a Node endpoint for baking"
       | Some _, Client.Node _ ->
           Test.fail
             "Should not provide both a node data dir and an 'owned' node"
