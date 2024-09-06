@@ -673,6 +673,77 @@ let test_deactivation =
           let total = Frozen_tez.total_current dlgt.frozen_deposits in
           Assert.equal_tez ~loc:__LOC__ total (Tez.of_mutez 2_200_000_000_000L))
 
+let change_delegate_and_wait_then_stake ~loc ~staker ~delegate ~amount ~wait =
+  let check_is_last_level_of_cycle ~loc =
+    exec_unit (fun (block, _state) ->
+        Assert.equal_bool ~loc (Block.last_block_of_cycle block) true)
+  in
+  let amount = Amount (Tez.of_mutez amount) in
+  set_delegate staker (Some delegate)
+  --> fail_to_stake_with_unfinalizable_unstake_requests ~loc staker ~amount
+  --> wait_n_cycles_f (unstake_wait -- 1)
+  --> exec bake_until_next_cycle_end_but_one
+  --> fail_to_stake_with_unfinalizable_unstake_requests ~loc staker ~amount
+  --> next_block --> stake staker amount --> wait_n_cycles wait
+  (* Create unstake request for cycle N *)
+  --> unstake staker Half
+  (* Bake until right before the end of the cycle *)
+  --> exec bake_until_next_cycle_end_but_one
+  (* Modify unstake request for cycle N, [unstake] also bakes a block,
+     so we are now at the end of the cycle. *)
+  --> unstake staker Half
+  --> check_is_last_level_of_cycle ~loc:__LOC__
+  --> stake staker amount
+  (* Create unstake request for cycle N + 1 *)
+  --> unstake staker Half
+
+let test_change_delegates =
+  let set_limit name l =
+    let params =
+      {
+        limit_of_staking_over_baking = Q.of_float l;
+        edge_of_baking_over_staking = Q.zero;
+      }
+    in
+    set_delegate_params name params
+  in
+  init_constants () --> activate_ai `Force
+  --> begin_test ["delegate1"; "delegate2"; "delegate3"; "faucet"]
+  --> add_account_with_funds
+        "staker"
+        ~funder:"faucet"
+        (Amount (Tez.of_mutez 400_000_000_000L))
+  --> set_limit "delegate1" 5. --> set_limit "delegate2" 4.
+  --> set_limit "delegate3" 3. --> wait_delegate_parameters_activation
+  --> set_delegate "staker" (Some "delegate1")
+  --> stake "staker" (Amount (Tez.of_mutez 10_000_000_000L))
+  --> wait_n_cycles 2
+  --> change_delegate_and_wait_then_stake
+        ~loc:__LOC__
+        ~staker:"staker"
+        ~delegate:"delegate2"
+        ~amount:10_000_000_000L
+        ~wait:3
+  --> change_delegate_and_wait_then_stake
+        ~loc:__LOC__
+        ~staker:"staker"
+        ~delegate:"delegate3"
+        ~amount:10_000_000_000L
+        ~wait:4
+  --> change_delegate_and_wait_then_stake
+        ~loc:__LOC__
+        ~staker:"staker"
+        ~delegate:"delegate1"
+        ~amount:15_000_000_000L
+        ~wait:1
+  --> change_delegate_and_wait_then_stake
+        ~loc:__LOC__
+        ~staker:"staker"
+        ~delegate:"staker"
+        ~amount:10_000_000_000L
+        ~wait:2
+  --> wait_n_cycles 2
+
 let tests =
   tests_of_scenarios
   @@ [
@@ -690,6 +761,7 @@ let tests =
        ("Test forbid costake", forbid_costaking);
        ("Test stake from unstake", shorter_roundtrip_for_baker);
        ("Test deactivation under AI", test_deactivation);
+       ("Test change delegates", test_change_delegates);
      ]
 
 let () = register_tests ~__FILE__ ~tags:["protocol"; "scenario"; "stake"] tests
