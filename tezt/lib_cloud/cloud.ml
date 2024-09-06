@@ -583,13 +583,14 @@ let agents t =
 
 let get_configuration = Agent.configuration
 
+let write_website t =
+  match t.website with
+  | None -> Lwt.return_unit
+  | Some website -> Web.write website ~agents:t.agents
+
 let set_agent_name t agent name =
   Agent.set_name agent name ;
-  let* () =
-    match t.website with
-    | None -> Lwt.return_unit
-    | Some website -> Web.write website ~agents:t.agents
-  in
+  let* () = write_website t in
   match t.prometheus with
   | None -> Lwt.return_unit
   | Some prometheus -> Prometheus.reload prometheus

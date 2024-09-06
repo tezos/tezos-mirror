@@ -27,6 +27,8 @@ val get_configuration : Agent.t -> Configuration.t
 val push_metric :
   t -> ?labels:(string * string) list -> name:string -> float -> unit
 
+val write_website : t -> unit Lwt.t
+
 val set_agent_name : t -> Agent.t -> string -> unit Lwt.t
 
 type target = {agent : Agent.t; port : int; app_name : string}
