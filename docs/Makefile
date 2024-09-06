@@ -217,6 +217,25 @@ sphinx: install-dependencies
 	@$(SPHINXBUILD) --builder html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS)
 	@ln -s active "$(BUILDDIR)/paris" || true
 
+# Syntax check RST files.
+# Run Sphinx, but first create dummy version of all generated files,
+# and write no output. Can be used to syntax check RST files.
+sphinx-check: install-dependencies
+	@(echo ':orphan:'; echo ''; cat ../CHANGES.rst) > CHANGES-dev.rst
+# Build a dummy version of all prerequisites
+	@${MAKE} --touch html >/dev/null
+# Unless this 'alpha/rpc.rst' contains a title, a non-suppressable warning is raised:
+	@echo "DUMMY TITLE" > alpha/rpc.rst
+	@echo "===========" >> alpha/rpc.rst
+# Unless this file contain the following lines, a non-suppressable warning is raised:
+	@echo "OPTIONS" > api/octez-dal-node-config-init.txt
+	@echo "COMMON OPTIONS" >> api/octez-dal-node-config-init.txt
+# metrics.csv must actually contain some CSV rows with 4 fields each.
+	@echo "a,b,c,d" > developer/metrics.csv
+	@echo "1,2,3,4" >> developer/metrics.csv
+# Build with dummy output
+	@$(SPHINXBUILD) --builder dummy $(SPHINXOPTS) "$(SOURCEDIR)" "$(BUILDDIR)"
+
 # pylint does not support pyproject.toml configuration for now
 # It is configured by ./.pylint.rc
 # In pylint, we ignore the following additional errors:
