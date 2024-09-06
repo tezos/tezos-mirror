@@ -492,6 +492,22 @@ let run ?verbosity ~singleprocess ~strict ~operation_metadata_size_limit
   let*! () =
     Tezos_base_unix.Internal_event_unix.init ~config:internal_events ()
   in
+  (match Option.map String.lowercase_ascii @@ Sys.getenv_opt "PROFILING" with
+  | Some (("true" | "on" | "yes" | "terse" | "detailed" | "verbose") as mode) ->
+      let max_lod =
+        match mode with
+        | "detailed" -> Profiler.Detailed
+        | "verbose" -> Profiler.Verbose
+        | _ -> Profiler.Terse
+      in
+      let instance =
+        Profiler.instance
+          Tezos_base_unix.Simple_profiler.auto_write_to_txt_file
+          Filename.Infix.(config.data_dir // "/node_profiling.txt", max_lod)
+      in
+      Tezos_base.Profiler.(plug main) instance ;
+      Tezos_protocol_environment.Environment_profiler.plug instance
+  | _ -> ()) ;
   Updater.init (Data_version.protocol_dir config.data_dir) ;
   Lwt_exit.(
     wrap_and_exit

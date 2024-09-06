@@ -464,6 +464,24 @@ let may_synchronise_context synchronisation_state chain_store =
     Context_ops.sync context_index
   else Lwt.return_unit
 
+let reset_profilers block =
+  let profilers =
+    Shell_profiling.
+      [
+        p2p_reader_profiler;
+        requester_profiler;
+        chain_validator_profiler;
+        rpc_server_profiler;
+      ]
+  in
+  List.iter
+    (fun profiler ->
+      (try Tezos_base.Profiler.stop profiler with _ -> ()) ;
+      Tezos_base.Profiler.record
+        profiler
+        (Block_hash.to_b58check (Store.Block.hash block)))
+    profilers
+
 let on_validation_request w peer start_testchain active_chains spawn_child block
     =
   let open Lwt_result_syntax in
@@ -484,6 +502,7 @@ let on_validation_request w peer start_testchain active_chains spawn_child block
   if not accepted_head then return Ignored_head
   else
     let* previous = Store.Chain.set_head chain_store block in
+    reset_profilers block ;
     let () =
       if is_bootstrapped nv then
         Distributed_db.Advertise.current_head nv.chain_db block

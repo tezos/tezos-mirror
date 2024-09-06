@@ -26,6 +26,7 @@
 
 module Context = Environment_context.Context
 module Register = Environment_context.Register
+module Environment_profiler = Environment_profiler
 
 let err_implementation_mismatch =
   Environment_context.err_implementation_mismatch
