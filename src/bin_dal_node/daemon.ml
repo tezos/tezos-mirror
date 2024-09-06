@@ -1029,7 +1029,6 @@ let run ~data_dir ~configuration_override =
       p2p_limits
       ~network_name
   in
-  let*! metrics_server = Metrics.launch config.metrics_addr in
   (* Initialize store *)
   let* store = Store.init config in
   let* last_processed_level =
@@ -1088,6 +1087,8 @@ let run ~data_dir ~configuration_override =
       return_some amplificator
     else return_none
   in
+  (* This must be done after the amplificator starts. *)
+  let*! metrics_server = Metrics.launch config.metrics_addr in
   (* Set value size hooks. *)
   Value_size_hooks.set_share_size
     (Cryptobox.Internal_for_tests.encoded_share_size cryptobox) ;
