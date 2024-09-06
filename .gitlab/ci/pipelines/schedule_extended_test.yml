@@ -196,6 +196,21 @@ check_rust_fmt:
   script:
   - scripts/check-format-rust.sh
 
+documentation:rst-check:
+  image: ${ci_image_name}/test:${ci_image_tag}
+  stage: sanity
+  tags:
+  - gcp
+  rules:
+  - when: always
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  before_script:
+  - . $HOME/.venv/bin/activate
+  script:
+  - make --silent -C docs sphinx-check
+
 oc.build_arm64-released:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
