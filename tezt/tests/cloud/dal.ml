@@ -88,6 +88,8 @@ module Network = struct
     | Ghostnet ->
         let* json = RPC_core.call endpoint (RPC.get_chain_block_header ()) in
         JSON.(json |-> "level" |> as_int) |> Lwt.return
+
+  let expected_pow = function Ghostnet -> 26. | Sandbox -> 0.
 end
 
 module Node = struct
@@ -1345,7 +1347,7 @@ let init_baker cloud (configuration : configuration) ~bootstrap account i agent
     in
     let* () =
       Dal_node.init_config
-        ~expected_pow:(if Cli.network = Ghostnet then 26. else 0.)
+        ~expected_pow:(Network.expected_pow Cli.network)
         ~attester_profiles:[account.Account.public_key_hash]
         ~peers:[bootstrap.dal_node_p2p_endpoint] (* no need for peer *)
         dal_node
@@ -1420,7 +1422,7 @@ let init_producer cloud configuration ~bootstrap ~number_of_slots account i
   let () = toplog "Init producer: init DAL node config" in
   let* () =
     Dal_node.init_config
-      ~expected_pow:(if Cli.network = Ghostnet then 26. else 0.)
+      ~expected_pow:(Network.expected_pow Cli.network)
       ~observer_profiles:[i mod number_of_slots]
       ~peers:[bootstrap.dal_node_p2p_endpoint]
       dal_node
@@ -1462,7 +1464,7 @@ let init_observer cloud configuration ~bootstrap ~slot_index i agent =
   in
   let* () =
     Dal_node.init_config
-      ~expected_pow:(if Cli.network = Ghostnet then 26. else 0.)
+      ~expected_pow:(Network.expected_pow Cli.network)
       ~observer_profiles:[slot_index]
       ~peers:[bootstrap.dal_node_p2p_endpoint]
       dal_node
@@ -1541,7 +1543,7 @@ let init_etherlink_operator_setup cloud configuration name ~bootstrap ~dal_slots
         in
         let* () =
           Dal_node.init_config
-            ~expected_pow:(if Cli.network = Ghostnet then 26. else 0.)
+            ~expected_pow:(Network.expected_pow Cli.network)
             ~producer_profiles:dal_slots
             ~peers:[bootstrap.dal_node_p2p_endpoint]
             dal_node
