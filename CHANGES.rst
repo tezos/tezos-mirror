@@ -139,6 +139,11 @@ Client
   Michelson-related commands, now allow file names as argument. (MR
   :gl:`!13311`)
 
+- **Breaking change** Removed all bls key related command in favor of
+  generics one. All keys that were generated with ``bls gen keys`` can
+  be used with usual command of the octez-client (``list``, ``known``,
+  ``sign``, ...).  (MR :gl:`!14417`)
+
 - **Breaking change** Removed read-write commands specific to Oxford. (MR :gl:`!13799`)
 
 - **Breaking changes** client's encoding with legacy attestation name are no

@@ -23,21 +23,28 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Aggregate_signature = Tezos_crypto.Aggregate_signature
-
-let get_keys cctxt pkh =
+let get_keys cctxt (pkh : Tezos_crypto.Aggregate_signature.public_key_hash) =
   let open Lwt_result_syntax in
   let open Tezos_client_base.Client_keys in
-  let* alias = Aggregate_alias.Public_key_hash.rev_find cctxt pkh in
+  let (Bls12_381 bls_pkh) = pkh in
+  let simple_pkh : Tezos_crypto.Signature.public_key_hash =
+    Signature.Bls bls_pkh
+  in
+  let* alias = Public_key_hash.rev_find cctxt simple_pkh in
   match alias with
   | None -> return (pkh, None, None)
   | Some alias -> (
-      let* keys_opt = alias_aggregate_keys cctxt alias in
+      let* keys_opt = alias_keys cctxt alias in
       match keys_opt with
-      | None ->
+      | Some (_pkh, Some (Bls pk), sk_uri_opt) ->
+          let (aggregate_pk : Tezos_crypto.Aggregate_signature.public_key) =
+            Tezos_crypto.Aggregate_signature.Bls12_381 pk
+          in
+          return (pkh, Some aggregate_pk, sk_uri_opt)
+      | _ ->
+          (* none or not bls key *)
           let*! () = Event.(emit committee_member_not_in_wallet pkh) in
-          return (pkh, None, None)
-      | Some (pkh, pk_opt, sk_uri_opt) -> return (pkh, pk_opt, sk_uri_opt))
+          return (pkh, None, None))
 
 let get_public_key cctxt address =
   let open Lwt_result_syntax in

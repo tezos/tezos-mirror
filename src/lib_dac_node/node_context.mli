@@ -71,7 +71,7 @@ module Committee_member : sig
 
   (** [secret_key_uri t] returns the secret key URI associated with the
       committee member managed by the [Committee_member] node.  *)
-  val secret_key_uri : t -> Client_keys.aggregate_sk_uri
+  val secret_key_uri : t -> Client_keys.sk_uri
 end
 
 (** The type of an [Observer] specific partial [Node_context.t]. *)

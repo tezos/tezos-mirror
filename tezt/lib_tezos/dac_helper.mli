@@ -37,7 +37,7 @@ module Scenarios : sig
     sc_rollup_address : string;
     sc_rollup_node : Sc_rollup_node.t;
     coordinator_node : Dac_node.t;
-    committee_members : Account.aggregate_key list;
+    committee_members : Account.key list;
     committee_members_nodes : Dac_node.t list;
     observer_nodes : Dac_node.t list;
     rollup_nodes : Sc_rollup_node.t list;
@@ -54,10 +54,10 @@ val with_coordinator_node :
   ?pvm_name:string ->
   ?wait_ready:bool ->
   ?allow_v1_api:bool ->
-  committee_members:Account.aggregate_key list ->
+  committee_members:Account.key list ->
   Node.t ->
   Client.t ->
-  (Dac_node.t -> Account.aggregate_key list -> 'a Lwt.t) ->
+  (Dac_node.t -> Account.key list -> 'a Lwt.t) ->
   'a Lwt.t
 
 (** Initializes a a Committee Member Dac node with key [committee_member].
@@ -107,7 +107,7 @@ val scenario_with_full_dac_infrastructure :
   ?tags:string list ->
   ?uses:(Protocol.t -> Uses.t list) ->
   ?pvm_name:string ->
-  ?custom_committee_members:Account.aggregate_key list ->
+  ?custom_committee_members:Account.key list ->
   ?commitment_period:int ->
   ?challenge_window:int ->
   ?event_sections_levels:(string * Daemon.Level.level) list ->

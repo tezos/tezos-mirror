@@ -44,6 +44,12 @@ let scheme = "encrypted"
 
 let aggregate_scheme = "aggregate_encrypted"
 
+(* aggregate_scheme is here for backward_compatible reason. There was
+   once a `aggregate_encrypted` signer before `tz4` keys were
+   added. *)
+let is_valid_scheme uri =
+  Uri.scheme uri = Some scheme || Uri.scheme uri = Some aggregate_scheme
+
 module Raw = struct
   (* https://tools.ietf.org/html/rfc2898#section-4.1 *)
   let salt_len = 8
@@ -313,33 +319,10 @@ let internal_decrypt_simple (cctxt : #Client_context.prompter) ?name sk_uri =
   let* decrypted_sk = decrypt_payload cctxt ?name payload in
   match decrypted_sk with Decrypted_sk sk -> return sk
 
-let internal_decrypt_aggregate (cctxt : #Client_context.prompter) ?name
-    aggregate_sk_uri =
-  let open Lwt_result_syntax in
-  let payload = Uri.path (aggregate_sk_uri : aggregate_sk_uri :> Uri.t) in
-  let* decrypted_sk = decrypt_payload cctxt ?name payload in
-  match decrypted_sk with
-  | Decrypted_sk (Bls sk) ->
-      return
-        (Tezos_crypto.Aggregate_signature.(Bls12_381 sk)
-          : Tezos_crypto.Aggregate_signature.secret_key)
-  | _ ->
-      failwith
-        "Found a non-aggregate secret key where an aggregate one was expected."
-
 let decrypt (cctxt : #Client_context.prompter) ?name sk_uri =
   let open Lwt_result_syntax in
   let* () = password_file_load cctxt in
   internal_decrypt_simple (cctxt : #Client_context.prompter) ?name sk_uri
-
-let decrypt_aggregate (cctxt : #Client_context.prompter) ?name aggregate_sk_uri
-    =
-  let open Lwt_result_syntax in
-  let* () = password_file_load cctxt in
-  internal_decrypt_aggregate
-    (cctxt : #Client_context.prompter)
-    ?name
-    aggregate_sk_uri
 
 let decrypt_all (cctxt : #Client_context.io_wallet) =
   let open Lwt_result_syntax in
@@ -347,7 +330,7 @@ let decrypt_all (cctxt : #Client_context.io_wallet) =
   let* () = password_file_load cctxt in
   List.iter_es
     (fun (name, sk_uri) ->
-      if Uri.scheme (sk_uri : sk_uri :> Uri.t) <> Some scheme then return_unit
+      if not (is_valid_scheme (sk_uri : sk_uri :> Uri.t)) then return_unit
       else
         let* _ = internal_decrypt_simple cctxt ~name sk_uri in
         return_unit)
@@ -360,7 +343,7 @@ let decrypt_list (cctxt : #Client_context.io_wallet) keys =
   List.iter_es
     (fun (name, sk_uri) ->
       if
-        Uri.scheme (sk_uri : sk_uri :> Uri.t) = Some scheme
+        is_valid_scheme (sk_uri : sk_uri :> Uri.t)
         && (keys = [] || List.mem ~equal:String.equal name keys)
       then
         let* _ = internal_decrypt_simple cctxt ~name sk_uri in
@@ -396,29 +379,12 @@ let internal_encrypt_simple sk password =
   let*? v = Client_keys.make_sk_uri (Uri.make ~scheme ~path ()) in
   return v
 
-let internal_encrypt_aggregate sk password =
-  let open Lwt_result_syntax in
-  let path = common_encrypt sk password in
-  let*? v =
-    Client_keys.make_aggregate_sk_uri
-      (Uri.make ~scheme:aggregate_scheme ~path ())
-  in
-  return v
-
 let encrypt sk password = internal_encrypt_simple (Decrypted_sk sk) password
-
-let encrypt_aggregate (Bls12_381 sk : Aggregate_type.secret_key) password =
-  internal_encrypt_aggregate (Decrypted_sk (Bls sk)) password
 
 let prompt_twice_and_encrypt cctxt sk =
   let open Lwt_result_syntax in
   let* password = read_password cctxt in
   encrypt sk password
-
-let prompt_twice_and_encrypt_aggregate cctxt sk =
-  let open Lwt_result_syntax in
-  let* password = read_password cctxt in
-  encrypt_aggregate sk password
 
 module Sapling_raw = struct
   let salt_len = 8
@@ -479,7 +445,7 @@ let decrypt_sapling_key (cctxt : #Client_context.io) (sk_uri : sapling_uri) =
   let open Lwt_result_syntax in
   let uri = (sk_uri :> Uri.t) in
   let payload = Uri.path uri in
-  if Uri.scheme uri = Some scheme then
+  if is_valid_scheme uri then
     let* password =
       cctxt#prompt_password "Enter password to decrypt your key: "
     in
@@ -505,10 +471,12 @@ let decrypt_sapling_key (cctxt : #Client_context.io) (sk_uri : sapling_uri) =
     | Some sapling_key -> return sapling_key
 
 module Make (C : sig
+  val scheme : string
+
   val cctxt : Client_context.io_wallet
 end) =
 struct
-  let scheme = "encrypted"
+  let scheme = C.scheme
 
   let title = "Built-in signer using encrypted keys."
 
@@ -552,45 +520,4 @@ struct
     return (Signature.deterministic_nonce_hash sk buf)
 
   let supports_deterministic_nonces _ = Lwt_result_syntax.return_true
-end
-
-module Make_aggregate (C : sig
-  val cctxt : Client_context.io_wallet
-end) =
-struct
-  let scheme = "aggregate_encrypted"
-
-  let title = "Built-in signer using encrypted aggregate keys."
-
-  let description =
-    "Valid aggregate secret key URIs are of the form\n\
-    \ - aggregate_encrypted:<encrypted_aggregate_key>\n\
-     where <encrypted_key> is the encrypted (password protected using Nacl's \
-     cryptobox and pbkdf) secret key, formatted in unprefixed \
-     Tezos_crypto.Base58.\n\
-     Valid aggregate public key URIs are of the form\n\
-    \ - aggregate_encrypted:<public_aggregate_key>\n\
-     where <public_aggregate_key> is the public key in Tezos_crypto.Base58."
-
-  include Client_keys.Aggregate_type
-
-  let public_key = Unencrypted.Aggregate.public_key
-
-  let public_key_hash = Unencrypted.Aggregate.public_key_hash
-
-  let import_secret_key = Unencrypted.Aggregate.import_secret_key
-
-  let neuterize sk_uri =
-    let open Lwt_result_syntax in
-    let* sk = decrypt_aggregate C.cctxt sk_uri in
-    let*? v =
-      Unencrypted.Aggregate.make_pk
-        (Tezos_crypto.Aggregate_signature.Secret_key.to_public_key sk)
-    in
-    return v
-
-  let sign sk_uri buf =
-    let open Lwt_result_syntax in
-    let* sk = decrypt_aggregate C.cctxt sk_uri in
-    return (Tezos_crypto.Aggregate_signature.sign sk buf)
 end

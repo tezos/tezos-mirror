@@ -157,30 +157,6 @@ let make_sapling_uri (x : Uri.t) : sapling_uri tzresult =
   | None -> tzfail (Exn (Failure "SAPLING_URI needs a scheme"))
   | Some _ -> return x
 
-type aggregate_pk_uri = Uri.t
-
-type aggregate_sk_uri = Uri.t
-
-let make_aggregate_pk_uri (x : Uri.t) : aggregate_pk_uri tzresult =
-  let open Result_syntax in
-  match Uri.scheme x with
-  | None ->
-      tzfail
-        (Exn
-           (Failure "Error while parsing URI: AGGREGATE_PK_URI needs a scheme"))
-  (* because it's possible to make an aggregate pk uri without having the signer
-     in the client we can't check that scheme is linked to a known signer *)
-  | Some _ -> return x
-
-let make_aggregate_sk_uri (x : Uri.t) : aggregate_sk_uri tzresult =
-  let open Result_syntax in
-  match Uri.scheme x with
-  | None ->
-      tzfail
-        (Exn
-           (Failure "Error while parsing URI: AGGREGATE_SK_URI needs a scheme"))
-  | Some _ -> return x
-
 let pk_uri_parameter () =
   Tezos_clic.parameter (fun _ s -> Lwt.return @@ make_pk_uri (Uri.of_string s))
 
@@ -210,22 +186,6 @@ let sk_uri_param ?name ?desc params =
       desc
   in
   Tezos_clic.param ~name ~desc (sk_uri_parameter ()) params
-
-let aggregate_sk_uri_parameter () =
-  Tezos_clic.parameter (fun _ s ->
-      make_aggregate_sk_uri @@ Uri.of_string s |> Lwt.return)
-
-let aggregate_sk_uri_param ?name ?desc params =
-  let name = Option.value ~default:"uri" name in
-  let desc =
-    Option.value
-      ~default:
-        "secret key\n\
-         Varies from one scheme to the other.\n\
-         Use command `list signing schemes` for more information."
-      desc
-  in
-  Tezos_clic.param ~name ~desc (aggregate_sk_uri_parameter ()) params
 
 type sapling_key = {
   sk : sapling_uri;
@@ -275,99 +235,6 @@ module Sapling_key = Client_aliases.Alias (struct
     Lwt.return_ok @@ Json.to_string (Json.construct encoding k)
 end)
 
-module Aggregate_alias = struct
-  module Public_key_hash = struct
-    include Client_aliases.Alias (struct
-      (* includes t, Compare, encoding, of/to_b58check *)
-      include Tezos_crypto.Aggregate_signature.Public_key_hash
-
-      let of_source s = Lwt.return (of_b58check s)
-
-      let to_source p = Lwt_result_syntax.return (to_b58check p)
-
-      let name = "Aggregate_public_key_hash"
-    end)
-  end
-
-  type pk_uri = Uri.t
-
-  let make_pk_uri (x : Uri.t) : pk_uri tzresult =
-    let open Result_syntax in
-    match Uri.scheme x with
-    | None ->
-        tzfail
-          (Exn
-             (Failure "Error while parsing URI: AGGREGATE_PK_URI needs a scheme"))
-    | Some _ -> return x
-
-  module Public_key = Client_aliases.Alias (struct
-    let name = "Aggregate_public_key"
-
-    type t = pk_uri * Tezos_crypto.Aggregate_signature.Public_key.t option
-
-    include Compare.Make (struct
-      type nonrec t = t
-
-      let compare (apk, aso) (bpk, bso) =
-        Compare.or_else (CompareUri.compare apk bpk) (fun () ->
-            Option.compare
-              Tezos_crypto.Aggregate_signature.Public_key.compare
-              aso
-              bso)
-    end)
-
-    let of_source s =
-      let open Lwt_result_syntax in
-      let*? pk_uri = make_pk_uri @@ Uri.of_string s in
-      return (pk_uri, None)
-
-    let to_source (t, _) = Lwt_result_syntax.return (Uri.to_string t)
-
-    let encoding =
-      let open Data_encoding in
-      union
-        [
-          case
-            Json_only
-            uri_encoding
-            ~title:"Locator_only"
-            (function uri, None -> Some uri | _, Some _ -> None)
-            (fun uri -> (uri, None));
-          case
-            Json_only
-            ~title:"Locator_and_full_key"
-            (obj2
-               (req "locator" uri_encoding)
-               (req "key" Tezos_crypto.Aggregate_signature.Public_key.encoding))
-            (function uri, Some key -> Some (uri, key) | _, None -> None)
-            (fun (uri, key) -> (uri, Some key));
-        ]
-  end)
-
-  type sk_uri = Uri.t
-
-  let make_sk_uri (x : Uri.t) : sk_uri tzresult Lwt.t =
-    let open Lwt_result_syntax in
-    match Uri.scheme x with
-    | None ->
-        failwith "Error while parsing URI: AGGREGATE_SK_URI needs a scheme"
-    | Some _ -> return x
-
-  module Secret_key = Client_aliases.Alias (struct
-    let name = "Aggregate_secret_key"
-
-    type t = sk_uri
-
-    include CompareUri
-
-    let encoding = uri_encoding
-
-    let of_source s = make_sk_uri @@ Uri.of_string s
-
-    let to_source t = Lwt_result_syntax.return (Uri.to_string t)
-  end)
-end
-
 module type COMMON_SIGNER = sig
   val scheme : string
 
@@ -400,22 +267,6 @@ module type COMMON_SIGNER = sig
     pk_uri -> (public_key_hash * public_key option) tzresult Lwt.t
 end
 
-module type AGGREGATE_SIGNER = sig
-  include
-    COMMON_SIGNER
-      with type public_key_hash =
-        Tezos_crypto.Aggregate_signature.Public_key_hash.t
-       and type public_key = Tezos_crypto.Aggregate_signature.Public_key.t
-       and type secret_key = Tezos_crypto.Aggregate_signature.Secret_key.t
-       and type pk_uri = aggregate_pk_uri
-       and type sk_uri = aggregate_sk_uri
-
-  val sign :
-    aggregate_sk_uri ->
-    Bytes.t ->
-    Tezos_crypto.Aggregate_signature.t tzresult Lwt.t
-end
-
 module Make_common_type (S : sig
   include Tezos_crypto.Intfs.COMMON_SIGNATURE
 
@@ -436,14 +287,6 @@ struct
 
   type signature = S.t
 end
-
-module Aggregate_type = Make_common_type (struct
-  include Tezos_crypto.Aggregate_signature
-
-  type pk_uri = aggregate_pk_uri
-
-  type sk_uri = aggregate_sk_uri
-end)
 
 module type Signature_S = sig
   include
@@ -597,19 +440,13 @@ module type SIGNER =
      and type secret_key = Tezos_crypto.Signature.Secret_key.t
      and type signature = Tezos_crypto.Signature.t
 
-type signer =
-  | Simple of (module SIGNER)
-  | Aggregate of (module AGGREGATE_SIGNER)
+type signer = (module SIGNER)
 
 let signers_table : signer String.Hashtbl.t = String.Hashtbl.create 13
 
 let register_signer signer =
   let module Signer = (val signer : SIGNER) in
-  String.Hashtbl.replace signers_table Signer.scheme (Simple signer)
-
-let register_aggregate_signer signer =
-  let module Signer = (val signer : AGGREGATE_SIGNER) in
-  String.Hashtbl.replace signers_table Signer.scheme (Aggregate signer)
+  String.Hashtbl.replace signers_table Signer.scheme signer
 
 let registered_signers () : (string * signer) list =
   String.Hashtbl.fold (fun k v acc -> (k, v) :: acc) signers_table []
@@ -620,39 +457,6 @@ let find_signer_for_key ~scheme : signer tzresult =
   | None -> tzfail (Unregistered_key_scheme scheme)
   | Some signer -> return signer
 
-let find_aggregate_signer_for_key ~scheme =
-  let open Result_syntax in
-  let* signer = find_signer_for_key ~scheme in
-  match signer with
-  | Simple _signer -> tzfail (Wrong_key_scheme ("aggregate", "standard"))
-  | Aggregate signer -> return signer
-
-let with_scheme_aggregate_signer (uri : Uri.t)
-    (f : (module AGGREGATE_SIGNER) -> 'a tzresult Lwt.t) : 'a tzresult Lwt.t =
-  let open Lwt_result_syntax in
-  match Uri.scheme uri with
-  | None -> tzfail @@ Unexisting_scheme uri
-  | Some scheme ->
-      let*? signer = find_aggregate_signer_for_key ~scheme in
-      f signer
-
-let register_aggregate_key cctxt ?(force = false)
-    (public_key_hash, pk_uri, sk_uri) ?public_key name =
-  let open Lwt_result_syntax in
-  let* () =
-    Aggregate_alias.Public_key.add ~force cctxt name (pk_uri, public_key)
-  in
-  let* () = Aggregate_alias.Secret_key.add ~force cctxt name sk_uri in
-  Aggregate_alias.Public_key_hash.add ~force cctxt name public_key_hash
-
-let aggregate_neuterize (sk_uri : sk_uri) : pk_uri tzresult Lwt.t =
-  with_scheme_aggregate_signer sk_uri (fun (module Signer : AGGREGATE_SIGNER) ->
-      Signer.neuterize sk_uri)
-
-let aggregate_public_key pk_uri =
-  with_scheme_aggregate_signer pk_uri (fun (module Signer : AGGREGATE_SIGNER) ->
-      Signer.public_key pk_uri)
-
 (* This function is used to chose between two aliases associated
    to the same key hash; if we know the secret key for one of them
    we take it, otherwise if we know the public key for one of them
@@ -662,108 +466,6 @@ let join_keys keys1_opt keys2 =
   | Some (_, Some _, None), (_, None, None) -> keys1_opt
   | Some (_, _, Some _), _ -> keys1_opt
   | _ -> Some keys2
-
-(* For efficiency, this function avoids loading the wallet, except for
-   the call to [Public_key.update]. Indeed the arguments [pkhs],
-   [pks], [sks] represent the already loaded list of public key
-   hashes, public keys, and secret keys. *)
-let raw_get_aggregate_key_aux (cctxt : #Client_context.wallet) pkhs pks sks pkh
-    =
-  let open Lwt_result_syntax in
-  let rev_find_all list pkh =
-    List.filter_map
-      (fun (name, pkh') ->
-        if Tezos_crypto.Aggregate_signature.Public_key_hash.equal pkh pkh' then
-          Some name
-        else None)
-      list
-  in
-  let names = rev_find_all pkhs pkh in
-  let* o =
-    List.fold_left_es
-      (fun keys_opt name ->
-        let sk_uri_opt = List.assoc ~equal:String.equal name sks in
-        let* pk_opt =
-          match List.assoc ~equal:String.equal name pks with
-          | None -> return_none
-          | Some (_, Some pk) -> return_some pk
-          | Some (pk_uri, None) ->
-              let* pk = aggregate_public_key pk_uri in
-              let* () =
-                Aggregate_alias.Public_key.update cctxt name (pk_uri, Some pk)
-              in
-              return_some pk
-        in
-        return @@ join_keys keys_opt (name, pk_opt, sk_uri_opt))
-      None
-      names
-  in
-  match o with
-  | None ->
-      failwith
-        "no keys for the source contract %a"
-        Tezos_crypto.Aggregate_signature.Public_key_hash.pp
-        pkh
-  | Some keys -> return keys
-
-let raw_get_aggregate_key (cctxt : #Client_context.wallet) pkh =
-  let open Lwt_result_syntax in
-  let* pkhs = Aggregate_alias.Public_key_hash.load cctxt in
-  let* pks = Aggregate_alias.Public_key.load cctxt in
-  let* sks = Aggregate_alias.Secret_key.load cctxt in
-  raw_get_aggregate_key_aux cctxt pkhs pks sks pkh
-
-let list_aggregate_keys cctxt =
-  let open Lwt_result_syntax in
-  let* pkhs = Aggregate_alias.Public_key_hash.load cctxt in
-  let* pks = Aggregate_alias.Public_key.load cctxt in
-  let* sks = Aggregate_alias.Secret_key.load cctxt in
-  List.map_es
-    (fun (name, pkh) ->
-      let*! r = raw_get_aggregate_key_aux cctxt pkhs pks sks pkh in
-      match r with
-      | Ok (_name, pk, sk_uri) -> return (name, pkh, pk, sk_uri)
-      | Error _ -> return (name, pkh, None, None))
-    pkhs
-
-let import_aggregate_secret_key ~io pk_uri =
-  with_scheme_aggregate_signer pk_uri (fun (module Signer : AGGREGATE_SIGNER) ->
-      Signer.import_secret_key ~io pk_uri)
-
-let alias_aggregate_keys cctxt name =
-  let open Lwt_result_syntax in
-  let* pkh = Aggregate_alias.Public_key_hash.find cctxt name in
-  let*! r = raw_get_aggregate_key cctxt pkh in
-  match r with
-  | Ok (_name, pk, sk_uri) -> return_some (pkh, pk, sk_uri)
-  | Error _ -> return_none
-
-let aggregate_sign cctxt sk_uri buf =
-  let open Lwt_result_syntax in
-  with_scheme_aggregate_signer sk_uri (fun (module Signer : AGGREGATE_SIGNER) ->
-      let* signature = Signer.sign sk_uri buf in
-      let* pk_uri = Signer.neuterize sk_uri in
-      let* pubkey =
-        let* o = Aggregate_alias.Secret_key.rev_find cctxt sk_uri in
-        match o with
-        | None -> aggregate_public_key pk_uri
-        | Some name -> (
-            let* r = Aggregate_alias.Public_key.find cctxt name in
-            match r with
-            | _, None ->
-                let* pk = aggregate_public_key pk_uri in
-                let* () =
-                  Aggregate_alias.Public_key.update cctxt name (pk_uri, Some pk)
-                in
-                return pk
-            | _, Some pubkey -> return pubkey)
-      in
-      let* () =
-        fail_unless
-          (Tezos_crypto.Aggregate_signature.check pubkey signature buf)
-          (Signature_mismatch sk_uri)
-      in
-      return signature)
 
 module Make (Signature : Signature_S) :
   S
@@ -926,9 +628,7 @@ module Make (Signature : Signature_S) :
   let find_simple_signer_for_key ~scheme =
     let open Result_syntax in
     let* signer = find_signer_for_key ~scheme in
-    match signer with
-    | Simple signer -> return (adapt_signer signer)
-    | Aggregate _signer -> tzfail (Wrong_key_scheme ("simple", "aggregate"))
+    match signer with signer -> return (adapt_signer signer)
 
   let with_scheme_simple_signer (uri : Uri.t)
       (f : (module V_SIGNER) -> 'a tzresult Lwt.t) : 'a tzresult Lwt.t =
@@ -999,11 +699,8 @@ module Make (Signature : Signature_S) :
         Signer.deterministic_nonce_hash sk_uri data)
 
   let supports_deterministic_nonces sk_uri =
-    let open Lwt_result_syntax in
-    with_scheme_signer sk_uri (function
-        | Simple (module Signer : SIGNER) ->
-            Signer.supports_deterministic_nonces sk_uri
-        | Aggregate _ -> return_false)
+    with_scheme_signer sk_uri (function (module Signer : SIGNER) ->
+        Signer.supports_deterministic_nonces sk_uri)
 
   let register_key cctxt ?(force = false) (public_key_hash, pk_uri, sk_uri)
       ?public_key name =

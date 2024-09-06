@@ -2267,8 +2267,8 @@ module Start_dac_node = struct
           let* committee_members =
             Lwt_list.map_p
               (fun name ->
-                let* account = Client.bls_show_address client ~alias:name in
-                return account.aggregate_public_key)
+                let* account = Client.show_address client ~alias:name in
+                return account.public_key)
               committee_members_aliases
           in
           let dac_node =
@@ -2288,7 +2288,7 @@ module Start_dac_node = struct
             state ;
           return dac_node
       | Member {alias; coordinator} ->
-          let* member_account = Client.bls_show_address client ~alias in
+          let* member_account = Client.show_address client ~alias in
           let coordinator_rpc_host, coordinator_rpc_port =
             dac_rpc_info state `Coordinator coordinator
           in
@@ -2300,7 +2300,7 @@ module Start_dac_node = struct
               ?name:args.name
               ~client
               ~endpoint
-              ~address:member_account.aggregate_public_key_hash
+              ~address:member_account.public_key_hash
               ~coordinator_rpc_host
               ~coordinator_rpc_port
               ()

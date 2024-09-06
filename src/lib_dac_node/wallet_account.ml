@@ -63,7 +63,7 @@ module Committee_member = struct
 
   type t = {
     public_key_hash : Aggregate_signature.public_key_hash;
-    secret_key_uri : Client_keys.aggregate_sk_uri;
+    secret_key_uri : Client_keys.sk_uri;
   }
 
   let of_committee_member_address pkh cctxt =
