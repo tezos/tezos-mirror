@@ -8,8 +8,8 @@ Where <action> can be:
 
 * --update-ocamlformat: update all the \`.ocamlformat\` files and
   git-commit (requires clean repo).
+* --check-ocamlformat: check that --update-ocamlformat does nothing.
 * --format-scripts: format shell scripts inplace using shfmt
-* --check-ocamlformat: check the above does nothing.
 * --check-gitlab-ci-yml: check .gitlab-ci.yml has been updated.
 * --check-scripts: shellcheck and check formatting of the .sh files
 * --check-redirects: check docs/_build/_redirects.
