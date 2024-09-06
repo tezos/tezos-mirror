@@ -723,6 +723,22 @@ let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
   let*! () =
     Tezos_base_unix.Internal_event_unix.init ~config:internal_events ()
   in
+  let () =
+    match Option.map String.lowercase_ascii @@ Sys.getenv_opt "PROFILING" with
+    | Some (("true" | "on" | "yes" | "terse" | "detailed" | "verbose") as mode)
+      ->
+        let max_lod =
+          match mode with
+          | "detailed" -> Profiler.Detailed
+          | "verbose" -> Profiler.Verbose
+          | _ -> Profiler.Terse
+        in
+        let profiler_maker =
+          Tezos_shell.Profiler_directory.profiler_maker config.data_dir max_lod
+        in
+        Shell_profiling.activate_all ~profiler_maker
+    | _ -> ()
+  in
   let*! () =
     Lwt_list.iter_s (fun evt -> Internal_event.Simple.emit evt ()) cli_warnings
   in
