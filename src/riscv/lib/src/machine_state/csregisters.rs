@@ -31,7 +31,7 @@ use crate::{
 use num_enum::TryFromPrimitive;
 use root::RootCSRegister;
 use strum::IntoEnumIterator;
-use values::{CSRValuesLayout, CSRegisterValues, MStatusValue};
+use values::{CSRValues, CSRValuesLayout, MStatusValue};
 
 /// Privilege required to access a CSR
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -1357,7 +1357,7 @@ pub fn access_checks(csr: CSRegister, hart_state: &HartState<impl ManagerRead>) 
 
 /// CSRs
 pub struct CSRegisters<M: backend::ManagerBase> {
-    registers: CSRegisterValues<M>,
+    registers: CSRValues<M>,
     pub(super) interrupt_cache: InterruptsCache,
 }
 
@@ -1630,7 +1630,7 @@ impl<M: backend::ManagerBase> CSRegisters<M> {
     /// Bind the CSR state to the allocated space.
     pub fn bind(space: backend::AllocatedOf<CSRegistersLayout, M>) -> Self {
         Self {
-            registers: values::CSRegisterValues::bind(space),
+            registers: values::CSRValues::bind(space),
             interrupt_cache: InterruptsCache::default(),
         }
     }
