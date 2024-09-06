@@ -352,6 +352,7 @@ let on_layer_1_head ({node_ctxt; _} as state) (head : Layer1.header) =
   let* () = Publisher.cement_commitments () in
   let*! () = Daemon_event.new_heads_processed reorg.new_chain in
   let* () = Batcher.produce_batches () in
+  let* () = Dal_injection_queue.produce_dal_slots () in
   let*! () = Injector.inject ~header:head.header () in
   Reference.set node_ctxt.degraded false ;
   return_unit
@@ -375,6 +376,7 @@ let degraded_refutation_loop state (head : Layer1.header) =
   let* () = Publisher.publish_commitments () in
   (* Continue to produce batches but ignore any error *)
   let*! (_ : unit tzresult) = Batcher.produce_batches () in
+  let*! (_ : unit tzresult) = Dal_injection_queue.produce_dal_slots () in
   let*! () = Injector.inject () in
   return_unit
 
