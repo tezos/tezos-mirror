@@ -109,7 +109,7 @@ sanity_ci:
   - ./scripts/ci/check_alpine_version.sh
   - make -C ci check
 
-docker:hadolint-schedule_extended_test:
+docker:hadolint:
   image: hadolint/hadolint:2.9.3-debian
   stage: sanity
   tags:
@@ -121,6 +121,58 @@ docker:hadolint-schedule_extended_test:
   script:
   - hadolint build.Dockerfile
   - hadolint Dockerfile
+
+oc.ocaml_fmt:
+  image: ${ci_image_name}/build:${ci_image_tag}
+  stage: sanity
+  tags:
+  - gcp
+  rules:
+  - when: always
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  before_script:
+  - ./scripts/ci/take_ownership.sh
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  script:
+  - scripts/lint.sh --check-ocamlformat
+  - dune build --profile=dev @fmt
+
+oc.semgrep:
+  image: returntocorp/semgrep-agent:sha-c6cd7cf
+  stage: sanity
+  tags:
+  - gcp
+  rules:
+  - when: always
+  dependencies: []
+  timeout: 60 minutes
+  script:
+  - echo "OCaml code linting. For information on how to reproduce locally, check out
+    scripts/semgrep/README.md"
+  - sh ./scripts/semgrep/lint-all-ocaml-sources.sh
+
+oc.misc_checks:
+  image: ${ci_image_name}/test:${ci_image_tag}
+  stage: sanity
+  tags:
+  - gcp
+  rules:
+  - when: always
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  before_script:
+  - ./scripts/ci/take_ownership.sh
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  - . $HOME/.venv/bin/activate
+  script:
+  - ./scripts/ci/lint_misc_check.sh
+  - scripts/check_wasm_pvm_regressions.sh check
+  - etherlink/scripts/check_evm_store_migrations.sh check
 
 oc.build_arm64-released:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -1398,26 +1450,6 @@ oc.check_lift_limits_patch:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
 
-oc.misc_checks:
-  image: ${ci_image_name}/test:${ci_image_tag}
-  stage: test
-  tags:
-  - gcp
-  rules:
-  - when: always
-  dependencies:
-  - oc.docker:ci:amd64
-  timeout: 60 minutes
-  before_script:
-  - ./scripts/ci/take_ownership.sh
-  - . ./scripts/version.sh
-  - eval $(opam env)
-  - . $HOME/.venv/bin/activate
-  script:
-  - ./scripts/ci/lint_misc_check.sh
-  - scripts/check_wasm_pvm_regressions.sh check
-  - etherlink/scripts/check_evm_store_migrations.sh check
-
 oc.python_check:
   image: ${ci_image_name}/test:${ci_image_tag}
   stage: test
@@ -1434,38 +1466,6 @@ oc.python_check:
   - . $HOME/.venv/bin/activate
   script:
   - ./scripts/ci/lint_misc_python_check.sh
-
-oc.ocaml_fmt:
-  image: ${ci_image_name}/build:${ci_image_tag}
-  stage: test
-  tags:
-  - gcp
-  rules:
-  - when: always
-  dependencies:
-  - oc.docker:ci:amd64
-  timeout: 60 minutes
-  before_script:
-  - ./scripts/ci/take_ownership.sh
-  - . ./scripts/version.sh
-  - eval $(opam env)
-  script:
-  - scripts/lint.sh --check-ocamlformat
-  - dune build --profile=dev @fmt
-
-oc.semgrep:
-  image: returntocorp/semgrep-agent:sha-c6cd7cf
-  stage: test
-  tags:
-  - gcp
-  rules:
-  - when: always
-  dependencies: []
-  timeout: 60 minutes
-  script:
-  - echo "OCaml code linting. For information on how to reproduce locally, check out
-    scripts/semgrep/README.md"
-  - sh ./scripts/semgrep/lint-all-ocaml-sources.sh
 
 oc.integration:compiler-rejections:
   image: ${ci_image_name}/build:${ci_image_tag}

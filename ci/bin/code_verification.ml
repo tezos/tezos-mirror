@@ -296,23 +296,21 @@ let jobs pipeline_type =
         in
         ([job_start], make_dependencies)
   in
-  (* Short-cut for jobs that has no dependencies except [job_start]
-     on [Before_merging] pipelines. *)
-  let dependencies_needs_start =
-    make_dependencies
-      ~before_merging:(fun job_start -> Dependent [Job job_start])
-      ~schedule_extended_test:(fun () -> Staged [])
-  in
-
   (* Sanity jobs *)
   let sanity =
+    let stage = Stages.sanity in
+    let dependencies =
+      make_dependencies
+        ~before_merging:(fun job_start -> Dependent [Job job_start])
+        ~schedule_extended_test:(fun () -> Staged [])
+    in
     let job_sanity_ci : tezos_job =
       job
         ~__POS__
         ~name:"sanity_ci"
         ~image:Images.CI.build
-        ~stage:Stages.sanity
-        ~dependencies:dependencies_needs_start
+        ~stage
+        ~dependencies
         ~before_script:(before_script ~take_ownership:true ~eval_opam:true [])
         [
           "make -C manifest check";
@@ -329,7 +327,8 @@ let jobs pipeline_type =
         ~__POS__
         ~name:"nix"
         ~image:Images.nix
-        ~stage:Stages.sanity
+        ~stage
+        ~dependencies
         ~artifacts:(artifacts ~when_:On_failure ["flake.lock"])
         ~rules:
           (make_rules
@@ -349,16 +348,69 @@ let jobs pipeline_type =
       job
         ~rules:(make_rules ~changes:changeset_hadolint_docker_files ())
         ~__POS__
-        ~name:
-          (* TODO: I'm not sure it makes sense to have different names for the same job *)
-          ("docker:hadolint-"
-          ^
-          match pipeline_type with
-          | Before_merging -> "before_merging"
-          | Schedule_extended_test -> "schedule_extended_test")
+        ~name:"docker:hadolint"
+        ~dependencies
         ~image:Images.hadolint
-        ~stage:Stages.sanity
+        ~stage
         ["hadolint build.Dockerfile"; "hadolint Dockerfile"]
+    in
+    let job_oc_ocaml_fmt : tezos_job =
+      job
+        ~__POS__
+        ~name:"oc.ocaml_fmt"
+        ~image:Images.CI.build
+        ~stage
+        ~dependencies
+        ~rules:(make_rules ~changes:changeset_ocaml_fmt_files ())
+        ~before_script:
+          (before_script
+             ~take_ownership:true
+             ~source_version:true
+             ~eval_opam:true
+             [])
+        ["scripts/lint.sh --check-ocamlformat"; "dune build --profile=dev @fmt"]
+    in
+    let job_semgrep : tezos_job =
+      job
+        ~__POS__
+        ~name:"oc.semgrep"
+        ~image:Images.semgrep_agent
+        ~stage
+        ~dependencies
+        ~rules:(make_rules ~changes:changeset_semgrep_files ())
+        [
+          "echo \"OCaml code linting. For information on how to reproduce \
+           locally, check out scripts/semgrep/README.md\"";
+          "sh ./scripts/semgrep/lint-all-ocaml-sources.sh";
+        ]
+    in
+    let job_oc_misc_checks : tezos_job =
+      job
+        ~__POS__
+        ~name:"oc.misc_checks"
+        ~image:Images.CI.test
+        ~stage
+        ~dependencies
+        ~rules:(make_rules ~changes:changeset_lint_files ())
+        ~before_script:
+          (before_script
+             ~take_ownership:true
+             ~source_version:true
+             ~eval_opam:true
+             ~init_python_venv:true
+             [])
+        ([
+           "./scripts/ci/lint_misc_check.sh";
+           "scripts/check_wasm_pvm_regressions.sh check";
+           "etherlink/scripts/check_evm_store_migrations.sh check";
+         ]
+        @
+        (* The license check only applies to new files (in the sense
+           of [git add]), so can only run in [before_merging]
+           pipelines. *)
+        if pipeline_type = Before_merging then
+          ["./scripts/ci/lint_check_licenses.sh"]
+        else [])
     in
     let mr_only_jobs =
       match pipeline_type with
@@ -370,7 +422,25 @@ let jobs pipeline_type =
           ]
       | _ -> []
     in
-    [job_sanity_ci; job_docker_hadolint] @ mr_only_jobs
+    [
+      job_sanity_ci;
+      job_docker_hadolint;
+      job_oc_ocaml_fmt;
+      job_semgrep;
+      job_oc_misc_checks;
+    ]
+    @ mr_only_jobs
+  in
+  (* Short-cut for jobs that have no dependencies except [job_start] on
+     [Before_merging] pipelines. These jobs must also depend on all
+     jobs in the stage [sanity], such that they do not run if this
+     stage does not succeed. Since some sanity jobs are conditional,
+     we make these dependencies optional. *)
+  let dependencies_needs_start =
+    make_dependencies
+      ~before_merging:(fun job_start ->
+        Dependent ([Job job_start] @ List.map (fun job -> Optional job) sanity))
+      ~schedule_extended_test:(fun () -> Staged [])
   in
   (* The build_x86_64 jobs are split in two to keep the artifact size
      under the 1GB hard limit set by GitLab. *)
@@ -635,34 +705,6 @@ let jobs pipeline_type =
         ]
       |> enable_cargo_cache |> enable_sccache
     in
-    let job_oc_misc_checks : tezos_job =
-      job
-        ~__POS__
-        ~name:"oc.misc_checks"
-        ~image:Images.CI.test
-        ~stage:Stages.test
-        ~dependencies:dependencies_needs_start
-        ~rules:(make_rules ~changes:changeset_lint_files ())
-        ~before_script:
-          (before_script
-             ~take_ownership:true
-             ~source_version:true
-             ~eval_opam:true
-             ~init_python_venv:true
-             [])
-        ([
-           "./scripts/ci/lint_misc_check.sh";
-           "scripts/check_wasm_pvm_regressions.sh check";
-           "etherlink/scripts/check_evm_store_migrations.sh check";
-         ]
-        @
-        (* The license check only applies to new files (in the sense
-           of [git add]), so can only run in [before_merging]
-           pipelines. *)
-        if pipeline_type = Before_merging then
-          ["./scripts/ci/lint_check_licenses.sh"]
-        else [])
-    in
     let job_oc_python_check : tezos_job =
       job
         ~__POS__
@@ -678,36 +720,6 @@ let jobs pipeline_type =
              ~init_python_venv:true
              [])
         ["./scripts/ci/lint_misc_python_check.sh"]
-    in
-    let job_oc_ocaml_fmt : tezos_job =
-      job
-        ~__POS__
-        ~name:"oc.ocaml_fmt"
-        ~image:Images.CI.build
-        ~stage:Stages.test
-        ~dependencies:dependencies_needs_start
-        ~rules:(make_rules ~changes:changeset_ocaml_fmt_files ())
-        ~before_script:
-          (before_script
-             ~take_ownership:true
-             ~source_version:true
-             ~eval_opam:true
-             [])
-        ["scripts/lint.sh --check-ocamlformat"; "dune build --profile=dev @fmt"]
-    in
-    let job_semgrep : tezos_job =
-      job
-        ~__POS__
-        ~name:"oc.semgrep"
-        ~image:Images.semgrep_agent
-        ~stage:Stages.test
-        ~dependencies:dependencies_needs_start
-        ~rules:(make_rules ~changes:changeset_semgrep_files ())
-        [
-          "echo \"OCaml code linting. For information on how to reproduce \
-           locally, check out scripts/semgrep/README.md\"";
-          "sh ./scripts/semgrep/lint-all-ocaml-sources.sh";
-        ]
     in
     let jobs_unit : tezos_job list =
       let build_dependencies = function
@@ -1350,10 +1362,7 @@ let jobs pipeline_type =
         job_kaitai_checks;
         job_kaitai_e2e_checks;
         job_oc_check_lift_limits_patch;
-        job_oc_misc_checks;
         job_oc_python_check;
-        job_oc_ocaml_fmt;
-        job_semgrep;
         job_oc_integration_compiler_rejections;
         job_oc_script_test_gen_genesis;
         job_oc_script_snapshot_alpha_and_link;
