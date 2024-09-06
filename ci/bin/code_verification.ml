@@ -418,6 +418,16 @@ let jobs pipeline_type =
           ["./scripts/ci/lint_check_licenses.sh"]
         else [])
     in
+    let job_check_rust_fmt : tezos_job =
+      job
+        ~__POS__
+        ~name:"check_rust_fmt"
+        ~image:Images.rust_toolchain
+        ~stage
+        ~dependencies
+        ~rules:(make_rules ~dependent:true ~changes:changeset_rust_fmt_files ())
+        ["scripts/check-format-rust.sh"]
+    in
     let mr_only_jobs =
       match pipeline_type with
       | Before_merging ->
@@ -434,6 +444,7 @@ let jobs pipeline_type =
       job_oc_ocaml_fmt;
       job_semgrep;
       job_oc_misc_checks;
+      job_check_rust_fmt;
     ]
     @ mr_only_jobs
   in

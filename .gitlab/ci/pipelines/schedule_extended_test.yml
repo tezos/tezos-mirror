@@ -183,6 +183,19 @@ oc.misc_checks:
   - scripts/check_wasm_pvm_regressions.sh check
   - etherlink/scripts/check_evm_store_migrations.sh check
 
+check_rust_fmt:
+  image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
+  stage: sanity
+  tags:
+  - gcp
+  rules:
+  - when: on_success
+  dependencies:
+  - oc.docker:rust-toolchain:amd64
+  timeout: 60 minutes
+  script:
+  - scripts/check-format-rust.sh
+
 oc.build_arm64-released:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
