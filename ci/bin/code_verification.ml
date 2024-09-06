@@ -368,7 +368,13 @@ let jobs pipeline_type =
              ~source_version:true
              ~eval_opam:true
              [])
-        ["scripts/lint.sh --check-ocamlformat"; "dune build --profile=dev @fmt"]
+        [
+          (* Check .ocamlformat files. *)
+          "scripts/lint.sh --check-ocamlformat";
+          (* Check actual formatting. *)
+          "dune build --profile=dev @fmt";
+        ]
+      |> enable_dune_cache
     in
     let job_semgrep : tezos_job =
       job
