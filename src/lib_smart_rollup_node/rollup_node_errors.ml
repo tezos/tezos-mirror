@@ -66,6 +66,8 @@ type error +=
   | Patch_durable_storage_on_commitment of int32
   | Dal_message_too_big of {slot_size : int; message_size : int}
 
+type error += PVM_eval_too_many_ticks of {max_given : int64; executed : int64}
+
 type error +=
   | Could_not_open_preimage_file of String.t
   | Could_not_encode_raw_data
@@ -632,4 +634,30 @@ let () =
           Some (slot_size, message_size)
       | _ -> None)
     (fun (slot_size, message_size) ->
-      Dal_message_too_big {slot_size; message_size})
+      Dal_message_too_big {slot_size; message_size}) ;
+
+  register_error_kind
+    ~id:"sc_rollup.node.pvm_eval_too_many_ticks"
+    ~title:"PVM advanced too many ticks"
+    ~description:
+      "The rollup node expects the PVM to advance at most a given amount of \
+       ticks. \n\
+       NOTE: This is a potential security issue. Please email \
+       security@tezos.com to have the problem investigated."
+    ~pp:(fun ppf (maximum, executed) ->
+      Format.fprintf
+        ppf
+        "The rollup node expected the PVM to advance at most %Ld ticks, but \
+         the PVM executed %Ld ticks \n\
+         NOTE: This is a potential security issue. Please email \
+         security@tezos.com to have the problem investigated."
+        maximum
+        executed)
+    `Permanent
+    Data_encoding.(
+      obj2 (req "maximum ticks" int64) (req "executed ticks" int64))
+    (function
+      | PVM_eval_too_many_ticks {max_given; executed} ->
+          Some (max_given, executed)
+      | _ -> None)
+    (fun (max_given, executed) -> PVM_eval_too_many_ticks {max_given; executed})
