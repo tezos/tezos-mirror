@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Features
+
+#### CLI
+
+- Add the argument `--block-number N` to select the state to patch when using
+  the `patch` commands. More precisely, patching the state `N` affects the
+  replay of block `N+1`. (!14809)
+
 ## Version 0.2 (2024-09-05)
 
 This release introduces a number of quality of life improvements for operators
@@ -26,6 +36,9 @@ Beta.
   snapshot. (!14333 !14778)
 - Add a new command `snapshot info` to display information about a snapshot
   without importing. (!14797)
+- Add new commands `snapshot export` to export a snapshot
+  of the EVM node current state  and `snapshot import` to bootstrap a node from
+  a snapshot. (!14255 !14280 !14281 !14325 !14372 !14333 !14781 !14778)
 
 #### RPCs
 

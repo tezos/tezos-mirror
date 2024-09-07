@@ -133,6 +133,7 @@ module Request = struct
         commit : bool;
         key : string;
         value : string;
+        block_number : Ethereum_types.quantity option;
       }
         -> (unit, tztrace) t
     | Wasm_pvm_version : (Tezos_scoru_wasm.Wasm_pvm_state.version, tztrace) t
@@ -296,17 +297,18 @@ module Request = struct
         case
           (Tag 13)
           ~title:"Patch_state"
-          (obj4
+          (obj5
              (req "request" (constant "patch_state"))
              (req "commit" bool)
              (req "key" string)
-             (req "value" (string' Hex)))
+             (req "value" (string' Hex))
+             (opt "block_number" Ethereum_types.quantity_encoding))
           (function
-            | View (Patch_state {commit; key; value}) ->
-                Some ((), commit, key, value)
+            | View (Patch_state {commit; key; value; block_number}) ->
+                Some ((), commit, key, value, block_number)
             | _ -> None)
-          (fun ((), commit, key, value) ->
-            View (Patch_state {commit; key; value}));
+          (fun ((), commit, key, value, block_number) ->
+            View (Patch_state {commit; key; value; block_number}));
         case
           (Tag 14)
           ~title:"Wasm_pvm_version"
@@ -1176,20 +1178,58 @@ module State = struct
     let*! version = Evm_state.wasm_pvm_version ctxt.session.evm_state in
     return version
 
-  let patch_state (ctxt : t) ~commit ~key ~value =
+  let canonical_block_number ctxt = function
+    | None -> None
+    | Some block_number ->
+        if Ethereum_types.Qty.(current_blueprint_number ctxt = block_number)
+        then None
+        else Some block_number
+
+  let perform_commit = commit
+
+  let patch_state (ctxt : t) ?block_number ~commit ~key ~value () =
     let open Lwt_result_syntax in
-    let*! evm_state = Evm_state.modify ~key ~value ctxt.session.evm_state in
-    let* () =
-      if commit then (
-        Evm_store.use ctxt.store @@ fun conn ->
-        let* commit = replace_current_commit ctxt conn evm_state in
-        on_modified_head ctxt evm_state commit ;
-        return_unit)
-      else (
-        ctxt.session.evm_state <- evm_state ;
-        return_unit)
+    let block_number = canonical_block_number ctxt block_number in
+    let* evm_state =
+      match block_number with
+      | None -> return ctxt.session.evm_state
+      | Some block_number -> (
+          Evm_store.use ctxt.store @@ fun conn ->
+          let* hash = Evm_store.Context_hashes.find conn block_number in
+          match hash with
+          | Some hash ->
+              let*! context = Irmin_context.checkout_exn ctxt.index hash in
+              let*! evm_state = Irmin_context.PVMState.get context in
+              return evm_state
+          | None ->
+              failwith
+                "Missing context for block number %a"
+                Ethereum_types.pp_quantity
+                block_number)
     in
-    let*! () = Events.patched_state key ctxt.session.next_blueprint_number in
+    let*! evm_state = Evm_state.modify ~key ~value evm_state in
+    let* (Qty number) =
+      match block_number with
+      | None ->
+          if commit then (
+            Evm_store.use ctxt.store @@ fun conn ->
+            let* commit = replace_current_commit ctxt conn evm_state in
+            on_modified_head ctxt evm_state commit ;
+            return (current_blueprint_number ctxt))
+          else (
+            ctxt.session.evm_state <- evm_state ;
+            return (current_blueprint_number ctxt))
+      | Some block_number ->
+          if commit then (
+            Evm_store.use ctxt.store @@ fun conn ->
+            let* context =
+              perform_commit conn ctxt.session.context evm_state block_number
+            in
+            ctxt.session.context <- context ;
+            return block_number)
+          else return block_number
+    in
+    let*! () = Events.patched_state key (Qty Z.(succ number)) in
     return_unit
 end
 
@@ -1356,10 +1396,10 @@ module Handlers = struct
           ~finalized_level
           ~levels_to_hashes
           ~l2_blocks
-    | Patch_state {commit; key; value} ->
+    | Patch_state {commit; key; value; block_number} ->
         protect @@ fun () ->
         let ctxt = Worker.state self in
-        State.patch_state ctxt ~commit ~key ~value
+        State.patch_state ?block_number ctxt ~commit ~key ~value ()
     | Wasm_pvm_version ->
         protect @@ fun () ->
         let ctxt = Worker.state self in
@@ -1781,7 +1821,7 @@ let execute ?(alter_evm_state = Lwt_result_syntax.return) input block =
         message
   | None -> failwith "Cannot read evm state"
 
-let patch_kernel path =
+let patch_kernel ?block_number path =
   let open Lwt_result_syntax in
   let* kernel, is_binary = Wasm_debugger.read_kernel_from_file path in
   let* version = worker_wait_for_request Wasm_pvm_version in
@@ -1794,21 +1834,29 @@ let patch_kernel path =
   in
   let* () =
     worker_wait_for_request
-      (Patch_state {commit = true; key = "/kernel/boot.wasm"; value = kernel})
+      (Patch_state
+         {
+           commit = true;
+           key = "/kernel/boot.wasm";
+           value = kernel;
+           block_number;
+         })
   in
   return_unit
 
-let patch_sequencer_key pk =
+let patch_sequencer_key ?block_number pk =
   worker_wait_for_request
     (Patch_state
        {
          commit = false;
          key = Durable_storage_path.sequencer_key;
          value = Signature.Public_key.to_b58check pk;
+         block_number;
        })
 
-let patch_state ~key ~value =
-  worker_wait_for_request (Patch_state {commit = true; key; value})
+let patch_state ?block_number ~key ~value () =
+  worker_wait_for_request
+    (Patch_state {commit = true; key; value; block_number})
 
 let block_param_to_block_number
     (block_param : Ethereum_types.Block_parameter.extended) =

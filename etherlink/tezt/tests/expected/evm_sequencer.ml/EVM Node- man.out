@@ -362,10 +362,12 @@ Miscellaneous commands:
     --kernel <evm_kernel.wasm>: Path to the EVM kernel used to launch the PVM, it will be loaded from storage afterward
     --profile: Profile the execution of the WASM PVM
   
-  patch kernel with <kernel_path> [--data-dir <data-dir>] [-f --force]
+  patch kernel with <kernel_path> [--data-dir <data-dir>]
+      [--block-number <N>] [-f --force]
     Patch the kernel used by the EVM node from its current HEAD. This is an unsafe command, which can lead to the EVM node diverging from the Etherlink main branch if the new kernel is not compatible with the one deployed on the network.
     <kernel_path>: Path to the kernel
     --data-dir <data-dir>: The path to the EVM node data directory
+    --block-number <N>: If provided, the state resulting in the application of the requested block will be used instead of the latest state. In that case, the patch will only impact replays of the successor block only.
     -f --force: Force patching the kernel
   
   init config [--data-dir <data-dir>] [--rpc-addr <ADDR>] [--rpc-port <PORT>]
@@ -475,11 +477,13 @@ Miscellaneous commands:
     --enable-dal: enable flag enable_dal in the installer config
     --dal-slots <0,1,4,6,...>: value for dal_slots in the installer config
   
-  patch state at <path> with <value> [--data-dir <data-dir>] [-f --force]
+  patch state at <path> with <value> [--data-dir <data-dir>]
+      [--block-number <N>] [-f --force]
     Patches the state with an arbitrary value. This is an unsafe command, it should be used for debugging only. Patched state is persisted and you need to use the command `reset` to revert the changes.
     <path>: Durable storage path
     <value>: Patched value
     --data-dir <data-dir>: The path to the EVM node data directory
+    --block-number <N>: If provided, the state resulting in the application of the requested block will be used instead of the latest state.
     -f --force: Force patching the state
   
   download kernel with root hash <root hash> [--data-dir <data-dir>]

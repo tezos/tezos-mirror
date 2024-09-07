@@ -153,15 +153,24 @@ val delayed_inbox_hashes : unit -> Ethereum_types.hash list tzresult Lwt.t
 
 (** [patch_kernel path] modifies the state of the current head of the EVM node
     to replace its kernel with the kernel file [path]. *)
-val patch_kernel : string -> unit tzresult Lwt.t
+val patch_kernel :
+  ?block_number:Ethereum_types.quantity -> string -> unit tzresult Lwt.t
 
 (** [patch_sequencer_key public_key] modifies the in memory state of the
     EVM node to replace the sequencer key with [public_key]. It does not
     modify the current head.  *)
-val patch_sequencer_key : Signature.public_key -> unit tzresult Lwt.t
+val patch_sequencer_key :
+  ?block_number:Ethereum_types.quantity ->
+  Signature.public_key ->
+  unit tzresult Lwt.t
 
-(** [patch_state ~key ~value] writes [value] at [key]. *)
-val patch_state : key:string -> value:string -> unit tzresult Lwt.t
+(** [patch_state ~key ~value ()] writes [value] at [key]. *)
+val patch_state :
+  ?block_number:Ethereum_types.quantity ->
+  key:string ->
+  value:string ->
+  unit ->
+  unit tzresult Lwt.t
 
 val block_param_to_block_number :
   Ethereum_types.Block_parameter.extended ->
