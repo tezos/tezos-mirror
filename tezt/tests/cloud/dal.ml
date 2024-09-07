@@ -78,18 +78,43 @@ module Disconnect = struct
 end
 
 module Network = struct
-  type t = Ghostnet | Sandbox
+  type testnet = Ghostnet
 
-  let to_string = function Ghostnet -> "ghostnet" | Sandbox -> "sandbox"
+  type t = Testnet of testnet | Sandbox
+
+  let to_string = function
+    | Testnet Ghostnet -> "ghostnet"
+    | Sandbox -> "sandbox"
+
+  let public_rpc_endpoint testnet =
+    Endpoint.
+      {
+        scheme = "https";
+        host = (match testnet with Ghostnet -> "rpc.ghostnet.teztnets.com");
+        port = 443;
+      }
+
+  let snapshot_service = function
+    | Ghostnet -> "https://snapshots.eu.tzinit.org/ghostnet"
+
+  (* Argument to give to the --network option of `octez-node config init`. *)
+  let to_octez_network_options = function Ghostnet -> "ghostnet"
+
+  let default_bootstrap = function
+    | Ghostnet -> "ghostnet.tzinit.org" (* Taken from ghostnet configuration *)
+
+  let default_dal_bootstrap = function
+    | Ghostnet ->
+        "dalboot.ghostnet.tzboot.net" (* Taken from ghostnet configuration *)
 
   let get_level network endpoint =
     match network with
     | Sandbox -> Lwt.return 1
-    | Ghostnet ->
+    | Testnet _ ->
         let* json = RPC_core.call endpoint (RPC.get_chain_block_header ()) in
         JSON.(json |-> "level" |> as_int) |> Lwt.return
 
-  let expected_pow = function Ghostnet -> 26. | Sandbox -> 0.
+  let expected_pow = function Testnet _ -> 26. | Sandbox -> 0.
 end
 
 module Node = struct
@@ -100,11 +125,13 @@ module Node = struct
   let init ?(arguments = []) ?data_dir ?dal_config ~name network agent =
     toplog "Inititializing a L1 node" ;
     match network with
-    | Network.Ghostnet -> (
+    | Network.Testnet network -> (
         match data_dir with
         | Some data_dir ->
             let* node = Node.Agent.create ~arguments ~data_dir ~name agent in
-            let* () = Node.run node [Network "ghostnet"] in
+            let* () =
+              Node.run node [Network (Network.to_octez_network_options network)]
+            in
             let* () = Node.wait_for_ready node in
             Lwt.return node
         | None ->
@@ -115,7 +142,11 @@ module Node = struct
             let* node =
               Node.Agent.create
                 ~arguments:
-                  [Network "ghostnet"; Expected_pow 26; Cors_origin "*"]
+                  [
+                    Network (Network.to_octez_network_options network);
+                    Expected_pow 26;
+                    Cors_origin "*";
+                  ]
                 ?data_dir
                 ~name
                 agent
@@ -128,7 +159,7 @@ module Node = struct
                 [
                   "-O";
                   "snapshot_file";
-                  "https://snapshots.eu.tzinit.org/ghostnet/rolling";
+                  sf "%s/rolling" (Network.snapshot_service network);
                 ]
               |> Process.check
             in
@@ -292,9 +323,11 @@ module Cli = struct
   let network_typ =
     Clap.typ
       ~name:"network"
-      ~dummy:Network.Ghostnet
+      ~dummy:Network.(Testnet Ghostnet)
       ~parse:(function
-        | "ghostnet" -> Some Ghostnet | "sandbox" -> Some Sandbox | _ -> None)
+        | "ghostnet" -> Some (Testnet Ghostnet)
+        | "sandbox" -> Some Sandbox
+        | _ -> None)
       ~show:Network.to_string
 
   let network =
@@ -310,7 +343,7 @@ module Cli = struct
     Clap.flag
       ~section
       ~set_long:"bootstrap"
-      (match network with Sandbox -> true | Ghostnet -> false)
+      (match network with Sandbox -> true | Testnet _ -> false)
 
   let stake =
     let stake_typ =
@@ -332,7 +365,7 @@ module Cli = struct
          shares old by one baker. The total stake is given by the sum of all \
          shares."
       stake_typ
-      (match network with Sandbox -> [100] | Ghostnet -> [])
+      (match network with Sandbox -> [100] | Testnet _ -> [])
 
   let stake_machine_type =
     let stake_machine_type_typ =
@@ -412,7 +445,7 @@ module Cli = struct
       ~placeholder:"<protocol_name> (such as alpha, oxford,...)"
       ~description:"Specify the economic protocol used for this test"
       protocol_typ
-      (match network with Sandbox -> Alpha | Ghostnet -> ParisC)
+      (match network with Sandbox -> Alpha | Testnet Ghostnet -> ParisC)
 
   let data_dir =
     Clap.optional_string ~section ~long:"data-dir" ~placeholder:"<data_dir>" ()
@@ -1054,7 +1087,8 @@ let init_teztale agent node =
     Lwt.return_some teztale
   else Lwt.return_none
 
-let init_ghostnet cloud (configuration : configuration) agent =
+let init_testnet cloud (configuration : configuration) agent
+    (network : Network.testnet) =
   toplog "Init testnet" ;
   let* bootstrap =
     match agent with
@@ -1062,13 +1096,9 @@ let init_ghostnet cloud (configuration : configuration) agent =
         let () = toplog "No agent given" in
         let node = None in
         let dal_node = None in
-        (* Taken from ghostnet configuration. *)
-        let node_p2p_endpoint = "ghostnet.tzinit.org" in
-        let dal_node_p2p_endpoint = "dalboot.ghostnet.tzboot.net" in
-        let node_rpc_endpoint =
-          Endpoint.
-            {scheme = "https"; host = "rpc.ghostnet.teztnets.com"; port = 443}
-        in
+        let node_p2p_endpoint = Network.default_bootstrap network in
+        let dal_node_p2p_endpoint = Network.default_dal_bootstrap network in
+        let node_rpc_endpoint = Network.public_rpc_endpoint network in
         let () = toplog "Creating the client" in
         let client =
           Client.create ~endpoint:(Foreign_endpoint node_rpc_endpoint) ()
@@ -1804,9 +1834,9 @@ let init ~(configuration : configuration) cloud next_agent =
     | Network.Sandbox ->
         let bootstrap_agent = Option.get bootstrap_agent in
         init_bootstrap_and_activate_protocol cloud configuration bootstrap_agent
-    | Ghostnet ->
+    | Testnet testnet ->
         let () = toplog "Init: initializting, testnet case" in
-        init_ghostnet cloud configuration bootstrap_agent
+        init_testnet cloud configuration bootstrap_agent testnet
   in
   let* bakers =
     Lwt_list.mapi_p
@@ -1953,7 +1983,7 @@ let ensure_enough_funds t i =
   let producer = List.nth t.producers i in
   match t.configuration.network with
   | Sandbox -> (* Producer has enough money *) Lwt.return_unit
-  | Ghostnet ->
+  | Testnet _ ->
       let* balance =
         Client.RPC.call producer.client
         @@ RPC.get_chain_block_context_contract_balance
@@ -2106,7 +2136,7 @@ let benchmark () =
   in
   let docker_image =
     match configuration.network with
-    | Ghostnet -> None (* Some Env.Octez_latest_release *)
+    | Testnet Ghostnet -> None (* Some Env.Octez_latest_release *)
     | Sandbox -> None
   in
   let default_vm_configuration = Configuration.make ?docker_image () in
