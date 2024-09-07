@@ -464,21 +464,21 @@ mod tests {
         }
     });
 
-    backend_test!(test_xregs_reset, F, {
-        test_determinism::<F, XRegistersLayout, _>(|space| {
-            let mut registers: XRegisters<ManagerFor<'_, F, XRegistersLayout>> =
-                XRegisters::bind(space);
+    #[test]
+    fn test_xregs_reset() {
+        test_determinism::<XRegistersLayout, _>(|space| {
+            let mut registers: XRegisters<_> = XRegisters::bind(space);
             registers.reset();
         });
-    });
+    }
 
-    backend_test!(test_fregs_reset, F, {
-        test_determinism::<F, FRegistersLayout, _>(|space| {
-            let mut registers: FRegisters<ManagerFor<'_, F, FRegistersLayout>> =
-                FRegisters::bind(space);
+    #[test]
+    fn test_fregs_reset() {
+        test_determinism::<FRegistersLayout, _>(|space| {
+            let mut registers: FRegisters<_> = FRegisters::bind(space);
             registers.reset();
         });
-    });
+    }
 
     #[test]
     fn parse_xregister_zero_to_x0() {

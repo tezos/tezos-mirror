@@ -71,15 +71,13 @@ impl<E: backend::Elem, M: backend::ManagerBase> AddressableWrite<E> for Devices<
 #[cfg(test)]
 mod tests {
     use super::{Devices, DevicesLayout};
-    use crate::{
-        backend_test,
-        machine_state::backend::tests::{test_determinism, ManagerFor},
-    };
+    use crate::machine_state::backend::tests::test_determinism;
 
-    backend_test!(test_reset, F, {
-        test_determinism::<F, DevicesLayout, _>(|space| {
-            let mut devices: Devices<ManagerFor<'_, F, DevicesLayout>> = Devices::bind(space);
+    #[test]
+    fn test_reset() {
+        test_determinism::<DevicesLayout, _>(|space| {
+            let mut devices: Devices<_> = Devices::bind(space);
             devices.reset();
         });
-    });
+    }
 }
