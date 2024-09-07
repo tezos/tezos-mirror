@@ -178,7 +178,23 @@ module Node = struct
             let* () = Node.config_init node [] in
             toplog "Importing the snapshot" ;
             let* () =
-              Node.snapshot_import ~no_check:true node "snapshot_file"
+              try
+                let* () =
+                  Node.snapshot_import ~no_check:true node "snapshot_file"
+                in
+                let () = toplog "Snapshot import succeeded." in
+                unit
+              with _ ->
+                (* Failing to import the snapshot could happen on a
+                   very young Weeklynet, before the first snapshot is
+                   available. In this case bootstrapping from the
+                   genesis block is OK. *)
+                let () =
+                  toplog
+                    "Snapshot import failed, the node will be bootstrapped \
+                     from genesis."
+                in
+                unit
             in
             toplog "Launching the node." ;
             let* () = Node.run node (Force_history_mode_switch :: arguments) in
