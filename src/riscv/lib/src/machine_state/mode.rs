@@ -79,12 +79,11 @@ impl TrapMode {
 #[cfg(test)]
 mod tests {
     use crate::{
-        backend_test, create_backend,
+        backend_test, create_backend, create_state,
         machine_state::{
-            backend::{tests::test_determinism, Backend, Layout},
+            backend::tests::test_determinism,
             mode::{Mode, ModeCell, ModeLayout},
         },
-        state_backend::BackendFull,
     };
     use strum::IntoEnumIterator;
 
@@ -102,15 +101,12 @@ mod tests {
         Mode::iter().for_each(|mode| {
             let first_value = mode;
 
-            {
-                let loc = ModeLayout::placed().into_location();
-                let mut inst = ModeCell::bind(backend.allocate(loc));
+            let mut inst = create_state!(ModeCell, ModeLayout, F, backend);
 
-                inst.write(first_value);
-                assert_eq!(inst.read(), first_value);
-            }
+            inst.write(first_value);
+            assert_eq!(inst.read(), first_value);
 
-            let value_read = backend.region(&ModeLayout::placed().into_location().as_array())[0];
+            let value_read = bincode::serialize(&inst.struct_ref()).unwrap()[0];
             assert_eq!(Mode::try_from(value_read), Ok(first_value));
         });
 

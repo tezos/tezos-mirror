@@ -428,14 +428,15 @@ pub(crate) mod tests {
         backend_test, create_backend,
         state_backend::{
             layout::{Atom, Layout},
-            Array, Backend, BackendFull, CellRead, CellReadWrite, CellWrite, Choreographer,
-            DynCells, Elem, LazyCell, Location, ManagerAlloc, ManagerBase,
+            test_helpers::TestBackend,
+            Array, CellRead, CellReadWrite, CellWrite, Choreographer, DynCells, Elem, LazyCell,
+            Location, ManagerAlloc, ManagerBase,
         },
     };
 
     /// Dummy type that helps us implement custom normalisation via [Elem]
     #[repr(packed)]
-    #[derive(Debug, Copy, Clone, PartialEq, PartialOrd, Ord, Eq, Default)]
+    #[derive(Debug, Copy, Clone, PartialEq, PartialOrd, Ord, Eq, Default, serde::Serialize)]
     struct Flipper {
         a: u8,
         b: u8,
@@ -641,44 +642,38 @@ pub(crate) mod tests {
         let mut backend = create_backend!(FlipperLayout, F);
 
         // Writing to one item of the region must convert to stored format.
-        {
-            let mut region = backend.allocate(FlipperLayout::placed().into_location());
+        let mut region = backend.allocate(FlipperLayout::placed().into_location());
 
-            region.write(0, Flipper { a: 13, b: 37 });
-            assert_eq!(region.read::<Flipper>(0), Flipper { a: 13, b: 37 });
-        }
+        region.write(0, Flipper { a: 13, b: 37 });
+        assert_eq!(region.read::<Flipper>(0), Flipper { a: 13, b: 37 });
 
-        let buffer = &backend.region(&FlipperLayout::placed().into_location())[..2];
+        let buffer = region.read::<[u8; 2]>(0);
         assert_eq!(buffer, [37, 13]);
 
         // Writing to the entire region must convert properly to stored format.
-        {
-            let mut region = backend.allocate(FlipperLayout::placed().into_location());
+        region.write_all::<Flipper>(
+            0,
+            &[
+                Flipper { a: 11, b: 22 },
+                Flipper { a: 13, b: 24 },
+                Flipper { a: 15, b: 26 },
+                Flipper { a: 17, b: 28 },
+            ],
+        );
 
-            region.write_all::<Flipper>(
-                0,
-                &[
-                    Flipper { a: 11, b: 22 },
-                    Flipper { a: 13, b: 24 },
-                    Flipper { a: 15, b: 26 },
-                    Flipper { a: 17, b: 28 },
-                ],
-            );
+        let mut buff = [Flipper::default(); 4];
+        region.read_all::<Flipper>(0, &mut buff);
+        assert_eq!(
+            buff,
+            [
+                Flipper { a: 11, b: 22 },
+                Flipper { a: 13, b: 24 },
+                Flipper { a: 15, b: 26 },
+                Flipper { a: 17, b: 28 },
+            ]
+        );
 
-            let mut buff = [Flipper::default(); 4];
-            region.read_all::<Flipper>(0, &mut buff);
-            assert_eq!(
-                buff,
-                [
-                    Flipper { a: 11, b: 22 },
-                    Flipper { a: 13, b: 24 },
-                    Flipper { a: 15, b: 26 },
-                    Flipper { a: 17, b: 28 },
-                ]
-            );
-        }
-
-        let buffer = &backend.region(&FlipperLayout::placed().into_location())[..8];
+        let buffer = region.read::<[u8; 8]>(0);
         assert_eq!(buffer, [22, 11, 24, 13, 26, 15, 28, 17]);
     });
 
@@ -688,63 +683,51 @@ pub(crate) mod tests {
         let mut backend = create_backend!(FlipperLayout, F);
 
         // Writing to one item of the region must convert to stored format.
-        {
-            let mut region = backend.allocate(FlipperLayout::placed().into_location());
+        let mut region = backend.allocate(FlipperLayout::placed().into_location());
 
-            region.write(0, Flipper { a: 13, b: 37 });
-            assert_eq!(region.read(0), Flipper { a: 13, b: 37 });
-        }
+        region.write(0, Flipper { a: 13, b: 37 });
+        assert_eq!(region.read(0), Flipper { a: 13, b: 37 });
 
-        let buffer = &backend.region(&FlipperLayout::placed().into_location())[..2];
-        assert_eq!(buffer, [37, 13]);
+        let buffer = bincode::serialize(&region.struct_ref()).unwrap();
+        assert_eq!(buffer[..2], [37, 13]);
 
         // Replacing a value in the region must convert to and from stored format.
-        {
-            let mut region = backend.allocate(FlipperLayout::placed().into_location());
-            let old = region.replace(0, Flipper { a: 26, b: 74 });
-            assert_eq!(old, Flipper { a: 13, b: 37 });
-        }
+        let old = region.replace(0, Flipper { a: 26, b: 74 });
+        assert_eq!(old, Flipper { a: 13, b: 37 });
 
-        let buffer = &backend.region(&FlipperLayout::placed().into_location())[..2];
-        assert_eq!(buffer, [74, 26]);
+        let buffer = bincode::serialize(&region.struct_ref()).unwrap();
+        assert_eq!(buffer[..2], [74, 26]);
 
         // Writing to sub-section must convert to stored format.
-        {
-            let mut region = backend.allocate(FlipperLayout::placed().into_location());
 
-            region.write_some(1, &[Flipper { a: 1, b: 2 }, Flipper { a: 3, b: 4 }]);
+        region.write_some(1, &[Flipper { a: 1, b: 2 }, Flipper { a: 3, b: 4 }]);
 
-            let mut buffer = [Flipper { a: 0, b: 0 }; 2];
-            region.read_some(1, &mut buffer);
-            assert_eq!(buffer, [Flipper { a: 1, b: 2 }, Flipper { a: 3, b: 4 }]);
-        }
+        let mut buffer = [Flipper { a: 0, b: 0 }; 2];
+        region.read_some(1, &mut buffer);
+        assert_eq!(buffer, [Flipper { a: 1, b: 2 }, Flipper { a: 3, b: 4 }]);
 
-        let buffer = &backend.region(&FlipperLayout::placed().into_location())[2..6];
-        assert_eq!(buffer, [2, 1, 4, 3]);
+        let buffer = bincode::serialize(&region.struct_ref()).unwrap();
+        assert_eq!(buffer[2..6], [2, 1, 4, 3]);
 
         // Writing to the entire region must convert properly to stored format.
-        {
-            let mut region = backend.allocate(FlipperLayout::placed().into_location());
+        region.write_all(&[
+            Flipper { a: 11, b: 22 },
+            Flipper { a: 13, b: 24 },
+            Flipper { a: 15, b: 26 },
+            Flipper { a: 17, b: 28 },
+        ]);
 
-            region.write_all(&[
+        assert_eq!(
+            region.read_all(),
+            [
                 Flipper { a: 11, b: 22 },
                 Flipper { a: 13, b: 24 },
                 Flipper { a: 15, b: 26 },
                 Flipper { a: 17, b: 28 },
-            ]);
+            ]
+        );
 
-            assert_eq!(
-                region.read_all(),
-                [
-                    Flipper { a: 11, b: 22 },
-                    Flipper { a: 13, b: 24 },
-                    Flipper { a: 15, b: 26 },
-                    Flipper { a: 17, b: 28 },
-                ]
-            );
-        }
-
-        let buffer = &backend.region(&FlipperLayout::placed().into_location())[..8];
-        assert_eq!(buffer, [22, 11, 24, 13, 26, 15, 28, 17]);
+        let buffer = bincode::serialize(&region.struct_ref()).unwrap();
+        assert_eq!(buffer[..8], [22, 11, 24, 13, 26, 15, 28, 17]);
     });
 }

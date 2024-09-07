@@ -231,15 +231,6 @@ pub trait Backend: BackendManagement + Sized {
     ) -> AllocatedOf<Self::Layout, Self::ManagerRO<'_>>;
 }
 
-/// Like [Backend], but with all its state accessible.
-pub trait BackendFull: Backend {
-    /// Obtain a reference to the storage that backs the given location.
-    fn region<E: Elem, const LEN: usize>(&self, loc: &Location<[E; LEN]>) -> &[u8];
-
-    /// Obtain a mutable reference to the storage that backs the given location.
-    fn region_mut<E: Elem, const LEN: usize>(&mut self, loc: &Location<[E; LEN]>) -> &mut [u8];
-}
-
 /// Manager wrapper around `M` whose regions are immutable references to regions of `M`
 pub struct Ref<'backend, M>(std::marker::PhantomData<&'backend M>);
 
@@ -265,8 +256,41 @@ impl<M: ManagerSerialise> ManagerSerialise for Ref<'_, M> {
     }
 }
 
+impl<M: ManagerRead> ManagerRead for Ref<'_, M> {
+    fn region_read<E: Elem, const LEN: usize>(region: &Self::Region<E, LEN>, index: usize) -> E {
+        M::region_read(region, index)
+    }
+
+    fn region_read_all<E: Elem, const LEN: usize>(region: &Self::Region<E, LEN>) -> Vec<E> {
+        M::region_read_all(region)
+    }
+
+    fn region_read_some<E: Elem, const LEN: usize>(
+        region: &Self::Region<E, LEN>,
+        offset: usize,
+        buffer: &mut [E],
+    ) {
+        M::region_read_some(region, offset, buffer)
+    }
+
+    fn dyn_region_read<E: Elem, const LEN: usize>(
+        region: &Self::DynRegion<LEN>,
+        address: usize,
+    ) -> E {
+        M::dyn_region_read(region, address)
+    }
+
+    fn dyn_region_read_all<E: Elem, const LEN: usize>(
+        region: &Self::DynRegion<LEN>,
+        address: usize,
+        values: &mut [E],
+    ) {
+        M::dyn_region_read_all(region, address, values)
+    }
+}
+
 pub mod test_helpers {
-    use super::{BackendFull, Layout};
+    use super::{AllocatedOf, Layout, ManagerReadWrite, ManagerSerialise, PlacedOf};
     use std::fmt;
 
     /// Generate a test against all test backends.
@@ -285,9 +309,24 @@ pub mod test_helpers {
         };
     }
 
+    /// Equivalent to [`BackendBase`] but for testing purposes
+    pub trait TestBackendBase {
+        type Manager<'backend>: ManagerReadWrite + ManagerSerialise;
+    }
+
+    /// Equivalent to [`Backend`] but for testing purposes
+    pub trait TestBackend: TestBackendBase + fmt::Debug + Clone + Eq {
+        type Layout: Layout;
+
+        fn allocate(
+            &mut self,
+            placed: PlacedOf<Self::Layout>,
+        ) -> AllocatedOf<Self::Layout, Self::Manager<'_>>;
+    }
+
     /// This lets you construct backends for any layout.
     pub trait TestBackendFactory {
-        type Backend<L: Layout>: BackendFull<Layout = L> + Clone + fmt::Debug + Eq;
+        type Backend<L: Layout>: TestBackend<Layout = L>;
 
         /// Construct a backend for the given layout `L`.
         fn new<L: Layout>() -> Self::Backend<L>;
@@ -296,14 +335,18 @@ pub mod test_helpers {
 
 #[cfg(test)]
 pub mod tests {
-    use super::{test_helpers::TestBackendFactory, *};
-    use crate::{backend_test, state_backend::random_backend::Randomised};
+    use super::{
+        random_backend::Randomised,
+        test_helpers::{TestBackendBase, TestBackendFactory},
+        *,
+    };
+    use crate::backend_test;
     use std::{collections::hash_map::RandomState, hash::BuildHasher};
 
     /// Construct the manager for a given backend lifetime `'a`, a test backend
     /// factory `F` and a specific layout `L`.
     pub type ManagerFor<'a, F, L> =
-        <<F as TestBackendFactory>::Backend<L> as BackendManagement>::Manager<'a>;
+        <<F as TestBackendFactory>::Backend<L> as TestBackendBase>::Manager<'a>;
 
     /// Run `f` twice against two different randomised backends and see if the
     /// resulting backend state is the same afterwards.
@@ -359,12 +402,12 @@ pub mod tests {
         // For an extra generic in the state (MachineState for example)
         ($State:tt, $StateLayout:ty, $Factory:ty, $backend:ident $(, $ExtraGenerics:ty)*) => {
             {
-                use $crate::state_backend::{Backend, BackendManagement, Layout};
+                use $crate::state_backend::{test_helpers::TestBackend, Layout};
                 let loc = <$StateLayout>::placed().into_location();
                 let new_state =
                     $State::<
                         $($ExtraGenerics,)*
-                        <<$Factory as $crate::state_backend::test_helpers::TestBackendFactory>::Backend<$StateLayout> as BackendManagement>::Manager<'_>
+                        <<$Factory as $crate::state_backend::test_helpers::TestBackendFactory>::Backend<$StateLayout> as $crate::state_backend::test_helpers::TestBackendBase>::Manager<'_>
                     >::bind(
                         $backend.allocate(loc),
                     );
@@ -422,27 +465,25 @@ pub mod tests {
         let first_value: u64 = rand::random();
         let second_value: [u32; 4] = rand::random();
 
-        {
-            let mut instance =
-                Example::bind(backend.allocate(ExampleLayout::placed().into_location()));
+        let mut instance = create_state!(Example, ExampleLayout, F, backend);
 
-            instance.first.write(first_value);
-            assert_eq!(instance.first.read(), first_value);
+        instance.first.write(first_value);
+        assert_eq!(instance.first.read(), first_value);
 
-            instance.second.write_all(&second_value);
-            assert_eq!(instance.second.read_all(), second_value);
-        }
+        instance.second.write_all(&second_value);
+        assert_eq!(instance.second.read_all(), second_value);
 
-        let first_value_read = u64::from_le_bytes(backend.region(&first_loc).try_into().unwrap());
+        let first_value_read = u64::from_le_bytes(
+            bincode::serialize(&instance.first.struct_ref())
+                .unwrap()
+                .try_into()
+                .unwrap(),
+        );
         assert_eq!(first_value_read, first_value);
 
         let second_value_read = unsafe {
-            backend
-                .region(&second_loc)
-                .as_ptr()
-                .cast::<[u32; 4]>()
-                .read()
-                .map(u32::from_le)
+            let data = bincode::serialize(&instance.second.struct_ref()).unwrap();
+            data.as_ptr().cast::<[u32; 4]>().read().map(u32::from_le)
         };
         assert_eq!(second_value_read, second_value);
     });
