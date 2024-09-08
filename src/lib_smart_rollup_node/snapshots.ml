@@ -634,6 +634,7 @@ let post_checks ?(apply_unsafe_patches = false) ~action ~message snapshot_header
     Context.load (module C) ~cache_size:100 Read_only context_dir
   in
   let* head = check_head head context in
+  let*? () = check_last_commitment head snapshot_header in
   let* check_block_data =
     match action with
     | `Export -> return check_block_data
@@ -645,7 +646,6 @@ let post_checks ?(apply_unsafe_patches = false) ~action ~message snapshot_header
                order to verify state hashes. *)
             failwith "No metadata (needs rollup kind)."
         | Some metadata ->
-            let*? () = check_last_commitment head snapshot_header in
             let* () = check_lcc metadata cctxt store head (module Plugin) in
             return
               (check_block_data_consistency
@@ -682,45 +682,6 @@ let snapshotable_files_regexp =
   Re.Str.regexp
     "^\\(storage/.*\\|context/.*\\|wasm_2_0_0/.*\\|arith/.*\\|riscv/.*\\|context/.*\\|metadata$\\)"
 
-let try_cancel_gc ~rollup_node_endpoint =
-  let open Lwt_syntax in
-  let open Tezos_rpc_http in
-  let open Tezos_rpc_http_client_unix in
-  let rhttp_ctxt =
-    new RPC_client_unix.http_ctxt
-      {RPC_client_unix.default_config with endpoint = rollup_node_endpoint}
-      Media_type.all_media_types
-  in
-  let* canceled =
-    Rollup_node_services.Admin.(make_call cancel_gc) rhttp_ctxt () () ()
-  in
-  (match canceled with
-  | Ok true -> Format.eprintf "Rollup node GC canceled@."
-  | Ok false -> Format.eprintf "No ongoing GC in rollup node@."
-  | Error trace ->
-      Format.eprintf
-        "Could not cancel rollup node GC (use --rollup-node-endpoint for that) \
-         because of the following error: %a@ Continuing anyway.@."
-        pp_print_trace
-        trace) ;
-  return_unit
-
-let with_locks ~data_dir ~rollup_node_endpoint =
-  let open Lwt_syntax in
-  let+ () = try_cancel_gc ~rollup_node_endpoint in
-  fun f ->
-    Format.eprintf "Acquiring GC lock@." ;
-    (* Take GC lock first in order to not prevent progression of rollup node. *)
-    Lwt_lock_file.with_lock
-      ~when_locked:`Block
-      ~filename:(Node_context.gc_lockfile_path ~data_dir)
-    @@ fun () ->
-    Format.eprintf "Acquiring process lock@." ;
-    Lwt_lock_file.with_lock
-      ~when_locked:`Block
-      ~filename:(Node_context.processing_lockfile_path ~data_dir)
-      f
-
 let get_rollup_node_endpoint rollup_node_endpoint ~data_dir =
   let open Lwt_syntax in
   match rollup_node_endpoint with
@@ -741,18 +702,65 @@ let get_rollup_node_endpoint rollup_node_endpoint ~data_dir =
       | Ok uri -> return uri
       | Error _ -> return default)
 
-let export_dir ?rollup_node_endpoint (header : Header.t) ~take_locks
-    ~compression ~data_dir ~dest ~filename =
-  let open Lwt_result_syntax in
-  let*! rollup_node_endpoint =
+let try_cancel_gc ~rollup_node_endpoint ~data_dir =
+  let open Lwt_syntax in
+  let open Tezos_rpc_http in
+  let open Tezos_rpc_http_client_unix in
+  let* rollup_node_endpoint =
     get_rollup_node_endpoint rollup_node_endpoint ~data_dir
   in
+  let rhttp_ctxt =
+    new RPC_client_unix.http_ctxt
+      {RPC_client_unix.default_config with endpoint = rollup_node_endpoint}
+      Media_type.all_media_types
+  in
+  let* canceled =
+    Rollup_node_services.Admin.(make_call cancel_gc) rhttp_ctxt () () ()
+  in
+  (match canceled with
+  | Ok true -> Format.eprintf "Rollup node GC canceled@."
+  | Ok false -> Format.eprintf "No ongoing GC in rollup node@."
+  | Error trace ->
+      Format.eprintf
+        "Could not cancel rollup node GC (use --rollup-node-endpoint for that) \
+         because of the following error: %a@ Continuing anyway.@."
+        pp_print_trace
+        trace) ;
+  return_unit
+
+let lock_processing ~data_dir =
+  let open Lwt_result_syntax in
+  Format.eprintf "Acquiring process lock@." ;
+  let* lock_fd =
+    Lwt_lock_file.lock
+      ~when_locked:`Block
+      ~filename:(Node_context.processing_lockfile_path ~data_dir)
+  in
+  let unlock () = Lwt_lock_file.unlock lock_fd in
+  return unlock
+
+let lock_all ~data_dir ~rollup_node_endpoint =
+  let open Lwt_result_syntax in
+  let*! () = try_cancel_gc ~rollup_node_endpoint ~data_dir in
+  Format.eprintf "Acquiring GC lock@." ;
+  (* Take GC lock first in order to not prevent progression of rollup node. *)
+  let* gc_lock_fd =
+    Lwt_lock_file.lock
+      ~when_locked:`Block
+      ~filename:(Node_context.gc_lockfile_path ~data_dir)
+  in
+  let* unlock_processing = lock_processing ~data_dir in
+  let unlock () =
+    let open Lwt_syntax in
+    let* () = unlock_processing () in
+    Lwt_lock_file.unlock gc_lock_fd
+  in
+  return unlock
+
+let export_dir (header : Header.t) ~unlock ~compression ~data_dir ~dest
+    ~filename =
+  let open Lwt_result_syntax in
   let* snapshot_file =
-    let*! with_locks =
-      if take_locks then with_locks ~rollup_node_endpoint ~data_dir
-      else Lwt.return @@ fun f -> f ()
-    in
-    with_locks @@ fun () ->
     let dest_file_name =
       match filename with
       | Some f ->
@@ -808,6 +816,7 @@ let export_dir ?rollup_node_endpoint (header : Header.t) ~take_locks
     in
     return dest_file
   in
+  let*! () = unlock () in
   let snapshot_file =
     match compression with
     | No | On_the_fly -> snapshot_file
@@ -818,24 +827,19 @@ let export_dir ?rollup_node_endpoint (header : Header.t) ~take_locks
 let export ?rollup_node_endpoint cctxt ~no_checks ~compression ~data_dir ~dest
     ~filename =
   let open Lwt_result_syntax in
+  let* unlock = lock_all ~data_dir ~rollup_node_endpoint in
   let* snapshot_header =
     pre_export_checks_and_get_snapshot_header cctxt ~no_checks ~data_dir
   in
   let* snapshot_file =
-    export_dir
-      snapshot_header
-      ?rollup_node_endpoint
-      ~take_locks:true
-      ~compression
-      ~data_dir
-      ~dest
-      ~filename
+    export_dir snapshot_header ~unlock ~compression ~data_dir ~dest ~filename
   in
   let* () = unless no_checks @@ fun () -> post_export_checks ~snapshot_file in
   return snapshot_file
 
 let export_compact cctxt ~no_checks ~compression ~data_dir ~dest ~filename =
   let open Lwt_result_syntax in
+  let* unlock = lock_processing ~data_dir in
   let* snapshot_header =
     pre_export_checks_and_get_snapshot_header cctxt ~no_checks ~data_dir
   in
@@ -892,17 +896,8 @@ let export_compact cctxt ~no_checks ~compression ~data_dir ~dest ~filename =
     if Sys.file_exists path then
       Tezos_stdlib_unix.Utils.copy_file ~src:path ~dst:(tmp_dir // a)
   in
-  Format.eprintf "Acquiring process lock@." ;
-  let* () =
-    Lwt_lock_file.with_lock
-      ~when_locked:`Block
-      ~filename:(Node_context.processing_lockfile_path ~data_dir)
-    @@ fun () ->
-    Format.eprintf "Copying data@." ;
-    Tezos_stdlib_unix.Utils.copy_dir store_dir tmp_store_dir ;
-    copy_file "metadata" ;
-    return_unit
-  in
+  Tezos_stdlib_unix.Utils.copy_dir store_dir tmp_store_dir ;
+  copy_file "metadata" ;
   copy_dir "wasm_2_0_0" ;
   copy_dir "arith" ;
   copy_dir "riscv" ;
@@ -915,7 +910,7 @@ let export_compact cctxt ~no_checks ~compression ~data_dir ~dest ~filename =
   in
   export_dir
     snapshot_header
-    ~take_locks:false
+    ~unlock
     ~compression
     ~data_dir:tmp_dir
     ~dest
