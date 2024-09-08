@@ -123,16 +123,15 @@ module Worker = struct
     let*! res =
       (* We do not check if we succeed or not: this will be done when new L2
          heads come from the rollup node. *)
-      match (state, chunks) with
-      | ( {enable_dal = true; dal_last_used; _},
-          Blueprints_publisher_types.Request.Blueprint
-            {chunks; inbox_payload = _} )
-        when use_dal_if_enabled && dal_last_used < level
-             (* For the moment, the rollup node only uses a single slot for
-                publishement. As such we cannot send blueprints that wouldn't
-                fit in a slot. *)
-             && List.length chunks
-                < Sequencer_blueprint.maximum_unsigned_chunks_per_dal_slot ->
+      match chunks with
+      | Blueprints_publisher_types.Request.Blueprint {chunks; inbox_payload = _}
+        when state.enable_dal && use_dal_if_enabled
+             && state.dal_last_used < level
+             && (* For the moment, the rollup node only uses a single slot for
+                   publishement. As such we cannot send blueprints that wouldn't
+                   fit in a slot. *)
+             List.length chunks
+             < Sequencer_blueprint.maximum_unsigned_chunks_per_dal_slot ->
           state.dal_last_used <- level ;
           let payload = Sequencer_blueprint.create_dal_payload chunks in
           let nb_chunks = List.length chunks in
