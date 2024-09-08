@@ -113,7 +113,7 @@ module Worker = struct
       ~rollup_node_endpoint:state.rollup_node_endpoint
       payload
 
-  let publish self chunks level ~use_dal_if_enabled =
+  let publish self payload level ~use_dal_if_enabled =
     let open Lwt_result_syntax in
     let state = state self in
     let rollup_node_endpoint = state.rollup_node_endpoint in
@@ -123,7 +123,7 @@ module Worker = struct
     let*! res =
       (* We do not check if we succeed or not: this will be done when new L2
          heads come from the rollup node. *)
-      match chunks with
+      match payload with
       | Blueprints_publisher_types.Request.Blueprint {chunks; inbox_payload = _}
         when state.enable_dal && use_dal_if_enabled
              && state.dal_last_used < level
@@ -144,7 +144,7 @@ module Worker = struct
               (Float.of_int nb_chunks)
           in
           Rollup_services.publish_on_dal ~rollup_node_endpoint payload
-      | _ -> publish_inbox_payload state level chunks
+      | _ -> publish_inbox_payload state level payload
     in
     let*! () =
       match res with
