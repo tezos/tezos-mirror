@@ -262,17 +262,25 @@ let as_empty_object_or_fail t =
   | [] -> ()
   | _ -> JSON.error t "Not an empty object"
 
-let post_local_dal_injection ~slot_content ~slot_index =
+let post_local_dal_injection ~slot_content =
+  let data = `O [("slot_content", `String slot_content)] in
+  make
+    POST
+    ["local"; "dal"; "injection"]
+    ~data:(Data data)
+    as_empty_object_or_fail
+
+let post_dal_slot_indices ~slot_indices =
   let data =
     `O
       [
-        ("slot_content", `String slot_content);
-        ("slot_index", `Float (float_of_int slot_index));
+        ( "indices",
+          `A (List.map (fun i -> `Float (float_of_int i)) slot_indices) );
       ]
   in
   make
     POST
-    ["local"; "dal"; "injection"]
+    ["local"; "dal"; "slot"; "indices"]
     ~data:(Data data)
     as_empty_object_or_fail
 

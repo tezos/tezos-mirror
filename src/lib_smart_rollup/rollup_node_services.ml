@@ -813,10 +813,7 @@ module Local = struct
 
   let dal_injection =
     let input_encoding =
-      Data_encoding.(
-        obj2
-          (req "slot_content" Data_encoding.Variable.string)
-          (req "slot_index" uint8))
+      Data_encoding.(obj1 (req "slot_content" Data_encoding.Variable.string))
     in
     Tezos_rpc.Service.post_service
       ~description:"Inject the given slot in the DAL queue"
@@ -857,6 +854,19 @@ module Local = struct
       ~output:Data_encoding.unit
       (path / "dal" / "injection"
      /: Tezos_crypto.Hashed.Injector_operations_hash.rpc_arg / "forget")
+
+  let dal_slot_indices =
+    let input_encoding = Data_encoding.(obj1 (req "indices" (list uint8))) in
+    Tezos_rpc.Service.post_service
+      ~description:
+        "Provide the (new) list of slot indices to use to the rollup node's \
+         DAL injector"
+      ~query:Tezos_rpc.Query.empty
+      ~input:
+        Data_encoding.(
+          def "slot_indices" ~description:"Slot indices to set" input_encoding)
+      ~output:Data_encoding.unit
+      (path / "dal" / "slot" / "indices")
 
   let synchronized =
     Tezos_rpc.Service.get_service

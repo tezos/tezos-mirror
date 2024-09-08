@@ -149,10 +149,7 @@ let batcher_injection :
 
 let dal_injection =
   let input_encoding =
-    Data_encoding.(
-      obj2
-        (req "slot_content" Data_encoding.Variable.string)
-        (req "slot_index" uint8))
+    Data_encoding.(obj1 (req "slot_content" Data_encoding.Variable.string))
   in
   Tezos_rpc.Service.post_service
     ~description:"Inject the given slot in the DAL queue"
@@ -162,6 +159,19 @@ let dal_injection =
         def "dal_slot" ~description:"Slot to inject" input_encoding)
     ~output:Data_encoding.unit
     (open_root / "local" / "dal" / "injection")
+
+let dal_slot_indices =
+  let input_encoding = Data_encoding.(obj1 (req "indices" (list uint8))) in
+  Tezos_rpc.Service.post_service
+    ~description:
+      "Provide the (new) list of slot indices to use to the rollup node's DAL \
+       injector"
+    ~query:Tezos_rpc.Query.empty
+    ~input:
+      Data_encoding.(
+        def "slot_indices" ~description:"Slot indices to set" input_encoding)
+    ~output:Data_encoding.unit
+    (open_root / "local" / "dal" / "slot" / "indices")
 
 let dal_injected_operations_statuses :
     ( [`GET],
@@ -310,19 +320,16 @@ let publish :
   in
   return_unit
 
-let publish_on_dal :
-    rollup_node_endpoint:Uri.t ->
-    slot_index:int ->
-    string ->
-    unit tzresult Lwt.t =
- fun ~rollup_node_endpoint ~slot_index inputs ->
+let publish_on_dal : rollup_node_endpoint:Uri.t -> string -> unit tzresult Lwt.t
+    =
+ fun ~rollup_node_endpoint inputs ->
   call_service
     ~keep_alive:false
     ~base:rollup_node_endpoint
     dal_injection
     ()
     ()
-    (inputs, slot_index)
+    inputs
 
 let get_injected_dal_operations_statuses :
     rollup_node_endpoint:Uri.t ->
@@ -339,6 +346,19 @@ let get_injected_dal_operations_statuses :
     ()
     ()
     ()
+
+let set_dal_slot_indices :
+    rollup_node_endpoint:Uri.t ->
+    slot_indices:Tezos_dal_node_services.Types.slot_index list ->
+    unit tzresult Lwt.t =
+ fun ~rollup_node_endpoint ~slot_indices ->
+  call_service
+    ~keep_alive:false
+    ~base:rollup_node_endpoint
+    dal_slot_indices
+    ()
+    ()
+    slot_indices
 
 let forget_dal_injection_id :
     rollup_node_endpoint:Uri.t ->

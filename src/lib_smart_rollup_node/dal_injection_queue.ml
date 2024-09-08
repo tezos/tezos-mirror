@@ -21,12 +21,11 @@ end
 module Dal_worker_types = struct
   module Request = struct
     type ('a, 'b) t =
-      | Register : {
-          slot_content : string;
-          slot_index : int;
-        }
-          -> (unit, error trace) t
+      | Register : {slot_content : string} -> (unit, error trace) t
       | Produce_dal_slots : (unit, error trace) t
+      | Set_dal_slot_indices :
+          Tezos_dal_node_services.Types.slot_index list
+          -> (unit, error trace) t
 
     type view = View : _ t -> view
 
@@ -39,32 +38,42 @@ module Dal_worker_types = struct
           case
             (Tag 0)
             ~title:"Register"
-            (obj3
+            (obj2
                (req "request" (constant "register"))
-               (req "slot_content" string)
-               (req "slot_index" int31))
+               (req "slot_content" string))
             (function
-              | View (Register {slot_content; slot_index}) ->
-                  Some ((), slot_content, slot_index)
+              | View (Register {slot_content}) -> Some ((), slot_content)
               | _ -> None)
-            (fun ((), slot_content, slot_index) ->
-              View (Register {slot_content; slot_index}));
+            (fun ((), slot_content) -> View (Register {slot_content}));
           case
             (Tag 1)
             ~title:"Produce_dal_slots"
             (obj1 (req "request" (constant "produce_dal_slots")))
             (function View Produce_dal_slots -> Some () | _ -> None)
             (fun () -> View Produce_dal_slots);
+          case
+            (Tag 2)
+            ~title:"Set_dal_slot_indices"
+            (obj2
+               (req "request" (constant "set_dal_slot_indices"))
+               (req "indices" (list uint8)))
+            (function
+              | View (Set_dal_slot_indices ids) -> Some ((), ids) | _ -> None)
+            (fun ((), ids) -> View (Set_dal_slot_indices ids));
         ]
 
     let pp ppf (View r) =
       match r with
-      | Register {slot_content = _; slot_index} ->
+      | Register _ -> Format.fprintf ppf "register slot injection request"
+      | Produce_dal_slots -> Format.fprintf ppf "produce DAL slots"
+      | Set_dal_slot_indices idx ->
           Format.fprintf
             ppf
-            "register slot injection request for index %d"
-            slot_index
-      | Produce_dal_slots -> Format.fprintf ppf "produce DAL slots"
+            "set slot indices %a"
+            (Format.pp_print_list
+               ~pp_sep:(fun fmt () -> Format.fprintf fmt ", ")
+               (fun fmt id -> Format.fprintf fmt "%d" id))
+            idx
   end
 end
 
@@ -102,6 +111,14 @@ module Events = struct
       ("errors", Error_monad.trace_encoding)
       ~pp3:Error_monad.pp_print_trace
 
+  let no_dal_slot_indices_set =
+    declare_0
+      ~section
+      ~name:"no_dal_slot_index_set"
+      ~msg:"Cannot inject slot as no DAL slot index is set"
+      ~level:Error
+      ()
+
   let request_completed =
     declare_2
       ~section
@@ -124,9 +141,7 @@ module Pending_chunks =
       let hash = Hashtbl.hash
     end)
     (struct
-      type t = int
-      (* This is the slot index on which we inject. It is removed
-         in the next MR. *)
+      type t = unit
     end)
 
 module Recent_dal_injections =
@@ -140,61 +155,85 @@ type state = {
   node_ctxt : Node_context.ro;
   recent_dal_injections : Recent_dal_injections.t;
   pending_chunks : Pending_chunks.t;
+  dal_slot_indices : Tezos_dal_node_services.Types.slot_index Queue.t;
+      (* We use a queue here to easily cycle through
+         the slots and use different ones from a
+         level to another (in case we have less data
+         to publish than available slot indices). *)
 }
 
-let inject_slot state ~slot_content ~slot_index =
+let inject_slot state ~slot_content =
   let open Lwt_result_syntax in
   let {Node_context.dal_cctxt; _} = state.node_ctxt in
-  let* commitment, operation =
-    match dal_cctxt with
-    | Some dal_cctxt ->
-        let* commitment, commitment_proof =
-          Dal_node_client.post_slot dal_cctxt ~slot_index slot_content
-        in
-        return
-          ( commitment,
-            L1_operation.Publish_dal_commitment
-              {slot_index; commitment; commitment_proof} )
-    | None ->
-        (* This should not be reachable, as we tested that some [dal_cctxt] is set
-           at startup before launching the worker. *)
-        assert false
-  in
-  let* l1_hash =
-    Injector.check_and_add_pending_operation
-      state.node_ctxt.config.mode
-      operation
-  in
-  let* l1_hash =
-    match l1_hash with
-    | Some l1_hash -> return l1_hash
-    | None ->
-        let op = Injector.Inj_operation.make operation in
-        return op.id
-  in
-  let*! () = Events.(emit injected) (commitment, slot_index, l1_hash) in
-  Recent_dal_injections.replace state.recent_dal_injections l1_hash () ;
-  return_unit
+  if Queue.is_empty state.dal_slot_indices then
+    (* No provided slot indices, no injection *)
+    let*! () = Events.(emit no_dal_slot_indices_set) () in
+    return_unit
+  else
+    (* The pop followed by a push is cycle through slot indices. *)
+    let slot_index = Queue.pop state.dal_slot_indices in
+    Queue.push slot_index state.dal_slot_indices ;
+    let* commitment, operation =
+      match dal_cctxt with
+      | Some dal_cctxt ->
+          let* commitment, commitment_proof =
+            Dal_node_client.post_slot dal_cctxt ~slot_index slot_content
+          in
+          return
+            ( commitment,
+              L1_operation.Publish_dal_commitment
+                {slot_index; commitment; commitment_proof} )
+      | None ->
+          (* This should not be reachable, as we tested that some [dal_cctxt] is set
+             at startup before launching the worker. *)
+          assert false
+    in
+    let* l1_hash =
+      Injector.check_and_add_pending_operation
+        state.node_ctxt.config.mode
+        operation
+    in
+    let* l1_hash =
+      match l1_hash with
+      | Some l1_hash -> return l1_hash
+      | None ->
+          let op = Injector.Inj_operation.make operation in
+          return op.id
+    in
+    let*! () = Events.(emit injected) (commitment, slot_index, l1_hash) in
+    Recent_dal_injections.replace state.recent_dal_injections l1_hash () ;
+    return_unit
 
-let on_register state ~slot_content ~slot_index : unit tzresult Lwt.t =
+let on_register state ~slot_content : unit tzresult Lwt.t =
   let open Lwt_result_syntax in
-  let number_of_slots =
-    (Reference.get state.node_ctxt.current_protocol).constants.dal
-      .number_of_slots
-  in
-  let* () =
-    fail_unless (slot_index >= 0 && slot_index < number_of_slots)
-    @@ error_of_fmt "Slot index %d out of range" slot_index
-  in
-  Pending_chunks.replace state.pending_chunks slot_content slot_index ;
+  Pending_chunks.replace state.pending_chunks slot_content () ;
   return_unit
 
 let on_produce_dal_slots state =
   let open Lwt_result_syntax in
   match Pending_chunks.take state.pending_chunks with
   | None -> return_unit
-  | Some (slot_content, slot_index) ->
-      inject_slot state ~slot_content ~slot_index
+  | Some (slot_content, ()) -> inject_slot state ~slot_content
+
+let on_set_dal_slot_indices state idx =
+  let open Lwt_result_syntax in
+  let module SI = Set.Make (Int) in
+  (* remove duplicates *)
+  let idx = SI.of_list idx in
+  let number_of_slots =
+    (Reference.get state.node_ctxt.current_protocol).constants.dal
+      .number_of_slots
+  in
+  let* () =
+    SI.iter_es
+      (fun slot_index ->
+        fail_unless (slot_index >= 0 && slot_index < number_of_slots)
+        @@ error_of_fmt "Slot index %d out of range" slot_index)
+      idx
+  in
+  Queue.clear state.dal_slot_indices ;
+  SI.iter (fun id -> Queue.push id state.dal_slot_indices) idx ;
+  return_unit
 
 let init_dal_worker_state node_ctxt =
   let dal_constants =
@@ -210,6 +249,7 @@ let init_dal_worker_state node_ctxt =
     node_ctxt;
     recent_dal_injections = Recent_dal_injections.create max_retained_slots_info;
     pending_chunks = Pending_chunks.create max_retained_slots_info;
+    dal_slot_indices = Queue.create ();
   }
 
 module Types = struct
@@ -232,10 +272,12 @@ module Handlers = struct
    fun w request ->
     let state = Worker.state w in
     match request with
-    | Request.Register {slot_content; slot_index} ->
-        protect @@ fun () -> on_register state ~slot_content ~slot_index
+    | Request.Register {slot_content} ->
+        protect @@ fun () -> on_register state ~slot_content
     | Request.Produce_dal_slots ->
         protect @@ fun () -> on_produce_dal_slots state
+    | Request.Set_dal_slot_indices idx ->
+        protect @@ fun () -> on_set_dal_slot_indices state idx
 
   type launch_error = error trace
 
@@ -254,10 +296,13 @@ module Handlers = struct
     | Request.Produce_dal_slots ->
         let*! () = Events.(emit request_failed) (Request.view r, st, errs) in
         return_unit
+    | Request.Set_dal_slot_indices _ ->
+        let*! () = Events.(emit request_failed) (Request.view r, st, errs) in
+        return_unit
 
   let on_completion _w r _ st =
     match Request.view r with
-    | Request.View (Register _ | Produce_dal_slots) ->
+    | Request.View (Register _ | Produce_dal_slots | Set_dal_slot_indices _) ->
         Events.(emit request_completed) (Request.view r, st)
 
   let on_no_request _ = Lwt.return_unit
@@ -301,7 +346,7 @@ let init (node_ctxt : _ Node_context.t) =
       then start node_ctxt
       else return_unit
 
-(* This is a DAL inection worker for a single scoru *)
+(* This is a DAL injection worker for a single scoru *)
 let worker =
   lazy
     (match Lwt.state worker_promise with
@@ -319,12 +364,10 @@ let handle_request_error rq =
   | Error (Closed (Some errs)) -> Lwt.return_error errs
   | Error (Any exn) -> Lwt.return_error [Exn exn]
 
-let register_dal_slot ~slot_content ~slot_index =
+let register_dal_slot ~slot_content =
   let open Lwt_result_syntax in
   let* w = lwt_map_error TzTrace.make (Lwt.return (Lazy.force worker)) in
-  Worker.Queue.push_request_and_wait
-    w
-    (Request.Register {slot_content; slot_index})
+  Worker.Queue.push_request_and_wait w (Request.Register {slot_content})
   |> handle_request_error
 
 let produce_dal_slots () =
@@ -337,6 +380,12 @@ let produce_dal_slots () =
   | Ok w ->
       Worker.Queue.push_request_and_wait w Request.Produce_dal_slots
       |> handle_request_error
+
+let set_dal_slot_indices idx =
+  let open Lwt_result_syntax in
+  let* w = lwt_map_error TzTrace.make (Lwt.return (Lazy.force worker)) in
+  Worker.Queue.push_request_and_wait w Request.(Set_dal_slot_indices idx)
+  |> handle_request_error
 
 let get_injection_ids () =
   let open Result_syntax in

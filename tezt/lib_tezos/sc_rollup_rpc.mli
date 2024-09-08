@@ -174,10 +174,13 @@ val get_global_block_durable_state_value :
 val post_local_batcher_injection :
   ?drop_duplicate:bool -> messages:string list -> unit -> string list RPC_core.t
 
-(** RPC: [POST local/dal/injection] injects the given DAL [slot_content] at
-    [slot_index] in the rollup node's DAL queue. *)
-val post_local_dal_injection :
-  slot_content:string -> slot_index:int -> unit RPC_core.t
+(** RPC: [POST local/dal/injection] injects the given DAL [slot_content] in the
+    rollup node's DAL queue. *)
+val post_local_dal_injection : slot_content:string -> unit RPC_core.t
+
+(** RPC: [POST local/dal/slot/indices] sets the given DAL [slot_indices] to be
+    used when injecting DAL slots. *)
+val post_dal_slot_indices : slot_indices:int list -> unit RPC_core.t
 
 val get_dal_injected_operations_statuses : unit -> JSON.t list RPC_core.t
 
