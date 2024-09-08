@@ -167,39 +167,46 @@ type state = {
          to publish than available slot indices). *)
 }
 
-let inject_slot state ~slot_content ~slot_index =
+let inject_slot state ~slot_content ~slot_index:_ =
   let open Lwt_result_syntax in
   let {Node_context.dal_cctxt; _} = state.node_ctxt in
-  let* commitment, operation =
-    match dal_cctxt with
-    | Some dal_cctxt ->
-        let* commitment, commitment_proof =
-          Dal_node_client.post_slot dal_cctxt ~slot_index slot_content
-        in
-        return
-          ( commitment,
-            L1_operation.Publish_dal_commitment
-              {slot_index; commitment; commitment_proof} )
-    | None ->
-        (* This should not be reachable, as we tested that some [dal_cctxt] is set
-           at startup before launching the worker. *)
-        assert false
-  in
-  let* l1_hash =
-    Injector.check_and_add_pending_operation
-      state.node_ctxt.config.mode
-      operation
-  in
-  let* l1_hash =
-    match l1_hash with
-    | Some l1_hash -> return l1_hash
-    | None ->
-        let op = Injector.Inj_operation.make operation in
-        return op.id
-  in
-  let*! () = Events.(emit injected) (commitment, slot_index, l1_hash) in
-  Recent_dal_injections.replace state.recent_dal_injections l1_hash () ;
-  return_unit
+  if Queue.is_empty state.dal_slot_indices then
+    (* No provided slot indices, no injection*)
+    return_unit
+  else
+    (* The pop followed by a push is cycle through slot indices. *)
+    let slot_index = Queue.pop state.dal_slot_indices in
+    Queue.push slot_index state.dal_slot_indices ;
+    let* commitment, operation =
+      match dal_cctxt with
+      | Some dal_cctxt ->
+          let* commitment, commitment_proof =
+            Dal_node_client.post_slot dal_cctxt ~slot_index slot_content
+          in
+          return
+            ( commitment,
+              L1_operation.Publish_dal_commitment
+                {slot_index; commitment; commitment_proof} )
+      | None ->
+          (* This should not be reachable, as we tested that some [dal_cctxt] is set
+             at startup before launching the worker. *)
+          assert false
+    in
+    let* l1_hash =
+      Injector.check_and_add_pending_operation
+        state.node_ctxt.config.mode
+        operation
+    in
+    let* l1_hash =
+      match l1_hash with
+      | Some l1_hash -> return l1_hash
+      | None ->
+          let op = Injector.Inj_operation.make operation in
+          return op.id
+    in
+    let*! () = Events.(emit injected) (commitment, slot_index, l1_hash) in
+    Recent_dal_injections.replace state.recent_dal_injections l1_hash () ;
+    return_unit
 
 let on_register state ~slot_content ~slot_index : unit tzresult Lwt.t =
   let open Lwt_result_syntax in
