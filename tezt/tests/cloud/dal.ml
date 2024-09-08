@@ -78,18 +78,54 @@ module Disconnect = struct
 end
 
 module Network = struct
-  type t = Ghostnet | Sandbox
+  type testnet = Ghostnet | Weeklynet of string
+  (* This string is the date of the genesis block of the current
+     weeklynet; typically it is last wednesday. *)
 
-  let to_string = function Ghostnet -> "ghostnet" | Sandbox -> "sandbox"
+  type t = Testnet of testnet | Sandbox
+
+  let to_string = function
+    | Testnet Ghostnet -> "ghostnet"
+    | Testnet (Weeklynet date) -> sf "weeklynet-%s" date
+    | Sandbox -> "sandbox"
+
+  let public_rpc_endpoint testnet =
+    Endpoint.
+      {
+        scheme = "https";
+        host =
+          (match testnet with
+          | Ghostnet -> "rpc.ghostnet.teztnets.com"
+          | Weeklynet date -> sf "rpc.weeklynet-%s.teztnets.com" date);
+        port = 443;
+      }
+
+  let snapshot_service = function
+    | Ghostnet -> "https://snapshots.eu.tzinit.org/ghostnet"
+    | Weeklynet _ -> "https://snapshots.eu.tzinit.org/weeklynet"
+
+  (* Argument to give to the --network option of `octez-node config init`. *)
+  let to_octez_network_options = function
+    | Ghostnet -> "ghostnet"
+    | Weeklynet date -> sf "https://teztnets.com/weeklynet-%s" date
+
+  let default_bootstrap = function
+    | Ghostnet -> "ghostnet.tzinit.org" (* Taken from ghostnet configuration *)
+    | Weeklynet date -> sf "weeklynet-%s.tzinit.org" date
+
+  let default_dal_bootstrap = function
+    | Ghostnet ->
+        "dalboot.ghostnet.tzboot.net" (* Taken from ghostnet configuration *)
+    | Weeklynet date -> sf "dal.weeklynet-%s.teztnets.com" date
 
   let get_level network endpoint =
     match network with
     | Sandbox -> Lwt.return 1
-    | Ghostnet ->
+    | Testnet _ ->
         let* json = RPC_core.call endpoint (RPC.get_chain_block_header ()) in
         JSON.(json |-> "level" |> as_int) |> Lwt.return
 
-  let expected_pow = function Ghostnet -> 26. | Sandbox -> 0.
+  let expected_pow = function Testnet _ -> 26. | Sandbox -> 0.
 end
 
 module Node = struct
@@ -100,11 +136,13 @@ module Node = struct
   let init ?(arguments = []) ?data_dir ?dal_config ~name network agent =
     toplog "Inititializing a L1 node" ;
     match network with
-    | Network.Ghostnet -> (
+    | Network.Testnet network -> (
         match data_dir with
         | Some data_dir ->
             let* node = Node.Agent.create ~arguments ~data_dir ~name agent in
-            let* () = Node.run node [Network "ghostnet"] in
+            let* () =
+              Node.run node [Network (Network.to_octez_network_options network)]
+            in
             let* () = Node.wait_for_ready node in
             Lwt.return node
         | None ->
@@ -115,7 +153,11 @@ module Node = struct
             let* node =
               Node.Agent.create
                 ~arguments:
-                  [Network "ghostnet"; Expected_pow 26; Cors_origin "*"]
+                  [
+                    Network (Network.to_octez_network_options network);
+                    Expected_pow 26;
+                    Cors_origin "*";
+                  ]
                 ?data_dir
                 ~name
                 agent
@@ -128,7 +170,7 @@ module Node = struct
                 [
                   "-O";
                   "snapshot_file";
-                  "https://snapshots.eu.tzinit.org/ghostnet/rolling";
+                  sf "%s/rolling" (Network.snapshot_service network);
                 ]
               |> Process.check
             in
@@ -136,10 +178,31 @@ module Node = struct
             let* () = Node.config_init node [] in
             toplog "Importing the snapshot" ;
             let* () =
-              Node.snapshot_import ~no_check:true node "snapshot_file"
+              try
+                let* () =
+                  Node.snapshot_import ~no_check:true node "snapshot_file"
+                in
+                let () = toplog "Snapshot import succeeded." in
+                unit
+              with _ ->
+                (* Failing to import the snapshot could happen on a
+                   very young Weeklynet, before the first snapshot is
+                   available. In this case bootstrapping from the
+                   genesis block is OK. *)
+                let () =
+                  toplog
+                    "Snapshot import failed, the node will be bootstrapped \
+                     from genesis."
+                in
+                unit
             in
             toplog "Launching the node." ;
-            let* () = Node.run node (Force_history_mode_switch :: arguments) in
+            let* () =
+              Node.run
+                node
+                (Force_history_mode_switch :: Synchronisation_threshold 1
+               :: arguments)
+            in
             toplog "Waiting for the node to be ready." ;
             let* () = wait_for_ready node in
             toplog "Node is ready." ;
@@ -292,16 +355,21 @@ module Cli = struct
   let network_typ =
     Clap.typ
       ~name:"network"
-      ~dummy:Network.Ghostnet
+      ~dummy:Network.(Testnet Ghostnet)
       ~parse:(function
-        | "ghostnet" -> Some Ghostnet | "sandbox" -> Some Sandbox | _ -> None)
+        | "ghostnet" -> Some (Testnet Ghostnet)
+        | s when String.length s = 20 && String.sub s 0 10 = "weeklynet-" ->
+            let date = String.sub s 10 10 in
+            Some (Testnet (Weeklynet date))
+        | "sandbox" -> Some Sandbox
+        | _ -> None)
       ~show:Network.to_string
 
   let network =
     Clap.default
       ~section
       ~long:"network"
-      ~placeholder:"<network> (sandbox,ghostnet,...)"
+      ~placeholder:"<network> (sandbox,ghostnet,weeklynet-YYYY-MM-DD,...)"
       ~description:"Allow to specify a network to use for the scenario"
       network_typ
       Sandbox
@@ -310,7 +378,7 @@ module Cli = struct
     Clap.flag
       ~section
       ~set_long:"bootstrap"
-      (match network with Sandbox -> true | Ghostnet -> false)
+      (match network with Sandbox -> true | Testnet _ -> false)
 
   let stake =
     let stake_typ =
@@ -332,7 +400,7 @@ module Cli = struct
          shares old by one baker. The total stake is given by the sum of all \
          shares."
       stake_typ
-      (match network with Sandbox -> [100] | Ghostnet -> [])
+      (match network with Sandbox -> [100] | Testnet _ -> [])
 
   let stake_machine_type =
     let stake_machine_type_typ =
@@ -412,7 +480,10 @@ module Cli = struct
       ~placeholder:"<protocol_name> (such as alpha, oxford,...)"
       ~description:"Specify the economic protocol used for this test"
       protocol_typ
-      (match network with Sandbox -> Alpha | Ghostnet -> ParisC)
+      (match network with
+      | Sandbox -> Alpha
+      | Testnet Ghostnet -> ParisC
+      | Testnet (Weeklynet _) -> Alpha)
 
   let data_dir =
     Clap.optional_string ~section ~long:"data-dir" ~placeholder:"<data_dir>" ()
@@ -1054,7 +1125,8 @@ let init_teztale agent node =
     Lwt.return_some teztale
   else Lwt.return_none
 
-let init_ghostnet cloud (configuration : configuration) agent =
+let init_testnet cloud (configuration : configuration) agent
+    (network : Network.testnet) =
   toplog "Init testnet" ;
   let* bootstrap =
     match agent with
@@ -1062,13 +1134,9 @@ let init_ghostnet cloud (configuration : configuration) agent =
         let () = toplog "No agent given" in
         let node = None in
         let dal_node = None in
-        (* Taken from ghostnet configuration. *)
-        let node_p2p_endpoint = "ghostnet.tzinit.org" in
-        let dal_node_p2p_endpoint = "dalboot.ghostnet.tzboot.net" in
-        let node_rpc_endpoint =
-          Endpoint.
-            {scheme = "https"; host = "rpc.ghostnet.teztnets.com"; port = 443}
-        in
+        let node_p2p_endpoint = Network.default_bootstrap network in
+        let dal_node_p2p_endpoint = Network.default_dal_bootstrap network in
+        let node_rpc_endpoint = Network.public_rpc_endpoint network in
         let () = toplog "Creating the client" in
         let client =
           Client.create ~endpoint:(Foreign_endpoint node_rpc_endpoint) ()
@@ -1804,9 +1872,9 @@ let init ~(configuration : configuration) cloud next_agent =
     | Network.Sandbox ->
         let bootstrap_agent = Option.get bootstrap_agent in
         init_bootstrap_and_activate_protocol cloud configuration bootstrap_agent
-    | Ghostnet ->
+    | Testnet testnet ->
         let () = toplog "Init: initializting, testnet case" in
-        init_ghostnet cloud configuration bootstrap_agent
+        init_testnet cloud configuration bootstrap_agent testnet
   in
   let* bakers =
     Lwt_list.mapi_p
@@ -1953,7 +2021,7 @@ let ensure_enough_funds t i =
   let producer = List.nth t.producers i in
   match t.configuration.network with
   | Sandbox -> (* Producer has enough money *) Lwt.return_unit
-  | Ghostnet ->
+  | Testnet _ ->
       let* balance =
         Client.RPC.call producer.client
         @@ RPC.get_chain_block_context_contract_balance
@@ -2106,8 +2174,8 @@ let benchmark () =
   in
   let docker_image =
     match configuration.network with
-    | Ghostnet -> None (* Some Env.Octez_latest_release *)
-    | Sandbox -> None
+    | Testnet Ghostnet -> None (* Some Env.Octez_latest_release *)
+    | Sandbox | Testnet (Weeklynet _) -> None
   in
   let default_vm_configuration = Configuration.make ?docker_image () in
   let vms =
