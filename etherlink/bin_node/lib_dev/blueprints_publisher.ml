@@ -99,16 +99,31 @@ module Worker = struct
     let current = current_cooldown worker in
     if on_cooldown worker then set_cooldown worker (current - 1) else ()
 
+  let publish_inbox_payload state level payload =
+    let open Lwt_result_syntax in
+    let payload = Blueprints_publisher_types.Request.inbox_payload payload in
+    let*! () = Blueprint_events.blueprint_injected_on_inbox level in
+    let () =
+      Prometheus.Counter.inc
+        Metrics.BlueprintChunkSent.on_inbox
+        (Float.of_int (List.length payload))
+    in
+    Rollup_services.publish
+      ~keep_alive:false
+      ~rollup_node_endpoint:state.rollup_node_endpoint
+      payload
+
   let publish self chunks level ~use_dal_if_enabled =
     let open Lwt_result_syntax in
-    let rollup_node_endpoint = rollup_node_endpoint self in
+    let state = state self in
+    let rollup_node_endpoint = state.rollup_node_endpoint in
     (* We do not check if we succeed or not: this will be done when new L2
        heads come from the rollup node. *)
     witness_level self level ;
     let*! res =
       (* We do not check if we succeed or not: this will be done when new L2
          heads come from the rollup node. *)
-      match (state self, chunks) with
+      match (state, chunks) with
       | ( {enable_dal = true; dal_last_used; _},
           Blueprints_publisher_types.Request.Blueprint
             {chunks; inbox_payload = _} )
@@ -118,7 +133,7 @@ module Worker = struct
                 fit in a slot. *)
              && List.length chunks
                 < Sequencer_blueprint.maximum_unsigned_chunks_per_dal_slot ->
-          (state self).dal_last_used <- level ;
+          state.dal_last_used <- level ;
           let payload = Sequencer_blueprint.create_dal_payload chunks in
           let nb_chunks = List.length chunks in
           let*! () =
@@ -130,24 +145,7 @@ module Worker = struct
               (Float.of_int nb_chunks)
           in
           Rollup_services.publish_on_dal ~rollup_node_endpoint payload
-      | _ ->
-          let payload =
-            match chunks with
-            | Blueprints_publisher_types.Request.Blueprint
-                {chunks = _; inbox_payload} ->
-                inbox_payload
-            | Inbox payload -> payload
-          in
-          let*! () = Blueprint_events.blueprint_injected_on_inbox level in
-          let () =
-            Prometheus.Counter.inc
-              Metrics.BlueprintChunkSent.on_inbox
-              (Float.of_int (List.length payload))
-          in
-          Rollup_services.publish
-            ~keep_alive:false
-            ~rollup_node_endpoint
-            payload
+      | _ -> publish_inbox_payload state level chunks
     in
     let*! () =
       match res with
