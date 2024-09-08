@@ -113,10 +113,22 @@ module Worker = struct
       ~rollup_node_endpoint:state.rollup_node_endpoint
       payload
 
+  let publish_on_dal state level chunks =
+    let open Lwt_result_syntax in
+    state.dal_last_used <- level ;
+    let payload = Sequencer_blueprint.create_dal_payload chunks in
+    let nb_chunks = List.length chunks in
+    let*! () = Blueprint_events.blueprint_injected_on_DAL ~level ~nb_chunks in
+    Prometheus.Counter.inc
+      Metrics.BlueprintChunkSent.on_dal
+      (Float.of_int nb_chunks) ;
+    Rollup_services.publish_on_dal
+      ~rollup_node_endpoint:state.rollup_node_endpoint
+      payload
+
   let publish self payload level ~use_dal_if_enabled =
     let open Lwt_result_syntax in
     let state = state self in
-    let rollup_node_endpoint = state.rollup_node_endpoint in
     (* We do not check if we succeed or not: this will be done when new L2
        heads come from the rollup node. *)
     witness_level self level ;
@@ -133,19 +145,7 @@ module Worker = struct
             && state.dal_last_used < level
             && List.length chunks
                < Sequencer_blueprint.maximum_unsigned_chunks_per_dal_slot
-          then (
-            state.dal_last_used <- level ;
-            let payload = Sequencer_blueprint.create_dal_payload chunks in
-            let nb_chunks = List.length chunks in
-            let*! () =
-              Blueprint_events.blueprint_injected_on_DAL ~level ~nb_chunks
-            in
-            let () =
-              Prometheus.Counter.inc
-                Metrics.BlueprintChunkSent.on_dal
-                (Float.of_int nb_chunks)
-            in
-            Rollup_services.publish_on_dal ~rollup_node_endpoint payload)
+          then publish_on_dal state level chunks
           else publish_inbox_payload state level payload
       | _ -> publish_inbox_payload state level payload
     in
