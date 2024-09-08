@@ -814,8 +814,7 @@ mod tests {
     use tezos_ethereum::{
         block::BlockConstants, transaction::TransactionType, tx_signature::TxSignature,
     };
-    use tezos_evm_runtime::{mock_internal::MockInternal, runtime::KernelHost};
-    use tezos_smart_rollup_mock::MockHost;
+    use tezos_evm_runtime::runtime::MockKernelHost;
 
     use crate::{
         current_timestamp, fees::gas_for_fees, retrieve_block_fees, retrieve_chain_id,
@@ -954,12 +953,7 @@ mod tests {
     #[test]
     fn simulation_result() {
         // setup
-        let mut host = MockHost::default();
-        let mut internal = MockInternal();
-        let mut host = KernelHost {
-            host: &mut host,
-            internal: &mut internal,
-        };
+        let mut host = MockKernelHost::default();
         let new_address = create_contract(&mut host);
 
         // run evaluation num
@@ -1017,12 +1011,7 @@ mod tests {
     #[test]
     fn evaluation_result_no_gas() {
         // setup
-        let mut host = MockHost::default();
-        let mut internal = MockInternal();
-        let mut host = KernelHost {
-            host: &mut host,
-            internal: &mut internal,
-        };
+        let mut host = MockKernelHost::default();
         let new_address = create_contract(&mut host);
 
         // run evaluation num
@@ -1090,12 +1079,7 @@ mod tests {
     #[test]
     fn parse_simulation2() {
         // setup
-        let mut host = MockHost::default();
-        let mut internal = MockInternal();
-        let mut host = KernelHost {
-            host: &mut host,
-            internal: &mut internal,
-        };
+        let mut host = MockKernelHost::default();
         let new_address = create_contract(&mut host);
 
         let to = Some(new_address);
@@ -1225,12 +1209,7 @@ mod tests {
 
     #[test]
     fn test_tx_validation_gas_price() {
-        let mut host = MockHost::default();
-        let mut internal = MockInternal();
-        let mut host = KernelHost {
-            host: &mut host,
-            internal: &mut internal,
-        };
+        let mut host = MockKernelHost::default();
         let block_fees = crate::retrieve_block_fees(&mut host).unwrap();
         let gas_price = U256::one();
         let tx_data = vec![];
@@ -1289,12 +1268,7 @@ mod tests {
 
     #[test]
     fn test_tx_validation_da_fees_not_covered() {
-        let mut host = MockHost::default();
-        let mut internal = MockInternal();
-        let mut host = KernelHost {
-            host: &mut host,
-            internal: &mut internal,
-        };
+        let mut host = MockKernelHost::default();
         let block_fees = crate::retrieve_block_fees(&mut host).unwrap();
 
         let transaction = EthereumTransactionCommon::new(

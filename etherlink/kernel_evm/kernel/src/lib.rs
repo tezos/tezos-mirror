@@ -5,6 +5,8 @@
 //
 // SPDX-License-Identifier: MIT
 
+use std::marker::PhantomData;
+
 use crate::configuration::{fetch_configuration, Configuration};
 use crate::error::Error;
 use crate::error::UpgradeProcessError::Fallback;
@@ -314,10 +316,11 @@ pub fn kernel_loop<Host: tezos_smart_rollup_host::runtime::Runtime>(host: &mut H
     // The kernel host is initialized as soon as possible. `kernel_loop`
     // shouldn't be called in tests as it won't use `MockInternal` for the
     // internal runtime.
-    let mut internal_storage = tezos_evm_runtime::internal_runtime::InternalHost();
+    let internal_storage = tezos_evm_runtime::internal_runtime::InternalHost();
     let mut host = KernelHost {
         host,
-        internal: &mut internal_storage,
+        internal: internal_storage,
+        _pd: PhantomData::<Host>,
     };
 
     let reboot_counter = host
@@ -401,8 +404,7 @@ mod tests {
         transaction::{TransactionHash, TransactionType},
         tx_common::EthereumTransactionCommon,
     };
-    use tezos_evm_runtime::mock_internal::MockInternal;
-    use tezos_evm_runtime::runtime::KernelHost;
+    use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_evm_runtime::safe_storage::SafeStorage;
 
     use tezos_smart_rollup::michelson::ticket::FA2_1Ticket;
@@ -417,7 +419,7 @@ mod tests {
     use tezos_smart_rollup_encoding::smart_rollup::SmartRollupAddress;
     use tezos_smart_rollup_encoding::timestamp::Timestamp;
     use tezos_smart_rollup_host::path::RefPath;
-    use tezos_smart_rollup_mock::{MockHost, TransferMetadata};
+    use tezos_smart_rollup_mock::TransferMetadata;
 
     const DUMMY_CHAIN_ID: U256 = U256::one();
     const DUMMY_BASE_FEE_PER_GAS: u64 = 12345u64;
@@ -521,12 +523,7 @@ mod tests {
     #[test]
     fn test_reboot_during_block_production() {
         // init host
-        let mut host = MockHost::default();
-        let mut internal = MockInternal();
-        let mut host = KernelHost {
-            host: &mut host,
-            internal: &mut internal,
-        };
+        let mut host = MockKernelHost::default();
 
         crate::storage::store_minimum_base_fee_per_gas(
             &mut host,
@@ -631,12 +628,7 @@ mod tests {
     #[test]
     fn load_block_fees_new() {
         // Arrange
-        let mut host = MockHost::default();
-        let mut internal = MockInternal();
-        let mut host = KernelHost {
-            host: &mut host,
-            internal: &mut internal,
-        };
+        let mut host = MockKernelHost::default();
 
         // Act
         let result = crate::retrieve_block_fees(&mut host);
@@ -658,12 +650,7 @@ mod tests {
             RefPath::assert_from(b"/evm/world_state/fees/minimum_base_fee_per_gas");
 
         // Arrange
-        let mut host = MockHost::default();
-        let mut internal = MockInternal();
-        let mut host = KernelHost {
-            host: &mut host,
-            internal: &mut internal,
-        };
+        let mut host = MockKernelHost::default();
 
         let min_base_fee = U256::from(17);
         let curr_base_fee = U256::from(20);
@@ -688,12 +675,7 @@ mod tests {
     #[test]
     fn test_xtz_withdrawal_applied() {
         // init host
-        let mut host = MockHost::default();
-        let mut internal = MockInternal();
-        let mut mock_host = KernelHost {
-            host: &mut host,
-            internal: &mut internal,
-        };
+        let mut mock_host = MockKernelHost::default();
         let mut safe_storage = SafeStorage {
             host: &mut mock_host,
         };
@@ -815,12 +797,7 @@ mod tests {
 
     fn send_fa_deposit(enable_fa_bridge: bool) -> Option<TransactionStatus> {
         // init host
-        let mut host = MockHost::default();
-        let mut internal = MockInternal();
-        let mut mock_host = KernelHost {
-            host: &mut host,
-            internal: &mut internal,
-        };
+        let mut mock_host = MockKernelHost::default();
         let mut safe_storage = SafeStorage {
             host: &mut mock_host,
         };
@@ -916,12 +893,7 @@ mod tests {
 
     fn send_fa_withdrawal(enable_fa_bridge: bool) -> Vec<Vec<u8>> {
         // init host
-        let mut host = MockHost::default();
-        let mut internal = MockInternal();
-        let mut mock_host = KernelHost {
-            host: &mut host,
-            internal: &mut internal,
-        };
+        let mut mock_host = MockKernelHost::default();
         let mut safe_storage = SafeStorage {
             host: &mut mock_host,
         };

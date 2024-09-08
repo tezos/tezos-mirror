@@ -167,11 +167,7 @@ mod test {
     use super::*;
     use proptest::prelude::*;
     use std::collections::VecDeque;
-    use tezos_evm_runtime::{
-        mock_internal::MockInternal,
-        runtime::{KernelHost, Runtime},
-    };
-    use tezos_smart_rollup_mock::MockHost;
+    use tezos_evm_runtime::runtime::{MockKernelHost, Runtime};
 
     proptest! {
         #[test]
@@ -201,12 +197,7 @@ mod test {
 
     #[test]
     fn gas_price_responds_to_load() {
-        let mut host = MockHost::default();
-        let mut internal = MockInternal();
-        let mut host = KernelHost {
-            host: &mut host,
-            internal: &mut internal,
-        };
+        let mut host = MockKernelHost::default();
         let timestamp = 0_i64;
         let mut block_fees = BlockFees::new(U256::zero(), U256::zero(), U256::zero());
 

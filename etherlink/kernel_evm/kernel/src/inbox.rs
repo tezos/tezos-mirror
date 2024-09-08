@@ -714,8 +714,7 @@ mod tests {
     use tezos_crypto_rs::hash::UnknownSignature;
     use tezos_data_encoding::types::Bytes;
     use tezos_ethereum::transaction::TRANSACTION_HASH_SIZE;
-    use tezos_evm_runtime::mock_internal::MockInternal;
-    use tezos_evm_runtime::runtime::KernelHost;
+    use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
     use tezos_smart_rollup_encoding::contract::Contract;
     use tezos_smart_rollup_encoding::inbox::ExternalMessageFrame;
@@ -723,7 +722,7 @@ mod tests {
     use tezos_smart_rollup_encoding::public_key_hash::PublicKeyHash;
     use tezos_smart_rollup_encoding::smart_rollup::SmartRollupAddress;
     use tezos_smart_rollup_encoding::timestamp::Timestamp;
-    use tezos_smart_rollup_mock::{MockHost, TransferMetadata};
+    use tezos_smart_rollup_mock::TransferMetadata;
 
     const SMART_ROLLUP_ADDRESS: [u8; 20] = [
         20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1,
@@ -833,12 +832,7 @@ mod tests {
 
     #[test]
     fn parse_valid_simple_transaction() {
-        let mut host = MockHost::default();
-        let mut internal = MockInternal();
-        let mut host = KernelHost {
-            host: &mut host,
-            internal: &mut internal,
-        };
+        let mut host = MockKernelHost::default();
 
         let tx_bytes = &hex::decode("f86d80843b9aca00825208940b52d4d3be5d18a7ab5e4476a2f5382bbf2b38d888016345785d8a000080820a95a0d9ef1298c18c88604e3f08e14907a17dfa81b1dc6b37948abe189d8db5cb8a43a06fc7040a71d71d3cb74bd05ead7046b10668ad255da60391c017eea31555f156").unwrap();
         let tx = EthereumTransactionCommon::from_bytes(tx_bytes).unwrap();
@@ -870,12 +864,7 @@ mod tests {
     #[test]
     fn parse_valid_chunked_transaction() {
         let address = smart_rollup_address();
-        let mut host = MockHost::with_address(&address);
-        let mut internal = MockInternal();
-        let mut host = KernelHost {
-            host: &mut host,
-            internal: &mut internal,
-        };
+        let mut host = MockKernelHost::with_address(address);
 
         let (data, tx) = large_transaction();
         let tx_hash: [u8; TRANSACTION_HASH_SIZE] = Keccak256::digest(data.clone()).into();
@@ -904,12 +893,7 @@ mod tests {
 
     #[test]
     fn parse_valid_kernel_upgrade() {
-        let mut host = MockHost::default();
-        let mut internal = MockInternal();
-        let mut host = KernelHost {
-            host: &mut host,
-            internal: &mut internal,
-        };
+        let mut host = MockKernelHost::default();
 
         // Prepare the upgrade's payload
         let preimage_hash: [u8; PREIMAGE_HASH_SIZE] = hex::decode(
@@ -968,12 +952,7 @@ mod tests {
     // Assert that trying to create a chunked transaction has no impact. Only
     // the first `NewChunkedTransaction` should be considered.
     fn recreate_chunked_transaction() {
-        let mut host = MockHost::default();
-        let mut internal = MockInternal();
-        let mut host = KernelHost {
-            host: &mut host,
-            internal: &mut internal,
-        };
+        let mut host = MockKernelHost::default();
 
         let chunk_hashes = vec![[1; TRANSACTION_HASH_SIZE], [2; TRANSACTION_HASH_SIZE]];
         let tx_hash = [0; TRANSACTION_HASH_SIZE];
@@ -1015,12 +994,7 @@ mod tests {
     // Assert that an out of bound chunk is simply ignored and does
     // not make the kernel fail.
     fn out_of_bound_chunk_is_ignored() {
-        let mut host = MockHost::default();
-        let mut internal = MockInternal();
-        let mut host = KernelHost {
-            host: &mut host,
-            internal: &mut internal,
-        };
+        let mut host = MockKernelHost::default();
 
         let (data, _tx) = large_transaction();
         let tx_hash = ZERO_TX_HASH;
@@ -1073,12 +1047,7 @@ mod tests {
     // Assert that an unknown chunk is simply ignored and does
     // not make the kernel fail.
     fn unknown_chunk_is_ignored() {
-        let mut host = MockHost::default();
-        let mut internal = MockInternal();
-        let mut host = KernelHost {
-            host: &mut host,
-            internal: &mut internal,
-        };
+        let mut host = MockKernelHost::default();
 
         let (data, _tx) = large_transaction();
         let tx_hash = ZERO_TX_HASH;
@@ -1131,12 +1100,7 @@ mod tests {
     // - Chunk 1
     // |--> Fails because the chunk is unknown
     fn transaction_is_complete_when_each_chunk_is_stored() {
-        let mut host = MockHost::default();
-        let mut internal = MockInternal();
-        let mut host = KernelHost {
-            host: &mut host,
-            internal: &mut internal,
-        };
+        let mut host = MockKernelHost::default();
 
         let (data, tx) = large_transaction();
         let tx_hash: [u8; TRANSACTION_HASH_SIZE] = Keccak256::digest(data.clone()).into();
@@ -1197,12 +1161,7 @@ mod tests {
         // parsing. This won't happen in practice, though
         let address = smart_rollup_address();
 
-        let mut host = MockHost::with_address(&address);
-        let mut internal = MockInternal();
-        let mut host = KernelHost {
-            host: &mut host,
-            internal: &mut internal,
-        };
+        let mut host = MockKernelHost::with_address(address.clone());
 
         let tx_bytes = &hex::decode("f86d80843b9aca00825208940b52d4d3be5d18a7ab5\
         e4476a2f5382bbf2b38d888016345785d8a000080820a95a0d9ef1298c18c88604e3f08e14907a17dfa81b1dc6b37948abe189d8db5cb8a43a06\
@@ -1258,12 +1217,7 @@ mod tests {
 
     #[test]
     fn empty_inbox_returns_none() {
-        let mut host = MockHost::default();
-        let mut internal = MockInternal();
-        let mut host = KernelHost {
-            host: &mut host,
-            internal: &mut internal,
-        };
+        let mut host = MockKernelHost::default();
 
         // Even reading the inbox with only the default elements returns
         // an empty inbox content. As we test in isolation there is nothing
