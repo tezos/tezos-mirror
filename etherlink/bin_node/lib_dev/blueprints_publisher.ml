@@ -126,6 +126,12 @@ module Worker = struct
       ~rollup_node_endpoint:state.rollup_node_endpoint
       payload
 
+  let publish_on_dal_precondition state use_dal_if_enabled level chunks =
+    state.enable_dal && use_dal_if_enabled
+    && state.dal_last_used < level
+    && List.length chunks
+       < Sequencer_blueprint.maximum_unsigned_chunks_per_dal_slot
+
   let publish self payload level ~use_dal_if_enabled =
     let open Lwt_result_syntax in
     let state = state self in
@@ -140,11 +146,7 @@ module Worker = struct
           (* For the moment, the rollup node only uses a single slot for
              publishement. As such we cannot send blueprints that wouldn't
              fit in a slot. *)
-          if
-            state.enable_dal && use_dal_if_enabled
-            && state.dal_last_used < level
-            && List.length chunks
-               < Sequencer_blueprint.maximum_unsigned_chunks_per_dal_slot
+          if publish_on_dal_precondition state use_dal_if_enabled level chunks
           then publish_on_dal state level chunks
           else publish_inbox_payload state level payload
       | _ -> publish_inbox_payload state level payload
