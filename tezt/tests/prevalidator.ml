@@ -3399,6 +3399,95 @@ module Revamped = struct
     let* () = check_mempool client2 in
 
     unit
+
+  (** Test that banning a validated operation preserves the other validated
+      operations classification.
+
+      Scenario:
+      - Step 1: Start two nodes, connect them, activate alpha.
+      - Step 2: Inject five transfers (from different sources, injected by both
+        nodes in alternance).
+      - Step 3: Check that all operations are in node1 and node2 mempools.
+      - Step 3: Ban one of these operations from node1.
+      - Step 4: Check that validated operations in node1 and node2 are still
+        validated except the banned operation.
+  *)
+  let ban_operation_and_check_validated =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"ban_operation RPC preserves other validated operations"
+      ~tags:[team; "mempool"; "ban"; "validated"]
+    @@ fun protocol ->
+    log_step 1 "start two nodes, connect them and activate alpha" ;
+    let* node1, client1 =
+      Client.init_with_protocol
+        ~protocol
+        ~event_sections_levels:[("prevalidator", `Debug)]
+        ~nodes_args:[Synchronisation_threshold 0; Connections 1]
+        `Client
+        ()
+    in
+    let* node2, client2 =
+      Client.init_with_node
+        ~nodes_args:[Synchronisation_threshold 0; Connections 1]
+        `Client
+        ()
+    in
+    let* () = Client.Admin.connect_address client1 ~peer:node2 in
+    let* _ = Node.wait_for_level node2 1 in
+
+    log_step 2 "inject five operations" ;
+    let bootstrap1, bootstrap2, bootstrap3, bootstrap4, bootstrap5 =
+      Constant.(bootstrap1, bootstrap2, bootstrap3, bootstrap4, bootstrap5)
+    in
+    let* (`OpHash oph1) =
+      Operation.Manager.(
+        inject [make ~source:bootstrap1 (transfer ~dest:bootstrap5 ())] client1)
+    in
+    (* start monitoring for an operation arrival in node1 *)
+    let wait_for = Node_event_level.wait_for_arrival node1 in
+    let* (`OpHash oph2) =
+      Operation.Manager.(
+        inject [make ~source:bootstrap2 (transfer ~dest:bootstrap5 ())] client2)
+    in
+    (* wait until the arrival is witnessed in node1 *)
+    let* () = wait_for in
+    let* (`OpHash oph3) =
+      Operation.Manager.(
+        inject [make ~source:bootstrap3 (transfer ~dest:bootstrap5 ())] client1)
+    in
+    (* start monitoring again for an operation arrival in node1 *)
+    let wait_for = Node_event_level.wait_for_arrival node1 in
+    let* (`OpHash oph4) =
+      Operation.Manager.(
+        inject [make ~source:bootstrap4 (transfer ~dest:bootstrap5 ())] client2)
+    in
+    (* wait until the arrival is witnessed in node1 *)
+    let* () = wait_for in
+    let* (`OpHash oph5) =
+      Operation.Manager.(
+        inject [make ~source:bootstrap5 (transfer ~dest:bootstrap1 ())] client1)
+    in
+
+    log_step 3 "check that all operations are validated in both mempool" ;
+    let* () = check_mempool ~validated:[oph1; oph2; oph3; oph4; oph5] client1 in
+    let* () = check_mempool ~validated:[oph1; oph2; oph3; oph4; oph5] client2 in
+
+    log_step 4 "ban %s" oph3 ;
+    let* _ =
+      Client.RPC.call client1
+      @@ RPC.post_chain_mempool_ban_operation ~data:(Data (`String oph3)) ()
+    in
+
+    log_step
+      5
+      "check that node1's mempool holds exactly the same operations except %s"
+      oph3 ;
+    let* () = check_mempool ~validated:[oph1; oph2; oph4; oph5] client1 in
+    log_step 6 "check that node2's mempool is unchanged." ;
+    let* () = check_mempool ~validated:[oph1; oph2; oph3; oph4; oph5] client2 in
+
+    unit
 end
 
 let check_operation_is_in_validated_mempool ops oph =
@@ -3612,111 +3701,6 @@ let check_validated_ophs_is client expected_ophs =
     Test.fail
       "Wrong list of validated operations in mempool (use --info to see \
        expected and actual lists).")
-
-(** Test.
-
-    Aim: check that, when banning an operation that was validated in the
-    mempool, the other validated operations are correctly revalidated (in
-    the same order).
-
-    Scenario:
-    - Step 1: Start two nodes, connect them, activate the protocol.
-    - Step 2: Inject five operations (transfers from five different sources,
-      injected by both nodes in alternance).
-    - Step 3: Ban one of these operations from node_1 (arbitrarily, the third
-      in the list of validated operations in the mempool of node_1).
-    - Step 4: Check that validated operations in node_1 are still validated
-
-    Note: the chosen operations are commutative, so that none of them
-    becomes branch_delayed instead of validated when one of them is banned.
-*)
-let ban_operation_and_check_validated =
-  Protocol.register_test
-    ~__FILE__
-    ~title:"mempool ban operation and check validated"
-    ~tags:[team; "mempool"; "node"]
-  @@ fun protocol ->
-  Log.info "Step 1: Start two nodes, connect them, activate the protocol." ;
-  let* node_1 =
-    Node.init
-      ~event_sections_levels:[("prevalidator", `Debug)]
-        (* to witness operation arrival events *)
-      [Synchronisation_threshold 0; Connections 1]
-  and* node_2 = Node.init [Synchronisation_threshold 0; Connections 1] in
-  let* client_1 = Client.init ~endpoint:Client.(Node node_1) ()
-  and* client_2 = Client.init ~endpoint:Client.(Node node_2) () in
-  let* () = Client.Admin.connect_address client_1 ~peer:node_2 in
-  let* () = Client.activate_protocol_and_wait ~protocol client_1 in
-  let* _ = Node.wait_for_level node_2 1 in
-  Log.info "Both nodes are at level 1." ;
-  Log.info
-    "Step 2: Inject five operations (transfers from five different sources, \
-     injected by both nodes in alternance)." ;
-  let* () =
-    transfer_and_wait_for_injection
-      node_1
-      client_1
-      1
-      Constant.bootstrap1
-      Constant.bootstrap5
-  in
-  let* () =
-    transfer_and_wait_for_arrival
-      node_1
-      client_2
-      2
-      Constant.bootstrap2
-      Constant.bootstrap5
-  in
-  let* () =
-    transfer_and_wait_for_injection
-      node_1
-      client_1
-      3
-      Constant.bootstrap3
-      Constant.bootstrap5
-  in
-  let* () =
-    transfer_and_wait_for_arrival
-      node_1
-      client_2
-      4
-      Constant.bootstrap4
-      Constant.bootstrap5
-  in
-  let* () =
-    transfer_and_wait_for_injection
-      node_1
-      client_1
-      5
-      Constant.bootstrap5
-      Constant.bootstrap1
-  in
-  Log.info
-    "Step 3: Ban one of these operations from node_1 (arbitrarily, the third \
-     in the list of validated operations in the mempool of node_1)." ;
-  let* validated_ophs = get_and_log_validated client_1 in
-  if not (Int.equal (List.compare_length_with validated_ophs 5) 0) then
-    (* This could theoretically happen: we wait for each transfer to
-       be present in the mempool as "pending", but not to be classified
-       as "validated". In practice, this does not seem to be a problem. *)
-    Test.fail
-      "Found only %d validated operations in node_1, expected 5."
-      (List.length validated_ophs) ;
-  let oph_to_ban = List.nth validated_ophs 2 in
-  Log.info "Operation to ban: %s" oph_to_ban ;
-  let* _ =
-    Client.RPC.call client_1
-    @@ RPC.post_chain_mempool_ban_operation ~data:(Data (`String oph_to_ban)) ()
-  in
-  Log.info "Operation %s is now banned." oph_to_ban ;
-  Log.info
-    "Step 4: Check that validated operations in node_1 are still validated." ;
-  let expected_revalidated_ophs =
-    List.filter (fun oph -> not (String.equal oph_to_ban oph)) validated_ophs
-  in
-  let* () = check_validated_ophs_is client_1 expected_revalidated_ophs in
-  unit
 
 (** Waits for an event in [node] signaling the arrival in the mempool
     of an operation of hash [ophash].
@@ -4267,7 +4251,7 @@ let register ~protocols =
   Revamped.test_filter_monitor_operations_by_sources protocols ;
   Revamped.pre_filtered_operation_removed_from_ddb protocols ;
   Revamped.fetch_failed_operation protocols ;
-  ban_operation_and_check_validated protocols ;
+  Revamped.ban_operation_and_check_validated protocols ;
   test_do_not_reclassify protocols ;
   force_operation_injection protocols ;
   injecting_old_operation_fails protocols ;
