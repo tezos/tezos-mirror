@@ -464,7 +464,7 @@ apt_repo_debian_current:
   script:
   - ./scripts/ci/create_debian_repo.sh debian bookworm
   variables:
-    ARCHITECTURES: amd64
+    ARCHITECTURES: amd64 arm64
     GNUPGHOME: $CI_PROJECT_DIR/.gnupg
 
 apt_repo_debian:
@@ -485,7 +485,7 @@ apt_repo_debian:
   script:
   - ./scripts/ci/create_debian_repo.sh debian bookworm
   variables:
-    ARCHITECTURES: amd64
+    ARCHITECTURES: amd64 arm64
     GNUPGHOME: $CI_PROJECT_DIR/.gnupg
     PREFIX: next
 
@@ -663,7 +663,7 @@ apt_repo_ubuntu_current:
   script:
   - ./scripts/ci/create_debian_repo.sh ubuntu noble jammy
   variables:
-    ARCHITECTURES: amd64
+    ARCHITECTURES: amd64 arm64
     GNUPGHOME: $CI_PROJECT_DIR/.gnupg
 
 apt_repo_ubuntu:
@@ -684,6 +684,6 @@ apt_repo_ubuntu:
   script:
   - ./scripts/ci/create_debian_repo.sh ubuntu noble jammy
   variables:
-    ARCHITECTURES: amd64
+    ARCHITECTURES: amd64 arm64
     GNUPGHOME: $CI_PROJECT_DIR/.gnupg
     PREFIX: next

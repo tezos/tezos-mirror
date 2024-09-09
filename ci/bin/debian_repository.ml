@@ -44,16 +44,19 @@ let ubuntu_package_release_matrix = function
   | Full | Release ->
       [[("RELEASE", ["noble"; "jammy"]); ("TAGS", ["gcp"; "gcp_arm64"])]]
 
+let archs_variables pipeline =
+  let amd64 = List.map Tezos_ci.arch_to_string_alt [Amd64] in
+  let all = List.map Tezos_ci.arch_to_string_alt [Amd64; Arm64] in
+  match pipeline with
+  | Partial -> [("ARCHITECTURES", String.concat " " amd64)]
+  | Full | Release -> [("ARCHITECTURES", String.concat " " all)]
+
 (* Push .deb artifacts to storagecloud apt repository. *)
-let job_apt_repo ?rules ~__POS__ ~name ?(stage = Stages.publishing)
-    ?(prefix = false) ?dependencies ?(archs = [Amd64]) ~image script : tezos_job
-    =
+let make_job_apt_repo ?rules ~__POS__ ~name ?(stage = Stages.publishing)
+    ?(prefix = false) ?dependencies ~variables ~image script : tezos_job =
   let variables =
-    [
-      ( "ARCHITECTURES",
-        String.concat " " (List.map Tezos_ci.arch_to_string_alt archs) );
-      ("GNUPGHOME", "$CI_PROJECT_DIR/.gnupg");
-    ]
+    variables
+    @ [("GNUPGHOME", "$CI_PROJECT_DIR/.gnupg")]
     @ if prefix then [("PREFIX", "next")] else []
   in
   job
@@ -226,7 +229,7 @@ let jobs pipeline_type =
 
   (* These jobs create the apt repository for the current packages *)
   let job_apt_repo_debian_current =
-    job_apt_repo
+    make_job_apt_repo
       ~__POS__
       ~name:"apt_repo_debian_current"
       ~dependencies:
@@ -235,11 +238,12 @@ let jobs pipeline_type =
              Artifacts job_build_debian_package_current_a;
              Artifacts job_build_debian_package_current_b;
            ])
+      ~variables:(archs_variables pipeline_type)
       ~image:Images.debian_bookworm
       ["./scripts/ci/create_debian_repo.sh debian bookworm"]
   in
   let job_apt_repo_ubuntu_current =
-    job_apt_repo
+    make_job_apt_repo
       ~__POS__
       ~name:"apt_repo_ubuntu_current"
       ~dependencies:
@@ -248,12 +252,13 @@ let jobs pipeline_type =
              Artifacts job_build_ubuntu_package_current_a;
              Artifacts job_build_ubuntu_package_current_b;
            ])
+      ~variables:(archs_variables pipeline_type)
       ~image:Images.ubuntu_noble
       ["./scripts/ci/create_debian_repo.sh ubuntu noble jammy"]
   in
   (* These jobs create the apt repository for the next packages *)
   let job_apt_repo_debian =
-    job_apt_repo
+    make_job_apt_repo
       ~__POS__
       ~name:"apt_repo_debian"
       ~prefix:true
@@ -263,11 +268,12 @@ let jobs pipeline_type =
              Artifacts job_build_debian_package;
              Artifacts job_build_data_packages;
            ])
+      ~variables:(archs_variables pipeline_type)
       ~image:Images.debian_bookworm
       ["./scripts/ci/create_debian_repo.sh debian bookworm"]
   in
   let job_apt_repo_ubuntu =
-    job_apt_repo
+    make_job_apt_repo
       ~__POS__
       ~name:"apt_repo_ubuntu"
       ~prefix:true
@@ -277,6 +283,7 @@ let jobs pipeline_type =
              Artifacts job_build_ubuntu_package;
              Artifacts job_build_data_packages;
            ])
+      ~variables:(archs_variables pipeline_type)
       ~image:Images.ubuntu_noble
       ["./scripts/ci/create_debian_repo.sh ubuntu noble jammy"]
   in

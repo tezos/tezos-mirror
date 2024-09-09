@@ -120,8 +120,9 @@ echo "$GPG_PRIVATE_KEY" | base64 --decode | gpg --batch --import --
 
 mkdir -p "$TARGETDIR/dists"
 
-for architecture in $ARCHITECTURES; do # amd64, arm64 ...
-  for release in $RELEASES; do         # unstable, jammy, noble ...
+# Copying files
+for release in $RELEASES; do             # unstable, jammy, noble ...
+  for architecture in $ARCHITECTURES; do # amd64, arm64 ...
     echo "Setting up APT repository for $DISTRIBUTION / $release / $architecture"
     echo "targetdir: $TARGETDIR"
 
@@ -132,42 +133,44 @@ for architecture in $ARCHITECTURES; do # amd64, arm64 ...
 
     mkdir -p "$TARGETDIR/${target}/"
 
-    for file in packages/"${DISTRIBUTION}/${release}"/*.deb; do
+    for file in packages/"${DISTRIBUTION}/${release}"/*_"$architecture".deb; do
       cp "$file" "$TARGETDIR/${target}/"
       echo "Adding package $file to $TARGETDIR/${target}/"
     done
 
-    # for ubuntu, we also add the data packages that we built for
+    # we also add the data packages that we built for
     # bookworm, that are distribution independent. Only for next packages
-    if [ "$DISTRIBUTION" = "ubuntu" ] && [ -n "$PREFIX" ]; then
-      for file in packages/debian/bookworm/*.deb; do
+    if [ -n "$PREFIX" ]; then
+      for file in packages/debian/bookworm/*_all.deb; do
         cp "$file" "$TARGETDIR/${target}/"
         echo "Adding data package $file to $TARGETDIR/${target}/"
       done
     fi
 
-    cd "$TARGETDIR"
-    echo "Create the Packages file"
-    apt-ftparchive packages "dists/${release}" > "${target}/Packages"
-    gzip -k -f "${target}/Packages"
-
-    echo "Create the Release files using a static configuration file"
-    apt-ftparchive \
-      -o APT::FTPArchive::Release::Codename="$release" \
-      -o APT::FTPArchive::Release::Architectures="noarch $architecture" \
-      -c "$oldPWD/scripts/packaging/Release.conf" release \
-      "dists/${release}/" > "dists/${release}/Release"
-
-    # sign the release file using GPG. Since gpg is run in a script we need to set
-    # some variables and extra options to make it work. The InRelease file contains
-    # both the gpg signature and the content of the Release file.
-    echo "Sign the release file"
-    echo "$GPG_PASSPHRASE" |
-      gpg --batch --passphrase-fd 0 --pinentry-mode loopback \
-        -u "$GPG_KEY_ID" --clearsign \
-        -o "dists/${release}/InRelease" "dists/${release}/Release"
-    cd -
   done
+  # Create Release and sign
+  cd "$TARGETDIR"
+  echo "Create the Packages file ${target}/Packages"
+  apt-ftparchive packages "dists/${release}" > "${target}/Packages"
+  gzip -k -f "${target}/Packages"
+
+  echo "Create the Release files using a static configuration file: \
+    dists/${release}/Release"
+  apt-ftparchive \
+    -o APT::FTPArchive::Release::Codename="$release" \
+    -o APT::FTPArchive::Release::Architectures="noarch $ARCHITECTURES" \
+    -c "$oldPWD/scripts/packaging/Release.conf" release \
+    "dists/${release}/" > "dists/${release}/Release"
+
+  # sign the release file using GPG. Since gpg is run in a script we need to set
+  # some variables and extra options to make it work. The InRelease file contains
+  # both the gpg signature and the content of the Release file.
+  echo "Sign the release file: dists/${release}/InRelease"
+  echo "$GPG_PASSPHRASE" |
+    gpg --batch --passphrase-fd 0 --pinentry-mode loopback \
+      -u "$GPG_KEY_ID" --clearsign \
+      -o "dists/${release}/InRelease" "dists/${release}/Release"
+
   # back to base
   cd "$oldPWD"
 done
