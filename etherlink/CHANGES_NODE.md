@@ -1,6 +1,13 @@
 # Changelog
 
-## Unreleased
+## Version 0.3 (2024-09-10)
+
+This release primilarly addresses two bugs uncovered in production: the broken
+`octez_evm_node_head` metrics for the RPC mode, and the node hanging when
+catching-up to the head of its upstream EVM node (in observer mode).
+
+This version is compatible with every kernel deployed on Etherlink Mainnet
+Beta.
 
 ### Features
 
@@ -24,6 +31,11 @@
 
 - Add state override option to `eth_call` RPC, similar to go-ethereum.
   Limited to fields `balance`, `nonce` and `code`. (!14708)
+
+#### Internals
+
+- Prevent the node to hang when catching-up to the head of its upstream EVM
+  node. (!14750)
 
 ## Version 0.2 (2024-09-05)
 
