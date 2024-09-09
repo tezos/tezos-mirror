@@ -244,6 +244,26 @@ oc.misc_checks:
   - etherlink/scripts/check_evm_store_migrations.sh check
   - ./scripts/ci/lint_check_licenses.sh
 
+check_rust_fmt:
+  image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
+  stage: sanity
+  tags:
+  - gcp
+  rules:
+  - changes:
+    - '**/*.rs'
+    - .gitlab-ci.yml
+    - .gitlab/**/*
+    when: on_success
+  needs:
+  - oc.docker:rust-toolchain:amd64
+  - trigger
+  dependencies:
+  - oc.docker:rust-toolchain:amd64
+  timeout: 60 minutes
+  script:
+  - scripts/check-format-rust.sh
+
 nix:
   image: nixos/nix:2.22.1
   stage: sanity
@@ -416,6 +436,8 @@ oc.build:static-x86_64-linux-binaries:
     optional: true
   - job: oc.misc_checks
     optional: true
+  - job: check_rust_fmt
+    optional: true
   - job: nix
     optional: true
   dependencies:
@@ -490,6 +512,8 @@ oc.build_x86_64-released:
   - job: oc.semgrep
     optional: true
   - job: oc.misc_checks
+    optional: true
+  - job: check_rust_fmt
     optional: true
   - job: nix
     optional: true
@@ -576,6 +600,8 @@ oc.build_x86_64-exp-dev-extra:
     optional: true
   - job: oc.misc_checks
     optional: true
+  - job: check_rust_fmt
+    optional: true
   - job: nix
     optional: true
   dependencies:
@@ -653,6 +679,8 @@ ocaml-check:
   - job: oc.semgrep
     optional: true
   - job: oc.misc_checks
+    optional: true
+  - job: check_rust_fmt
     optional: true
   - job: nix
     optional: true
@@ -970,6 +998,8 @@ opam:prepare:
   - job: oc.semgrep
     optional: true
   - job: oc.misc_checks
+    optional: true
+  - job: check_rust_fmt
     optional: true
   - job: nix
     optional: true
@@ -1801,6 +1831,8 @@ kaitai_checks:
     optional: true
   - job: oc.misc_checks
     optional: true
+  - job: check_rust_fmt
+    optional: true
   - job: nix
     optional: true
   dependencies:
@@ -1887,6 +1919,8 @@ oc.check_lift_limits_patch:
     optional: true
   - job: oc.misc_checks
     optional: true
+  - job: check_rust_fmt
+    optional: true
   - job: nix
     optional: true
   dependencies:
@@ -1941,6 +1975,8 @@ oc.python_check:
   - job: oc.semgrep
     optional: true
   - job: oc.misc_checks
+    optional: true
+  - job: check_rust_fmt
     optional: true
   - job: nix
     optional: true
@@ -2056,6 +2092,8 @@ oc.script:test-gen-genesis:
   - job: oc.semgrep
     optional: true
   - job: oc.misc_checks
+    optional: true
+  - job: check_rust_fmt
     optional: true
   - job: nix
     optional: true
@@ -2190,6 +2228,8 @@ oc.script:b58_prefix:
   - job: oc.semgrep
     optional: true
   - job: oc.misc_checks
+    optional: true
+  - job: check_rust_fmt
     optional: true
   - job: nix
     optional: true
@@ -3007,6 +3047,8 @@ oc.install_opam_jammy:
     optional: true
   - job: oc.misc_checks
     optional: true
+  - job: check_rust_fmt
+    optional: true
   - job: nix
     optional: true
   dependencies: []
@@ -3039,6 +3081,8 @@ oc.compile_sources_doc_bookworm:
   - job: oc.semgrep
     optional: true
   - job: oc.misc_checks
+    optional: true
+  - job: check_rust_fmt
     optional: true
   - job: nix
     optional: true
@@ -3656,6 +3700,8 @@ commit_titles:
     optional: true
   - job: oc.misc_checks
     optional: true
+  - job: check_rust_fmt
+    optional: true
   - job: nix
     optional: true
   dependencies:
@@ -3758,6 +3804,8 @@ oc.install_python_bookworm:
     optional: true
   - job: oc.misc_checks
     optional: true
+  - job: check_rust_fmt
+    optional: true
   - job: nix
     optional: true
   dependencies: []
@@ -3804,6 +3852,8 @@ documentation:odoc:
   - job: oc.semgrep
     optional: true
   - job: oc.misc_checks
+    optional: true
+  - job: check_rust_fmt
     optional: true
   - job: nix
     optional: true
@@ -3875,6 +3925,8 @@ documentation:manuals:
     optional: true
   - job: oc.misc_checks
     optional: true
+  - job: check_rust_fmt
+    optional: true
   - job: nix
     optional: true
   dependencies:
@@ -3945,6 +3997,8 @@ documentation:docgen:
   - job: oc.semgrep
     optional: true
   - job: oc.misc_checks
+    optional: true
+  - job: check_rust_fmt
     optional: true
   - job: nix
     optional: true

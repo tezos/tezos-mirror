@@ -494,6 +494,9 @@ let changeset_lint_files =
 let changeset_python_files =
   Changeset.(changeset_base @ make ["poetry.lock"; "pyproject.toml"; "**/*.py"])
 
+(** Set of Rust files for formatting ([cargo fmt --check]). *)
+let changeset_rust_fmt_files = Changeset.(changeset_base @ make ["**/*.rs"])
+
 (** Set of OCaml files for formatting ([dune build @fmt]). *)
 let changeset_ocaml_fmt_files =
   Changeset.(changeset_base @ make ["**/.ocamlformat"; "**/*.ml"; "**/*.mli"])
