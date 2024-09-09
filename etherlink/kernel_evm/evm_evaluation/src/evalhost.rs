@@ -6,8 +6,7 @@ use std::{cell::RefCell, io::Write};
 
 use tezos_evm_runtime::{
     internal_runtime::{ExtendedRuntime, InternalRuntime},
-    mock_internal::MockInternal,
-    runtime::KernelHost,
+    runtime::MockKernelHost,
 };
 use tezos_smart_rollup_host::{
     dal_parameters::RollupDalParameters,
@@ -16,12 +15,11 @@ use tezos_smart_rollup_host::{
     path::Path,
     runtime::{Runtime as SdkRuntime, RuntimeError, ValueType},
 };
-use tezos_smart_rollup_mock::MockHost;
 
-use tezos_smart_rollup_core::{smart_rollup_core::SmartRollupCore, PREIMAGE_HASH_SIZE};
+use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
 
 pub struct EvalHost {
-    pub host: KernelHost<MockHost, MockInternal>,
+    pub host: MockKernelHost,
     pub buffer: RefCell<Vec<u8>>,
 }
 
@@ -29,7 +27,7 @@ impl EvalHost {
     /// Create a new instance of the `MockHost`, additionally provide the buffer
     /// where the logs will be outputed.
     pub fn default_with_buffer(buffer: RefCell<Vec<u8>>) -> Self {
-        let host = KernelHost::<MockHost, MockInternal>::default();
+        let host = MockKernelHost::default();
         Self { host, buffer }
     }
 }

@@ -527,13 +527,14 @@ mod test {
     use super::*;
     use host::path::RefPath;
     use primitive_types::U256;
-    use tezos_smart_rollup_mock::MockHost;
+    use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezos_smart_rollup_host::runtime::Runtime as SdkRuntime; // Used for
     use tezos_storage::helpers::bytes_hash;
     use tezos_storage::write_u256_le;
 
     #[test]
     fn test_account_nonce_update() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let mut storage =
             init_account_storage().expect("Could not create EVM accounts storage API");
 
@@ -569,7 +570,7 @@ mod test {
 
     #[test]
     fn test_zero_account_balance_for_new_accounts() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let mut storage =
             init_account_storage().expect("Could not create EVM accounts storage API");
 
@@ -607,7 +608,7 @@ mod test {
 
     #[test]
     fn test_account_balance_add() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let mut storage =
             init_account_storage().expect("Could not create EVM accounts storage API");
 
@@ -651,7 +652,7 @@ mod test {
 
     #[test]
     fn test_account_balance_sub() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let mut storage =
             init_account_storage().expect("Could not create EVM accounts storage API");
 
@@ -695,7 +696,7 @@ mod test {
 
     #[test]
     fn test_account_balance_underflow() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let mut storage =
             init_account_storage().expect("Could not create EVM accounts storage API");
 
@@ -737,7 +738,7 @@ mod test {
 
     #[test]
     fn test_account_storage_zero_default() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let mut storage =
             init_account_storage().expect("Could not create EVM accounts storage API");
 
@@ -764,7 +765,7 @@ mod test {
 
     #[test]
     fn test_account_storage_update() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let mut storage =
             init_account_storage().expect("Could not create EVM accounts storage API");
 
@@ -805,7 +806,7 @@ mod test {
 
     #[test]
     fn test_account_storage_update_checked() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let mut storage =
             init_account_storage().expect("Could not create EVM accounts storage API");
 
@@ -886,7 +887,7 @@ mod test {
 
     #[test]
     fn test_account_code_storage_initial_code_is_zero() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let mut storage =
             init_account_storage().expect("Could not create EVM accounts storage API");
 
@@ -934,7 +935,7 @@ mod test {
     }
 
     fn test_account_code_storage_write_code_aux(sample_code: Vec<u8>) {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let mut storage =
             init_account_storage().expect("Could not create EVM accounts storage API");
 
@@ -994,7 +995,7 @@ mod test {
 
     #[test]
     fn test_account_code_storage_cant_be_overwritten() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let mut storage =
             init_account_storage().expect("Could not create EVM accounts storage API");
 
@@ -1046,7 +1047,7 @@ mod test {
 
     #[test]
     fn test_account_code_storage_delete_code() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let mut storage =
             init_account_storage().expect("Could not create EVM accounts storage API");
 
@@ -1100,7 +1101,7 @@ mod test {
 
     #[test]
     fn test_empty_contract_hash_matches_default() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let mut storage =
             init_account_storage().expect("Could not create EVM accounts storage API");
 
@@ -1149,7 +1150,7 @@ mod test {
 
     #[test]
     fn test_read_u256_le_default_le() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let path = RefPath::assert_from(b"/value");
         assert_eq!(
             read_u256_le_default(&host, &path, U256::from(128)).unwrap(),
@@ -1178,7 +1179,7 @@ mod test {
 
     #[test]
     fn test_write_u256_le_le() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let path = RefPath::assert_from(b"/value");
 
         write_u256_le(&mut host, &path, U256::from(255)).unwrap();
@@ -1193,7 +1194,7 @@ mod test {
         let sample_code: Vec<u8> = (0..100).collect();
         let sample_code_hash: H256 = bytes_hash(&sample_code);
 
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let mut storage =
             init_account_storage().expect("Could not create EVM accounts storage API");
 
@@ -1260,7 +1261,7 @@ mod test {
         let sample_code: Vec<u8> = (0..100).collect();
         let sample_code_hash: H256 = bytes_hash(&sample_code);
 
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let mut storage =
             init_account_storage().expect("Could not create EVM accounts storage API");
 

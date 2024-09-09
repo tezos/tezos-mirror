@@ -377,13 +377,13 @@ mod test {
     use evm::executor::stack::Log;
     use evm::{ExitError, ExitSucceed, Opcode};
     use handler::ExecutionOutcome;
-    use host::runtime::Runtime;
     use primitive_types::{H160, H256};
     use std::str::FromStr;
     use std::vec;
     use tezos_ethereum::block::BlockFees;
     use tezos_ethereum::tx_common::EthereumTransactionCommon;
-    use tezos_smart_rollup_mock::MockHost;
+    use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezos_evm_runtime::runtime::Runtime;
 
     // The compiled initialization code for the Ethereum demo contract given
     // as an example in kernel_evm/solidity_examples/storage.sol
@@ -409,7 +409,7 @@ mod test {
     const DUMMY_ALLOCATED_TICKS: u64 = 1_000_000_000;
 
     fn set_balance(
-        host: &mut MockHost,
+        host: &mut MockKernelHost,
         evm_account_storage: &mut EthereumAccountStorage,
         address: &H160,
         balance: U256,
@@ -430,7 +430,7 @@ mod test {
     }
 
     fn set_storage(
-        host: &mut MockHost,
+        host: &mut MockKernelHost,
         evm_account_storage: &mut EthereumAccountStorage,
         address: &H160,
         index: &H256,
@@ -443,7 +443,7 @@ mod test {
     }
 
     fn get_storage(
-        host: &mut MockHost,
+        host: &mut MockKernelHost,
         evm_account_storage: &mut EthereumAccountStorage,
         address: &H160,
         index: &H256,
@@ -455,7 +455,7 @@ mod test {
     }
 
     fn get_balance(
-        host: &mut MockHost,
+        host: &mut MockKernelHost,
         evm_account_storage: &mut EthereumAccountStorage,
         address: &H160,
     ) -> U256 {
@@ -478,7 +478,7 @@ mod test {
     }
 
     fn get_code(
-        host: &mut MockHost,
+        host: &mut MockKernelHost,
         evm_account_storage: &mut EthereumAccountStorage,
         address: &H160,
     ) -> Vec<u8> {
@@ -499,7 +499,7 @@ mod test {
     }
 
     fn get_nonce(
-        host: &mut MockHost,
+        host: &mut MockKernelHost,
         evm_account_storage: &mut EthereumAccountStorage,
         address: &H160,
     ) -> u64 {
@@ -526,9 +526,9 @@ mod test {
 
     #[test]
     fn transfer_without_sufficient_funds_fails() {
-        let mut mock_runtime = MockHost::default();
+        let mut mock_runtime = MockKernelHost::default();
         let block = dummy_first_block();
-        let precompiles = precompiles::precompile_set::<MockHost>(false);
+        let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_evm_account_storage().unwrap();
 
         let callee = H160::from_low_u64_be(234213);
@@ -591,9 +591,9 @@ mod test {
 
     #[test]
     fn transfer_funds_with_sufficient_balance() {
-        let mut mock_runtime = MockHost::default();
+        let mut mock_runtime = MockKernelHost::default();
         let block = dummy_first_block();
-        let precompiles = precompiles::precompile_set::<MockHost>(false);
+        let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_evm_account_storage().unwrap();
 
         let callee = H160::from_low_u64_be(82193);
@@ -657,9 +657,9 @@ mod test {
 
     #[test]
     fn create_contract_fails_with_insufficient_funds() {
-        let mut mock_runtime = MockHost::default();
+        let mut mock_runtime = MockKernelHost::default();
         let block = dummy_first_block();
-        let precompiles = precompiles::precompile_set::<MockHost>(false);
+        let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_evm_account_storage().unwrap();
 
         let callee = None;
@@ -711,9 +711,9 @@ mod test {
 
     #[test]
     fn create_contract_succeeds_with_valid_initialization() {
-        let mut mock_runtime = MockHost::default();
+        let mut mock_runtime = MockKernelHost::default();
         let block = dummy_first_block();
-        let precompiles = precompiles::precompile_set::<MockHost>(false);
+        let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_evm_account_storage().unwrap();
 
         let callee = None;
@@ -872,9 +872,9 @@ mod test {
 
     #[test]
     fn create_contract_erc20_succeeds() {
-        let mut mock_runtime = MockHost::default();
+        let mut mock_runtime = MockKernelHost::default();
         let block = dummy_first_block();
-        let precompiles = precompiles::precompile_set::<MockHost>(false);
+        let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_evm_account_storage().unwrap();
 
         let callee = None;
@@ -928,9 +928,9 @@ mod test {
 
     #[test]
     fn create_contract_fails_when_initialization_fails() {
-        let mut mock_runtime = MockHost::default();
+        let mut mock_runtime = MockKernelHost::default();
         let block = dummy_first_block();
-        let precompiles = precompiles::precompile_set::<MockHost>(false);
+        let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_evm_account_storage().unwrap();
 
         let callee = None;
@@ -986,9 +986,9 @@ mod test {
     #[test]
     fn call_non_existing_contract() {
         // Arange
-        let mut mock_runtime = MockHost::default();
+        let mut mock_runtime = MockKernelHost::default();
         let block = dummy_first_block();
-        let precompiles = precompiles::precompile_set::<MockHost>(false);
+        let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_evm_account_storage().unwrap();
         let target = H160::from_low_u64_be(117u64);
         let caller = H160::from_low_u64_be(118u64);
@@ -1123,9 +1123,9 @@ mod test {
     #[test]
     fn call_simple_return_contract() {
         // Arrange
-        let mut mock_runtime = MockHost::default();
+        let mut mock_runtime = MockKernelHost::default();
         let block = dummy_first_block();
-        let precompiles = precompiles::precompile_set::<MockHost>(false);
+        let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_evm_account_storage().unwrap();
         let target = H160::from_low_u64_be(117u64);
         let caller = H160::from_low_u64_be(118u64);
@@ -1185,9 +1185,9 @@ mod test {
     #[test]
     fn call_simple_revert_contract() {
         // Arrange
-        let mut mock_runtime = MockHost::default();
+        let mut mock_runtime = MockKernelHost::default();
         let block = dummy_first_block();
-        let precompiles = precompiles::precompile_set::<MockHost>(false);
+        let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_evm_account_storage().unwrap();
         let target = H160::from_low_u64_be(117u64);
         let caller = H160::from_low_u64_be(118u64);
@@ -1254,9 +1254,9 @@ mod test {
     #[test]
     fn call_contract_with_invalid_opcode() {
         // Arrange
-        let mut mock_runtime = MockHost::default();
+        let mut mock_runtime = MockKernelHost::default();
         let block = dummy_first_block();
-        let precompiles = precompiles::precompile_set::<MockHost>(false);
+        let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_evm_account_storage().unwrap();
         let target = H160::from_low_u64_be(117u64);
         let caller = H160::from_low_u64_be(118u64);
@@ -1306,9 +1306,9 @@ mod test {
 
     #[test]
     fn no_transfer_when_contract_call_fails() {
-        let mut mock_runtime = MockHost::default();
+        let mut mock_runtime = MockKernelHost::default();
         let block = dummy_first_block();
-        let precompiles = precompiles::precompile_set::<MockHost>(false);
+        let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_evm_account_storage().unwrap();
         let caller = H160::from_low_u64_be(118_u64);
         let gas_price = U256::from(21000);
@@ -1371,9 +1371,9 @@ mod test {
     #[test]
     fn call_precompiled_contract() {
         // Arrange
-        let mut mock_runtime = MockHost::default();
+        let mut mock_runtime = MockKernelHost::default();
         let block = dummy_first_block();
-        let precompiles = precompiles::precompile_set::<MockHost>(false);
+        let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let target = H160::from_low_u64_be(4u64); // identity contract
         let mut evm_account_storage = init_evm_account_storage().unwrap();
         let caller = H160::from_low_u64_be(118u64);
@@ -1426,9 +1426,9 @@ mod test {
     #[test]
     fn call_ecrecover() {
         // Arrange
-        let mut mock_runtime = MockHost::default();
+        let mut mock_runtime = MockKernelHost::default();
         let block = dummy_first_block();
-        let precompiles = precompiles::precompile_set::<MockHost>(false);
+        let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         // example from https://www.evm.codes/precompiled?fork=shanghai
         let data_str = "456e9aea5e197a1f1af7a3e85a3212fa4049a3ba34c2289b4c860fc0b0c64ef3000000000000000000000000000000000000000000000000000000000000001c9242685bf161793cc25603c231bc2f568eb630ea16aa137d2664ac80388256084f8ae3bd7535248d0bd448298cc2e2071e56992d0774dc340c368ae950852ada";
         let data = hex::decode(data_str)
@@ -1488,9 +1488,9 @@ mod test {
     #[test]
     fn create_and_call_contract() {
         // Arrange
-        let mut mock_runtime = MockHost::default();
+        let mut mock_runtime = MockKernelHost::default();
         let block = dummy_first_block();
-        let precompiles = precompiles::precompile_set::<MockHost>(false);
+        let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_evm_account_storage().unwrap();
         let target = H160::from_low_u64_be(117u64);
         let caller = H160::from_low_u64_be(118u64);
@@ -1590,9 +1590,9 @@ mod test {
 
     #[test]
     fn static_calls_cannot_update_storage() {
-        let mut mock_runtime = MockHost::default();
+        let mut mock_runtime = MockKernelHost::default();
         let block = dummy_first_block();
-        let precompiles = precompiles::precompile_set::<MockHost>(false);
+        let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_evm_account_storage().unwrap();
         let target = H160::from_low_u64_be(117_u64);
         let caller = H160::from_low_u64_be(118_u64);
@@ -1684,9 +1684,9 @@ mod test {
 
     #[test]
     fn static_calls_fail_when_logging() {
-        let mut mock_runtime = MockHost::default();
+        let mut mock_runtime = MockKernelHost::default();
         let block = dummy_first_block();
-        let precompiles = precompiles::precompile_set::<MockHost>(false);
+        let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_evm_account_storage().unwrap();
         let target = H160::from_low_u64_be(117_u64);
         let caller = H160::from_low_u64_be(118_u64);
@@ -1778,9 +1778,9 @@ mod test {
 
     #[test]
     fn logs_get_written_to_output() {
-        let mut mock_runtime = MockHost::default();
+        let mut mock_runtime = MockKernelHost::default();
         let block = dummy_first_block();
-        let precompiles = precompiles::precompile_set::<MockHost>(false);
+        let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_evm_account_storage().unwrap();
         let target = H160::from_low_u64_be(117_u64);
         let caller = H160::from_low_u64_be(118_u64);
@@ -1899,9 +1899,9 @@ mod test {
 
     #[test]
     fn no_logs_when_contract_reverts() {
-        let mut mock_runtime = MockHost::default();
+        let mut mock_runtime = MockKernelHost::default();
         let block = dummy_first_block();
-        let precompiles = precompiles::precompile_set::<MockHost>(false);
+        let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_evm_account_storage().unwrap();
         let target = H160::from_low_u64_be(117_u64);
         let caller = H160::from_low_u64_be(118_u64);
@@ -2005,9 +2005,9 @@ mod test {
 
     #[test]
     fn contract_selfdestruct_deletes_contract() {
-        let mut mock_runtime = MockHost::default();
+        let mut mock_runtime = MockKernelHost::default();
         let block = dummy_first_block();
-        let precompiles = precompiles::precompile_set::<MockHost>(false);
+        let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_evm_account_storage().unwrap();
         let target = H160::from_low_u64_be(42_u64);
         let caller = H160::from_low_u64_be(115_u64);
@@ -2115,9 +2115,9 @@ mod test {
 
     #[test]
     fn selfdestruct_is_ignored_when_call_fails() {
-        let mut mock_runtime = MockHost::default();
+        let mut mock_runtime = MockKernelHost::default();
         let block = dummy_first_block();
-        let precompiles = precompiles::precompile_set::<MockHost>(false);
+        let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_evm_account_storage().unwrap();
         let target = H160::from_low_u64_be(42_u64);
         let caller = H160::from_low_u64_be(115_u64);
@@ -2234,7 +2234,7 @@ mod test {
     #[test]
     fn test_chain_id() {
         // Arrange
-        let mut mock_runtime = MockHost::default();
+        let mut mock_runtime = MockKernelHost::default();
         let chain_id = U256::from(42);
         let mut chain_id_bytes = [0u8; 32];
         chain_id.to_big_endian(&mut chain_id_bytes);
@@ -2250,7 +2250,7 @@ mod test {
             u64::MAX,
             H160::zero(),
         );
-        let precompiles = precompiles::precompile_set::<MockHost>(false);
+        let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_evm_account_storage().unwrap();
         let target = H160::from_low_u64_be(117u64);
         let caller = H160::from_low_u64_be(118u64);
@@ -2319,7 +2319,7 @@ mod test {
     #[test]
     fn test_base_fee_per_gas() {
         // Arrange
-        let mut mock_runtime = MockHost::default();
+        let mut mock_runtime = MockKernelHost::default();
         let base_fee_per_gas = U256::from(23000);
         let mut base_fee_per_gas_bytes = [0u8; 32];
         base_fee_per_gas.to_big_endian(&mut base_fee_per_gas_bytes);
@@ -2335,7 +2335,7 @@ mod test {
             u64::MAX,
             H160::zero(),
         );
-        let precompiles = precompiles::precompile_set::<MockHost>(false);
+        let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_evm_account_storage().unwrap();
         let target = H160::from_low_u64_be(117u64);
         let caller = H160::from_low_u64_be(118u64);
@@ -2425,9 +2425,9 @@ mod test {
 
     #[test]
     fn evm_should_fail_gracefully_when_balance_overflow_occurs() {
-        let mut mock_runtime = MockHost::default();
+        let mut mock_runtime = MockKernelHost::default();
         let block = dummy_first_block();
-        let precompiles = precompiles::precompile_set::<MockHost>(false);
+        let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_evm_account_storage().unwrap();
         let caller = H160::from_low_u64_be(523);
         let target = H160::from_low_u64_be(210);
@@ -2473,9 +2473,9 @@ mod test {
 
     #[test]
     fn create_contract_gas_cost() {
-        let mut mock_runtime = MockHost::default();
+        let mut mock_runtime = MockKernelHost::default();
         let block = dummy_first_block();
-        let precompiles = precompiles::precompile_set::<MockHost>(false);
+        let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_evm_account_storage().unwrap();
 
         let callee = None;
@@ -2532,9 +2532,9 @@ mod test {
 
     #[test]
     fn create_contract_fail_gas_cost() {
-        let mut mock_runtime = MockHost::default();
+        let mut mock_runtime = MockKernelHost::default();
         let block = dummy_first_block();
-        let precompiles = precompiles::precompile_set::<MockHost>(false);
+        let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_evm_account_storage().unwrap();
 
         let callee = None;
@@ -2590,7 +2590,7 @@ mod test {
     #[test]
     fn test_transaction_data_cost() {
         // Arrange
-        let mut mock_runtime = MockHost::default();
+        let mut mock_runtime = MockKernelHost::default();
         let base_fee_per_gas = U256::from(23000);
         let block_fees = BlockFees::new(
             U256::one(),
@@ -2604,7 +2604,7 @@ mod test {
             u64::MAX,
             H160::zero(),
         );
-        let precompiles = precompiles::precompile_set::<MockHost>(false);
+        let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_evm_account_storage().unwrap();
         let target = H160::from_low_u64_be(117u64);
         let caller = H160::from_low_u64_be(118u64);
@@ -2660,7 +2660,7 @@ mod test {
     #[test]
     fn test_transaction_data_cost_non_zero() {
         // Arrange
-        let mut mock_runtime = MockHost::default();
+        let mut mock_runtime = MockKernelHost::default();
         let base_fee_per_gas = U256::from(23000);
         let block_fees = BlockFees::new(
             U256::one(),
@@ -2674,7 +2674,7 @@ mod test {
             u64::MAX,
             H160::zero(),
         );
-        let precompiles = precompiles::precompile_set::<MockHost>(false);
+        let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_evm_account_storage().unwrap();
         let target = H160::from_low_u64_be(117u64);
         let caller = H160::from_low_u64_be(118u64);
@@ -2748,9 +2748,9 @@ mod test {
         all_the_gas: u64,
     ) -> Result<Option<ExecutionOutcome>, EthereumError> {
         // Arrange
-        let mut mock_runtime = MockHost::default();
+        let mut mock_runtime = MockKernelHost::default();
         let block = first_block();
-        let precompiles = precompiles::precompile_set::<MockHost>(false);
+        let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_evm_account_storage().unwrap();
         let caller = H160::from_low_u64_be(118u64);
         let gas_price = U256::from(1356);
@@ -2828,9 +2828,9 @@ mod test {
     // Test case from https://eips.ethereum.org/EIPS/eip-684
     #[test]
     fn test_create_to_address_with_code_returns_error() {
-        let mut mock_runtime = MockHost::default();
+        let mut mock_runtime = MockKernelHost::default();
         let block = dummy_first_block();
-        let precompiles = precompiles::precompile_set::<MockHost>(false);
+        let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_evm_account_storage().unwrap();
 
         let caller =
@@ -2901,9 +2901,9 @@ mod test {
     // Caller nonce is bumped at each contract creation
     #[test]
     fn test_caller_nonce_after_create() {
-        let mut mock_runtime = MockHost::default();
+        let mut mock_runtime = MockKernelHost::default();
         let block = dummy_first_block();
-        let precompiles = precompiles::precompile_set::<MockHost>(false);
+        let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_evm_account_storage().unwrap();
 
         let caller =
@@ -3001,9 +3001,9 @@ mod test {
     // The nonce of the caller 'contract' should still be incremented
     #[test]
     fn test_caller_nonce_after_create_collision() {
-        let mut mock_runtime = MockHost::default();
+        let mut mock_runtime = MockKernelHost::default();
         let block = dummy_first_block();
-        let precompiles = precompiles::precompile_set::<MockHost>(false);
+        let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_evm_account_storage().unwrap();
 
         let caller =
@@ -3109,9 +3109,9 @@ mod test {
     // Test case from https://eips.ethereum.org/EIPS/eip-684 with modification
     #[test]
     fn test_create_to_address_with_non_zero_nonce_returns_error() {
-        let mut mock_runtime = MockHost::default();
+        let mut mock_runtime = MockKernelHost::default();
         let block = dummy_first_block();
-        let precompiles = precompiles::precompile_set::<MockHost>(false);
+        let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_evm_account_storage().unwrap();
 
         let caller =
@@ -3174,9 +3174,9 @@ mod test {
 
     #[test]
     fn created_contract_start_at_nonce_one() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let block = dummy_first_block();
-        let precompiles = precompiles::precompile_set::<MockHost>(false);
+        let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_evm_account_storage().unwrap();
 
         let callee = None;
@@ -3219,9 +3219,9 @@ mod test {
 
     #[test]
     fn call_contract_create_contract_with_insufficient_funds() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let block = dummy_first_block();
-        let precompiles = precompiles::precompile_set::<MockHost>(false);
+        let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_evm_account_storage().unwrap();
 
         let callee = H160::from_str("095e7baea6a6c7c4c2dfeb977efac326af552d87").unwrap();
@@ -3284,9 +3284,9 @@ mod test {
 
     #[test]
     fn nested_create_check_nonce_start_at_one() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let block = dummy_first_block();
-        let precompiles = precompiles::precompile_set::<MockHost>(false);
+        let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_evm_account_storage().unwrap();
 
         let caller = H160::from_str("a94f5374fce5edbc8e2a8697c15331677e6ebf0b").unwrap();
@@ -3400,15 +3400,15 @@ mod test {
     fn out_of_tick_scenario(
         retriable: bool,
     ) -> (
-        MockHost,
+        MockKernelHost,
         Result<Option<ExecutionOutcome>, EthereumError>,
         EthereumAccount,
         U256,
         u64,
     ) {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let block = dummy_first_block();
-        let precompiles = precompiles::precompile_set::<MockHost>(false);
+        let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_evm_account_storage().unwrap();
         let callee = None;
         let caller = H160::from_low_u64_be(117);
@@ -3510,9 +3510,9 @@ mod test {
     #[test]
     #[ignore]
     fn multiple_call_all_the_way_to_1024() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let block = dummy_first_block();
-        let precompiles = precompiles::precompile_set::<MockHost>(false);
+        let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_evm_account_storage().unwrap();
 
         let caller = H160::from_str("a94f5374fce5edbc8e2a8697c15331677e6ebf0b").unwrap();
@@ -3597,9 +3597,9 @@ mod test {
     // at 1024 we stop at 1025 (this should fail)
     #[test]
     fn multiple_call_fails_right_after_1024() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let block = dummy_first_block();
-        let precompiles = precompiles::precompile_set::<MockHost>(false);
+        let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_evm_account_storage().unwrap();
 
         let caller = H160::from_str("a94f5374fce5edbc8e2a8697c15331677e6ebf0b").unwrap();
@@ -3682,9 +3682,9 @@ mod test {
     #[test]
     #[ignore]
     fn call_too_deep_not_revert() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let block = dummy_first_block();
-        let precompiles = precompiles::precompile_set::<MockHost>(false);
+        let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_evm_account_storage().unwrap();
 
         let caller = H160::from_str("a94f5374fce5edbc8e2a8697c15331677e6ebf0b").unwrap();
@@ -3733,9 +3733,9 @@ mod test {
         // with the second data which is invalid (size wise)
         // The test was a bit tweaked so that the called contract transfer 1 WEI to the called contract.
 
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let block = dummy_first_block();
-        let precompiles = precompiles::precompile_set::<MockHost>(false);
+        let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_evm_account_storage().unwrap();
 
         let address_1 =
@@ -3838,9 +3838,9 @@ mod test {
         // ethereum/tests/GeneralStateTests/Shanghai/stSStoreTest/InitCollision.json
         // with the second data.
 
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let block = dummy_first_block();
-        let precompiles = precompiles::precompile_set::<MockHost>(false);
+        let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_evm_account_storage().unwrap();
 
         let address_1 =
@@ -3915,9 +3915,9 @@ mod test {
 
     #[test]
     fn nonce_bump_before_tx() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let block = dummy_first_block();
-        let precompiles = precompiles::precompile_set::<MockHost>(false);
+        let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_evm_account_storage().unwrap();
 
         let caller = H160::from_str("a94f5374fce5edbc8e2a8697c15331677e6ebf0b").unwrap();

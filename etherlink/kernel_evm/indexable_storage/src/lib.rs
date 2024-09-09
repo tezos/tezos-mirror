@@ -165,13 +165,12 @@ impl IndexableStorage {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tezos_evm_runtime::{mock_internal::MockInternal, runtime::KernelHost};
+    use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup_host::path::RefPath;
-    use tezos_smart_rollup_mock::MockHost;
 
     #[test]
     fn test_indexable_empty() {
-        let host = KernelHost::<MockHost, MockInternal>::default();
+        let host = MockKernelHost::default();
         let values = RefPath::assert_from(b"/values");
         let storage = IndexableStorage::new(&values).expect("Path to index is invalid");
 
@@ -180,7 +179,7 @@ mod tests {
 
     #[test]
     fn test_indexing_new_value() {
-        let mut host = KernelHost::<MockHost, MockInternal>::default();
+        let mut host = MockKernelHost::default();
         let values = RefPath::assert_from(b"/values");
         let storage = IndexableStorage::new(&values).expect("Path to index is invalid");
 
@@ -197,7 +196,7 @@ mod tests {
 
     #[test]
     fn test_get_out_of_bounds() {
-        let mut host = KernelHost::<MockHost, MockInternal>::default();
+        let mut host = MockKernelHost::default();
         let values = RefPath::assert_from(b"/values");
         let storage = IndexableStorage::new(&values).expect("Path to index is invalid");
 

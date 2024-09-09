@@ -937,12 +937,12 @@ pub fn read_delayed_transaction_bridge<Host: Runtime>(
 
 #[cfg(test)]
 mod tests {
-    use tezos_smart_rollup_mock::MockHost;
+    use tezos_evm_runtime::runtime::MockKernelHost;
 
     #[test]
     fn update_burned_fees() {
         // Arrange
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
 
         let fst = 17.into();
         let snd = 19.into();
