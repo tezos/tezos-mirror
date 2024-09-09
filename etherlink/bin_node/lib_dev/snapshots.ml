@@ -12,6 +12,7 @@ type error +=
   | File_not_found of string
   | Incorrect_rollup of Address.t * Address.t
   | Outdated_snapshot of Ethereum_types.quantity * Ethereum_types.quantity
+  | Invalid_snapshot_file of string
 
 let () =
   register_error_kind
@@ -75,7 +76,22 @@ let () =
         (req "evm_node_level" Ethereum_types.quantity_encoding)
         (req "snapshot_level" Ethereum_types.quantity_encoding))
     (function Outdated_snapshot (a1, a2) -> Some (a1, a2) | _ -> None)
-    (fun (a1, a2) -> Outdated_snapshot (a1, a2))
+    (fun (a1, a2) -> Outdated_snapshot (a1, a2)) ;
+  register_error_kind
+    `Permanent
+    ~id:"evm_invalid_snapshot_file"
+    ~title:"Invalid snapshot file path"
+    ~description:"The snapshot file path is invalid."
+    ~pp:(fun ppf name ->
+      Format.fprintf
+        ppf
+        "%s is not a valid snapshot file name. It is likely because you are \
+         using an invalid string interpolation variable or have a trailing \
+         percent"
+        name)
+    Data_encoding.(obj1 (req "snapshot_file" string))
+    (function Invalid_snapshot_file name -> Some name | _ -> None)
+    (fun name -> Invalid_snapshot_file name)
 
 type compression = No | On_the_fly | After
 
@@ -138,6 +154,15 @@ end
 
 open Snapshot_utils.Make (Header)
 
+let interpolate_snapshot_file current_level rollup_address filename =
+  let percent = ('%', "%") in
+  let rollup_address = ('r', Address.to_b58check rollup_address) in
+  let current_level =
+    ('l', Format.asprintf "%a" Ethereum_types.pp_quantity current_level)
+  in
+  try Ok (Misc.interpolate filename [percent; rollup_address; current_level])
+  with _ -> Result_syntax.tzfail (Invalid_snapshot_file filename)
+
 let export ?snapshot_file ~compression ~data_dir () =
   let open Lwt_result_syntax in
   let* () = Evm_context.lock_data_dir ~data_dir in
@@ -165,22 +190,26 @@ let export ?snapshot_file ~compression ~data_dir () =
       | On_the_fly -> gzip_writer
       | No | After -> stdlib_writer
     in
-    let dest_file =
+    let*? dest_file =
       match snapshot_file with
-      | Some f -> f
+      | Some f ->
+          interpolate_snapshot_file header.current_level header.rollup_address f
       | None ->
           let suffix =
             match compression with
             | On_the_fly -> ".compressed"
             | No | After -> ".uncompressed"
           in
-          Format.asprintf
-            "evm-snapshot-%a-%a%s"
-            Address.pp_short
-            header.rollup_address
-            Ethereum_types.pp_quantity
-            header.current_level
-            suffix
+          let filename =
+            Format.asprintf
+              "evm-snapshot-%a-%a%s"
+              Address.pp_short
+              header.rollup_address
+              Ethereum_types.pp_quantity
+              header.current_level
+              suffix
+          in
+          Ok filename
     in
     let*! () = Lwt_utils_unix.create_dir (Filename.dirname dest_file) in
     create stdlib_reader writer header ~files ~dest:dest_file ;
