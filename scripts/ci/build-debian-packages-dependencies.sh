@@ -39,7 +39,7 @@ docker build \
   --build-arg IMAGE="$DISTRIBUTION:$RELEASE" \
   --build-arg RECOMMENDED_RUST_VERSION="$recommended_rust_version" \
   --cache-from="${DEP_IMAGE}:${ARCHITECTURE}-${CI_COMMIT_REF_SLUG}" \
-  --cache-from="${DEP_IMAGE}:master" \
+  --cache-from="${DEP_IMAGE_PROTECTED}:master" \
   -t "$LOCAL_IMAGE_NAME" \
   .
 

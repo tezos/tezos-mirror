@@ -76,6 +76,10 @@ let jobs pipeline_type =
     ( "DEP_IMAGE",
       "${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION-$RELEASE"
     )
+    (* this second variable is for a read only registry and we want it to be
+       tezos/tezos *)
+    :: ( "DEP_IMAGE_PROTECTED",
+         "${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-$DISTRIBUTION-$RELEASE" )
     :: add
   in
   let make_job_docker_build_debian_dependencies ~__POS__ ~name ~matrix
