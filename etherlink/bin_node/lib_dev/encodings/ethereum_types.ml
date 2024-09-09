@@ -1059,10 +1059,23 @@ module From_rlp = struct
         Result_syntax.return @@ Z.to_int @@ Z.of_bits @@ Bytes.to_string b)
 end
 
+module StorageKey = struct
+  type t = hex
+
+  let compare (Hex a) (Hex b) = String.compare a b
+
+  let of_string = hex_of_string
+
+  let to_string = hex_to_string
+end
+
+module StorageMap = MapMake (StorageKey)
+
 type state_account_override = {
   balance : quantity option;
   nonce : quantity option;
   code : hex option;
+  state_diff : hex StorageMap.t;
 }
 
 type state_override = state_account_override AddressMap.t
@@ -1070,12 +1083,18 @@ type state_override = state_account_override AddressMap.t
 let state_account_override_encoding =
   let open Data_encoding in
   conv
-    (fun {balance; nonce; code} -> (balance, nonce, code))
-    (fun (balance, nonce, code) -> {balance; nonce; code})
-    (obj3
+    (fun {balance; nonce; code; state_diff} ->
+      (balance, nonce, code, state_diff))
+    (fun (balance, nonce, code, state_diff) ->
+      {balance; nonce; code; state_diff})
+    (obj4
        (opt "balance" quantity_encoding)
        (opt "nonce" quantity_encoding)
-       (opt "code" hex_encoding))
+       (opt "code" hex_encoding)
+       (dft
+          "state_diff"
+          (StorageMap.associative_array_encoding hex_encoding)
+          StorageMap.empty))
 
 let state_override_empty = AddressMap.empty
 

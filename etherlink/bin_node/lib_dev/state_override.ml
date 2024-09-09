@@ -11,7 +11,20 @@ let durable_nonce v = v |> Ethereum_types.encode_u64_le |> Bytes.to_string
 
 let durable_code = Ethereum_types.hex_to_bytes
 
-let update_account address {Ethereum_types.balance; nonce; code} state =
+let update_storage address state_diff state =
+  let open Ethereum_types in
+  let update key value state =
+    let (Hex key) = key in
+    let (Hex value) = value in
+    Evm_state.modify
+      ~key:(Durable_storage_path.Accounts.storage address key)
+      ~value
+      state
+  in
+  StorageMap.fold_s update state_diff state
+
+let update_account address {Ethereum_types.balance; nonce; code; state_diff}
+    state =
   let open Durable_storage_path in
   let open Lwt_syntax in
   let update v_opt key encode state =
@@ -24,6 +37,7 @@ let update_account address {Ethereum_types.balance; nonce; code} state =
   in
   let* state = update nonce (Accounts.nonce address) durable_nonce state in
   let* state = update code (Accounts.code address) durable_code state in
+  let* state = update_storage address state_diff state in
   return state
 
 let update_accounts state_override state =
