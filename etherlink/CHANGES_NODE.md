@@ -10,6 +10,12 @@
   the `patch` commands. More precisely, patching the state `N` affects the
   replay of block `N+1`. (!14809)
 
+### Bug fixes
+
+#### Metrics
+
+- Fix `octez_evm_node_head` for the RPC mode. (!14849)
+
 ## Version 0.2 (2024-09-05)
 
 This release introduces a number of quality of life improvements for operators

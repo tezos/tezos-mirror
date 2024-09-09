@@ -66,10 +66,11 @@ let main ~data_dir ~evm_node_endpoint ~(config : Configuration.t) =
     ~time_between_blocks
     ~evm_node_endpoint
     ~next_blueprint_number
-  @@ fun number blueprint ->
+  @@ fun (Qty number) blueprint ->
   let* () =
     when_ (Option.is_some blueprint.kernel_upgrade) @@ fun () ->
-    Evm_ro_context.preload_kernel_from_level ctxt number
+    Evm_ro_context.preload_kernel_from_level ctxt (Qty number)
   in
+  Metrics.set_level ~level:number ;
   Blueprints_watcher.notify blueprint ;
   return_unit
