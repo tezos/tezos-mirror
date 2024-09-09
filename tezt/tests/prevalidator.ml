@@ -3237,6 +3237,81 @@ module Revamped = struct
       ([] = ophs) (list string) ~error_msg:"Expected operations %L, got %R") ;
 
     unit
+
+  (** Test that operations failing pre_filtering are removed from the DDB
+
+   Scenario:
+   + 2 Nodes are chained connected and activate a protocol
+   + Inject an operation in node_1 with low fees
+   + Wait for node_2 to receive and pre_filter the operation
+   + Check that node_2 pre_filtering discared it for fees being too low
+   + Check that node_2 DDB is empty
+  *)
+  let pre_filtered_operation_removed_from_ddb =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"pre_filtered operations removed from ddb"
+      ~tags:[team; "mempool"; "pre_filtered"; "ddb"]
+    @@ fun protocol ->
+    log_step 1 "Starting two nodes" ;
+    let* node1, client1 =
+      Client.init_with_protocol
+        ~protocol
+        ~event_sections_levels:[("prevalidator", `Debug)]
+        ~nodes_args:[Synchronisation_threshold 0]
+        `Client
+        ()
+    in
+    let* node2, client2 =
+      Client.init_with_node
+        ~event_sections_levels:[("prevalidator", `Debug)]
+        ~nodes_args:[Synchronisation_threshold 0]
+        `Client
+        ()
+    in
+
+    log_step 2 "Connect nodes together" ;
+    let* () = Client.Admin.connect_address client1 ~peer:node2 in
+
+    log_step 3 "Waiting for %s to reach level 1" (Node.name node2) ;
+    let* _ = Node.wait_for_level node2 1 in
+
+    log_step 4 "forge an operation from client1" ;
+    let* op =
+      Operation.Manager.(operation [make ~fee:1 (transfer ())] client1)
+    in
+    let* (`OpHash oph) = Operation.hash op client1 in
+
+    log_step 5 "Start listening for operation classification on both nodes" ;
+    let wait_for = List.map (wait_for_classified oph) [node1; node2] in
+
+    log_step 6 "Inject the operation from client1" ;
+    (* This operation is expected to be refused by the pre_filter for fees being
+       too low. Since we do not pre_filter operations on injection, the
+       operation is expected to be validated by node1's prevalidator and refused
+       by node2's. *)
+    let* _ = Operation.(inject op client1) in
+
+    log_step 7 "Waiting for operation to be classified on both nodes" ;
+    let* () = Lwt.join wait_for in
+
+    log_step
+      8
+      "Check that client1 validated the operation and client2 refused it" ;
+    let* () = check_mempool ~validated:[oph] client1 in
+    let* () = check_mempool ~refused:[oph] client2 in
+
+    log_step 9 "Check that %s DDB is empty" (Client.name client2) ;
+    let* ddb_len =
+      let* json =
+        Client.RPC.call client2 @@ RPC.get_worker_chain_validator_ddb ()
+      in
+      return JSON.(json |-> "operation_db" |-> "table_length" |> as_int)
+    in
+    Check.(
+      (ddb_len = 0) int ~error_msg:"DDB is expected empty, contains %L elements") ;
+
+    unit
 end
 
 let check_operation_is_in_validated_mempool ops oph =
@@ -3371,102 +3446,8 @@ let inject_operation ~client (`Hex op_str_hex) (`Hex signature) =
   Client.RPC.call client
   @@ RPC.post_injection_operation (Data (`String signed_op))
 
-let forge_and_inject_operation ~branch ~fee ~gas_limit ~source ~destination
-    ~counter ~signer ~client =
-  let* op_str_hex =
-    forge_operation
-      ~branch
-      ~fee
-      ~gas_limit
-      ~source
-      ~destination
-      ~counter
-      ~client
-  in
-  let signature = Operation.sign_manager_op_hex ~signer op_str_hex in
-  inject_operation ~client op_str_hex signature
-
 (* TODO: add a test than ensure that we cannot have more than 1000
    branch delayed/branch refused/refused *)
-
-let check_empty_operation__ddb ddb =
-  let open JSON in
-  let op_db_length = as_int (ddb |-> "operation_db" |-> "table_length") in
-  if op_db_length > 0 then
-    Test.fail
-      "Operation Ddb should be empty, contains : %d elements"
-      op_db_length
-
-(** This test checks that pre-filtered operations are cleaned from the ddb
-
-   Scenario:
-
-   + 3 Nodes are chained connected and activate a protocol
-
-   + Get the counter and the current branch
-
-   + Forge operation, inject it and check injection on node_1
-     This operation is pre-filtered on node_2
-
-   + Bake 1 block
-
-   + Get client_2 ddb and check that it contains no operation
-*)
-let forge_pre_filtered_operation =
-  Protocol.register_test
-    ~__FILE__
-    ~title:"Forge pre-filtered operation and check mempool"
-    ~tags:[team; "forge"; "mempool"; "pre_filtered"]
-  @@ fun protocol ->
-  (* Step 1 *)
-  (* Two Nodes are started and we activate the protocol and wait the nodes to be synced *)
-  let* node_1 = Node.init [Synchronisation_threshold 0; Private_mode]
-  and* node_2 = Node.init [Synchronisation_threshold 0; Private_mode] in
-  let* client_1 = Client.init ~endpoint:(Node node_1) ()
-  and* client_2 = Client.init ~endpoint:(Node node_2) () in
-  let* () = Client.Admin.trust_address client_1 ~peer:node_2
-  and* () = Client.Admin.trust_address client_2 ~peer:node_1 in
-  let* () = Client.Admin.connect_address client_1 ~peer:node_2 in
-  let* () = Client.activate_protocol_and_wait ~protocol client_1 in
-  Log.info "Activated protocol." ;
-  let* _ = Node.wait_for_level node_2 1 in
-  Log.info "All nodes are at level %d." 1 ;
-  (* Step 2 *)
-  (* Get the counter and the current branch *)
-  let* base_counter_json =
-    Client.RPC.call client_1
-    @@ RPC.get_chain_block_context_contract_counter
-         ~id:Constant.bootstrap1.public_key_hash
-         ()
-  in
-  let counter = JSON.as_int base_counter_json in
-  let* branch = Operation.Manager.get_branch client_1 in
-
-  (* Step 3 *)
-  (* Forge operation, inject it and check injection *)
-  let* _op =
-    forge_and_inject_operation
-      ~branch
-      ~fee:1
-      ~gas_limit:1040000
-      ~source:Constant.bootstrap1.public_key_hash
-      ~destination:Constant.bootstrap2.public_key_hash
-      ~counter:(counter + 1)
-      ~signer:Constant.bootstrap1
-      ~client:client_1
-  in
-  Log.info "Op forged and injected" ;
-  (* Step 4 *)
-  (* Bake 1 block *)
-  let* () = Client.bake_for_and_wait client_2 in
-  (* Step 5 *)
-  (* Get client_2 ddb and check that it contains no operation *)
-  let* ddb2 =
-    Client.RPC.call client_2 @@ RPC.get_worker_chain_validator_ddb ()
-  in
-  check_empty_operation__ddb ddb2 ;
-  Log.info "Operation Ddb of client_2 does not contain any operation" ;
-  unit
 
 (** Matches events which contain a failed fetch.
    For example:
@@ -4349,7 +4330,7 @@ let register ~protocols =
   Revamped.test_mempool_config_operation_filtering protocols ;
   Revamped.test_filter_mempool_operations_by_hash protocols ;
   Revamped.test_filter_monitor_operations_by_sources protocols ;
-  forge_pre_filtered_operation protocols ;
+  Revamped.pre_filtered_operation_removed_from_ddb protocols ;
   refetch_failed_operation protocols ;
   ban_operation_and_check_validated protocols ;
   test_do_not_reclassify protocols ;
