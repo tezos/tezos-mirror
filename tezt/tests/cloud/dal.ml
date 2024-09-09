@@ -253,12 +253,9 @@ module Teztale = struct
     mutable archivers : Teztale.Archiver.t list;
   }
 
-  let fresh_user =
-    let i = ref (-1) in
-    fun () : Teztale.user ->
-      incr i ;
-      let login = "teztale-archiver-" ^ string_of_int !i in
-      {login; password = login}
+  let user ~agent_name ~node_name : Teztale.user =
+    let login = "teztale-archiver-" ^ agent_name ^ "-" ^ node_name in
+    {login; password = login}
 
   let run_server
       ?(path =
@@ -277,8 +274,8 @@ module Teztale = struct
   let add_archiver
       ?(path =
         Uses.(path (make ~tag:"codec" ~path:"./octez-teztale-archiver" ()))) t
-      agent ~node_port =
-    let user = fresh_user () in
+      agent ~node_name ~node_port =
+    let user = user ~agent_name:(Agent.name agent) ~node_name in
     let feed : Teztale.interface list =
       [{address = t.address; port = t.server.conf.interface.port}]
     in
@@ -513,7 +510,6 @@ type configuration = {
 type bootstrap = {
   node : Node.t option;
   dal_node : Dal_node.t option;
-  teztale : Teztale.t option;
   node_p2p_endpoint : string;
   node_rpc_endpoint : Endpoint.t;
   dal_node_p2p_endpoint : string;
@@ -612,6 +608,7 @@ type t = {
   metrics : (int, metrics) Hashtbl.t;
   disconnection_state : Disconnect.t option;
   first_level : int;
+  teztale : Teztale.t option;
 }
 
 let pp_metrics t
@@ -1074,17 +1071,14 @@ let add_etherlink_source cloud agent ~job_name ?dal_node node sc_rollup_node
     ([node_metric_target; sc_rollup_metric_target; evm_node_metric_target]
     @ dal_node_metric_target)
 
-let init_teztale agent node =
+let init_teztale agent =
   if Cli.teztale then
     let* teztale = Teztale.run_server agent in
     let* () = Teztale.wait_server teztale in
-    let* () =
-      Teztale.add_archiver teztale agent ~node_port:(Node.rpc_port node)
-    in
     Lwt.return_some teztale
   else Lwt.return_none
 
-let init_testnet cloud (configuration : configuration) agent
+let init_testnet cloud (configuration : configuration) teztale agent
     (network : Network.testnet) =
   toplog "Init testnet" ;
   let* bootstrap =
@@ -1100,7 +1094,6 @@ let init_testnet cloud (configuration : configuration) agent
         let client =
           Client.create ~endpoint:(Foreign_endpoint node_rpc_endpoint) ()
         in
-        let teztale = None in
         let bootstrap =
           {
             node;
@@ -1109,7 +1102,6 @@ let init_testnet cloud (configuration : configuration) agent
             node_rpc_endpoint;
             dal_node_p2p_endpoint;
             client;
-            teztale;
           }
         in
         Lwt.return bootstrap
@@ -1143,7 +1135,6 @@ let init_testnet cloud (configuration : configuration) agent
               port = Node.rpc_port node;
             }
         in
-        let* teztale = init_teztale agent node in
         let bootstrap =
           {
             node = Some node;
@@ -1152,8 +1143,17 @@ let init_testnet cloud (configuration : configuration) agent
             node_rpc_endpoint;
             dal_node_p2p_endpoint = Dal_node.point_str dal_node;
             client;
-            teztale;
           }
+        in
+        let* () =
+          match teztale with
+          | None -> Lwt.return_unit
+          | Some teztale ->
+              Teztale.add_archiver
+                teztale
+                agent
+                ~node_name:(Node.name node)
+                ~node_port:(Node.rpc_port node)
         in
         Lwt.return bootstrap
   in
@@ -1335,7 +1335,6 @@ let init_bootstrap_and_activate_protocol cloud (configuration : configuration)
         port = Node.rpc_port bootstrap_node;
       }
   in
-  let* teztale = init_teztale agent bootstrap_node in
   let (bootstrap : bootstrap) =
     {
       node = Some bootstrap_node;
@@ -1344,14 +1343,13 @@ let init_bootstrap_and_activate_protocol cloud (configuration : configuration)
       node_rpc_endpoint;
       dal_node_p2p_endpoint = Dal_node.point_str dal_bootstrap_node;
       client;
-      teztale;
     }
   in
   Lwt.return
     (bootstrap, baker_accounts, producer_accounts, etherlink_rollup_operator_key)
 
-let init_baker cloud (configuration : configuration) ~bootstrap account i agent
-    =
+let init_baker cloud (configuration : configuration) ~bootstrap teztale account
+    i agent =
   let stake = List.nth configuration.stake i in
   let name = Format.asprintf "baker-node-%d" i in
   let data_dir =
@@ -1407,10 +1405,20 @@ let init_baker cloud (configuration : configuration) ~bootstrap account i agent
       node
       dal_node
   in
+  let* () =
+    match teztale with
+    | None -> Lwt.return_unit
+    | Some teztale ->
+        Teztale.add_archiver
+          teztale
+          agent
+          ~node_name:(Node.name node)
+          ~node_port:(Node.rpc_port node)
+  in
   Lwt.return {node; dal_node; baker; account; stake}
 
-let init_producer cloud configuration ~bootstrap ~number_of_slots account i
-    agent =
+let init_producer cloud configuration ~bootstrap teztale ~number_of_slots
+    account i agent =
   let () = toplog "Initializing a DAL producer" in
   let name = Format.asprintf "producer-node-%i" i in
   let data_dir =
@@ -1468,9 +1476,19 @@ let init_producer cloud configuration ~bootstrap ~number_of_slots account i
   let () = toplog "Init producer: wait for DAL node to be ready" in
   let is_ready = Dal_node.run ~event_level:`Notice dal_node in
   let () = toplog "Init producer: DAL node is ready" in
+  let* () =
+    match teztale with
+    | None -> Lwt.return_unit
+    | Some teztale ->
+        Teztale.add_archiver
+          teztale
+          agent
+          ~node_name:(Node.name node)
+          ~node_port:(Node.rpc_port node)
+  in
   Lwt.return {client; node; dal_node; account; is_ready}
 
-let init_observer cloud configuration ~bootstrap ~slot_index i agent =
+let init_observer cloud configuration ~bootstrap teztale ~slot_index i agent =
   let name = Format.asprintf "observer-node-%i" i in
   let data_dir =
     Cli.data_dir |> Option.map (fun data_dir -> data_dir // name)
@@ -1505,6 +1523,16 @@ let init_observer cloud configuration ~bootstrap ~slot_index i agent =
       dal_node
   in
   let* () = Dal_node.run ~event_level:`Notice dal_node in
+  let* () =
+    match teztale with
+    | None -> Lwt.return_unit
+    | Some teztale ->
+        Teztale.add_archiver
+          teztale
+          agent
+          ~node_name:(Node.name node)
+          ~node_port:(Node.rpc_port node)
+  in
   Lwt.return {node; dal_node; slot_index}
 
 let init_etherlink_operator_setup cloud configuration name ~bootstrap ~dal_slots
@@ -1824,6 +1852,11 @@ let init ~(configuration : configuration) cloud next_agent =
       configuration.observer_slot_indices
     |> Lwt.all
   in
+  let* teztale =
+    match bootstrap_agent with
+    | None -> Lwt.return_none
+    | Some agent -> init_teztale agent
+  in
   let* ( bootstrap,
          baker_accounts,
          producer_accounts,
@@ -1834,12 +1867,12 @@ let init ~(configuration : configuration) cloud next_agent =
         init_bootstrap_and_activate_protocol cloud configuration bootstrap_agent
     | Testnet testnet ->
         let () = toplog "Init: initializting, testnet case" in
-        init_testnet cloud configuration bootstrap_agent testnet
+        init_testnet cloud configuration teztale bootstrap_agent testnet
   in
   let* bakers =
     Lwt_list.mapi_p
       (fun i (agent, account) ->
-        init_baker cloud configuration ~bootstrap account i agent)
+        init_baker cloud configuration ~bootstrap teztale account i agent)
       (List.combine attesters_agents baker_accounts)
   in
   let client =
@@ -1854,6 +1887,7 @@ let init ~(configuration : configuration) cloud next_agent =
           cloud
           configuration
           ~bootstrap
+          teztale
           ~number_of_slots:parameters.number_of_slots
           account
           i
@@ -1862,7 +1896,7 @@ let init ~(configuration : configuration) cloud next_agent =
   and* observers =
     Lwt_list.mapi_p
       (fun i (agent, slot_index) ->
-        init_observer cloud configuration ~bootstrap ~slot_index i agent)
+        init_observer cloud configuration ~bootstrap teztale ~slot_index i agent)
       (List.combine observers_agents configuration.observer_slot_indices)
   in
   let () = toplog "Init: all producers and observers have been initialized" in
@@ -1924,6 +1958,7 @@ let init ~(configuration : configuration) cloud next_agent =
       metrics;
       disconnection_state;
       first_level;
+      teztale;
     }
 
 let wait_for_level t level =
