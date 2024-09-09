@@ -461,7 +461,7 @@ let operation_and_block_validation protocol manager_kind tag =
   let* client2 = Client.init ~endpoint:(Node node2) () in
   let classify_t, classify_u = Lwt.task () in
   let on_notify_event u cpt list time Node.{name; value; timestamp} =
-    if name = "operation_reclassified.v0" then (
+    if name = "operation_classified.v0" then (
       list := JSON.encode value :: !list ;
       if !cpt = 0 then time := timestamp ;
       incr cpt ;

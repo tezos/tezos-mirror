@@ -381,15 +381,16 @@ module Make_s
 
   let pre_filter pv ~notifier parsed_op : pre_filter_result Lwt.t =
     let open Lwt_syntax in
-    let+ v =
+    let* v =
       Prevalidation_t.pre_filter pv.validation_state pv.config parsed_op
     in
     match v with
     | (`Branch_delayed _ | `Branch_refused _ | `Refused _ | `Outdated _) as errs
       ->
         handle_classification ~notifier pv.shell (parsed_op, errs) ;
-        Drop
-    | `Passed_prefilter priority -> Priority priority
+        let* () = Events.(emit operation_classified) parsed_op.hash in
+        return Drop
+    | `Passed_prefilter priority -> return (Priority priority)
 
   let set_mempool shell mempool =
     shell.mempool <- mempool ;
@@ -531,8 +532,8 @@ module Make_s
                   status_and_priority
                   op
               in
-              let+ () = Events.(emit operation_reclassified) oph in
               List.iter (handle_classification ~notifier shell) to_handle ;
+              let+ () = Events.(emit operation_classified) oph in
               let advertisable_mempool, validated_mempool =
                 match validated_operation with
                 | None -> (advertisable_mempool, validated_mempool)
@@ -803,6 +804,7 @@ module Make_s
                   in
                   (* Call handle & update_advertised_mempool only if op is accepted *)
                   List.iter (handle_classification ~notifier pv.shell) to_handle ;
+                  let*! () = Events.(emit operation_classified) oph in
                   pv.validation_state <- validation_state ;
                   (* Note that in this case, we may advertise an operation and bypass
                      the prioritirization strategy. *)

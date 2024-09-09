@@ -100,11 +100,11 @@ let operations_to_reclassify =
     ~pp1:Format.pp_print_int
     ("count", Data_encoding.int31)
 
-let operation_reclassified =
+let operation_classified =
   declare_1
     ~section
-    ~name:"operation_reclassified"
-    ~msg:"operation {oph} reclassified"
+    ~name:"operation_classified"
+    ~msg:"operation {oph} classified"
     ~level:Debug
     ~pp1:Operation_hash.pp
     ("oph", Operation_hash.encoding)
