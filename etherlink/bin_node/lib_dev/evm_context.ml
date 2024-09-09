@@ -1723,7 +1723,9 @@ let init_from_rollup_node ~omit_delayed_tx_events ~data_dir
           ~l2_blocks
     | None -> return_unit
   in
-  apply_evm_events ~finalized_level evm_events
+  worker_wait_for_request
+    (Apply_evm_events
+       {finalized_level = Some finalized_level; events = evm_events})
 
 let apply_blueprint timestamp payload delayed_transactions =
   worker_wait_for_request
