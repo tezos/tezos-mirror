@@ -57,26 +57,36 @@ html: octez-gen docexes-gen
 %/octez-accuser.html:
 	@../octez-accuser-$($(@D)_short) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > $@
 
+# Binary non-protocol specific manuals for clic binaries.
+api/%.html:
+	@../$* man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/$*.html
+
+# Binary non-protocol specific manuals for cmdliner binaries.
+api/octez-node.txt:
+	@../octez-node --help | grep -v '^Octez-node' | grep -v 'OCTEZ-NODE(1)' | \
+		./scripts/man2txt.py -r > api/octez-node.txt
+api/octez-dal-node.txt:
+	@../octez-dal-node --help | grep -v '^Octez-dal-node' | grep -v 'OCTEZ-DAL-NODE(1)' | \
+		./scripts/man2txt.py -r > api/octez-dal-node.txt
+api/octez-dal-node-config-init.txt:
+	@../octez-dal-node config init --help | grep -v '^Octez-dal-node' | grep -v 'OCTEZ-DAL-NODE(1)' | \
+		./scripts/man2txt.py > api/octez-dal-node-config-init.txt
+
 .PHONY: manuals
 manuals: \
 	 $(PROTOCOLS:%=%/octez-client.html) \
 	 $(PROTOCOLS:%=%/octez-baker.html) \
-	 $(PROTOCOLS:%=%/octez-accuser.html)
-	# generic
-	@../octez-admin-client man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/octez-admin-client.html
-	@../octez-signer man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/octez-signer.html
-	@../octez-codec man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/octez-codec.html
-	@../octez-snoop man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/octez-snoop.html
-	@ ../octez-dac-node man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/octez-dac-node.html
-	@ ../octez-dac-client man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/octez-dac-client.html
-	@../octez-node --help | grep -v '^Octez-node' | grep -v 'OCTEZ-NODE(1)' | \
-		./scripts/man2txt.py -r > api/octez-node.txt
-	@../octez-smart-rollup-node man -verbosity 3 -format html | \
-		sed "s#${HOME}#\$$HOME#g" > api/octez-smart-rollup-node.html
-	@../octez-dal-node --help | grep -v '^Octez-dal-node' | grep -v 'OCTEZ-DAL-NODE(1)' | \
-		./scripts/man2txt.py -r > api/octez-dal-node.txt
-	@../octez-dal-node config init --help | grep -v '^Octez-dal-node' | grep -v 'OCTEZ-DAL-NODE(1)' | \
-		./scripts/man2txt.py > api/octez-dal-node-config-init.txt
+	 $(PROTOCOLS:%=%/octez-accuser.html) \
+	 api/octez-admin-client.html \
+	 api/octez-signer.html \
+	 api/octez-codec.html \
+	 api/octez-snoop.html \
+	 api/octez-dac-node.html \
+	 api/octez-dac-client.html \
+	 api/octez-smart-rollup-node.html \
+	 api/octez-node.txt \
+	 api/octez-dal-node.txt \
+	 api/octez-dal-node-config-init.txt
 
 .PHONY: odoc
 odoc:
