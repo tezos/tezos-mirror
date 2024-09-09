@@ -697,6 +697,7 @@ dependencies = [
  "serde_yaml",
  "structopt",
  "tezos-evm-logging",
+ "tezos-evm-runtime",
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-host",
  "tezos-smart-rollup-mock",
