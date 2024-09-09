@@ -35,7 +35,7 @@ state-passing machine where:
   level. For instance, the context contains the information of all
   activated accounts and contracts, and their balances. More
   generally, the context must provide enough information to determine
-  the validity of operations, and blocks.
+  the validity of operations and blocks.
 
 - The *apply_operation* method determines whether an operation is safe
   to be executed in a given context. If so, it proceeds to execute it
@@ -86,7 +86,7 @@ Validation modes
 
 The Tezos protocol provides different validation modes, intended to be
 used by the Tezos *shell* and *baker* software implementations when
-needing to apply (or to assert the validity) of blocks and operations
+needing to apply (or to assert the validity of) blocks and operations
 under different, or specialized, circumstances -- for example, in
 order to *bake* a block. For each of these validation modes, the API
 specified by the protocol environment offers an entry point so that
@@ -215,7 +215,7 @@ Block Validation
 
    Adapt to pipelined block validation up to Lima and v7 environment.
 
-The validity of a blocks depends on a set of precondition checks
+The validity of a block depends on a set of precondition checks
 implemented in different steps, which happen at different stages of
 the application (and the construction) of a block.
 
@@ -282,17 +282,28 @@ application process for each of the different validation passes.
 
 .. _manager_operations_validity_alpha:
 
+Validity of operations
+~~~~~~~~~~~~~~~~~~~~~~
+
+For consensus, voting, and anonymous validation passes, validation is sufficient
+to ensure successful application. For manager operations, validation only
+ensures that the manager’s balance is sufficient to cover the fees, in addition
+to verifying that the operation is well-formed. It does not guarantee that the
+operation’s execution will be error-free. If an operation does result in an
+error, all side effects will be canceled, but the fees will be forfeited.
+
+
 Validity of Manager Operations
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+..............................
 
 In this sub-section, we explain the conditions for manager operations
 (and batches of managers operations) to be considered valid and hence
 suitable for inclusion in a block.
 
 Validity of Individual Manager Operations
-.........................................
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-:ref:`Manager operation<manager_operations_alpha>` are a class of
+:ref:`Manager operations<manager_operations_alpha>` are a class of
 operations, issued by a single *manager* account which signs the
 operation and pays their fees. The different manager operation kinds
 share several common fields:
@@ -326,7 +337,7 @@ conditions hold:
 - The manager account is solvent to pay the announced fees.
 
 Validity of Manager Operation Batches
-.....................................
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 A :ref:`batch<manager_operations_batches_alpha>` of manager operations
 includes one or more manager operations for sequential and atomic
@@ -354,6 +365,34 @@ defined as the conjunction of the following conditions:
   than the account's balance. That is, the manager account must be
   solvent to pay the announced fees for all the operations in the
   batch.
+
+.. _co-valid_operations:
+
+Co-valid operations
+^^^^^^^^^^^^^^^^^^^
+
+However, two valid manager operations (or batches) do not always form a valid
+block together. For example, operations ``op1`` and ``op2`` might both be valid
+in the context ``C``, but after applying ``op1`` to ``C``, ``op2`` might no
+longer be valid in the resulting context because the manager's balance may no
+longer cover the fees.
+
+In order to enforce that a set of valid managers
+operations forms a valib block, the protocol over-approximate this property by
+requiring the property of *co-validity*:
+
+Two manager operations are *compatible* if they correspond to distinct managers.
+
+Two manager operations are *co-valid* in a context if they are
+compatible and valid in this context.
+
+Considering two co-valid operations in a context, the
+application of one of them preserves the solvability of the other.
+
+This property extends to a set of operations if every pair of distinct
+operations is co-valid. In this case, the operations could be included in
+the next block in any order, modulo block limits (eg. maximum gas, block size
+limit, etc).
 
 .. _manager_operations_application_alpha:
 

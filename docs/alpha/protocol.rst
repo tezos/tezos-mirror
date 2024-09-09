@@ -85,7 +85,7 @@ Sapling, etc), and some details about its implementation.
 .. toctree::
    :maxdepth: 2
 
-   precheck
+   mempool
 
 .. toctree::
    :maxdepth: 2
