@@ -124,8 +124,6 @@ type t = {
   *)
   execute_outbox_messages_filter : outbox_message_filter list;
   dal_node_endpoint : Uri.t option;
-  dac_observer_endpoint : Uri.t option;
-  dac_timeout : Z.t option;
   pre_images_endpoint : Uri.t option;
   batcher : batcher;
   injector : injector;
@@ -297,8 +295,6 @@ module Cli : sig
     loser_mode:Loser_mode.t option ->
     reconnection_delay:float option ->
     dal_node_endpoint:Uri.t option ->
-    dac_observer_endpoint:Uri.t option ->
-    dac_timeout:Z.t option ->
     pre_images_endpoint:Uri.t option ->
     injector_retention_period:int option ->
     injector_attempts:int option ->
@@ -332,8 +328,6 @@ module Cli : sig
     loser_mode:Loser_mode.t option ->
     reconnection_delay:float option ->
     dal_node_endpoint:Uri.t option ->
-    dac_observer_endpoint:Uri.t option ->
-    dac_timeout:Z.t option ->
     pre_images_endpoint:Uri.t option ->
     injector_retention_period:int option ->
     injector_attempts:int option ->

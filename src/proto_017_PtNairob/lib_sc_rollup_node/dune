@@ -22,7 +22,6 @@
   octez-libs.tezos-workers
   tezos-dal-node-services
   tezos-dal-node-lib
-  tezos-dac-lib
   octez-shell-libs.shell-services
   octez-l2-libs.smart-rollup
   octez-protocol-017-PtNairob-libs.smart-rollup
@@ -60,7 +59,6 @@
   -open Tezos_protocol_017_PtNairob_parameters
   -open Tezos_workers
   -open Tezos_dal_node_lib
-  -open Tezos_dac_lib
   -open Tezos_shell_services
   -open Octez_smart_rollup
   -open Tezos_smart_rollup_017_PtNairob

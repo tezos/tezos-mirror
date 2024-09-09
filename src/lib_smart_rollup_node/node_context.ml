@@ -93,7 +93,6 @@ type 'a t = {
   cctxt : Client_context.full;
   degraded : ('a, bool) Reference.t;
   dal_cctxt : Dal_node_client.cctxt option;
-  dac_client : Dac_observer_client.t option;
   data_dir : string;
   l1_ctxt : Layer1.t;
   genesis_info : genesis_info;

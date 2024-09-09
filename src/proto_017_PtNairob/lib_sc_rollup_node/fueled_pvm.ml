@@ -39,9 +39,7 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
       match reveal_map with
       | None -> None
       | Some map ->
-          Utils.Reveal_hash_map.find_opt
-            (Reveals.proto_hash_to_dac_hash hash)
-            map
+          Utils.Reveal_hash_map.find_opt (Reveals.proto_hash_to_bytes hash) map
     in
     match found_in_map with
     | Some data -> return data

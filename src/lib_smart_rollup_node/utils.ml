@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 module Reveal_hash_map = Map.Make (struct
-  type t = Dac_plugin.hash
+  type t = bytes
 
-  let compare = Dac_plugin.raw_compare
+  let compare = Bytes.compare
 end)

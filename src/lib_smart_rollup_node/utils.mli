@@ -23,5 +23,5 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** A map addressed by (protocol agnostic) DAC reveal hashes. *)
-module Reveal_hash_map : Map.S with type key = Dac_plugin.hash
+(** A map addressed by (protocol agnostic) reveal hashes. *)
+module Reveal_hash_map : Map.S with type key = bytes

@@ -109,17 +109,6 @@ let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
       Event.warn_dal_enabled_no_node ()
     else Lwt.return_unit
   in
-  let* dac_client =
-    Option.map_es
-      (fun observer_endpoint ->
-        Dac_observer_client.init
-          {
-            observer_endpoint;
-            reveal_data_dir = Filename.concat data_dir (Kind.to_string kind);
-            timeout_seconds = configuration.dac_timeout;
-          })
-      configuration.dac_observer_endpoint
-  in
   let*! kernel_debug_logger, kernel_debug_finaliser =
     let open Lwt_syntax in
     if configuration.log_kernel_debug then
@@ -155,7 +144,6 @@ let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
       cctxt :> Client_context.full;
       degraded = Reference.new_ false;
       dal_cctxt;
-      dac_client;
       data_dir;
       l1_ctxt;
       genesis_info;
@@ -247,8 +235,6 @@ module For_snapshots = struct
                execute_outbox_messages_filter =
                  Configuration.default_execute_outbox_filter;
                dal_node_endpoint = None;
-               dac_observer_endpoint = None;
-               dac_timeout = None;
                batcher = Configuration.default_batcher;
                injector = Configuration.default_injector;
                l1_blocks_cache_size;
@@ -302,7 +288,6 @@ module For_snapshots = struct
         cctxt :> Client_context.full;
         degraded = Reference.new_ false;
         dal_cctxt = None;
-        dac_client = None;
         data_dir;
         l1_ctxt;
         genesis_info = metadata.genesis_info;
@@ -361,8 +346,6 @@ module Internal_for_tests = struct
           execute_outbox_messages_filter =
             Configuration.default_execute_outbox_filter;
           dal_node_endpoint = None;
-          dac_observer_endpoint = None;
-          dac_timeout = None;
           pre_images_endpoint = None;
           batcher = Configuration.default_batcher;
           injector = Configuration.default_injector;
@@ -430,7 +413,6 @@ module Internal_for_tests = struct
         cctxt :> Client_context.full;
         degraded = Reference.new_ false;
         dal_cctxt = None;
-        dac_client = None;
         data_dir;
         l1_ctxt;
         genesis_info;

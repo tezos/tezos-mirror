@@ -23,9 +23,6 @@
   octez-libs.tezos-workers
   tezos-dal-node-services
   tezos-dal-node-lib
-  octez-protocol-021-PsQuebec-libs.dac
-  tezos-dac-lib
-  tezos-dac-client-lib
   octez-shell-libs.shell-services
   octez-l2-libs.smart-rollup
   octez-protocol-021-PsQuebec-libs.smart-rollup
@@ -64,9 +61,6 @@
   -open Tezos_protocol_021_PsQuebec_parameters
   -open Tezos_workers
   -open Tezos_dal_node_lib
-  -open Tezos_dac_021_PsQuebec
-  -open Tezos_dac_lib
-  -open Tezos_dac_client_lib
   -open Tezos_shell_services
   -open Octez_smart_rollup
   -open Tezos_smart_rollup_021_PsQuebec

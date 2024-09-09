@@ -22,8 +22,6 @@
   octez-libs.tezos-workers
   tezos-dal-node-services
   tezos-dal-node-lib
-  tezos-dac-lib
-  tezos-dac-client-lib
   octez-shell-libs.shell-services
   octez-l2-libs.smart-rollup
   octez-protocol-018-Proxford-libs.smart-rollup
@@ -61,8 +59,6 @@
   -open Tezos_protocol_018_Proxford_parameters
   -open Tezos_workers
   -open Tezos_dal_node_lib
-  -open Tezos_dac_lib
-  -open Tezos_dac_client_lib
   -open Tezos_shell_services
   -open Octez_smart_rollup
   -open Tezos_smart_rollup_018_Proxford

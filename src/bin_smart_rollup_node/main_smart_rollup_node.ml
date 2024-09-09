@@ -43,7 +43,7 @@ let config_init_command =
     ~group
     ~desc:"Configure the smart rollup node."
     (merge_options
-       (args25
+       (args23
           force_switch
           data_dir_arg
           rpc_addr_arg
@@ -54,8 +54,6 @@ let config_init_command =
           loser_mode_arg
           reconnection_delay_arg
           dal_node_endpoint_arg
-          dac_observer_endpoint_arg
-          dac_timeout_arg
           pre_images_endpoint_arg
           injector_retention_period_arg
           injector_attempts_arg
@@ -85,8 +83,6 @@ let config_init_command =
              loser_mode,
              reconnection_delay,
              dal_node_endpoint,
-             dac_observer_endpoint,
-             dac_timeout,
              pre_images_endpoint,
              injector_retention_period,
              injector_attempts,
@@ -115,8 +111,6 @@ let config_init_command =
           ~loser_mode
           ~reconnection_delay
           ~dal_node_endpoint
-          ~dac_observer_endpoint
-          ~dac_timeout
           ~pre_images_endpoint
           ~injector_retention_period
           ~injector_attempts
@@ -161,12 +155,10 @@ let legacy_run_command =
           acl_override_arg
           metrics_addr_arg
           enable_performance_metrics_arg)
-       (args21
+       (args19
           loser_mode_arg
           reconnection_delay_arg
           dal_node_endpoint_arg
-          dac_observer_endpoint_arg
-          dac_timeout_arg
           pre_images_endpoint_arg
           injector_retention_period_arg
           injector_attempts_arg
@@ -195,8 +187,6 @@ let legacy_run_command =
            ( loser_mode,
              reconnection_delay,
              dal_node_endpoint,
-             dac_observer_endpoint,
-             dac_timeout,
              pre_images_endpoint,
              injector_retention_period,
              injector_attempts,
@@ -225,8 +215,6 @@ let legacy_run_command =
           ~loser_mode
           ~reconnection_delay
           ~dal_node_endpoint
-          ~dac_observer_endpoint
-          ~dac_timeout
           ~pre_images_endpoint
           ~injector_retention_period
           ~injector_attempts
@@ -263,7 +251,7 @@ let run_command =
       "Run the rollup node daemon. Arguments overwrite values provided in the \
        configuration file."
     (merge_options
-       (args12
+       (args10
           data_dir_arg
           rpc_addr_arg
           rpc_port_arg
@@ -273,8 +261,6 @@ let run_command =
           loser_mode_arg
           reconnection_delay_arg
           dal_node_endpoint_arg
-          dac_observer_endpoint_arg
-          dac_timeout_arg
           pre_images_endpoint_arg)
        (args15
           injector_retention_period_arg
@@ -305,8 +291,6 @@ let run_command =
              loser_mode,
              reconnection_delay,
              dal_node_endpoint,
-             dac_observer_endpoint,
-             dac_timeout,
              pre_images_endpoint ),
            ( injector_retention_period,
              injector_attempts,
@@ -338,8 +322,6 @@ let run_command =
           ~loser_mode
           ~reconnection_delay
           ~dal_node_endpoint
-          ~dac_observer_endpoint
-          ~dac_timeout
           ~pre_images_endpoint
           ~injector_retention_period
           ~injector_attempts

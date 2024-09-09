@@ -84,8 +84,6 @@ type t = {
   unsafe_pvm_patches : Pvm_patches.unsafe_patch list;
   execute_outbox_messages_filter : outbox_message_filter list;
   dal_node_endpoint : Uri.t option;
-  dac_observer_endpoint : Uri.t option;
-  dac_timeout : Z.t option;
   pre_images_endpoint : Uri.t option;
   batcher : batcher;
   injector : injector;
@@ -521,8 +519,6 @@ let encoding default_display : t Data_encoding.t =
            execute_outbox_messages_filter;
            unsafe_pvm_patches;
            dal_node_endpoint;
-           dac_observer_endpoint;
-           dac_timeout;
            pre_images_endpoint;
            batcher;
            injector;
@@ -555,8 +551,6 @@ let encoding default_display : t Data_encoding.t =
             unsafe_pvm_patches,
             execute_outbox_messages_filter ) ),
         ( ( dal_node_endpoint,
-            dac_observer_endpoint,
-            dac_timeout,
             pre_images_endpoint,
             batcher,
             injector,
@@ -588,8 +582,6 @@ let encoding default_display : t Data_encoding.t =
                unsafe_pvm_patches,
                execute_outbox_messages_filter ) ),
            ( ( dal_node_endpoint,
-               dac_observer_endpoint,
-               dac_timeout,
                pre_images_endpoint,
                batcher,
                injector,
@@ -626,8 +618,6 @@ let encoding default_display : t Data_encoding.t =
         unsafe_pvm_patches;
         execute_outbox_messages_filter;
         dal_node_endpoint;
-        dac_observer_endpoint;
-        dac_timeout;
         pre_images_endpoint;
         batcher;
         injector;
@@ -710,10 +700,8 @@ let encoding default_display : t Data_encoding.t =
                 execute_outbox_messages_filter_encoding
                 default_execute_outbox_filter)))
        (merge_objs
-          (obj9
+          (obj7
              (opt "DAL node endpoint" Tezos_rpc.Encoding.uri_encoding)
-             (opt "dac-observer-client" Tezos_rpc.Encoding.uri_encoding)
-             (opt "dac-timeout" Data_encoding.z)
              (opt "pre-images-endpoint" Tezos_rpc.Encoding.uri_encoding)
              (dft "batcher" batcher_encoding default_batcher)
              (dft "injector" injector_encoding default_injector)
@@ -845,12 +833,12 @@ module Cli = struct
 
   let configuration_from_args ~rpc_addr ~rpc_port ~acl_override ~metrics_addr
       ~enable_performance_metrics ~loser_mode ~reconnection_delay
-      ~dal_node_endpoint ~dac_observer_endpoint ~dac_timeout
-      ~pre_images_endpoint ~injector_retention_period ~injector_attempts
-      ~injection_ttl ~mode ~sc_rollup_address ~boot_sector_file ~operators
-      ~index_buffer_size ~irmin_cache_size ~log_kernel_debug ~no_degraded
-      ~gc_frequency ~history_mode ~allowed_origins ~allowed_headers
-      ~apply_unsafe_patches ~bail_on_disagree =
+      ~dal_node_endpoint ~pre_images_endpoint ~injector_retention_period
+      ~injector_attempts ~injection_ttl ~mode ~sc_rollup_address
+      ~boot_sector_file ~operators ~index_buffer_size ~irmin_cache_size
+      ~log_kernel_debug ~no_degraded ~gc_frequency ~history_mode
+      ~allowed_origins ~allowed_headers ~apply_unsafe_patches ~bail_on_disagree
+      =
     let open Lwt_result_syntax in
     let*? purposed_operators, default_operator =
       get_purposed_and_default_operators operators
@@ -876,8 +864,6 @@ module Cli = struct
         reconnection_delay =
           Option.value ~default:default_reconnection_delay reconnection_delay;
         dal_node_endpoint;
-        dac_observer_endpoint;
-        dac_timeout;
         pre_images_endpoint;
         metrics_addr;
         performance_metrics = enable_performance_metrics;
@@ -924,12 +910,12 @@ module Cli = struct
 
   let patch_configuration_from_args configuration ~rpc_addr ~rpc_port
       ~acl_override ~metrics_addr ~enable_performance_metrics ~loser_mode
-      ~reconnection_delay ~dal_node_endpoint ~dac_observer_endpoint ~dac_timeout
-      ~pre_images_endpoint ~injector_retention_period ~injector_attempts
-      ~injection_ttl ~mode ~sc_rollup_address ~boot_sector_file ~operators
-      ~index_buffer_size ~irmin_cache_size ~log_kernel_debug ~no_degraded
-      ~gc_frequency ~history_mode ~allowed_origins ~allowed_headers
-      ~apply_unsafe_patches ~bail_on_disagree =
+      ~reconnection_delay ~dal_node_endpoint ~pre_images_endpoint
+      ~injector_retention_period ~injector_attempts ~injection_ttl ~mode
+      ~sc_rollup_address ~boot_sector_file ~operators ~index_buffer_size
+      ~irmin_cache_size ~log_kernel_debug ~no_degraded ~gc_frequency
+      ~history_mode ~allowed_origins ~allowed_headers ~apply_unsafe_patches
+      ~bail_on_disagree =
     let open Lwt_result_syntax in
     let mode = Option.value ~default:configuration.mode mode in
     let*? () = check_custom_mode mode in
@@ -962,11 +948,6 @@ module Cli = struct
         acl;
         dal_node_endpoint =
           Option.either dal_node_endpoint configuration.dal_node_endpoint;
-        dac_observer_endpoint =
-          Option.either
-            dac_observer_endpoint
-            configuration.dac_observer_endpoint;
-        dac_timeout = Option.either dac_timeout configuration.dac_timeout;
         pre_images_endpoint =
           Option.either pre_images_endpoint configuration.pre_images_endpoint;
         reconnection_delay =
@@ -1022,12 +1003,12 @@ module Cli = struct
 
   let create_or_read_config ~data_dir ~rpc_addr ~rpc_port ~acl_override
       ~metrics_addr ~enable_performance_metrics ~loser_mode ~reconnection_delay
-      ~dal_node_endpoint ~dac_observer_endpoint ~dac_timeout
-      ~pre_images_endpoint ~injector_retention_period ~injector_attempts
-      ~injection_ttl ~mode ~sc_rollup_address ~boot_sector_file ~operators
-      ~index_buffer_size ~irmin_cache_size ~log_kernel_debug ~no_degraded
-      ~gc_frequency ~history_mode ~allowed_origins ~allowed_headers
-      ~apply_unsafe_patches ~bail_on_disagree =
+      ~dal_node_endpoint ~pre_images_endpoint ~injector_retention_period
+      ~injector_attempts ~injection_ttl ~mode ~sc_rollup_address
+      ~boot_sector_file ~operators ~index_buffer_size ~irmin_cache_size
+      ~log_kernel_debug ~no_degraded ~gc_frequency ~history_mode
+      ~allowed_origins ~allowed_headers ~apply_unsafe_patches ~bail_on_disagree
+      =
     let open Lwt_result_syntax in
     let open Filename.Infix in
     (* Check if the data directory of the smart rollup node is not the one of Octez node *)
@@ -1058,8 +1039,6 @@ module Cli = struct
           ~loser_mode
           ~reconnection_delay
           ~dal_node_endpoint
-          ~dac_observer_endpoint
-          ~dac_timeout
           ~pre_images_endpoint
           ~injector_retention_period
           ~injector_attempts
@@ -1110,8 +1089,6 @@ module Cli = struct
           ~loser_mode
           ~reconnection_delay
           ~dal_node_endpoint
-          ~dac_observer_endpoint
-          ~dac_timeout
           ~pre_images_endpoint
           ~injector_retention_period
           ~injector_attempts
