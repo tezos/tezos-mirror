@@ -37,6 +37,7 @@
 (package (name octez-node))
 (package (name octez-node-config))
 (package (name octez-proto-libs))
+(package (name octez-proto-manager))
 (package (name octez-protocol-000-Ps9mPmXa-libs))
 (package (name octez-protocol-001-PtCJ7pwo-libs))
 (package (name octez-protocol-002-PsYLVpVv-libs))

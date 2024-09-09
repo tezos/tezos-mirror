@@ -62,6 +62,7 @@ __pycache__
 /safety-checker
 /octez-teztale-archiver
 /octez-teztale-server
+/octez-proto-manager
 
 /src/riscv/riscv-sandbox*
 /src/riscv/riscv-dummy.elf

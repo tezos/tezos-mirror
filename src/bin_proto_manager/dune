@@ -1,0 +1,15 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executable
+ (name main)
+ (public_name octez-proto-manager)
+ (package octez-proto-manager)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  unix
+  cmdliner
+  octez-version.value)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/static-link-flags.sexp)))
