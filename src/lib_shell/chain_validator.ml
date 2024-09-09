@@ -38,6 +38,10 @@ module Name = struct
   let equal = Chain_id.equal
 end
 
+module Profiler = struct
+  include (val Profiler.wrap Shell_profiling.chain_validator_profiler)
+end
+
 module Request = struct
   include Request
 
@@ -333,7 +337,9 @@ let instantiate_prevalidator parameters set_prevalidator block chain_db =
         ~block_hash:(Store.Block.hash block)
         new_protocol_hash
     in
-    let instances = Profiler.plugged Shell_profiling.mempool_profiler in
+    let instances =
+      Tezos_base.Profiler.plugged Shell_profiling.mempool_profiler
+    in
     List.iter Tezos_protocol_environment.Environment_profiler.plug instances ;
     Prevalidator.create parameters.prevalidator_limits proto chain_db
   in
@@ -487,59 +493,65 @@ let reset_profilers block =
 let on_validation_request w peer start_testchain active_chains spawn_child block
     =
   let open Lwt_result_syntax in
-  let*! () =
-    Option.iter_s
-      (update_synchronisation_state w (Store.Block.header block))
-      peer
-  in
-  let nv = Worker.state w in
-  let chain_store = nv.parameters.chain_store in
-  let*! head = Store.Chain.current_head chain_store in
-  let head_header = Store.Block.header head
-  and head_hash = Store.Block.hash head
-  and block_header = Store.Block.header block in
-  let head_fitness = head_header.shell.fitness in
-  let new_fitness = block_header.shell.fitness in
-  let accepted_head = Fitness.(new_fitness > head_fitness) in
-  if not accepted_head then return Ignored_head
-  else
-    let* previous = Store.Chain.set_head chain_store block in
-    reset_profilers block ;
-    let () =
-      if is_bootstrapped nv then
-        Distributed_db.Advertise.current_head nv.chain_db block
-    in
-    let*! () =
-      if start_testchain then
-        may_switch_test_chain w active_chains spawn_child chain_store block
-      else Lwt.return_unit
-    in
-    Lwt_watcher.notify nv.new_head_input (Store.Block.hash block, block_header) ;
-    let is_head_increment =
-      Block_hash.equal head_hash block_header.shell.predecessor
-    in
-    let event = if is_head_increment then Head_increment else Branch_switch in
-    let* () =
-      when_ (not is_head_increment) (fun () ->
-          Store.Chain.may_update_ancestor_protocol_level chain_store ~head:block)
-    in
-    let*! () = may_synchronise_context nv.synchronisation_state chain_store in
-    let* () =
-      may_flush_or_update_prevalidator
-        nv.parameters
-        event
-        nv.prevalidator
-        nv.chain_db
-        ~prev:previous
-        ~block
-    in
-    return event
+  (let*! () =
+     Option.iter_s
+       (update_synchronisation_state w (Store.Block.header block))
+       peer
+   in
+   let nv = Worker.state w in
+   let chain_store = nv.parameters.chain_store in
+   let*! head = Store.Chain.current_head chain_store in
+   let head_header = Store.Block.header head
+   and head_hash = Store.Block.hash head
+   and block_header = Store.Block.header block in
+   let head_fitness = head_header.shell.fitness in
+   let new_fitness = block_header.shell.fitness in
+   let accepted_head = Fitness.(new_fitness > head_fitness) in
+   if not accepted_head then return Ignored_head
+   else
+     let* previous = Store.Chain.set_head chain_store block in
+     reset_profilers block ;
+     let () =
+       if is_bootstrapped nv then
+         Distributed_db.Advertise.current_head nv.chain_db block
+     in
+     let*! () =
+       if start_testchain then
+         may_switch_test_chain w active_chains spawn_child chain_store block
+       else Lwt.return_unit
+     in
+     Lwt_watcher.notify nv.new_head_input (Store.Block.hash block, block_header) ;
+     let is_head_increment =
+       Block_hash.equal head_hash block_header.shell.predecessor
+     in
+     let event = if is_head_increment then Head_increment else Branch_switch in
+     let* () =
+       when_ (not is_head_increment) (fun () ->
+           Store.Chain.may_update_ancestor_protocol_level
+             chain_store
+             ~head:block)
+     in
+     let*! () = may_synchronise_context nv.synchronisation_state chain_store in
+     let* () =
+       may_flush_or_update_prevalidator
+         nv.parameters
+         event
+         nv.prevalidator
+         nv.chain_db
+         ~prev:previous
+         ~block
+     in
+     return event)
+  [@profiler.span_s ["chain_validator"; "validation request (set_head)"]]
 
 let on_notify_branch w peer_id locator =
   let open Lwt_syntax in
   let {Block_locator.head_hash; head_header; _} = locator in
   let* () =
     check_and_update_synchronisation_state w (head_hash, head_header) peer_id
+  in
+  let () =
+    (() [@profiler.mark ["chain_validator"; "notify branch received"]])
   in
   with_activated_peer_validator w peer_id (fun pv ->
       Peer_validator.notify_branch pv locator ;
@@ -548,6 +560,7 @@ let on_notify_branch w peer_id locator =
 let on_notify_head w peer_id (block_hash, header) mempool =
   let open Lwt_syntax in
   let nv = Worker.state w in
+  () [@profiler.mark ["chain_validator"; "notify head received"]] ;
   let* () =
     check_and_update_synchronisation_state w (block_hash, header) peer_id
   in
