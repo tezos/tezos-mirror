@@ -1713,6 +1713,7 @@ let init_etherlink_producer_setup cloud operator name account ~bootstrap agent =
   let mode =
     Evm_node.Observer
       {
+        private_rpc_port = None;
         initial_kernel = output;
         preimages_dir;
         rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;

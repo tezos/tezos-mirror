@@ -32,6 +32,7 @@ type mode =
   | Observer of {
       initial_kernel : string;
       preimages_dir : string;
+      private_rpc_port : int option;
       rollup_node_endpoint : string;
     }
   | Threshold_encryption_observer of {
@@ -858,7 +859,13 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
             "dal-slots"
             (fun l -> String.concat "," (List.map string_of_int l))
             dal_slots
-    | Observer {preimages_dir; initial_kernel = _; rollup_node_endpoint} ->
+    | Observer
+        {
+          preimages_dir;
+          initial_kernel = _;
+          rollup_node_endpoint;
+          private_rpc_port;
+        } ->
         [
           "--evm-node-endpoint";
           evm_node.persistent_state.endpoint;
@@ -867,6 +874,7 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
           "--preimages-dir";
           preimages_dir;
         ]
+        @ Cli_arg.optional_arg "private-rpc-port" string_of_int private_rpc_port
     | Threshold_encryption_observer
         {
           preimages_dir;
@@ -897,6 +905,7 @@ let rpc_endpoint ?(local = false) ?(private_ = false) (evm_node : t) =
     if private_ then
       match evm_node.persistent_state.mode with
       | Sequencer {private_rpc_port = Some private_rpc_port; _}
+      | Observer {private_rpc_port = Some private_rpc_port; _}
       | Sandbox {private_rpc_port = Some private_rpc_port; _} ->
           (host, private_rpc_port, "/private")
       | Sequencer {private_rpc_port = None; _}
@@ -966,14 +975,17 @@ let init ?patch_config ?name ?runner ?mode ?data_dir ?rpc_addr ?rpc_port
   let* () = run evm_node in
   return evm_node
 
-let init_from_rollup_node_data_dir ?reconstruct evm_node rollup_node =
+let init_from_rollup_node_data_dir ?reconstruct
+    ?(omit_delayed_tx_events = false) evm_node rollup_node =
   let rollup_node_data_dir = Sc_rollup_node.data_dir rollup_node in
   let process =
     spawn_command
       evm_node
       (["init"; "from"; "rollup"; "node"; rollup_node_data_dir]
       @ data_dir_arg evm_node
-      @ Cli_arg.optional_arg "reconstruct" Fun.id reconstruct)
+      @ Cli_arg.optional_arg "reconstruct" Fun.id reconstruct
+      @ Cli_arg.optional_switch "omit-delayed-tx-events" omit_delayed_tx_events
+      )
   in
   Process.check process
 

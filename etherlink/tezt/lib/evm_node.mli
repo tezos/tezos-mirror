@@ -40,6 +40,7 @@ type mode =
   | Observer of {
       initial_kernel : string;
       preimages_dir : string;
+      private_rpc_port : int option;  (** Port for private RPC server*)
       rollup_node_endpoint : string;
     }
   | Threshold_encryption_observer of {
@@ -381,11 +382,16 @@ val sequencer_upgrade_payload :
   unit ->
   string Lwt.t
 
-(** [init_from_rollup_node_data_dir ?reconstruct evm_node rollup_node]
-    initialises the data dir of the evm node by importing the evm
-    state from a rollup node data dir. [devmode] is false by default. *)
+(** [init_from_rollup_node_data_dir ?reconstruct
+    ?omit_delayed_tx_events evm_node rollup_node] initialises the data
+    dir of the evm node by importing the evm state from a rollup node
+    data dir. *)
 val init_from_rollup_node_data_dir :
-  ?reconstruct:string -> t -> Sc_rollup_node.t -> unit Lwt.t
+  ?reconstruct:string ->
+  ?omit_delayed_tx_events:bool ->
+  t ->
+  Sc_rollup_node.t ->
+  unit Lwt.t
 
 (** [transform_dump ~dump_json ~dump_rlp] transforms a JSON list of
     instructions stored in [dump_json] to an RLP list, which is
