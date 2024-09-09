@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2024 Trilitech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
 
@@ -7,15 +8,19 @@
 //! Chapter 8 - Unprivileged spec
 
 use crate::{
-    machine_state::{bus::main_memory::MainMemoryLayout, registers::XRegister, MachineState},
+    machine_state::{
+        bus::main_memory::MainMemoryLayout, instruction_cache::InstructionCacheLayout,
+        registers::XRegister, MachineState,
+    },
     state_backend as backend,
     traps::Exception,
 };
 use std::ops::{BitAnd, BitOr, BitXor};
 
-impl<ML, M> MachineState<ML, M>
+impl<ML, ICL, M> MachineState<ML, ICL, M>
 where
     ML: MainMemoryLayout,
+    ICL: InstructionCacheLayout,
     M: backend::ManagerReadWrite,
 {
     /// `LR.D` R-type instruction

@@ -7,6 +7,7 @@ use crate::{
     kernel_loader,
     machine_state::{
         bus::main_memory::{MainMemoryLayout, M1G},
+        instruction_cache::{DefaultInstructionCacheLayout, InstructionCacheLayout},
         mode::Mode,
         MachineError, MachineState,
     },
@@ -32,23 +33,30 @@ pub enum PvmStepperError {
 }
 
 /// Wrapper over a PVM that lets you step through it
-pub struct PvmStepper<'backend, 'hooks, ML: MainMemoryLayout = M1G> {
-    pvm: Pvm<ML, SliceManager<'backend>>,
+pub struct PvmStepper<
+    'backend,
+    'hooks,
+    ML: MainMemoryLayout = M1G,
+    ICL: InstructionCacheLayout = DefaultInstructionCacheLayout,
+> {
+    pvm: Pvm<ML, ICL, SliceManager<'backend>>,
     hooks: PvmHooks<'hooks>,
     inbox: Inbox,
     rollup_address: [u8; 20],
     origination_level: u32,
 }
 
-impl<'backend, 'hooks, ML: MainMemoryLayout> PvmStepper<'backend, 'hooks, ML> {
+impl<'backend, 'hooks, ML: MainMemoryLayout, ICL: InstructionCacheLayout>
+    PvmStepper<'backend, 'hooks, ML, ICL>
+{
     /// Create the state backend which the PVM needs to bind to.
-    pub fn create_backend() -> InMemoryBackend<PvmLayout<ML>> {
-        InMemoryBackend::<PvmLayout<ML>>::new().0
+    pub fn create_backend() -> InMemoryBackend<PvmLayout<ML, ICL>> {
+        InMemoryBackend::<PvmLayout<ML, ICL>>::new().0
     }
 
     /// Create a new PVM stepper.
     pub fn new(
-        backend: &'backend mut InMemoryBackend<PvmLayout<ML>>,
+        backend: &'backend mut InMemoryBackend<PvmLayout<ML, ICL>>,
         program: &[u8],
         initrd: Option<&[u8]>,
         inbox: Inbox,
@@ -56,7 +64,7 @@ impl<'backend, 'hooks, ML: MainMemoryLayout> PvmStepper<'backend, 'hooks, ML> {
         rollup_address: [u8; 20],
         origination_level: u32,
     ) -> Result<Self, PvmStepperError> {
-        let placed = <PvmLayout<ML> as Layout>::placed().into_location();
+        let placed = <PvmLayout<ML, ICL> as Layout>::placed().into_location();
         let space = backend.allocate(placed);
         let mut pvm = Pvm::bind(space);
 
@@ -129,12 +137,18 @@ impl<'backend, 'hooks, ML: MainMemoryLayout> PvmStepper<'backend, 'hooks, ML> {
     }
 }
 
-impl<'backend, 'hooks, ML: MainMemoryLayout> Stepper for PvmStepper<'backend, 'hooks, ML> {
+impl<'backend, 'hooks, ML: MainMemoryLayout, ICL: InstructionCacheLayout> Stepper
+    for PvmStepper<'backend, 'hooks, ML, ICL>
+{
     type MainMemoryLayout = ML;
+
+    type InstructionCacheLayout = ICL;
 
     type Manager = SliceManager<'backend>;
 
-    fn machine_state(&self) -> &MachineState<Self::MainMemoryLayout, Self::Manager> {
+    fn machine_state(
+        &self,
+    ) -> &MachineState<Self::MainMemoryLayout, Self::InstructionCacheLayout, Self::Manager> {
         &self.pvm.machine_state
     }
 

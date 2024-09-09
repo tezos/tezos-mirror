@@ -12,6 +12,7 @@ use octez_riscv::{
     machine_state::{
         bus::{main_memory::MainMemoryLayout, Address},
         csregisters::satp::{Satp, SvLength, TranslationAlgorithm},
+        instruction_cache::InstructionCacheLayout,
         mode::Mode,
         AccessType, MachineState,
     },
@@ -175,8 +176,8 @@ impl<'a, ML: MainMemoryLayout> DebuggerApp<'a, TestStepper<'a, ML>> {
     }
 }
 
-impl<'backend, 'hooks, ML: MainMemoryLayout>
-    DebuggerApp<'backend, PvmStepper<'backend, 'hooks, ML>>
+impl<'backend, 'hooks, ML: MainMemoryLayout, ICL: InstructionCacheLayout>
+    DebuggerApp<'backend, PvmStepper<'backend, 'hooks, ML, ICL>>
 {
     /// Launch the Debugger app for a PVM.
     pub fn launch(
@@ -189,8 +190,8 @@ impl<'backend, 'hooks, ML: MainMemoryLayout>
     ) -> Result<()> {
         let hooks = PvmHooks::new(|_| {});
 
-        let mut backend = PvmStepper::<'backend, 'hooks, ML>::create_backend();
-        let mut stepper = PvmStepper::new(
+        let mut backend = PvmStepper::<'backend, 'hooks, ML, ICL>::create_backend();
+        let mut stepper = PvmStepper::<'_, '_, ML, ICL>::new(
             &mut backend,
             program,
             initrd,
@@ -311,7 +312,7 @@ where
             .step_max(Bound::Included(1))
             .to_stepper_status();
 
-        let should_continue = |machine: &MachineState<_, _>| {
+        let should_continue = |machine: &MachineState<_, _, _>| {
             let raw_pc = machine.hart.pc.read();
             let pc = machine
                 .translate_without_cache(raw_pc, AccessType::Instruction)
@@ -339,7 +340,7 @@ where
             .step_max(Bound::Included(1))
             .to_stepper_status();
 
-        let should_continue = |machine: &MachineState<_, _>| {
+        let should_continue = |machine: &MachineState<_, _, _>| {
             let raw_pc = machine.hart.pc.read();
             let pc = machine
                 .translate_without_cache(raw_pc, AccessType::Instruction)

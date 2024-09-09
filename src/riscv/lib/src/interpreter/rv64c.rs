@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2024 Trilitech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
 
@@ -9,6 +10,7 @@
 use crate::{
     machine_state::{
         bus::main_memory::MainMemoryLayout,
+        instruction_cache::InstructionCacheLayout,
         registers::{sp, x0, XRegister, XRegisters},
         MachineState,
     },
@@ -48,9 +50,10 @@ where
     }
 }
 
-impl<ML, M> MachineState<ML, M>
+impl<ML, ICL, M> MachineState<ML, ICL, M>
 where
     ML: MainMemoryLayout,
+    ICL: InstructionCacheLayout,
     M: backend::ManagerReadWrite,
 {
     /// `C.LD` CL-type compressed instruction

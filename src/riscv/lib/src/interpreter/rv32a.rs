@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2024 Trilitech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
 
@@ -7,15 +8,19 @@
 //! Chapter 8 - Unprivileged spec
 
 use crate::{
-    machine_state::{bus::main_memory::MainMemoryLayout, registers::XRegister, MachineState},
+    machine_state::{
+        bus::main_memory::MainMemoryLayout, instruction_cache::InstructionCacheLayout,
+        registers::XRegister, MachineState,
+    },
     state_backend as backend,
     traps::Exception,
 };
 use std::ops::{BitAnd, BitOr, BitXor};
 
-impl<ML, M> MachineState<ML, M>
+impl<ML, ICL, M> MachineState<ML, ICL, M>
 where
     ML: MainMemoryLayout,
+    ICL: InstructionCacheLayout,
     M: backend::ManagerReadWrite,
 {
     /// `LR.W` R-type instruction
@@ -233,8 +238,9 @@ mod test {
     macro_rules! test_lrsc {
         ($name:ident, $lr: ident, $sc: ident, $align: expr, $t: ident) => {
             backend_test!($name, F, {
-                let mut backend = create_backend!(MachineStateLayout<T1K>, F);
-                let state = create_state!(MachineState, MachineStateLayout<T1K>, F, backend, T1K);
+                use $crate::machine_state::instruction_cache::TestInstructionCacheLayout;
+                let mut backend = create_backend!(MachineStateLayout<T1K, TestInstructionCacheLayout>, F);
+                let state = create_state!(MachineState, MachineStateLayout<T1K, TestInstructionCacheLayout>, F, backend, T1K, TestInstructionCacheLayout);
                 let state_cell = std::cell::RefCell::new(state);
 
                 proptest!(|(
@@ -276,8 +282,9 @@ mod test {
     macro_rules! test_amo {
         ($instr: ident, $f: expr, $align: expr, $t: ident) => {
             backend_test!($instr, F, {
-                let mut backend = create_backend!(MachineStateLayout<T1K>, F);
-                let state = create_state!(MachineState, MachineStateLayout<T1K>, F, backend, T1K);
+                use $crate::machine_state::instruction_cache::TestInstructionCacheLayout;
+                let mut backend = create_backend!(MachineStateLayout<T1K, TestInstructionCacheLayout>, F);
+                let state = create_state!(MachineState, MachineStateLayout<T1K, TestInstructionCacheLayout>, F, backend, T1K, TestInstructionCacheLayout);
                 let state_cell = std::cell::RefCell::new(state);
 
                 proptest!(|(

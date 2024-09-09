@@ -13,7 +13,6 @@ impl FenceCounter {
     pub const INITIAL: Self = Self(0);
 
     /// Maximum fence counter value
-    #[cfg(test)]
     pub const MAX: Self = Self(u32::MAX);
 
     /// Increment the fence counter.

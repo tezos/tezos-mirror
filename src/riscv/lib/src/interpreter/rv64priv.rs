@@ -1,12 +1,17 @@
+// SPDX-FileCopyrightText: 2024 Trilitech <contact@trili.tech>
+//
+// SPDX-License-Identifier: MIT
+
 use crate::{
     machine_state::{
-        bus::{main_memory, Address},
+        bus::{main_memory::MainMemoryLayout, Address},
         csregisters::{
             effects::handle_csr_effect,
             xstatus::{MPPValue, SPPValue},
             CSRegister,
         },
         hart_state::HartState,
+        instruction_cache::InstructionCacheLayout,
         mode::Mode,
         registers::XRegister,
         AccessType, MachineState,
@@ -97,9 +102,10 @@ where
     }
 }
 
-impl<ML, M> MachineState<ML, M>
+impl<ML, ICL, M> MachineState<ML, ICL, M>
 where
-    ML: main_memory::MainMemoryLayout,
+    ML: MainMemoryLayout,
+    ICL: InstructionCacheLayout,
     M: backend::ManagerReadWrite,
 {
     /// `WFI` instruction
@@ -142,6 +148,7 @@ mod tests {
         machine_state::{
             bus::main_memory::tests::T1K,
             csregisters::{xstatus, CSRRepr, CSRegister},
+            instruction_cache::TestInstructionCacheLayout,
             mode::Mode,
             registers::{a0, t0},
             MachineState, MachineStateLayout,
@@ -150,11 +157,11 @@ mod tests {
     };
 
     backend_test!(test_sfence, F, {
-        type L = MachineStateLayout<T1K>;
+        type L = MachineStateLayout<T1K, TestInstructionCacheLayout>;
         let mut backend = create_backend!(L, F);
-        let mut state = create_state!(MachineState, L, F, backend, T1K);
+        let mut state = create_state!(MachineState, L, F, backend, T1K, TestInstructionCacheLayout);
 
-        let run_test = |state: &mut MachineState<_, _>,
+        let run_test = |state: &mut MachineState<_, _, _>,
                         mode: Mode,
                         bit: bool,
                         result: Result<(), Exception>| {
