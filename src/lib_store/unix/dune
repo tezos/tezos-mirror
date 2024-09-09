@@ -25,6 +25,7 @@
   tar
   tar-unix
   octez-libs.prometheus)
+ (preprocess (pps octez-libs.ppx_profiler))
  (flags
   (:standard)
   -open Tezos_shell_services

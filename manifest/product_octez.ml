@@ -3486,6 +3486,7 @@ let octez_store_unix =
     "store.unix"
     ~internal_name:"tezos_store_unix"
     ~path:"src/lib_store/unix"
+    ~preprocess:(pps ppx_profiler)
     ~deps:
       [
         octez_shell_services |> open_;
