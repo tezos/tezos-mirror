@@ -196,13 +196,22 @@ let export ?snapshot_file ~compression ~data_dir () =
       | No | After -> stdlib_writer
     in
     let*? dest_file =
+      let open Result_syntax in
       match snapshot_file with
-      | Some f ->
-          interpolate_snapshot_file header.current_level header.rollup_address f
+      | Some f -> (
+          let+ f =
+            interpolate_snapshot_file
+              header.current_level
+              header.rollup_address
+              f
+          in
+          match compression with
+          | No | On_the_fly -> f
+          | After -> f ^ ".uncompressed")
       | None ->
           let suffix =
             match compression with
-            | On_the_fly -> ".compressed"
+            | On_the_fly -> ""
             | No | After -> ".uncompressed"
           in
           let filename =
@@ -214,7 +223,7 @@ let export ?snapshot_file ~compression ~data_dir () =
               header.current_level
               suffix
           in
-          Ok filename
+          return filename
     in
     let*! () = Lwt_utils_unix.create_dir (Filename.dirname dest_file) in
     create stdlib_reader writer header ~files ~dest:dest_file ;
