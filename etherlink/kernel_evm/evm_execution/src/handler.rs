@@ -36,13 +36,13 @@ use evm::{
     CallScheme, Capture, Config, Context, CreateScheme, ExitError, ExitFatal, ExitReason,
     ExitRevert, ExitSucceed, Handler, Opcode, Resolve, Stack, Transfer,
 };
-use host::runtime::Runtime;
 use primitive_types::{H160, H256, U256};
 use sha3::{Digest, Keccak256};
 use std::cmp::min;
 use std::fmt::Debug;
 use tezos_ethereum::block::BlockConstants;
 use tezos_evm_logging::{log, Level::*};
+use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_encoding::michelson::ticket::FA2_1Ticket;
 use tezos_smart_rollup_encoding::michelson::{MichelsonContract, MichelsonPair};
 use tezos_smart_rollup_encoding::outbox::OutboxMessage;

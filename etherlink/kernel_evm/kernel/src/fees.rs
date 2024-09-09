@@ -24,7 +24,7 @@ use primitive_types::{H160, H256, U256};
 use tezos_ethereum::access_list::AccessListItem;
 use tezos_ethereum::block::BlockFees;
 use tezos_ethereum::tx_common::EthereumTransactionCommon;
-use tezos_smart_rollup_host::runtime::Runtime;
+use tezos_evm_runtime::runtime::Runtime;
 
 use std::mem::size_of;
 

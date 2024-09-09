@@ -14,10 +14,11 @@ use alloc::collections::TryReserveError;
 use crypto::hash::{ContractKt1Hash, HashTrait};
 use evm::executor::stack::PrecompileFailure;
 use handler::{EvmHandler, ExecutionResult};
-use host::{path::RefPath, runtime::Runtime};
+use host::path::RefPath;
 use primitive_types::{H160, H256, U256};
 use tezos_ethereum::block::BlockConstants;
 use tezos_evm_logging::{log, Level::*};
+use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_storage::StorageError;
 use thiserror::Error;
 

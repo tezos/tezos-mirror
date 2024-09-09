@@ -729,6 +729,7 @@ dependencies = [
  "sha3",
  "substrate-bn",
  "tezos-evm-logging",
+ "tezos-evm-runtime",
  "tezos-indexable-storage",
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-debug",
@@ -2240,6 +2241,7 @@ version = "0.1.0"
 dependencies = [
  "rlp",
  "tezos-evm-logging",
+ "tezos-evm-runtime",
  "tezos-smart-rollup-host",
  "tezos-smart-rollup-mock",
  "tezos-smart-rollup-storage",
@@ -2389,6 +2391,7 @@ dependencies = [
  "primitive-types",
  "rlp",
  "sha3",
+ "tezos-evm-runtime",
  "tezos-smart-rollup-host",
  "tezos-smart-rollup-storage",
  "tezos_crypto_rs",

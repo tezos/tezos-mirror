@@ -13,7 +13,7 @@
 
 use evm::{Context, Handler, Transfer};
 use primitive_types::{H160, U256};
-use tezos_smart_rollup_host::runtime::Runtime;
+use tezos_evm_runtime::runtime::Runtime;
 
 use crate::{
     fa_bridge::{execute_fa_withdrawal, withdrawal::FaWithdrawal},
@@ -45,7 +45,7 @@ pub const FA_WITHDRAWAL_PRECOMPILE_TICKS_SLOPE: u64 = 700;
 ///
 /// An execution of a single outbox message carrying a FA withdrawal
 /// costs around 0.0025ꜩ on L1; the equivalent amount of gas units on L2 is:
-///  
+///
 ///  0.0025 * 10^18 / GAS_PRICE
 ///
 /// Multiplying the numerator by 2 for a safe reserve and this is our cost in Wei.

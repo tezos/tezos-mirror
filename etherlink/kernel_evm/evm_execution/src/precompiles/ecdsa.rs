@@ -8,13 +8,13 @@ use crate::precompiles::tick_model;
 use crate::{handler::EvmHandler, precompiles::PrecompileOutcome, EthereumError};
 use evm::{Context, Transfer};
 use evm::{ExitReason, ExitSucceed};
-use host::runtime::Runtime;
 use libsecp256k1::{recover, Message, RecoveryId, Signature};
 use sha2::Digest;
 use sha3::Keccak256;
 use std::cmp::min;
 use tezos_evm_logging::log;
 use tezos_evm_logging::Level::{Debug, Info};
+use tezos_evm_runtime::runtime::Runtime;
 
 macro_rules! unwrap_ecrecover {
     ($expr : expr) => {

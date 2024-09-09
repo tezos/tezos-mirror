@@ -12,9 +12,9 @@ use crate::{handler::EvmHandler, precompiles::PrecompileOutcome, EthereumError};
 use alloc::borrow::Cow;
 use evm::{executor::stack::PrecompileFailure, ExitError};
 use evm::{Context, ExitReason, ExitSucceed, Transfer};
-use host::runtime::Runtime;
 use tezos_evm_logging::log;
 use tezos_evm_logging::Level::{Debug, Info};
+use tezos_evm_runtime::runtime::Runtime;
 
 /// The precomputed values for BLAKE2b [from the spec](https://tools.ietf.org/html/rfc7693#section-2.7)
 /// There are 10 16-byte arrays - one for each round

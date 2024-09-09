@@ -7,11 +7,11 @@ use crate::fail_if_too_much;
 use crate::precompiles::{tick_model, PrecompileOutcome};
 use crate::{handler::EvmHandler, EthereumError};
 use evm::{Context, ExitReason, ExitSucceed, Transfer};
-use host::runtime::Runtime;
 use ripemd::Ripemd160;
 use sha2::{Digest, Sha256};
 use tezos_evm_logging::log;
 use tezos_evm_logging::Level::Debug;
+use tezos_evm_runtime::runtime::Runtime;
 
 // Implementation of 0x03 precompiled (sha256)
 pub fn sha256_precompile<Host: Runtime>(

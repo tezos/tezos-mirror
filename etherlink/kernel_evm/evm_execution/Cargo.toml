@@ -38,6 +38,7 @@ bn.workspace = true
 
 tezos_ethereum.workspace = true
 tezos-evm-logging.workspace = true
+tezos-evm-runtime.workspace = true
 tezos-indexable-storage.workspace = true
 tezos-storage.workspace = true
 

@@ -9,10 +9,8 @@
 
 use crate::account_storage::{account_path, AccountStorageError, EthereumAccount};
 use primitive_types::{H160, H256, U256};
-use tezos_smart_rollup_host::{
-    path::{concat, OwnedPath, RefPath},
-    runtime::Runtime,
-};
+use tezos_evm_runtime::runtime::Runtime;
+use tezos_smart_rollup_host::path::{concat, OwnedPath, RefPath};
 use tezos_storage::{path_from_h256, read_u256_le_default, write_u256_le};
 
 /// Path where global ticket table is stored

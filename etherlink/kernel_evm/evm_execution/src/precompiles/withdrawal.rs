@@ -19,7 +19,6 @@ use crate::withdrawal_counter::WithdrawalCounter;
 use crate::{abi, fail_if_too_much, EthereumError};
 use evm::Handler;
 use evm::{Context, ExitReason, ExitRevert, ExitSucceed, Transfer};
-use host::runtime::Runtime;
 use primitive_types::H160;
 use primitive_types::H256;
 use primitive_types::U256;
@@ -29,6 +28,7 @@ use tezos_ethereum::wei::ErrorMutezFromWei;
 use tezos_ethereum::Log;
 use tezos_evm_logging::log;
 use tezos_evm_logging::Level::Info;
+use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_encoding::contract::Contract;
 use tezos_smart_rollup_encoding::entrypoint::Entrypoint;
 use tezos_smart_rollup_encoding::michelson::ticket::FA2_1Ticket;
@@ -46,7 +46,7 @@ use tezos_smart_rollup_encoding::outbox::{OutboxMessage, OutboxMessageTransactio
 ///
 /// An execution of a single outbox message carrying a XTZ withdrawal
 /// costs around 0.0025ꜩ on L1; the equivalent amount of gas units on L2 is:
-///  
+///
 ///  0.0025 * 10^18 / GAS_PRICE
 ///
 /// Multiplying the numerator by 2 for a safe reserve and this is our cost in Wei.

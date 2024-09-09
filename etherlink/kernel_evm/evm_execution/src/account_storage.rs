@@ -7,9 +7,10 @@
 
 use const_decoder::Decoder;
 use host::path::{concat, OwnedPath, Path, RefPath};
-use host::runtime::{Runtime, RuntimeError, ValueType};
+use host::runtime::{RuntimeError, ValueType};
 use primitive_types::{H160, H256, U256};
 use rlp::DecoderError;
+use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_storage::storage::Storage;
 use tezos_storage::{
     error::Error as GenStorageError, read_u256_le_default, read_u64_le_default,

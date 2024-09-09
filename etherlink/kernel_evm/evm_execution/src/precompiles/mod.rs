@@ -30,10 +30,10 @@ use ecdsa::ecrecover_precompile;
 use evm::{Context, ExitReason, Handler, Transfer};
 use fa_bridge::fa_bridge_precompile;
 use hash::{ripemd160_precompile, sha256_precompile};
-use host::runtime::Runtime;
 use identity::identity_precompile;
 use modexp::modexp_precompile;
 use primitive_types::H160;
+use tezos_evm_runtime::runtime::Runtime;
 use withdrawal::withdrawal_precompile;
 use zero_knowledge::{ecadd_precompile, ecmul_precompile, ecpairing_precompile};
 

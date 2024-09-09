@@ -6,12 +6,13 @@
 pub mod tracer {
     use host::{
         path::{OwnedPath, RefPath},
-        runtime::{Runtime, RuntimeError},
+        runtime::RuntimeError,
     };
 
     use primitive_types::H256;
     use tezos_evm_logging::log;
     use tezos_evm_logging::Level::Debug;
+    use tezos_evm_runtime::runtime::Runtime;
     use tezos_indexable_storage::{IndexableStorage, IndexableStorageError};
     use tezos_smart_rollup_host::path::*;
     use thiserror::Error;

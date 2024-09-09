@@ -6,7 +6,7 @@ use crate::{inbox::Transaction, storage, upgrade};
 use primitive_types::{H256, U256};
 use rlp::{Encodable, RlpStream};
 use tezos_ethereum::rlp_helpers::append_u256_le;
-use tezos_smart_rollup_host::runtime::Runtime;
+use tezos_evm_runtime::runtime::Runtime;
 
 pub const UPGRADE_TAG: u8 = 0x01;
 pub const SEQUENCER_UPGRADE_TAG: u8 = 0x02;

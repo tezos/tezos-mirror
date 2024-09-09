@@ -9,10 +9,10 @@ use alloc::vec::Vec;
 use bn::{FieldError, GroupError};
 use evm::{executor::stack::PrecompileFailure, ExitError, ExitReason, ExitSucceed};
 use evm::{Context, Transfer};
-use host::runtime::Runtime;
 use primitive_types::U256;
 use tezos_evm_logging::log;
 use tezos_evm_logging::Level::Debug;
+use tezos_evm_runtime::runtime::Runtime;
 
 /// Input length for the add operation.
 const ADD_INPUT_LEN: usize = 128;

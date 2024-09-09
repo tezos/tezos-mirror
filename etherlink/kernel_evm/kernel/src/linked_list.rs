@@ -4,10 +4,8 @@ use anyhow::{Context, Result};
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpIterator, RlpStream};
 use std::marker::PhantomData;
 use tezos_ethereum::rlp_helpers::{append_option, decode_field, decode_option, next};
-use tezos_smart_rollup_host::{
-    path::{concat, OwnedPath, Path},
-    runtime::Runtime,
-};
+use tezos_evm_runtime::runtime::Runtime;
+use tezos_smart_rollup_host::path::{concat, OwnedPath, Path};
 use tezos_storage::{read_optional_rlp, read_rlp, store_rlp};
 
 /// Doubly linked list using the durable storage.

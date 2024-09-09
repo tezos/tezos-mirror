@@ -26,9 +26,9 @@ use tezos_ethereum::transaction::{TransactionHash, TransactionType};
 use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_ethereum::tx_signature::TxSignature;
 use tezos_evm_logging::{log, Level::*};
+use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup::outbox::{OutboxMessage, OutboxQueue};
 use tezos_smart_rollup_host::path::{Path, RefPath};
-use tezos_smart_rollup_host::runtime::Runtime;
 
 use crate::bridge::{execute_deposit, Deposit};
 use crate::configuration::Limits;

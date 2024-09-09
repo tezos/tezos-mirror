@@ -11,7 +11,9 @@
 //! revertable updates (if withdrawal fails the counter won't increment).
 
 use primitive_types::U256;
-use tezos_smart_rollup_host::{path::RefPath, runtime::Runtime};
+
+use tezos_evm_runtime::runtime::Runtime;
+use tezos_smart_rollup_host::path::RefPath;
 use tezos_storage::{read_u256_le_default, write_u256_le};
 
 use crate::account_storage::{AccountStorageError, EthereumAccount};

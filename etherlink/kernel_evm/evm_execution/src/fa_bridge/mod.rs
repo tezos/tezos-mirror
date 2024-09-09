@@ -35,10 +35,10 @@ use std::borrow::Cow;
 
 use deposit::FaDeposit;
 use evm::{Config, ExitReason};
-use host::runtime::Runtime;
 use primitive_types::{H160, U256};
 use tezos_ethereum::block::BlockConstants;
 use tezos_evm_logging::{log, Level::Info};
+use tezos_evm_runtime::runtime::Runtime;
 use ticket_table::TicketTable;
 use withdrawal::FaWithdrawal;
 
