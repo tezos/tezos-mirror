@@ -3312,6 +3312,93 @@ module Revamped = struct
       (ddb_len = 0) int ~error_msg:"DDB is expected empty, contains %L elements") ;
 
     unit
+
+  (* [set_config_operations_timeout timeout config] returns the node
+      configuration [config] where parameter operations_request_timeout
+      is set to [timeout]. *)
+  let set_config_operations_timeout timeout json =
+    let chain_validator_config =
+      let open JSON in
+      json |-> "shell" |-> "chain_validator"
+    in
+    let updated_shell_config =
+      JSON.annotate
+        ~origin:"shell"
+        (Ezjsonm.from_string
+           (Format.asprintf
+              {|{"prevalidator": { "operations_request_timeout" : %f },
+            "peer_validator" : { "new_head_request_timeout" : 5 },
+            "chain_validator": %s}|}
+              timeout
+              (JSON.encode chain_validator_config)))
+    in
+    JSON.put ("shell", updated_shell_config) json
+
+  (* Wait for event [operation_not_fetched] ("prevalidator" section,
+     "debug" level). *)
+  let wait_for_failed_fetch node =
+    Node.wait_for node "operation_not_fetched.v0" (fun _ -> Some ())
+
+  (** Test that failed fetched operations emit the event
+      [operation_not_fetched]
+
+   Scenario:
+   + initialise two nodes and activate the protocol. The second node is
+     initialized with a specific configuration to force timeout when fetching
+   + Inject an operation in node_1, checks that the fetch fail in node_2
+   + Ensure that the injected operation is in node_1 mempool
+   + Ensure that the mempool of node_2 is empty
+*)
+
+  let fetch_failed_operation =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Fetch failed operation"
+      ~tags:[team; "fetch"; "mempool"]
+    @@ fun protocol ->
+    log_step 1 "Starting two nodes" ;
+    let* _, client1 =
+      Client.init_with_protocol
+        ~protocol
+        ~nodes_args:[Synchronisation_threshold 0]
+        `Client
+        ()
+    in
+    let* node2 =
+      Node.init
+        ~event_sections_levels:[("prevalidator", `Debug)]
+          (* Set a low operations_request_timeout to force timeout at fetching *)
+        ~patch_config:(set_config_operations_timeout 0.00001)
+        [Synchronisation_threshold 0]
+    in
+    let* () = Node.wait_for_ready node2 in
+    let* client2 = Client.init ~endpoint:(Node node2) () in
+
+    log_step 2 "Connect nodes together" ;
+    let* () = Client.Admin.connect_address client1 ~peer:node2 in
+
+    log_step 3 "Wait for node2 to reach level 1" ;
+    let* _ = Node.wait_for_level node2 1 in
+
+    log_step 4 "Listen for the operation_not_fetched event" ;
+    let failed_fetching_listener = wait_for_failed_fetch node2 in
+
+    log_step 5 "Inject an operation from client1" ;
+    let* (`OpHash oph1) =
+      Operation.Manager.(inject [make (transfer ())] client1)
+    in
+
+    log_step 6 "wait for node2 fetching to fail" ;
+    let* () = failed_fetching_listener in
+
+    log_step
+      7
+      "check that operation reached validation in client1 and is absent from \
+       client2 mempool" ;
+    let* () = check_mempool ~validated:[oph1] client1 in
+    let* () = check_mempool client2 in
+
+    unit
 end
 
 let check_operation_is_in_validated_mempool ops oph =
@@ -3441,160 +3528,8 @@ let forge_operation ~branch ~fee ~gas_limit ~source ~destination ~counter
   in
   return (`Hex (JSON.as_string op_hex))
 
-let inject_operation ~client (`Hex op_str_hex) (`Hex signature) =
-  let signed_op = op_str_hex ^ signature in
-  Client.RPC.call client
-  @@ RPC.post_injection_operation (Data (`String signed_op))
-
 (* TODO: add a test than ensure that we cannot have more than 1000
    branch delayed/branch refused/refused *)
-
-(** Matches events which contain a failed fetch.
-   For example:
-
-  {[
-    {  "event": {
-           "operation_not_fetched": "onuvmuCS5NqtJG65BJWqH44bzwiXLw4tVpfNqRQvkgorv5LoejA"
-       },
-       "level": "debug"
-    }
-  ]}
-*)
-let wait_for_failed_fetch node =
-  Node.wait_for node "operation_not_fetched.v0" (fun _ -> Some ())
-
-let set_config_operations_timeout timeout json =
-  let chain_validator_config =
-    let open JSON in
-    json |-> "shell" |-> "chain_validator"
-  in
-  let updated_shell_config =
-    JSON.annotate
-      ~origin:"shell"
-      (Ezjsonm.from_string
-         (Format.asprintf
-            {|{"prevalidator": { "operations_request_timeout" : %f },
-            "peer_validator" : { "new_head_request_timeout" : 5 },
-            "chain_validator": %s}|}
-            timeout
-            (JSON.encode chain_validator_config)))
-  in
-  JSON.put ("shell", updated_shell_config) json
-
-(** This test checks that failed fetched operations can be refetched successfully
-
-   Scenario:
-
-   + initialise two nodes and activate the protocol. The second node is initialise with specific configuration
-
-   + Get the counter and the current branch
-
-   + Forge operation and inject it in node_1, checks that the fetch fail in node_2
-
-   + Ensure that the injected operation is in node_1 mempool
-
-   + Ensure that the mempool of node_2 is empty
-
-   + Inject the previous operation in node_2
-
-   + Ensure that the operation is injected in node_2 mempool
-*)
-let refetch_failed_operation =
-  Protocol.register_test
-    ~__FILE__
-    ~title:"Fetch failed operation"
-    ~tags:[team; "fetch"; "mempool"]
-  @@ fun protocol ->
-  (* Step 1 *)
-  (* initialise both nodes and activate protocol
-     node_2 uses specific configuration to force timeout in fetching *)
-  let* node_1 = Node.init [Synchronisation_threshold 0; Private_mode] in
-  let* node_2 =
-    Node.init
-    (* Run the node with the new config.
-       event_level is set to debug to catch fetching event at this level *)
-      ~event_sections_levels:[("prevalidator", `Debug)]
-        (* Set a low operations_request_timeout to force timeout at fetching *)
-      ~patch_config:(set_config_operations_timeout 0.00001)
-      [Synchronisation_threshold 0; Private_mode]
-  in
-  let* () = Node.wait_for_ready node_2 in
-  let* client_1 = Client.init ~endpoint:(Node node_1) ()
-  and* client_2 = Client.init ~endpoint:(Node node_2) () in
-  let* () = Client.Admin.trust_address client_1 ~peer:node_2
-  and* () = Client.Admin.trust_address client_2 ~peer:node_1 in
-  let* () = Client.Admin.connect_address client_1 ~peer:node_2 in
-  let* () = Client.activate_protocol_and_wait ~protocol client_1 in
-  Log.info "Activated protocol." ;
-  let* _ = Node.wait_for_level node_2 1 in
-  Log.info "All nodes are at level %d." 1 ;
-  (* Step 2 *)
-  (* get counter and branches *)
-  let* counter_json =
-    Client.RPC.call client_1
-    @@ RPC.get_chain_block_context_contract_counter
-         ~id:Constant.bootstrap1.public_key_hash
-         ()
-  in
-  let counter = JSON.as_int counter_json in
-  let* branch = Operation.Manager.get_branch client_1 in
-
-  (* Step 3 *)
-  (* Forge operation and inject it in node_1, checks that the fetch fail in node_2 *)
-  let* op_str_hex =
-    forge_operation
-      ~branch
-      ~fee:1000 (* Minimal fees to successfully apply the transfer *)
-      ~gas_limit:1040 (* Minimal gas to successfully apply the transfer *)
-      ~source:Constant.bootstrap1.public_key_hash
-      ~destination:Constant.bootstrap2.public_key_hash
-      ~counter:(counter + 1)
-      ~client:client_1
-  in
-  let signature =
-    Operation.sign_manager_op_hex ~signer:Constant.bootstrap1 op_str_hex
-  in
-  let failed_fetching_waiter = wait_for_failed_fetch node_2 in
-  let* oph = inject_operation ~client:client_1 op_str_hex signature in
-  let* () = failed_fetching_waiter in
-  (* Step 4 *)
-  (* Ensure that the injected operation is in node_1 mempool *)
-  let* mempool_node_1 =
-    Client.RPC.call client_1 @@ RPC.get_chain_mempool_pending_operations ()
-  in
-  check_operation_is_in_validated_mempool mempool_node_1 oph ;
-  (* Step 5 *)
-  (* Ensure that the mempool of node_2 is empty *)
-  let* mempool_count_after_failed_fetch =
-    Client.RPC.call client_2 @@ RPC.get_chain_mempool_pending_operations ()
-  in
-  let count_failed_fetching = count_mempool mempool_count_after_failed_fetch in
-  if count_failed_fetching.total <> 0 then
-    Test.fail "The mempool of node 2 should be empty" ;
-  (* Step 6 *)
-  (* Inject the previous operation in node_2 *)
-  let* oph2 = inject_operation ~client:client_2 op_str_hex signature in
-  if oph <> oph2 then
-    Test.fail
-      "The operation injected in node_2 should be the same as the one injected \
-       in node_1" ;
-  (* Step 7 *)
-  (* Ensure that the operation is injected in node_2 mempool *)
-  let* mempool_inject_on_node_2 =
-    Client.RPC.call client_2 @@ RPC.get_chain_mempool_pending_operations ()
-  in
-  check_operation_is_in_validated_mempool mempool_inject_on_node_2 oph ;
-  unit
-
-let check_op_removed client op =
-  let* pending_ops =
-    Client.RPC.call client @@ RPC.get_chain_mempool_pending_operations ()
-  in
-  let open JSON in
-  let ops_list = pending_ops |-> "validated" |> as_list in
-  let res = List.exists (fun e -> e |-> "hash" |> as_string = op) ops_list in
-  if res then Test.fail "%s found after removal" op ;
-  unit
 
 (** Bakes with an empty mempool to force synchronisation between nodes. *)
 let bake_empty_block ?endpoint ?protocol client =
@@ -4331,7 +4266,7 @@ let register ~protocols =
   Revamped.test_filter_mempool_operations_by_hash protocols ;
   Revamped.test_filter_monitor_operations_by_sources protocols ;
   Revamped.pre_filtered_operation_removed_from_ddb protocols ;
-  refetch_failed_operation protocols ;
+  Revamped.fetch_failed_operation protocols ;
   ban_operation_and_check_validated protocols ;
   test_do_not_reclassify protocols ;
   force_operation_injection protocols ;
