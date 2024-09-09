@@ -460,9 +460,9 @@ let () =
   Batcher.register_messages ~drop_duplicate messages
 
 let () =
-  Local_directory.register0 Rollup_node_services.Local.dal_injection
-  @@ fun _node_ctxt () message ->
-  Dal_injection_queue.register_dal_message ~message
+  Local_directory.register0 Rollup_node_services.Local.dal_batcher_injection
+  @@ fun _node_ctxt () messages ->
+  Dal_injection_queue.register_dal_messages ~messages
 
 let () =
   Local_directory.register0 Rollup_node_services.Local.dal_slot_indices

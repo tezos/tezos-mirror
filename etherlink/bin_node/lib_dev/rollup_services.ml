@@ -147,18 +147,15 @@ let batcher_injection :
           (list string))
     (open_root / "local" / "batcher" / "injection")
 
-let dal_injection =
-  let input_encoding =
-    Data_encoding.(obj1 (req "content" Data_encoding.Variable.string))
-  in
+let dal_batcher_injection =
   Tezos_rpc.Service.post_service
-    ~description:"Inject the given message in the DAL queue"
+    ~description:"Inject the given messages in the DAL queue"
     ~query:Tezos_rpc.Query.empty
     ~input:
       Data_encoding.(
-        def "message" ~description:"Message to inject" input_encoding)
+        def "messages" ~description:"Messages to inject" (list (string' Plain)))
     ~output:Data_encoding.unit
-    (open_root / "local" / "dal" / "injection")
+    (open_root / "local" / "dal" / "batcher" / "injection")
 
 let dal_slot_indices =
   let input_encoding = Data_encoding.(obj1 (req "indices" (list uint8))) in
@@ -321,15 +318,15 @@ let publish :
   return_unit
 
 let publish_on_dal :
-    rollup_node_endpoint:Uri.t -> message:string -> unit tzresult Lwt.t =
- fun ~rollup_node_endpoint ~message ->
+    rollup_node_endpoint:Uri.t -> messages:string list -> unit tzresult Lwt.t =
+ fun ~rollup_node_endpoint ~messages ->
   call_service
     ~keep_alive:false
     ~base:rollup_node_endpoint
-    dal_injection
+    dal_batcher_injection
     ()
     ()
-    message
+    messages
 
 let get_injected_dal_operations_statuses :
     rollup_node_endpoint:Uri.t ->

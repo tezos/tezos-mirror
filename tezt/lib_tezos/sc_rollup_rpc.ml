@@ -262,12 +262,13 @@ let as_empty_object_or_fail t =
   | [] -> ()
   | _ -> JSON.error t "Not an empty object"
 
-let post_local_dal_injection ~message =
-  let data = `O [("content", `String message)] in
+let post_local_dal_batcher_injection ~messages =
+  let json = `A (List.map Dal_common.RPC.unistring_to_json messages) in
+  let data = Data json in
   make
     POST
-    ["local"; "dal"; "injection"]
-    ~data:(Data data)
+    ["local"; "dal"; "batcher"; "injection"]
+    ~data
     as_empty_object_or_fail
 
 let post_dal_slot_indices ~slot_indices =
