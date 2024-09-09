@@ -9,7 +9,10 @@ contract Child {
 
 contract StateOverrideTester {
 
-    int private count = 42;
+    uint32 private count = 42; // private, so requires an explicit accessor
+    uint32 public const2 = 0xffffffff;
+    uint256 public sep = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
+    uint32 public const3 = 0xffffffff;
 
     function getBalance() public view returns (uint256) {
         return msg.sender.balance;
