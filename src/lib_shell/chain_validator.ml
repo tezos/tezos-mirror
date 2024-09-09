@@ -333,6 +333,8 @@ let instantiate_prevalidator parameters set_prevalidator block chain_db =
         ~block_hash:(Store.Block.hash block)
         new_protocol_hash
     in
+    let instances = Profiler.plugged Shell_profiling.mempool_profiler in
+    List.iter Tezos_protocol_environment.Environment_profiler.plug instances ;
     Prevalidator.create parameters.prevalidator_limits proto chain_db
   in
   match r with
