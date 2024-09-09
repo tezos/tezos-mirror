@@ -46,37 +46,44 @@ open Helpers
 open Setup
 
 module Delayed_inbox = struct
-  let content sc_rollup_node =
-    Sc_rollup_node.RPC.call sc_rollup_node
-    @@ Sc_rollup_rpc.get_global_block_durable_state_value
-         ~pvm_kind:"wasm_2_0_0"
-         ~operation:Sc_rollup_rpc.Subkeys
-         ~key:Durable_storage_path.delayed_inbox
-         ()
+  type endpoint = Sc_rollup_node of Sc_rollup_node.t | Evm_node of Evm_node.t
 
-  let data sc_rollup_node hash =
-    Sc_rollup_node.RPC.call sc_rollup_node
-    @@ Sc_rollup_rpc.get_global_block_durable_state_value
-         ~pvm_kind:"wasm_2_0_0"
-         ~operation:Sc_rollup_rpc.Value
-         ~key:(sf "%s/%s/data" Durable_storage_path.delayed_inbox hash)
-         ()
+  let subkeys path = function
+    | Sc_rollup_node sc_rollup_node ->
+        Sc_rollup_node.RPC.call sc_rollup_node
+        @@ Sc_rollup_rpc.get_global_block_durable_state_value
+             ~pvm_kind:"wasm_2_0_0"
+             ~operation:Sc_rollup_rpc.Subkeys
+             ~key:path
+             ()
+    | Evm_node evm_node ->
+        let*@! list = Rpc.state_subkeys evm_node path in
+        return list
 
-  let assert_mem sc_rollup_node hash =
-    let* delayed_transactions_hashes = content sc_rollup_node in
+  let content = subkeys Durable_storage_path.delayed_inbox
+
+  let data endpoint hash =
+    let path = sf "%s/%s/data" Durable_storage_path.delayed_inbox hash in
+    match endpoint with
+    | Sc_rollup_node sc_rollup_node ->
+        Sc_rollup_node.RPC.call sc_rollup_node
+        @@ Sc_rollup_rpc.get_global_block_durable_state_value
+             ~pvm_kind:"wasm_2_0_0"
+             ~operation:Sc_rollup_rpc.Value
+             ~key:path
+             ()
+    | Evm_node evm_node ->
+        let*@ res = Rpc.state_value evm_node path in
+        return res
+
+  let assert_mem endpoint hash =
+    let* delayed_transactions_hashes = content endpoint in
     Check.(list_mem string hash delayed_transactions_hashes)
       ~error_msg:"hash %L should be present in the delayed inbox %R" ;
     unit
 
-  let assert_empty sc_rollup_node =
-    let* delayed_transactions_hashes =
-      Sc_rollup_node.RPC.call sc_rollup_node
-      @@ Sc_rollup_rpc.get_global_block_durable_state_value
-           ~pvm_kind:"wasm_2_0_0"
-           ~operation:Sc_rollup_rpc.Subkeys
-           ~key:Durable_storage_path.delayed_inbox
-           ()
-    in
+  let assert_empty endpoint =
+    let* delayed_transactions_hashes = content endpoint in
     Check.is_true
       (List.length delayed_transactions_hashes <= 1)
       ~error_msg:"Expected empty delayed inbox" ;
@@ -749,7 +756,7 @@ let test_send_transaction_to_delayed_inbox =
   let* hash = send ~amount:Tez.one ~expect_failure:false () in
   (* Assert that the expected transaction hash is found in the delayed inbox
      durable storage path. *)
-  let* () = Delayed_inbox.assert_mem sc_rollup_node hash in
+  let* () = Delayed_inbox.assert_mem (Sc_rollup_node sc_rollup_node) hash in
   (* Test that paying more than 1XTZ is allowed. *)
   let* _hash =
     send ~amount:(Tez.parse_floating "1.1") ~expect_failure:false ()
@@ -783,9 +790,13 @@ let test_send_deposit_to_delayed_inbox =
       ~sc_rollup_address
       client
   in
-  let* delayed_transactions_hashes = Delayed_inbox.content sc_rollup_node in
+  let* delayed_transactions_hashes =
+    Delayed_inbox.content (Sc_rollup_node sc_rollup_node)
+  in
   let* deposit =
-    Delayed_inbox.data sc_rollup_node (List.hd delayed_transactions_hashes)
+    Delayed_inbox.data
+      (Sc_rollup_node sc_rollup_node)
+      (List.hd delayed_transactions_hashes)
   in
 
   let deposit_bytes = Hex.to_bytes (`Hex (Option.get deposit)) in
@@ -912,7 +923,7 @@ let test_delayed_transfer_is_included =
       ~client
   in
   let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
-  let* () = Delayed_inbox.assert_empty sc_rollup_node in
+  let* () = Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node) in
   let* sender_balance_next = Eth_cli.balance ~account:sender ~endpoint in
   let* receiver_balance_next = Eth_cli.balance ~account:receiver ~endpoint in
   Check.((sender_balance_prev > sender_balance_next) Wei.typ)
@@ -1000,7 +1011,7 @@ let test_largest_delayed_transfer_is_included =
       ~client
   in
   let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
-  let* () = Delayed_inbox.assert_empty sc_rollup_node in
+  let* () = Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node) in
   unit
 
 let test_delayed_deposit_is_included =
@@ -1052,7 +1063,7 @@ let test_delayed_deposit_is_included =
       ~client
   in
   let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
-  let* () = Delayed_inbox.assert_empty sc_rollup_node in
+  let* () = Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node) in
   let* receiver_balance_next =
     Eth_cli.balance ~account:receiver.address ~endpoint
   in
@@ -1160,7 +1171,7 @@ let test_delayed_fa_deposit_is_included =
       ~client
   in
   let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
-  let* () = Delayed_inbox.assert_empty sc_rollup_node in
+  let* () = Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node) in
 
   let* zero_ticket_hash = ticket_hash l1_contracts.ticket_router_tester 0 in
 
@@ -1225,7 +1236,7 @@ let test_delayed_fa_deposit_is_ignored_if_feature_disabled =
       ~sc_rollup_address
       client
   in
-  let* () = Delayed_inbox.assert_empty sc_rollup_node in
+  let* () = Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node) in
 
   let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
 
@@ -1356,7 +1367,7 @@ let test_invalid_delayed_transaction =
   in
   (* Assert that the expected transaction hash is found in the delayed inbox
      durable storage path. *)
-  let* () = Delayed_inbox.assert_mem sc_rollup_node hash in
+  let* () = Delayed_inbox.assert_mem (Sc_rollup_node sc_rollup_node) hash in
   (* We bake enough blocks for the sequencer to see the transaction. *)
   let* () =
     repeat 2 (fun () ->
@@ -1372,7 +1383,7 @@ let test_invalid_delayed_transaction =
     (receipt_opt = None)
     ~error_msg:"The transaction should not have a receipt" ;
   (* The transaction has been cleared from the delayed inbox. *)
-  Delayed_inbox.assert_empty sc_rollup_node
+  Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node)
 
 let call_fa_withdraw ?expect_failure ~sender ~endpoint ~evm_node ~ticket_owner
     ~routing_info ~amount ~ticketer ~content () =
@@ -1447,7 +1458,7 @@ let test_fa_withdrawal_is_included =
       ~client
   in
   let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
-  let* () = Delayed_inbox.assert_empty sc_rollup_node in
+  let* () = Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node) in
 
   (* Check that deposit is successful *)
   let* zero_ticket_hash = ticket_hash l1_contracts.ticket_router_tester 0 in
@@ -1607,7 +1618,7 @@ let test_delayed_deposit_from_init_rollup_node =
   let* () =
     bake_until_sync ~sc_rollup_node ~proxy ~sequencer:new_sequencer ~client ()
   in
-  let* () = Delayed_inbox.assert_empty sc_rollup_node in
+  let* () = Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node) in
   let* receiver_balance_next =
     Eth_cli.balance
       ~account:receiver
@@ -2711,7 +2722,7 @@ let test_legacy_deposits_dispatched_after_kernel_upgrade =
     ~error_msg:"Expected a bigger balance" ;
 
   (* Ensure delayed inbox is empty now *)
-  let* () = Delayed_inbox.assert_empty sc_rollup_node in
+  let* () = Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node) in
 
   unit
 
@@ -3841,7 +3852,7 @@ let test_outbox_size_limit_resilience ~slow =
       ~client
   in
   let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
-  let* () = Delayed_inbox.assert_empty sc_rollup_node in
+  let* () = Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node) in
   let* receiver_balance_next =
     Eth_cli.balance ~account:receiver.address ~endpoint
   in
