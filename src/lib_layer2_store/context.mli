@@ -159,6 +159,10 @@ module PVMState : sig
   (** [find context] returns the PVM state stored in the [context], if any. *)
   val find : 'a t -> value option Lwt.t
 
+  (** [get context] is the same as {!find} but fails if there is no PVM state
+      stored in the context. *)
+  val get : 'a t -> value tzresult Lwt.t
+
   (** [lookup state path] returns the data stored for the path [path] in the PVM
       state [state].  *)
   val lookup : value -> string list -> bytes option Lwt.t

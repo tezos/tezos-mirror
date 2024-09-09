@@ -371,6 +371,56 @@ let () =
       in
       return_some (commitment, hash, first_published, published)
 
+let get_outbox_content (node_ctxt : _ Node_context.t)
+    (outbox_level, message_indexes) =
+  let open Lwt_result_syntax in
+  let* outbox =
+    let lcc = (Reference.get node_ctxt.lcc).level in
+    let ctxt_block_level = Int32.max lcc outbox_level in
+    let* ctxt_block_hash =
+      Node_context.hash_of_level_opt node_ctxt ctxt_block_level
+    in
+    match ctxt_block_hash with
+    | None -> return_nil
+    | Some ctxt_block_hash ->
+        let* ctxt = Node_context.checkout_context node_ctxt ctxt_block_hash in
+        let* state = Context.PVMState.get ctxt in
+        let*? (module Plugin) =
+          Protocol_plugins.proto_plugin_for_protocol
+            (Reference.get node_ctxt.current_protocol).hash
+        in
+        let*! outbox =
+          Plugin.Pvm.get_outbox_messages node_ctxt state ~outbox_level
+        in
+        return outbox
+  in
+  let messages =
+    List.rev_map
+      (fun i -> (i, List.assoc ~equal:Int.equal i outbox))
+      message_indexes
+    |> List.rev
+  in
+  return (outbox_level, messages)
+
+let () =
+  Local_directory.register0 Rollup_node_services.Local.outbox_pending_executable
+  @@ fun node_ctxt () () ->
+  let open Lwt_result_syntax in
+  let* outbox_messages =
+    Node_context.get_executable_pending_outbox_messages node_ctxt
+  in
+  List.map_ep (get_outbox_content node_ctxt) outbox_messages
+
+let () =
+  Local_directory.register0
+    Rollup_node_services.Local.outbox_pending_unexecutable
+  @@ fun node_ctxt () () ->
+  let open Lwt_result_syntax in
+  let* outbox_messages =
+    Node_context.get_unexecutable_pending_outbox_messages node_ctxt
+  in
+  List.map_ep (get_outbox_content node_ctxt) outbox_messages
+
 let () =
   Local_directory.register0 Rollup_node_services.Local.gc_info
   @@ fun node_ctxt () () ->

@@ -122,6 +122,116 @@ module Commitments =
       include Add_empty_header
     end)
 
+module Outbox_messages = struct
+  type messages_per_level = {messages : Bitset.t; executed_messages : Bitset.t}
+
+  module H = Hashtbl.Make (struct
+    include Int32
+
+    let hash = to_int
+  end)
+
+  type pending_messages = messages_per_level H.t
+
+  (* Relatively small so we keep all in memory. *)
+  include Indexed_store.Make_singleton (struct
+    type t = pending_messages
+
+    let name = "outbox_messages"
+
+    let encoding =
+      let open Data_encoding in
+      conv
+        (fun tbl -> H.to_seq tbl |> List.of_seq)
+        (fun l -> List.to_seq l |> H.of_seq)
+      @@ list
+           (conv
+              (fun (outbox_level, {messages; executed_messages}) ->
+                (outbox_level, (messages, executed_messages)))
+              (fun (outbox_level, (messages, executed_messages)) ->
+                (outbox_level, {messages; executed_messages}))
+           @@ merge_objs
+                (obj1 (req "outbox_level" int32))
+                (obj2
+                   (req "messages" Bitset.encoding)
+                   (req "executed_messages" Bitset.encoding)))
+  end)
+
+  let by_outbox_level (t : _ t) ~outbox_level =
+    let open Lwt_result_syntax in
+    let* res = read t in
+    match res with
+    | None -> return_nil
+    | Some h -> (
+        match H.find_opt h outbox_level with
+        | None -> return_nil
+        | Some {messages; executed_messages} ->
+            let indexes = Bitset.to_list messages in
+            List.map_e
+              (fun i ->
+                let open Result_syntax in
+                let* exec = Bitset.mem executed_messages i in
+                return (i, exec))
+              indexes
+            |> Lwt.return)
+
+  let pending (t : _ t) ~min_level ~max_level =
+    let open Lwt_result_syntax in
+    let* res = read t in
+    match res with
+    | None -> return_nil
+    | Some h ->
+        H.fold
+          (fun outbox_level {messages; executed_messages} acc ->
+            if outbox_level < min_level || outbox_level > max_level then acc
+            else
+              let pending_at_level = Bitset.diff messages executed_messages in
+              let l = Bitset.to_list pending_at_level in
+              if List.is_empty l then acc else (outbox_level, l) :: acc)
+          h
+          []
+        |> List.fast_sort (fun (o1, _) (o2, _) -> Int32.compare o1 o2)
+        |> return
+
+  let register_new_outbox_messages (t : _ t) ~outbox_level ~indexes =
+    let open Lwt_result_syntax in
+    let* res = read t in
+    let h = match res with None -> H.create 97 | Some h -> h in
+    let*? messages = Bitset.from_list indexes in
+    H.replace h outbox_level {messages; executed_messages = Bitset.empty} ;
+    write t h
+
+  let register_missing_outbox_messages (t : _ t) ~outbox_level ~indexes =
+    let open Lwt_result_syntax in
+    let* res = read t in
+    let h = match res with None -> H.create 97 | Some h -> h in
+    let*? messages = Bitset.from_list indexes in
+    if H.mem h outbox_level then return_unit
+    else (
+      H.replace h outbox_level {messages; executed_messages = Bitset.empty} ;
+      write t h)
+
+  let set_outbox_message_executed (t : _ t) ~outbox_level ~index =
+    let open Lwt_result_syntax in
+    let* res = read t in
+    match res with
+    | None ->
+        (* Not tracking *)
+        return_unit
+    | Some h -> (
+        match H.find h outbox_level with
+        | None ->
+            (* Not tracking *)
+            return_unit
+        | Some {messages; executed_messages} ->
+            let*? executed_messages = Bitset.add executed_messages index in
+            if Bitset.is_empty (Bitset.diff messages executed_messages) then
+              (* Clean outbox level when all messages are executed. *)
+              H.remove h outbox_level
+            else H.replace h outbox_level {messages; executed_messages} ;
+            write t h)
+end
+
 (** Single commitment for LCC. *)
 module Lcc = struct
   type lcc = {commitment : Commitment.Hash.t; level : int32}
@@ -285,6 +395,7 @@ type 'a store = {
   inboxes : 'a Inboxes.t;
   commitments : 'a Commitments.t;
   commitments_published_at_level : 'a Commitments_published_at_level.t;
+  outbox_messages : 'a Outbox_messages.t;
   l2_head : 'a L2_head.t;
   last_finalized_level : 'a Last_finalized_level.t;
   lcc : 'a Lcc.t;
@@ -311,6 +422,7 @@ let readonly
        inboxes;
        commitments;
        commitments_published_at_level;
+       outbox_messages;
        l2_head;
        last_finalized_level;
        lcc;
@@ -331,6 +443,7 @@ let readonly
     commitments = Commitments.readonly commitments;
     commitments_published_at_level =
       Commitments_published_at_level.readonly commitments_published_at_level;
+    outbox_messages = Outbox_messages.readonly outbox_messages;
     l2_head = L2_head.readonly l2_head;
     last_finalized_level = Last_finalized_level.readonly last_finalized_level;
     lcc = Lcc.readonly lcc;
@@ -352,6 +465,7 @@ let close
        inboxes;
        commitments;
        commitments_published_at_level;
+       outbox_messages = _;
        l2_head = _;
        last_finalized_level = _;
        lcc = _;
@@ -402,6 +516,9 @@ let load (type a) (mode : a mode) ~index_buffer_size ~l2_blocks_cache_size
       mode
       ~path:(path "commitments_published_at_level")
   in
+  let* outbox_messages =
+    Outbox_messages.load mode ~path:(path "outbox_messages")
+  in
   let* l2_head = L2_head.load mode ~path:(path "l2_head") in
   let* last_finalized_level =
     Last_finalized_level.load mode ~path:(path "last_finalized_level")
@@ -430,6 +547,7 @@ let load (type a) (mode : a mode) ~index_buffer_size ~l2_blocks_cache_size
     inboxes;
     commitments;
     commitments_published_at_level;
+    outbox_messages;
     l2_head;
     last_finalized_level;
     lcc;
@@ -527,6 +645,7 @@ let gc
        inboxes;
        commitments;
        commitments_published_at_level;
+       outbox_messages = _;
        l2_head = _;
        last_finalized_level = _;
        lcc = _;
@@ -561,6 +680,7 @@ let wait_gc_completion
        inboxes;
        commitments;
        commitments_published_at_level;
+       outbox_messages = _;
        l2_head = _;
        last_finalized_level = _;
        lcc = _;
@@ -592,6 +712,7 @@ let is_gc_finished
        inboxes;
        commitments;
        commitments_published_at_level;
+       outbox_messages = _;
        l2_head = _;
        last_finalized_level = _;
        lcc = _;
@@ -620,6 +741,7 @@ let cancel_gc
        inboxes;
        commitments;
        commitments_published_at_level;
+       outbox_messages = _;
        l2_head = _;
        last_finalized_level = _;
        lcc = _;

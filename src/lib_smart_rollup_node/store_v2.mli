@@ -55,6 +55,41 @@ module Commitments :
      and type value := Octez_smart_rollup.Commitment.t
      and type header := unit
 
+module Outbox_messages : sig
+  type +'a t
+
+  val load : path:string -> 'a Store_sigs.mode -> 'a t tzresult Lwt.t
+
+  val readonly : [> `Read] t -> [`Read] t
+
+  val by_outbox_level :
+    [> `Read] t -> outbox_level:int32 -> (int * bool) list tzresult Lwt.t
+
+  val pending :
+    [> `Read] t ->
+    min_level:int32 ->
+    max_level:int32 ->
+    (int32 * int list) list tzresult Lwt.t
+
+  val register_new_outbox_messages :
+    [> `Read | `Write] t ->
+    outbox_level:int32 ->
+    indexes:int list ->
+    unit tzresult Lwt.t
+
+  val register_missing_outbox_messages :
+    [> `Read | `Write] t ->
+    outbox_level:int32 ->
+    indexes:int list ->
+    unit tzresult Lwt.t
+
+  val set_outbox_message_executed :
+    [> `Read | `Write] t ->
+    outbox_level:int32 ->
+    index:int ->
+    unit tzresult Lwt.t
+end
+
 (** Storage containing the last cemented commitment. *)
 module Lcc : sig
   type lcc = {commitment : Commitment.Hash.t; level : int32}
@@ -123,6 +158,7 @@ type +'a store = {
   inboxes : 'a Inboxes.t;
   commitments : 'a Commitments.t;
   commitments_published_at_level : 'a Commitments_published_at_level.t;
+  outbox_messages : 'a Outbox_messages.t;
   l2_head : 'a L2_head.t;
   last_finalized_level : 'a Last_finalized_level.t;
   lcc : 'a Lcc.t;
