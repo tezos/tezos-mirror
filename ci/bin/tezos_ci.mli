@@ -42,6 +42,7 @@ module Cli : sig
   (** Action the binary should perform. *)
   type action =
     | Write  (** Write the CI configuration *)
+    | Overview_pipelines  (** Print pipelines as table. *)
     | List_pipelines  (** List registered pipelines. *)
     | Describe_pipeline of {name : string}
         (** Describe a registered pipeline. *)
@@ -154,8 +155,11 @@ module Pipeline : sig
     unit ->
     unit
 
-  (** Pretty prints the set of registered pipelines. *)
+  (** Outputs the set of registered pipelines with their description. *)
   val list_pipelines : unit -> unit
+
+  (** Pretty prints the set of registered pipelines as a table. *)
+  val overview_pipelines : unit -> unit
 
   (** Describe the registered pipeline of a given name.
 

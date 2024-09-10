@@ -323,4 +323,5 @@ let () =
         ~exclude:exclude_fun
         ()
   | List_pipelines -> Pipeline.list_pipelines ()
+  | Overview_pipelines -> Pipeline.overview_pipelines ()
   | Describe_pipeline {name} -> Pipeline.describe_pipeline name

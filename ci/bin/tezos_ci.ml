@@ -3,7 +3,11 @@ open Gitlab_ci.Util
 let failwith fmt = Format.kasprintf (fun s -> failwith s) fmt
 
 module Cli = struct
-  type action = Write | List_pipelines | Describe_pipeline of {name : string}
+  type action =
+    | Write
+    | Overview_pipelines
+    | List_pipelines
+    | Describe_pipeline of {name : string}
 
   type config = {
     mutable verbose : bool;
@@ -48,6 +52,9 @@ module Cli = struct
           ( "--remove-extra-files",
             Arg.Unit (fun () -> config.remove_extra_files <- true),
             " Remove files that are neither generated nor excluded." );
+          ( "--overview-pipelines",
+            Arg.Unit (fun () -> config.action <- Overview_pipelines),
+            " List registered pipelines." );
           ( "--list-pipelines",
             Arg.Unit (fun () -> config.action <- List_pipelines),
             " List registered pipelines." );
@@ -611,6 +618,19 @@ module Pipeline = struct
     description |> String.split_on_char '\n' |> function
     | [] -> description
     | l :: _ -> l
+
+  let overview_pipelines () =
+    markdown_table
+      stdout
+      ~headers:["PIPELINE"; "DESCRIPTION"; "JOBS"]
+      ~rows:
+        ( Fun.flip List.map (all ()) @@ fun pipeline ->
+          let description = shorten_description @@ description pipeline in
+          [
+            name pipeline;
+            description;
+            List.length (jobs pipeline) |> string_of_int;
+          ] )
 
   let describe_pipeline pipeline_name =
     let pipelines = all () in
