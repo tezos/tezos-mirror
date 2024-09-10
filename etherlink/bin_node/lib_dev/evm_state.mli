@@ -107,3 +107,9 @@ val wasm_pvm_version : t -> Tezos_scoru_wasm.Wasm_pvm_state.version Lwt.t
 val irmin_store_path : data_dir:string -> string
 
 val preload_kernel : t -> unit Lwt.t
+
+(** [get_delayed_inbox_item state hash] returns the delayed inbox content behind
+    the hash [hash]. It fails if the hash does not exist or if the value
+    cannot be decoded. *)
+val get_delayed_inbox_item :
+  t -> Ethereum_types.hash -> Evm_events.Delayed_transaction.t tzresult Lwt.t

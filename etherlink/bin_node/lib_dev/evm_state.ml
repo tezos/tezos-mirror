@@ -316,3 +316,27 @@ let preload_kernel evm_state =
   in
   let* version = kernel_version evm_state in
   Events.preload_kernel version
+
+let get_delayed_inbox_item evm_state hash =
+  let open Lwt_result_syntax in
+  let*! bytes =
+    inspect
+      evm_state
+      (Durable_storage_path.Delayed_transaction.transaction hash)
+  in
+  let*? bytes =
+    Option.to_result ~none:[error_of_fmt "missing delayed inbox item"] bytes
+  in
+  let*? rlp_item = Rlp.decode bytes in
+  match rlp_item with
+  | Rlp.(List (rlp_item :: _)) ->
+      let*? res =
+        Option.to_result ~none:[error_of_fmt "cannot parse delayed inbox item"]
+        @@ Evm_events.Delayed_transaction.of_rlp_content
+             ~transaction_tag:"\x01"
+             ~fa_deposit_tag:"\x03"
+             hash
+             rlp_item
+      in
+      return res
+  | _ -> failwith "invalid delayed inbox item"

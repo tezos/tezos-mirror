@@ -127,8 +127,7 @@ let take_delayed_transactions maximum_number_of_chunks =
   return (delayed_transactions, remaining_cumulative_size)
 
 let produce_block_with_transactions ~sequencer_key ~cctxt ~timestamp
-    ~smart_rollup_address ~transactions_and_objects ~delayed_transactions
-    head_info =
+    ~smart_rollup_address ~transactions_and_objects ~delayed_hashes head_info =
   let open Lwt_result_syntax in
   let transactions, tx_hashes =
     List.to_seq transactions_and_objects
@@ -151,7 +150,7 @@ let produce_block_with_transactions ~sequencer_key ~cctxt ~timestamp
       ~cctxt
       ~timestamp
       ~transactions
-      ~delayed_transactions
+      ~delayed_transactions:delayed_hashes
       ~parent_hash:head_info.current_block_hash
       ~number:head_info.next_blueprint_number
   in
@@ -159,6 +158,13 @@ let produce_block_with_transactions ~sequencer_key ~cctxt ~timestamp
     Sequencer_blueprint.create_inbox_payload
       ~smart_rollup_address
       ~chunks:blueprint_chunks
+  in
+  (* Resolve the content of delayed transactions. *)
+  let* delayed_transactions =
+    List.map_es
+      (fun delayed_hash ->
+        Evm_state.get_delayed_inbox_item head_info.evm_state delayed_hash)
+      delayed_hashes
   in
   let* () =
     Evm_context.apply_blueprint timestamp blueprint_payload delayed_transactions
@@ -173,7 +179,7 @@ let produce_block_with_transactions ~sequencer_key ~cctxt ~timestamp
   let*! () =
     List.iter_p
       (fun hash -> Block_producer_events.transaction_selected ~hash)
-      (tx_hashes @ delayed_transactions)
+      (tx_hashes @ delayed_hashes)
   in
   return_unit
 
@@ -182,7 +188,7 @@ let produce_block_with_transactions ~sequencer_key ~cctxt ~timestamp
 let produce_block_if_needed ~cctxt ~smart_rollup_address ~sequencer_key ~force
     ~timestamp ~maximum_number_of_chunks head_info =
   let open Lwt_result_syntax in
-  let* delayed_transactions, remaining_cumulative_size =
+  let* delayed_hashes, remaining_cumulative_size =
     take_delayed_transactions maximum_number_of_chunks
   in
   let* transactions_and_objects =
@@ -194,9 +200,7 @@ let produce_block_if_needed ~cctxt ~smart_rollup_address ~sequencer_key ~force
       Tx_pool.pop_transactions
         ~maximum_cumulative_size:remaining_cumulative_size
   in
-  let n =
-    List.length transactions_and_objects + List.length delayed_transactions
-  in
+  let n = List.length transactions_and_objects + List.length delayed_hashes in
   if force || n > 0 then
     let* () =
       produce_block_with_transactions
@@ -205,7 +209,7 @@ let produce_block_if_needed ~cctxt ~smart_rollup_address ~sequencer_key ~force
         ~timestamp
         ~smart_rollup_address
         ~transactions_and_objects
-        ~delayed_transactions
+        ~delayed_hashes
         head_info
     in
     let* () = Tx_pool.clear_popped_transactions () in
@@ -235,7 +239,7 @@ let produce_block ~cctxt ~smart_rollup_address ~sequencer_key ~force ~timestamp
           ~timestamp
           ~smart_rollup_address
           ~transactions_and_objects:[]
-          ~delayed_transactions:[]
+          ~delayed_hashes:[]
           head_info
       in
       return 0
