@@ -108,7 +108,10 @@ let test_publish_blueprints_on_dal =
   let expected_nb_of_bp_on_dal, expected_nb_of_bp_on_inbox =
     if enable_dal then (number_of_blueprints, 0) else (0, number_of_blueprints)
   in
-  let expected_nb_of_signals = expected_nb_of_bp_on_dal in
+  let expected_nb_of_signals =
+    1
+    (* We sent few blueprints and they are empty. They all fit in a single DAL slot. *)
+  in
   Check.(expected_nb_of_bp_on_dal = !number_of_blueprints_sent_to_dal)
     ~__LOC__
     Check.int
