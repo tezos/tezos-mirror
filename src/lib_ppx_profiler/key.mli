@@ -5,7 +5,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t =
+type content =
   | Empty
   | Ident of string
   | String of string
@@ -13,6 +13,12 @@ type t =
   | Apply of Ppxlib.expression * Parsetree.expression list
   | Other of Ppxlib.expression
 
+type t = {label : string option; content : content}
+
+val to_label : Ppxlib.Location.t -> t -> Ppxlib.expression
+
 val to_expression : Ppxlib.Location.t -> t -> Ppxlib.expression
 
 val pp : Format.formatter -> t -> unit
+
+val content : t -> content
