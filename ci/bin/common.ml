@@ -639,11 +639,14 @@ module Images = struct
   (* Include external images here for convenience. *)
   include Images_external
 
+  (* Internal images are built in the stage {!Stages.images}. *)
+  let stage = Stages.images
+
   let client_libs_dependencies =
     let image_builder_amd64 =
       job_docker_authenticated
         ~__POS__
-        ~stage:Stages.build
+        ~stage
         ~name:"oc.docker:client-libs-dependencies"
           (* These image are not built for external use. *)
         ~ci_docker_hub:false
@@ -670,7 +673,7 @@ module Images = struct
         ~__POS__
         ~arch
         ~skip_docker_initialization:true
-        ~stage:Stages.images
+        ~stage
         ~name:("oc.docker:rust-toolchain:" ^ arch_to_string_alt arch)
         ~ci_docker_hub:false
         ~artifacts:
@@ -705,7 +708,7 @@ module Images = struct
         ~__POS__
         ~arch
         ~skip_docker_initialization:true
-        ~stage:Stages.images
+        ~stage
         ~name:("oc.docker:ci:" ^ arch_to_string_alt arch)
         ~ci_docker_hub:false
         ~artifacts:
