@@ -1180,7 +1180,19 @@ let jobs pipeline_type =
             Artifacts job_tezt_fetch_records;
           ]
       in
+      (* Rules for tezt jobs that are started automatically.
+
+         Tezt jobs are selected whenever a file in [changeset_octez] is modified.
+         The tezt jobs are dependent (they need the binaries and such). *)
       let rules = make_rules ~dependent:true ~changes:changeset_octez () in
+      (* Rules for tezt jobs that are started manually.
+
+         These jobs can only be manually started on [before_merging]
+         pipelines when its artifact dependencies exist, which they do
+         when [changeset_octez] is changed. *)
+      let rules_manual =
+        make_rules ~dependent:true ~manual:(On_changes changeset_octez) ()
+      in
       let coverage_expiry = Duration (Days 3) in
       let tezt : tezos_job =
         Tezt.job
@@ -1241,9 +1253,7 @@ let jobs pipeline_type =
         Tezt.job
           ~__POS__
           ~name:"tezt-slow"
-          ~rules:
-            (* See comment for [tezt_flaky] *)
-            (make_rules ~dependent:true ~manual:(On_changes changeset_octez) ())
+          ~rules:rules_manual
           ~tezt_tests:
             (Tezt.tests_tag_selector
                ~slow:true
@@ -1285,12 +1295,7 @@ let jobs pipeline_type =
           ~tezt_retry:3
           ~tezt_parallel:1
           ~dependencies
-          ~rules:
-            (* This job can only be manually started on
-               [before_merging] pipelines when it's artifact
-               dependencies exists, which they do when
-               [changeset_octez] is changed. *)
-            (make_rules ~dependent:true ~manual:(On_changes changeset_octez) ())
+          ~rules:rules_manual
           ()
         |> enable_coverage_output_artifact
       in
