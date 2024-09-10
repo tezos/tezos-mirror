@@ -381,16 +381,13 @@ mod tests {
     use crate::current_timestamp;
     use crate::inbox::Transaction;
     use primitive_types::{H160, U256};
-    use tezos_evm_runtime::mock_internal::MockInternal;
-    use tezos_evm_runtime::runtime::KernelHost;
+    use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup_encoding::timestamp::Timestamp;
 
     use crate::inbox::TransactionContent::{Ethereum, EthereumDelayed};
     use tezos_ethereum::{
         transaction::TRANSACTION_HASH_SIZE, tx_common::EthereumTransactionCommon,
     };
-
-    use tezos_smart_rollup_mock::MockHost;
 
     fn address_from_str(s: &str) -> Option<H160> {
         let data = &hex::decode(s).unwrap();
@@ -422,12 +419,7 @@ mod tests {
 
     #[test]
     fn test_delayed_inbox_roundtrip() {
-        let mut host = MockHost::default();
-        let mut internal = MockInternal();
-        let mut host = KernelHost {
-            host: &mut host,
-            internal: &mut internal,
-        };
+        let mut host = MockKernelHost::default();
         let mut delayed_inbox =
             DelayedInbox::new(&mut host).expect("Delayed inbox should be created");
 
@@ -450,12 +442,7 @@ mod tests {
 
     #[test]
     fn test_delayed_inbox_roundtrip_error_non_delayed() {
-        let mut host = MockHost::default();
-        let mut internal = MockInternal();
-        let mut host = KernelHost {
-            host: &mut host,
-            internal: &mut internal,
-        };
+        let mut host = MockKernelHost::default();
         let mut delayed_inbox =
             DelayedInbox::new(&mut host).expect("Delayed inbox should be created");
 
