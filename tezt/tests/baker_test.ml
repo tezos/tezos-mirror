@@ -115,7 +115,7 @@ let baker_reward_test =
       in
       unit)
 
-let baker_test ?force_apply protocol ~keys =
+let baker_test protocol ~keys =
   let* parameter_file =
     Protocol.write_parameter_file
       ~bootstrap_accounts:(List.map (fun k -> (k, None)) keys)
@@ -133,7 +133,7 @@ let baker_test ?force_apply protocol ~keys =
   in
   let level_2_promise = Node.wait_for_level node 2 in
   let level_3_promise = Node.wait_for_level node 3 in
-  let* baker = Baker.init ?force_apply ~protocol node client in
+  let* baker = Baker.init ~protocol node client in
   Log.info "Wait for new head." ;
   Baker.log_events baker ;
   let* _ = level_2_promise in
@@ -181,7 +181,7 @@ let baker_stresstest_apply =
   let* node, client =
     Client.init_with_protocol `Client ~protocol () ~timestamp:Now
   in
-  let* _ = Baker.init ~force_apply:true ~protocol node client in
+  let* _ = Baker.init ~force_apply_from_round:0 ~protocol node client in
   let* _ = Node.wait_for_level node 3 in
   (* Use a large tps, to have failing operations too *)
   let* () = Client.stresstest ~tps:25 ~transfers:100 client in
