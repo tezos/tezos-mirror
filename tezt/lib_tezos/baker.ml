@@ -49,7 +49,7 @@ module Parameters = struct
     mutable pending_ready : unit option Lwt.u list;
     votefile : string option;
     liquidity_baking_toggle_vote : liquidity_baking_vote option;
-    force_apply : bool;
+    force_apply_from_round : int option;
     remote_mode : bool;
     operations_pool : string option;
     minimal_nanotez_per_gas_unit : int option;
@@ -100,7 +100,7 @@ let liquidity_baking_votefile ?path vote =
 let create_from_uris ?runner ~protocol
     ?(path = Uses.path (Protocol.baker protocol)) ?name ?color ?event_pipe
     ?(delegates = []) ?votefile ?(liquidity_baking_toggle_vote = Some Pass)
-    ?(force_apply = false) ?(remote_mode = false) ?operations_pool
+    ?force_apply_from_round ?(remote_mode = false) ?operations_pool
     ?dal_node_rpc_endpoint ?dal_node_timeout_percentage
     ?minimal_nanotez_per_gas_unit ?(state_recorder = false)
     ?(node_version_check_bypass = false) ?node_version_allowed ~base_dir
@@ -123,7 +123,7 @@ let create_from_uris ?runner ~protocol
         votefile;
         liquidity_baking_toggle_vote;
         remote_mode;
-        force_apply;
+        force_apply_from_round;
         operations_pool;
         dal_node_rpc_endpoint;
         dal_node_timeout_percentage;
@@ -137,8 +137,8 @@ let create_from_uris ?runner ~protocol
   baker
 
 let create ?runner ~protocol ?path ?name ?color ?event_pipe ?(delegates = [])
-    ?votefile ?(liquidity_baking_toggle_vote = Some Pass) ?(force_apply = false)
-    ?(remote_mode = false) ?operations_pool ?dal_node
+    ?votefile ?(liquidity_baking_toggle_vote = Some Pass)
+    ?force_apply_from_round ?(remote_mode = false) ?operations_pool ?dal_node
     ?dal_node_timeout_percentage ?minimal_nanotez_per_gas_unit
     ?(state_recorder = false) ?(node_version_check_bypass = false)
     ?node_version_allowed node client =
@@ -153,7 +153,7 @@ let create ?runner ~protocol ?path ?name ?color ?event_pipe ?(delegates = [])
     ~delegates
     ?votefile
     ~liquidity_baking_toggle_vote
-    ~force_apply
+    ?force_apply_from_round
     ~remote_mode
     ?operations_pool
     ?minimal_nanotez_per_gas_unit
@@ -185,8 +185,22 @@ let run ?event_level ?event_sections_levels (baker : t) =
       liquidity_baking_vote_to_string
       baker.persistent_state.liquidity_baking_toggle_vote
   in
-  let force_apply =
-    Cli_arg.optional_switch "force-apply" baker.persistent_state.force_apply
+  let force_apply_from_round =
+    (* From Quebec, the flag --force-apply has been replaced by
+       --force-apply-from-round, the following maintains back-compatibility with
+       ParisC tests. *)
+    if
+      Protocol.number baker.persistent_state.protocol
+      > Protocol.number Protocol.ParisC
+    then
+      Cli_arg.optional_arg
+        "force-apply-from-round"
+        string_of_int
+        baker.persistent_state.force_apply_from_round
+    else
+      Cli_arg.optional_switch
+        "force-apply"
+        (Option.is_some baker.persistent_state.force_apply_from_round)
   in
   let operations_pool =
     Cli_arg.optional_arg
@@ -232,10 +246,10 @@ let run ?event_level ?event_sections_levels (baker : t) =
   in
   let arguments =
     ["--endpoint"; node_addr; "--base-dir"; base_dir; "run"]
-    @ run_args @ liquidity_baking_toggle_vote @ votefile @ force_apply
-    @ operations_pool @ dal_node_endpoint @ dal_node_timeout_percentage
-    @ delegates @ minimal_nanotez_per_gas_unit @ state_recorder
-    @ node_version_check_bypass @ node_version_allowed
+    @ run_args @ liquidity_baking_toggle_vote @ votefile
+    @ force_apply_from_round @ operations_pool @ dal_node_endpoint
+    @ dal_node_timeout_percentage @ delegates @ minimal_nanotez_per_gas_unit
+    @ state_recorder @ node_version_check_bypass @ node_version_allowed
   in
 
   let on_terminate _ =
@@ -270,7 +284,7 @@ let wait_for_ready baker =
 
 let init ?runner ~protocol ?(path = Uses.path (Protocol.baker protocol)) ?name
     ?color ?event_level ?event_pipe ?event_sections_levels ?(delegates = [])
-    ?votefile ?liquidity_baking_toggle_vote ?force_apply ?remote_mode
+    ?votefile ?liquidity_baking_toggle_vote ?force_apply_from_round ?remote_mode
     ?operations_pool ?dal_node ?dal_node_timeout_percentage
     ?minimal_nanotez_per_gas_unit ?state_recorder ?node_version_check_bypass
     ?node_version_allowed node client =
@@ -285,7 +299,7 @@ let init ?runner ~protocol ?(path = Uses.path (Protocol.baker protocol)) ?name
       ?event_pipe
       ?votefile
       ?liquidity_baking_toggle_vote
-      ?force_apply
+      ?force_apply_from_round
       ?remote_mode
       ?operations_pool
       ?dal_node

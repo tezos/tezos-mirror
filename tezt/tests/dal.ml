@@ -4587,7 +4587,7 @@ let test_restart_dal_node protocol dal_parameters _cryptobox node client
       ~delegates:all_pkhs
       ~liquidity_baking_toggle_vote:(Some On)
       ~state_recorder:true
-      ~force_apply:true
+      ~force_apply_from_round:0
       ~dal_node
       node
       client
@@ -7260,7 +7260,7 @@ let scenario_tutorial_dal_baker =
           ~delegates:all_delegates
           ~liquidity_baking_toggle_vote:(Some On)
           ~state_recorder:true
-          ~force_apply:true
+          ~force_apply_from_round:0
           node
           client
       in
