@@ -5,12 +5,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [main ?kernel_path ~rollup_node_endpoint ~evm_node_endpoint
-    ~data_dir ~config] starts the main event-loop of the Observer,
-    consuming the blueprints received from [evm_node_endpoint]. *)
+(** [main ?kernel_path ~data_dir ~config ~no_sync ()] starts the main
+    event-loop of the Observer, consuming the blueprints received from
+    the EVM node endpoint, unless [no_sync] is true. *)
 val main :
   ?kernel_path:string ->
   data_dir:string ->
   config:Configuration.t ->
+  no_sync:bool ->
   unit ->
   unit tzresult Lwt.t

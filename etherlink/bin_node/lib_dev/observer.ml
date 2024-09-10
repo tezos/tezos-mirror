@@ -45,7 +45,7 @@ let install_finalizer_observer ~rollup_node_tracking finalizer_public_server
   let* () = Evm_context.shutdown () in
   when_ rollup_node_tracking @@ fun () -> Evm_events_follower.shutdown ()
 
-let main ?kernel_path ~data_dir ~(config : Configuration.t) () =
+let main ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync () =
   let open Lwt_result_syntax in
   let*? {
           evm_node_endpoint;
@@ -159,8 +159,13 @@ let main ?kernel_path ~data_dir ~(config : Configuration.t) () =
 
   let*! next_blueprint_number = Evm_context.next_blueprint_number () in
 
-  Blueprints_follower.start
-    ~time_between_blocks
-    ~evm_node_endpoint
-    ~next_blueprint_number
-    on_new_blueprint
+  if no_sync then
+    let task, _resolver = Lwt.task () in
+    let*! () = task in
+    return_unit
+  else
+    Blueprints_follower.start
+      ~time_between_blocks
+      ~evm_node_endpoint
+      ~next_blueprint_number
+      on_new_blueprint
