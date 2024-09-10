@@ -117,6 +117,7 @@ let configuration config dir =
           threshold_encryption_sequencer = None;
           proxy;
           observer;
+          private_rpc = None;
         }
       in
 
