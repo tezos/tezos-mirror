@@ -81,6 +81,8 @@ val os : string
 
 val open_telemetry : bool
 
+val jaeger : bool
+
 val init : unit -> unit Lwt.t
 
 val project_id : unit -> string Lwt.t

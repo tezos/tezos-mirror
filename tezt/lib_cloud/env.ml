@@ -72,6 +72,8 @@ let os = Cli.os
 
 let open_telemetry = Cli.open_telemetry
 
+let jaeger = Cli.jaeger
+
 let docker_image =
   (* In localhost mode, we don't want to interact with GCP. The image is taken
      locally. *)
