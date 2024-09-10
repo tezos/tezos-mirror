@@ -1701,6 +1701,32 @@ let init_etherlink_dal_node ~bootstrap ~next_agent ~name ~dal_slots ~network =
           default_dal_node
       in
       let* () = Dal_node.Agent.run ~memtrace:Cli.memtrace default_dal_node in
+
+      let* _dal_slots_and_nodes =
+        dal_slots
+        |> Lwt_list.map_p (fun slot_index ->
+               let name =
+                 Format.asprintf "etherlink-%s-dal-operator-%d" name slot_index
+               in
+               let* agent = next_agent ~name in
+               let* node =
+                 Node.init
+                   ~name
+                   ~arguments:[Peer bootstrap.node_p2p_endpoint]
+                   network
+                   agent
+               in
+               let* dal_node = Dal_node.Agent.create ~name ~node agent in
+               let* () =
+                 Dal_node.init_config
+                   ~expected_pow:(Network.expected_pow Cli.network)
+                   ~observer_profiles:[slot_index]
+                   ~peers:[bootstrap.dal_node_p2p_endpoint]
+                   dal_node
+               in
+               let* () = Dal_node.Agent.run ~memtrace:Cli.memtrace dal_node in
+               return (slot_index, Dal_node.rpc_endpoint dal_node))
+      in
       some default_dal_node
 
 let init_etherlink_operator_setup cloud configuration name ~bootstrap ~dal_slots
@@ -2340,8 +2366,12 @@ let benchmark () =
       List.init configuration.dal_node_producers (fun _ -> `Producer);
       List.map (fun _ -> `Observer) configuration.observer_slot_indices;
       (if configuration.etherlink then [`Etherlink_operator] else []);
-      (if configuration.etherlink && configuration.etherlink_dal_slots <> []
-       then [`Etherlink_dal_node]
+      (if configuration.etherlink then
+         match configuration.etherlink_dal_slots with
+         | [] -> []
+         | [_] -> [`Etherlink_dal_node]
+         | dal_slots ->
+             `Reverse_proxy :: List.map (fun _ -> `Etherlink_dal_node) dal_slots
        else []);
       List.init configuration.etherlink_producers (fun i ->
           `Etherlink_producer i);
@@ -2370,7 +2400,8 @@ let benchmark () =
                | Some machine_type ->
                    Configuration.make ?docker_image ~machine_type ())
            | `Etherlink_operator -> default_vm_configuration
-           | `Etherlink_producer _ -> default_vm_configuration)
+           | `Etherlink_producer _ -> default_vm_configuration
+           | `Reverse_proxy -> default_vm_configuration)
   in
   Cloud.register
   (* docker images are pushed before executing the test in case binaries are modified locally. This way we always use the latest ones. *)
