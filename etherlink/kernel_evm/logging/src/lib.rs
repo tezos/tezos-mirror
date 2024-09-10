@@ -49,6 +49,10 @@ impl std::fmt::Display for Level {
     }
 }
 
+pub trait Verbosity {
+    fn verbosity(&self) -> Level;
+}
+
 #[cfg(feature = "alloc")]
 #[macro_export]
 macro_rules! log {

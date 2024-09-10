@@ -17,6 +17,7 @@ use crate::{
     internal_runtime::{ExtendedRuntime, InternalRuntime},
     mock_internal::MockInternal,
 };
+use tezos_evm_logging::{Level, Verbosity};
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
 use tezos_smart_rollup_encoding::smart_rollup::SmartRollupAddress;
 use tezos_smart_rollup_host::{
@@ -28,11 +29,11 @@ use tezos_smart_rollup_host::{
 };
 use tezos_smart_rollup_mock::MockHost;
 
-pub trait Runtime: SdkRuntime + InternalRuntime + ExtendedRuntime {}
+pub trait Runtime: SdkRuntime + InternalRuntime + ExtendedRuntime + Verbosity {}
 
 // If a type implements the Runtime, InternalRuntime and ExtendedRuntime traits,
 // it also implements the kernel Runtime.
-impl<T: SdkRuntime + InternalRuntime + ExtendedRuntime> Runtime for T {}
+impl<T: SdkRuntime + InternalRuntime + ExtendedRuntime + Verbosity> Runtime for T {}
 
 // This type has two interesting parts:
 // 1. Host: BorrowMut<R> + Borrow<R>
@@ -53,6 +54,7 @@ impl<T: SdkRuntime + InternalRuntime + ExtendedRuntime> Runtime for T {}
 pub struct KernelHost<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>, Internal> {
     pub host: Host,
     pub internal: Internal,
+    pub logs_verbosity: Level,
     pub _pd: PhantomData<R>,
 }
 
@@ -259,8 +261,17 @@ where
         KernelHost {
             host: &mut self.host,
             internal: &mut self.internal,
+            logs_verbosity: self.logs_verbosity,
             _pd: PhantomData,
         }
+    }
+}
+
+impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>, Internal: InternalRuntime> Verbosity
+    for KernelHost<R, Host, Internal>
+{
+    fn verbosity(&self) -> Level {
+        self.logs_verbosity
     }
 }
 
@@ -271,6 +282,7 @@ impl Default for MockKernelHost {
         Self {
             host: MockHost::default(),
             internal: MockInternal(),
+            logs_verbosity: Level::default(),
             _pd: PhantomData,
         }
     }
@@ -283,6 +295,7 @@ impl MockKernelHost {
         KernelHost {
             host,
             internal,
+            logs_verbosity: Level::default(),
             _pd: PhantomData,
         }
     }

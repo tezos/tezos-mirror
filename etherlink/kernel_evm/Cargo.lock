@@ -2230,6 +2230,7 @@ name = "tezos-evm-runtime"
 version = "0.1.0"
 dependencies = [
  "sha3",
+ "tezos-evm-logging",
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-debug",
  "tezos-smart-rollup-encoding",

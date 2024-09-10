@@ -320,6 +320,7 @@ pub fn kernel_loop<Host: tezos_smart_rollup_host::runtime::Runtime>(host: &mut H
     let mut host = KernelHost {
         host,
         internal: internal_storage,
+        logs_verbosity: Level::default(),
         _pd: PhantomData::<Host>,
     };
 
