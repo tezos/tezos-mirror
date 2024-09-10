@@ -37,11 +37,13 @@
 # @eugenz = Eugen Zalinescu
 # @iguerNL = Mohamed Iguernlala
 # @jobjo = Joel Bjornson
+# @julien.sagot.nl = Julien Sagot
 # @julien.t = Julien Tesson
 # @Killian-Delarue = Killian Delarue
 # @lrand = Lucas Randazzo
 # @lthms = Thomas Letan
 # @MBourgoin = Mathias Bourgoin
+# @mattiasdrp = Mattias Roux
 # @mebsout = Alain Mebsout
 # @murbard = Arthur B.
 # @naih = Nicolas Ayache
@@ -62,7 +64,7 @@
 # @victor-dumitrescu = Victor Dumitrescu
 # @yrg = Yann Regis-Gianas
 #
-* @abate @ACoquereau @andrea.cerone @arvidnl @dianegalloiswong @emturner @eugenz @iguerNL @jobjo @julien.t @Killian-Delarue @lrand @lthms @MBourgoin @mebsout @murbard @naih @NicVolanschi @ole.kruger @pe.cornilleau @phink @picdc @rafoo_ @rodibozman @romain.nl @ryan.tan3 @Saroupille @sribaroud @tomjack @vch9 @vect0r @victor-dumitrescu @yrg
+* @abate @ACoquereau @andrea.cerone @arvidnl @dianegalloiswong @emturner @eugenz @iguerNL @jobjo @julien.sagot.nl @julien.t @Killian-Delarue @lrand @lthms @MBourgoin @mattiasdrp @mebsout @murbard @naih @NicVolanschi @ole.kruger @pe.cornilleau @phink @picdc @rafoo_ @rodibozman @romain.nl @ryan.tan3 @Saroupille @sribaroud @tomjack @vch9 @vect0r @victor-dumitrescu @yrg
 
 # CODEOWNERS Owners
 #
