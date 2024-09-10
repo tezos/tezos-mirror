@@ -2220,6 +2220,8 @@ dependencies = [
 name = "tezos-evm-logging"
 version = "0.1.0"
 dependencies = [
+ "num-derive",
+ "num-traits",
  "tezos-smart-rollup-debug",
 ]
 

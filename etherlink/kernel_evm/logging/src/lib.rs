@@ -5,13 +5,24 @@
 #[doc(hidden)]
 pub use tezos_smart_rollup_debug::debug_str;
 
-#[derive(PartialEq)]
+use num_derive::FromPrimitive;
+use num_traits::FromPrimitive;
+
+#[repr(u8)]
+#[derive(PartialEq, Clone, Copy, PartialOrd, FromPrimitive)]
 pub enum Level {
-    Info,
+    Fatal = 0,
     Error,
-    Fatal,
+    Info,
     Debug,
     Benchmarking,
+}
+
+impl TryFrom<u8> for Level {
+    type Error = ();
+    fn try_from(value: u8) -> Result<Self, ()> {
+        FromPrimitive::from_u8(value).ok_or(())
+    }
 }
 
 impl std::fmt::Display for Level {
