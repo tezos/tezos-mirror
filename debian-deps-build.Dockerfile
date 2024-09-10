@@ -14,6 +14,8 @@ ENV BLST_PORTABLE=true
 ENV BLST_PORTABLE=true
 
 # we trust sw distributors
+# We install sccache as a static binary because at the moment of writing
+# the package sccache is not available on ubuntu jammy
 #hadolint ignore=DL3008,DL3009
 RUN apt-get update && \
     apt-get install --no-install-recommends -y bubblewrap \
@@ -28,7 +30,12 @@ RUN apt-get update && \
       libsqlite3-dev libpq-dev \
       lintian devscripts && \
     apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+    rm -rf /var/lib/apt/lists/* && \
+    ARCH=$(uname -m) && \
+    curl  -L --output sccache.tgz "https://github.com/mozilla/sccache/releases/download/v0.8.1/sccache-v0.8.1-$ARCH-unknown-linux-musl.tar.gz" && \
+    tar zxvf sccache.tgz && \
+    cp "sccache-v0.8.1-$ARCH-unknown-linux-musl/sccache" /usr/local/bin/sccache && \
+    rm -Rf sccache*
 
 #hadolint ignore=SC2154
 ARG RECOMMENDED_RUST_VERSION=

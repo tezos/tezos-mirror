@@ -297,13 +297,24 @@ oc.build-debian:
   - oc.docker-build-debian-dependencies
   dependencies: []
   timeout: 60 minutes
+  cache:
+    key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  before_script:
+  - . ./scripts/ci/sccache-start.sh
   script:
   - export CARGO_NET_OFFLINE=false
   - ./scripts/ci/build-debian-packages.sh binaries
+  after_script:
+  - sccache --stop-server || true
   variables:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION-$RELEASE
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: debian
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_IDLE_TIMEOUT: "0"
   artifacts:
     paths:
     - packages/$DISTRIBUTION/$RELEASE
@@ -329,13 +340,24 @@ oc.build-debian-current_a:
   - oc.docker-build-debian-dependencies
   dependencies: []
   timeout: 60 minutes
+  cache:
+    key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  before_script:
+  - . ./scripts/ci/sccache-start.sh
   script:
   - export CARGO_NET_OFFLINE=false
   - ./scripts/ci/build-debian-packages_current.sh A
+  after_script:
+  - sccache --stop-server || true
   variables:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION-$RELEASE
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: debian
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_IDLE_TIMEOUT: "0"
   artifacts:
     paths:
     - packages/$DISTRIBUTION/$RELEASE
@@ -361,13 +383,24 @@ oc.build-debian-current_b:
   - oc.docker-build-debian-dependencies
   dependencies: []
   timeout: 60 minutes
+  cache:
+    key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  before_script:
+  - . ./scripts/ci/sccache-start.sh
   script:
   - export CARGO_NET_OFFLINE=false
   - ./scripts/ci/build-debian-packages_current.sh B
+  after_script:
+  - sccache --stop-server || true
   variables:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION-$RELEASE
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: debian
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_IDLE_TIMEOUT: "0"
   artifacts:
     paths:
     - packages/$DISTRIBUTION/$RELEASE
@@ -485,13 +518,24 @@ oc.build-ubuntu:
   - oc.docker-build-ubuntu-dependencies
   dependencies: []
   timeout: 60 minutes
+  cache:
+    key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  before_script:
+  - . ./scripts/ci/sccache-start.sh
   script:
   - export CARGO_NET_OFFLINE=false
   - ./scripts/ci/build-debian-packages.sh binaries
+  after_script:
+  - sccache --stop-server || true
   variables:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION-$RELEASE
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: ubuntu
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_IDLE_TIMEOUT: "0"
   artifacts:
     paths:
     - packages/$DISTRIBUTION/$RELEASE
@@ -517,13 +561,24 @@ oc.build-ubuntu-current_a:
   - oc.docker-build-ubuntu-dependencies
   dependencies: []
   timeout: 60 minutes
+  cache:
+    key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  before_script:
+  - . ./scripts/ci/sccache-start.sh
   script:
   - export CARGO_NET_OFFLINE=false
   - ./scripts/ci/build-debian-packages_current.sh A
+  after_script:
+  - sccache --stop-server || true
   variables:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION-$RELEASE
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: ubuntu
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_IDLE_TIMEOUT: "0"
   artifacts:
     paths:
     - packages/$DISTRIBUTION/$RELEASE
@@ -549,13 +604,24 @@ oc.build-ubuntu-current_b:
   - oc.docker-build-ubuntu-dependencies
   dependencies: []
   timeout: 60 minutes
+  cache:
+    key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  before_script:
+  - . ./scripts/ci/sccache-start.sh
   script:
   - export CARGO_NET_OFFLINE=false
   - ./scripts/ci/build-debian-packages_current.sh B
+  after_script:
+  - sccache --stop-server || true
   variables:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION-$RELEASE
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: ubuntu
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_IDLE_TIMEOUT: "0"
   artifacts:
     paths:
     - packages/$DISTRIBUTION/$RELEASE

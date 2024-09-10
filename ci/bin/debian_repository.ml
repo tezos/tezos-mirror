@@ -131,12 +131,15 @@ let jobs pipeline_type =
            to override the default [CARGO_NET_OFFLINE=true], we cannot
            just set it in the job-level variables of this job.
 
+           [enable_sccache] adds the cache directive for [$CI_PROJECT_DIR/_sccache].
+
            See
            {{:https://docs.gitlab.com/ee/ci/variables/index.html#cicd-variable-precedence}here}
            for more info. *)
         "export CARGO_NET_OFFLINE=false";
         script;
       ]
+    |> enable_sccache ~idle_timeout:"0"
   in
 
   (* These jobs build the current packages in a matrix using the
