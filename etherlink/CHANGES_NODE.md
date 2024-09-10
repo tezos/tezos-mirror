@@ -7,8 +7,8 @@
 #### CLI
 
 - Support string interpolation in `--snapshot-file` (for command `snapshot
-  export`): `%r` will be replace by the rollup address, and `%l` by the current
-  level. (!14854)
+  export`): `%r` will be replace by the short rollup address, `%R` by the full
+  rollup address, and `%l` by the current level. (!14854 !14886)
 
 ### Bug fixes
 
