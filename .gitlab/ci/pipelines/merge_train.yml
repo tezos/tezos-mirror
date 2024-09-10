@@ -313,6 +313,21 @@ nix:
     - flake.lock
     when: on_failure
 
+commit_titles:
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
+  stage: sanity
+  tags:
+  - gcp
+  needs:
+  - oc.docker:ci:amd64
+  - trigger
+  dependencies:
+  - oc.docker:ci:amd64
+  allow_failure: true
+  timeout: 60 minutes
+  script:
+  - ./scripts/ci/check_commit_messages.sh || exit $?
+
 oc.build_arm64-released:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
@@ -461,6 +476,8 @@ oc.build:static-x86_64-linux-binaries:
     optional: true
   - job: nix
     optional: true
+  - job: commit_titles
+    optional: true
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -539,6 +556,8 @@ oc.build_x86_64-released:
   - job: documentation:rst-check
     optional: true
   - job: nix
+    optional: true
+  - job: commit_titles
     optional: true
   dependencies:
   - oc.docker:ci:amd64
@@ -629,6 +648,8 @@ oc.build_x86_64-exp-dev-extra:
     optional: true
   - job: nix
     optional: true
+  - job: commit_titles
+    optional: true
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -710,6 +731,8 @@ ocaml-check:
   - job: documentation:rst-check
     optional: true
   - job: nix
+    optional: true
+  - job: commit_titles
     optional: true
   dependencies:
   - oc.docker:ci:amd64
@@ -1031,6 +1054,8 @@ opam:prepare:
   - job: documentation:rst-check
     optional: true
   - job: nix
+    optional: true
+  - job: commit_titles
     optional: true
   dependencies:
   - oc.docker:ci:amd64
@@ -1866,6 +1891,8 @@ kaitai_checks:
     optional: true
   - job: nix
     optional: true
+  - job: commit_titles
+    optional: true
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -1956,6 +1983,8 @@ oc.check_lift_limits_patch:
     optional: true
   - job: nix
     optional: true
+  - job: commit_titles
+    optional: true
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -2014,6 +2043,8 @@ oc.python_check:
   - job: documentation:rst-check
     optional: true
   - job: nix
+    optional: true
+  - job: commit_titles
     optional: true
   dependencies:
   - oc.docker:ci:amd64
@@ -2133,6 +2164,8 @@ oc.script:test-gen-genesis:
   - job: documentation:rst-check
     optional: true
   - job: nix
+    optional: true
+  - job: commit_titles
     optional: true
   dependencies:
   - oc.docker:ci:amd64
@@ -2271,6 +2304,8 @@ oc.script:b58_prefix:
   - job: documentation:rst-check
     optional: true
   - job: nix
+    optional: true
+  - job: commit_titles
     optional: true
   dependencies:
   - oc.docker:ci:amd64
@@ -3092,6 +3127,8 @@ oc.install_opam_jammy:
     optional: true
   - job: nix
     optional: true
+  - job: commit_titles
+    optional: true
   dependencies: []
   allow_failure: true
   timeout: 2 hours
@@ -3128,6 +3165,8 @@ oc.compile_sources_doc_bookworm:
   - job: documentation:rst-check
     optional: true
   - job: nix
+    optional: true
+  - job: commit_titles
     optional: true
   dependencies: []
   timeout: 60 minutes
@@ -3725,37 +3764,6 @@ tezt:static-binaries:
       junit: $JUNIT
     when: always
 
-commit_titles:
-  image: ${ci_image_name}/prebuild:${ci_image_tag}
-  stage: test
-  tags:
-  - gcp
-  needs:
-  - job: oc.docker:ci:amd64
-  - job: trigger
-  - job: sanity_ci
-    optional: true
-  - job: docker:hadolint
-    optional: true
-  - job: oc.ocaml_fmt
-    optional: true
-  - job: oc.semgrep
-    optional: true
-  - job: oc.misc_checks
-    optional: true
-  - job: check_rust_fmt
-    optional: true
-  - job: documentation:rst-check
-    optional: true
-  - job: nix
-    optional: true
-  dependencies:
-  - oc.docker:ci:amd64
-  allow_failure: true
-  timeout: 60 minutes
-  script:
-  - ./scripts/ci/check_commit_messages.sh || exit $?
-
 oc.unified_coverage:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
   stage: test_coverage
@@ -3855,6 +3863,8 @@ oc.install_python_bookworm:
     optional: true
   - job: nix
     optional: true
+  - job: commit_titles
+    optional: true
   dependencies: []
   timeout: 60 minutes
   script:
@@ -3905,6 +3915,8 @@ documentation:odoc:
   - job: documentation:rst-check
     optional: true
   - job: nix
+    optional: true
+  - job: commit_titles
     optional: true
   dependencies:
   - oc.docker:ci:amd64
@@ -3980,6 +3992,8 @@ documentation:manuals:
     optional: true
   - job: nix
     optional: true
+  - job: commit_titles
+    optional: true
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -4054,6 +4068,8 @@ documentation:docgen:
   - job: documentation:rst-check
     optional: true
   - job: nix
+    optional: true
+  - job: commit_titles
     optional: true
   dependencies:
   - oc.docker:ci:amd64

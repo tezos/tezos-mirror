@@ -438,6 +438,19 @@ let jobs pipeline_type =
         ~before_script:(before_script ~init_python_venv:true [])
         ["make --silent -C docs sphinx-check"]
     in
+    let job_commit_titles : tezos_job =
+      job
+        ~__POS__
+        ~name:"commit_titles"
+        ~image:Images.CI.prebuild
+        ~stage
+        ~dependencies
+        (* ./scripts/ci/check_commit_messages.sh exits with code 65 when a git history contains
+           invalid commits titles in situations where that is allowed. *)
+        (script_propagate_exit_code "./scripts/ci/check_commit_messages.sh")
+        (* temporary cf issue https://gitlab.com/tezos/tezos/-/issues/7436 *)
+        ~allow_failure:Yes
+    in
     let mr_only_jobs =
       match pipeline_type with
       | Before_merging ->
@@ -445,6 +458,10 @@ let jobs pipeline_type =
             (* This job shall only run in pipelines for MRs because it's not
                sensitive to changes in time. *)
             job_nix;
+            (* It makes no sense to test commit titles in scheduled
+               pipelines (they run on master, where commit titles are
+               unmutable) *)
+            job_commit_titles;
           ]
       | _ -> []
     in
@@ -1399,28 +1416,7 @@ let jobs pipeline_type =
         job_oc_test_liquidity_baking_scripts;
       ]
     in
-    let job_commit_titles : tezos_job list =
-      match pipeline_type with
-      | Before_merging ->
-          let job_commit_titles : tezos_job =
-            job
-              ~__POS__
-              ~name:"commit_titles"
-              ~image:Images.CI.prebuild
-              ~stage:Stages.test
-              ~dependencies:dependencies_needs_start
-              (* ./scripts/ci/check_commit_messages.sh exits with code 65 when a git history contains
-                 invalid commits titles in situations where that is allowed. *)
-              (script_propagate_exit_code
-                 "./scripts/ci/check_commit_messages.sh")
-              (* temporary cf issue https://gitlab.com/tezos/tezos/-/issues/7436 *)
-              ~allow_failure:Yes
-          in
-          [job_commit_titles]
-      | Schedule_extended_test -> []
-    in
     jobs_misc @ jobs_kernels @ jobs_unit @ jobs_install_octez @ jobs_tezt
-    @ job_commit_titles
   in
 
   (*Coverage jobs *)
