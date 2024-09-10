@@ -315,6 +315,11 @@ let import ~force ~data_dir ~snapshot_file =
     Unix.rename
       (Evm_context.State.store_path ~data_dir:dest)
       (Evm_context.State.store_path ~data_dir) ;
+    let rm f =
+      try Unix.unlink f with Unix.Unix_error (Unix.ENOENT, _, _) -> ()
+    in
+    rm @@ (data_dir // Evm_store.sqlite_file_name) ^ "-shm" ;
+    rm @@ (data_dir // Evm_store.sqlite_file_name) ^ "-wal" ;
     Unix.rename
       (dest // Evm_store.sqlite_file_name)
       (data_dir // Evm_store.sqlite_file_name) ;
