@@ -216,8 +216,8 @@ module RPC : sig
     Helpers.slot ->
     (commitment * commitment_proof) RPC_core.t
 
-  (** Call RPC "GET /levels/<slot_level>/slot/<slot_index>/content" to retrieve the slot
-        content associated with the given level and index. *)
+  (** Call RPC "GET /levels/<slot_level>/slot/<slot_index>/content" to retrieve
+      the slot content associated with the given level and index. *)
   val get_level_slot_content :
     slot_level:int -> slot_index:int -> Helpers.slot RPC_core.t
 
