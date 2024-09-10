@@ -957,6 +957,32 @@ select_tezts:
   stage: build
   tags:
   - gcp
+  rules:
+  - changes:
+    - .gitlab-ci.yml
+    - .gitlab/**/*
+    - CHANGES.rst
+    - LICENSES/**/*
+    - Makefile
+    - brassaia/**/*
+    - cohttp/**/*
+    - data-encoding/**/*
+    - dune
+    - dune-project
+    - dune-workspace
+    - etherlink/**/*
+    - irmin/**/*
+    - michelson_test_scripts/**/*
+    - opam/**/*
+    - prometheus/**/*
+    - resto/**/*
+    - rust-toolchain
+    - script-inputs/**/*
+    - scripts/**/*
+    - src/**/*
+    - tezt/**/*
+    - tzt_reference_test_suite/**/*
+    when: on_success
   dependencies:
   - oc.docker:ci:amd64
   allow_failure:

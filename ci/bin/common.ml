@@ -1290,13 +1290,14 @@ module Tezt = struct
      Fetch records for Tezt generated on the last merge request pipeline
      on the most recently merged MR and makes them available in artifacts
      for future merge request pipelines. *)
-  let job_select_tezts : tezos_job =
+  let job_select_tezts ?rules () : tezos_job =
     Tezos_ci.job
       ~__POS__
       ~name:"select_tezts"
         (* We need:
            - Git (to run git diff)
            - ocamlyacc, ocamllex and ocamlc (to build manifest/manifest) *)
+      ?rules
       ~image:Images.CI.prebuild
       ~stage:Stages.build
       ~before_script:(before_script ~take_ownership:true ~eval_opam:true [])

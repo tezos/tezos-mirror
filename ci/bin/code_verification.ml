@@ -538,6 +538,9 @@ let jobs pipeline_type =
       ~rules:(make_rules ~changes:changeset_octez ())
       ()
   in
+  let job_tezt_select_tezts =
+    Tezt.job_select_tezts ~rules:(make_rules ~changes:changeset_octez ()) ()
+  in
   let job_static_x86_64_experimental =
     job_build_static_binaries
       ~__POS__
@@ -624,7 +627,7 @@ let jobs pipeline_type =
       job_build_kernels;
       job_build_dsn_node;
       job_tezt_fetch_records;
-      Tezt.job_select_tezts;
+      job_tezt_select_tezts;
       build_octez_source;
     ]
     @ bin_packages_jobs
@@ -1172,7 +1175,7 @@ let jobs pipeline_type =
       let dependencies =
         Dependent
           [
-            Artifacts Tezt.job_select_tezts;
+            Artifacts job_tezt_select_tezts;
             Artifacts job_build_x86_64_release;
             Artifacts job_build_x86_64_exp_dev_extra;
             Artifacts job_build_kernels;
@@ -1311,7 +1314,7 @@ let jobs pipeline_type =
           ~dependencies:
             (Dependent
                [
-                 Artifacts Tezt.job_select_tezts;
+                 Artifacts job_tezt_select_tezts;
                  Artifacts job_build_x86_64_exp_dev_extra;
                  Artifacts job_static_x86_64_experimental;
                  Artifacts job_tezt_fetch_records;

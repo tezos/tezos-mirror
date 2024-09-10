@@ -590,6 +590,8 @@ select_tezts:
   stage: build
   tags:
   - gcp
+  rules:
+  - when: always
   dependencies:
   - oc.docker:ci:amd64
   allow_failure:
