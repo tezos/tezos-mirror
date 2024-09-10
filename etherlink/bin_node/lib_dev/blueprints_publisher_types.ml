@@ -82,4 +82,9 @@ module Request = struct
         Format.fprintf ppf "Publish { level = %a }" Z.pp_print level
     | New_rollup_node_block rollup_level ->
         Format.fprintf ppf "New_rollup_node_block %ld" rollup_level
+
+  let inbox_payload payload =
+    match payload with
+    | Blueprint {inbox_payload; _} -> inbox_payload
+    | Inbox payload -> payload
 end

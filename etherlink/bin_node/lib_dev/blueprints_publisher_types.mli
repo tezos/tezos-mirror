@@ -27,6 +27,10 @@ module Request : sig
 
   type view = View : _ t -> view
 
+  (** [inbox_payload payload] returns the inbox payload associated
+      with the given [payload]. *)
+  val inbox_payload : payload -> Blueprint_types.payload
+
   include
     Worker_intf.REQUEST
       with type ('a, 'request_error) t := ('a, 'request_error) t
