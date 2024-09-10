@@ -181,14 +181,29 @@ let filter_up_to_staking_share share total_stake to_mutez keys_list =
       in
       loop ([], 0L) keys_list |> fst |> List.rev
 
-let get_delegates (module P : Sigs.PROTOCOL) context
-    (header : Block_header.shell_header) active_bakers_only staking_share_opt =
+let get_delegates_and_accounts (module P : Sigs.PROTOCOL) context
+    (header : Block_header.shell_header) active_bakers_only staking_share_opt
+    accounts_pkh_lists =
   let open Lwt_result_syntax in
   let level = header.Block_header.level in
   let predecessor_timestamp = header.timestamp in
   let timestamp = Time.Protocol.add predecessor_timestamp 10000L in
   let* ctxt =
     P.prepare_context context ~level ~predecessor_timestamp ~timestamp
+  in
+  let* accounts =
+    List.filter_map_es
+      (fun pkh ->
+        let*! pk_opt =
+          Option.map_es
+            (P.Contract.get_manager_key ctxt)
+            (P.Signature.Of_latest.public_key_hash pkh)
+        in
+        match pk_opt with
+        | Ok (Some pk) ->
+            return (Some (pkh, P.Signature.To_latest.public_key pk))
+        | Ok None | Error _ -> return_none)
+      accounts_pkh_lists
   in
   (* Loop on delegates to extract keys and compute the total stake. *)
   let* delegates, total_stake =
@@ -235,9 +250,12 @@ let get_delegates (module P : Sigs.PROTOCOL) context
             (staking_balance_info :: key_list_acc, updated_staking_balance_acc))
   in
   return
-  @@ filter_up_to_staking_share staking_share_opt total_stake P.Tez.to_mutez
-  @@ (* By swapping x and y we do a descending sort *)
-  List.sort (fun (_, _, x, _, _) (_, _, y, _, _) -> P.Tez.compare y x) delegates
+    ( filter_up_to_staking_share staking_share_opt total_stake P.Tez.to_mutez
+      @@ (* By swapping x and y we do a descending sort *)
+      List.sort
+        (fun (_, _, x, _, _) (_, _, y, _, _) -> P.Tez.compare y x)
+        delegates,
+      accounts )
 
 type contract_info = {
   address : string;
@@ -486,31 +504,31 @@ let get_context ?level ~network_opt base_dir =
   let header = header.shell in
   return (protocol_hash, context, header, store)
 
-(** [load_mainnet_bakers_public_keys base_dir ?level active_backers_only
-    alias_phk_pk_list] checkouts the head context at the given
-    [base_dir] and computes a list of [(alias, pkh, pk, stake,
-    frozen_deposits, unstake_frozen_deposits)] corresponding to all
-    delegates in that context. The [alias] for the delegates are
-    gathered from [alias_pkh_pk_list]).
+(** [load_bakers_public_keys ?staking_share_opt ?network_opt ?level
+    ~active_backers_only base_dir alias_phk_pk_list] checkouts the head context at the
+    given [base_dir] and computes a list of [(alias, pkh, pk, stake,
+    frozen_deposits, unstake_frozen_deposits)] corresponding to all delegates in
+    that context. The [alias] for the delegates are gathered from
+    [alias_pkh_pk_list]).
 
     if [active_bakers_only] then the deactivated delegates are
     filtered out of the list. if an optional [level] is given, use the
     context from this level instead of head, if it exists.
 *)
-let load_bakers_public_keys ?(staking_share_opt = None)
-    ?(network_opt = "mainnet") ?level base_dir ~active_bakers_only
-    alias_pkh_pk_list =
+let load_bakers_public_keys ?staking_share_opt ?(network_opt = "mainnet") ?level
+    ~active_bakers_only base_dir alias_pkh_pk_list other_accounts_pkh =
   let open Lwt_result_syntax in
   let* protocol_hash, context, header, store =
     get_context ?level ~network_opt base_dir
   in
-  let* (delegates :
-         (Signature.public_key_hash
-         * Signature.public_key
-         * int64
-         * int64
-         * int64)
-         list) =
+  let* ( (delegates :
+           (Signature.public_key_hash
+           * Signature.public_key
+           * int64
+           * int64
+           * int64)
+           list),
+         other_accounts ) =
     match protocol_of_hash protocol_hash with
     | None ->
         if
@@ -543,31 +561,48 @@ let load_bakers_public_keys ?(staking_share_opt = None)
           "@[<h>Detected protocol:@;<10 0>%a@]@."
           pp_protocol
           protocol ;
-        get_delegates
+        get_delegates_and_accounts
           protocol
           context
           header
           active_bakers_only
           staking_share_opt
+          other_accounts_pkh
   in
   let*! () = Tezos_store.Store.close_store store in
-  return
-  @@ List.mapi
-       (fun i (pkh, pk, stake, frozen_deposits, unstake_frozen_deposits) ->
-         let pkh = Tezos_crypto.Signature.Public_key_hash.to_b58check pkh in
-         let pk = Tezos_crypto.Signature.Public_key.to_b58check pk in
-         let alias =
-           List.find_map
-             (fun (alias, pkh', _) ->
-               if String.equal pkh' pkh then Some alias else None)
-             alias_pkh_pk_list
-         in
-         let alias =
-           Option.value_f alias ~default:(fun () ->
-               Format.asprintf "baker_%d" i)
-         in
-         (alias, pkh, pk, stake, frozen_deposits, unstake_frozen_deposits))
-       delegates
+  let with_alias =
+    List.mapi
+      (fun i (pkh, pk, stake, frozen_deposits, unstake_frozen_deposits) ->
+        let pkh = Tezos_crypto.Signature.Public_key_hash.to_b58check pkh in
+        let pk = Tezos_crypto.Signature.Public_key.to_b58check pk in
+        let alias =
+          List.find_map
+            (fun (alias, pkh', _) ->
+              if String.equal pkh' pkh then Some alias else None)
+            alias_pkh_pk_list
+        in
+        let alias =
+          Option.value_f alias ~default:(fun () -> Format.asprintf "baker_%d" i)
+        in
+        (alias, pkh, pk, stake, frozen_deposits, unstake_frozen_deposits))
+      delegates
+  in
+  let other_accounts =
+    List.map
+      (fun (pkh, pk) ->
+        let pkh = Tezos_crypto.Signature.Public_key_hash.to_b58check pkh in
+        let pk = Tezos_crypto.Signature.Public_key.to_b58check pk in
+        let alias =
+          List.find_map
+            (fun (alias, pkh', _) ->
+              if String.equal pkh' pkh then Some alias else None)
+            alias_pkh_pk_list
+        in
+        let alias = Option.value alias ~default:pkh in
+        (alias, pkh, pk))
+      other_accounts
+  in
+  return (with_alias, other_accounts)
 
 (** [load_contracts ?dump_contracts ?network ?level base_dir] checkouts the block
     context at the given [base_dir] (at level [?level] or defaulting
@@ -618,17 +653,19 @@ let load_contracts ?dump_contracts ?(network_opt = "mainnet") ?level base_dir =
   return contracts
 
 let build_yes_wallet ?staking_share_opt ?network_opt base_dir
-    ~active_bakers_only ~aliases =
+    ~active_bakers_only ~aliases ~other_accounts_pkh =
   let open Lwt_result_syntax in
-  let+ mainnet_bakers =
+  let+ mainnet_bakers, other_accounts =
     load_bakers_public_keys
       ?staking_share_opt
       ?network_opt
       base_dir
       ~active_bakers_only
       aliases
+      other_accounts_pkh
     (* get rid of stake *)
   in
   List.map
     (fun (alias, pkh, pk, _stake, _, _) -> (alias, pkh, pk))
     mainnet_bakers
+  @ other_accounts
