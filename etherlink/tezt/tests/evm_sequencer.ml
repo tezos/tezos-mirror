@@ -572,11 +572,34 @@ let test_snapshots_import_outdated =
   in
   unit
 
+(* A test for the fix introduced in
+   https://gitlab.com/tezos/tezos/-/merge_requests/14794. *)
+let test_snapshots_reexport =
+  register_all
+    ~tags:["evm"; "sequencer"; "snapshots"]
+    ~title:"Import sequencer snapshot and re-export"
+    ~time_between_blocks:Nothing
+  @@ fun ({sequencer; sc_rollup_node; _} as setup) _protocol ->
+  let* _snapshot_file_before, snapshot_file, _block_number =
+    snapshots_setup setup
+  in
+  Log.info "Create new sequencer from snapshot." ;
+  let new_sequencer =
+    let mode = Evm_node.mode sequencer in
+    Evm_node.create ~mode (Sc_rollup_node.endpoint sc_rollup_node)
+  in
+  let* () = Process.check @@ Evm_node.spawn_init_config new_sequencer in
+  let*! () = Evm_node.import_snapshot new_sequencer ~snapshot_file in
+  Log.info "Re-export snapshot from new sequencer." ;
+  let*! _file = Evm_node.export_snapshot sequencer in
+  unit
+
 let test_snapshots protocols =
   test_snapshots_lock protocols ;
   test_snapshots_import_empty protocols ;
   test_snapshots_import_populated protocols ;
-  test_snapshots_import_outdated protocols
+  test_snapshots_import_outdated protocols ;
+  test_snapshots_reexport protocols
 
 let test_publish_blueprints =
   register_all
