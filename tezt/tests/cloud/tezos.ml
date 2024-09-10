@@ -228,10 +228,7 @@ module Teztale = struct
       let port =
         match port with
         | Some port -> port
-        | None -> (
-            match Agent.point agent |> Option.map snd with
-            | Some port -> port
-            | None -> Agent.next_available_port agent)
+        | None -> Agent.next_available_port agent
       in
       let* path = Agent.copy agent ~source:path in
       Teztale.Server.run ?runner ~path ~port ?name ?address ?users ?admin ()
