@@ -60,8 +60,8 @@ module Baker = struct
   let run (cctxt : Protocol_client_context.full) ?minimal_fees
       ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?votes
       ?extra_operations ?dal_node_endpoint ?dal_node_timeout_percentage
-      ?pre_emptive_forge_time ?force_apply ?context_path ?state_recorder ~chain
-      ~keep_alive delegates =
+      ?pre_emptive_forge_time ?force_apply_from_round ?context_path
+      ?state_recorder ~chain ~keep_alive delegates =
     let open Lwt_result_syntax in
     let process () =
       let* user_activated_upgrades =
@@ -112,7 +112,7 @@ module Baker = struct
           ?dal_node_endpoint
           ?dal_node_timeout_percentage
           ~pre_emptive_forge_time
-          ?force_apply
+          ?force_apply_from_round
           ?context_path
           ~user_activated_upgrades
           ?state_recorder
