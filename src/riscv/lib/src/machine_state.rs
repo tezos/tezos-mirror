@@ -26,7 +26,7 @@ use crate::{
         csregisters::CSRegister,
         hart_state::{HartState, HartStateLayout},
     },
-    parser::{instruction::Instr, parse},
+    parser::{instruction::Instr, is_compressed},
     program::Program,
     range_utils::{bound_saturating_sub, less_than_bound, unwrap_bound},
     state_backend::{self as backend},
@@ -354,32 +354,34 @@ impl<ML: main_memory::MainMemoryLayout, ICL: InstructionCacheLayout, M: backend:
         M: backend::ManagerReadWrite,
     {
         let first_halfword = self.fetch_instr_halfword(phys_addr)?;
-        let mut combined = first_halfword as u32;
 
         // The reasons to provide the second half in the lambda is
         // because those bytes may be inaccessible or may trigger an exception when read.
         // Hence we can't read all 4 bytes eagerly.
-        let instr = parse(first_halfword, || {
-            let next_addr = phys_addr + 2;
+        let instr = if is_compressed(first_halfword) {
+            self.instruction_cache
+                .cache_compressed(phys_addr, first_halfword)
+        } else {
+            let upper = {
+                let next_addr = phys_addr + 2;
 
-            // Optimization to skip an extra address translation lookup:
-            // If the last 2 bytes of the instruction are in the same page
-            // as the first 2 bytes, then we already know the translated address
-            let phys_addr = if next_addr % PAGE_SIZE == 0 {
-                self.translate_instr_address(mode, satp, virt_addr + 2)?
-            } else {
-                next_addr
+                // Optimization to skip an extra address translation lookup:
+                // If the last 2 bytes of the instruction are in the same page
+                // as the first 2 bytes, then we already know the translated address
+                let phys_addr = if next_addr % PAGE_SIZE == 0 {
+                    self.translate_instr_address(mode, satp, virt_addr + 2)?
+                } else {
+                    next_addr
+                };
+
+                self.fetch_instr_halfword(phys_addr)?
             };
 
-            let second_halfword = self.fetch_instr_halfword(phys_addr)?;
+            let combined = (upper as u32) << 16 | (first_halfword as u32);
+            self.instruction_cache
+                .cache_uncompressed(phys_addr, combined)
+        };
 
-            combined |= (second_halfword as u32) << 16;
-
-            Ok(second_halfword)
-        })?;
-
-        self.instruction_cache
-            .cache_instr(phys_addr, combined, instr);
         Ok(instr)
     }
 
