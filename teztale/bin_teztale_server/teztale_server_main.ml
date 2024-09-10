@@ -292,8 +292,10 @@ let get_head ~logger conf db_pool =
        (fun (module Db : Caqti_lwt.CONNECTION) ->
          maybe_with_metrics conf "get_head" @@ fun () -> Db.find_opt query ())
        db_pool)
-    (fun head_level ->
-      reply_public_json Data_encoding.(obj1 (opt "level" int32)) head_level)
+    (fun level ->
+      let open Data in
+      let res = Option.map (fun level -> {level}) level in
+      reply_public_json (Data_encoding.option head_encoding) res)
 
 (** Fetch allowed users' logins from db. *)
 let get_users ~logger conf db_pool =

@@ -1,0 +1,24 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executable
+ (name teztale_snitch_main)
+ (public_name octez-teztale-snitch)
+ (package octez-teztale)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  bls12-381.archive
+  octez-libs.base
+  octez-version.value
+  lib_teztale_base
+  octez-libs.cohttp-lwt
+  octez-libs.cohttp-lwt-unix
+  cmdliner)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp)
+  (:include %{workspace_root}/static-link-flags-teztale.sexp))
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Lib_teztale_base))
