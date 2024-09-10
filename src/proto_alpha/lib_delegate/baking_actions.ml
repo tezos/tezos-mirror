@@ -178,6 +178,14 @@ let generate_seed_nonce_hash config delegate level =
     return_some seed_nonce
   else return_none
 
+let round_of_shell_header shell_header =
+  let open Result_syntax in
+  let* fitness =
+    Environment.wrap_tzresult
+    @@ Fitness.from_raw shell_header.Tezos_base.Block_header.fitness
+  in
+  return (Fitness.round fitness)
+
 let sign_block_header global_state proposer unsigned_block_header =
   let open Lwt_result_syntax in
   let cctxt = global_state.cctxt in
@@ -192,7 +200,7 @@ let sign_block_header global_state proposer unsigned_block_header =
       (shell, contents)
   in
   let level = shell.level in
-  let*? round = Baking_state.round_of_shell_header shell in
+  let*? round = round_of_shell_header shell in
   let open Baking_highwatermarks in
   let* result =
     cctxt#with_lock (fun () ->
@@ -561,7 +569,8 @@ let authorized_consensus_votes global_state
         (* Record all consensus votes new highwatermarks as one batch *)
         let delegates =
           List.map
-            (fun {delegate = ck, _; _} -> ck.public_key_hash)
+            (fun ({delegate = ck, _; _} : unsigned_consensus_vote) ->
+              ck.public_key_hash)
             authorized_votes
         in
         let record_all_consensus_vote =
@@ -854,7 +863,7 @@ let start_waiting_for_attestation_quorum state =
     ~get_slot_voting_power
     candidate
 
-let compute_round proposal round_durations =
+let compute_round (proposal : proposal) round_durations =
   let open Protocol in
   let open Baking_state in
   let timestamp = Time.System.now () |> Time.System.to_protocol in

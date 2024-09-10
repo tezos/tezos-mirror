@@ -305,9 +305,9 @@ let try_migrate_legacy_nonces state =
   | Error _ -> return_unit
 
 (** [partition_unrevealed_nonces state nonces current_cycle current_level] partitions
-    nonces into 2 groups: 
+    nonces into 2 groups:
      - nonces that need to be re/revealed
-     - nonces that are live 
+     - nonces that are live
     Nonces that are not relevant can be dropped.
 *)
 let partition_unrevealed_nonces {cctxt; chain; _} nonces
@@ -424,7 +424,7 @@ let register_nonce (cctxt : #Protocol_client_context.full) ~chain_id block_hash
   in
   return_unit
 
-(** [inject_seed_nonce_revelation cctxt ~chain ~block ~branch nonces] forges one 
+(** [inject_seed_nonce_revelation cctxt ~chain ~block ~branch nonces] forges one
     [Seed_nonce_revelation] operation per each nonce to be revealed, together with
     a signature and then injects these operations. *)
 let inject_seed_nonce_revelation (cctxt : #Protocol_client_context.full) ~chain
@@ -459,10 +459,10 @@ let inject_seed_nonce_revelation (cctxt : #Protocol_client_context.full) ~chain
           return_unit)
         nonces
 
-(** [reveal_potential_nonces state new_proposal] updates the internal [state] 
+(** [reveal_potential_nonces state new_proposal] updates the internal [state]
     of the worker each time a proposal with a new predecessor is received; this means
     revealing the necessary nonces. *)
-let reveal_potential_nonces state new_proposal =
+let reveal_potential_nonces state (new_proposal : Baking_state.proposal) =
   let open Lwt_result_syntax in
   let {
     cctxt;
