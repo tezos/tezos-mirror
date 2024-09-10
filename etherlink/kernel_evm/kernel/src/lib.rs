@@ -30,7 +30,11 @@ use storage::{
 };
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_ethereum::block::BlockFees;
-use tezos_evm_logging::{log, Level::*};
+use tezos_evm_logging::{
+    log,
+    Level::{self, *},
+    Verbosity,
+};
 use tezos_evm_runtime::runtime::{KernelHost, Runtime};
 use tezos_evm_runtime::safe_storage::WORLD_STATE_PATH;
 use tezos_smart_rollup::entrypoint;
