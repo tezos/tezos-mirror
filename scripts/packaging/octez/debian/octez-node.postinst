@@ -18,9 +18,10 @@ debsystemctl=$(command -v deb-systemd-invoke || echo systemctl)
 
 case "${1}" in
 configure)
-  # if $2 is empty, then we're doing a fresh install.
-  # Ohtwerwise we're upgrading
-  if [ -z "$2" ]; then
+  # if $2 is empty, then we're doing a fresh install or
+  # if $DPKG_RUNNING_VERSION" is empty a reconfigure
+  # Otherwise we're upgrading
+  if [ -z "${2:-}" ] || [ -z "$DPKG_RUNNING_VERSION" ]; then
     # these are the defaults for the package and only used
     # in the "configure" stage.
     DATADIR="$TEZOS_HOME/.tezos-node"
