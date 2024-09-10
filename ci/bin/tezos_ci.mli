@@ -39,6 +39,11 @@ val check_files :
 
 (** Run-time configuration and command-line processing. *)
 module Cli : sig
+  (** Action the binary should perform. *)
+  type action =
+    | Write  (** Write the CI configuration *)
+    | List_pipelines  (** List registered pipelines. *)
+
   (** Type of the command-line configuration for the generator binary. *)
   type config = {
     mutable verbose : bool;
@@ -47,6 +52,7 @@ module Cli : sig
         (** Enable the emission of source information in generated configuration. *)
     mutable remove_extra_files : bool;
         (** Remove files that are neither generated nor excluded. *)
+    mutable action : action;  (** Action to perform *)
   }
 
   (** Populate  {!config} from command-line arguments.
@@ -74,18 +80,21 @@ end
 module Pipeline : sig
   (** Register a pipeline.
 
-      [register ?variables name rule] will register a pipeline [name]
+      [register ~description ?variables name rule] will register a pipeline [name]
       that runs when [rule] is true.
 
       If [variables] is set, then these variables will be added to the
       [workflow:] clause for this pipeline in the top-level [.gitlab-ci.yml].
       Similarly, an [auto_cancel] clause can be specified.
 
+      The [description] is printed in {!list_pipelines}.
+
       The [jobs] of the pipeline are generated to the file
       [.gitlab/ci/pipelines/NAME.yml] when {!write} is called. *)
   val register :
     ?variables:Gitlab_ci.Types.variables ->
     ?auto_cancel:Gitlab_ci.Types.auto_cancel ->
+    description:string ->
     jobs:tezos_job list ->
     string ->
     Gitlab_ci.If.t ->
@@ -104,10 +113,13 @@ module Pipeline : sig
       [.gitlab/ci/pipelines/NAME.yml] when {!write} is called. See
       {!register} for info on [auto_cancel].
 
+      The [description] is printed in {!list_pipelines}.
+
       Child pipelines cannot be launched without a trigger job that is
       included in a regular pipeline (see {!trigger_job}). *)
   val register_child :
     ?auto_cancel:Gitlab_ci.Types.auto_cancel ->
+    description:string ->
     jobs:tezos_job list ->
     string ->
     child_pipeline
@@ -138,6 +150,9 @@ module Pipeline : sig
     filename:string ->
     unit ->
     unit
+
+  (** Pretty prints the set of registered pipelines. *)
+  val list_pipelines : unit -> unit
 end
 
 (** A facility for registering images for [image:] keywords.

@@ -3,14 +3,22 @@ open Gitlab_ci.Util
 let failwith fmt = Format.kasprintf (fun s -> failwith s) fmt
 
 module Cli = struct
+  type action = Write | List_pipelines
+
   type config = {
     mutable verbose : bool;
     mutable inline_source_info : bool;
     mutable remove_extra_files : bool;
+    mutable action : action;
   }
 
   let config =
-    {verbose = false; inline_source_info = false; remove_extra_files = false}
+    {
+      verbose = false;
+      inline_source_info = false;
+      remove_extra_files = false;
+      action = Write;
+    }
 
   let verbose fmt =
     Format.kasprintf (if config.verbose then print_endline else fun _ -> ()) fmt
@@ -32,7 +40,7 @@ module Cli = struct
         [
           ( "--verbose",
             Arg.Unit (fun () -> config.verbose <- true),
-            " Show debug output, including the location of each generated job.."
+            " Show debug output, including the location of each generated job."
           );
           ( "--inline-source-info",
             Arg.Unit (fun () -> config.inline_source_info <- true),
@@ -40,6 +48,9 @@ module Cli = struct
           ( "--remove-extra-files",
             Arg.Unit (fun () -> config.remove_extra_files <- true),
             " Remove files that are neither generated nor excluded." );
+          ( "--list-pipelines",
+            Arg.Unit (fun () -> config.action <- List_pipelines),
+            " List registered pipelines." );
         ]
     in
     Arg.parse
@@ -121,6 +132,7 @@ let () = Printexc.register_printer @@ function Failure s -> Some s | _ -> None
 module Pipeline = struct
   type pipeline = {
     name : string;
+    description : string;
     if_ : Gitlab_ci.If.t;
     variables : Gitlab_ci.Types.variables option;
     auto_cancel : Gitlab_ci.Types.auto_cancel option;
@@ -129,6 +141,7 @@ module Pipeline = struct
 
   type child_pipeline = {
     name : string;
+    description : string;
     auto_cancel : Gitlab_ci.Types.auto_cancel option;
     jobs : tezos_job list;
   }
@@ -138,6 +151,9 @@ module Pipeline = struct
   let pipelines : t list ref = ref []
 
   let name = function Pipeline {name; _} | Child_pipeline {name; _} -> name
+
+  let description = function
+    | Pipeline {description; _} | Child_pipeline {description; _} -> description
 
   let jobs = function
     | Child_pipeline {jobs; _} -> jobs
@@ -158,11 +174,12 @@ module Pipeline = struct
         (name pipeline)
     else pipelines := pipeline :: !pipelines
 
-  let register ?variables ?auto_cancel ~jobs name if_ =
-    register_raw (Pipeline {variables; if_; name; jobs; auto_cancel})
+  let register ?variables ?auto_cancel ~description ~jobs name if_ =
+    register_raw
+      (Pipeline {variables; if_; name; jobs; auto_cancel; description})
 
-  let register_child ?auto_cancel ~jobs name =
-    let child_pipeline = {name; jobs; auto_cancel} in
+  let register_child ?auto_cancel ~description ~jobs name =
+    let child_pipeline = {name; jobs; auto_cancel; description} in
     register_raw (Child_pipeline child_pipeline) ;
     child_pipeline
 
@@ -447,6 +464,21 @@ module Pipeline = struct
     in
     to_file ~filename config ;
     ()
+
+  let list_pipelines () =
+    let pipelines = all () in
+    let open Format in
+    open_vbox 0 ;
+    Printf.printf "Registered pipeline types:\n\n" ;
+    ( Fun.flip List.iter pipelines @@ fun pipeline ->
+      let pipeline = add_image_builders pipeline in
+      let jobs = jobs pipeline in
+      let name = name pipeline in
+      let filename = path ~name in
+      printf " - '%s' (%s): %d job(s)@," name filename (List.length jobs) ;
+      printf "@,@[<2>  %a@]@,@," pp_print_text (description pipeline) ) ;
+    close_box () ;
+    print_flush ()
 end
 
 module Image = struct
@@ -738,8 +770,9 @@ let job ?arch ?after_script ?allow_failure ?artifacts ?before_script ?cache
   {job = Job job; source_position = __POS__; stage; image_builders}
 
 let trigger_job ?(dependencies = Staged []) ?rules ~__POS__ ~stage
-    Pipeline.{name = child_pipeline_name; jobs = _; auto_cancel = _} : tezos_job
-    =
+    Pipeline.
+      {name = child_pipeline_name; jobs = _; auto_cancel = _; description = _} :
+    tezos_job =
   let job_name = "trigger:" ^ child_pipeline_name in
   let needs, dependencies = resolve_dependencies job_name dependencies in
   if dependencies != [] then

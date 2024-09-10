@@ -14,6 +14,10 @@ inline-source-info: manifest # Regenerate GitLab CI configuration, inlining sour
 remove-extra-files: manifest # Regenerate GitLab CI configuration and remove any non-generated files.
 	cd .. && . ./scripts/version.sh && dune exec ci/bin/main.exe -- --remove-extra-files
 
+.PHONY: list-pipelines
+list-pipelines: manifest # List and describe the set of registered pipelines
+	cd .. && . ./scripts/version.sh && dune exec ci/bin/main.exe -- --list-pipelines
+
 .PHONY: manifest
 manifest:
 	cd .. && ${MAKE} --silent -C manifest
@@ -37,6 +41,9 @@ docker-inline-source-info: docker-do-inline-source-info # Build the target 'inli
 
 .PHONY: docker-remove-extra-files
 docker-remove-extra-files: docker-do-remove-extra-files # Build the target 'remove-extra-files' using the 'build' Docker image.
+
+.PHONY: docker-list-pipelines
+docker-list-pipelines: docker-do-list-pipelines # Build the target 'list-pipelines' using the 'build' Docker image.
 
 .PHONY: check
 check: all # Used in the CI to verify that [.gitlab-ci.yml] is up to date.

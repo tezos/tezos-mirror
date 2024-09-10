@@ -65,3 +65,10 @@ required prerequisites installed.
 For more information, see
 
     dune exec bin/ci/main.exe -- --help
+
+## Inline documentation
+
+The set of registered pipelines types, and their documentation, can be
+accessed by:
+
+    make -s -C ci list-pipelines
