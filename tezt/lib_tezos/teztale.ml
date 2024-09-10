@@ -84,7 +84,7 @@ module Server = struct
     in
     Lwt.return {conf_filename; db_filename}
 
-  let make ?name ?(address = "127.0.0.1") ?port ?(users = [])
+  let make ?name ?(address = "0.0.0.0") ?port ?(users = [])
       ?(admin = {login = "admin"; password = "password"}) () =
     let port = match port with Some port -> port | None -> Port.fresh () in
     let name = match name with Some name -> name | None -> fresh_name () in
@@ -114,8 +114,7 @@ module Server = struct
     in
     wait ()
 
-  (** Return *)
-  let add_user {conf = {interface; admin; _}; _} user =
+  let add_user ?runner {conf = {interface; admin; _}; _} ?public_address user =
     let user =
       JSON.parse
         ~origin:__LOC__
@@ -124,15 +123,18 @@ module Server = struct
            user.login
            user.password)
     in
+    let address =
+      match public_address with None -> interface.address | Some v -> v
+    in
     let url =
       Format.asprintf
         "http://%s:%s@%s:%d/user"
         admin.login
         admin.password
-        interface.address
+        address
         interface.port
     in
-    Curl.put url user |> Runnable.run
+    Curl.put ?runner url user |> Runnable.run
     |> Lwt.map (fun json ->
            match JSON.(get "status" json |> as_string) with
            | "OK" -> Ok ()

@@ -217,21 +217,16 @@ module Teztale = struct
   module Server = struct
     include Teztale.Server
 
-    let run agent ?(path = Uses.path Constant.teztale_server) ?name ?address
+    let run agent ?(path = Uses.path Constant.teztale_server) ?address ?name
         ?port ?users ?admin () =
       let runner = Agent.runner agent in
-      let address =
-        match address with
-        | Some address -> address
-        | None -> Agent.point agent |> Option.map fst
-      in
       let port =
         match port with
         | Some port -> port
         | None -> Agent.next_available_port agent
       in
       let* path = Agent.copy agent ~source:path in
-      Teztale.Server.run ?runner ~path ~port ?name ?address ?users ?admin ()
+      Teztale.Server.run ?runner ~path ?address ~port ?name ?users ?admin ()
   end
 
   module Archiver = struct

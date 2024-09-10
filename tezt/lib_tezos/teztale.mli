@@ -57,7 +57,12 @@ module Server : sig
   (** [add_user server user]
       Add an archiver (its credentials) allowed to feed the database.
   *)
-  val add_user : t -> user -> (unit, exn) Result.t Lwt.t
+  val add_user :
+    ?runner:Runner.t ->
+    t ->
+    ?public_address:string ->
+    user ->
+    (unit, exn) Result.t Lwt.t
 end
 
 module Archiver : sig
