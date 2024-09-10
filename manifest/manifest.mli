@@ -427,7 +427,10 @@ type modules =
 (** Preprocessor dependencies.
 
     - [File]: becomes a [(preprocessor_deps (file ...))] stanza in the [dune] file. *)
-type preprocessor_dep = File of string | Glob_files of string
+type preprocessor_dep =
+  | File of string
+  | Glob_files of string
+  | Env_var of string
 
 (** Target descriptions.
 
@@ -549,6 +552,13 @@ end
 (** Preprocessors. *)
 type preprocessor
 
+(** Type with necessary information for a PPX configuration. *)
+type ppx =
+  | PPX of {
+      preprocess : preprocessor;
+      preprocessor_deps : preprocessor_dep list;
+    }
+
 (** Make a preprocessor.
 
     [pps target] becomes a [(preprocess (pps target))] stanza in the [dune] file.
@@ -570,6 +580,9 @@ val ppses : target list -> preprocessor
     [staged_pps targets] becomes a [(preprocess (staged_pps target1 target2 ..))] stanza in the [dune] file.
     The target's package is also added as a dependency in the [.opam] file. *)
 val staged_pps : target list -> preprocessor
+
+(** Create a PPX configuration using the given preprocessor and environment variable. *)
+val make_ppx : env_var:string -> preprocess:target -> ppx
 
 (** Inline_tests backend.
 

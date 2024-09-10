@@ -369,6 +369,8 @@ module Dune = struct
 
   let glob_files expr = [S "glob_files"; S expr]
 
+  let env_var expr = [S "env_var"; S expr]
+
   let glob_files_rec expr = [S "glob_files_rec"; S expr]
 
   let runtest ?(alias = "runtest") ?action ?package ?locks ?enabled_if
@@ -1155,7 +1157,10 @@ module Target = struct
      name for [public_name] stanzas in [dune] and the name in [.opam] files. *)
   type full_name = {internal_name : string; public_name : string}
 
-  type preprocessor_dep = File of string | Glob_files of string
+  type preprocessor_dep =
+    | File of string
+    | Glob_files of string
+    | Env_var of string
 
   type release_status = Unreleased | Experimental | Released | Auto_opam
 
@@ -1243,6 +1248,12 @@ module Target = struct
     | PPS of {targets : t list; args : string list}
     | Staged_PPS of t list
 
+  and ppx =
+    | PPX of {
+        preprocess : preprocessor;
+        preprocessor_deps : preprocessor_dep list;
+      }
+
   and inline_tests = Inline_tests_backend of t
 
   and select = {
@@ -1287,6 +1298,9 @@ module Target = struct
 
   let staged_pps targets =
     Staged_PPS (Stdlib.List.concat_map Option.to_list targets)
+
+  let make_ppx ~env_var ~preprocess =
+    PPX {preprocess = pps preprocess; preprocessor_deps = [Env_var env_var]}
 
   let inline_tests_backend = function
     | None ->
@@ -2688,6 +2702,7 @@ let generate_dune (internal : Target.internal) =
     let make_pp_dep = function
       | Target.File filename -> Dune.file filename
       | Glob_files glob -> Dune.glob_files glob
+      | Env_var env_var -> Dune.env_var env_var
     in
 
     List.map make_pp_dep internal.preprocessor_deps
@@ -4197,7 +4212,8 @@ let list_tests_to_run_after_changes ~(tezt_exe : target)
              | (File file : Target.preprocessor_dep) ->
                  file_has_changed (tezt_target_dir // file)
              | (Glob_files glob : Target.preprocessor_dep) ->
-                 glob_has_changed ~rec_:false tezt_target_dir glob)
+                 glob_has_changed ~rec_:false tezt_target_dir glob
+             | Env_var _ -> false)
            preprocessor_deps
       || List.exists (glob_has_changed ~rec_:false tezt_target_dir) dep_globs
       || List.exists (glob_has_changed ~rec_:true tezt_target_dir) dep_globs_rec
