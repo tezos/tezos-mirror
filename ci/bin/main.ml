@@ -65,50 +65,30 @@ let variables : variables =
     ("CARGO_TERM_QUIET", "true");
   ]
 
+(** {2 Pipeline types} *)
+
 (* Register pipelines types. Pipelines types are used to generate
    workflow rules and includes of the files where the jobs of the
-   pipeline is defined. *)
+   pipeline is defined.
+
+   Please add a [~description] to each pipeline.
+
+   The first sentence of the description should be short (<=80
+   characters), and be terminated by two new-lines. It should
+   describe _what_ the pipeline does.
+
+   The remainder of the description should detail:
+   - what the pipeline does;
+   - why we do it;
+   - when it happens;
+   - how;
+   - and by whom it is triggered (a developer? a release manager? some automated system?). *)
+
+(** {3 General pipelines} *)
+
 let () =
-  (* Matches Octez release tags, e.g. [octez-v1.2.3] or [octez-v1.2.3-rc4]. *)
-  let octez_release_tag_re = "/^octez-v\\d+\\.\\d+(?:\\-rc\\d+)?$/" in
-  (* Matches Octez beta release tags, e.g. [octez-v1.2.3-beta5]. *)
-  let octez_beta_release_tag_re = "/^octez-v\\d+\\.\\d+\\-beta\\d*$/" in
-  (* Matches Etherlink release tags, e.g. [etherlink-v1.2.3] or [etherlink-v1.2.3-rc4]. *)
-  let octez_evm_node_release_tag_re =
-    "/^octez-evm-node-v\\d+\\.\\d+(?:\\-rc\\d+)?$/"
-  in
   let open Rules in
   let open Pipeline in
-  (* Matches either Octez release tags or Octez beta release tags,
-     e.g. [octez-v1.2], [octez-v1.2-rc4] or [octez-v1.2-beta5]. *)
-  let has_any_octez_release_tag =
-    If.(
-      has_tag_match octez_release_tag_re
-      || has_tag_match octez_beta_release_tag_re)
-  in
-  let has_non_release_tag =
-    If.(
-      Predefined_vars.ci_commit_tag != null
-      && (not has_any_octez_release_tag)
-      && not (has_tag_match octez_evm_node_release_tag_re))
-  in
-  let release_description =
-    "\n\n\
-     For more information on Octez' release system, see: \
-     https://tezos.gitlab.io/releases/releases.html"
-  in
-  (* Please add a [~description] to each pipeline.
-
-     The first sentence of the description should be short (<=80
-     characters), and be terminated by two new-lines. It should
-     describe _what_ the pipeline does.
-
-     The remainder of the description should detail:
-      - what the pipeline does;
-      - why we do it;
-      - when it happens;
-      - how;
-      - and by whom it is triggered (a developer? a release manager? some automated system?). *)
   register
     "before_merging"
     If.(on_tezos_namespace && merge_request && not merge_train)
@@ -144,7 +124,39 @@ let () =
        static binaries, and the 'master' tag of the Octez Docker distribution. \
        This pipeline is created automatically by GitLab on each push, \
        typically resulting from the merge of a merge request, to the 'master' \
-       branch on tezos/tezos." ;
+       branch on tezos/tezos."
+
+(** {3 Release pipelines} *)
+
+let () =
+  (* Matches Octez release tags, e.g. [octez-v1.2.3] or [octez-v1.2.3-rc4]. *)
+  let octez_release_tag_re = "/^octez-v\\d+\\.\\d+(?:\\-rc\\d+)?$/" in
+  (* Matches Octez beta release tags, e.g. [octez-v1.2.3-beta5]. *)
+  let octez_beta_release_tag_re = "/^octez-v\\d+\\.\\d+\\-beta\\d*$/" in
+  (* Matches Etherlink release tags, e.g. [etherlink-v1.2.3] or [etherlink-v1.2.3-rc4]. *)
+  let octez_evm_node_release_tag_re =
+    "/^octez-evm-node-v\\d+\\.\\d+(?:\\-rc\\d+)?$/"
+  in
+  let open Rules in
+  let open Pipeline in
+  (* Matches either Octez release tags or Octez beta release tags,
+     e.g. [octez-v1.2], [octez-v1.2-rc4] or [octez-v1.2-beta5]. *)
+  let has_any_octez_release_tag =
+    If.(
+      has_tag_match octez_release_tag_re
+      || has_tag_match octez_beta_release_tag_re)
+  in
+  let has_non_release_tag =
+    If.(
+      Predefined_vars.ci_commit_tag != null
+      && (not has_any_octez_release_tag)
+      && not (has_tag_match octez_evm_node_release_tag_re))
+  in
+  let release_description =
+    "\n\n\
+     For more information on Octez' release system, see: \
+     https://tezos.gitlab.io/releases/releases.html"
+  in
   (* TODO: rename 'octez_docker_latest_release' ?? *)
   register
     "octez_latest_release"
@@ -232,8 +244,13 @@ let () =
        This pipeline checks that 'non_release_tag' pipelines work as intended, \
        without publishing any release. Developers, or release managers, can \
        create this pipeline by pushing a tag to a fork of 'tezos/tezos', e.g. \
-       to the 'nomadic-labs/tezos' project." ;
-  (* Scheduled pipelines *)
+       to the 'nomadic-labs/tezos' project."
+
+(** {3 Scheduled pipelines} *)
+
+let () =
+  let open Pipeline in
+  let open Rules in
   register
     "schedule_extended_test"
     schedule_extended_tests
@@ -263,6 +280,8 @@ let () =
        on 'master'.\n\n\
        This scheduled pipeline exercices the full tezt tests suites, but with \
        Octez nodes configured to use single-process validation."
+
+(** {2 Entry point of the generator binary} *)
 
 let () =
   (* If argument --verbose is set, then log generation info.
