@@ -44,14 +44,14 @@ pub enum InterruptsCacheResult {
 
 /// Cache of the possible interrupts, which depends on the mode.
 /// Cache is valid iff it contains Some(Cache), and invalidates on changes to mstatus
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct InterruptsCache(Option<Cache>);
 
 impl InterruptsCache {
     /// For the given mode, get the interrupts from the cache.
     /// Returns (`Miss` | `PossibleInterrupts` (Partial) | `PendingInterrupt` (Full))    
     fn get(&self, mode: Mode) -> InterruptsCacheResult {
-        match self.0 {
+        match &self.0 {
             Some(cache) => cache.get_interrupts(mode),
             None => InterruptsCacheResult::Miss,
         }
@@ -81,13 +81,13 @@ impl InterruptsCache {
 
     /// Invalidate the pending interrupt, but keep the possible interrupts.
     pub fn invalidate_by_mip(&mut self) {
-        if let Some(mut cache) = self.0 {
+        if let Some(ref mut cache) = &mut self.0 {
             cache.clear_pending_interrupts();
         }
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Clone, Debug)]
 struct Cache {
     // If PossibleInterruptsCache is populated, the (mode, possible_interrupts) pair is valid
     mode: Mode,
@@ -112,7 +112,7 @@ impl Cache {
         self.pending_interrupt = None;
     }
 
-    fn get_interrupts(self, mode: Mode) -> InterruptsCacheResult {
+    fn get_interrupts(&self, mode: Mode) -> InterruptsCacheResult {
         if self.mode == mode {
             match self.pending_interrupt {
                 Some(result) => InterruptsCacheResult::PendingInterrupt(result.into()),
