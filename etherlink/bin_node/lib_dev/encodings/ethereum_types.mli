@@ -95,6 +95,8 @@ val decode_number_be : bytes -> quantity
 
 val encode_u256_le : quantity -> bytes
 
+val encode_u64_le : quantity -> bytes
+
 (** [u16_to_bytes n] Translate an int in a binary string of two bytes
     (little endian).  Ints greater than 2 bytes are truncated. *)
 val u16_to_bytes : int -> string
@@ -229,6 +231,18 @@ type txpool = {
 }
 
 val txpool_encoding : txpool Data_encoding.t
+
+type state_account_override = {
+  balance : quantity option;
+  nonce : quantity option;
+  code : hex option;
+}
+
+type state_override = state_account_override AddressMap.t
+
+val state_override_encoding : state_override Data_encoding.t
+
+val state_override_empty : state_override
 
 val block_from_rlp : bytes -> block
 

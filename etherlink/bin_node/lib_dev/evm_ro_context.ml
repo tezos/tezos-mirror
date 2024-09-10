@@ -195,7 +195,7 @@ struct
   module SimulatorBackend = struct
     include Reader
 
-    let simulate_and_read simulate_state ~input =
+    let simulate_and_read ?state_override simulate_state ~input =
       let open Lwt_result_syntax in
       let config =
         Config.config
@@ -204,6 +204,9 @@ struct
           ~kernel_debug:false
           ~destination:Ctxt.ctxt.smart_rollup_address
           ()
+      in
+      let*! simulate_state =
+        State_override.update_accounts state_override simulate_state
       in
       let* raw_insights =
         Evm_state.execute_and_inspect

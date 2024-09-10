@@ -55,3 +55,6 @@ type wallet = {address : string; private_key : string}
     generates [number] random wallets and returns a list of [wallet] structs.
     This call does not store anything in the file system. *)
 val gen_wallets : number:int -> unit -> wallet list Lwt.t
+
+(** [calldata ?args signature] returns the encoded calldata. *)
+val calldata : ?args:string list -> string -> string Lwt.t

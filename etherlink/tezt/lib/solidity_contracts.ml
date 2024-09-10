@@ -10,7 +10,12 @@
 
 open Helpers
 
-type contract = {label : string; abi : string; bin : string}
+type contract = {
+  label : string;
+  abi : string;
+  bin : string;
+  deployed_bin : string option;
+}
 
 let solidity_contracts_path = "etherlink/kernel_evm/solidity_examples"
 
@@ -37,7 +42,8 @@ let generate_json_string ~label ~contract ~path ~evm_version =
       "*": {
         "%s": [
           "abi",
-          "evm.bytecode.object"
+          "evm.bytecode.object",
+          "evm.deployedBytecode.object"
         ]
       }
     }
@@ -86,12 +92,21 @@ let compile_contract ~source ~label ~contract ~evm_version =
       json |-> "contracts" |-> label |-> contract |-> "evm" |-> "bytecode"
       |-> "object" |> as_string)
   in
+  let deployed_bin =
+    JSON.(
+      json |-> "contracts" |-> label |-> contract |-> "evm"
+      |-> "deployedBytecode" |-> "object" |> as_string)
+  in
 
   let abi_file = Tezt.Temp.file (label ^ ".abi") in
   let bin_file = Tezt.Temp.file (label ^ ".bin") in
+  let deployed_file = Tezt.Temp.file (label ^ ".deployed.bin") in
+
   JSON.encode_to_file abi_file abi ;
   Tezt.Base.write_file bin_file ~contents:bin ;
-  return {label; abi = abi_file; bin = bin_file}
+  Tezt.Base.write_file deployed_file ~contents:deployed_bin ;
+  return
+    {label; abi = abi_file; bin = bin_file; deployed_bin = Some deployed_file}
 
 (** The info for the "storage.sol" contract. *)
 let simple_storage () =
@@ -284,6 +299,7 @@ let block_constants =
     label = "blocks_constants";
     abi = kernel_inputs_path ^ "/block_constants.abi";
     bin = kernel_inputs_path ^ "/block_constants.bin";
+    deployed_bin = None;
   }
 
 (** The info for the "call_withdrawal.sol" contract.
@@ -293,6 +309,7 @@ let call_withdrawal =
     label = "call_withdrawal";
     abi = kernel_inputs_path ^ "/call_withdrawal.abi";
     bin = kernel_inputs_path ^ "/call_withdrawal.bin";
+    deployed_bin = None;
   }
 
 (** The info for the "callcode_withdrawal.sol" contract.
@@ -302,6 +319,7 @@ let callcode_withdrawal =
     label = "callcode_withdrawal";
     abi = kernel_inputs_path ^ "/callcode_withdrawal.abi";
     bin = kernel_inputs_path ^ "/callcode_withdrawal.bin";
+    deployed_bin = None;
   }
 
 let gas_left () =
@@ -344,4 +362,18 @@ let precompiles () =
     ~source:(solidity_contracts_path ^ "/precompiles.sol")
     ~label:"precompiles"
     ~contract:"PrecompileCaller"
+    ~evm_version:"shanghai"
+
+let state_override_tester () =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/state_override_tester.sol")
+    ~label:"state_override_tester"
+    ~contract:"StateOverrideTester"
+    ~evm_version:"shanghai"
+
+let state_override_tester_readable () =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/state_override_tester_readable.sol")
+    ~label:"state_override_tester_readable"
+    ~contract:"StateOverrideTester"
     ~evm_version:"shanghai"

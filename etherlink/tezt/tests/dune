@@ -24,7 +24,7 @@
   -open Tezt_tezos
   -open Tezt_tezos.Runnable.Syntax
   -open Tezt_etherlink)
- (modules evm_rollup evm_sequencer validate dal_sequencer))
+ (modules evm_rollup evm_sequencer validate dal_sequencer eth_call))
 
 (executable
  (name main)

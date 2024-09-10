@@ -269,6 +269,10 @@ let encode_u256_le (Qty n) =
   let bits = Z.to_bits n |> Bytes.of_string in
   pad_to_n_bytes_le bits 32
 
+let encode_u64_le (Qty n) =
+  let bits = Z.to_bits n |> Bytes.of_string in
+  pad_to_n_bytes_le bits 4
+
 type transaction_log = {
   address : address;
   topics : hash list;
@@ -1054,3 +1058,26 @@ module From_rlp = struct
     Rlp.decode_value (fun b ->
         Result_syntax.return @@ Z.to_int @@ Z.of_bits @@ Bytes.to_string b)
 end
+
+type state_account_override = {
+  balance : quantity option;
+  nonce : quantity option;
+  code : hex option;
+}
+
+type state_override = state_account_override AddressMap.t
+
+let state_account_override_encoding =
+  let open Data_encoding in
+  conv
+    (fun {balance; nonce; code} -> (balance, nonce, code))
+    (fun (balance, nonce, code) -> {balance; nonce; code})
+    (obj3
+       (opt "balance" quantity_encoding)
+       (opt "nonce" quantity_encoding)
+       (opt "code" hex_encoding))
+
+let state_override_empty = AddressMap.empty
+
+let state_override_encoding =
+  AddressMap.associative_array_encoding state_account_override_encoding

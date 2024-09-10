@@ -10,20 +10,25 @@ module type SimulationBackend = sig
   include Durable_storage.READER
 
   val simulate_and_read :
-    state -> input:Simulation.Encodings.simulate_input -> bytes tzresult Lwt.t
+    ?state_override:Ethereum_types.state_override ->
+    state ->
+    input:Simulation.Encodings.simulate_input ->
+    bytes tzresult Lwt.t
 end
 
 (* This value is a hard maximum used by estimateGas. Set at Int64.max_int / 2 *)
 let max_gas_limit = Z.of_int64 0x3FFFFFFFFFFFFFFFL
 
 module Make (SimulationBackend : SimulationBackend) = struct
-  let call_simulation ~log_file ~input_encoder ~input simulation_state =
+  let call_simulation ?(state_override = Ethereum_types.state_override_empty)
+      ~log_file ~input_encoder ~input simulation_state =
     let open Lwt_result_syntax in
     let*? messages = input_encoder input in
     let insight_requests =
       [Simulation.Encodings.Durable_storage_key ["evm"; "simulation_result"]]
     in
     SimulationBackend.simulate_and_read
+      ~state_override
       simulation_state
       ~input:
         {
@@ -65,12 +70,13 @@ module Make (SimulationBackend : SimulationBackend) = struct
         return `V0
       else return `V1
 
-  let simulate_call call block_param =
+  let simulate_call call block_param state_override =
     let open Lwt_result_syntax in
     let* simulation_state = SimulationBackend.get_state ~block:block_param () in
     let* simulation_version = simulation_version simulation_state in
     let* bytes =
       call_simulation
+        ~state_override
         simulation_state
         ~log_file:"simulate_call"
         ~input_encoder:Simulation.encode

@@ -131,7 +131,7 @@ end) : Services_backend_sig.Backend = struct
   module SimulatorBackend = struct
     include Reader
 
-    let simulate_and_read _state ~input =
+    let simulate_and_read ?state_override:_ _state ~input =
       let open Lwt_result_syntax in
       let* json =
         call_service

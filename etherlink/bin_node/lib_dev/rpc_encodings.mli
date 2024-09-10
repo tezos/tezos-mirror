@@ -235,7 +235,9 @@ module Send_raw_transaction :
 module Eth_call :
   METHOD
     with type input =
-      Ethereum_types.call * Ethereum_types.Block_parameter.extended
+      Ethereum_types.call
+      * Ethereum_types.Block_parameter.extended
+      * Ethereum_types.state_override
      and type output = Ethereum_types.hash
 
 module Get_estimate_gas :
