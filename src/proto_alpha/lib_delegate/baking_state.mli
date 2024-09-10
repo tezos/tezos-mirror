@@ -350,8 +350,8 @@ type block_to_bake = {
   kind : block_kind;  (** Either a reproposal or a fresh proposal *)
   force_apply : bool;
       (** if true, while baking the block, try and apply the block and its
-          operations instead of only validating them. this can be permanently
-          set using the [--force-apply] flag (see [force_apply_switch_arg] in
+          operations instead of only validating them. This can be set using the
+          [--force-apply-from-round] flag (see [force_apply_from_round_arg] in
           [baking_commands.ml]). *)
 }
 
