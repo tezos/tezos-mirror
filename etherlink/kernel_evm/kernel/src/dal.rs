@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
+use crate::parsing::parse_unsigned_blueprint_chunk;
 use crate::sequencer_blueprint::UnsignedSequencerBlueprint;
 use rlp::{DecoderError, PayloadInfo};
 use tezos_evm_logging::{log, Level::*};
@@ -11,7 +12,14 @@ use tezos_smart_rollup_host::runtime::Runtime;
 
 const TAG_SIZE: usize = 1;
 
-const DAL_BLUEPRINT_INPUT_TAG: u8 = 0_u8;
+const DAL_BLUEPRINT_INPUT_TAG: u8 = 1;
+
+const DAL_PADDING_TAG: u8 = 0;
+
+enum ParsedInput {
+    UnsignedSequencerBlueprint(UnsignedSequencerBlueprint),
+    Padding,
+}
 
 // Import all the pages of a DAL slot and concatenate them.
 fn import_dal_slot<Host: Runtime>(
@@ -60,12 +68,92 @@ fn rlp_length(data: &[u8]) -> Result<usize, DecoderError> {
     Result::Ok(header_len + value_len)
 }
 
+fn parse_unsigned_sequencer_blueprint<Host: Runtime>(
+    host: &mut Host,
+    bytes: &[u8],
+) -> (Option<ParsedInput>, usize) {
+    if let Result::Ok(chunk_length) = rlp_length(bytes) {
+        let unsigned_chunk = parse_unsigned_blueprint_chunk(&bytes[..chunk_length]);
+        (
+            unsigned_chunk.map(ParsedInput::UnsignedSequencerBlueprint),
+            chunk_length + TAG_SIZE,
+        )
+    } else {
+        log!(host, Debug, "Read an invalid chunk from slot.");
+        (None, TAG_SIZE)
+    }
+}
+
+fn parse_input<Host: Runtime>(
+    host: &mut Host,
+    bytes: &[u8],
+) -> (Option<ParsedInput>, usize) {
+    // The expected format is:
+
+    // blueprint tag (1 byte) / blueprint chunk (variable)
+
+    match bytes[0] {
+        DAL_PADDING_TAG => (Some(ParsedInput::Padding), TAG_SIZE),
+        DAL_BLUEPRINT_INPUT_TAG => {
+            let bytes = &bytes[TAG_SIZE..];
+            parse_unsigned_sequencer_blueprint(host, bytes)
+        }
+        invalid_tag => {
+            log!(
+                host,
+                Debug,
+                "DAL slot contains an invalid message tag: '{}'.",
+                invalid_tag
+            );
+            (None, TAG_SIZE)
+        } // Tag is invalid, let's yield and give the responsibility to the
+          // caller to continue reading.
+    }
+}
+
+fn parse_slot<Host: Runtime>(
+    host: &mut Host,
+    slot: &[u8],
+) -> Vec<UnsignedSequencerBlueprint> {
+    // The format of a dal slot is
+    // tagged chunk | tagged chunk | .. | padding
+    //
+    // DAL slots are padded with zeros to have a constant size. We read chunks
+    // until reading `\x00` which is considered as `end of list`.
+
+    let mut buffer = Vec::new();
+    let mut offset = 0;
+
+    // Invariant: at each loop, at least one byte has been read. Once
+    // `end_of_list` has been reached or the slot has been fully read, the
+    // buffer is returned.
+    loop {
+        // Checked at the beginning of the loop: if the slot is empty, it
+        // returns directly and avoids reading the tag outside of the bounds of the slot.
+        if offset >= slot.len() {
+            return buffer;
+        };
+        let (next_input, length) = parse_input(host, &slot[offset..]);
+
+        match next_input {
+            None => return buffer, // Once an unparsable input has been read,
+            // stop reading and return the list of chunks read.
+            Some(ParsedInput::UnsignedSequencerBlueprint(b)) => buffer.push(b),
+            Some(ParsedInput::Padding) => return buffer,
+        }
+
+        // The offset is incremented by the number of bytes read, and the
+        // function returns if all the bytes have been read already.
+        offset += length;
+    }
+}
+
 pub fn fetch_and_parse_sequencer_blueprint_from_dal<Host: Runtime>(
     host: &mut Host,
     params: &RollupDalParameters,
     slot_index: u8,
     published_level: u32,
-) -> Option<UnsignedSequencerBlueprint> {
+) -> Option<Vec<UnsignedSequencerBlueprint>> {
     if let Some(slot) = import_dal_slot(host, params, published_level, slot_index) {
         log!(
             host,
@@ -79,47 +167,14 @@ pub fn fetch_and_parse_sequencer_blueprint_from_dal<Host: Runtime>(
         // size, we need to remove this padding before parsing the
         // slot as a blueprint chunk.
 
-        // The expected format is:
-
-        // blueprint tag (1 byte) / blueprint chunk (variable) / padding
-
-        if slot[0] != DAL_BLUEPRINT_INPUT_TAG {
-            return None;
-        }
-
-        // To remove the padding we need to measure the length of
-        // the RLP-encoded blueprint chunk
-        if let Result::Ok(chunk_length) = rlp_length(&slot[TAG_SIZE..]) {
-            // Padding removal
-            let slot = &slot[TAG_SIZE..chunk_length + TAG_SIZE];
-            let res = crate::parsing::parse_unsigned_blueprint_chunk(slot);
-            if let Some(chunk) = res {
-                log!(
-                    host,
-                    Info,
-                    "DAL slot successfully parsed as a blueprint chunk"
-                );
-                Some(chunk)
-            } else {
-                log!(
-                    host,
-                    Debug,
-                    "Slot {} at level {} contains an invalid chunk",
-                    slot_index,
-                    published_level
-                );
-                None
-            }
-        } else {
-            log!(
-                host,
-                Debug,
-                "Slot {} at level {} is illformed",
-                slot_index,
-                published_level
-            );
-            None
-        }
+        let chunks = parse_slot(host, &slot);
+        log!(
+            host,
+            Debug,
+            "DAL slot successfully parsed as {} unsigned blueprint chunks",
+            chunks.len()
+        );
+        Some(chunks)
     } else {
         log!(
             host,

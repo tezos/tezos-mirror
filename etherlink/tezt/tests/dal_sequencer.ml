@@ -29,6 +29,15 @@ let register_test =
     ~enable_dal:true
     ~threshold_encryption:false
 
+let count_event sequencer event counter =
+  Evm_node.wait_for sequencer event (fun _json ->
+      incr counter ;
+      (* We return None here to keep the loop running *)
+      None)
+
+let count_blueprint_sent_on_inbox sequencer counter =
+  count_event sequencer "blueprint_injection_on_inbox.v0" counter
+
 (* This test is similar to {Evm_sequencer.test_publish_blueprints} but it also checks
    that all 5 blueprints sent from the sequencer were published on the
    DAL (and none on the inbox). *)
@@ -47,25 +56,19 @@ let test_publish_blueprints_on_dal =
   let number_of_blueprints_sent_to_dal = ref 0 in
   let number_of_signals = ref 0 in
 
-  let count_event event counter =
-    Evm_node.wait_for sequencer event (fun _json ->
-        incr counter ;
-        (* We return None here to keep the loop running *)
-        None)
-  in
-
   let inbox_counter_p =
-    count_event
-      "blueprint_injection_on_inbox.v0"
-      number_of_blueprints_sent_to_inbox
+    count_blueprint_sent_on_inbox sequencer number_of_blueprints_sent_to_inbox
   in
 
   let dal_counter_p =
-    count_event "blueprint_injection_on_DAL.v0" number_of_blueprints_sent_to_dal
+    count_event
+      sequencer
+      "blueprint_injection_on_DAL.v0"
+      number_of_blueprints_sent_to_dal
   in
 
   let signal_counter_p =
-    count_event "signal_publisher_signal_signed.v0" number_of_signals
+    count_event sequencer "signal_publisher_signal_signed.v0" number_of_signals
   in
 
   let* _ =
@@ -125,6 +128,58 @@ let test_publish_blueprints_on_dal =
   Lwt.cancel signal_counter_p ;
   unit
 
+let test_chunked_blueprints_on_dal =
+  register_test
+    ~time_between_blocks:Nothing
+    ~tags:["evm"; "sequencer"; "chunks"]
+    ~title:
+      "Sequencer publishes entire blueprints of more than one chunk to the DAL"
+  @@ fun {sequencer; sc_rollup_node; client; proxy; _} _protocol ->
+  (* Send data big enough to trigger splitting in multiple chunks. *)
+  let number_of_blueprints_sent_to_inbox = ref 0 in
+
+  let inbox_counter_p =
+    count_blueprint_sent_on_inbox sequencer number_of_blueprints_sent_to_inbox
+  in
+
+  (* Chunks size depends on the size of messages in the inbox, which is for now
+     of 4096 bytes. Let's make a transaction that is far bigger so that we can
+     be sure it will be added to a blueprint that will be chunked. *)
+  let data = String.make 64896 '0' in
+  let to_public_key = Eth_account.bootstrap_accounts.(1).address in
+  let* _tx_hash =
+    send_transaction_to_sequencer
+      (Eth_cli.transaction_send
+         ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+         ~to_public_key
+         ~value:Wei.zero
+         ~data
+         ~endpoint:(Evm_node.endpoint sequencer))
+      sequencer
+  and* _level, nb_chunks =
+    Evm_node.wait_for_blueprint_injected_on_dal sequencer
+  in
+  Check.(
+    (nb_chunks >= 2)
+      int
+      ~error_msg:
+        "The number of chunks injected should be at least %R but it is %L") ;
+  (* bake until the sequencer and the rollup are in sync, to assess the input
+     has been read correctly. *)
+  let* () =
+    bake_until_sync ~__LOC__ ~sc_rollup_node ~client ~sequencer ~proxy ()
+  in
+  Check.(
+    (!number_of_blueprints_sent_to_inbox = 0)
+      int
+      ~error_msg:
+        "No blueprint should've been sent through the inbox, otherwise it \
+         means that the data has been sent via the catchup mechanism") ;
+  Lwt.cancel inbox_counter_p ;
+  unit
+
 let protocols = Protocol.all
 
-let () = test_publish_blueprints_on_dal protocols
+let () =
+  test_publish_blueprints_on_dal protocols ;
+  test_chunked_blueprints_on_dal protocols

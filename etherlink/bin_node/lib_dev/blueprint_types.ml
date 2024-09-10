@@ -5,7 +5,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type payload = [`External of string] list
+type chunk = [`External of string]
+
+type payload = chunk list
 
 type t = {
   number : Ethereum_types.quantity;

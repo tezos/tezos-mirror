@@ -296,6 +296,14 @@ let wait_for_blueprint_applied ?timeout evm_node level =
   | Not_running | Running {session_state = {ready = false; _}; _} ->
       failwith "EVM node is not ready"
 
+let wait_for_blueprint_injected_on_dal ?timeout evm_node =
+  wait_for_event ?timeout evm_node ~event:"blueprint_injection_on_DAL.v0"
+  @@ JSON.(
+       fun json ->
+         let level = json |-> "level" |> as_int in
+         let nb_chunks = json |-> "nb_chunks" |> as_int in
+         Some (level, nb_chunks))
+
 let wait_for_rollup_node_follower_disabled ?timeout evm_node =
   wait_for_event ?timeout evm_node ~event:"rollup_node_follower_disabled.v0"
   @@ Fun.const (Some ())
