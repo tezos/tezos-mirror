@@ -264,6 +264,25 @@ check_rust_fmt:
   script:
   - scripts/check-format-rust.sh
 
+documentation:rst-check:
+  image: ${ci_image_name}/test:${ci_image_tag}
+  stage: sanity
+  tags:
+  - gcp
+  rules:
+  - changes:
+    - .gitlab-ci.yml
+    - .gitlab/**/*
+    - docs/**/*.rst
+    when: on_success
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  before_script:
+  - . $HOME/.venv/bin/activate
+  script:
+  - make --silent -C docs sphinx-check
+
 nix:
   image: nixos/nix:2.22.1
   stage: sanity
@@ -438,6 +457,8 @@ oc.build:static-x86_64-linux-binaries:
     optional: true
   - job: check_rust_fmt
     optional: true
+  - job: documentation:rst-check
+    optional: true
   - job: nix
     optional: true
   dependencies:
@@ -514,6 +535,8 @@ oc.build_x86_64-released:
   - job: oc.misc_checks
     optional: true
   - job: check_rust_fmt
+    optional: true
+  - job: documentation:rst-check
     optional: true
   - job: nix
     optional: true
@@ -602,6 +625,8 @@ oc.build_x86_64-exp-dev-extra:
     optional: true
   - job: check_rust_fmt
     optional: true
+  - job: documentation:rst-check
+    optional: true
   - job: nix
     optional: true
   dependencies:
@@ -681,6 +706,8 @@ ocaml-check:
   - job: oc.misc_checks
     optional: true
   - job: check_rust_fmt
+    optional: true
+  - job: documentation:rst-check
     optional: true
   - job: nix
     optional: true
@@ -1000,6 +1027,8 @@ opam:prepare:
   - job: oc.misc_checks
     optional: true
   - job: check_rust_fmt
+    optional: true
+  - job: documentation:rst-check
     optional: true
   - job: nix
     optional: true
@@ -1833,6 +1862,8 @@ kaitai_checks:
     optional: true
   - job: check_rust_fmt
     optional: true
+  - job: documentation:rst-check
+    optional: true
   - job: nix
     optional: true
   dependencies:
@@ -1921,6 +1952,8 @@ oc.check_lift_limits_patch:
     optional: true
   - job: check_rust_fmt
     optional: true
+  - job: documentation:rst-check
+    optional: true
   - job: nix
     optional: true
   dependencies:
@@ -1977,6 +2010,8 @@ oc.python_check:
   - job: oc.misc_checks
     optional: true
   - job: check_rust_fmt
+    optional: true
+  - job: documentation:rst-check
     optional: true
   - job: nix
     optional: true
@@ -2094,6 +2129,8 @@ oc.script:test-gen-genesis:
   - job: oc.misc_checks
     optional: true
   - job: check_rust_fmt
+    optional: true
+  - job: documentation:rst-check
     optional: true
   - job: nix
     optional: true
@@ -2230,6 +2267,8 @@ oc.script:b58_prefix:
   - job: oc.misc_checks
     optional: true
   - job: check_rust_fmt
+    optional: true
+  - job: documentation:rst-check
     optional: true
   - job: nix
     optional: true
@@ -3049,6 +3088,8 @@ oc.install_opam_jammy:
     optional: true
   - job: check_rust_fmt
     optional: true
+  - job: documentation:rst-check
+    optional: true
   - job: nix
     optional: true
   dependencies: []
@@ -3083,6 +3124,8 @@ oc.compile_sources_doc_bookworm:
   - job: oc.misc_checks
     optional: true
   - job: check_rust_fmt
+    optional: true
+  - job: documentation:rst-check
     optional: true
   - job: nix
     optional: true
@@ -3702,6 +3745,8 @@ commit_titles:
     optional: true
   - job: check_rust_fmt
     optional: true
+  - job: documentation:rst-check
+    optional: true
   - job: nix
     optional: true
   dependencies:
@@ -3806,6 +3851,8 @@ oc.install_python_bookworm:
     optional: true
   - job: check_rust_fmt
     optional: true
+  - job: documentation:rst-check
+    optional: true
   - job: nix
     optional: true
   dependencies: []
@@ -3854,6 +3901,8 @@ documentation:odoc:
   - job: oc.misc_checks
     optional: true
   - job: check_rust_fmt
+    optional: true
+  - job: documentation:rst-check
     optional: true
   - job: nix
     optional: true
@@ -3927,6 +3976,8 @@ documentation:manuals:
     optional: true
   - job: check_rust_fmt
     optional: true
+  - job: documentation:rst-check
+    optional: true
   - job: nix
     optional: true
   dependencies:
@@ -3999,6 +4050,8 @@ documentation:docgen:
   - job: oc.misc_checks
     optional: true
   - job: check_rust_fmt
+    optional: true
+  - job: documentation:rst-check
     optional: true
   - job: nix
     optional: true

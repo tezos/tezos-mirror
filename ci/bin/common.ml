@@ -402,6 +402,10 @@ let changeset_octez_docs =
           "docs/**/*";
         ])
 
+(** Only if reStructured Text files have changed *)
+let changeset_octez_docs_rst =
+  Changeset.(changeset_base @ make ["docs/**/*.rst"])
+
 let changeset_octez_docker_changes_or_master =
   Changeset.(
     changeset_base

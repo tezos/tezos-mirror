@@ -280,3 +280,9 @@ html_domain_indices = False
 default_role = 'default'
 
 html_favicon = 'favicon.ico'
+
+# Suppress some specific warnings
+# suppress_warnings = [
+#     'toc.not_readable',
+#     'ref.doc',
+# ]
