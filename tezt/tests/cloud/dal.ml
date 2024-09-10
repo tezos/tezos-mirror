@@ -1838,7 +1838,6 @@ let init_etherlink_dal_node ~bootstrap ~next_agent ~name ~dal_slots ~network =
       let* () =
         Dal_node.init_config
           ~expected_pow:(Network.expected_pow Cli.network)
-          ~producer_profiles:dal_slots
           ~peers:[bootstrap.dal_node_p2p_endpoint]
           default_dal_node
       in
