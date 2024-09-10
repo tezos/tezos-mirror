@@ -1638,6 +1638,26 @@ let init_observer cloud configuration ~bootstrap teztale ~slot_index i agent =
   in
   Lwt.return {node; dal_node; slot_index}
 
+let init_etherlink_dal_node ~bootstrap ~node ~agent ~name ~dal_slots =
+  match dal_slots with
+  | [] -> none
+  | dal_slots ->
+      let* dal_node =
+        Dal_node.Agent.create
+          ~name:(Format.asprintf "etherlink-%s-dal-node" name)
+          ~node
+          agent
+      in
+      let* () =
+        Dal_node.init_config
+          ~expected_pow:(Network.expected_pow Cli.network)
+          ~producer_profiles:dal_slots
+          ~peers:[bootstrap.dal_node_p2p_endpoint]
+          dal_node
+      in
+      let* () = Dal_node.Agent.run ~memtrace:Cli.memtrace dal_node in
+      some dal_node
+
 let init_etherlink_operator_setup cloud configuration name ~bootstrap ~dal_slots
     account agent =
   let is_sequencer = configuration.etherlink_sequencer in
@@ -1690,24 +1710,12 @@ let init_etherlink_operator_setup cloud configuration name ~bootstrap ~dal_slots
       ()
   in
   let* dal_node =
-    match configuration.etherlink_dal_slots with
-    | [] -> none
-    | dal_slots ->
-        let* dal_node =
-          Dal_node.Agent.create
-            ~name:(Format.asprintf "etherlink-%s-dal-node" name)
-            ~node
-            agent
-        in
-        let* () =
-          Dal_node.init_config
-            ~expected_pow:(Network.expected_pow Cli.network)
-            ~producer_profiles:dal_slots
-            ~peers:[bootstrap.dal_node_p2p_endpoint]
-            dal_node
-        in
-        let* () = Dal_node.Agent.run ~memtrace:Cli.memtrace dal_node in
-        some dal_node
+    init_etherlink_dal_node
+      ~bootstrap
+      ~node
+      ~agent
+      ~name
+      ~dal_slots:configuration.etherlink_dal_slots
   in
   let* sc_rollup_node =
     Sc_rollup_node.Agent.create
