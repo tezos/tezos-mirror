@@ -25,6 +25,18 @@ impl TryFrom<u8> for Level {
     }
 }
 
+impl Default for Level {
+    fn default() -> Self {
+        if cfg!(feature = "debug") {
+            Self::Debug
+        } else if cfg!(feature = "benchmark") {
+            Self::Benchmarking
+        } else {
+            Self::Info
+        }
+    }
+}
+
 impl std::fmt::Display for Level {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self {
