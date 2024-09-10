@@ -59,6 +59,7 @@
     "benchmarks/bench_ecpairing.js",
     "benchmarks/bench_modexp.js",
     "benchmarks/bench_imbricated_calls.js",
+    "benchmarks/bench_revert_computation.js",
     "benchmarks/bench_linear_transfers.js --count 0",
     "benchmarks/bench_linear_transfers.js --count 5",
     "benchmarks/bench_linear_transfers.js --count 10",
