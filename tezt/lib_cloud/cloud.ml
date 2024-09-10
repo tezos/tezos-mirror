@@ -221,7 +221,7 @@ let orchestrator deployement f =
   in
   let* ot =
     if Env.open_telemetry then
-      let* ot = Ot.run () in
+      let* ot = Ot.run ~jaeger:Env.jaeger in
       Lwt.return_some ot
     else Lwt.return_none
   in

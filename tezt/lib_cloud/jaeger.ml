@@ -9,12 +9,13 @@ type t = unit
 
 let run () =
   let* () =
-    (* Not using --network host may be an issue. *)
     Process.run
       "docker"
       [
         "run";
         "-d";
+        "--network";
+        "host";
         "--rm";
         "--name";
         "jaeger";

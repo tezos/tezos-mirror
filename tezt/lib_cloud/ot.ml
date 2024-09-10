@@ -7,15 +7,28 @@
 
 type t = unit
 
-let configuration =
-  {|
+let configuration ~jaeger =
+  let jaeger =
+    if jaeger then
+      {|
+  otlp/jaeger:
+      endpoint: http://localhost:4317
+      tls:
+        insecure: true
+|}
+    else ""
+  in
+  Format.asprintf
+    {|
 receivers:
   otlp:
     protocols:
-      grpc:  # Listening for OTLP data over gRPC (default port: 4317)
-      http:  # Listening for OTLP data over HTTP (default port: 55681)
+      http:  
+        endpoint: "0.0.0.0:55681"
 
 exporters:
+
+%s
 
 processors:
   batch:  # Batch processor to optimize telemetry processing
@@ -39,25 +52,27 @@ extensions:
   health_check:
     endpoint: "localhost:13133"
 |}
+    jaeger
 
-let run () =
+let run ~jaeger =
   let configuration_file =
     Filename.get_temp_dir_name () // "otel-config.yaml"
   in
-  write_file configuration_file ~contents:configuration ;
+  let contents = configuration ~jaeger in
+  write_file configuration_file ~contents ;
   let* () =
     Process.run
       "docker"
       [
         "run";
-        "--rm";
         "-d";
+        "--rm";
         "--network";
         "host";
         "--name";
         "otel-collector";
         "-p";
-        "4317:4317";
+        "4317-4318:4317-4318";
         "-p";
         "13133:13133";
         "-p";
