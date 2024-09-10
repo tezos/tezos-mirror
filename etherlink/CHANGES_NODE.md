@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Features
+
+#### CLI
+
+- Support string interpolation in `--snapshot-file` (for command `snapshot
+  export`): `%r` will be replace by the rollup address, and `%l` by the current
+  level. (!14854)
+
 ## Version 0.3 (2024-09-10)
 
 This release primilarly addresses two bugs uncovered in production: the broken

@@ -35,3 +35,24 @@ let normalize_addr str =
   match String.remove_prefix ~prefix:"0x" str with
   | Some str -> str
   | None -> str
+
+let interpolate str vars =
+  let buf = Buffer.create (String.length str) in
+  let look =
+    String.fold_left
+      (fun look c ->
+        if look then
+          match List.assoc_opt ~equal:( = ) c vars with
+          | Some substitute ->
+              Buffer.add_string buf substitute ;
+              false
+          | None -> raise (Invalid_argument "interpolate")
+        else if c = '%' then true
+        else (
+          Buffer.add_char buf c ;
+          false))
+      false
+      str
+  in
+  assert (not look) ;
+  Buffer.contents buf
