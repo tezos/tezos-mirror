@@ -77,15 +77,6 @@
     "batch_limit": "unlimited",
     "restricted_rpcs": "unrestricted",
     "max_active_connections": "unlimited"
-  },
-  "private_rpc": {
-    "port": "hidden-for-regression-only",
-    "addr": "127.0.0.1",
-    "cors_origins": [],
-    "cors_headers": [],
-    "batch_limit": "unlimited",
-    "restricted_rpcs": "unrestricted",
-    "max_active_connections": "unlimited"
   }
 }
 {

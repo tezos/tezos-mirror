@@ -6208,24 +6208,9 @@ let test_configuration_service =
           json)
       json
   in
-  let remove_private_rpc_port json =
-    JSON.update
-      "private_rpc"
-      (fun json ->
-        JSON.update
-          "port"
-          (fun _ ->
-            JSON.annotate
-              ~origin:"remove_fresh_ports"
-              (`String "hidden-for-regression-only"))
-          json)
-      json
-  in
 
   Regression.capture (JSON.encode (remove_public_rpc_port proxy_config)) ;
-  Regression.capture
-    (JSON.encode
-       (remove_public_rpc_port @@ remove_private_rpc_port @@ sequencer_config)) ;
+  Regression.capture (JSON.encode (remove_public_rpc_port @@ sequencer_config)) ;
   Regression.capture (JSON.encode (remove_public_rpc_port @@ observer_config)) ;
 
   unit

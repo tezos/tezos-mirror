@@ -12,6 +12,10 @@
 
 ### Bug fixes
 
+#### RPCs
+
+- Hide `private_rpc` in the output of `GET /configuration`. (!14868)
+
 #### Metrics
 
 - Fix `octez_evm_node_head` for the RPC mode. (!14849)
