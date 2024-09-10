@@ -30,7 +30,6 @@ depends: [
   "octez-injector" { = version }
   "octez-l2-libs" { = version }
   "octez-alcotezt" { with-test & = version }
-  "tezos-dac-node-lib" { with-test & = version }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
