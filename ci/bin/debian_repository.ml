@@ -426,14 +426,23 @@ let jobs pipeline_type =
         job_build_debian_package_current_b )
 
 let register pipeline_type =
-  let pipeline_name =
+  let pipeline_name, description =
     match pipeline_type with
-    | Partial -> "debian_repository_partial"
-    | Full -> "debian_repository_full"
-    | Release -> "debian_repository_release"
+    | Partial ->
+        ( "debian_repository_partial",
+          "A child pipeline of 'before_merging' testing the build of .deb \
+           packages for Debian stable." )
+    | Full ->
+        ( "debian_repository_full",
+          "A child pipeline of 'schedule_extended_test' testing the build of \
+           all .deb packages." )
+    | Release ->
+        ( "debian_repository_release",
+          "A child pipeline testing the builds of and publishes all the .deb \
+           packages." )
   in
   let jobs, _, _, _, _ = jobs pipeline_type in
-  Pipeline.register_child pipeline_name ~jobs
+  Pipeline.register_child pipeline_name ~description ~jobs
 
 let child_pipeline_partial = register Partial
 

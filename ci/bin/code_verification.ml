@@ -1693,7 +1693,7 @@ let jobs pipeline_type =
     jobs_install_python @ jobs_documentation
   in
 
-  (*Manual jobs *)
+  (* Manual jobs *)
   let manual =
     (* On scheduled pipelines we build and test the full test matrix.
        On [Before_merging] pipelines only a subset of the packages are built

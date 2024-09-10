@@ -8,8 +8,8 @@
 (* This module defines the jobs of the [master_branch] pipeline.
 
    This pipeline runs for each merge on the [master] branch. To goal
-   of this pipeline is to publish artifacts for the development
-   version of Octez, including:
+   of this pipeline is to publish artifacts for the latest development
+   version of Octez (e.g. the latest version on 'master'), including:
 
    - docker images,
    - static binaries, and
