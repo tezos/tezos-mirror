@@ -51,6 +51,13 @@ pub enum Input<'a> {
     Reveal(RevealData<'a>),
 }
 
+/// A value of this type could only be returned as part of successfully verifying
+/// a proof, which is not yet implemented. It is therefore only mocked for now.
+#[ocaml::sig]
+pub struct InputRequest;
+
+ocaml::custom!(InputRequest);
+
 impl From<PvmStatus> for Status {
     fn from(item: PvmStatus) -> Self {
         Status::try_from(item as u8).expect("Invalid conversion")
@@ -308,4 +315,40 @@ pub unsafe fn octez_riscv_storage_export_snapshot(
         let s = format!("{e:?}");
         ocaml::Value::hash_variant(gc, "Msg", Some(s.to_value(gc)))
     })
+}
+
+/// Proofs
+#[ocaml::sig]
+pub struct Proof;
+
+ocaml::custom!(Proof);
+
+#[ocaml::func]
+#[ocaml::sig("proof -> bytes")]
+pub fn octez_riscv_proof_start_state(_proof: Pointer<Proof>) -> [u8; 32] {
+    todo!()
+}
+
+#[ocaml::func]
+#[ocaml::sig("proof -> bytes")]
+pub fn octez_riscv_proof_stop_state(_proof: Pointer<Proof>) -> [u8; 32] {
+    todo!()
+}
+
+#[ocaml::func]
+#[ocaml::sig("input option -> proof -> input_request option")]
+pub unsafe fn octez_riscv_verify_proof(
+    _proof: Pointer<Proof>,
+    _input: Option<Input>,
+) -> Option<Pointer<InputRequest>> {
+    None
+}
+
+#[ocaml::func]
+#[ocaml::sig("input option -> state -> proof option")]
+pub unsafe fn octez_riscv_produce_proof(
+    _input: Option<Input>,
+    _state: Pointer<State>,
+) -> Option<Pointer<InputRequest>> {
+    None
 }

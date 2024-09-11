@@ -6,6 +6,34 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type Environment.Error_monad.error += Riscv_proof_verification_failed
+
+type Environment.Error_monad.error += Riscv_proof_production_failed
+
+let () =
+  let open Environment.Error_monad in
+  let open Data_encoding in
+  let msg = "Proof verification failed" in
+  register_error_kind
+    `Permanent
+    ~id:"smart_rollup_riscv_proof_verification_failed"
+    ~title:msg
+    ~pp:(fun fmt () -> Format.fprintf fmt "%s" msg)
+    ~description:msg
+    unit
+    (function Riscv_proof_verification_failed -> Some () | _ -> None)
+    (fun () -> Riscv_proof_verification_failed) ;
+  let msg = "Proof production failed" in
+  register_error_kind
+    `Permanent
+    ~id:"smart_rollup_riscv_proof_production_failed"
+    ~title:msg
+    ~pp:(fun fmt () -> Format.fprintf fmt "%s" msg)
+    ~description:msg
+    unit
+    (function Riscv_proof_production_failed -> Some () | _ -> None)
+    (fun () -> Riscv_proof_production_failed)
+
 open Protocol
 open Alpha_context
 module Context = Riscv_context
@@ -44,13 +72,20 @@ module PVM :
 
   type hash = Sc_rollup.State_hash.t
 
-  type proof = void
+  type proof = Backend.proof
 
-  let proof_encoding = void
+  let proof_encoding =
+    Data_encoding.(
+      conv_with_guard
+        (function (_ : proof) -> ())
+        (fun _ -> Error "proofs not implemented")
+        unit)
 
-  let proof_start_state = function (_ : proof) -> .
+  let proof_start_state proof =
+    Sc_rollup.State_hash.of_bytes_exn (Backend.proof_start_state proof)
 
-  let proof_stop_state = function (_ : proof) -> .
+  let proof_stop_state proof =
+    Sc_rollup.State_hash.of_bytes_exn (Backend.proof_stop_state proof)
 
   let state_hash state =
     Lwt.return (Sc_rollup.State_hash.of_bytes_exn (Backend.state_hash state))
@@ -91,23 +126,35 @@ module PVM :
     | Sc_rollup.(Reveal (Raw_data data)) -> Reveal (RawData data)
     | _ -> assert false
 
+  let of_pvm_input_request (_input_request : Backend.input_request) :
+      Sc_rollup.input_request =
+    raise (Invalid_argument "input_request not implemented")
+
   let set_input input state = Backend.set_input state (to_pvm_input input)
 
   let eval state = Backend.compute_step state
 
-  let verify_proof ~is_reveal_enabled:_ _input = function (_ : proof) -> .
+  let verify_proof ~is_reveal_enabled:_ input_given proof =
+    let open Environment.Error_monad.Lwt_result_syntax in
+    match Backend.verify_proof (Option.map to_pvm_input input_given) proof with
+    | None -> tzfail Riscv_proof_verification_failed
+    | Some request -> return (of_pvm_input_request request)
 
-  let produce_proof _context ~is_reveal_enabled:_ _state _step = assert false
+  let produce_proof _context ~is_reveal_enabled:_ input_given state =
+    let open Environment.Error_monad.Lwt_result_syntax in
+    match Backend.produce_proof (Option.map to_pvm_input input_given) state with
+    | None -> tzfail Riscv_proof_production_failed
+    | Some proof -> return proof
 
   type output_proof = void
 
   let output_proof_encoding = void
 
-  let output_of_output_proof = function (_ : proof) -> .
+  let output_of_output_proof = function (_ : output_proof) -> .
 
-  let state_of_output_proof = function (_ : proof) -> .
+  let state_of_output_proof = function (_ : output_proof) -> .
 
-  let verify_output_proof = function (_ : proof) -> .
+  let verify_output_proof = function (_ : output_proof) -> .
 
   let produce_output_proof _context _state _output = assert false
 

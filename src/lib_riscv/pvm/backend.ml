@@ -12,8 +12,6 @@ type reveals = unit
 
 type write_debug = string -> unit Lwt.t
 
-type input_info
-
 type state = Storage.State.t
 
 type status = Api.status
@@ -21,6 +19,10 @@ type status = Api.status
 type reveal_data = Api.reveal_data
 
 type input = Api.input
+
+type input_request = Octez_riscv_api.input_request
+
+type proof = Octez_riscv_api.proof
 
 (* The kernel debug logging function (`string -> unit Lwt.t`) passed by the node
  * to [compute_step] and [compute_step_many] cannot be passed directly
@@ -73,3 +75,11 @@ let get_current_level state = Lwt.return (Api.octez_riscv_get_level state)
 let state_hash state = Api.octez_riscv_state_hash state
 
 let set_input state input = Lwt.return (Api.octez_riscv_set_input state input)
+
+let proof_start_state proof = Api.octez_riscv_proof_start_state proof
+
+let proof_stop_state proof = Api.octez_riscv_proof_stop_state proof
+
+let verify_proof input proof = Api.octez_riscv_verify_proof input proof
+
+let produce_proof input state = Api.octez_riscv_produce_proof input state
