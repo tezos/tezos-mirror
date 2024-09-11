@@ -154,7 +154,8 @@
 
    - [chain_store_dir]/<stored_data>* files containing encoded simple
      data structures such as: genesis block, checkpoint, savepoint,
-     caboose, protocol levels, forked chains, invalid blocks, etc.
+     caboose, protocol levels, forked chains, alternate heads, invalid
+     blocks, etc.
 
    - [chain_store_dir]/testchains/<testchain_id_b58>/ contains the
      [chains_store_dir]'s test chain, based on a similar hierarchy.
@@ -203,8 +204,9 @@ type chain_store
       Default: {!History_mode.default} (which should correspond to
     full with 5 extra preserved cycles.)
 
-    @param readonly a flag that, if set to true, prevent writing
-    throughout the store {b and} context.
+    @param readonly a flag that, if set to true, opens the storage,
+      that is stored on disk, in read-only mode preventing to write in
+      the corresponding store {b and} context.
       Default: false
 
     @param block_cache_limit allows to override the size of the block
@@ -218,13 +220,6 @@ type chain_store
     @param maintenance_delay a flag that, if set, will disable the
     storage maintenance by a certain delay.
       Default: Disabled
-
-    @param disable_context_pruning specifies whether or not the
-    context pruning is expected to be run (if set to true) or not (if
-    set to false -- default) during a storage maintenance.
-
-    @param maintenace_delay allows to introduce a delay prior to the
-    trigger of the storage maintenance
 *)
 val init :
   ?patch_context:
@@ -456,7 +451,10 @@ module Block : sig
      the newly created block is returned.
 
      If the block was successfully stored, then the block is removed
-     from the validated block cache. *)
+     from the validated block cache.
+
+     {b Warning} The store will refuse to store blocks with no
+     associated context's commit. *)
   val store_block :
     chain_store ->
     block_header:Block_header.t ->
@@ -671,8 +669,8 @@ module Chain : sig
         checkpoint's level.
 
       - The checkpoint is updated periodically such that the following
-        invariant holds: [checkpoint.level >=
-        all_head.last_preserved_block_level]
+      invariant holds:
+      [checkpoint.level >= all_head.last_preserved_block_level]
 
       The checkpoint will tend to designate the highest block among
       all chain head's [last_preserved_block_level] in a normal
@@ -781,9 +779,8 @@ module Chain : sig
         this level or unchanged otherwise;
 
       - The savepoint will be updated to :
-        min(max_op_ttl(lpbl(new_head)), lpbl(new_head) -
-        <cycle_length> * <history_mode_offset>) or will remain 0 in
-        Archive mode;
+        min(max_op_ttl(lpbl(new_head)), lpbl(new_head) - <cycle_length>
+        * <history_mode_offset>) or will remain 0 in Archive mode;
 
       - The caboose will be updated to the same value as the savepoint
         in Rolling mode.
@@ -927,16 +924,18 @@ module Chain : sig
     Block.block * Protocol_hash.t ->
     unit tzresult Lwt.t
 
-  (** [may_update_ancestor_protocol_level chain_store ~head] tries to
-      find the activation block of the [head]'s protocol, checks that
-      its an ancestor and tries to update it if that's not the
-      case. If the registered activation block is not reachable
-      (already pruned), this function does nothing. *)
+  (** [may_update_ancestor_protocol_level chain_store ~head
+      ~expect_predecessor_context] tries to find the activation block
+      of the [head]'s protocol, checks that its an ancestor and tries
+      to update it if that's not the case. If the registered
+      activation block is not reachable (already pruned), this
+      function does nothing. The [expect_predecessor_context] argument
+      specifies which context hash semantics should be used. *)
   val may_update_ancestor_protocol_level :
     chain_store -> head:Block.block -> unit tzresult Lwt.t
 
-  (** [validated_watcher chain_store] instantiates a new validated block
-       watcher for [chain_store]. *)
+  (** [validated_watcher chain_store] instantiates a new validated
+      block watcher for [chain_store]. *)
   val validated_watcher :
     chain_store -> Block.t Lwt_stream.t * Lwt_watcher.stopper
 
