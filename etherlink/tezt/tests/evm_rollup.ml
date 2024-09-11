@@ -12,7 +12,7 @@
    -------
    Component:    Smart Optimistic Rollups: EVM Kernel
    Requirement:  make -f kernels.mk build
-                 npm install eth-cli
+                 npm install eth-cli solc@0.8.26
 
                  # Install cast or foundry (see: https://book.getfoundry.sh/getting-started/installation)
                  curl -L https://foundry.paradigm.xyz | bash
