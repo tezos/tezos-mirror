@@ -88,12 +88,13 @@ mod tests {
     };
     use strum::IntoEnumIterator;
 
-    backend_test!(test_mode_reset, F, {
-        test_determinism::<F, ModeLayout, _>(|space| {
+    #[test]
+    fn test_mode_reset() {
+        test_determinism::<ModeLayout, _>(|space| {
             let mut mode1 = ModeCell::bind(space);
             mode1.reset();
         });
-    });
+    }
 
     backend_test!(test_mode_read_write, F, {
         let mut backend = create_backend!(ModeLayout, F);

@@ -64,6 +64,9 @@ pub mod memory_backend;
 pub mod owned_backend;
 mod region;
 
+#[cfg(test)]
+pub(crate) mod random_backend;
+
 pub use alloc::*;
 pub use effects::*;
 pub use elems::*;
@@ -245,71 +248,49 @@ pub mod test_helpers {
 #[cfg(test)]
 pub mod tests {
     use super::{test_helpers::TestBackendFactory, *};
-    use crate::backend_test;
-    use rand::Fill;
-    use std::marker::PhantomData;
-
-    /// Fill the backend with random data.
-    pub fn randomise_backend<B: BackendFull>(backend: &mut B) {
-        struct Randomiser<'a, B> {
-            backend: &'a mut B,
-        }
-
-        impl<'a, B> ManagerBase for Randomiser<'a, B> {
-            type Region<E: Elem, const LEN: usize> = DummyRegion<E>;
-
-            type DynRegion<const LEN: usize> = DummyRegion<u8>;
-        }
-
-        impl<'a, B: BackendFull> ManagerAlloc for Randomiser<'a, B> {
-            fn allocate_region<E: Elem, const LEN: usize>(
-                &mut self,
-                loc: Location<[E; LEN]>,
-            ) -> Self::Region<E, LEN> {
-                let region = self.backend.region_mut(&loc);
-                region.try_fill(&mut rand::thread_rng()).unwrap();
-                DummyRegion(PhantomData)
-            }
-
-            fn allocate_dyn_region<const LEN: usize>(
-                &mut self,
-                loc: Location<[u8; LEN]>,
-            ) -> Self::DynRegion<LEN> {
-                self.allocate_region(loc)
-            }
-        }
-
-        B::Layout::allocate(
-            &mut Randomiser { backend },
-            B::Layout::placed().into_location(),
-        );
-    }
+    use crate::{backend_test, state_backend::random_backend::Randomised};
+    use std::{collections::hash_map::RandomState, hash::BuildHasher};
 
     /// Construct the manager for a given backend lifetime `'a`, a test backend
     /// factory `F` and a specific layout `L`.
     pub type ManagerFor<'a, F, L> =
         <<F as TestBackendFactory>::Backend<L> as BackendManagement>::Manager<'a>;
 
-    /// Dummy region that does nothing
-    struct DummyRegion<E>(PhantomData<E>);
-
     /// Run `f` twice against two different randomised backends and see if the
     /// resulting backend state is the same afterwards.
-    pub fn test_determinism<F: TestBackendFactory, L: Layout, T>(f: T)
+    pub fn test_determinism<L, T>(f: T)
     where
-        T: Fn(AllocatedOf<L, ManagerFor<'_, F, L>>),
+        L: Layout,
+        T: Fn(AllocatedOf<L, Randomised>),
     {
-        let mut backend1 = crate::create_backend!(L, F);
-        randomise_backend(&mut backend1);
+        let hash_state = RandomState::default();
 
-        let mut backend2 = crate::create_backend!(L, F);
-        randomise_backend(&mut backend2);
+        let (start1, snapshot1) = {
+            let placed = L::placed().into_location();
+            let mut manager = Randomised::default();
 
-        // Run the procedure against both backends.
-        f(backend1.allocate(L::placed().into_location()));
-        f(backend2.allocate(L::placed().into_location()));
+            let space = L::allocate(&mut manager, placed);
+            let initial_checksum = hash_state.hash_one(manager.snapshot_regions());
 
-        assert_eq!(backend1, backend2);
+            f(space);
+
+            (initial_checksum, manager.snapshot_regions())
+        };
+
+        let (start2, snapshot2) = {
+            let placed = L::placed().into_location();
+            let mut manager = Randomised::default();
+
+            let space = L::allocate(&mut manager, placed);
+            let initial_checksum = hash_state.hash_one(manager.snapshot_regions());
+
+            f(space);
+
+            (initial_checksum, manager.snapshot_regions())
+        };
+
+        assert_ne!(start1, start2);
+        assert_eq!(snapshot1, snapshot2);
     }
 
     /// Given a `StateLayout` and a [`TestBackendFactory`] type,

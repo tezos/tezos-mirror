@@ -925,10 +925,8 @@ pub enum MachineError {
 #[cfg(test)]
 mod tests {
     use super::{
-        backend::tests::{test_determinism, ManagerFor},
-        bus,
-        bus::main_memory::tests::T1K,
-        MachineState, MachineStateLayout,
+        backend::tests::test_determinism, bus, bus::main_memory::tests::T1K, MachineState,
+        MachineStateLayout,
     };
     use crate::{
         backend_test,
@@ -955,16 +953,14 @@ mod tests {
     use crate::{bits::u64, machine_state::bus::main_memory::M1K};
     use proptest::{prop_assert_eq, proptest};
 
-    backend_test!(test_machine_state_reset, F, {
-        test_determinism::<F, MachineStateLayout<T1K, TestInstructionCacheLayout>, _>(|space| {
-            let mut machine: MachineState<
-                T1K,
-                TestInstructionCacheLayout,
-                ManagerFor<'_, F, MachineStateLayout<T1K, TestInstructionCacheLayout>>,
-            > = MachineState::bind(space);
+    #[test]
+    fn test_machine_state_reset() {
+        test_determinism::<MachineStateLayout<T1K, TestInstructionCacheLayout>, _>(|space| {
+            let mut machine: MachineState<T1K, TestInstructionCacheLayout, _> =
+                MachineState::bind(space);
             machine.reset();
         });
-    });
+    }
 
     backend_test!(test_step, F, {
         let mut backend = create_backend!(MachineStateLayout<T1K, TestInstructionCacheLayout>, F);
@@ -1267,16 +1263,14 @@ mod tests {
         });
     });
 
-    backend_test!(test_reset, F, {
-        test_determinism::<F, MachineStateLayout<M1K, TestInstructionCacheLayout>, _>(|space| {
-            let mut machine_state: MachineState<
-                M1K,
-                TestInstructionCacheLayout,
-                ManagerFor<'_, F, MachineStateLayout<M1K, TestInstructionCacheLayout>>,
-            > = MachineState::bind(space);
+    #[test]
+    fn test_reset() {
+        test_determinism::<MachineStateLayout<M1K, TestInstructionCacheLayout>, _>(|space| {
+            let mut machine_state: MachineState<M1K, TestInstructionCacheLayout, _> =
+                MachineState::bind(space);
             machine_state.reset();
         });
-    });
+    }
 
     // Test that the machine state does not behave differently when potential ephermeral state is
     // reset that may impact instruction caching.

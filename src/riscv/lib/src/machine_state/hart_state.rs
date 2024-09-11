@@ -246,17 +246,17 @@ impl<M: backend::ManagerBase> HartState<M> {
 #[cfg(test)]
 mod tests {
     use crate::{
-        backend_test,
         machine_state::hart_state::{HartState, HartStateLayout},
         state_backend::tests::test_determinism,
     };
 
-    backend_test!(test_hart_state_reset, F, {
+    #[test]
+    fn test_hart_state_reset() {
         proptest::proptest!(|(pc: u64)| {
-            test_determinism::<F, HartStateLayout, _>(|space| {
+            test_determinism::<HartStateLayout, _>(|space| {
                 let mut hart = HartState::bind(space);
                 hart.reset(pc);
             });
         });
-    });
+    }
 }

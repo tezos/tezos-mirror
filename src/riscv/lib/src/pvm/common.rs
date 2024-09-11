@@ -251,7 +251,6 @@ impl<
 mod tests {
     use super::*;
     use crate::{
-        backend_test,
         machine_state::{
             bus::{
                 main_memory::{M1K, M1M},
@@ -260,11 +259,7 @@ mod tests {
             instruction_cache::TestInstructionCacheLayout,
             registers::{a0, a1, a2, a3, a6, a7},
         },
-        state_backend::{
-            memory_backend::InMemoryBackend,
-            tests::{test_determinism, ManagerFor},
-            Backend,
-        },
+        state_backend::{memory_backend::InMemoryBackend, tests::test_determinism, Backend},
     };
     use rand::{thread_rng, Fill};
     use std::mem;
@@ -393,18 +388,15 @@ mod tests {
         assert_eq!(written, buffer);
     }
 
-    backend_test!(test_reset, F, {
-        test_determinism::<F, PvmLayout<M1K, TestInstructionCacheLayout>, _>(|mut space| {
+    #[test]
+    fn test_reset() {
+        test_determinism::<PvmLayout<M1K, TestInstructionCacheLayout>, _>(|mut space| {
             // The [Pvm] type won't bind unless the version cell is set to its initial value.
             // TODO: RV-46 might change this constraint in the future.
             space.0.write(INITIAL_VERSION);
 
-            let mut machine_state: Pvm<
-                M1K,
-                TestInstructionCacheLayout,
-                ManagerFor<'_, F, PvmLayout<M1K, TestInstructionCacheLayout>>,
-            > = Pvm::bind(space);
+            let mut machine_state: Pvm<M1K, TestInstructionCacheLayout, _> = Pvm::bind(space);
             machine_state.reset();
         });
-    });
+    }
 }

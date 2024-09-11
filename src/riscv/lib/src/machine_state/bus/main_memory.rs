@@ -269,9 +269,10 @@ pub mod tests {
         check_address!(u8, 7, 0x11);
     });
 
-    backend_test!(test_reset, F, {
-        test_determinism::<F, T1K, _>(|mut memory| {
+    #[test]
+    fn test_reset() {
+        test_determinism::<T1K, _>(|mut memory| {
             memory.reset();
         });
-    });
+    }
 }

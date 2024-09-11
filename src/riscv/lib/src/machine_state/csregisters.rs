@@ -1997,13 +1997,13 @@ mod tests {
         assert_eq!(csrs.read::<CSRRepr>(CSRegister::sie), stip | seip);
     });
 
-    backend_test!(test_reset, F, {
-        test_determinism::<F, CSRegistersLayout, _>(|space| {
-            let mut csregs: CSRegisters<ManagerFor<'_, F, CSRegistersLayout>> =
-                CSRegisters::bind(space);
+    #[test]
+    fn test_reset() {
+        test_determinism::<CSRegistersLayout, _>(|space| {
+            let mut csregs: CSRegisters<_> = CSRegisters::bind(space);
             csregs.reset();
         });
-    });
+    }
 
     backend_test!(test_fcsr, F, {
         let mut backend = create_backend!(CSRegistersLayout, F);
