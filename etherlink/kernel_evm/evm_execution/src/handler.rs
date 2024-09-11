@@ -2614,6 +2614,7 @@ mod test {
     use crate::account_storage::init_account_storage;
     use crate::precompiles;
     use evm::Config;
+    use pretty_assertions::assert_eq;
     use primitive_types::{H160, H256};
     use std::cmp::Ordering;
     use std::str::FromStr;
@@ -4446,17 +4447,17 @@ mod test {
 
         let code: Vec<u8> = vec![
             Opcode::PUSH13.as_u8(), // 3 gas
-            0x63,
+            0x63,                   // 3 gas
             0xff,
             0xff,
             0xff,
             0xff,
-            0x60,
+            0x60, // 3 gas
             0x00,
-            0x52,
-            0x60,
+            0x52, // 6 gas
+            0x60, // 3 gas
             0x04,
-            0x60,
+            0x60, // 3 gas
             0x1c,
             0xf3,
             Opcode::PUSH1.as_u8(), // 3 gas
@@ -4468,7 +4469,7 @@ mod test {
             19,
             Opcode::PUSH1.as_u8(), // 3 gas
             0,
-            Opcode::CREATE.as_u8(), // 32000 gas + init_code
+            Opcode::CREATE.as_u8(), // 32000 gas + 800 gas (code_deposit_cost) + 2 gas (init_code_cost)
             Opcode::STOP.as_u8(),
         ];
 
@@ -4478,14 +4479,13 @@ mod test {
         let result =
             handler.call_contract(caller, address, None, vec![], Some(1000000), false);
 
-        // Top layers costs 21000 + 3 + 6 + 3 + 3 + 3 + 32000 = 53021 < 53839
         assert_eq!(
             Ok(ExecutionOutcome {
-                gas_used: 53839, // costs 53841 on ethereum
+                gas_used: 53841,
                 logs: vec![],
                 result: ExecutionResult::CallSucceeded(ExitSucceed::Stopped, vec![]),
                 withdrawals: vec![],
-                estimated_ticks_used: 40549308
+                estimated_ticks_used: 40549406
             }),
             result,
         )
