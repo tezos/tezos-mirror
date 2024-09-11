@@ -222,6 +222,11 @@ cause the offender to be :ref:`slashed<slashing>`, that is, to lose part of its 
 
 The accuser uses the same format of configuration file as the client (see :ref:`client_conf_file`).
 
+DAL node
+~~~~~~~~
+
+When running a delegate, it is recommended to also run a :doc:`Data Availability Layer (DAL) node <../shell/dal_overview>` to support data transmission across the network, see :doc:`../shell/dal_run`.
+
 Docker
 ~~~~~~
 
