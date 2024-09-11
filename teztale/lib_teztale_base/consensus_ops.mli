@@ -15,11 +15,9 @@ type rights = right list
 
 val rights_encoding : rights Data_encoding.t
 
-type operation_kind = Endorsement | Preendorsement
+type operation_kind = Attestation | Preattestation
 
 val operation_kind_encoding : operation_kind Data_encoding.encoding
-
-val pp_operation_kind : Format.formatter -> operation_kind -> unit
 
 type operation = {
   hash : Operation_hash.t;

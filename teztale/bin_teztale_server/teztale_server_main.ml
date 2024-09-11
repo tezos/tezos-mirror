@@ -495,7 +495,7 @@ let may_insert_operations =
 
 let format_block_op level delegate
     (op : Lib_teztale_base.Consensus_ops.operation) =
-  ((level, op.hash, op.kind = Endorsement, op.round), delegate)
+  ((level, op.hash, op.kind = Attestation, op.round), delegate)
 
 let endorsing_rights_callback =
   let module Cache =
@@ -581,7 +581,7 @@ let insert_operations_from_block (module Db : Caqti_lwt.CONNECTION) conf level
     List.map
       (fun op ->
         ( Lib_teztale_base.Consensus_ops.
-            (op.delegate, op.op.kind = Endorsement, op.op.round),
+            (op.delegate, op.op.kind = Attestation, op.op.round),
           (block_hash, level) ))
       operations
   in
@@ -608,7 +608,7 @@ let block_callback =
       ( Lib_teztale_base.Data.Block.
           {delegate; timestamp; reception_times; round; hash; predecessor; _},
         cycle_info,
-        (endorsements, preendorsements),
+        (attestations, preattestations),
         baking_rights ) ->
     let open Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax in
     let level = Int32.of_string (Re.Group.get g 1) in
@@ -672,7 +672,7 @@ let block_callback =
                we add it again in order to mark it as recent. *)
             Lwt_result.map
               (fun () ->
-                if endorsements <> [] then
+                if attestations <> [] then
                   Block_lru_cache.add block_operations_cache hash)
               (if Block_lru_cache.mem block_operations_cache hash then
                  return_unit
@@ -683,7 +683,7 @@ let block_callback =
                      conf
                      (Int32.pred level)
                      hash
-                     endorsements
+                     attestations
                  in
                  let* () =
                    insert_operations_from_block
@@ -691,7 +691,7 @@ let block_callback =
                      conf
                      level
                      hash
-                     preendorsements
+                     preattestations
                  in
                  Lib_teztale_base.Log.debug logger (fun () ->
                      Format.asprintf
@@ -808,7 +808,7 @@ let operations_callback ~logger conf db_pool g source operations =
                       ( ( op.reception_time,
                           op.errors,
                           right.Lib_teztale_base.Consensus_ops.address,
-                          op.op.kind = Endorsement ),
+                          op.op.kind = Attestation ),
                         (op.op.round, source, level) ))
                 ops)
             operations
@@ -909,7 +909,7 @@ let import_callback ~logger conf db_pool g data =
                     Sql_requests.maybe_insert_operation
                     ( ( level,
                         hash,
-                        kind = Lib_teztale_base.Consensus_ops.Endorsement,
+                        kind = Lib_teztale_base.Consensus_ops.Attestation,
                         round ),
                       delegate ))
                 operations)
@@ -947,7 +947,7 @@ let import_callback ~logger conf db_pool g data =
                         ( ( reception_time,
                             errors,
                             delegate,
-                            kind = Lib_teztale_base.Consensus_ops.Endorsement ),
+                            kind = Lib_teztale_base.Consensus_ops.Attestation ),
                           (round, source, level) ))
                     mempool_inclusion)
                 operations)
@@ -966,7 +966,7 @@ let import_callback ~logger conf db_pool g data =
                       Db.exec
                         Sql_requests.insert_included_operation
                         ( ( delegate,
-                            kind = Lib_teztale_base.Consensus_ops.Endorsement,
+                            kind = Lib_teztale_base.Consensus_ops.Attestation,
                             round ),
                           (block_hash, level) ))
                     block_inclusion)

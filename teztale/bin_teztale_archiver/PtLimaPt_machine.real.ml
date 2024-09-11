@@ -63,7 +63,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
 
   module BlockIdMap = Map.Make (Protocol.Block_payload_hash)
 
-  let extract_endorsement
+  let extract_attestation
       (operation_content : Protocol.Alpha_context.packed_operation) =
     match operation_content with
     | {
@@ -79,7 +79,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
         Some
           ( ( block_payload_hash,
               Protocol.Alpha_context.Raw_level.to_int32 level,
-              Consensus_ops.Endorsement,
+              Consensus_ops.Attestation,
               Some (Protocol.Alpha_context.Round.to_int32 round) ),
             slot_to_int slot )
     | {
@@ -95,7 +95,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
         Some
           ( ( block_payload_hash,
               Protocol.Alpha_context.Raw_level.to_int32 level,
-              Consensus_ops.Preendorsement,
+              Consensus_ops.Preattestation,
               Some (Protocol.Alpha_context.Round.to_int32 round) ),
             slot_to_int slot )
     | _ -> None
@@ -117,7 +117,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
     return
       ( Lwt_stream.filter_map
           (fun ((hash, op), errors) ->
-            Option.map (fun x -> ((hash, x), errors)) (extract_endorsement op))
+            Option.map (fun x -> ((hash, x), errors)) (extract_attestation op))
           op_stream,
         stopper )
 
@@ -199,7 +199,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
   let block_round (header : Block_header.t) =
     raw_block_round header.Block_header.shell
 
-  let get_endorsement_round protocol_data =
+  let get_attestation_round protocol_data =
     match protocol_data with
     | Protocol.Alpha_context.Operation_data {contents; _} -> (
         match contents with
@@ -207,7 +207,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
             Protocol.Alpha_context.Round.to_int32 round
         | _ -> assert false)
 
-  let get_preendorsement_round protocol_data =
+  let get_preattestation_round protocol_data =
     match protocol_data with
     | Protocol.Alpha_context.Operation_data {contents; _} -> (
         match contents with
@@ -239,8 +239,8 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
                 op =
                   {
                     hash;
-                    round = Some (get_preendorsement_round protocol_data);
-                    kind = Consensus_ops.Preendorsement;
+                    round = Some (get_preattestation_round protocol_data);
+                    kind = Consensus_ops.Preattestation;
                   };
                 delegate = public_key_hash_of_v0 delegate;
                 power = preendorsement_power;
@@ -259,8 +259,8 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
                 op =
                   {
                     hash;
-                    round = Some (get_endorsement_round protocol_data);
-                    kind = Consensus_ops.Endorsement;
+                    round = Some (get_attestation_round protocol_data);
+                    kind = Consensus_ops.Attestation;
                   };
                 delegate = public_key_hash_of_v0 delegate;
                 power = endorsement_power;

@@ -12,7 +12,7 @@ let fake_hash level round delegate kind =
       level;
       Int32.to_string (Option.value round ~default:0l);
       Tezos_crypto.Signature.Public_key_hash.to_string delegate;
-      (if kind = Consensus_ops.Endorsement then "" else "P");
+      (if kind = Consensus_ops.Attestation then "" else "P");
     ]
 
 let to_received_ops ctx endpoint auth level data =

@@ -52,7 +52,7 @@ module Delegate_operations = struct
          (dft
             "kind"
             Consensus_ops.operation_kind_encoding
-            Consensus_ops.Endorsement)
+            Consensus_ops.Attestation)
          (opt "round" int32)
          (req "reception_time" (option Time.System.encoding))
          (dft "errors" Tezos_rpc.Error.opt_encoding None)
@@ -70,7 +70,7 @@ module Delegate_operations = struct
          (dft
             "kind"
             Consensus_ops.operation_kind_encoding
-            Consensus_ops.Endorsement)
+            Consensus_ops.Attestation)
          (opt "round" int32)
          (dft "received_in_mempools" (list reception_encoding) [])
          (dft "included_in_blocks" (list Block_hash.encoding) []))
@@ -126,7 +126,7 @@ module Delegate_operations = struct
                 [
                   {
                     hash = Operation_hash.zero;
-                    kind = Endorsement;
+                    kind = Attestation;
                     mempool_inclusion;
                     round = None;
                     block_inclusion;
