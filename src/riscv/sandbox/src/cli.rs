@@ -41,6 +41,10 @@ pub struct RunOptions {
     /// Path to the initrd
     #[arg(long)]
     pub initrd: Option<Box<Path>>,
+
+    /// Print the number of steps taken by `run`.
+    #[arg(long, default_value_t = false)]
+    pub print_steps: bool,
 }
 
 #[derive(Debug, Clone, Parser)]
