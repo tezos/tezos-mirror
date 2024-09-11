@@ -12,11 +12,11 @@
 
 ### Bug fixes
 
-#### CLI
-
 - Fix `init from rollup node` command failing to store items of the delayed
   inbox in its local state when `--omit-delayed-tx-events` is not provided.
   (!14855)
+- Delayed transactions are now stored on applied blueprint, instead of internal
+  evm event. Otherwise it could result in incoherent blueprints. (!14878)
 
 ## Version 0.3 (2024-09-10)
 

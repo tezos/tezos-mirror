@@ -26,11 +26,6 @@ let on_new_blueprint next_blueprint_number
       | None -> []
     in
     let* () = Evm_context.apply_evm_events events in
-    let delayed_transactions =
-      List.map
-        (fun Evm_events.Delayed_transaction.{hash; _} -> hash)
-        delayed_transactions
-    in
     Evm_context.apply_blueprint
       blueprint.timestamp
       blueprint.payload

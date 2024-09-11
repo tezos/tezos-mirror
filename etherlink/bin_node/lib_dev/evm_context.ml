@@ -100,7 +100,7 @@ module Request = struct
     | Apply_blueprint : {
         timestamp : Time.Protocol.t;
         payload : Blueprint_types.payload;
-        delayed_transactions : Ethereum_types.hash list;
+        delayed_transactions : Evm_events.Delayed_transaction.t list;
       }
         -> (unit, tztrace) t
     | Last_produce_blueprint : (Blueprint_types.t, tztrace) t
@@ -188,7 +188,9 @@ module Request = struct
              (req "request" (constant "apply_blueprint"))
              (req "timestamp" Time.Protocol.encoding)
              (req "payload" Blueprint_types.payload_encoding)
-             (req "delayed_transactions" (list Ethereum_types.hash_encoding)))
+             (req
+                "delayed_transactions"
+                (list Evm_events.Delayed_transaction.encoding)))
           (function
             | View (Apply_blueprint {timestamp; payload; delayed_transactions})
               ->
@@ -547,12 +549,6 @@ module State = struct
         let* evm_state =
           on_new_delayed_transaction ~delayed_transaction evm_state
         in
-        let* () =
-          Evm_store.Delayed_transactions.store
-            conn
-            ctxt.session.next_blueprint_number
-            delayed_transaction
-        in
         return (evm_state, on_success)
 
   let current_blueprint_number ctxt =
@@ -664,8 +660,14 @@ module State = struct
       delayed_transactions =
     let open Lwt_result_syntax in
     Evm_store.assert_in_transaction conn ;
+
     let*! data_dir, config = execution_config in
-    let (Qty next) = ctxt.session.next_blueprint_number in
+    let next = ctxt.session.next_blueprint_number in
+    let* () =
+      List.iter_es
+        (Evm_store.Delayed_transactions.store conn next)
+        delayed_transactions
+    in
 
     let time_processed = ref Ptime.Span.zero in
     let* try_apply =
@@ -706,25 +708,10 @@ module State = struct
             ctxt.session.next_blueprint_number
         in
 
-        let* delayed_transactions =
-          List.map_es
-            (fun hash ->
-              let* delayed_transaction =
-                Evm_store.Delayed_transactions.at_hash conn hash
-              in
-              match delayed_transaction with
-              | None ->
-                  failwith
-                    "Delayed transaction %a is missing from store"
-                    Ethereum_types.pp_hash
-                    hash
-              | Some delayed_transaction -> return delayed_transaction)
-            delayed_transactions
-        in
         let* context = commit_next_head ctxt conn evm_state in
-        return
-          (evm_state, context, block.hash, kernel_upgrade, delayed_transactions)
+        return (evm_state, context, block.hash, kernel_upgrade)
     | Apply_failure (* Did not produce a block *) ->
+        let (Qty next) = next in
         let*! () = Blueprint_events.invalid_blueprint_produced next in
         tzfail (Cannot_apply_blueprint {local_state_level = Z.pred next})
 
@@ -745,11 +732,7 @@ module State = struct
 
   let apply_blueprint ctxt timestamp payload delayed_transactions =
     let open Lwt_result_syntax in
-    let* ( evm_state,
-           context,
-           current_block_hash,
-           kernel_upgrade,
-           delayed_transactions ) =
+    let* evm_state, context, current_block_hash, kernel_upgrade =
       with_store_transaction ctxt @@ fun conn ->
       apply_blueprint_store_unsafe
         ctxt
@@ -989,31 +972,6 @@ module State = struct
         keys
     in
     return hashes
-
-  let delayed_inbox_item evm_state hash =
-    let open Lwt_result_syntax in
-    let*! bytes =
-      Evm_state.inspect
-        evm_state
-        (Durable_storage_path.Delayed_transaction.transaction hash)
-    in
-    let*? bytes =
-      Option.to_result ~none:[error_of_fmt "missing delayed inbox item "] bytes
-    in
-    let*? rlp_item = Rlp.decode bytes in
-    match rlp_item with
-    | Rlp.(List (rlp_item :: _)) ->
-        let*? res =
-          Option.to_result
-            ~none:[error_of_fmt "cannot parse delayed inbox item "]
-          @@ Evm_events.Delayed_transaction.of_rlp_content
-               ~transaction_tag:"\x01"
-               ~fa_deposit_tag:"\x03"
-               hash
-               rlp_item
-        in
-        return res
-    | _ -> failwith "invalid delayed inbox item"
 
   let block_number_of_hash evm_state hash =
     let open Lwt_result_syntax in
@@ -1651,7 +1609,7 @@ let get_evm_events_from_rollup_node_state ~omit_delayed_tx_events evm_state =
       let* events =
         List.map_es
           (fun hash ->
-            let* item = State.delayed_inbox_item evm_state hash in
+            let* item = Evm_state.get_delayed_inbox_item evm_state hash in
             return (Evm_events.New_delayed_transaction item))
           hashes
       in

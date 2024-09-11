@@ -127,7 +127,7 @@ val last_produced_blueprint : unit -> Blueprint_types.t tzresult Lwt.t
 val apply_blueprint :
   Time.Protocol.t ->
   Blueprint_types.payload ->
-  Ethereum_types.hash list ->
+  Evm_events.Delayed_transaction.t list ->
   unit tzresult Lwt.t
 
 val head_info : unit -> head Lwt.t

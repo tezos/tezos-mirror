@@ -95,9 +95,11 @@ let produce_block ~sequencer_key ~cctxt ~smart_rollup_address preblock =
     Sequencer_blueprint.create_inbox_payload ~smart_rollup_address ~chunks
   in
   let (Qty number) = current_blueprint_number in
-  let* () =
-    Evm_context.apply_blueprint timestamp payload delayed_transactions
-  in
+  (* FIXME: The threshold encryption block producer sees only
+     hashes. However, apply blueprint now require the full transaction
+     in order to save them in the {!Evm_store}. *)
+  assert (delayed_transactions = []) ;
+  let* () = Evm_context.apply_blueprint timestamp payload [] in
   let* () =
     Blueprints_publisher.publish
       number
