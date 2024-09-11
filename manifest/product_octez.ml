@@ -1903,6 +1903,9 @@ let ppx_profiler =
     ~ppx_runtime_libraries:[logs]
     ~preprocess:(pps ppxlib_metaquot)
 
+let ppx_profiler =
+  make_ppx ~env_var:"TEZOS_PPX_PROFILER" ~preprocess:ppx_profiler
+
 let ppx_brassaia =
   octez_lib
     "ppx_brassaia"
@@ -3482,11 +3485,13 @@ let octez_store_shared =
       ]
 
 let octez_store_unix =
+  let (PPX {preprocess; preprocessor_deps}) = ppx_profiler in
   octez_shell_lib
     "store.unix"
     ~internal_name:"tezos_store_unix"
     ~path:"src/lib_store/unix"
-    ~preprocess:(pps ppx_profiler)
+    ~preprocess
+    ~preprocessor_deps
     ~deps:
       [
         octez_shell_services |> open_;
@@ -3635,6 +3640,7 @@ let octez_requester_tests =
       ]
 
 let octez_shell =
+  let (PPX {preprocess; preprocessor_deps}) = ppx_profiler in
   octez_shell_lib
     "shell"
     ~internal_name:"tezos_shell"
@@ -3645,7 +3651,8 @@ let octez_shell =
       Dune.
         [[S "package"; S "octez-shell-libs"]; [S "mld_files"; S "octez_shell"]]
     ~inline_tests:ppx_expect
-    ~preprocess:(pps ppx_profiler)
+    ~preprocess
+    ~preprocessor_deps
     ~deps:
       [
         lwt_watcher;
