@@ -1285,11 +1285,6 @@ module Tezt = struct
       @ List.map (fun tag -> TSL_AST.Not (Has_tag tag)) negative
       @ and_)
 
-  (* Used in [before_merging] and [schedule_extended_tests].
-
-     Fetch records for Tezt generated on the last merge request pipeline
-     on the most recently merged MR and makes them available in artifacts
-     for future merge request pipelines. *)
   let job_select_tezts ?rules () : tezos_job =
     Tezos_ci.job
       ~__POS__
