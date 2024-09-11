@@ -952,6 +952,46 @@ oc.tezt:fetch-records:
     - tezt/records/*.json.broken
     when: always
 
+build_octez_source:
+  image: ${ci_image_name}/build:${ci_image_tag}
+  stage: build
+  tags:
+  - gcp
+  rules:
+  - when: manual
+    allow_failure: true
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  before_script:
+  - ./scripts/ci/take_ownership.sh
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - ./scripts/ci/restrict_export_to_octez_source.sh
+  - ./scripts/ci/create_octez_tarball.sh octez
+  - mv octez.tar.bz2 ../
+  - cd ../
+  - tar xf octez.tar.bz2
+  - cd octez/
+  - eval $(opam env)
+  - make octez
+  after_script:
+  - sccache --stop-server || true
+  variables:
+    CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+
 select_tezts:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: build
@@ -998,46 +1038,6 @@ select_tezts:
     paths:
     - selected_tezts.tsl
     when: always
-
-build_octez_source:
-  image: ${ci_image_name}/build:${ci_image_tag}
-  stage: build
-  tags:
-  - gcp
-  rules:
-  - when: manual
-    allow_failure: true
-  dependencies:
-  - oc.docker:ci:amd64
-  timeout: 60 minutes
-  cache:
-  - key: cargo-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
-  before_script:
-  - ./scripts/ci/take_ownership.sh
-  - . ./scripts/version.sh
-  - eval $(opam env)
-  - . ./scripts/ci/sccache-start.sh
-  script:
-  - ./scripts/ci/restrict_export_to_octez_source.sh
-  - ./scripts/ci/create_octez_tarball.sh octez
-  - mv octez.tar.bz2 ../
-  - cd ../
-  - tar xf octez.tar.bz2
-  - cd octez/
-  - eval $(opam env)
-  - make octez
-  after_script:
-  - sccache --stop-server || true
-  variables:
-    CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
 
 opam:prepare:
   image: ${ci_image_name}/prebuild:${ci_image_tag}

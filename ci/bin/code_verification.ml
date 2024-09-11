@@ -545,7 +545,14 @@ let jobs pipeline_type =
       ()
   in
   let job_select_tezts =
-    Tezt.job_select_tezts ~rules:(make_rules ~changes:changeset_octez ()) ()
+    (* Scheduled pipelines execute all tezt tests: no need for [job_select_tezts]. *)
+    match pipeline_type with
+    | Before_merging ->
+        Some
+          (Tezt.job_select_tezts
+             ~rules:(make_rules ~changes:changeset_octez ())
+             ())
+    | Schedule_extended_test -> None
   in
   let job_static_x86_64_experimental =
     job_build_static_binaries
@@ -633,9 +640,9 @@ let jobs pipeline_type =
       job_build_kernels;
       job_build_dsn_node;
       job_tezt_fetch_records;
-      job_select_tezts;
       build_octez_source;
     ]
+    @ Option.to_list job_select_tezts
     @ bin_packages_jobs
   in
 
@@ -1214,7 +1221,7 @@ let jobs pipeline_type =
           ~timeout:(Minutes 40)
           ~rules
           ~dependencies
-          ~job_select_tezts
+          ?job_select_tezts
           ()
         |> enable_coverage_output_artifact ~expire_in:coverage_expiry
       in
@@ -1226,7 +1233,7 @@ let jobs pipeline_type =
           ~tezt_variant:"-memory_3k"
           ~parallel:(Vector 6)
           ~dependencies
-          ~job_select_tezts
+          ?job_select_tezts
           ~rules
           ()
         |> enable_coverage_output_artifact ~expire_in:coverage_expiry
@@ -1239,7 +1246,7 @@ let jobs pipeline_type =
           ~tezt_variant:"-memory_4k"
           ~parallel:(Vector 4)
           ~dependencies
-          ~job_select_tezts
+          ?job_select_tezts
           ~rules
           ()
         |> enable_coverage_output_artifact ~expire_in:coverage_expiry
@@ -1256,7 +1263,7 @@ let jobs pipeline_type =
           ~tezt_tests:(Tezt.tests_tag_selector ~time_sensitive:true [])
           ~tezt_variant:"-time_sensitive"
           ~dependencies
-          ~job_select_tezts
+          ?job_select_tezts
           ~rules
           ()
         |> enable_coverage_output_artifact ~expire_in:coverage_expiry
@@ -1286,7 +1293,7 @@ let jobs pipeline_type =
           ~tezt_parallel:3
           ~parallel:(Vector 10)
           ~dependencies
-          ~job_select_tezts
+          ?job_select_tezts
           ()
       in
       let tezt_flaky : tezos_job =
@@ -1308,7 +1315,7 @@ let jobs pipeline_type =
           ~tezt_retry:3
           ~tezt_parallel:1
           ~dependencies
-          ~job_select_tezts
+          ?job_select_tezts
           ~rules:rules_manual
           ()
         |> enable_coverage_output_artifact
@@ -1330,7 +1337,7 @@ let jobs pipeline_type =
                  Artifacts job_tezt_fetch_records;
                ])
           ~rules
-          ~job_select_tezts
+          ?job_select_tezts
           ~before_script:(before_script ["mv octez-binaries/x86_64/octez-* ."])
           ()
       in

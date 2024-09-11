@@ -46,7 +46,6 @@ let jobs =
      is executed.
   *)
   let job_tezt_fetch_records = Tezt.job_tezt_fetch_records () in
-  let job_select_tezts = Tezt.job_select_tezts () in
   let job_build_kernels = job_build_kernels () in
   let dependencies =
     Dependent
@@ -68,7 +67,6 @@ let jobs =
       ~parallel:(Vector 100)
       ~timeout:(Minutes 40)
       ~dependencies
-      ~job_select_tezts
       ()
   in
   let tezt_memory_3k : tezos_job =
@@ -79,7 +77,6 @@ let jobs =
       ~tezt_variant:"-memory_3k"
       ~parallel:(Vector 6)
       ~dependencies
-      ~job_select_tezts
       ()
   in
   let tezt_memory_4k : tezos_job =
@@ -90,7 +87,6 @@ let jobs =
       ~tezt_variant:"-memory_4k"
       ~parallel:(Vector 4)
       ~dependencies
-      ~job_select_tezts
       ()
   in
   let tezt_time_sensitive : tezos_job =
@@ -105,7 +101,6 @@ let jobs =
       ~tezt_tests:(Tezt.tests_tag_selector ~time_sensitive:true [])
       ~tezt_variant:"-time_sensitive"
       ~dependencies
-      ~job_select_tezts
       ()
   in
   let tezt_slow : tezos_job =
@@ -132,7 +127,6 @@ let jobs =
       ~tezt_parallel:3
       ~parallel:(Vector 10)
       ~dependencies
-      ~job_select_tezts
       ()
   in
   let tezt_flaky : tezos_job =
@@ -154,7 +148,6 @@ let jobs =
       ~tezt_retry:3
       ~tezt_parallel:1
       ~dependencies
-      ~job_select_tezts
       ()
   in
   [
@@ -168,5 +161,4 @@ let jobs =
     job_build_x86_64_exp_dev_extra;
     job_build_kernels;
     job_tezt_fetch_records;
-    job_select_tezts;
   ]
