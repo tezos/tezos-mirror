@@ -622,7 +622,7 @@ let () =
       Format.fprintf
         ppf
         "The DAL injection worker received a %d bytes message length, but a \
-         DAL slot size is %d."
+         DAL slot size is %d bytes."
         message_size
         slot_size)
     `Permanent
