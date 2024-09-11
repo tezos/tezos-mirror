@@ -16,6 +16,10 @@ type state = Storage.State.t
 
 type status = Octez_riscv_api.status
 
+type reveal_data = Octez_riscv_api.reveal_data
+
+type input = Octez_riscv_api.input
+
 val compute_step_many :
   ?reveal_builtins:reveals ->
   ?write_debug:write_debug ->
@@ -42,8 +46,4 @@ val get_current_level : state -> int32 option Lwt.t
 
 val state_hash : state -> bytes
 
-val set_input : state -> int32 -> int64 -> string -> state Lwt.t
-
-val set_metadata : state -> bytes -> int32 -> state Lwt.t
-
-val reveal_raw_data : state -> string -> state Lwt.t
+val set_input : state -> input -> state Lwt.t

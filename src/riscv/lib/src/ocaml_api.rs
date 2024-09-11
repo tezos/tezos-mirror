@@ -37,6 +37,20 @@ pub enum Status {
     WaitingForMetadata,
 }
 
+#[derive(ocaml::FromValue, ocaml::ToValue)]
+#[ocaml::sig("RawData of string | Metadata of bytes * int32")]
+pub enum RevealData<'a> {
+    RawData(&'a [u8]),
+    Metadata(&'a [u8], u32),
+}
+
+#[derive(ocaml::FromValue, ocaml::ToValue)]
+#[ocaml::sig("InboxMessage of int32 * int64 * string | Reveal of reveal_data")]
+pub enum Input<'a> {
+    InboxMessage(u32, u64, &'a [u8]),
+    Reveal(RevealData<'a>),
+}
+
 impl From<PvmStatus> for Status {
     fn from(item: PvmStatus) -> Self {
         Status::try_from(item as u8).expect("Invalid conversion")
@@ -255,38 +269,25 @@ pub fn octez_riscv_state_hash(state: Pointer<State>) -> [u8; 32] {
 }
 
 #[ocaml::func]
-#[ocaml::sig("state -> int32 -> int64 -> bytes -> state")]
-pub fn octez_riscv_set_input_message(
-    state: Pointer<State>,
-    level: u32,
-    message_counter: u64,
-    input: &[u8],
-) -> Pointer<State> {
-    State(
-        state
-            .as_ref()
-            .0
-            .set_input_message(level, message_counter, input.to_vec()),
-    )
-    .into()
-}
-
-#[ocaml::func]
-#[ocaml::sig("state -> bytes -> int32 -> state")]
-pub fn octez_riscv_set_metadata(
-    state: Pointer<State>,
-    address: &[u8],
-    origination_level: u32,
-) -> Pointer<State> {
-    let address: &[u8; 20] = address.try_into().expect("Unexpected rollup address size");
-    State(state.as_ref().0.set_metadata(address, origination_level)).into()
-}
-
-#[ocaml::func]
-#[ocaml::sig("state -> string -> state")]
-pub fn octez_riscv_reveal_raw_data(_state: Pointer<State>, _data: &[u8]) -> Pointer<State> {
-    // TODO: RV-110. Support all revelations in set_input method
-    todo!()
+#[ocaml::sig("state -> input -> state")]
+pub fn octez_riscv_set_input(state: Pointer<State>, input: Input) -> Pointer<State> {
+    match input {
+        Input::InboxMessage(level, message_counter, payload) => State(
+            state
+                .as_ref()
+                .0
+                .set_input_message(level, message_counter, payload.to_vec()),
+        )
+        .into(),
+        Input::Reveal(RevealData::Metadata(address, origination_level)) => {
+            let address: &[u8; 20] = address.try_into().expect("Unexpected rollup address size");
+            State(state.as_ref().0.set_metadata(address, origination_level)).into()
+        }
+        _ => {
+            // TODO: RV-110. Support all revelations in set_input method
+            todo!()
+        }
+    }
 }
 
 #[ocaml::func]
