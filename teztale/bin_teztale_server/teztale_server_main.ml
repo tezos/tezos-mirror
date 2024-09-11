@@ -1273,84 +1273,72 @@ let run (conf : Config.t) =
   let uri = Uri.of_string conf.Config.db_uri in
   let users = ref [] in
   let admins = List.map (fun (u, p) -> (u, Bcrypt.hash p)) conf.Config.admins in
-  let code =
-    Lwt_main.run
-      (match Caqti_lwt_unix.connect_pool ~env:Sql_requests.env uri with
-      | Error e ->
-          let* () = Lwt_io.eprintl (Caqti_error.show e) in
-          Lwt.return 1
-      | Ok pool -> (
-          let* res = maybe_alter_and_create_tables pool in
-          match res with
-          | Error e ->
-              let* () = Lwt_io.eprintl (Caqti_error.show e) in
-              Lwt.return 1
-          | Ok () -> (
-              let stop, paf = Lwt.task () in
-              let shutdown _ = Lwt.wakeup paf () in
-              let _ = Sys.signal Sys.sigint (Sys.Signal_handle shutdown) in
-              let* res =
-                let+ list =
-                  Lwt_list.map_s
-                    (fun (login, password) ->
-                      let password = Bcrypt.hash password in
-                      upsert_user conf pool login password)
-                    conf.Config.users
-                in
-                List.find_map (function Error e -> Some e | _ -> None) list
-              in
-              match res with
-              | Some e ->
-                  let* () = Lwt_io.eprintl (Caqti_error.show e) in
-                  Lwt.return 1
-              | None -> (
-                  let* res = refresh_users conf pool users in
-                  match res with
-                  | Error e ->
-                      let* () = Lwt_io.eprintl (Caqti_error.show e) in
-                      Lwt.return 1
-                  | Ok () ->
-                      let servers =
-                        List.map
-                          (fun con ->
-                            let* ctx =
-                              Conduit_lwt_unix.init ?src:con.Config.source ()
-                            in
-                            let ctx = Cohttp_lwt_unix.Net.init ~ctx () in
-                            let mode =
-                              match con.Config.tls with
-                              | Some Config.{crt; key} ->
-                                  `TLS
-                                    ( `Crt_file_path crt,
-                                      `Key_file_path key,
-                                      `No_password,
-                                      `Port con.Config.port )
-                              | None -> `TCP (`Port con.Config.port)
-                            in
-                            let promise =
-                              Cohttp_lwt_unix.Server.create
-                                ~stop
-                                ~ctx
-                                ~mode
-                                (Cohttp_lwt_unix.Server.make
-                                   ~callback:
-                                     (callback ~conf ~admins ~users pool)
-                                   ())
-                            in
-                            Lib_teztale_base.Log.info logger (fun () ->
-                                Printf.sprintf
-                                  "Server listening at %s:%d."
-                                  (match con.Config.source with
-                                  | None -> "<default>"
-                                  | Some s -> s)
-                                  con.port) ;
-                            promise)
-                          conf.Config.network_interfaces
-                      in
-                      let* () = Lwt.join servers in
-                      Lwt.return 0))))
+  let show_error_and_exit e =
+    let* () = Lwt_io.eprintl (Caqti_error.show e) in
+    Lwt.return 1
   in
-  exit code
+  let ( let*! ) v f =
+    let* res = v in
+    match res with Error e -> show_error_and_exit e | Ok v -> f v
+  in
+  Lwt_main.run
+    (let res = Caqti_lwt_unix.connect_pool ~env:Sql_requests.env uri in
+     match res with
+     | Error e -> show_error_and_exit e
+     | Ok pool ->
+         let*! () = maybe_alter_and_create_tables pool in
+         let stop, paf = Lwt.task () in
+         let shutdown _ = Lwt.wakeup paf () in
+         let _ = Sys.signal Sys.sigint (Sys.Signal_handle shutdown) in
+         let*! () =
+           let+ list =
+             Lwt_list.map_s
+               (fun (login, password) ->
+                 let password = Bcrypt.hash password in
+                 upsert_user conf pool login password)
+               conf.Config.users
+           in
+           List.find_map (function Error e -> Some e | _ -> None) list
+           |> Option.fold ~none:(Ok ()) ~some:(fun e -> Error e)
+         in
+         let*! () = refresh_users conf pool users in
+         let servers =
+           List.map
+             (fun con ->
+               let* ctx = Conduit_lwt_unix.init ?src:con.Config.source () in
+               let ctx = Cohttp_lwt_unix.Net.init ~ctx () in
+               let mode =
+                 match con.Config.tls with
+                 | Some Config.{crt; key} ->
+                     `TLS
+                       ( `Crt_file_path crt,
+                         `Key_file_path key,
+                         `No_password,
+                         `Port con.Config.port )
+                 | None -> `TCP (`Port con.Config.port)
+               in
+               let promise =
+                 Cohttp_lwt_unix.Server.create
+                   ~stop
+                   ~ctx
+                   ~mode
+                   (Cohttp_lwt_unix.Server.make
+                      ~callback:(callback ~conf ~admins ~users pool)
+                      ())
+               in
+               Lib_teztale_base.Log.info logger (fun () ->
+                   Printf.sprintf
+                     "Server listening at %s:%d."
+                     (match con.Config.source with
+                     | None -> "<default>"
+                     | Some s -> s)
+                     con.port) ;
+               promise)
+             conf.Config.network_interfaces
+         in
+         let* () = Lwt.join servers in
+         Lwt.return 0)
+  |> exit
 
 let () =
   if Array.length Sys.argv <> 2 then (
