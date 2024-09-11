@@ -273,6 +273,9 @@ Smart Rollup node
 
 - The command ``generate openapi`` now exports mimified JSON. (MR :gl:`!14908`)
 
+- The rollup node can be configured to execute outbox message automatically with
+  filters. (MRs :gl:`!14498`, :gl:`!14499`)
+
 Smart Rollup WASM Debugger
 --------------------------
 
