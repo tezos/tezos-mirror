@@ -113,7 +113,7 @@ module Worker = struct
 
   let publish_on_dal state level chunks =
     let open Lwt_result_syntax in
-    let payload = Sequencer_blueprint.create_dal_payload chunks in
+    let payloads = Sequencer_blueprint.create_dal_payloads chunks in
     let nb_chunks = List.length chunks in
     let*! () = Blueprint_events.blueprint_injected_on_DAL ~level ~nb_chunks in
     Prometheus.Counter.inc
@@ -121,13 +121,10 @@ module Worker = struct
       (Float.of_int nb_chunks) ;
     Rollup_services.publish_on_dal
       ~rollup_node_endpoint:state.rollup_node_endpoint
-      ~messages:[payload]
+      ~messages:payloads
 
-  let publish_on_dal_precondition state use_dal_if_enabled level chunks =
-    state.enable_dal && use_dal_if_enabled
-    && Z.(zero < level)
-    && List.length chunks
-       < Sequencer_blueprint.maximum_unsigned_chunks_per_dal_slot
+  let publish_on_dal_precondition state use_dal_if_enabled level =
+    state.enable_dal && use_dal_if_enabled && Z.(zero < level)
 
   let publish self payload level ~use_dal_if_enabled =
     let open Lwt_result_syntax in
@@ -140,11 +137,8 @@ module Worker = struct
          heads come from the rollup node. *)
       match payload with
       | Blueprints_publisher_types.Request.Blueprint {chunks; _} ->
-          (* For the moment, the rollup node only uses a single slot for
-             publishement. As such we cannot send blueprints that wouldn't
-             fit in a slot. *)
-          if publish_on_dal_precondition state use_dal_if_enabled level chunks
-          then publish_on_dal state level chunks
+          if publish_on_dal_precondition state use_dal_if_enabled level then
+            publish_on_dal state level chunks
           else publish_inbox_payload state level payload
       | _ -> publish_inbox_payload state level payload
     in
