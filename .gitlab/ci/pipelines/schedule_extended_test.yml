@@ -32,7 +32,7 @@ oc.docker:ci:amd64:
 
 oc.docker:client-libs-dependencies:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
-  stage: build
+  stage: images
   tags:
   - gcp
   dependencies: []
@@ -590,6 +590,8 @@ select_tezts:
   stage: build
   tags:
   - gcp
+  rules:
+  - when: always
   dependencies:
   - oc.docker:ci:amd64
   allow_failure:

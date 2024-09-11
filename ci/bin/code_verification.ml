@@ -438,6 +438,19 @@ let jobs pipeline_type =
         ~before_script:(before_script ~init_python_venv:true [])
         ["make --silent -C docs sphinx-check"]
     in
+    let job_commit_titles : tezos_job =
+      job
+        ~__POS__
+        ~name:"commit_titles"
+        ~image:Images.CI.prebuild
+        ~stage
+        ~dependencies
+        (* ./scripts/ci/check_commit_messages.sh exits with code 65 when a git history contains
+           invalid commits titles in situations where that is allowed. *)
+        (script_propagate_exit_code "./scripts/ci/check_commit_messages.sh")
+        (* temporary cf issue https://gitlab.com/tezos/tezos/-/issues/7436 *)
+        ~allow_failure:Yes
+    in
     let mr_only_jobs =
       match pipeline_type with
       | Before_merging ->
@@ -445,6 +458,10 @@ let jobs pipeline_type =
             (* This job shall only run in pipelines for MRs because it's not
                sensitive to changes in time. *)
             job_nix;
+            (* It makes no sense to test commit titles in scheduled
+               pipelines (they run on master, where commit titles are
+               unmutable) *)
+            job_commit_titles;
           ]
       | _ -> []
     in
@@ -520,6 +537,9 @@ let jobs pipeline_type =
     Tezt.job_tezt_fetch_records
       ~rules:(make_rules ~changes:changeset_octez ())
       ()
+  in
+  let job_tezt_select_tezts =
+    Tezt.job_select_tezts ~rules:(make_rules ~changes:changeset_octez ()) ()
   in
   let job_static_x86_64_experimental =
     job_build_static_binaries
@@ -607,7 +627,7 @@ let jobs pipeline_type =
       job_build_kernels;
       job_build_dsn_node;
       job_tezt_fetch_records;
-      Tezt.job_select_tezts;
+      job_tezt_select_tezts;
       build_octez_source;
     ]
     @ bin_packages_jobs
@@ -1155,7 +1175,7 @@ let jobs pipeline_type =
       let dependencies =
         Dependent
           [
-            Artifacts Tezt.job_select_tezts;
+            Artifacts job_tezt_select_tezts;
             Artifacts job_build_x86_64_release;
             Artifacts job_build_x86_64_exp_dev_extra;
             Artifacts job_build_kernels;
@@ -1163,7 +1183,19 @@ let jobs pipeline_type =
             Artifacts job_tezt_fetch_records;
           ]
       in
+      (* Rules for tezt jobs that are started automatically.
+
+         Tezt jobs are selected whenever a file in [changeset_octez] is modified.
+         The tezt jobs are dependent (they need the binaries and such). *)
       let rules = make_rules ~dependent:true ~changes:changeset_octez () in
+      (* Rules for tezt jobs that are started manually.
+
+         These jobs can only be manually started on [before_merging]
+         pipelines when its artifact dependencies exist, which they do
+         when [changeset_octez] is changed. *)
+      let rules_manual =
+        make_rules ~dependent:true ~manual:(On_changes changeset_octez) ()
+      in
       let coverage_expiry = Duration (Days 3) in
       let tezt : tezos_job =
         Tezt.job
@@ -1224,9 +1256,7 @@ let jobs pipeline_type =
         Tezt.job
           ~__POS__
           ~name:"tezt-slow"
-          ~rules:
-            (* See comment for [tezt_flaky] *)
-            (make_rules ~dependent:true ~manual:(On_changes changeset_octez) ())
+          ~rules:rules_manual
           ~tezt_tests:
             (Tezt.tests_tag_selector
                ~slow:true
@@ -1268,12 +1298,7 @@ let jobs pipeline_type =
           ~tezt_retry:3
           ~tezt_parallel:1
           ~dependencies
-          ~rules:
-            (* This job can only be manually started on
-               [before_merging] pipelines when it's artifact
-               dependencies exists, which they do when
-               [changeset_octez] is changed. *)
-            (make_rules ~dependent:true ~manual:(On_changes changeset_octez) ())
+          ~rules:rules_manual
           ()
         |> enable_coverage_output_artifact
       in
@@ -1289,7 +1314,7 @@ let jobs pipeline_type =
           ~dependencies:
             (Dependent
                [
-                 Artifacts Tezt.job_select_tezts;
+                 Artifacts job_tezt_select_tezts;
                  Artifacts job_build_x86_64_exp_dev_extra;
                  Artifacts job_static_x86_64_experimental;
                  Artifacts job_tezt_fetch_records;
@@ -1399,28 +1424,7 @@ let jobs pipeline_type =
         job_oc_test_liquidity_baking_scripts;
       ]
     in
-    let job_commit_titles : tezos_job list =
-      match pipeline_type with
-      | Before_merging ->
-          let job_commit_titles : tezos_job =
-            job
-              ~__POS__
-              ~name:"commit_titles"
-              ~image:Images.CI.prebuild
-              ~stage:Stages.test
-              ~dependencies:dependencies_needs_start
-              (* ./scripts/ci/check_commit_messages.sh exits with code 65 when a git history contains
-                 invalid commits titles in situations where that is allowed. *)
-              (script_propagate_exit_code
-                 "./scripts/ci/check_commit_messages.sh")
-              (* temporary cf issue https://gitlab.com/tezos/tezos/-/issues/7436 *)
-              ~allow_failure:Yes
-          in
-          [job_commit_titles]
-      | Schedule_extended_test -> []
-    in
     jobs_misc @ jobs_kernels @ jobs_unit @ jobs_install_octez @ jobs_tezt
-    @ job_commit_titles
   in
 
   (*Coverage jobs *)
