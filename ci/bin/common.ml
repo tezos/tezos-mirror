@@ -347,7 +347,11 @@ let enable_dune_cache ?key ?(path = "$CI_PROJECT_DIR/_dune_cache")
 
 (** {2 Changesets} *)
 
-(** Modifying these files will unconditionally execute all conditional jobs. *)
+(** Modifying these files will unconditionally execute all conditional jobs.
+
+    If the CI configuration change, we execute all
+    jobs. [changeset_base] should be included in all changesets below,
+    any exceptions should be explained. *)
 let changeset_base = Changeset.make [".gitlab/**/*"; ".gitlab-ci.yml"]
 
 let changeset_images = Changeset.make ["images/**/*"]
