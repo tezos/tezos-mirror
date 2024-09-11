@@ -2078,8 +2078,12 @@ module Unsafe = struct
   let block_of_repr = Fun.id
 end
 
-let stat_metadata_cycles _ = Lwt_result_syntax.return_nil
+module Utilities = struct
+  let stat_metadata_cycles _ = Lwt_result_syntax.return_nil
+end
 
-let v_3_1_upgrade ~store_dir:_ _genesis = Lwt_result_syntax.return_unit
+module Upgrade = struct
+  let v_3_1_upgrade ~store_dir:_ _genesis = Lwt_result_syntax.return_unit
 
-let v_3_2_upgrade ~store_dir:_ _genesis = Lwt_result_syntax.return_unit
+  let v_3_2_upgrade ~store_dir:_ _genesis = Lwt_result_syntax.return_unit
+end

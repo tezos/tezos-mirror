@@ -395,7 +395,7 @@ module Term = struct
            ~allow_testchains:false
            genesis
        in
-       let* res = Store.stat_metadata_cycles store in
+       let* res = Store.Utilities.stat_metadata_cycles store in
        let overall_stats =
          List.fold_left
            (fun {

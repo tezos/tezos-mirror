@@ -131,11 +131,11 @@ let upgradable_data_version =
   let open Lwt_result_syntax in
   let v_3_1_upgrade ~data_dir genesis =
     let store_dir = store_dir data_dir in
-    Store.v_3_1_upgrade ~store_dir genesis
+    Store.Upgrade.v_3_1_upgrade ~store_dir genesis
   in
   let v_3_2_upgrade ~data_dir genesis =
     let store_dir = store_dir data_dir in
-    Store.v_3_2_upgrade ~store_dir genesis
+    Store.Upgrade.v_3_2_upgrade ~store_dir genesis
   in
   [
     ( v_3_0,

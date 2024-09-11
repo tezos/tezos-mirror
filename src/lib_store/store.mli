@@ -175,17 +175,18 @@ type chain_store
 
 (** {3 Initialization} *)
 
-(** [init ?patch_context ?commit_genesis ?history_mode
-    ?block_cache_limit ~store_dir ~context_dir ~allow_testchains
-    genesis] initializes the store and a main chain store. If
-    [store_dir] (resp. [context_dir]) does not exist, a fresh store
-    (resp. context) is created. Otherwise, it loads the store
-    (resp. context) from reading the adequate directory. If
-    [allow_testchains] is passed, the store will be able to fork
-    chains and instantiate testchain's sub chain stores, for all
-    chains contained in the store. The chain store created is based on
-    the [genesis] provided. Its chain identifier will be computed
-    using the {!Chain_id.of_block_hash} function.
+(** [init ?patch_context ?commit_genesis ?history_mode ?readonly
+    ?block_cache_limit ?disable_context_pruning ?maintenance_delay
+    ~store_dir ~context_dir ~allow_testchains genesis] initializes the
+    store and a main chain store. If [store_dir] (resp. [context_dir])
+    does not exist, a fresh store (resp. context) is
+    created. Otherwise, it loads the store (resp. context) from
+    reading the adequate directory. If [allow_testchains] is passed,
+    the store will be able to fork chains and instantiate testchain's
+    sub chain stores, for all chains contained in the store. The chain
+    store created is based on the [genesis] provided. Its chain
+    identifier will be computed using the {!Chain_id.of_block_hash}
+    function.
 
     @param patch_context the handle called when initializing the
     context. It usually is passed when creating a sandboxed chain.
@@ -203,21 +204,23 @@ type chain_store
       Default: {!History_mode.default} (which should correspond to
     full with 5 extra preserved cycles.)
 
+    @param readonly a flag that, if set to true, opens the storage,
+      that is stored on disk, in read-only mode preventing to write in
+      the corresponding store {b and} context.
+      Default: false
+
     @param block_cache_limit allows to override the size of the block
     cache to use. The minimal value is 1.
 
-    @param disable_context_pruning specifies whether or not the
-    context pruning is expected to be run (if set to true) or not (if
-    set to false -- default) during a storage maintenance.
-
-    @param maintenace_delay allows to introduce a delay prior to the
-    trigger of the storage maintenance
-
-    @param readonly a flag that, if set to true, prevent writing
-    throughout the store {b and} context.
+    @param disable_context_pruning a flag that, if set to true,
+      prevent the store to trigger the context pruning. Note that the
+      storage maintenance, aka merge, won't be impacted by this flag.
       Default: false
-*)
 
+    @param maintenance_delay a flag that, if set, will disable the
+    storage maintenance by a certain delay.
+      Default: Disabled
+*)
 val init :
   ?patch_context:
     (Context_ops.Environment_context.t ->
@@ -315,8 +318,6 @@ module Block : sig
     block_metadata : Bytes.t;
     operations_metadata : Block_validation.operation_metadata list list;
   }
-
-  (* FIXME: could be misleading. *)
 
   (** [equal b1 b2] tests the equality between [b1] and [b2]. {b
       Warning} only block hashes are compared. *)
@@ -449,10 +450,10 @@ module Block : sig
      the block was already stored. If the block is correctly stored,
      the newly created block is returned.
 
-      If the block was successfully stored, then the block is removed
+     If the block was successfully stored, then the block is removed
      from the validated block cache.
 
-      {b Warning} The store will refuse to store blocks with no
+     {b Warning} The store will refuse to store blocks with no
      associated context's commit. *)
   val store_block :
     chain_store ->
@@ -668,8 +669,8 @@ module Chain : sig
         checkpoint's level.
 
       - The checkpoint is updated periodically such that the following
-        invariant holds:
-        [checkpoint.level >= all_head.last_preserved_block_level]
+      invariant holds:
+      [checkpoint.level >= all_head.last_preserved_block_level]
 
       The checkpoint will tend to designate the highest block among
       all chain head's [last_preserved_block_level] in a normal
@@ -893,7 +894,7 @@ module Chain : sig
   val find_protocol :
     chain_store -> protocol_level:int -> Protocol_hash.t option Lwt.t
 
-  (** [expects_predecessor_context_hash chain_store proto_level]
+  (** [expects_predecessor_context_hash chain_store ~protocol_level]
       returns whether or not a protocol requires the context hash of a
       block to target resulting context of it's predecessor. This
       depends on the environment of each protocol.*)
@@ -933,8 +934,8 @@ module Chain : sig
   val may_update_ancestor_protocol_level :
     chain_store -> head:Block.block -> unit tzresult Lwt.t
 
-  (** [validated_watcher chain_store] instantiates a new validated block
-      watcher for [chain_store]. *)
+  (** [validated_watcher chain_store] instantiates a new validated
+      block watcher for [chain_store]. *)
   val validated_watcher :
     chain_store -> Block.t Lwt_stream.t * Lwt_watcher.stopper
 
@@ -1039,14 +1040,23 @@ module Chain_traversal : sig
     (Block.t * Block.t list) Lwt.t
 end
 
-(** Store utility function that aims to give an overview of the shape
+(** Utilities brings some utility functions that aims to help
+    extracting values, data or statistics from the store. *)
+module Utilities : sig
+  (** Store utility function that aims to give an overview of the shape
     of the store's metadata. *)
-val stat_metadata_cycles :
-  t -> (string * metadata_stat list) list tzresult Lwt.t
+  val stat_metadata_cycles :
+    t -> (string * metadata_stat list) list tzresult Lwt.t
+end
 
-val v_3_1_upgrade : store_dir:string -> Genesis.t -> unit tzresult Lwt.t
+(** Upgrade module gathering all available upgrades. *)
+module Upgrade : sig
+  (** Upgrade the block_store_status in v_3_1. *)
+  val v_3_1_upgrade : store_dir:string -> Genesis.t -> unit tzresult Lwt.t
 
-val v_3_2_upgrade : store_dir:string -> Genesis.t -> unit tzresult Lwt.t
+  (** Upgrade the offset format for cemented files in v_3_2. *)
+  val v_3_2_upgrade : store_dir:string -> Genesis.t -> unit tzresult Lwt.t
+end
 
 (**/**)
 
