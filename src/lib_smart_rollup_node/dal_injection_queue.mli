@@ -26,7 +26,7 @@ val forget_injection_id : Injector_sigs.Id.t -> unit tzresult
     injected to the DAL injection queue. *)
 val produce_dal_slots : unit -> unit tzresult Lwt.t
 
-(** [set_dal_slot_indices ~add idx] sets the list of slot indices on which the
+(** [set_dal_slot_indices idx] sets the list of slot indices on which the
     DAL injection worker will publish DAL slots. *)
 val set_dal_slot_indices :
   Tezos_dal_node_services.Types.slot_index list -> unit tzresult Lwt.t
