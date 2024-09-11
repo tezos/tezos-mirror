@@ -133,9 +133,7 @@ module Worker = struct
                in
                let*! () =
                  Signals_publisher_events.signal_signed
-                   ~injector_op_hash:injection_id
-                   ~published_level
-                   ~slot_index
+                   ~signals:[(slot_index, published_level)]
                    ~smart_rollup_address:state.smart_rollup_address
                in
                Rollup_services.publish

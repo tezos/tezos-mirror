@@ -31,14 +31,10 @@ val commited_or_included_injection_id :
   published_level:int32 ->
   unit Lwt.t
 
-(** [signal_signed ~injector_op_hash ~published_level ~slot_index
-    ~smart_rollup_address] advertizes that a signal has been signed
-    for injector operation id [injector_op_hash], published at level
-    [published_level], with slot index [slot_index] and smart rollup
-    address [smart_rollup_address]. *)
+(** [signal_signed ~signals ~smart_rollup_address] advertizes that
+    some [signals] have been signed for the smart rollup address
+    [smart_rollup_address]. Here signals are lists of pairs, where
+    each pair consists of a DAL slot index and the level at which its
+    injection was published. *)
 val signal_signed :
-  injector_op_hash:Tezos_crypto.Hashed.Injector_operations_hash.t ->
-  published_level:int32 ->
-  slot_index:int ->
-  smart_rollup_address:string ->
-  unit Lwt.t
+  signals:(int * int32) list -> smart_rollup_address:string -> unit Lwt.t

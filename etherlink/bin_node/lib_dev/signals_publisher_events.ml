@@ -48,18 +48,21 @@ let commited_or_included_injection_id =
     ("publish_level", Data_encoding.int32)
 
 let signal_signed =
-  declare_4
+  declare_2
     ~section
     ~name:"signal_publisher_signal_signed"
     ~msg:
-      "Signed a signal for injector operation hash {injector_op_hash} \
-       published at level {published_level}, with slot index {slot_index} and \
-       smart rollup address {smart_rollup_address}."
-    ~level:Debug
-    ("injector_op_hash", Tezos_crypto.Hashed.Injector_operations_hash.encoding)
-    ("published_level", Data_encoding.int32)
-    ("slot_index", Data_encoding.int8)
+      "Signed the following signals: {signals} (slot_index, published_level) \
+       for smart rollup address {smart_rollup_address}."
+    ~level:Info
+    ( "signals",
+      Data_encoding.(
+        list (obj2 (req "slot_index" uint8) (req "published_level" int32))) )
     ("smart_rollup_address", Data_encoding.string)
+    ~pp1:
+      Format.(
+        pp_print_list ~pp_sep:pp_print_space (fun fmt (k, v) ->
+            fprintf fmt "(%d, %ld)" k v))
 
 let publisher_is_ready () = emit publisher_ready ()
 
@@ -70,8 +73,5 @@ let untracking ~injector_op_hash = emit untracking injector_op_hash
 let commited_or_included_injection_id ~injector_op_hash ~published_level =
   emit commited_or_included_injection_id (injector_op_hash, published_level)
 
-let signal_signed ~injector_op_hash ~published_level ~slot_index
-    ~smart_rollup_address =
-  emit
-    signal_signed
-    (injector_op_hash, published_level, slot_index, smart_rollup_address)
+let signal_signed ~signals ~smart_rollup_address =
+  emit signal_signed (signals, smart_rollup_address)
