@@ -1046,11 +1046,14 @@ end
 val stat_metadata_cycles :
   t -> (string * metadata_stat list) list tzresult Lwt.t
 
-(** Upgrade the block_store_status in v_3_1. *)
-val v_3_1_upgrade : store_dir:string -> Genesis.t -> unit tzresult Lwt.t
+(** Upgrade module gathering all available upgrades. *)
+module Upgrade : sig
+  (** Upgrade the block_store_status in v_3_1. *)
+  val v_3_1_upgrade : store_dir:string -> Genesis.t -> unit tzresult Lwt.t
 
-(** Upgrade the offset format for cemented files in v_3_2. *)
-val v_3_2_upgrade : store_dir:string -> Genesis.t -> unit tzresult Lwt.t
+  (** Upgrade the offset format for cemented files in v_3_2. *)
+  val v_3_2_upgrade : store_dir:string -> Genesis.t -> unit tzresult Lwt.t
+end
 
 (**/**)
 

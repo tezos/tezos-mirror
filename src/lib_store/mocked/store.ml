@@ -2080,6 +2080,8 @@ end
 
 let stat_metadata_cycles _ = Lwt_result_syntax.return_nil
 
-let v_3_1_upgrade ~store_dir:_ _genesis = Lwt_result_syntax.return_unit
+module Upgrade = struct
+  let v_3_1_upgrade ~store_dir:_ _genesis = Lwt_result_syntax.return_unit
 
-let v_3_2_upgrade ~store_dir:_ _genesis = Lwt_result_syntax.return_unit
+  let v_3_2_upgrade ~store_dir:_ _genesis = Lwt_result_syntax.return_unit
+end
