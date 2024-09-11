@@ -655,9 +655,10 @@ let snapshot_file_arg =
     ~placeholder:"path"
     ~doc:
       "Path to the snapshot file to create, with string interpolation. %r is \
-       replaced by the Smart Rollup address, %l by the current head of the \
-       node, and %% by %. Default is located in the current directory, and the \
-       filename is based on the snapshot information."
+       replaced by the short form of the Smart Rollup address, %R by the \
+       complete Smart Rollup address, %l by the current head of the node, and \
+       %% by %. Default is located in the current directory, and the filename \
+       is based on the snapshot information."
     Params.string
 
 let start_proxy ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?rpc_batch_limit

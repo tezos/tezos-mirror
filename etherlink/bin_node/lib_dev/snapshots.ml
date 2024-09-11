@@ -156,11 +156,16 @@ open Snapshot_utils.Make (Header)
 
 let interpolate_snapshot_file current_level rollup_address filename =
   let percent = ('%', "%") in
-  let rollup_address = ('r', Address.to_b58check rollup_address) in
+  let rollup_address_short = ('r', Address.to_short_b58check rollup_address) in
+  let rollup_address_long = ('R', Address.to_b58check rollup_address) in
   let current_level =
     ('l', Format.asprintf "%a" Ethereum_types.pp_quantity current_level)
   in
-  try Ok (Misc.interpolate filename [percent; rollup_address; current_level])
+  try
+    Ok
+      (Misc.interpolate
+         filename
+         [percent; rollup_address_short; rollup_address_long; current_level])
   with _ -> Result_syntax.tzfail (Invalid_snapshot_file filename)
 
 let export ?snapshot_file ~compression ~data_dir () =
