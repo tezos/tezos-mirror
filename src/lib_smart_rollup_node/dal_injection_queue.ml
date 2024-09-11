@@ -233,6 +233,8 @@ let inject_slot state ~slot_index ~slot_content =
   in
   let*! () = Events.(emit injected) (commitment, slot_index, l1_hash) in
   Recent_dal_injections.replace state.recent_dal_injections l1_hash () ;
+  Metrics.DAL_batcher.set_dal_injections_queue_length
+    (Recent_dal_injections.length state.recent_dal_injections) ;
   return_unit
 
 let on_register state ~message : unit tzresult Lwt.t =
@@ -250,6 +252,8 @@ let on_register state ~message : unit tzresult Lwt.t =
     tzfail @@ Rollup_node_errors.Dal_message_too_big {slot_size; message_size}
   else (
     Pending_messages.replace state.pending_messages state.count_messages message ;
+    Metrics.DAL_batcher.set_dal_batcher_queue_length
+      (Pending_messages.length state.pending_messages) ;
     (* We don't care about overflows here. *)
     state.count_messages <- state.count_messages + 1 ;
     let*! () = Events.(emit dal_message_received) () in
@@ -296,6 +300,8 @@ let fill_slot state ~slot_size =
         else
           (* Pop the element to remove it. *)
           let () = ignore @@ Pending_messages.take state.pending_messages in
+          Metrics.DAL_batcher.set_dal_batcher_queue_length
+            (Pending_messages.length state.pending_messages) ;
           fill_slot_aux (message :: accu) ~remaining_size
   in
   fill_slot_aux [] ~remaining_size:slot_size
@@ -539,4 +545,6 @@ let forget_injection_id id =
   let open Result_syntax in
   let+ w = Result.map_error TzTrace.make (Lazy.force worker) in
   let state = Worker.state w in
-  Recent_dal_injections.remove state.recent_dal_injections id
+  let () = Recent_dal_injections.remove state.recent_dal_injections id in
+  Metrics.DAL_batcher.set_dal_injections_queue_length
+    (Recent_dal_injections.length state.recent_dal_injections)

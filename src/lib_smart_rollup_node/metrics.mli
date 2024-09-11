@@ -110,6 +110,14 @@ module Batcher : sig
   val set_last_batch_time : Ptime.t -> unit
 end
 
+module DAL_batcher : sig
+  (** Set the number of messages in the queue waiting to be published on the DAL *)
+  val set_dal_batcher_queue_length : int -> unit
+
+  (** Set the number of DAL slots which were recently published and not yet forgotten *)
+  val set_dal_injections_queue_length : int -> unit
+end
+
 module GC : sig
   (** Set the time to process a GC *)
   val set_process_time : Ptime.span -> unit
