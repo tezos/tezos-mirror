@@ -1148,11 +1148,17 @@ let job_build_dsn_node ?rules () : tezos_job =
   |> enable_kernels |> enable_sccache |> enable_cargo_cache
 
 module Tezt = struct
+  (** Create a tezt job.
+
+      To enable tezt selection via manifest, pass a job as constructed
+      by {!job_select_tezts} as [~job_select_tezts]. Then the
+      constructed tezt job will only run the tezts selected by the
+      selection job. *)
   let job ~__POS__ ?rules ?parallel ?(tag = Gcp_tezt) ~name
       ~(tezt_tests : Tezt_core.TSL_AST.t) ?(retry = 2) ?(tezt_retry = 1)
       ?(tezt_parallel = 1) ?(tezt_variant = "")
       ?(before_script = before_script ~source_version:true ~eval_opam:true [])
-      ?timeout ~dependencies () : tezos_job =
+      ?timeout ?job_select_tezts ~dependencies () : tezos_job =
     let variables =
       [
         ("JUNIT", "tezt-junit.xml");
@@ -1199,6 +1205,17 @@ module Tezt = struct
         "TEZT_VARIANT";
       ]
     in
+    let tezt_wrapper, dependencies =
+      match job_select_tezts with
+      | Some job_select_tezts ->
+          let dependencies =
+            Tezos_ci.dependencies_add_artifact_dependency
+              dependencies
+              job_select_tezts
+          in
+          ("./scripts/ci/tezt.sh", dependencies)
+      | None -> ("_build/default/tezt/tests/main.exe", dependencies)
+    in
     let retry = if retry = 0 then None else Some {max = retry; when_ = []} in
     job
       ?timeout
@@ -1226,9 +1243,10 @@ module Tezt = struct
            second call that affect test selection.Note that TESTS must be quoted (here and below)
            since it will contain e.g. '&&' which we want to interpreted as TSL and not shell
            syntax. *)
-        "./scripts/ci/tezt.sh \"${TESTS}\" --from-record tezt/records --job \
-         ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --list-tsv > \
-         selected_tezts.tsv";
+        tezt_wrapper
+        ^ " \"${TESTS}\" --from-record tezt/records --job \
+           ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --list-tsv > \
+           selected_tezts.tsv";
         (* For Tezt tests, there are multiple timeouts:
            - --global-timeout is the internal timeout of Tezt, which only works if tests
              are cooperative;
@@ -1241,13 +1259,13 @@ module Tezt = struct
            because if the CI timeout is reached, there are no artefacts,
            and thus no logs to investigate.
            See also: https://gitlab.com/gitlab-org/gitlab/-/issues/19818 *)
-        "./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh \
-         \"${TESTS}\" --color --log-buffer-size 5000 --log-file tezt.log \
-         --global-timeout 1800 --on-unknown-regression-files fail --junit \
-         ${JUNIT} --from-record tezt/records --job \
-         ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record \
-         tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json --job-count \
-         ${TEZT_PARALLEL} --retry ${TEZT_RETRY}";
+        "./scripts/ci/exit_code.sh timeout -k 60 1860 " ^ tezt_wrapper
+        ^ " \"${TESTS}\" --color --log-buffer-size 5000 --log-file tezt.log \
+           --global-timeout 1800 --on-unknown-regression-files fail --junit \
+           ${JUNIT} --from-record tezt/records --job \
+           ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record \
+           tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json --job-count \
+           ${TEZT_PARALLEL} --retry ${TEZT_RETRY}";
       ]
 
   (** Tezt tag selector string.
@@ -1285,6 +1303,11 @@ module Tezt = struct
       @ List.map (fun tag -> TSL_AST.Not (Has_tag tag)) negative
       @ and_)
 
+  (** Selects tezt tests based on merge request diff.
+
+      This job only makes sense in merge request pipelines. To enable
+      tezt selection, it should be passed to the [~job_select_tezts]
+      argument to {!Tezt.job}. *)
   let job_select_tezts ?rules () : tezos_job =
     Tezos_ci.job
       ~__POS__
