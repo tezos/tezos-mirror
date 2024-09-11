@@ -530,6 +530,19 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             })
     }
 
+    fn get_word_size(&self, init_code: &[u8]) -> u64 {
+        // ceil(len(init_code) / 32)
+        (init_code.len() as u64 + 31) / 32
+    }
+
+    fn record_init_code_cost(&mut self, init_code: &[u8]) -> Result<(), ExitError> {
+        // As per EIP-3860:
+        // > We define init_code_cost to equal INITCODE_WORD_COST * get_word_size(init_code).
+        // where INITCODE_WORD_COST is 2.
+        let init_code_cost = 2 * self.get_word_size(init_code);
+        self.record_cost(init_code_cost)
+    }
+
     /// Mark a location in durable storage as _hot_ for the purpose of calculating
     /// cost of SSTORE and SLOAD. Return type chosen for compatibility with the
     /// SputnikVM functions that need to call this function.
@@ -1077,22 +1090,12 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             }
         }
 
-        // Charge of 2 gas for every 32-byte chunk of initcode to represent
-        // the cost of jumpdest-analysis.
-        // See: https://eips.ethereum.org/EIPS/eip-3860
-        // * We target wasm32-unknown-unknown, so this conversion should be safe.
-        // * The division behave as an unsafe div_floor which we can't use since
-        //   it's nightly-only.
-        // * The `unwrap_or` is there in case there's an unexpected behaviour
-        //   that we missed.
-        let extra_cost: u64 = (initial_code.len() / 32).try_into().unwrap_or(0) * 2;
-
-        if self.record_cost(extra_cost).is_err() {
+        if let Err(err) = self.record_init_code_cost(&initial_code) {
             log!(
                 self.host,
                 Debug,
-                "Not enought gas for call. Required at least: {:?} for the init code size extra cost.",
-                extra_cost
+                "{:?}: Not enough gas for create. Cannot record init code cost.",
+                err
             );
 
             return Ok((ExitReason::Error(ExitError::OutOfGas), None, vec![]));
