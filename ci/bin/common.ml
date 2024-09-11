@@ -26,10 +26,6 @@ open Tezos_ci
 *)
 type debian_repository_pipeline = Full | Partial | Release
 
-(* Encodes the conditional [before_merging] pipeline and its
-   unconditional variant [schedule_extended_test]. *)
-type code_verification_pipeline = Before_merging | Schedule_extended_test
-
 let cargo_home =
   (* Note:
      - We want [CARGO_HOME] to be in a sub-folder of

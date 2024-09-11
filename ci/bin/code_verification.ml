@@ -36,6 +36,12 @@ open Gitlab_ci.Util
 open Tezos_ci
 open Common
 
+(** Variants of the code verification pipeline.
+
+    Encodes the conditional [before_merging] pipeline and its
+    unconditional variant [schedule_extended_test]. *)
+type code_verification_pipeline = Before_merging | Schedule_extended_test
+
 (** Configuration of manual jobs for [make_rules] *)
 type manual =
   | No  (** Do not add rule for manual start. *)
