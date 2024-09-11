@@ -1327,6 +1327,16 @@ let run (conf : Config.t) =
                                       `Port con.Config.port )
                               | None -> `TCP (`Port con.Config.port)
                             in
+                            let promise =
+                              Cohttp_lwt_unix.Server.create
+                                ~stop
+                                ~ctx
+                                ~mode
+                                (Cohttp_lwt_unix.Server.make
+                                   ~callback:
+                                     (callback ~conf ~admins ~users pool)
+                                   ())
+                            in
                             Lib_teztale_base.Log.info logger (fun () ->
                                 Printf.sprintf
                                   "Server listening at %s:%d."
@@ -1334,13 +1344,7 @@ let run (conf : Config.t) =
                                   | None -> "<default>"
                                   | Some s -> s)
                                   con.port) ;
-                            Cohttp_lwt_unix.Server.create
-                              ~stop
-                              ~ctx
-                              ~mode
-                              (Cohttp_lwt_unix.Server.make
-                                 ~callback:(callback ~conf ~admins ~users pool)
-                                 ()))
+                            promise)
                           conf.Config.network_interfaces
                       in
                       let* () = Lwt.join servers in
