@@ -3526,9 +3526,11 @@ let make_pp_store (store : store) =
         pp_testchain_store
         ())
 
-let stat_metadata_cycles store =
-  let chain_store = main_chain_store store in
-  Block_store.stat_metadata_cycles chain_store.block_store
+module Utilities = struct
+  let stat_metadata_cycles store =
+    let chain_store = main_chain_store store in
+    Block_store.stat_metadata_cycles chain_store.block_store
+end
 
 module Upgrade = struct
   let v_3_1_upgrade ~store_dir genesis =

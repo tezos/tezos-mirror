@@ -1039,10 +1039,14 @@ module Chain_traversal : sig
     (Block.t * Block.t list) Lwt.t
 end
 
-(** Store utility function that aims to give an overview of the shape
+(** Utilities brings some utility functions that aims to help
+    extracting values, data or statistics from the store. *)
+module Utilities : sig
+  (** Store utility function that aims to give an overview of the shape
     of the store's metadata. *)
-val stat_metadata_cycles :
-  t -> (string * metadata_stat list) list tzresult Lwt.t
+  val stat_metadata_cycles :
+    t -> (string * metadata_stat list) list tzresult Lwt.t
+end
 
 (** Upgrade module gathering all available upgrades. *)
 module Upgrade : sig
