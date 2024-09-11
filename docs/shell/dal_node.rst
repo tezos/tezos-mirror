@@ -64,12 +64,14 @@ The RPC server is started by default, even if this option is not given.
 Operational aspects
 -------------------
 
-Running a DAL node
-^^^^^^^^^^^^^^^^^^
+.. _dal-node-commands:
+
+DAL node commands
+^^^^^^^^^^^^^^^^^
 
 The DAL node has two commands ``config init`` and ``run``.
 
-The command ``init config`` creates a new configuration file in the specified data directory or in the default location (ie ``~/.tezos-dal-node``) with the parameters provided on the command-line by the corresponding arguments, in case no configuration file exists already. If such a file already exists, it overrides it with the provided parameters (old parameters are lost).
+The ``config init`` command creates a new configuration file in the specified data directory or in the default location (ie ``~/.tezos-dal-node``) with the parameters provided on the command-line by the corresponding arguments, in case no configuration file exists already. If such a file already exists, it overrides it with the provided parameters (old parameters are lost).
 
 The command ``run`` runs the DAL node. The CLI arguments take precedence over the configuration file arguments, except for the list of bootstrap peers and of profiles, which are considered in addition to the ones from the configuration file. The configuration file is however not overridden with the new values of the node’s parameters. However, at the end of the execution, the node’s profiles, which may have been given as arguments or set via RPCs, are written to the configuration file.
 
@@ -81,6 +83,7 @@ Both commands have the same arguments, which can be seen by executing, e.g., ``o
 
 See the :ref:`DAL node manual <dal_node_manual>` for more details.
 
+The concrete operational steps for participating in the DAL network are described in page :doc:`./dal_run`.
 In order to run a DAL node with an operator profile, one first needs to
 install some cryptographic parameters, see the section on :ref:`Install DAL
 trusted setup<setup_dal_crypto_params>`.
