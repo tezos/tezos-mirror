@@ -648,7 +648,7 @@ module Images = struct
         ~__POS__
         ~stage
         ~name:"oc.docker:client-libs-dependencies"
-          (* These image are not built for external use. *)
+          (* This image is not built for external use. *)
         ~ci_docker_hub:false
           (* Handle docker initialization, if necessary, in [./scripts/ci/docker_client_libs_dependencies_build.sh]. *)
         ~skip_docker_initialization:true
