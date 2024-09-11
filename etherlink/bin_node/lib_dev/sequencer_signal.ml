@@ -52,7 +52,7 @@ let create ~cctxt ~sequencer_key ~smart_rollup_address ~slot_ids =
     List
       (compact_levels_slots ~slot_ids
       |> List.map (fun (published_level, slots) ->
-             let slots = List.map (fun idx -> Value (encode_u8 idx)) slots in
+             let slots = List.map (fun idx -> Value (encode_int idx)) slots in
              List [Value (encode_i32_le published_level); List slots]))
   in
   let rlp_unsigned_signal = encoded_levels_to_slots |> encode in

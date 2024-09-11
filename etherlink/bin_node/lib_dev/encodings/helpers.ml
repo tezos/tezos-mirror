@@ -12,11 +12,6 @@ let keccak256 (Hex s) =
   let bytes = Hex.to_bytes_exn (`Hex s) in
   Tezos_crypto.Hacl.Hash.Keccak_256.digest bytes
 
-let encode_u8 i =
-  let bytes = Bytes.make 1 '\000' in
-  Bytes.set_uint8 bytes 0 i ;
-  bytes
-
 let encode_i32_le i =
   let bytes = Bytes.make 4 '\000' in
   Bytes.set_int32_le bytes 0 i ;
