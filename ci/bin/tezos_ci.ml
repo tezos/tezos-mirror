@@ -550,6 +550,11 @@ type dependency =
 
 type dependencies = Staged of tezos_job list | Dependent of dependency list
 
+let dependencies_add_artifact_dependency dependencies tezos_job =
+  match dependencies with
+  | Staged jobs -> Staged (tezos_job :: jobs)
+  | Dependent dependencies -> Dependent (Artifacts tezos_job :: dependencies)
+
 (* Resolve {!dependencies} into a pair of [needs:] and [dependencies:] *)
 let resolve_dependencies job_name dependencies =
   let needs, dependencies =
