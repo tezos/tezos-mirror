@@ -249,6 +249,7 @@ end
 module Teztale = struct
   type t = {
     server : Teztale.Server.t;
+    address : string;
     mutable archivers : Teztale.Archiver.t list;
   }
 
@@ -263,7 +264,12 @@ module Teztale = struct
       ?(path = Uses.(path (make ~tag:"codec" ~path:"./octez-teztale-server")))
       agent =
     let* server = Teztale.Server.run ~path agent () in
-    Lwt.return {server; archivers = []}
+    let address =
+      match Agent.point agent with
+      | None -> "127.0.0.1"
+      | Some point -> fst point
+    in
+    Lwt.return {server; address; archivers = []}
 
   let wait_server t = Teztale.Server.wait_for_readiness t.server
 
@@ -271,8 +277,17 @@ module Teztale = struct
       ?(path = Uses.(path (make ~tag:"codec" ~path:"./octez-teztale-archiver")))
       t agent ~node_port =
     let user = fresh_user () in
-    let feed : Teztale.interface list = [t.server.conf.interface] in
-    let* () = Lwt_result.get_exn (Teztale.Server.add_user t.server user) in
+    let feed : Teztale.interface list =
+      [{address = t.address; port = t.server.conf.interface.port}]
+    in
+    let* () =
+      Lwt_result.get_exn
+        (Teztale.Server.add_user
+           ?runner:(Agent.runner agent)
+           ~public_address:t.address
+           t.server
+           user)
+    in
     let* archiver = Teztale.Archiver.run agent ~path user feed ~node_port in
     t.archivers <- archiver :: t.archivers ;
     Lwt.return_unit
