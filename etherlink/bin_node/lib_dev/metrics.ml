@@ -255,6 +255,14 @@ module BlueprintChunkSent = struct
       "blueprint_chunks_sent_on_dal"
 end
 
+let signals_sent =
+  Counter.v
+    ~registry
+    ~help:"Number of DAL import signals sent on the inbox"
+    ~namespace
+    ~subsystem
+    "signals_sent"
+
 let metrics =
   let name = "Etherlink" in
   let chain = Chain.init name in
