@@ -27,7 +27,6 @@ type state = {
   mutable cooldown : int;
       (** Do not try to catch-up if [cooldown] is not equal to 0 *)
   enable_dal : bool;
-  dal_slots : int list option;
 }
 
 module Types = struct
@@ -275,7 +274,6 @@ module Handlers = struct
         catchup_cooldown;
         keep_alive;
         enable_dal = Option.is_some dal_slots;
-        dal_slots;
       }
 
   let on_request :
