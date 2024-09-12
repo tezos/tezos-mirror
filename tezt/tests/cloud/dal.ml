@@ -487,7 +487,7 @@ module Cli = struct
       ~set_long:"teztale"
       ~unset_long:"no-teztale"
       ~description:"Runs teztale"
-      bootstrap
+      false
 end
 
 type configuration = {
