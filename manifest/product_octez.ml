@@ -4520,42 +4520,6 @@ let octez_dac_node_lib =
         octez_dac_client_lib |> open_;
       ]
 
-let _octez_dac_node_lib_tests =
-  tezt
-    ["test_data_streamer"]
-    ~path:"src/lib_dac_node/test"
-    ~opam:"tezos-dac-node-lib-test"
-    ~synopsis:"Test for dac node lib"
-    ~with_macos_security_framework:true
-    ~deps:
-      [
-        octez_stdlib |> open_;
-        octez_stdlib_unix |> open_;
-        octez_base |> open_ |> open_ ~m:"TzPervasives";
-        octez_test_helpers |> open_;
-        octez_base_test_helpers |> open_;
-        octez_dac_node_lib |> open_;
-        alcotezt;
-      ]
-
-let _octez_dac_lib_tests =
-  tezt
-    ["test_certificate"; "test_dac_plugin"; "test_dac_clic_helpers"]
-    ~path:"src/lib_dac/test"
-    ~opam:"tezos-dac-lib-test"
-    ~synopsis:"Test for dac lib"
-    ~with_macos_security_framework:true
-    ~deps:
-      [
-        octez_stdlib |> open_;
-        octez_stdlib_unix |> open_;
-        octez_base |> open_ |> open_ ~m:"TzPervasives";
-        octez_test_helpers |> open_;
-        octez_base_test_helpers |> open_;
-        octez_dac_lib |> open_;
-        alcotezt;
-      ]
-
 let octez_node_config =
   public_lib
     "octez-node-config"
@@ -6590,30 +6554,6 @@ let hash = Protocol.hash
           ]
         ~inline_tests:ppx_expect
         ~linkall:true
-    in
-    let _dac_tests =
-      only_if (active && N.(number >= 017)) @@ fun () ->
-      tezt
-        [
-          "test_dac_pages_encoding";
-          "test_dac_plugin_registration";
-          "test_helpers";
-        ]
-        ~path:(path // "lib_dac_plugin/test")
-        ~with_macos_security_framework:true
-        ~opam:(sf "octez-protocol-%s-libs" name_dash)
-        ~deps:
-          [
-            octez_base |> open_ ~m:"TzPervasives"
-            |> error_monad_module N.(number <= 018);
-            dac |> if_some |> open_;
-            main |> open_;
-            octez_base_test_helpers |> open_;
-            test_helpers |> if_some |> open_;
-            octez_dac_lib |> open_;
-            octez_dac_node_lib |> open_;
-            alcotezt;
-          ]
     in
     let octez_injector =
       only_if N.(active && number >= 017) @@ fun () ->

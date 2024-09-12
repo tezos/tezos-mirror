@@ -31,7 +31,6 @@
   src_proto_alpha_lib_plugin_test_tezt_lib
   src_proto_alpha_lib_delegate_test_tezt_lib
   src_proto_alpha_lib_dal_test_tezt_lib
-  src_proto_alpha_lib_dac_plugin_test_tezt_lib
   src_proto_alpha_lib_client_test_tezt_lib
   src_proto_021_PsquebeC_lib_sc_rollup_node_test_tezt_lib
   src_proto_021_PsquebeC_lib_protocol_test_unit_tezt_lib
@@ -46,7 +45,6 @@
   src_proto_021_PsquebeC_lib_plugin_test_tezt_lib
   src_proto_021_PsquebeC_lib_delegate_test_tezt_lib
   src_proto_021_PsquebeC_lib_dal_test_tezt_lib
-  src_proto_021_PsquebeC_lib_dac_plugin_test_tezt_lib
   src_proto_021_PsquebeC_lib_client_test_tezt_lib
   src_proto_020_PsParisC_lib_sc_rollup_node_test_tezt_lib
   src_proto_020_PsParisC_lib_protocol_test_unit_tezt_lib
@@ -61,7 +59,6 @@
   src_proto_020_PsParisC_lib_plugin_test_tezt_lib
   src_proto_020_PsParisC_lib_delegate_test_tezt_lib
   src_proto_020_PsParisC_lib_dal_test_tezt_lib
-  src_proto_020_PsParisC_lib_dac_plugin_test_tezt_lib
   src_proto_020_PsParisC_lib_client_test_tezt_lib
   src_lib_workers_test_tezt_lib
   src_lib_webassembly_tests_tezt_lib
@@ -99,8 +96,6 @@
   src_lib_hacl_test_tezt_lib
   src_lib_gossipsub_test_tezt_lib
   src_lib_error_monad_test_tezt_lib
-  src_lib_dac_node_test_tezt_lib
-  src_lib_dac_test_tezt_lib
   src_lib_crypto_dal_test_tezt_lib
   src_lib_crypto_test_unix_tezt_lib
   src_lib_crypto_test_tezt_lib

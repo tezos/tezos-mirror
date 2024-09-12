@@ -1323,7 +1323,7 @@ opam:all_2:
       - octez-smart-rollup-node-PtParisB
       - octez-smart-rollup-node-PtNairob
       - octez-smart-rollup-node-PsquebeC
-      - octez-smart-rollup-node-Proxford
+      - octez-smart-rollup-node-PsParisC
       - octez-protocol-alpha-libs
       - octez-protocol-021-PsquebeC-libs
       - octez-protocol-020-PsParisC-libs
@@ -1400,7 +1400,7 @@ opam:all_1:
   parallel:
     matrix:
     - package:
-      - octez-smart-rollup-node-PsParisC
+      - octez-smart-rollup-node-Proxford
       - octez-evm-node-libs
 
 opam:all_3:

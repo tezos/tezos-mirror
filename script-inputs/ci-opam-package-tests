@@ -52,8 +52,8 @@ octez-rust-deps	all	7
 octez-shell-libs	all	6
 octez-signer	exec	4
 octez-smart-rollup-node	exec	1
-octez-smart-rollup-node-Proxford	all	2
-octez-smart-rollup-node-PsParisC	all	1
+octez-smart-rollup-node-Proxford	all	1
+octez-smart-rollup-node-PsParisC	all	2
 octez-smart-rollup-node-PsquebeC	all	2
 octez-smart-rollup-node-PtNairob	all	2
 octez-smart-rollup-node-PtParisB	all	2

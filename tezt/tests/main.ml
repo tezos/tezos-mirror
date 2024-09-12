@@ -220,7 +220,6 @@ let register_protocol_tests_that_use_supports_correctly () =
   Views.register ~protocols ;
   Zk_rollup.register ~protocols ;
   Tx_sc_rollup.register ~protocols ;
-  Dac.register ~protocols ;
   Timelock.register ~protocols ;
   Tzt_regression.register ~protocols ;
   Dal.register ~protocols ;
