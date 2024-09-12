@@ -10,6 +10,7 @@
 val main :
   ?profile:bool ->
   ?kernel_path:string ->
+  ?kernel_verbosity:Events.kernel_log_level ->
   data_dir:string ->
   preimages:string ->
   preimages_endpoint:Uri.t option ->
