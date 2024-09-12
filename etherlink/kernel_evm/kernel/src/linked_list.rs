@@ -220,7 +220,7 @@ impl<Id: Decodable + Encodable + AsRef<[u8]>, Elt: Encodable + Decodable>
 #[allow(dead_code)]
 impl<Id, Elt> LinkedList<Id, Elt>
 where
-    Id: AsRef<[u8]> + Encodable + Decodable + Clone,
+    Id: AsRef<[u8]> + Encodable + Decodable + Clone + PartialEq,
     Elt: Encodable + Decodable + Clone,
 {
     /// Load a list from the storage.
@@ -295,10 +295,22 @@ where
                 // And the save the data
                 back.save_data(host, &self.path, elt)?;
                 // update the back pointer of the list
-                self.pointers = Some(LinkedListPointer {
-                    front: front.clone(),
-                    back,
-                });
+
+                // Before the addition, penultimate might be the front
+                // *and* the back of the list. The back is always updated to
+                // the inserted cell, but the front cell might need an update.
+                if penultimate.id == front.id {
+                    self.pointers = Some(LinkedListPointer {
+                        front: penultimate,
+                        back,
+                    });
+                } else {
+                    // If not, we need to update only the back pointer.
+                    self.pointers = Some(LinkedListPointer {
+                        front: front.clone(),
+                        back,
+                    });
+                }
             }
             None => {
                 // This case corresponds to the empty list
@@ -363,11 +375,20 @@ where
                 };
                 // update the pointer
                 new_front.save(host, &self.path)?;
-                // update the list pointers
-                self.pointers = Some(LinkedListPointer {
-                    front: new_front,
-                    back: back.clone(),
-                });
+
+                // If the list has 2 elements and if the front is removed,
+                // then the front and the back are equal.
+                if new_front.id == back.id {
+                    self.pointers = Some(LinkedListPointer {
+                        front: new_front.clone(),
+                        back: new_front,
+                    });
+                } else {
+                    self.pointers = Some(LinkedListPointer {
+                        front: new_front,
+                        back: back.clone(),
+                    });
+                }
             }
             // The end of the list is being removed
             (Some(previous), None) => {
@@ -376,11 +397,19 @@ where
                     ..previous
                 };
                 new_back.save(host, &self.path)?;
-                // update the list pointers
-                self.pointers = Some(LinkedListPointer {
-                    front: front.clone(),
-                    back: new_back,
-                });
+                // If the list has 2 elements and if the back is removed,
+                // then the front and the back are equal.
+                if new_back.id == front.id {
+                    self.pointers = Some(LinkedListPointer {
+                        front: new_back.clone(),
+                        back: new_back,
+                    });
+                } else {
+                    self.pointers = Some(LinkedListPointer {
+                        front: front.clone(),
+                        back: new_back,
+                    });
+                }
             }
             // Removes an element between two elements
             (Some(previous), Some(next)) => {
@@ -395,6 +424,36 @@ where
                 };
                 new_previous.save(host, &self.path)?;
                 new_next.save(host, &self.path)?;
+
+                // We remove the second item of a list of three. It means back and front
+                // have been updated and are pointing to each other now.
+                if new_previous.clone().id == front.clone().id
+                    && new_next.clone().id == back.clone().id
+                {
+                    self.pointers = Some(LinkedListPointer {
+                        front: new_previous.clone(),
+                        back: new_next.clone(),
+                    });
+                } else {
+                    // If the new previous is the front pointer, we need to
+                    // update the front pointer to handle the new next pointer
+                    if new_previous.clone().id == front.clone().id {
+                        self.pointers = Some(LinkedListPointer {
+                            front: new_previous,
+                            back: back.clone(),
+                        });
+                    } else {
+                        // Similarly to the previous case. If the new next is the
+                        // back pointer, we need to update the back pointer to handle
+                        // the previous pointer.
+                        if new_next.clone().id == back.clone().id {
+                            self.pointers = Some(LinkedListPointer {
+                                front: front.clone(),
+                                back: new_next.clone(),
+                            });
+                        }
+                    }
+                }
             }
         };
         self.save(host)?;
@@ -444,7 +503,7 @@ mod tests {
     use tezos_smart_rollup_host::path::RefPath;
     use tezos_smart_rollup_mock::MockHost;
 
-    #[derive(Clone)]
+    #[derive(Clone, PartialEq)]
     struct Hash([u8; TRANSACTION_HASH_SIZE]);
 
     impl Encodable for Hash {
