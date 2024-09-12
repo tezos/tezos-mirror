@@ -293,6 +293,8 @@ module Teztale = struct
 end
 
 module Cli = struct
+  include Cli
+
   let section =
     Clap.section
       ~description:
@@ -2176,29 +2178,26 @@ let benchmark () =
     |> List.concat
   in
   let docker_image =
-    match configuration.network with
-    | Testnet Ghostnet -> None (* Some Env.Octez_latest_release *)
-    | Sandbox | Testnet (Weeklynet _) -> None
+    Option.map (fun tag -> Env.Octez_release {tag}) Cli.octez_release
   in
   let default_vm_configuration = Configuration.make ?docker_image () in
   let vms =
     vms
     |> List.map (function
-           | `Bootstrap ->
-               (* Configuration.make ~docker_image:Octez_latest_release () *)
-               default_vm_configuration
+           | `Bootstrap -> default_vm_configuration
            | `Baker i -> (
                match configuration.stake_machine_type with
                | None -> default_vm_configuration
                | Some list -> (
                    try
                      let machine_type = List.nth list i in
-                     Configuration.make ~machine_type ()
+                     Configuration.make ?docker_image ~machine_type ()
                    with _ -> default_vm_configuration))
            | `Producer | `Observer -> (
                match configuration.producer_machine_type with
-               | None -> Configuration.make ()
-               | Some machine_type -> Configuration.make ~machine_type ())
+               | None -> Configuration.make ?docker_image ()
+               | Some machine_type ->
+                   Configuration.make ?docker_image ~machine_type ())
            | `Etherlink_operator -> default_vm_configuration
            | `Etherlink_producer _ -> default_vm_configuration)
   in

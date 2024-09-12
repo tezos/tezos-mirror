@@ -12,7 +12,9 @@ module Agent : sig
 end
 
 module Configuration : sig
-  type docker_image = Gcp of {alias : string} | Octez_latest_release
+  type docker_image =
+    | Gcp of {alias : string}
+    | Octez_release of {tag : string}
 
   type t = private {
     machine_type : string;
@@ -23,11 +25,11 @@ module Configuration : sig
   }
 
   (** [make ?machine_type ()] is a smart-constructor to make a VM
-      configuration. 
+      configuration.
 
-    Default value for [max_run_duration] is [7200].  
-        
-    Default value for [machine_type] is [n1-standard-2]. 
+    Default value for [max_run_duration] is [7200].
+
+    Default value for [machine_type] is [n1-standard-2].
 
     Default value for [docker_image] is [Custom {tezt_cloud}] where [tezt_cloud]
     is the value provided by the environement variable [$TEZT_CLOUD].

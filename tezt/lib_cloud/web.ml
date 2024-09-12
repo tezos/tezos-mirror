@@ -17,7 +17,7 @@ type t = {
 
 let pp_docker_image fmt = function
   | Env.Gcp {alias} -> Format.fprintf fmt "%s" alias
-  | Octez_latest_release -> Format.fprintf fmt "Octez latest release"
+  | Octez_release {tag} -> Format.fprintf fmt "Octez %s release" tag
 
 let configuration ~agents =
   let str =

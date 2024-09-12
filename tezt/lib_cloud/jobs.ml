@@ -34,7 +34,7 @@ let docker_build =
       let alias =
         match docker_image with
         | Gcp {alias} -> alias
-        | Octez_latest_release -> "octez"
+        | Octez_release _ -> "octez"
       in
       let dockerfile = Path.dockerfile ~alias in
       Log.info "Checking the existence of the docker file %s..." dockerfile ;
@@ -66,7 +66,8 @@ let docker_build =
               ("DAL_TRUSTED_SETUP_PATH", Path.dal_trusted_setup);
               ("BINARIES_DESTINATION_PATH", Path.default_binaries_path ());
             ]
-        | Octez_latest_release -> [("SSH_PUBLIC_KEY", ssh_public_key)]
+        | Octez_release {tag} ->
+            [("SSH_PUBLIC_KEY", ssh_public_key); ("RELEASE_TAG", tag)]
       in
       Log.info "Building image from %s..." Env.tezt_cloud ;
       let* () = Docker.build ~alias ~args () |> Process.check in
