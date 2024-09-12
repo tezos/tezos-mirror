@@ -16,7 +16,8 @@ let tag = function
   | Eip1559 -> "Eip1559"
   | Eip2930 -> "Eip2930"
 
-let register ?set_account_code ?da_fee_per_byte ~title ~tags f tx_types =
+let register ?set_account_code ?da_fee_per_byte ?minimum_base_fee_per_gas ~title
+    ~tags f tx_types =
   List.iter
     (fun tx_type ->
       let tag_tx = tag tx_type in
@@ -44,6 +45,7 @@ let register ?set_account_code ?da_fee_per_byte ~title ~tags f tx_types =
         Helpers.init_sequencer_sandbox
           ?set_account_code
           ?da_fee_per_byte
+          ?minimum_base_fee_per_gas
           ~patch_config
           ()
       in
@@ -367,6 +369,47 @@ let test_validate_pay_for_fees =
 
   unit
 
+let test_validate_pay_for_fees_max_fee_per_gas =
+  register
+    ~da_fee_per_byte:(Wei.of_string "4_000_00_000")
+    ~minimum_base_fee_per_gas:(Wei.of_string "2_000")
+    ~title:"DA fees computation with max fee per gas"
+    ~tags:["pay_for_fees"; "da_fees"]
+  @@ fun sequencer tx_type ->
+  (* This is a regression test for the bug where the DA fees are computed using
+     the `transaction.max_fee_per_gas` instead of the `base_fee_per_gas`
+     (or `gas_price`).
+     The problem occured because the account is supposed to be able to
+     pay for `max_fee_per_gas`, but the DA fees computation should use the real
+     `gas_price`.
+
+     The test uses a very small base_fee_per_gas, so the gas limit will be
+     enormous as it requires many units to cover for the da fees. However,
+     if the validation computes the DA fees using a different gas price
+     (a much bigger one), it will consider too many gas unit for the execution
+     gas. *)
+  let estimateGas =
+    [("to", `String "0xd77420f73b4612a7a99dba8c2afd30a1886b0344")]
+  in
+  let*@ gas = Rpc.estimate_gas estimateGas sequencer in
+  let* raw_tx =
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~legacy:(tx_type = Legacy)
+      ~gas_price:1_000_000_000
+      ~gas:(Int64.to_int gas)
+      ~address:"0xd77420f73b4612a7a99dba8c2afd30a1886b0344"
+      ~value:Wei.zero
+      ()
+  in
+  (* As the transaction has the maximum gas possible 30M. If the DA fees
+     are wrongly calculted it would consider that the execution gas limit
+     is more than 30M, and result in a failure. *)
+  let*@ _tx_hash = Rpc.send_raw_transaction ~raw_tx sequencer in
+  unit
+
 let test_validate_gas_limit =
   register
     ~da_fee_per_byte:(Wei.of_string "4_000_000_000_000")
@@ -489,5 +532,6 @@ let () =
   test_validate_nonce all_types ;
   test_validate_max_fee_per_gas all_types ;
   test_validate_pay_for_fees [Legacy; Eip1559] ;
+  test_validate_pay_for_fees_max_fee_per_gas [Legacy; Eip1559] ;
   test_validate_gas_limit all_types ;
   test_sender_is_not_contract all_types
