@@ -320,14 +320,34 @@ let perform_dal_benchmarks snoop =
   let* benches = Snoop.(list_benchmarks ~mode:All ~tags:[Dal] snoop) in
   perform_benchmarks [] snoop benches
 
-let perform_io_benchmarks snoop =
+let perform_io_benchmarks snoop io_data_dir io_cache_dir =
+  let patches =
+    [
+      ( rex ".*",
+        fun (_json, parameters) ->
+          let data_dir =
+            Option.fold
+              ~none:[]
+              ~some:(fun x -> [("tezos_data_dir", Ezjsonm.string x)])
+              io_data_dir
+          in
+          let cache_dir =
+            Option.fold
+              ~none:[]
+              ~some:(fun x -> [("cache_dir", Ezjsonm.string x)])
+              io_cache_dir
+          in
+          let json = Ezjsonm.dict (data_dir @ cache_dir) in
+          return (Some json, parameters) );
+    ]
+  in
   let benches = ["io/READ"; "io/WRITE"] in
-  perform_benchmarks [] snoop benches
+  perform_benchmarks patches snoop benches
 
-let main protocol ~io_only_flag =
+let main ~io_only_flag ?io_data_dir ?io_cache_dir protocol =
   Log.info "Entering Perform_inference.main" ;
   let snoop = Snoop.create () in
-  if io_only_flag then perform_io_benchmarks snoop
+  if io_only_flag then perform_io_benchmarks snoop io_data_dir io_cache_dir
   else
     let* () = perform_misc_benchmarks snoop in
     let* () = perform_interpreter_benchmarks snoop protocol in

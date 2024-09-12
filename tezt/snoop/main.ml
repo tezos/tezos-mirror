@@ -26,10 +26,12 @@
 (* This module runs the scripts implemented in all other modules of this
    directory. *)
 
-let run proto ~io_only_flag =
+let run ~io_only_flag ?io_data_dir ?io_cache_dir proto =
   Lwt_main.run
     (let* () = Prepare_data.main proto in
-     let* () = Perform_benchmarks.main proto ~io_only_flag in
+     let* () =
+       Perform_benchmarks.main ~io_only_flag ?io_data_dir ?io_cache_dir proto
+     in
      let* () = Perform_inference.main () in
      Perform_codegen.main ())
 
@@ -39,6 +41,18 @@ let io_only =
     ~set_long:"io-only"
     false
 
+let io_data_dir =
+  Clap.optional_string
+    ~long:"io-data-dir"
+    ~description:"Path of the data dir for the io benchmarks."
+    ()
+
+let io_cache_dir =
+  Clap.optional_string
+    ~long:"io-cache-dir"
+    ~description:"Path of the cache for the io benchmarks."
+    ()
+
 let () =
   Background.start (fun x -> raise x) ;
-  run Protocol.Alpha ~io_only_flag:io_only
+  run ~io_only_flag:io_only ?io_data_dir ?io_cache_dir Protocol.Alpha
