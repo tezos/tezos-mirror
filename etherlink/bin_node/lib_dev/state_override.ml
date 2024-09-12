@@ -11,19 +11,31 @@ let durable_nonce v = v |> Ethereum_types.encode_u64_le |> Bytes.to_string
 
 let durable_code = Ethereum_types.hex_to_bytes
 
+type error += Invalid_storage_value of string
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"durable_storage_invalid_value"
+    ~title:"Invalid storage value"
+    ~description:"Tried to set an invalid value in an account storage."
+    ~pp:(fun ppf path ->
+      Format.fprintf ppf "%s is not a valid storage value" path)
+    Data_encoding.(obj1 (req "durable_storage_invalid_value" string))
+    (function Invalid_storage_value path -> Some path | _ -> None)
+    (fun path -> Invalid_storage_value path)
+
 let update_storage address state_diff state =
   let open Ethereum_types in
   let open Lwt_result_syntax in
   let update key value state =
     let (Hex key) = key in
     let (Hex value) = value in
-    let*! state =
-      Evm_state.modify
-        ~key:(Durable_storage_path.Accounts.storage address key)
-        ~value
-        state
-    in
-    return state
+    if String.length value = 64 then
+      let*? key = Durable_storage_path.Accounts.storage_e address key in
+      let*! state = Evm_state.modify ~key ~value state in
+      return state
+    else tzfail (Invalid_storage_value value)
   in
   StorageMap.fold_es update state_diff state
 
