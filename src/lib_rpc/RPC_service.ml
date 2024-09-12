@@ -120,7 +120,8 @@ let error_encoding =
         "error"
         ~description:
           (Printf.sprintf
-             "The full list of errors is available with the global RPC `%s %s`"
+             "An error trace. The full list of errors is available with the \
+              global RPC `%s %s`"
              (string_of_meth meth)
              (Uri.path_and_query uri))
       @@ conv
