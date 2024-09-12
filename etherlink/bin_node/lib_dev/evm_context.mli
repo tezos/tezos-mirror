@@ -86,37 +86,6 @@ val reset :
 val apply_evm_events :
   ?finalized_level:int32 -> Evm_events.t list -> unit tzresult Lwt.t
 
-(** [inspect ?block path] returns the value (if it exists) stored in [path] on the EVM
-    state of [block] (if [block] is omitted then the freshest state is used). *)
-val inspect :
-  ?block:Ethereum_types.Block_parameter.extended ->
-  string ->
-  bytes option tzresult Lwt.t
-
-(** [inspect_subkeys ?block path] returns the subkeys stored in [path]
-    on the EVM state of [block] (if [block] is omitted then the
-    freshest state is used). *)
-val inspect_subkeys :
-  ?block:Ethereum_types.Block_parameter.extended ->
-  string ->
-  string list tzresult Lwt.t
-
-(** [get_evm_state block] returns the evm state associated to [block]. Fails
-    if it doesn't exist. *)
-val get_evm_state :
-  Ethereum_types.Block_parameter.extended -> Evm_state.t tzresult Lwt.t
-
-(** [execute_and_inspect ~input evm_state ctxt] executes [input] using
-    the EVM state of [evm_state], and returns [input.insights_requests].
-
-    If [wasm_entrypoint] is omitted, the [kernel_run] function of the kernel is
-    executed. *)
-val execute_and_inspect :
-  ?wasm_entrypoint:string ->
-  Evm_state.t ->
-  Simulation.Encodings.simulate_input ->
-  bytes option list tzresult Lwt.t
-
 (** [last_produced_blueprint ctxt] returns the blueprint used to
     create the current head of the chain. *)
 val last_produced_blueprint : unit -> Blueprint_types.t tzresult Lwt.t
@@ -176,12 +145,6 @@ val patch_state :
 val block_param_to_block_number :
   Ethereum_types.Block_parameter.extended ->
   Ethereum_types.quantity tzresult Lwt.t
-
-val execute :
-  ?alter_evm_state:(Evm_state.t -> Evm_state.t tzresult Lwt.t) ->
-  Simulation.Encodings.simulate_input ->
-  Ethereum_types.Block_parameter.extended ->
-  Irmin_context.tree tzresult Lwt.t
 
 module State : sig
   (** Path of EVM state store. *)

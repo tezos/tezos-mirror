@@ -119,7 +119,6 @@ module Request = struct
     | New_last_known_L1_level : int32 -> (unit, tztrace) t
     | Delayed_inbox_hashes : (Ethereum_types.hash list, tztrace) t
     | Evm_state_after : block_request -> (Evm_state.t option, tztrace) t
-    | Finalized_state : (Evm_state.t option, tztrace) t
     | Earliest_state : (Evm_state.t option, tztrace) t
     | Earliest_number : (Ethereum_types.quantity option, tztrace) t
     | Reconstruct : {
@@ -1366,19 +1365,6 @@ module Handlers = struct
             let*! evm_state = Irmin_context.PVMState.get context in
             return_some evm_state
         | None -> return_none)
-    | Finalized_state -> (
-        protect @@ fun () ->
-        let ctxt = Worker.state self in
-        Evm_store.use ctxt.store @@ fun conn ->
-        let* checkpoint =
-          Evm_store.Context_hashes.find conn ctxt.session.finalized_number
-        in
-        match checkpoint with
-        | Some checkpoint ->
-            let*! context = Irmin_context.checkout_exn ctxt.index checkpoint in
-            let*! evm_state = Irmin_context.PVMState.get context in
-            return_some evm_state
-        | None -> return_none)
     | Earliest_state -> (
         protect @@ fun () ->
         let ctxt = Worker.state self in
@@ -1767,56 +1753,6 @@ let next_blueprint_number () =
   let+ head_info = head_info () in
   head_info.next_blueprint_number
 
-let find_evm_state block =
-  let open Lwt_result_syntax in
-  match block with
-  | Ethereum_types.Block_parameter.Block_parameter (Latest | Pending) ->
-      let*! {evm_state; _} = head_info () in
-      return_some evm_state
-  | Block_parameter Earliest -> worker_wait_for_request Earliest_state
-  | Block_parameter Finalized -> worker_wait_for_request Finalized_state
-  | Block_parameter (Number number) ->
-      worker_wait_for_request (Evm_state_after (Number number))
-  | Block_hash {hash; require_canonical = _} ->
-      let*! {evm_state; current_block_hash; _} = head_info () in
-      if hash = current_block_hash then return_some evm_state
-      else worker_wait_for_request (Evm_state_after (Hash hash))
-
-let get_evm_state block =
-  let open Lwt_result_syntax in
-  let* evm_state = find_evm_state block in
-  match evm_state with
-  | None ->
-      failwith
-        "EVM state was not found on block %a"
-        Ethereum_types.Block_parameter.pp_extended
-        block
-  | Some evm_state -> return evm_state
-
-let execute_and_inspect ?wasm_entrypoint evm_state input =
-  let open Lwt_result_syntax in
-  let*! data_dir, config = execution_config in
-  Evm_state.execute_and_inspect
-    ~data_dir
-    ?wasm_entrypoint
-    ~config
-    ~input
-    evm_state
-
-let inspect ?(block = Ethereum_types.Block_parameter.(Block_parameter Latest))
-    path =
-  let open Lwt_result_syntax in
-  let* evm_state = get_evm_state block in
-  let*! res = Evm_state.inspect evm_state path in
-  return res
-
-let inspect_subkeys
-    ?(block = Ethereum_types.Block_parameter.(Block_parameter Latest)) path =
-  let open Lwt_result_syntax in
-  let* evm_state = get_evm_state block in
-  let*! res = Evm_state.subkeys evm_state path in
-  return res
-
 let blueprint level = worker_wait_for_request (Blueprint {level})
 
 let blueprints_range from to_ =
@@ -1828,24 +1764,6 @@ let new_last_known_l1_level l =
   worker_add_request ~request:(New_last_known_L1_level l)
 
 let delayed_inbox_hashes () = worker_wait_for_request Delayed_inbox_hashes
-
-let execute ?(alter_evm_state = Lwt_result_syntax.return) input block =
-  let open Lwt_result_syntax in
-  let message =
-    List.map (fun s -> `Input s) Simulation.Encodings.(input.messages)
-  in
-  let* evm_state = find_evm_state block in
-  match evm_state with
-  | Some evm_state ->
-      let* evm_state = alter_evm_state evm_state in
-      let*! data_dir, config = execution_config in
-      Evm_state.execute
-        ?log_file:input.log_kernel_debug_file
-        ~data_dir
-        ~config
-        evm_state
-        message
-  | None -> failwith "Cannot read evm state"
 
 let patch_kernel ?block_number path =
   let open Lwt_result_syntax in
