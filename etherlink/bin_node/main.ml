@@ -374,6 +374,12 @@ let dont_track_rollup_node_arg =
        node."
     ()
 
+let no_sync_arg =
+  Tezos_clic.switch
+    ~long:"no-sync"
+    ~doc:"Disable tracking the head of the EVM node endpoint"
+    ()
+
 let evm_node_endpoint_arg =
   Tezos_clic.arg
     ~long:"evm-node-endpoint"
@@ -1013,7 +1019,7 @@ let start_observer ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?rpc_batch_limit
     ?evm_node_endpoint ?threshold_encryption_bundler_endpoint
     ?tx_pool_timeout_limit ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit
     ?log_filter_chunk_size ?log_filter_max_nb_logs ?log_filter_max_nb_blocks
-    ?restricted_rpcs ?kernel () =
+    ?restricted_rpcs ?kernel ~no_sync () =
   let open Lwt_result_syntax in
   let* config =
     Cli.create_or_read_config
@@ -1068,7 +1074,12 @@ let start_observer ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?rpc_batch_limit
     init ~config ()
   in
   let*! () = Internal_event.Simple.emit Event.event_starting "observer" in
-  Evm_node_lib_dev.Observer.main ?kernel_path:kernel ~data_dir ~config ()
+  Evm_node_lib_dev.Observer.main
+    ~no_sync
+    ?kernel_path:kernel
+    ~data_dir
+    ~config
+    ()
 
 let make_dev_messages ~kind ~smart_rollup_address data =
   let open Lwt_result_syntax in
@@ -2088,13 +2099,14 @@ let threshold_encryption_sequencer_command =
         ())
 
 let observer_run_args =
-  Tezos_clic.args6
+  Tezos_clic.args7
     evm_node_endpoint_arg
     bundler_node_endpoint_arg
     preimages_arg
     preimages_endpoint_arg
     initial_kernel_arg
     dont_track_rollup_node_arg
+    no_sync_arg
 
 let observer_command =
   let open Tezos_clic in
@@ -2125,7 +2137,8 @@ let observer_command =
              preimages,
              preimages_endpoint,
              kernel,
-             dont_track_rollup_node ) )
+             dont_track_rollup_node,
+             no_sync ) )
          () ->
       let open Lwt_result_syntax in
       let* restricted_rpcs =
@@ -2154,6 +2167,7 @@ let observer_command =
         ?log_filter_max_nb_blocks
         ?restricted_rpcs
         ?kernel
+        ~no_sync
         ())
 
 let export_snapshot (data_dir, snapshot_file, compress_on_the_fly, uncompressed)

@@ -9,6 +9,8 @@
 - Support string interpolation in `--snapshot-file` (for command `snapshot
   export`): `%r` will be replace by the short rollup address, `%R` by the full
   rollup address, and `%l` by the current level. (!14854 !14886)
+- Add a flag `--no-sync` to the observer command. If the flag is set, the observer
+  does not synchronise with the EVM node endpoint. (!14889)
 
 ### Bug fixes
 

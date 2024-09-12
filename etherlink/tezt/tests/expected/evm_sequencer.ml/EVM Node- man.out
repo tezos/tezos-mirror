@@ -236,7 +236,7 @@ Miscellaneous commands:
       [--bundler-node-endpoint <url>]
       [--preimages-dir <_evm_installer_preimages>]
       [--preimages-endpoint <url>] [--initial-kernel <evm_installer.wasm>]
-      [--dont-track-rollup-node]
+      [--dont-track-rollup-node] [--no-sync]
     Start the EVM node in observer mode
     --data-dir <data-dir>: The path to the EVM node data directory
     --rpc-addr <ADDR>: The EVM node server rpc address.
@@ -262,6 +262,7 @@ Miscellaneous commands:
     --preimages-endpoint <url>: The address of a service which provides pre-images for the rollup. Missing pre-images will be downloaded remotely if they are not already present on disk.
     --initial-kernel <evm_installer.wasm>: Path to the EVM kernel used to launch the PVM, it will be loaded from storage afterward
     --dont-track-rollup-node: Disable tracking the head of the rollup node. Tracking the state of a rollup node allows to confirm the blocks received from the upstream EVM node.
+    --no-sync: Disable tracking the head of the EVM node endpoint
   
   experimental run rpc [--data-dir <data-dir>] [--rpc-addr <ADDR>]
       [--rpc-port <PORT>] [--rpc-batch-limit <PORT>]
