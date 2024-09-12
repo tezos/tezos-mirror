@@ -1815,30 +1815,190 @@ module Chain = struct
         let* () = set_delayed_target chain_store ~new_head ~delay:auto_delay in
         return_false
 
+  let check_merge_status chain_store =
+    let open Lwt_syntax in
+    (* Check the status to be extra-safe *)
+    let* store_status = Block_store.status chain_store.block_store in
+    match Block_store.get_merge_status chain_store.block_store with
+    | Merge_failed errs ->
+        (* If the merge has failed, notify in the logs but don't
+           trigger any merge. *)
+        let* () = Store_events.(emit notify_merge_error errs) in
+        (* We mark the merge as on-going to prevent the merge from
+           being triggered and to update on-disk values. *)
+        return_true
+    | Not_running when not @@ Block_store_status.is_idle store_status ->
+        (* Degenerate case, do the same as the Merge_failed case *)
+        let* () = Store_events.(emit notify_merge_error []) in
+        return_true
+    | Not_running -> return_false
+    | Running -> return_true
+
+  let compute_new_cementing_highwatermark chain_store chain_state ~new_head
+      ~new_head_metadata ~is_merge_ongoing ~new_head_lpbl =
+    let open Lwt_result_syntax in
+    let*! cementing_highwatermark =
+      locked_determine_cementing_highwatermark
+        chain_store
+        chain_state
+        new_head_lpbl
+    in
+    (* This write call will initialize the cementing
+       highwatermark when it is not yet set or do nothing
+       otherwise. *)
+    let* () =
+      locked_may_update_cementing_highwatermark
+        chain_state
+        cementing_highwatermark
+    in
+    (* [should_merge] is a placeholder acknowledging that a
+       storage maintenance can be triggered, thanks to several
+       fulfilled parameters. *)
+    let should_merge =
+      (* Make sure that the previous merge is completed before
+         starting a new merge. If the lock on the chain_state is
+         retained, the merge thread will never be able to
+         complete. *)
+      (not is_merge_ongoing)
+      &&
+      match cementing_highwatermark with
+      | None ->
+          (* Do not merge if the cementing highwatermark is not
+             set. *)
+          false
+      | Some cementing_highwatermark ->
+          Compare.Int32.(new_head_lpbl > cementing_highwatermark)
+    in
+    if should_merge then
+      (* [trigger_merge] is a placeholder that depends on
+         [should_merge] and that controls the delayed
+         maintenance. Thus, even if we [should_merge],
+         [trigger_merge] may interfere with the actual merge to
+         delay it. *)
+      let* trigger_merge =
+        match chain_store.storage_maintenance.maintenance_delay with
+        | Disabled ->
+            (* The storage maintenance delay is off -- merging right now. *)
+            let* () =
+              (* Reset scheduled maintenance flag. It could be
+                 necessary if the node was stopped during a
+                 delay and restarted with the delay as
+                 disabled. *)
+              Stored_data.write
+                chain_store.storage_maintenance.scheduled_maintenance
+                None
+            in
+            return_true
+        | Custom delay -> custom_delayed_maintenance chain_store new_head delay
+        | Auto -> auto_delayed_maintenance chain_store chain_state new_head
+      in
+      (* We effectively trigger the merge only if the delayed
+         maintenance is disabled or if the targeted delay is
+         reached. *)
+      if trigger_merge then
+        let*! b = try_lock_for_write chain_store.lockfile in
+        match b with
+        | false ->
+            (* Delay the merge until the lock is available *)
+            return cementing_highwatermark
+        | true ->
+            (* Lock on lockfile is now taken *)
+            let finalizer new_highest_cemented_level =
+              let* () =
+                merge_finalizer chain_store new_highest_cemented_level
+              in
+              let*! () = may_unlock chain_store.lockfile in
+              return_unit
+            in
+            let on_error errs =
+              (* Release the lockfile *)
+              let*! () = may_unlock chain_store.lockfile in
+              Lwt.return (Error errs)
+            in
+            (* Notes:
+               - The lock will be released when the merge
+                 terminates. i.e. in [finalizer] or in
+                 [on_error].
+               - The heavy-work of this function is asynchronously
+                 done so this call is expected to return quickly. *)
+            let* () =
+              (Block_store.merge_stores
+                 chain_store.block_store
+                 ~on_error
+                 ~finalizer
+                 ~history_mode:(history_mode chain_store)
+                 ~new_head
+                 ~new_head_metadata
+                 ~cementing_highwatermark:
+                   (WithExceptions.Option.get
+                      ~loc:__LOC__
+                      cementing_highwatermark)
+                 ~disable_context_pruning:chain_store.disable_context_pruning
+               [@profiler.span_s ["start merge store"]])
+            in
+            (* The new memory highwatermark is new_head_lpbl, the disk
+               value will be updated after the merge completion. *)
+            return_some new_head_lpbl
+      else return cementing_highwatermark
+    else return cementing_highwatermark
+
+  let finalize_set_head chain_store chain_state ~checkpoint ~new_checkpoint
+      ~new_head ~new_head_metadata ~new_head_descr ~new_target =
+    let open Lwt_result_syntax in
+    let* () =
+      Lwt.finalize
+        (fun () ->
+          let*! () = lock_for_write chain_store.stored_data_lockfile in
+          let* () =
+            if Compare.Int32.(snd new_checkpoint > snd checkpoint) then
+              (* Remove potentially outdated invalid blocks if the
+                 checkpoint changed *)
+              let* () =
+                Stored_data.update_with
+                  chain_state.invalid_blocks_data
+                  (fun invalid_blocks ->
+                    Lwt.return
+                      (Block_hash.Map.filter
+                         (fun _k {level; _} -> level > snd new_checkpoint)
+                         invalid_blocks))
+              in
+              write_checkpoint chain_state new_checkpoint
+            else return_unit
+          in
+          (* Update values on disk but not the cementing highwatermark
+             which will be updated by the merge finalizer. *)
+          let* () =
+            (Stored_data.write
+               chain_state.current_head_data
+               new_head_descr [@profiler.record_s "write_new_head"])
+          in
+          (Stored_data.write
+             chain_state.target_data
+             new_target [@profiler.record_s "write_new_target"]))
+        (fun () -> unlock chain_store.stored_data_lockfile)
+    in
+    (* Update live_data *)
+    let* live_blocks, live_operations =
+      (locked_compute_live_blocks
+         ~update_cache:true
+         chain_store
+         chain_state
+         new_head
+         new_head_metadata [@profiler.record_s "updating live blocks"])
+    in
+    let new_chain_state =
+      {chain_state with live_blocks; live_operations; current_head = new_head}
+    in
+    let*! () = Store_events.(emit set_head) new_head_descr in
+    return (Some new_chain_state)
+
   let set_head chain_store new_head =
     let open Lwt_result_syntax in
     (Shared.update_with chain_store.chain_state (fun chain_state ->
          (* The merge cannot finish until we release the lock on the
             chain state so its status cannot change while this
             function is executed. *)
-         (* Also check the status to be extra-safe *)
-         let*! store_status = Block_store.status chain_store.block_store in
-         let* is_merge_ongoing =
-           match Block_store.get_merge_status chain_store.block_store with
-           | Merge_failed errs ->
-               (* If the merge has failed, notify in the logs but don't
-                  trigger any merge. *)
-               let*! () = Store_events.(emit notify_merge_error errs) in
-               (* We mark the merge as on-going to prevent the merge from
-                  being triggered and to update on-disk values. *)
-               return_true
-           | Not_running when not @@ Block_store_status.is_idle store_status ->
-               (* Degenerate case, do the same as the Merge_failed case *)
-               let*! () = Store_events.(emit notify_merge_error []) in
-               return_true
-           | Not_running -> return_false
-           | Running -> return_true
-         in
+         let*! is_merge_ongoing = check_merge_status chain_store in
          let previous_head = chain_state.current_head in
          let*! checkpoint = Stored_data.get chain_state.checkpoint_data in
          let new_head_descr = Block.descriptor new_head in
@@ -1874,20 +2034,6 @@ module Chain = struct
               new_head_lpbl
               previous_head [@profiler.record_s "may_split_context"])
          in
-         let*! cementing_highwatermark =
-           locked_determine_cementing_highwatermark
-             chain_store
-             chain_state
-             new_head_lpbl
-         in
-         (* This write call will initialize the cementing
-            highwatermark when it is not yet set or do nothing
-            otherwise. *)
-         let* () =
-           locked_may_update_cementing_highwatermark
-             chain_state
-             cementing_highwatermark
-         in
          let* lfbl_block_opt =
            match chain_state.last_finalized_block_level with
            | None -> return_none
@@ -1915,100 +2061,14 @@ module Chain = struct
                  ~checkpoint
                  ~target
          in
-         (* [should_merge] is a placeholder acknowledging that a
-            storage maintenance can be triggered, thanks to several
-            fulfilled parameters. *)
-         let should_merge =
-           (* Make sure that the previous merge is completed before
-              starting a new merge. If the lock on the chain_state is
-              retained, the merge thread will never be able to
-              complete. *)
-           (not is_merge_ongoing)
-           &&
-           match cementing_highwatermark with
-           | None ->
-               (* Do not merge if the cementing highwatermark is not
-                  set. *)
-               false
-           | Some cementing_highwatermark ->
-               Compare.Int32.(new_head_lpbl > cementing_highwatermark)
-         in
          let* new_cementing_highwatermark =
-           if should_merge then
-             (* [trigger_merge] is a placeholder that depends on
-                [should_merge] and that controls the delayed
-                maintenance. Thus, even if we [should_merge],
-                [trigger_merge] may interfere with the actual merge to
-                delay it. *)
-             let* trigger_merge =
-               match chain_store.storage_maintenance.maintenance_delay with
-               | Disabled ->
-                   (* The storage maintenance delay is off -- merging right now. *)
-                   let* () =
-                     (* Reset scheduled maintenance flag. It could be
-                        necessary if the node was stopped during a
-                        delay and restarted with the delay as
-                        disabled. *)
-                     Stored_data.write
-                       chain_store.storage_maintenance.scheduled_maintenance
-                       None
-                   in
-                   return_true
-               | Custom delay ->
-                   custom_delayed_maintenance chain_store new_head delay
-               | Auto ->
-                   auto_delayed_maintenance chain_store chain_state new_head
-             in
-             (* We effectively trigger the merge only if the delayed
-                maintenance is disabled or if the targeted delay is
-                reached. *)
-             if trigger_merge then
-               let*! b = try_lock_for_write chain_store.lockfile in
-               match b with
-               | false ->
-                   (* Delay the merge until the lock is available *)
-                   return cementing_highwatermark
-               | true ->
-                   (* Lock on lockfile is now taken *)
-                   let finalizer new_highest_cemented_level =
-                     let* () =
-                       merge_finalizer chain_store new_highest_cemented_level
-                     in
-                     let*! () = may_unlock chain_store.lockfile in
-                     return_unit
-                   in
-                   let on_error errs =
-                     (* Release the lockfile *)
-                     let*! () = may_unlock chain_store.lockfile in
-                     Lwt.return (Error errs)
-                   in
-                   (* Notes:
-                      - The lock will be released when the merge
-                        terminates. i.e. in [finalizer] or in
-                        [on_error].
-                      - The heavy-work of this function is asynchronously
-                        done so this call is expected to return quickly. *)
-                   let* () =
-                     (Block_store.merge_stores
-                        chain_store.block_store
-                        ~on_error
-                        ~finalizer
-                        ~history_mode:(history_mode chain_store)
-                        ~new_head
-                        ~new_head_metadata
-                        ~cementing_highwatermark:
-                          (WithExceptions.Option.get
-                             ~loc:__LOC__
-                             cementing_highwatermark)
-                        ~disable_context_pruning:
-                          chain_store.disable_context_pruning
-                      [@profiler.span_s ["start merge store"]])
-                   in
-                   (* The new memory highwatermark is new_head_lpbl, the disk
-                      value will be updated after the merge completion. *)
-                   return_some new_head_lpbl
-             else return cementing_highwatermark
-           else return cementing_highwatermark
+           compute_new_cementing_highwatermark
+             chain_store
+             chain_state
+             ~new_head
+             ~new_head_metadata
+             ~is_merge_ongoing
+             ~new_head_lpbl
          in
          let*! new_checkpoint =
            match new_cementing_highwatermark with
@@ -2029,57 +2089,18 @@ module Chain = struct
                  | None -> Lwt.return new_checkpoint
                  | Some h -> Lwt.return (h, new_cementing_highwatermark))
          in
-         let* () =
-           Lwt.finalize
-             (fun () ->
-               let*! () = lock_for_write chain_store.stored_data_lockfile in
-               let* () =
-                 if Compare.Int32.(snd new_checkpoint > snd checkpoint) then
-                   (* Remove potentially outdated invalid blocks if the
-                      checkpoint changed *)
-                   let* () =
-                     Stored_data.update_with
-                       chain_state.invalid_blocks_data
-                       (fun invalid_blocks ->
-                         Lwt.return
-                           (Block_hash.Map.filter
-                              (fun _k {level; _} -> level > snd new_checkpoint)
-                              invalid_blocks))
-                   in
-                   write_checkpoint chain_state new_checkpoint
-                 else return_unit
-               in
-               (* Update values on disk but not the cementing highwatermark
-                  which will be updated by the merge finalizer. *)
-               let* () =
-                 (Stored_data.write
-                    chain_state.current_head_data
-                    new_head_descr [@profiler.record_s "write_new_head"])
-               in
-               (Stored_data.write
-                  chain_state.target_data
-                  new_target [@profiler.record_s "write_new_target"]))
-             (fun () -> unlock chain_store.stored_data_lockfile)
+         let* new_chain_state =
+           finalize_set_head
+             chain_store
+             chain_state
+             ~checkpoint
+             ~new_checkpoint
+             ~new_head
+             ~new_head_metadata
+             ~new_head_descr
+             ~new_target
          in
-         (* Update live_data *)
-         let* live_blocks, live_operations =
-           (locked_compute_live_blocks
-              ~update_cache:true
-              chain_store
-              chain_state
-              new_head
-              new_head_metadata [@profiler.record_s "updating live blocks"])
-         in
-         let new_chain_state =
-           {
-             chain_state with
-             live_blocks;
-             live_operations;
-             current_head = new_head;
-           }
-         in
-         let*! () = Store_events.(emit set_head) new_head_descr in
-         return (Some new_chain_state, previous_head))
+         return (new_chain_state, previous_head))
     [@profiler.record_s "set_head"])
 
   let set_target chain_store new_target =
