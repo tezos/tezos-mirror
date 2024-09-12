@@ -44,6 +44,8 @@ This kernel has been activated on Etherlink Testnet on block
 [4,899,480][af90-activation-testnet]. It requires the 3rd revision of the WASM
 PVM to work.
 
+Its storage version is 14.
+
 [af90-activation-testnet]: https://testnet.explorer.etherlink.com/block/0x2d80703e04542bd3e465d028674e19d3888e057b764a8482ed3218cc175b55d0
 
 ### Features
@@ -95,6 +97,8 @@ L1 blocks, without sacrificing decentralization, and with reduced costs.
 This kernel has been activated on Etherlink Testnet on block
 [3,825,580][4f44-activation-testnet], and on Etherlink Mainnet Beta on block
 [1,273,380][4f44-activation-mainnet].
+
+Its storage version is 12.
 
 **Note:** This commit is not part of the `master` branch of the Octez
 repository, but is part of [`etherlink-mainnet-launch`][mainnet-branch] instead.
@@ -148,6 +152,8 @@ repository, but is part of [`etherlink-mainnet-launch`][mainnet-branch] instead.
 This kernel has been deployed on Etherlink Testnet on block
 [3,244,690][ec7c3-activation]. It has not been activated on Mainnet Beta.
 
+Its storage version is 12.
+
 [ec7c3-activation]: https://testnet-explorer.etherlink.com/block/0x5d16e74c2d5445df5944f79509c3e24dfe392f5f07556efe1b7c30ca477e7a28
 
 ### Features
@@ -185,6 +191,8 @@ This kernel has been deployed on Etherlink Testnet on block
 ## Version b9f6c9138719220db83086f0548e49c5c4c8421f
 
 This is the kernel used to originate Etherlink Mainnet Beta.
+
+Its storage version is 11.
 
 ### Features
 
