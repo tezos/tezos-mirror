@@ -1076,6 +1076,7 @@ type state_account_override = {
   nonce : quantity option;
   code : hex option;
   state_diff : hex StorageMap.t;
+  state : hex StorageMap.t;
 }
 
 type state_override = state_account_override AddressMap.t
@@ -1083,14 +1084,18 @@ type state_override = state_account_override AddressMap.t
 let state_account_override_encoding =
   let open Data_encoding in
   conv
-    (fun {balance; nonce; code; state_diff} ->
-      (balance, nonce, code, state_diff))
-    (fun (balance, nonce, code, state_diff) ->
-      {balance; nonce; code; state_diff})
-    (obj4
+    (fun {balance; nonce; code; state; state_diff} ->
+      (balance, nonce, code, state, state_diff))
+    (fun (balance, nonce, code, state, state_diff) ->
+      {balance; nonce; code; state; state_diff})
+    (obj5
        (opt "balance" quantity_encoding)
        (opt "nonce" quantity_encoding)
        (opt "code" hex_encoding)
+       (dft
+          "state"
+          (StorageMap.associative_array_encoding hex_encoding)
+          StorageMap.empty)
        (dft
           "state_diff"
           (StorageMap.associative_array_encoding hex_encoding)
