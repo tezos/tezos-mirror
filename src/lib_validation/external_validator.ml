@@ -24,6 +24,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Profiler = Tezos_protocol_environment.Environment_profiler
+
 module Events = struct
   open Internal_event.Simple
 
@@ -163,6 +165,7 @@ module Processing = struct
           should_validate;
           simulate;
         } ->
+        () [@profiler.record "apply_block"] ;
         let*! block_application_result =
           let* predecessor_context =
             Error_monad.catch_es (fun () ->
@@ -299,6 +302,7 @@ module Processing = struct
           operations;
           _;
         } ->
+        () [@profiler.record "validate_block"] ;
         let*! block_validate_result =
           let* predecessor_context =
             Error_monad.catch_es (fun () ->
