@@ -59,3 +59,27 @@ let summary_encoding =
         (function Transaction_batch trs -> Some trs | _ -> None)
         (fun trs -> Transaction_batch trs);
     ]
+
+let pp_summary fmt = function
+  | Whitelist_update None -> Format.pp_print_string fmt "Remove whitelist"
+  | Whitelist_update (Some pkhs) ->
+      Format.fprintf
+        fmt
+        "Set whitelist to @[<hov 2>[@,%a]@]"
+        (Format.pp_print_list
+           ~pp_sep:(fun fmt () -> Format.fprintf fmt ",@ ")
+           Signature.Public_key_hash.pp)
+        pkhs
+  | Transaction_batch txs ->
+      Format.fprintf fmt "@[<v 2>Transactions:@," ;
+      List.iter
+        (fun {destination; entrypoint; parameters; parameters_ty = _} ->
+          Format.fprintf
+            fmt
+            "@[<hov>%s:@ %s(%a)@]"
+            destination
+            entrypoint
+            Tezos_micheline.Micheline_printer.print_expr_unwrapped
+            (Tezos_micheline.Micheline_printer.printable Fun.id parameters))
+        txs ;
+      Format.fprintf fmt "@]"

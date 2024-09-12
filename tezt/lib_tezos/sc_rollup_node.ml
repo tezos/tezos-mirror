@@ -26,7 +26,12 @@
 
 type 'a known = Unknown | Known of 'a
 
-type purpose = Operating | Batching | Cementing | Recovering
+type purpose =
+  | Operating
+  | Batching
+  | Cementing
+  | Recovering
+  | Executing_outbox
 
 type operation_kind =
   | Publish
@@ -198,7 +203,7 @@ module Parameters = struct
   type persistent_state = {
     data_dir : string;
     base_dir : string;
-    operators : (purpose * string) list;
+    mutable operators : (purpose * string) list;
     default_operator : string option;
     metrics_addr : string option;
     metrics_port : int;
@@ -307,6 +312,7 @@ let string_of_purpose = function
   | Batching -> "batching"
   | Cementing -> "cementing"
   | Recovering -> "recovering"
+  | Executing_outbox -> "executing_outbox"
 
 (* Extracts operators from node state, handling custom mode, and
    formats them as "purpose:operator". Includes default operator if present. *)
@@ -409,6 +415,24 @@ let patch_config_unsafe_pvm_patches pvm_patches =
                     | Increase_max_nb_ticks i ->
                         ("increase_max_nb_tick", `String (string_of_int i)))
                   pvm_patches);
+           ] )
+
+let patch_config_execute_outbox =
+  JSON.put
+    ( "execute-outbox-messages-filter",
+      JSON.annotate ~origin:"sc_rollup_node.execute_outbox"
+      @@ `A
+           [
+             `O
+               [
+                 ( "transaction",
+                   `O
+                     [
+                       ("destination", `String "any");
+                       ("entrypoint", `String "any");
+                     ] );
+               ]
+             (* execute all outbox messages transactions *);
            ] )
 
 let trigger_ready sc_node value =
@@ -649,6 +673,9 @@ let change_node_mode sc_rollup_node mode =
     sc_rollup_node with
     persistent_state = {sc_rollup_node.persistent_state with mode};
   }
+
+let change_operators sc_rollup_node operators =
+  sc_rollup_node.persistent_state.operators <- operators
 
 let dump_durable_storage ~sc_rollup_node ~dump ?(block = "head") () =
   let cmd =

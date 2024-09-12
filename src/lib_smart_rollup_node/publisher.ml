@@ -87,7 +87,7 @@ let sc_rollup_challenge_window node_ctxt =
 let next_commitment_level node_ctxt last_commitment_level =
   add_level last_commitment_level (sc_rollup_commitment_period node_ctxt)
 
-type state = Node_context.ro
+type state = Node_context.rw
 
 let tick_of_level (node_ctxt : _ Node_context.t) inbox_level =
   let open Lwt_result_syntax in
@@ -462,10 +462,13 @@ let on_cement_commitments (node_ctxt : state) =
   let* cementable_commitments = cementable_commitments node_ctxt in
   List.iter_es (cement_commitment node_ctxt) cementable_commitments
 
+let on_execute_outbox (node_ctxt : state) =
+  Outbox_execution.publish_executable_messages node_ctxt
+
 module Types = struct
   type nonrec state = state
 
-  type parameters = {node_ctxt : Node_context.ro}
+  type parameters = {node_ctxt : Node_context.rw}
 end
 
 module Name = struct
@@ -497,6 +500,7 @@ module Handlers = struct
     match request with
     | Request.Publish -> protect @@ fun () -> on_publish_commitments state
     | Request.Cement -> protect @@ fun () -> on_cement_commitments state
+    | Request.Execute_outbox -> protect @@ fun () -> on_execute_outbox state
 
   type launch_error = error trace
 
@@ -515,6 +519,7 @@ module Handlers = struct
     match r with
     | Request.Publish -> emit_and_return_errors errs
     | Request.Cement -> emit_and_return_errors errs
+    | Request.Execute_outbox -> emit_and_return_errors errs
 
   let on_completion _w r _ st =
     Commitment_event.Publisher.request_completed (Request.view r) st
@@ -531,7 +536,6 @@ let worker_promise, worker_waker = Lwt.task ()
 let start node_ctxt =
   let open Lwt_result_syntax in
   let*! () = Commitment_event.starting () in
-  let node_ctxt = Node_context.readonly node_ctxt in
   let+ worker = Worker.launch table () {node_ctxt} (module Handlers) in
   Lwt.wakeup worker_waker worker
 
@@ -540,7 +544,10 @@ let start_in_mode mode =
   match mode with
   | Maintenance | Operator | Bailout -> true
   | Observer | Accuser | Batcher -> false
-  | Custom ops -> purpose_matches_mode (Custom ops) Operating
+  | Custom ops ->
+      purposes_matches_mode
+        (Custom ops)
+        [Operating; Cementing; Executing_outbox]
 
 let init (node_ctxt : _ Node_context.t) =
   let open Lwt_result_syntax in
@@ -565,22 +572,32 @@ let worker =
     | Lwt.Fail exn -> fail (Error_monad.error_of_exn exn)
     | Lwt.Sleep -> Error Rollup_node_errors.No_publisher)
 
-let worker_add_request ~request =
+let worker_add_request condition ~request =
   let open Lwt_result_syntax in
   match Lazy.force worker with
   | Ok w ->
       let node_ctxt = Worker.state w in
       (* Bailout does not publish any commitment it only cement them. *)
-      unless (Node_context.is_bailout node_ctxt && request = Request.Publish)
+      unless
+        ((not (condition node_ctxt))
+        || (Node_context.is_bailout node_ctxt && request = Request.Publish))
       @@ fun () ->
       let*! (_pushed : bool) = Worker.Queue.push_request w request in
       return_unit
   | Error Rollup_node_errors.No_publisher -> return_unit
   | Error e -> tzfail e
 
-let publish_commitments () = worker_add_request ~request:Request.Publish
+let publish_commitments () =
+  worker_add_request ~request:Request.Publish (fun node_ctxt ->
+      Configuration.can_inject node_ctxt.config.mode Publish)
 
-let cement_commitments () = worker_add_request ~request:Request.Cement
+let cement_commitments () =
+  worker_add_request ~request:Request.Cement (fun node_ctxt ->
+      Configuration.can_inject node_ctxt.config.mode Cement)
+
+let execute_outbox () =
+  worker_add_request ~request:Request.Execute_outbox (fun node_ctxt ->
+      Configuration.can_inject node_ctxt.config.mode Execute_outbox_message)
 
 let shutdown () =
   match Lazy.force worker with

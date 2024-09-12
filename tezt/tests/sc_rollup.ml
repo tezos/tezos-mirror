@@ -686,20 +686,38 @@ let bake_until_lpc_updated ?hook ?at_least ?timeout client sc_rollup_node =
   in
   bake_until_event ?hook ?at_least ?timeout client ~event_name event
 
+let bake_until_lcc_updated ?hook ?at_least ?timeout ~level client sc_rollup_node
+    =
+  let event_name = "smart_rollup_node_commitment_lcc_updated.v0" in
+  let event =
+    Sc_rollup_node.wait_for sc_rollup_node event_name @@ fun json ->
+    let lcc_level = JSON.(json |-> "level" |> as_int) in
+    Log.info "LCC updated to %d" lcc_level ;
+    if lcc_level >= level then Some lcc_level else None
+  in
+  bake_until_event ?hook ?at_least ?timeout client ~event_name event
+
+let bake_until_execute_outbox_message ?at_least ?timeout client rollup_node =
+  bake_until_event
+    ?at_least
+    ?timeout
+    client
+    ~event_name:"included_successful_operation"
+  @@ wait_for_included_successful_operation
+       rollup_node
+       ~operation_kind:"execute_outbox_message"
+
 (** helpers that send a message then bake until the rollup node
     executes an output message (whitelist_update) *)
 let send_messages_then_bake_until_rollup_node_execute_output_message
     ~commitment_period ~challenge_window client rollup_node msg_list =
   let* () = send_text_messages ~hooks ~format:`Hex client msg_list in
   let* () =
-    bake_until_event
+    bake_until_execute_outbox_message
       ~timeout:5.0
       ~at_least:(commitment_period + challenge_window + 1)
       client
-      ~event_name:"included_successful_operation"
-    @@ wait_for_included_successful_operation
-         rollup_node
-         ~operation_kind:"execute_outbox_message"
+      rollup_node
   and* res = wait_for_publish_execute_whitelist_update rollup_node in
   return res
 
@@ -4017,9 +4035,9 @@ let test_refutation_reward_and_punishment ~kind =
 let test_outbox_message_generic ?supports ?regression ?expected_error
     ?expected_l1_error ~earliness ?entrypoint ~init_storage ~storage_ty
     ?outbox_parameters_ty ?boot_sector ~input_message ~expected_storage ~kind
-    ~message_kind =
+    ~message_kind ~auto_execute_outbox =
   let commitment_period = 2 and challenge_window = 5 in
-  let outbox_level = 5 in
+  let _outbox_level = 5 in
   let message_index = 0 in
   let message_kind_s =
     match message_kind with `Internal -> "intern" | `External -> "extern"
@@ -4028,6 +4046,7 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
   let outbox_parameters_ty_s =
     Option.value ~default:"no_parameters_ty" outbox_parameters_ty
   in
+  let auto_s = if auto_execute_outbox then ", auto_execute_outbox" else "" in
   test_full_scenario
     ?supports
     ?regression
@@ -4042,20 +4061,36 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
       variant =
         Some
           (Format.sprintf
-             "%s, entrypoint: %%%s, eager: %d, %s, %s"
+             "%s, entrypoint: %%%s, eager: %d, %s, %s%s"
              init_storage
              entrypoint_s
              earliness
              message_kind_s
-             outbox_parameters_ty_s);
+             outbox_parameters_ty_s
+             auto_s);
       description = "output exec";
     }
     ~uses:(fun _protocol -> [Constant.octez_codec])
   @@ fun protocol rollup_node sc_rollup node client ->
-  let* () = Sc_rollup_node.run rollup_node sc_rollup [] in
   let src = Constant.bootstrap1.public_key_hash in
   let src2 = Constant.bootstrap2.public_key_hash in
+  let* () =
+    if auto_execute_outbox then (
+      Sc_rollup_node.change_operators rollup_node [(Executing_outbox, src2)] ;
+      let* () =
+        Process.check @@ Sc_rollup_node.spawn_config_init rollup_node sc_rollup
+      in
+      Sc_rollup_node.Config_file.update
+        rollup_node
+        Sc_rollup_node.patch_config_execute_outbox ;
+      Log.info "config updated" ;
+      unit)
+    else unit
+  in
+  let* () = Sc_rollup_node.run ~event_level:`Debug rollup_node sc_rollup [] in
+  let* _level = Sc_rollup_node.wait_sync ~timeout:30. rollup_node in
   let originate_target_contract () =
+    Log.info "Originate target contract" ;
     let prg =
       Printf.sprintf
         {|
@@ -4101,6 +4136,7 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
     return address
   in
   let check_contract_execution address expected_storage =
+    Log.info "Check contract execution" ;
     let* storage = Client.contract_storage address client in
     return
     @@ Check.(
@@ -4139,6 +4175,7 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
           unexecutable
   in
   let perform_rollup_execution_and_cement source_address target_address =
+    Log.info "Perform rollup execution and cement" ;
     let* payload = input_message protocol target_address in
     let* () =
       match payload with
@@ -4158,7 +4195,7 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
           in
           Client.bake_for_and_wait client
     in
-    let* _ = Sc_rollup_node.wait_sync rollup_node ~timeout:10. in
+    let* outbox_level = Sc_rollup_node.wait_sync rollup_node ~timeout:10. in
     let* outbox_l2_block =
       Sc_rollup_node.RPC.call rollup_node
       @@ Sc_rollup_rpc.get_global_block ~outbox:true ()
@@ -4171,12 +4208,21 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
     Check.((nb_outbox_transactions_in_block = [1]) (list int))
       ~error_msg:"Block has %L outbox transactions but expected %R" ;
     let* () = check_outbox_execution outbox_level `Unexecutable in
-    let blocks_to_wait =
-      3 + (2 * commitment_period) + challenge_window - earliness
+    let* _ =
+      bake_until_lcc_updated
+        ~timeout:100.
+        client
+        rollup_node
+        ~level:outbox_level
+        ~hook:(fun _ ->
+          let* _level = Sc_rollup_node.wait_sync ~timeout:10. rollup_node in
+          unit)
     in
-    repeat blocks_to_wait @@ fun () -> Client.bake_for_and_wait client
+    return outbox_level
   in
-  let trigger_outbox_message_execution ?expected_l1_error address =
+  let trigger_outbox_message_execution ?expected_l1_error ~outbox_level address
+      =
+    Log.info "Trigger outbox message execution" ;
     let parameters = "37" in
     let check_expected_outbox () =
       let* outbox =
@@ -4225,49 +4271,64 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
           assert (JSON.encode outbox = "[]") ;
           return None
     in
-    let* answer = check_expected_outbox () in
-    match (answer, expected_error) with
-    | Some _, Some _ -> assert false
-    | None, None -> failwith "Unexpected error during proof generation"
-    | None, Some _ -> unit
-    | Some {commitment_hash; proof}, None -> (
-        match expected_l1_error with
-        | None ->
-            let* () = check_outbox_execution outbox_level `Executable in
-            let*! () =
-              Client.Sc_rollup.execute_outbox_message
-                ~hooks
-                ~burn_cap:(Tez.of_int 10)
-                ~rollup:sc_rollup
-                ~src:src2
-                ~commitment_hash
-                ~proof
-                client
-            in
-            Client.bake_for_and_wait client
-        | Some msg ->
-            let*? process =
-              Client.Sc_rollup.execute_outbox_message
-                ~hooks
-                ~burn_cap:(Tez.of_int 10)
-                ~rollup:sc_rollup
-                ~src:src2
-                ~commitment_hash
-                ~proof
-                client
-            in
-            Process.check_error ~msg process)
+    if Option.is_some expected_error then unit
+    else
+      let* () = check_outbox_execution outbox_level `Executable in
+      if auto_execute_outbox then
+        bake_until_execute_outbox_message
+          ~at_least:1
+          ~timeout:30.
+          client
+          rollup_node
+      else
+        let* answer = check_expected_outbox () in
+        match answer with
+        | None -> failwith "Unexpected error during proof generation"
+        | Some {commitment_hash; proof} -> (
+            match expected_l1_error with
+            | None ->
+                let* () = check_outbox_execution outbox_level `Executable in
+                let*! () =
+                  Client.Sc_rollup.execute_outbox_message
+                    ~hooks
+                    ~burn_cap:(Tez.of_int 1)
+                    ~rollup:sc_rollup
+                    ~src:src2
+                    ~commitment_hash
+                    ~proof
+                    client
+                in
+                let* () = Client.bake_for_and_wait client in
+                let* _ = Sc_rollup_node.wait_sync rollup_node ~timeout:10. in
+                let* _ = Client.RPC.call client @@ RPC.get_chain_block () in
+                unit
+                (* Client.bake_for_and_wait client *)
+            | Some msg ->
+                let*? process =
+                  Client.Sc_rollup.execute_outbox_message
+                    ~hooks
+                    ~burn_cap:(Tez.of_int 10)
+                    ~rollup:sc_rollup
+                    ~src:src2
+                    ~commitment_hash
+                    ~proof
+                    client
+                in
+                Process.check_error ~msg process)
   in
   let* target_contract_address = originate_target_contract () in
+  let* _level = Sc_rollup_node.wait_sync ~timeout:30. rollup_node in
   let* source_contract_address =
     originate_forward_smart_contract client protocol
   in
-  let* () =
+  let* _level = Sc_rollup_node.wait_sync ~timeout:30. rollup_node in
+  let* outbox_level =
     perform_rollup_execution_and_cement
       source_contract_address
       target_contract_address
   in
   let* () = Client.bake_for_and_wait client in
+  let* _level = Sc_rollup_node.wait_sync ~timeout:30. rollup_node in
   let consumed_outputs () =
     Node.RPC.call node
     @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_consumed_outputs
@@ -4279,7 +4340,10 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
   Check.((prior_consumed_outputs = []) (list int))
     ~error_msg:"Expected empty list found %L for consumed outputs" ;
   let* () =
-    trigger_outbox_message_execution ?expected_l1_error target_contract_address
+    trigger_outbox_message_execution
+      ?expected_l1_error
+      ~outbox_level
+      target_contract_address
   in
   match expected_error with
   | None ->
@@ -4299,7 +4363,8 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
 
 let test_outbox_message ?supports ?regression ?expected_error ?expected_l1_error
     ~earliness ?entrypoint ?(init_storage = "0") ?(storage_ty = "int")
-    ?(outbox_parameters = "37") ?outbox_parameters_ty ~kind ~message_kind =
+    ?(outbox_parameters = "37") ?outbox_parameters_ty ~kind ~message_kind
+    ~auto_execute_outbox =
   let wrap payload =
     match message_kind with
     | `Internal -> `Internal payload
@@ -4368,16 +4433,20 @@ let test_outbox_message ?supports ?regression ?expected_error ?expected_l1_error
     ~expected_storage
     ~message_kind
     ~kind
+    ~auto_execute_outbox
 
 let test_outbox_message protocols ~kind =
-  let test (expected_error, earliness, entrypoint, message_kind) =
+  let test
+      (expected_error, earliness, entrypoint, message_kind, auto_execute_outbox)
+      =
     test_outbox_message
       ?expected_error
       ~earliness
       ?entrypoint
       ~message_kind
       protocols
-      ~kind ;
+      ~kind
+      ~auto_execute_outbox ;
     (* arith does not support, yet, the typed outbox messages *)
     if kind <> "arith" then
       test_outbox_message
@@ -4389,18 +4458,31 @@ let test_outbox_message protocols ~kind =
         ~outbox_parameters_ty:"int"
         protocols
         ~kind
+        ~auto_execute_outbox
   in
   List.iter
     test
     [
-      (None, 0, None, `Internal);
-      (None, 0, Some "aux", `Internal);
-      (Some (Base.rex ".*Invalid claim about outbox"), 5, None, `Internal);
-      (Some (Base.rex ".*Invalid claim about outbox"), 5, Some "aux", `Internal);
-      (None, 0, None, `External);
-      (None, 0, Some "aux", `External);
-      (Some (Base.rex ".*Invalid claim about outbox"), 5, None, `External);
-      (Some (Base.rex ".*Invalid claim about outbox"), 5, Some "aux", `External);
+      (None, 0, None, `Internal, false);
+      (None, 0, Some "aux", `Internal, false);
+      (Some (Base.rex ".*Invalid claim about outbox"), 5, None, `Internal, false);
+      ( Some (Base.rex ".*Invalid claim about outbox"),
+        5,
+        Some "aux",
+        `Internal,
+        false );
+      (None, 0, None, `External, false);
+      (None, 0, Some "aux", `External, false);
+      (Some (Base.rex ".*Invalid claim about outbox"), 5, None, `External, false);
+      ( Some (Base.rex ".*Invalid claim about outbox"),
+        5,
+        Some "aux",
+        `External,
+        false );
+      (None, 0, None, `Internal, true);
+      (None, 0, Some "aux", `Internal, true);
+      (None, 0, None, `External, true);
+      (None, 0, Some "aux", `External, true);
     ] ;
   if kind <> "arith" then (
     (* wrong type for the parameters *)
@@ -4412,7 +4494,8 @@ let test_outbox_message protocols ~kind =
       ~message_kind:`Internal
       ~outbox_parameters_ty:"string"
       protocols
-      ~kind ;
+      ~kind
+      ~auto_execute_outbox:false ;
     test_outbox_message
       ~expected_l1_error:
         (Base.rex ".*or a parameter was supplied of the wrong type")
@@ -4423,7 +4506,8 @@ let test_outbox_message protocols ~kind =
       ~storage_ty:"string"
       ~outbox_parameters_ty:"int"
       protocols
-      ~kind)
+      ~kind
+      ~auto_execute_outbox:false)
 
 let test_rpcs ~kind
     ?(boot_sector = Sc_rollup_helpers.default_boot_sector_of ~kind)

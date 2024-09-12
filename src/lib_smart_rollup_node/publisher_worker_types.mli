@@ -30,6 +30,8 @@ module Request : sig
         (** Request to publish new commitments in L1. *)
     | Cement : (unit, error trace) t
         (** Request to cement commitments in L1. *)
+    | Execute_outbox : (unit, error trace) t
+        (** Request to execute outbox messages on L1. *)
 
   type view = View : _ t -> view
 

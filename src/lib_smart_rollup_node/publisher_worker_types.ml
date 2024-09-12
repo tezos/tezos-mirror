@@ -27,6 +27,7 @@ module Request = struct
   type ('a, 'b) t =
     | Publish : (unit, error trace) t
     | Cement : (unit, error trace) t
+    | Execute_outbox : (unit, error trace) t
 
   type view = View : _ t -> view
 
@@ -48,10 +49,17 @@ module Request = struct
           (obj1 (req "request" (constant "cement")))
           (function View Cement -> Some () | _ -> None)
           (fun () -> View Cement);
+        case
+          (Tag 2)
+          ~title:"Execute_outbox"
+          (obj1 (req "request" (constant "execute_outbox")))
+          (function View Execute_outbox -> Some () | _ -> None)
+          (fun () -> View Execute_outbox);
       ]
 
   let pp ppf (View r) =
     match r with
     | Publish -> Format.pp_print_string ppf "publish"
     | Cement -> Format.pp_print_string ppf "cement"
+    | Execute_outbox -> Format.pp_print_string ppf "execute_outbox"
 end
