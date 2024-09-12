@@ -323,7 +323,8 @@ commit_titles:
   - trigger
   dependencies:
   - oc.docker:ci:amd64
-  allow_failure: true
+  allow_failure:
+    exit_codes: 65
   timeout: 60 minutes
   script:
   - ./scripts/ci/check_commit_messages.sh || exit $?

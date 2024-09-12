@@ -454,8 +454,7 @@ let jobs pipeline_type =
         (* ./scripts/ci/check_commit_messages.sh exits with code 65 when a git history contains
            invalid commits titles in situations where that is allowed. *)
         (script_propagate_exit_code "./scripts/ci/check_commit_messages.sh")
-        (* temporary cf issue https://gitlab.com/tezos/tezos/-/issues/7436 *)
-        ~allow_failure:Yes
+        ~allow_failure:(With_exit_codes [65])
     in
     let mr_only_jobs =
       match pipeline_type with
