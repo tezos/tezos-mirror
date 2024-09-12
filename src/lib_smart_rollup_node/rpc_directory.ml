@@ -461,8 +461,8 @@ let () =
 
 let () =
   Local_directory.register0 Rollup_node_services.Local.dal_injection
-  @@ fun _node_ctxt () slot_content ->
-  Dal_injection_queue.register_dal_slot ~slot_content
+  @@ fun _node_ctxt () message ->
+  Dal_injection_queue.register_dal_message ~message
 
 let () =
   Local_directory.register0 Rollup_node_services.Local.dal_slot_indices

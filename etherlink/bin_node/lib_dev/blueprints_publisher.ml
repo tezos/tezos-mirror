@@ -124,7 +124,7 @@ module Worker = struct
       (Float.of_int nb_chunks) ;
     Rollup_services.publish_on_dal
       ~rollup_node_endpoint:state.rollup_node_endpoint
-      payload
+      ~message:payload
 
   let publish_on_dal_precondition state use_dal_if_enabled level chunks =
     state.enable_dal && use_dal_if_enabled

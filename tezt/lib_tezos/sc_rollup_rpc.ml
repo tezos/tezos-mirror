@@ -262,8 +262,8 @@ let as_empty_object_or_fail t =
   | [] -> ()
   | _ -> JSON.error t "Not an empty object"
 
-let post_local_dal_injection ~slot_content =
-  let data = `O [("slot_content", `String slot_content)] in
+let post_local_dal_injection ~message =
+  let data = `O [("content", `String message)] in
   make
     POST
     ["local"; "dal"; "injection"]
