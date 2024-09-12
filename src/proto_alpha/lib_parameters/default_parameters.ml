@@ -285,7 +285,7 @@ let constants_mainnet : Constants.Parametric.t =
       };
     adaptive_issuance =
       {
-        global_limit_of_staking_over_baking = 5;
+        global_limit_of_staking_over_baking = 9;
         edge_of_staking_over_delegation = 2;
         launch_ema_threshold = 0l;
         adaptive_rewards_params =

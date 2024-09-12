@@ -1388,7 +1388,7 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
         in
         let adaptive_issuance =
           let ({
-                 global_limit_of_staking_over_baking;
+                 global_limit_of_staking_over_baking = _;
                  edge_of_staking_over_delegation;
                  launch_ema_threshold;
                  adaptive_rewards_params = _;
@@ -1402,7 +1402,7 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
           in
           Constants_parametric_repr.
             {
-              global_limit_of_staking_over_baking;
+              global_limit_of_staking_over_baking = 9;
               edge_of_staking_over_delegation;
               launch_ema_threshold;
               adaptive_rewards_params;
