@@ -17,7 +17,7 @@ module Uses : sig
 
       For instance, you can define:
       {[
-        let data = Uses.make ~tag:"data" ~path:"data/file.dat"
+        let data = Uses.make ~tag:"data" ~path:"data/file.dat" ()
       ]}
       You would then:
       - declare your test with [~uses:[data]];
@@ -40,8 +40,19 @@ module Uses : sig
   (** Make a test dependency.
 
       Multiple paths can be associated with the same tag,
-      and the same paths can be associated with different tags. *)
-  val make : tag:string -> path:string -> t
+      and the same paths can be associated with different tags.
+
+      [how_to_build], if set, is printed to the user should the
+      dependency be missing, and should contain instructions on how to
+      build the dependency. Example:
+      {[
+        Uses.make
+          ~how_to_build:"make -f etherlink.ml build"
+          ~tag:"evm_kernel"
+          ~path:"evm_kernel.wasm"
+          ()
+      ]} *)
+  val make : ?how_to_build:string -> tag:string -> path:string -> unit -> t
 
   (** Get the path of a test dependency. *)
   val path : t -> string

@@ -261,8 +261,9 @@ module Teztale = struct
       {login; password = login}
 
   let run_server
-      ?(path = Uses.(path (make ~tag:"codec" ~path:"./octez-teztale-server")))
-      agent =
+      ?(path =
+        Uses.(path (make ~tag:"codec" ~path:"./octez-teztale-server" ()))) agent
+      =
     let* server = Teztale.Server.run ~path agent () in
     let address =
       match Agent.point agent with
@@ -274,8 +275,9 @@ module Teztale = struct
   let wait_server t = Teztale.Server.wait_for_readiness t.server
 
   let add_archiver
-      ?(path = Uses.(path (make ~tag:"codec" ~path:"./octez-teztale-archiver")))
-      t agent ~node_port =
+      ?(path =
+        Uses.(path (make ~tag:"codec" ~path:"./octez-teztale-archiver" ()))) t
+      agent ~node_port =
     let user = fresh_user () in
     let feed : Teztale.interface list =
       [{address = t.address; port = t.server.conf.interface.port}]
