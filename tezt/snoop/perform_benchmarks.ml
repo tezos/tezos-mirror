@@ -320,20 +320,26 @@ let perform_dal_benchmarks snoop =
   let* benches = Snoop.(list_benchmarks ~mode:All ~tags:[Dal] snoop) in
   perform_benchmarks [] snoop benches
 
-let main protocol =
+let perform_io_benchmarks snoop =
+  let benches = ["io/READ"; "io/WRITE"] in
+  perform_benchmarks [] snoop benches
+
+let main protocol ~io_only_flag =
   Log.info "Entering Perform_inference.main" ;
   let snoop = Snoop.create () in
-  let* () = perform_misc_benchmarks snoop in
-  let* () = perform_interpreter_benchmarks snoop protocol in
-  let* () = perform_typechecker_benchmarks snoop protocol in
-  let* () = perform_tickets_benchmarks snoop protocol in
-  let* () = perform_global_constants_benchmarks snoop in
-  let* () = perform_cache_benchmarks snoop in
-  let* () = perform_encoding_benchmarks snoop protocol in
-  let* () = perform_big_map_benchmarks snoop protocol in
-  let* () = perform_skip_list_benchmarks snoop protocol in
-  let* () = perform_carbonated_map_benchmarks snoop protocol in
-  let* () = perform_sc_rollup_benchmarks snoop protocol in
-  let* () = perform_shell_micheline_benchmarks snoop in
-  let* () = perform_dal_benchmarks snoop in
-  perform_sapling_benchmarks snoop
+  if io_only_flag then perform_io_benchmarks snoop
+  else
+    let* () = perform_misc_benchmarks snoop in
+    let* () = perform_interpreter_benchmarks snoop protocol in
+    let* () = perform_typechecker_benchmarks snoop protocol in
+    let* () = perform_tickets_benchmarks snoop protocol in
+    let* () = perform_global_constants_benchmarks snoop in
+    let* () = perform_cache_benchmarks snoop in
+    let* () = perform_encoding_benchmarks snoop protocol in
+    let* () = perform_big_map_benchmarks snoop protocol in
+    let* () = perform_skip_list_benchmarks snoop protocol in
+    let* () = perform_carbonated_map_benchmarks snoop protocol in
+    let* () = perform_sc_rollup_benchmarks snoop protocol in
+    let* () = perform_shell_micheline_benchmarks snoop in
+    let* () = perform_dal_benchmarks snoop in
+    perform_sapling_benchmarks snoop

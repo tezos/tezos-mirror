@@ -26,13 +26,19 @@
 (* This module runs the scripts implemented in all other modules of this
    directory. *)
 
-let run proto =
+let run proto ~io_only_flag =
   Lwt_main.run
     (let* () = Prepare_data.main proto in
-     let* () = Perform_benchmarks.main proto in
+     let* () = Perform_benchmarks.main proto ~io_only_flag in
      let* () = Perform_inference.main () in
      Perform_codegen.main ())
 
+let io_only =
+  Clap.flag
+    ~description:"Only run the IO benchmarks (io/READ and io/WRITE)."
+    ~set_long:"io-only"
+    false
+
 let () =
   Background.start (fun x -> raise x) ;
-  run Protocol.Alpha
+  run Protocol.Alpha ~io_only_flag:io_only
