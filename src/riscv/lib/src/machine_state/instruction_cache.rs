@@ -473,7 +473,11 @@ mod tests {
     // Ensure
     // - on rebind the cached instructions are still present
     // - able to cache possibly overlapping instructions
-    backend_test!(test_rebind, F, {
+    #[test]
+    fn test_rebind() {
+        // TODO: RV-210: Generalise for all testable backends.
+        type F = crate::state_backend::memory_backend::test_helpers::InMemoryBackendFactory;
+
         let mut backend = create_backend!(TestInstructionCacheLayout, F);
 
         let compressed_bytes = 0x4505;
@@ -524,5 +528,5 @@ mod tests {
                 state.fetch_instr(phys_addr_uncompressed)
             );
         }
-    });
+    }
 }

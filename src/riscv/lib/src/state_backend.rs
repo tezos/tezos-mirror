@@ -291,7 +291,6 @@ impl<M: ManagerRead> ManagerRead for Ref<'_, M> {
 
 pub mod test_helpers {
     use super::{AllocatedOf, Layout, ManagerReadWrite, ManagerSerialise, PlacedOf};
-    use std::fmt;
 
     /// Generate a test against all test backends.
     #[macro_export]
@@ -305,6 +304,7 @@ pub mod test_helpers {
                 }
 
                 inner::<$crate::state_backend::memory_backend::test_helpers::InMemoryBackendFactory>();
+                inner::<$crate::state_backend::owned_backend::test_helpers::OwnedTestBackendFactory>();
             }
         };
     }
@@ -315,7 +315,7 @@ pub mod test_helpers {
     }
 
     /// Equivalent to [`Backend`] but for testing purposes
-    pub trait TestBackend: TestBackendBase + fmt::Debug + Clone + Eq {
+    pub trait TestBackend: TestBackendBase {
         type Layout: Layout;
 
         fn allocate(

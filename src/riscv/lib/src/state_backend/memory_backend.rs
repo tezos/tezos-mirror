@@ -373,10 +373,12 @@ impl backend::ManagerSerialise for SliceManager<'_> {
         region: &Self::Region<E, LEN>,
         serializer: S,
     ) -> Result<S::Ok, S::Error> {
+        // We're serialising this as a fixed-sized tuple because otherwise `bincode` would prefix
+        // the length of this array, which is not needed.
         let mut serializer = serializer.serialize_tuple(LEN)?;
 
-        for elem in region.iter() {
-            serializer.serialize_element(elem)?;
+        for elem in <Self as backend::ManagerRead>::region_read_all::<E, LEN>(region) {
+            serializer.serialize_element(&elem)?;
         }
 
         serializer.end()

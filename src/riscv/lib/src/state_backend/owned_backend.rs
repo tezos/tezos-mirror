@@ -255,7 +255,39 @@ impl ManagerDeserialise for Owned {
 #[cfg(test)]
 pub mod test_helpers {
     use super::*;
-    use crate::state_backend::{Cell, Cells, DynCells};
+    use crate::state_backend::{
+        test_helpers::{TestBackend, TestBackendBase, TestBackendFactory},
+        Cell, Cells, DynCells,
+    };
+
+    /// Test backend for the owned state manager
+    pub struct OwnedTestBackend<L>(PhantomData<L>);
+
+    impl<L> TestBackendBase for OwnedTestBackend<L> {
+        type Manager<'backend> = Owned;
+    }
+
+    impl<L: Layout> TestBackend for OwnedTestBackend<L> {
+        type Layout = L;
+
+        fn allocate(
+            &mut self,
+            _placed: crate::state_backend::PlacedOf<Self::Layout>,
+        ) -> AllocatedOf<Self::Layout, Self::Manager<'_>> {
+            Owned::allocate::<Self::Layout>()
+        }
+    }
+
+    /// Test backend factory for the owned state manager
+    pub struct OwnedTestBackendFactory;
+
+    impl TestBackendFactory for OwnedTestBackendFactory {
+        type Backend<L: Layout> = OwnedTestBackend<L>;
+
+        fn new<L: Layout>() -> Self::Backend<L> {
+            OwnedTestBackend(PhantomData)
+        }
+    }
 
     /// Ensure [`Cell`] can be serialised and deserialised in a consistent way.
     #[test]

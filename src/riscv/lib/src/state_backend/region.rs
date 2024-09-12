@@ -433,13 +433,26 @@ pub(crate) mod tests {
             Location, ManagerAlloc, ManagerBase,
         },
     };
+    use serde::ser::SerializeTuple;
 
     /// Dummy type that helps us implement custom normalisation via [Elem]
     #[repr(packed)]
-    #[derive(Debug, Copy, Clone, PartialEq, PartialOrd, Ord, Eq, Default, serde::Serialize)]
+    #[derive(Debug, Copy, Clone, PartialEq, PartialOrd, Ord, Eq, Default)]
     struct Flipper {
         a: u8,
         b: u8,
+    }
+
+    impl serde::Serialize for Flipper {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer,
+        {
+            let mut serializer = serializer.serialize_tuple(2)?;
+            serializer.serialize_element(&self.b)?;
+            serializer.serialize_element(&self.a)?;
+            serializer.end()
+        }
     }
 
     impl Elem for Flipper {
@@ -537,7 +550,11 @@ pub(crate) mod tests {
         assert_eq!(cell1.read(), cell1_value);
     });
 
-    backend_test!(test_lazy_cell, F, {
+    #[test]
+    fn test_lazy_cell() {
+        // TODO: RV-210: Generalise for all testable backends.
+        type F = crate::state_backend::memory_backend::test_helpers::InMemoryBackendFactory;
+
         #[derive(Debug, Clone, Copy, PartialEq, Eq)]
         struct Wrapper(u64);
 
@@ -582,7 +599,7 @@ pub(crate) mod tests {
         // Rebinding, check cell contents
         let cell = backend.allocate(OurLayout::placed().into_location());
         assert_eq!(cell.read(), expected);
-    });
+    }
 
     backend_test!(
         #[should_panic]
