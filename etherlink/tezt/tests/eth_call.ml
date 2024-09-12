@@ -319,6 +319,25 @@ let test_call_state_override_state_diff =
   check_value
     call_result
     "0x00000000000000000000000000000000000000000000000000000000ffffffff" ;
+
+  (* try with an invalid override *)
+  let invalid =
+    `O
+      [
+        ( "0x00",
+          `String
+            "0x0000000000000000000000000000000000000000000000000000000000000000"
+        );
+      ]
+  in
+  let override = [`O [(contract, `O [("state_diff", invalid)])]] in
+  let* call_result = make_call ~override "getCount()" in
+  Check.(
+    (Evm_node.extract_error_message call_result
+    |> JSON.as_string = "Error:\n  00 is not a valid storage key\n")
+      string)
+    ~error_msg:"Expected error %R but got %L " ;
+
   unit
 
 let protocols = Protocol.all
