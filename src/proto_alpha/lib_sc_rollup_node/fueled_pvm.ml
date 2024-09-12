@@ -76,8 +76,8 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
         [message_index] at a given [level] and this is the [start_tick] of this
         message processing. If some [failing_ticks] are planned by the loser
         mode, they will be made. *)
-  let eval_until_input (node_ctxt : _ Node_context.t) reveal_map level
-      message_index ~fuel start_tick failing_ticks state =
+  let eval_until_input (module PVM : Pvm_sig.S) (node_ctxt : _ Node_context.t)
+      reveal_map level message_index ~fuel start_tick failing_ticks state =
     let open Lwt_result_syntax in
     let open Delayed_write_monad.Lwt_result_syntax in
     let* constants =
@@ -91,7 +91,6 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
           |> Sc_rollup_proto_types.Constants.reveal_activation_level_of_octez
           |> Protocol.Alpha_context.Sc_rollup.is_reveal_enabled_predicate
     in
-    let module PVM = (val Pvm.of_kind node_ctxt.kind) in
     let metadata = metadata node_ctxt in
     let dal_attested_slots_validity_lag =
       match constants.sc_rollup.reveal_activation_level with
@@ -335,13 +334,13 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
         [state] to the next step that requires an input. This function is
         controlled by some [fuel] and may introduce intended failures at some
         given [failing_ticks]. *)
-  let feed_input (node_ctxt : _ Node_context.t) reveal_map level message_index
-      ~fuel ~failing_ticks state input =
+  let feed_input (module PVM : Pvm_sig.S) (node_ctxt : _ Node_context.t)
+      reveal_map level message_index ~fuel ~failing_ticks state input =
     let open Lwt_result_syntax in
     let open Delayed_write_monad.Lwt_result_syntax in
-    let module PVM = (val Pvm.of_kind node_ctxt.kind) in
     let>* res =
       eval_until_input
+        (module PVM)
         node_ctxt
         reveal_map
         level
@@ -381,6 +380,7 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
             let state = PVM.Ctxt_wrapper.to_node_pvmstate state in
             let>* res =
               eval_until_input
+                (module PVM)
                 node_ctxt
                 reveal_map
                 level
@@ -396,8 +396,8 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
             | Completed {state; fuel; _} ->
                 return (Feed_input_completed {state; fuel})))
 
-  let eval_messages ~reveal_map ~fuel node_ctxt ~message_counter_offset state
-      inbox_level messages =
+  let eval_messages ~reveal_map ~fuel (module PVM : Pvm_sig.S) node_ctxt
+      ~message_counter_offset state inbox_level messages =
     let open Delayed_write_monad.Lwt_result_syntax in
     let level = Int32.to_int inbox_level in
     (* Iterate the PVM state with all the messages. *)
@@ -427,6 +427,7 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
           in
           let>* res =
             feed_input
+              (module PVM)
               node_ctxt
               reveal_map
               level
@@ -459,24 +460,27 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
       fuel eval_result Node_context.delayed_write tzresult Lwt.t =
     let open Lwt_result_syntax in
     let open Delayed_write_monad.Lwt_result_syntax in
-    let open (val Pvm.of_kind node_ctxt.kind) in
+    let module PVM = (val Pvm.of_kind node_ctxt.kind) in
     (* Obtain inbox and its messages for this block. *)
     let inbox_level = Octez_smart_rollup.Inbox.inbox_level inbox in
-    let*! initial_tick = get_tick (Ctxt_wrapper.of_node_pvmstate state) in
+    let*! initial_tick =
+      PVM.get_tick (PVM.Ctxt_wrapper.of_node_pvmstate state)
+    in
     (* Evaluate all the messages for this level. *)
     let>* state, remaining_fuel, num_messages, remaining_messages =
       eval_messages
         ~reveal_map:None
         ~fuel
+        (module PVM)
         node_ctxt
         ~message_counter_offset:0
         state
         inbox_level
         messages
     in
-    let pvm_state = Ctxt_wrapper.of_node_pvmstate state in
-    let*! final_tick = get_tick pvm_state in
-    let*! state_hash = state_hash pvm_state in
+    let pvm_state = PVM.Ctxt_wrapper.of_node_pvmstate state in
+    let*! final_tick = PVM.get_tick pvm_state in
+    let*! state_hash = PVM.state_hash pvm_state in
     let num_ticks = Sc_rollup.Tick.distance initial_tick final_tick in
     let eval_state =
       {
@@ -503,6 +507,7 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
       } =
     let open Lwt_result_syntax in
     let open Delayed_write_monad.Lwt_result_syntax in
+    let module PVM = (val Pvm.of_kind node_ctxt.kind) in
     let>* state, remaining_fuel, num_messages, remaining_messages =
       match messages with
       | [] ->
@@ -516,6 +521,7 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
           in
           let>* res =
             eval_until_input
+              (module PVM)
               node_ctxt
               reveal_map
               level
@@ -535,17 +541,17 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
           eval_messages
             ~reveal_map
             ~fuel
+            (module PVM)
             node_ctxt
             ~message_counter_offset
             state
             inbox_level
             messages
     in
-    let open (val Pvm.of_kind node_ctxt.kind) in
-    let pvm_state = Ctxt_wrapper.of_node_pvmstate state in
-    let*! final_tick = get_tick pvm_state in
+    let pvm_state = PVM.Ctxt_wrapper.of_node_pvmstate state in
+    let*! final_tick = PVM.get_tick pvm_state in
     let final_tick = Sc_rollup.Tick.to_z final_tick in
-    let*! state_hash = state_hash pvm_state in
+    let*! state_hash = PVM.state_hash pvm_state in
     let num_ticks = Z.sub final_tick initial_tick in
     let eval_state =
       {
