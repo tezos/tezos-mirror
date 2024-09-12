@@ -466,7 +466,10 @@ module Make (P : External_process_parameters.S) = struct
                  let*! res =
                    Lwt_unix_socket.recv_result
                      process_output
-                     (P.result_encoding request)
+                     Data_encoding.(
+                       tup2
+                         (P.result_encoding request)
+                         (option Profiler.report_encoding))
                  in
                  let timespan =
                    let then_ = Time.System.now () in
@@ -518,7 +521,11 @@ module Make (P : External_process_parameters.S) = struct
     return process
 
   let reconfigure_event_logging process config =
-    send_request process (P.reconfigure_event_logging_request config)
+    let open Lwt_result_syntax in
+    let* (), _report =
+      send_request process (P.reconfigure_event_logging_request config)
+    in
+    return_unit
 
   let close p =
     let open Lwt_syntax in

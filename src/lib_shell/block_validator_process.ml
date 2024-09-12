@@ -479,13 +479,15 @@ module External_validator_process = struct
           simulate;
         }
     in
-    send_request validator request
+    let* res, _report = send_request validator request in
+    return res
 
   let preapply_block validator ~chain_id ~timestamp ~protocol_data ~live_blocks
       ~live_operations ~predecessor_shell_header ~predecessor_hash
       ~predecessor_max_operations_ttl ~predecessor_block_metadata_hash
       ~predecessor_ops_metadata_hash ~predecessor_resulting_context_hash
       operations =
+    let open Lwt_result_syntax in
     let request =
       External_validation.Preapply
         {
@@ -503,7 +505,8 @@ module External_validator_process = struct
           operations;
         }
     in
-    send_request validator request
+    let* res, _report = send_request validator request in
+    return res
 
   let validate_block validator chain_store ~predecessor header hash operations =
     let open Lwt_result_syntax in
@@ -525,37 +528,50 @@ module External_validator_process = struct
           hash;
         }
     in
-    send_request validator request
+    let* res, _report = send_request validator request in
+    return res
 
   let context_garbage_collection validator _index context_hash ~gc_lockfile_path
       =
+    let open Lwt_result_syntax in
     let request =
       External_validation.Context_garbage_collection
         {context_hash; gc_lockfile_path}
     in
-    send_request validator request
+    let* (), _report = send_request validator request in
+    return_unit
 
   let context_split validator _index =
+    let open Lwt_result_syntax in
     let request = External_validation.Context_split in
-    send_request validator request
+    let* (), _report = send_request validator request in
+    return_unit
 
   let commit_genesis validator ~chain_id =
+    let open Lwt_result_syntax in
     let request = External_validation.Commit_genesis {chain_id} in
-    send_request validator request
+    let* res, _report = send_request validator request in
+    return res
 
   let init_test_chain validator chain_id forking_block =
+    let open Lwt_result_syntax in
     let forked_header = Store.Block.header forking_block in
     let context_hash = forked_header.shell.context in
     let request =
       External_validation.Fork_test_chain
         {chain_id; context_hash; forked_header}
     in
-    send_request validator request
+    let* res, _report = send_request validator request in
+    return res
 
   let reconfigure_event_logging validator config =
-    send_request
-      validator
-      (External_validation.Reconfigure_event_logging config)
+    let open Lwt_result_syntax in
+    let* (), _report =
+      send_request
+        validator
+        (External_validation.Reconfigure_event_logging config)
+    in
+    return_unit
 end
 
 let init validator_kind =

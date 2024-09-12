@@ -428,8 +428,8 @@ let replay ~internal_events ~singleprocess ~strict
                process_path = Sys.executable_name;
              })
       in
-      let commit_genesis =
-        Block_validator_process.commit_genesis validator_process
+      let commit_genesis ~chain_id =
+        Block_validator_process.commit_genesis validator_process ~chain_id
       in
       let* store =
         Store.init
