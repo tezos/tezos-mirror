@@ -100,7 +100,7 @@ module WASM = struct
 
   let evm_kernel =
     Uses.make
-      ~how_to_build:"make -f etherlink.ml build"
+      ~how_to_build:"make -f etherlink.mk build"
       ~tag:"evm_kernel"
       ~path:"evm_kernel.wasm"
       ()
