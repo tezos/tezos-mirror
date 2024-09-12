@@ -48,6 +48,10 @@ val to_mutez : t -> int64
 (* Is actually of_mutez_exn *)
 val of_mutez : int64 -> t
 
+val to_repr : t -> Protocol.Tez_repr.t
+
+val of_repr : Protocol.Tez_repr.t -> t
+
 val min : t -> t -> t
 
 module Compare : Compare.S with type t := t

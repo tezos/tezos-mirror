@@ -494,6 +494,32 @@ let check_min_delegated_and_its_level ~blocks_per_cycle ~current_level
   in
   return_unit
 
+let check_min_delegated_and_its_level_rpc b ~(delegate : Contract.t)
+    ~min_delegated ~min_delegated_level =
+  let open Lwt_result_wrap_syntax in
+  let* min_delegated_in_current_cycle_rpc =
+    get_min_delegated_in_current_cycle b ~delegate
+  in
+  let min_delegated_in_cycle_rpc, level_of_min_delegated_rpc =
+    min_delegated_in_current_cycle_rpc
+  in
+  let* () =
+    Assert.equal_tez_repr ~loc:__LOC__ min_delegated_in_cycle_rpc min_delegated
+  in
+  let* () =
+    Assert.equal
+      ~loc:__LOC__
+      (Option.equal Level_repr.( = ))
+      "level_min_delegated are not equal"
+      (fun ppf x ->
+        match x with
+        | Some x -> Format.fprintf ppf "%a" Level_repr.pp x
+        | None -> Format.fprintf ppf "None")
+      min_delegated_level
+      level_of_min_delegated_rpc
+  in
+  return_unit
+
 let print_min_delegated_in_cycle_rpc b ~(delegate : Contract.t) =
   let open Lwt_result_wrap_syntax in
   let* liquid_balance = Context.Contract.balance (B b) delegate in
@@ -737,6 +763,106 @@ let test_min_delegated_in_cycle () =
       ~min_delegated_level:24l (* first level of the current cycle *)
       ~new_staking_balance:staking_balance
       ~expected_staking_balance:staking_balance_add_20
+  in
+  return_unit
+
+(* Remove X tez in the last block and add Y tez in the first block of
+   the next cycle *)
+let test_min_delegated_rpc_for_last_and_first_blocks () =
+  let open Lwt_result_wrap_syntax in
+  let constants =
+    constants |> Constants_helpers.Set.Adaptive_issuance.force_activation true
+  in
+  let get_staking_balance b ~delegate =
+    let* () = print_min_delegated_in_cycle_rpc b ~delegate in
+    let* staking_balance = get_staking_balance b ~delegate in
+    return staking_balance
+  in
+  let level_from_int32 level =
+    let blocks_per_cycle = constants.blocks_per_cycle in
+    let*? cycle_eras = cycle_eras_init ~blocks_per_cycle in
+    let* level = level_from_int ~cycle_eras level in
+    return level
+  in
+
+  let* b, (delegate, contractor) = Context.init_with_constants2 constants in
+  Log.info ~color:Log.Color.BG.blue "Initial state" ;
+  let* _staking_balance = get_staking_balance b ~delegate in
+  let delegated_init = Tez_repr.(mul_exn one 3_800_000) in
+  let* zero_level = level_from_int32 0l in
+  let* () =
+    check_min_delegated_and_its_level_rpc
+      b
+      ~delegate
+      ~min_delegated:delegated_init
+      ~min_delegated_level:(Some zero_level)
+  in
+
+  Log.info ~color:Log.Color.BG.blue "Baking until the last level of 1st cycle" ;
+  let*?@ last_level =
+    Raw_level.of_int32 (Int32.sub constants.blocks_per_cycle 2l)
+  in
+  let* b = Block.bake_until_level last_level b in
+  let* _staking_balance = get_staking_balance b ~delegate in
+  let* () =
+    check_min_delegated_and_its_level_rpc
+      b
+      ~delegate
+      ~min_delegated:delegated_init
+      ~min_delegated_level:(Some zero_level)
+  in
+
+  (* Remove 1000 tez from delegated_balance in the last block *)
+  Log.info ~color:Log.Color.BG.blue "Removing 1_000 tez in the last block" ;
+  let amount_1000 = Tez_helpers.of_int 1000 in
+  let* op_minus_1000 = Op.transaction (B b) delegate contractor amount_1000 in
+  let* b = Block.bake ~operation:op_minus_1000 b in
+  let* _staking_balance = get_staking_balance b ~delegate in
+  let*?@ delegated_minus_1000 =
+    Tez_repr.(delegated_init -? Tez_helpers.to_repr amount_1000)
+  in
+  let* last_level_of_fst_block = level_from_int32 (Block.current_level b) in
+  let* () =
+    check_min_delegated_and_its_level_rpc
+      b
+      ~delegate
+      ~min_delegated:delegated_minus_1000
+      ~min_delegated_level:(Some last_level_of_fst_block)
+  in
+
+  (* Add 5000 tez to delegated_balance in 1st block of the next cycle *)
+  Log.info
+    ~color:Log.Color.BG.blue
+    "Adding 5_000 tez in 1st block of the next cycle" ;
+  let amount_5000 = Tez_helpers.of_int 5000 in
+  let* op_plus_5000 = Op.transaction (B b) contractor delegate amount_5000 in
+  let* b = Block.bake ~operation:op_plus_5000 b in
+  let* _staking_balance = get_staking_balance b ~delegate in
+  let*?@ delegated_plus_5000 =
+    Tez_repr.(delegated_minus_1000 +? Tez_helpers.to_repr amount_5000)
+  in
+  let* first_level_of_snd_block = level_from_int32 (Block.current_level b) in
+  let* () =
+    check_min_delegated_and_its_level_rpc
+      b
+      ~delegate
+      ~min_delegated:delegated_plus_5000
+      ~min_delegated_level:(Some first_level_of_snd_block)
+  in
+
+  (* Baking until the last level of 2nd cycle *)
+  Log.info ~color:Log.Color.BG.blue "Baking until the last level of 2nd cycle" ;
+  let*?@ last_level_2nd_cycle =
+    Raw_level.of_int32 (Int32.sub (Int32.mul constants.blocks_per_cycle 2l) 1l)
+  in
+  let* b = Block.bake_until_level last_level_2nd_cycle b in
+  let* _staking_balance = get_staking_balance b ~delegate in
+  let* () =
+    check_min_delegated_and_its_level_rpc
+      b
+      ~delegate
+      ~min_delegated:delegated_plus_5000
+      ~min_delegated_level:(Some first_level_of_snd_block)
   in
   return_unit
 
@@ -1336,6 +1462,10 @@ let tests =
     [
       tztest "full staking balance - encoding" `Quick test_encodings;
       tztest "min delegated in cycle" `Quick test_min_delegated_in_cycle;
+      tztest
+        "min delegated RPC for last and first blocks"
+        `Quick
+        test_min_delegated_rpc_for_last_and_first_blocks;
       tztest
         "add delegated (different cycle)"
         `Quick
