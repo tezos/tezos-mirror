@@ -254,7 +254,7 @@ type dependency =
   | Optional of tezos_job
   | Artifacts of tezos_job
 
-(** Job dependencies.
+(** Job dependency sets.
 
     - A [Staged artifact_deps] job implements the default GitLab CI behavior of
       running once all jobs in the previous stage have terminated. Artifacts are
@@ -267,6 +267,10 @@ type dependency =
     artifact_deps] when the number of dependencies exceed the GitLab
     imposed limit of 50 [needs:] per job. *)
 type dependencies = Staged of tezos_job list | Dependent of dependency list
+
+(** Add the artifacts of [tezos_job] to a [dependencies] set. *)
+val dependencies_add_artifact_dependency :
+  dependencies -> tezos_job -> dependencies
 
 (** Values for the [GIT_STRATEGY] variable.
 

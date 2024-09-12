@@ -46,12 +46,10 @@ let jobs =
      is executed.
   *)
   let job_tezt_fetch_records = Tezt.job_tezt_fetch_records () in
-  let job_tezt_select_tezts = Tezt.job_select_tezts () in
   let job_build_kernels = job_build_kernels () in
   let dependencies =
     Dependent
       [
-        Artifacts job_tezt_select_tezts;
         Artifacts job_build_x86_64_release;
         Artifacts job_build_x86_64_exp_dev_extra;
         Artifacts job_build_kernels;
@@ -163,5 +161,4 @@ let jobs =
     job_build_x86_64_exp_dev_extra;
     job_build_kernels;
     job_tezt_fetch_records;
-    job_tezt_select_tezts;
   ]

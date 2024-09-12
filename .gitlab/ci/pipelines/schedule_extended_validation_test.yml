@@ -52,14 +52,12 @@ tezt:
   - gcp_tezt
   needs:
   - oc.docker:ci:amd64
-  - select_tezts
   - oc.build_x86_64-released
   - oc.build_x86_64-exp-dev-extra
   - oc.build_kernels
   - oc.tezt:fetch-records
   dependencies:
   - oc.docker:ci:amd64
-  - select_tezts
   - oc.build_x86_64-released
   - oc.build_x86_64-exp-dev-extra
   - oc.build_kernels
@@ -71,13 +69,13 @@ tezt:
   script:
   - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
     CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
-  - ./scripts/ci/tezt.sh "${TESTS}" --from-record tezt/records --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
-    --list-tsv > selected_tezts.tsv
-  - ./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh "${TESTS}" --color
-    --log-buffer-size 5000 --log-file tezt.log --global-timeout 1800 --on-unknown-regression-files
-    fail --junit ${JUNIT} --from-record tezt/records --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
-    --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json --job-count ${TEZT_PARALLEL}
-    --retry ${TEZT_RETRY}
+  - _build/default/tezt/tests/main.exe "${TESTS}" --from-record tezt/records --job
+    ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --list-tsv > selected_tezts.tsv
+  - ./scripts/ci/exit_code.sh timeout -k 60 1860 _build/default/tezt/tests/main.exe
+    "${TESTS}" --color --log-buffer-size 5000 --log-file tezt.log --global-timeout
+    1800 --on-unknown-regression-files fail --junit ${JUNIT} --from-record tezt/records
+    --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
+    --job-count ${TEZT_PARALLEL} --retry ${TEZT_RETRY}
   variables:
     JUNIT: tezt-junit.xml
     TEZT_VARIANT: ""
@@ -106,14 +104,12 @@ tezt-memory-3k:
   - gcp_tezt
   needs:
   - oc.docker:ci:amd64
-  - select_tezts
   - oc.build_x86_64-released
   - oc.build_x86_64-exp-dev-extra
   - oc.build_kernels
   - oc.tezt:fetch-records
   dependencies:
   - oc.docker:ci:amd64
-  - select_tezts
   - oc.build_x86_64-released
   - oc.build_x86_64-exp-dev-extra
   - oc.build_kernels
@@ -125,13 +121,13 @@ tezt-memory-3k:
   script:
   - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
     CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
-  - ./scripts/ci/tezt.sh "${TESTS}" --from-record tezt/records --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
-    --list-tsv > selected_tezts.tsv
-  - ./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh "${TESTS}" --color
-    --log-buffer-size 5000 --log-file tezt.log --global-timeout 1800 --on-unknown-regression-files
-    fail --junit ${JUNIT} --from-record tezt/records --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
-    --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json --job-count ${TEZT_PARALLEL}
-    --retry ${TEZT_RETRY}
+  - _build/default/tezt/tests/main.exe "${TESTS}" --from-record tezt/records --job
+    ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --list-tsv > selected_tezts.tsv
+  - ./scripts/ci/exit_code.sh timeout -k 60 1860 _build/default/tezt/tests/main.exe
+    "${TESTS}" --color --log-buffer-size 5000 --log-file tezt.log --global-timeout
+    1800 --on-unknown-regression-files fail --junit ${JUNIT} --from-record tezt/records
+    --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
+    --job-count ${TEZT_PARALLEL} --retry ${TEZT_RETRY}
   variables:
     JUNIT: tezt-junit.xml
     TEZT_VARIANT: -memory_3k
@@ -160,14 +156,12 @@ tezt-memory-4k:
   - gcp_tezt
   needs:
   - oc.docker:ci:amd64
-  - select_tezts
   - oc.build_x86_64-released
   - oc.build_x86_64-exp-dev-extra
   - oc.build_kernels
   - oc.tezt:fetch-records
   dependencies:
   - oc.docker:ci:amd64
-  - select_tezts
   - oc.build_x86_64-released
   - oc.build_x86_64-exp-dev-extra
   - oc.build_kernels
@@ -179,13 +173,13 @@ tezt-memory-4k:
   script:
   - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
     CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
-  - ./scripts/ci/tezt.sh "${TESTS}" --from-record tezt/records --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
-    --list-tsv > selected_tezts.tsv
-  - ./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh "${TESTS}" --color
-    --log-buffer-size 5000 --log-file tezt.log --global-timeout 1800 --on-unknown-regression-files
-    fail --junit ${JUNIT} --from-record tezt/records --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
-    --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json --job-count ${TEZT_PARALLEL}
-    --retry ${TEZT_RETRY}
+  - _build/default/tezt/tests/main.exe "${TESTS}" --from-record tezt/records --job
+    ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --list-tsv > selected_tezts.tsv
+  - ./scripts/ci/exit_code.sh timeout -k 60 1860 _build/default/tezt/tests/main.exe
+    "${TESTS}" --color --log-buffer-size 5000 --log-file tezt.log --global-timeout
+    1800 --on-unknown-regression-files fail --junit ${JUNIT} --from-record tezt/records
+    --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
+    --job-count ${TEZT_PARALLEL} --retry ${TEZT_RETRY}
   variables:
     JUNIT: tezt-junit.xml
     TEZT_VARIANT: -memory_4k
@@ -214,14 +208,12 @@ tezt-time-sensitive:
   - gcp_tezt
   needs:
   - oc.docker:ci:amd64
-  - select_tezts
   - oc.build_x86_64-released
   - oc.build_x86_64-exp-dev-extra
   - oc.build_kernels
   - oc.tezt:fetch-records
   dependencies:
   - oc.docker:ci:amd64
-  - select_tezts
   - oc.build_x86_64-released
   - oc.build_x86_64-exp-dev-extra
   - oc.build_kernels
@@ -233,13 +225,13 @@ tezt-time-sensitive:
   script:
   - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
     CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
-  - ./scripts/ci/tezt.sh "${TESTS}" --from-record tezt/records --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
-    --list-tsv > selected_tezts.tsv
-  - ./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh "${TESTS}" --color
-    --log-buffer-size 5000 --log-file tezt.log --global-timeout 1800 --on-unknown-regression-files
-    fail --junit ${JUNIT} --from-record tezt/records --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
-    --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json --job-count ${TEZT_PARALLEL}
-    --retry ${TEZT_RETRY}
+  - _build/default/tezt/tests/main.exe "${TESTS}" --from-record tezt/records --job
+    ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --list-tsv > selected_tezts.tsv
+  - ./scripts/ci/exit_code.sh timeout -k 60 1860 _build/default/tezt/tests/main.exe
+    "${TESTS}" --color --log-buffer-size 5000 --log-file tezt.log --global-timeout
+    1800 --on-unknown-regression-files fail --junit ${JUNIT} --from-record tezt/records
+    --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
+    --job-count ${TEZT_PARALLEL} --retry ${TEZT_RETRY}
   variables:
     JUNIT: tezt-junit.xml
     TEZT_VARIANT: -time_sensitive
@@ -267,14 +259,12 @@ tezt-slow:
   - gcp_tezt
   needs:
   - oc.docker:ci:amd64
-  - select_tezts
   - oc.build_x86_64-released
   - oc.build_x86_64-exp-dev-extra
   - oc.build_kernels
   - oc.tezt:fetch-records
   dependencies:
   - oc.docker:ci:amd64
-  - select_tezts
   - oc.build_x86_64-released
   - oc.build_x86_64-exp-dev-extra
   - oc.build_kernels
@@ -286,13 +276,13 @@ tezt-slow:
   script:
   - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
     CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
-  - ./scripts/ci/tezt.sh "${TESTS}" --from-record tezt/records --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
-    --list-tsv > selected_tezts.tsv
-  - ./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh "${TESTS}" --color
-    --log-buffer-size 5000 --log-file tezt.log --global-timeout 1800 --on-unknown-regression-files
-    fail --junit ${JUNIT} --from-record tezt/records --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
-    --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json --job-count ${TEZT_PARALLEL}
-    --retry ${TEZT_RETRY}
+  - _build/default/tezt/tests/main.exe "${TESTS}" --from-record tezt/records --job
+    ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --list-tsv > selected_tezts.tsv
+  - ./scripts/ci/exit_code.sh timeout -k 60 1860 _build/default/tezt/tests/main.exe
+    "${TESTS}" --color --log-buffer-size 5000 --log-file tezt.log --global-timeout
+    1800 --on-unknown-regression-files fail --junit ${JUNIT} --from-record tezt/records
+    --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
+    --job-count ${TEZT_PARALLEL} --retry ${TEZT_RETRY}
   variables:
     JUNIT: tezt-junit.xml
     TEZT_VARIANT: -slow
@@ -321,14 +311,12 @@ tezt-flaky:
   - gcp_tezt
   needs:
   - oc.docker:ci:amd64
-  - select_tezts
   - oc.build_x86_64-released
   - oc.build_x86_64-exp-dev-extra
   - oc.build_kernels
   - oc.tezt:fetch-records
   dependencies:
   - oc.docker:ci:amd64
-  - select_tezts
   - oc.build_x86_64-released
   - oc.build_x86_64-exp-dev-extra
   - oc.build_kernels
@@ -340,13 +328,13 @@ tezt-flaky:
   script:
   - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
     CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
-  - ./scripts/ci/tezt.sh "${TESTS}" --from-record tezt/records --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
-    --list-tsv > selected_tezts.tsv
-  - ./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh "${TESTS}" --color
-    --log-buffer-size 5000 --log-file tezt.log --global-timeout 1800 --on-unknown-regression-files
-    fail --junit ${JUNIT} --from-record tezt/records --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
-    --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json --job-count ${TEZT_PARALLEL}
-    --retry ${TEZT_RETRY}
+  - _build/default/tezt/tests/main.exe "${TESTS}" --from-record tezt/records --job
+    ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --list-tsv > selected_tezts.tsv
+  - ./scripts/ci/exit_code.sh timeout -k 60 1860 _build/default/tezt/tests/main.exe
+    "${TESTS}" --color --log-buffer-size 5000 --log-file tezt.log --global-timeout
+    1800 --on-unknown-regression-files fail --junit ${JUNIT} --from-record tezt/records
+    --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
+    --job-count ${TEZT_PARALLEL} --retry ${TEZT_RETRY}
   variables:
     JUNIT: tezt-junit.xml
     TEZT_VARIANT: -flaky
@@ -527,25 +515,4 @@ oc.tezt:fetch-records:
     - tezt-fetch-records.log
     - tezt/records/*.json
     - tezt/records/*.json.broken
-    when: always
-
-select_tezts:
-  image: ${ci_image_name}/prebuild:${ci_image_tag}
-  stage: build
-  tags:
-  - gcp
-  dependencies:
-  - oc.docker:ci:amd64
-  allow_failure:
-    exit_codes: 17
-  timeout: 60 minutes
-  before_script:
-  - ./scripts/ci/take_ownership.sh
-  - eval $(opam env)
-  script:
-  - scripts/ci/select_tezts.sh || exit $?
-  artifacts:
-    expire_in: 3 days
-    paths:
-    - selected_tezts.tsl
     when: always
