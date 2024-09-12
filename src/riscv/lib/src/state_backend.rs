@@ -205,6 +205,17 @@ pub trait ManagerDeserialise: ManagerBase {
     ) -> Result<Self::DynRegion<LEN>, D::Error>;
 }
 
+/// Manager with the ability to clone regions
+pub trait ManagerClone: ManagerBase {
+    /// Clone the region.
+    fn clone_region<E: Elem, const LEN: usize>(
+        region: &Self::Region<E, LEN>,
+    ) -> Self::Region<E, LEN>;
+
+    /// Clone the dynamic region.
+    fn clone_dyn_region<const LEN: usize>(region: &Self::DynRegion<LEN>) -> Self::DynRegion<LEN>;
+}
+
 /// State backend with manager
 pub trait BackendManagement {
     /// Backend manager
