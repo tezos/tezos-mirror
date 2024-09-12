@@ -37,6 +37,11 @@ Beta.
   the `patch` commands. More precisely, patching the state `N` affects the
   replay of block `N+1`. (!14809)
 
+#### RPCs
+
+- Add state override option to `eth_call` RPC, similar to go-ethereum.
+  Limited to fields `balance`, `nonce` and `code`. (!14708)
+
 ### Bug fixes
 
 #### RPCs
@@ -46,11 +51,6 @@ Beta.
 #### Metrics
 
 - Fix `octez_evm_node_head` for the RPC mode. (!14849)
-
-#### RPCs
-
-- Add state override option to `eth_call` RPC, similar to go-ethereum.
-  Limited to fields `balance`, `nonce` and `code`. (!14708)
 
 #### Internals
 
