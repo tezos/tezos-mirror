@@ -530,6 +530,19 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             })
     }
 
+    fn get_word_size(&self, init_code: &[u8]) -> u64 {
+        // ceil(len(init_code) / 32)
+        (init_code.len() as u64 + 31) / 32
+    }
+
+    fn record_init_code_cost(&mut self, init_code: &[u8]) -> Result<(), ExitError> {
+        // As per EIP-3860:
+        // > We define init_code_cost to equal INITCODE_WORD_COST * get_word_size(init_code).
+        // where INITCODE_WORD_COST is 2.
+        let init_code_cost = 2 * self.get_word_size(init_code);
+        self.record_cost(init_code_cost)
+    }
+
     /// Mark a location in durable storage as _hot_ for the purpose of calculating
     /// cost of SSTORE and SLOAD. Return type chosen for compatibility with the
     /// SputnikVM functions that need to call this function.
@@ -1077,22 +1090,12 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             }
         }
 
-        // Charge of 2 gas for every 32-byte chunk of initcode to represent
-        // the cost of jumpdest-analysis.
-        // See: https://eips.ethereum.org/EIPS/eip-3860
-        // * We target wasm32-unknown-unknown, so this conversion should be safe.
-        // * The division behave as an unsafe div_floor which we can't use since
-        //   it's nightly-only.
-        // * The `unwrap_or` is there in case there's an unexpected behaviour
-        //   that we missed.
-        let extra_cost: u64 = (initial_code.len() / 32).try_into().unwrap_or(0) * 2;
-
-        if self.record_cost(extra_cost).is_err() {
+        if let Err(err) = self.record_init_code_cost(&initial_code) {
             log!(
                 self.host,
                 Debug,
-                "Not enought gas for call. Required at least: {:?} for the init code size extra cost.",
-                extra_cost
+                "{:?}: Not enough gas for create. Cannot record init code cost.",
+                err
             );
 
             return Ok((ExitReason::Error(ExitError::OutOfGas), None, vec![]));
@@ -2611,6 +2614,7 @@ mod test {
     use crate::account_storage::init_account_storage;
     use crate::precompiles;
     use evm::Config;
+    use pretty_assertions::assert_eq;
     use primitive_types::{H160, H256};
     use std::cmp::Ordering;
     use std::str::FromStr;
@@ -4443,17 +4447,17 @@ mod test {
 
         let code: Vec<u8> = vec![
             Opcode::PUSH13.as_u8(), // 3 gas
-            0x63,
+            0x63,                   // 3 gas
             0xff,
             0xff,
             0xff,
             0xff,
-            0x60,
+            0x60, // 3 gas
             0x00,
-            0x52,
-            0x60,
+            0x52, // 6 gas
+            0x60, // 3 gas
             0x04,
-            0x60,
+            0x60, // 3 gas
             0x1c,
             0xf3,
             Opcode::PUSH1.as_u8(), // 3 gas
@@ -4465,7 +4469,7 @@ mod test {
             19,
             Opcode::PUSH1.as_u8(), // 3 gas
             0,
-            Opcode::CREATE.as_u8(), // 32000 gas + init_code
+            Opcode::CREATE.as_u8(), // 32000 gas + 800 gas (code_deposit_cost) + 2 gas (init_code_cost)
             Opcode::STOP.as_u8(),
         ];
 
@@ -4475,14 +4479,13 @@ mod test {
         let result =
             handler.call_contract(caller, address, None, vec![], Some(1000000), false);
 
-        // Top layers costs 21000 + 3 + 6 + 3 + 3 + 3 + 32000 = 53021 < 53839
         assert_eq!(
             Ok(ExecutionOutcome {
-                gas_used: 53839, // costs 53841 on ethereum
+                gas_used: 53841,
                 logs: vec![],
                 result: ExecutionResult::CallSucceeded(ExitSucceed::Stopped, vec![]),
                 withdrawals: vec![],
-                estimated_ticks_used: 40549308
+                estimated_ticks_used: 40549406
             }),
             result,
         )

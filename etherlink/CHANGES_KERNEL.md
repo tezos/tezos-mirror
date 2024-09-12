@@ -33,6 +33,11 @@ Beta and Testnet, and allows users to deposit and withdraw FA 2.1 tokens.
 - A generic storage crate was introduced so that every component of the kernel
   benefits from the same implementation to read/write primitives. (!14735)
 
+### Bug fixes
+
+- Fix gas cost of contract creation by fixing the implementation of init code
+  cost recording. (!14892)
+
 ## Version af7909023768bc4aad3120bec7bea4a64a576047
 
 This kernel has been activated on Etherlink Testnet on block

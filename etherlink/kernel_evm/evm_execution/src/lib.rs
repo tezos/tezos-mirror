@@ -2523,7 +2523,7 @@ mod test {
         + 1220 // transaction data cost
         + 12600 // code deposit cost
         + 42 // init cost
-        + 4; // extra cost (EIP-3860)
+        + 6; // extra cost (EIP-3860)
 
         assert_eq!(expected_gas, result.gas_used);
     }
