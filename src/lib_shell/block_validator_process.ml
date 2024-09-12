@@ -327,6 +327,12 @@ module Internal_validator_process = struct
         Events.(emit validation_success (block_hash, timespan))
       else Events.(emit application_success (block_hash, timespan))
     in
+    let report = Tezos_base.Profiler.report validator.headless in
+    (match report with
+    | None -> ()
+    | Some report -> (
+        try Profiler.inc Shell_profiling.block_validator_profiler report
+        with _ -> ())) ;
     return result
 
   let preapply_block validator ~chain_id ~timestamp ~protocol_data ~live_blocks
@@ -414,15 +420,24 @@ module Internal_validator_process = struct
           `Inherited (block_cache, predecessor_resulting_context_hash)
     in
     let predecessor_block_hash = Store.Block.hash predecessor in
-    Block_validation.validate
-      ~chain_id
-      ~predecessor_block_header
-      ~predecessor_block_hash
-      ~predecessor_context
-      ~predecessor_resulting_context_hash
-      ~cache
-      header
-      operations
+    let* res =
+      Block_validation.validate
+        ~chain_id
+        ~predecessor_block_header
+        ~predecessor_block_hash
+        ~predecessor_context
+        ~predecessor_resulting_context_hash
+        ~cache
+        header
+        operations
+    in
+    let report = Tezos_base.Profiler.report validator.headless in
+    (match report with
+    | None -> ()
+    | Some report -> (
+        try Profiler.inc Shell_profiling.block_validator_profiler report
+        with _ -> ())) ;
+    return res
 
   let context_garbage_collection _validator context_index context_hash
       ~gc_lockfile_path:_ =
