@@ -110,7 +110,10 @@ let main ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync () =
         max_number_of_chunks = None;
       }
   in
-  Metrics.init ~mode:"observer" ~tx_pool_size_info:Tx_pool.size_info ;
+  Metrics.init
+    ~mode:"observer"
+    ~tx_pool_size_info:Tx_pool.size_info
+    ~smart_rollup_address ;
 
   let* finalizer_public_server =
     Rpc_server.start_public_server

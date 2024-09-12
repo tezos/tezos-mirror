@@ -12,6 +12,10 @@
 - Add a flag `--no-sync` to the observer command. If the flag is set, the observer
   does not synchronise with the EVM node endpoint. (!14889)
 
+#### Metrics
+
+- Add the `smart_rollup_address` label to the `octez_evm_node_info` metrics. (!14906)
+
 ### Bug fixes
 
 - Fix `init from rollup node` command failing to store items of the delayed

@@ -45,7 +45,10 @@ let main ~data_dir ~evm_node_endpoint ~(config : Configuration.t) =
         max_number_of_chunks = None;
       }
   in
-  Metrics.init ~mode:"rpc" ~tx_pool_size_info:Tx_pool.size_info ;
+  Metrics.init
+    ~mode:"rpc"
+    ~tx_pool_size_info:Tx_pool.size_info
+    ~smart_rollup_address:ctxt.smart_rollup_address ;
 
   let* server_public_finalizer =
     Rpc_server.start_public_server
