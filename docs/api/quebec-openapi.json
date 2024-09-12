@@ -3,7 +3,7 @@
   "info": {
     "title": "Octez Protocol quebec RPC",
     "description": "The RPC API for protocol quebec served by the Octez node.",
-    "version": "Octez 21.0~rc1 (836f2fa1a4)"
+    "version": "Octez 21.0~beta11+dev (216ad76c)"
   },
   "paths": {
     "/": {
@@ -90,7 +90,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -125,7 +125,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -184,7 +184,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -231,7 +231,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -317,7 +317,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -359,7 +359,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -409,7 +409,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -438,7 +438,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -467,7 +467,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -1206,7 +1206,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -1231,7 +1231,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -1888,7 +1888,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -1918,7 +1918,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -1982,7 +1982,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -2043,7 +2043,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -2081,7 +2081,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -2119,7 +2119,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -2188,7 +2188,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -2228,7 +2228,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -2271,7 +2271,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -2347,7 +2347,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -2403,7 +2403,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -2441,7 +2441,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -2479,7 +2479,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -2517,7 +2517,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -2565,7 +2565,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -2611,7 +2611,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -2701,7 +2701,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -2789,7 +2789,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -2827,7 +2827,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -2865,7 +2865,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -2913,7 +2913,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -2951,7 +2951,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -2989,7 +2989,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -3076,7 +3076,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -3124,7 +3124,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -3172,7 +3172,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -3237,7 +3237,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -3343,7 +3343,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -3391,7 +3391,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -3439,7 +3439,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -3597,7 +3597,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -3665,7 +3665,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -3732,7 +3732,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -3796,7 +3796,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -4222,7 +4222,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -4276,7 +4276,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -4316,7 +4316,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -4398,7 +4398,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -4438,7 +4438,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -4476,7 +4476,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -4516,7 +4516,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -4554,7 +4554,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -4592,7 +4592,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -4633,7 +4633,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -4674,7 +4674,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -4756,7 +4756,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -4794,7 +4794,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -4832,7 +4832,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -4870,7 +4870,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -4908,7 +4908,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -4956,7 +4956,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -4994,7 +4994,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -5034,7 +5034,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -5072,7 +5072,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -5158,7 +5158,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -5196,7 +5196,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -5234,7 +5234,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -5272,7 +5272,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -5348,7 +5348,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -5419,7 +5419,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -5472,7 +5472,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -5510,7 +5510,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -5548,7 +5548,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -5586,7 +5586,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -5624,7 +5624,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -5662,7 +5662,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -5717,7 +5717,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -5772,7 +5772,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -5834,7 +5834,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -5874,7 +5874,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -5949,7 +5949,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -5998,7 +5998,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -6061,7 +6061,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -6100,7 +6100,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -6160,7 +6160,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -6187,7 +6187,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -6220,7 +6220,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -6268,7 +6268,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -6384,7 +6384,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -6453,7 +6453,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -6490,7 +6490,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -6578,7 +6578,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -6616,7 +6616,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -6682,7 +6682,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -6712,7 +6712,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -6786,7 +6786,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -6855,7 +6855,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -6902,7 +6902,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -6952,7 +6952,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -7004,7 +7004,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -7056,7 +7056,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -7112,7 +7112,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -7155,7 +7155,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -7207,7 +7207,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -7265,7 +7265,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -7379,7 +7379,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -7735,7 +7735,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -7784,7 +7784,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -7863,7 +7863,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -7947,7 +7947,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -8063,7 +8063,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -8104,7 +8104,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -8169,7 +8169,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -8216,7 +8216,50 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/context/total_currently_staked": {
+      "get": {
+        "description": "Returns the amount of staked tez by delegates, delegators or overstaked.",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "delegates": {
+                      "$ref": "#/components/schemas/021-PsquebeC.mutez"
+                    },
+                    "delegators": {
+                      "$ref": "#/components/schemas/021-PsquebeC.mutez"
+                    },
+                    "overstaked": {
+                      "$ref": "#/components/schemas/021-PsquebeC.mutez"
+                    }
+                  },
+                  "required": [
+                    "delegates",
+                    "delegators",
+                    "overstaked"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -8243,7 +8286,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -8270,7 +8313,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -8302,7 +8345,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -8457,7 +8500,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -8564,7 +8607,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -8592,7 +8635,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -8620,7 +8663,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -8691,7 +8734,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -8803,7 +8846,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -8914,7 +8957,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -8954,7 +8997,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -9028,7 +9071,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -9081,7 +9124,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -9150,7 +9193,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -9244,7 +9287,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -9297,7 +9340,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -9416,7 +9459,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -9499,7 +9542,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -9773,7 +9816,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -9826,7 +9869,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -9855,7 +9898,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -9910,7 +9953,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -9983,7 +10026,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -10112,7 +10155,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -10190,7 +10233,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -10345,7 +10388,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -10397,7 +10440,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -10477,7 +10520,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -10648,7 +10691,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -10858,7 +10901,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -10973,7 +11016,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -11125,7 +11168,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -11274,7 +11317,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -11338,7 +11381,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -11472,7 +11515,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -11647,7 +11690,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -11753,7 +11796,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -11831,7 +11874,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -11917,7 +11960,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -11947,7 +11990,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -11985,7 +12028,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -12017,7 +12060,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -12050,7 +12093,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -12091,7 +12134,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -12143,7 +12186,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -12176,7 +12219,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -12217,7 +12260,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -12269,7 +12312,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -12331,7 +12374,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -12399,7 +12442,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -12473,7 +12516,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -12505,7 +12548,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -12544,7 +12587,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -12576,7 +12619,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -12623,7 +12666,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -12666,7 +12709,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -12775,7 +12818,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -12812,7 +12855,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -12841,7 +12884,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -12883,7 +12926,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -12923,7 +12966,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -12963,7 +13006,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -13072,7 +13115,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -13101,7 +13144,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -23416,7 +23459,7 @@
         ]
       },
       "error": {
-        "description": "The full list of errors is available with the global RPC `GET errors`"
+        "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
       },
       "fitness": {
         "title": "Block fitness",
