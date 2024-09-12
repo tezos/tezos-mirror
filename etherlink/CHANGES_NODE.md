@@ -12,6 +12,10 @@
 - Add a flag `--no-sync` to the observer command. If the flag is set, the observer
   does not synchronise with the EVM node endpoint. (!14889)
 
+#### Metrics
+
+- Add the `smart_rollup_address` label to the `octez_evm_node_info` metrics. (!14906)
+
 ### Bug fixes
 
 - Fix `init from rollup node` command failing to store items of the delayed
@@ -37,6 +41,11 @@ Beta.
   the `patch` commands. More precisely, patching the state `N` affects the
   replay of block `N+1`. (!14809)
 
+#### RPCs
+
+- Add state override option to `eth_call` RPC, similar to go-ethereum.
+  Limited to fields `balance`, `nonce` and `code`. (!14708)
+
 ### Bug fixes
 
 #### RPCs
@@ -46,11 +55,6 @@ Beta.
 #### Metrics
 
 - Fix `octez_evm_node_head` for the RPC mode. (!14849)
-
-#### RPCs
-
-- Add state override option to `eth_call` RPC, similar to go-ethereum.
-  Limited to fields `balance`, `nonce` and `code`. (!14708)
 
 #### Internals
 

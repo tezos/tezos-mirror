@@ -84,7 +84,7 @@ module Chain = struct
 end
 
 module Info = struct
-  let init ~mode =
+  let init ~mode ~smart_rollup_address =
     let commit_hash =
       Tezos_version_value.Current_git_info.abbreviated_commit_hash
     in
@@ -95,10 +95,20 @@ module Info = struct
         ~help:"Information"
         ~namespace
         ~subsystem
-        ~label_names:["commit_hash"; "commit_date"; "mode"]
+        ~label_names:
+          ["commit_hash"; "commit_date"; "mode"; "smart_rollup_address"]
         "info"
     in
-    ignore (Gauge.labels metric [commit_hash; commit_date; mode])
+    ignore
+      (Gauge.labels
+         metric
+         [
+           commit_hash;
+           commit_date;
+           mode;
+           Tezos_crypto.Hashed.Smart_rollup_address.to_b58check
+             smart_rollup_address;
+         ])
 end
 
 module Block = struct
@@ -253,8 +263,8 @@ let metrics =
   let health = Health.init name in
   {chain; block; simulation; health}
 
-let init ~mode ~tx_pool_size_info =
-  Info.init ~mode ;
+let init ~mode ~tx_pool_size_info ~smart_rollup_address =
+  Info.init ~mode ~smart_rollup_address ;
   Tx_pool.register tx_pool_size_info
 
 let set_level ~level = Gauge.set metrics.chain.head (Z.to_float level)

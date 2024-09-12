@@ -75,7 +75,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
         configuration.experimental_features.block_storage_sqlite3
       ()
   in
-  let smart_rollup_address = Address.to_string smart_rollup_address_typed in
+  let smart_rollup_address_b58 = Address.to_string smart_rollup_address_typed in
   let* () =
     match sandbox_key with
     | Some (pk, _sk) -> Evm_context.patch_sequencer_key pk
@@ -90,7 +90,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
       (fun _ ->
         Signals_publisher.start
           ~cctxt
-          ~smart_rollup_address
+          ~smart_rollup_address:smart_rollup_address_b58
           ~sequencer_key:sequencer_config.sequencer
           ~rollup_node_endpoint
           ())
@@ -119,7 +119,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
       in
       let genesis_payload =
         Sequencer_blueprint.create_inbox_payload
-          ~smart_rollup_address
+          ~smart_rollup_address:smart_rollup_address_b58
           ~chunks:genesis_chunks
       in
       let* () =
@@ -145,7 +145,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
     Tx_pool.start
       {
         rollup_node = backend;
-        smart_rollup_address;
+        smart_rollup_address = smart_rollup_address_b58;
         mode = Sequencer;
         tx_timeout_limit = configuration.tx_pool_timeout_limit;
         tx_pool_addr_limit = Int64.to_int configuration.tx_pool_addr_limit;
@@ -157,12 +157,15 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
           | None -> None);
       }
   in
-  Metrics.init ~mode:"sequencer" ~tx_pool_size_info:Tx_pool.size_info ;
+  Metrics.init
+    ~mode:"sequencer"
+    ~tx_pool_size_info:Tx_pool.size_info
+    ~smart_rollup_address:smart_rollup_address_typed ;
   let* () =
     Block_producer.start
       {
         cctxt;
-        smart_rollup_address;
+        smart_rollup_address = smart_rollup_address_b58;
         sequencer_key = sequencer_config.sequencer;
         maximum_number_of_chunks = sequencer_config.max_number_of_chunks;
       }
