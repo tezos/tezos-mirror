@@ -38,7 +38,10 @@ val init : kernel:string -> t tzresult Lwt.t
     state. *)
 val modify : key:string -> value:string -> t -> t Lwt.t
 
-(** [exists evm_state key] returns [true] if a value or a tree/subtree 
+(** [delete ~kind evm_state key] delete the value/directory at [key] *)
+val delete : kind:Tezos_scoru_wasm.Durable.kind -> t -> string -> t Lwt.t
+
+(** [exists evm_state key] returns [true] if a value or a tree/subtree
     exists under [key] in [evm_state], [false] otherwise. *)
 val exists : t -> string -> bool Lwt.t
 

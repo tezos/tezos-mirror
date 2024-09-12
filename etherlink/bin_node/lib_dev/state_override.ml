@@ -11,7 +11,7 @@ let durable_nonce v = v |> Ethereum_types.encode_u64_le |> Bytes.to_string
 
 let durable_code = Ethereum_types.hex_to_bytes
 
-type error += Invalid_storage_value of string
+type error += Invalid_storage_value of string | State_and_state_diff
 
 let () =
   register_error_kind
@@ -23,7 +23,16 @@ let () =
       Format.fprintf ppf "%s is not a valid storage value" path)
     Data_encoding.(obj1 (req "durable_storage_invalid_value" string))
     (function Invalid_storage_value path -> Some path | _ -> None)
-    (fun path -> Invalid_storage_value path)
+    (fun path -> Invalid_storage_value path) ;
+  register_error_kind
+    `Permanent
+    ~id:"durable_storage_state_and_state_diff"
+    ~title:"Invalid state override"
+    ~description:
+      "Invalid state override, state and state diff are mutually exclusive."
+    Data_encoding.empty
+    (function State_and_state_diff -> Some () | _ -> None)
+    (fun () -> State_and_state_diff)
 
 let update_storage address state_diff state =
   let open Ethereum_types in
@@ -41,8 +50,23 @@ let update_storage address state_diff state =
   in
   StorageMap.fold_es update state_diff state
 
-let update_account address {Ethereum_types.balance; nonce; code; state_diff}
-    state =
+let replace_storage address state_override state =
+  let open Lwt_result_syntax in
+  if Ethereum_types.StorageMap.is_empty state_override then return state
+  else
+    let*? key = Durable_storage_path.Accounts.storage_dir_e address in
+    let*! state =
+      Evm_state.delete ~kind:Tezos_scoru_wasm.Durable.Directory state key
+    in
+    update_storage address state_override state
+
+let is_invalid state_override =
+  let open Ethereum_types in
+  not
+    (StorageMap.is_empty state_override.state
+    || StorageMap.is_empty state_override.state_diff)
+
+let update_account address state_override evm_state =
   let open Durable_storage_path in
   let open Lwt_result_syntax in
   let update v_opt key encode state =
@@ -52,13 +76,30 @@ let update_account address {Ethereum_types.balance; nonce; code; state_diff}
         let*! state = Evm_state.modify ~key ~value:(encode v) state in
         return state
   in
-  let* state =
-    update balance (Accounts.balance address) durable_balance state
-  in
-  let* state = update nonce (Accounts.nonce address) durable_nonce state in
-  let* state = update code (Accounts.code address) durable_code state in
-  let* state = update_storage address state_diff state in
-  return state
+  if is_invalid state_override then tzfail State_and_state_diff
+  else
+    let* evm_state =
+      update
+        state_override.balance
+        (Accounts.balance address)
+        durable_balance
+        evm_state
+    in
+    let* evm_state =
+      update
+        state_override.nonce
+        (Accounts.nonce address)
+        durable_nonce
+        evm_state
+    in
+    let* evm_state =
+      update state_override.code (Accounts.code address) durable_code evm_state
+    in
+    let* evm_state =
+      update_storage address state_override.state_diff evm_state
+    in
+    let* evm_state = replace_storage address state_override.state evm_state in
+    return evm_state
 
 let update_accounts state_override state =
   match state_override with

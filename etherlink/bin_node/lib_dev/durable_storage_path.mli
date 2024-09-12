@@ -69,6 +69,8 @@ module Accounts : sig
   (** Path to the account's storage at a given index. Error if address or
       storage key is invalid. *)
   val storage_e : address -> path -> path tzresult
+
+  val storage_dir_e : address -> path tzresult
 end
 
 module Code : sig
