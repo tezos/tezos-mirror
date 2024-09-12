@@ -268,10 +268,17 @@ let () =
   Block_directory.register0 Sc_rollup_services.Block.dal_processed_slots
   @@ fun (node_ctxt, block) () () -> get_dal_processed_slots node_ctxt block
 
-let () =
-  Block_directory.register0 Sc_rollup_services.Block.outbox
-  @@ fun (node_ctxt, block) outbox_level () ->
+let get_outbox_messages node_ctxt block outbox_level =
   let open Lwt_result_syntax in
+  let* block_level = Node_context.level_of_hash node_ctxt block in
+  let outbox_level_int32 = Alpha_context.Raw_level.to_int32 outbox_level in
+  let* () =
+    when_ (outbox_level_int32 > block_level) @@ fun () ->
+    failwith
+      "Outbox level %ld is not known at level %ld@."
+      outbox_level_int32
+      block_level
+  in
   let* state = get_state node_ctxt block in
   let open (val Pvm.of_kind node_ctxt.kind) in
   let*! outbox =
@@ -280,15 +287,14 @@ let () =
   return outbox
 
 let () =
+  Block_directory.register0 Sc_rollup_services.Block.outbox
+  @@ fun (node_ctxt, block) outbox_level () ->
+  get_outbox_messages node_ctxt block outbox_level
+
+let () =
   Block_directory.register1 Sc_rollup_services.Block.outbox_messages
   @@ fun (node_ctxt, block) outbox_level () () ->
-  let open Lwt_result_syntax in
-  let* state = get_state node_ctxt block in
-  let open (val Pvm.of_kind node_ctxt.kind) in
-  let*! outbox =
-    get_outbox outbox_level (Ctxt_wrapper.of_node_pvmstate state)
-  in
-  return outbox
+  get_outbox_messages node_ctxt block outbox_level
 
 let () =
   Block_helpers_directory.register1
