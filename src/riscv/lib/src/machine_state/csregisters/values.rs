@@ -161,7 +161,7 @@ impl Layout for CSRValuesLayout {
     }
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct CSRValuesF<Raw, MStatus, MIP> {
     pub mstatus: MStatus,
     pub mnscratch: Raw,

@@ -5,7 +5,9 @@
 use crate::state_backend::Elem;
 
 /// Integer to keep track of the fence counter
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(
+    Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+)]
 pub struct FenceCounter(pub u32);
 
 impl FenceCounter {

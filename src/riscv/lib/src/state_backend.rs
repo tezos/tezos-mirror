@@ -171,6 +171,39 @@ pub trait ManagerReadWrite: ManagerRead + ManagerWrite {
     ) -> E;
 }
 
+/// Manager with the ability to serialise regions
+pub trait ManagerSerialise: ManagerBase {
+    /// Serialise the contents of the region.
+    fn serialise_region<E: serde::Serialize + Elem, const LEN: usize, S: serde::Serializer>(
+        region: &Self::Region<E, LEN>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>;
+
+    /// Serialise the contents of the dynamic region.
+    fn serialise_dyn_region<const LEN: usize, S: serde::Serializer>(
+        region: &Self::DynRegion<LEN>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>;
+}
+
+/// Manager with the ability to deserialise regions
+pub trait ManagerDeserialise: ManagerBase {
+    /// Deserialise a region.
+    fn deserialise_region<
+        'de,
+        E: serde::Deserialize<'de> + Elem,
+        const LEN: usize,
+        D: serde::Deserializer<'de>,
+    >(
+        deserializer: D,
+    ) -> Result<Self::Region<E, LEN>, D::Error>;
+
+    /// Deserialise the dyanmic region.
+    fn deserialise_dyn_region<'de, const LEN: usize, D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<Self::DynRegion<LEN>, D::Error>;
+}
+
 /// State backend with manager
 pub trait BackendManagement {
     /// Backend manager
@@ -214,6 +247,22 @@ impl<'backend, M: ManagerBase> ManagerBase for Ref<'backend, M> {
     type Region<E: Elem, const LEN: usize> = &'backend M::Region<E, LEN>;
 
     type DynRegion<const LEN: usize> = &'backend M::DynRegion<LEN>;
+}
+
+impl<M: ManagerSerialise> ManagerSerialise for Ref<'_, M> {
+    fn serialise_region<E: serde::Serialize + Elem, const LEN: usize, S: serde::Serializer>(
+        region: &Self::Region<E, LEN>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        M::serialise_region(region, serializer)
+    }
+
+    fn serialise_dyn_region<const LEN: usize, S: serde::Serializer>(
+        region: &Self::DynRegion<LEN>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        M::serialise_dyn_region(region, serializer)
+    }
 }
 
 pub mod test_helpers {

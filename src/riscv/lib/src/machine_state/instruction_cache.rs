@@ -98,7 +98,7 @@ impl<M: ManagerBase> Cached<M> {
 ///
 /// Compressed instructions are represented as the lower-16 bits of the u32, with upper-16 bits
 /// set to zero.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[repr(transparent)]
 pub struct Unparsed(u32);
 

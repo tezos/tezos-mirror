@@ -108,25 +108,38 @@ macro_rules! struct_layout {
         $( , )?
     }) => {
         paste::paste! {
-            $vis struct $layout_t {
-                $( [<_$field_name>]: $cell_repr ),+
+            #[derive(serde::Deserialize, serde::Serialize)]
+            $vis struct [<$layout_t F>]<
+                $(
+                    [<$field_name:upper>]
+                ),+
+            > {
+                $(
+                    $field_name: [<$field_name:upper>]
+                ),+
             }
 
-            pub struct [<$layout_t Placed>] {
-                $( $field_name: $crate::state_backend::PlacedOf<$cell_repr> ),+
-            }
-
-            pub struct [<$layout_t Allocated>]<M: $crate::state_backend::ManagerBase> {
-                $( $field_name: AllocatedOf<$cell_repr, M> ),+
-            }
+            $vis type $layout_t = [<$layout_t F>]<
+                $(
+                    $cell_repr
+                ),+
+            >;
 
             impl $crate::state_backend::Layout for $layout_t {
-                type Placed = [<$layout_t Placed>];
+                type Placed = [<$layout_t F>]<
+                    $(
+                        $crate::state_backend::PlacedOf<$cell_repr>
+                    ),+
+                >;
 
-                type Allocated<M: $crate::state_backend::ManagerBase> = [<$layout_t Allocated>]<M>;
+                type Allocated<M: $crate::state_backend::ManagerBase> = [<$layout_t F>]<
+                    $(
+                        AllocatedOf<$cell_repr, M>
+                    ),+
+                >;
 
                 fn place_with(alloc: &mut $crate::state_backend::Choreographer) -> Self::Placed {
-                    [<$layout_t Placed>] {
+                    Self::Placed {
                         $($field_name: <$cell_repr>::place_with(alloc)),+
                     }
                 }

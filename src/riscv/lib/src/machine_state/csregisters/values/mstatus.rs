@@ -72,7 +72,7 @@ impl<M: ManagerBase> MStatusValue<M> {
 
     /// Obtain a structure with references to the bound regions of this type.
     pub fn struct_ref(&self) -> AllocatedOf<MStatusLayout, Ref<'_, M>> {
-        MStatusLayoutAllocated {
+        MStatusLayoutF {
             sie: self.sie.struct_ref(),
             mie: self.mie.struct_ref(),
             spie: self.spie.struct_ref(),
