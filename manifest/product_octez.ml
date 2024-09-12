@@ -6260,6 +6260,7 @@ let hash = Protocol.hash
     in
     let baking =
       only_if active @@ fun () ->
+      let (PPX {preprocess; preprocessor_deps}) = ppx_profiler in
       octez_protocol_lib
         "baking"
         ~internal_name:("tezos_baking_" ^ name_dash)
@@ -6268,6 +6269,8 @@ let hash = Protocol.hash
           (if N.(number <= 011) then
              "Base library for `tezos-baker/endorser/accuser`"
            else "Base library for `tezos-baker/accuser`")
+        ~preprocess
+        ~preprocessor_deps
         ~deps:
           [
             octez_base |> open_ ~m:"TzPervasives"
