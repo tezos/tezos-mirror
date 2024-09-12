@@ -39,6 +39,26 @@ rm -f current_run_dir
 
 TODAY=$(date +"%Y%m%d_%H%M")
 
+# Directory variables for the io benchmarks. They must be set manually.
+# Data directory. This directory should contain data from a tezos node.
+IO_DATA_DIR=${IO_DATA_DIR-""}
+# Cache directory. This directory is used to cache context keys during benchmarks. It should
+# be cleaned if the data directory changes. It can be cleaned anytime, at the cost of performance.
+IO_CACHE_DIR=${IO_CACHE_DIR-""}
+
+# IO benchmarks are run if and only if the [IO_BENCH] environment variable, as well as the directories
+# [IO_DATA_DIR] and [IO_CACHE_DIR], are defined.
+if [ -n "$IO_BENCH" ]; then
+  if [ -n "$IO_DATA_DIR" ] && [ -n "$IO_CACHE_DIR" ]; then
+    extra_param="--io-only --io-cache-dir ${IO_CACHE_DIR} --io-data-dir ${IO_DATA_DIR}"
+  else
+    dated_log "Either IO_DATA_DIR or IO_CACHE_DIR is not set for the IO benchmarks. Exiting."
+    exit 1
+  fi
+else
+  extra_param=""
+fi
+
 dated_log() {
   date +"[%Y-%m-%d %T] $1."
 }
@@ -85,7 +105,7 @@ dated_log "Install DAL trusted setup"
 
 # Run benchmarks.
 dated_log "Running benchmarks"
-time dune exec tezt/snoop/main.exe -- --verbose
+time dune exec tezt/snoop/main.exe -- --verbose "$extra_param"
 dated_log "End of benchmarks run"
 
 # Move results from tezos to their dedicated directory.
