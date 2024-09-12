@@ -29,9 +29,10 @@ let register_test =
     ~enable_dal:true
     ~threshold_encryption:false
 
-let count_event sequencer event counter =
-  Evm_node.wait_for sequencer event (fun _json ->
-      incr counter ;
+let count_event ?(get_count_from_event = fun _event -> 1) sequencer event
+    counter =
+  Evm_node.wait_for sequencer event (fun json ->
+      counter := !counter + get_count_from_event json ;
       (* We return None here to keep the loop running *)
       None)
 
@@ -70,7 +71,12 @@ let test_publish_blueprints_on_dal ~dal_slot =
   in
 
   let signal_counter_p =
-    count_event sequencer "signal_publisher_signal_signed.v0" number_of_signals
+    count_event
+      ~get_count_from_event:(fun event ->
+        JSON.(event |-> "signals" |> as_list |> List.length))
+      sequencer
+      "signal_publisher_signal_signed.v0"
+      number_of_signals
   in
 
   let* _ =
