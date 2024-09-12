@@ -629,19 +629,15 @@ let run ?verbosity ~singleprocess ~strict ~repeat ~stats_output
   let*! () =
     Tezos_base_unix.Internal_event_unix.init ~config:internal_events ()
   in
-  (match Option.map String.lowercase_ascii @@ Sys.getenv_opt "PROFILING" with
-  | Some (("true" | "on" | "yes" | "terse" | "detailed" | "verbose") as mode) ->
-      let max_lod =
-        match mode with
-        | "detailed" -> Profiler.Detailed
-        | "verbose" -> Profiler.Verbose
-        | _ -> Profiler.Terse
-      in
-      let profiler_maker =
-        Tezos_shell.Profiler_directory.profiler_maker config.data_dir max_lod
-      in
-      Shell_profiling.activate_all ~profiler_maker
-  | _ -> ()) ;
+  let () =
+    match Tezos_base.Profiler.parse_profiling_vars config.data_dir with
+    | Some max_lod, output_dir ->
+        let profiler_maker =
+          Tezos_shell.Profiler_directory.profiler_maker output_dir max_lod
+        in
+        Shell_profiling.activate_all ~profiler_maker
+    | None, _ -> ()
+  in
   Updater.init (Data_version.protocol_dir config.data_dir) ;
   Lwt_exit.(
     wrap_and_exit

@@ -57,22 +57,17 @@ let await_protocol_start (cctxt : #Protocol_client_context.full) ~chain =
   Node_rpc.await_protocol_activation cctxt ~chain ()
 
 let may_start_profiler baking_dir =
-  match Option.map String.lowercase_ascii @@ Sys.getenv_opt "PROFILING" with
-  | Some (("true" | "on" | "yes" | "terse" | "detailed" | "verbose") as mode) ->
-      let max_lod =
-        match mode with
-        | "detailed" -> Profiler.Detailed
-        | "verbose" -> Profiler.Verbose
-        | _ -> Profiler.Terse
-      in
+  match Tezos_base.Profiler.parse_profiling_vars baking_dir with
+  | Some max_lod, output_dir ->
       let profiler_maker ~name =
         Profiler.instance
           Tezos_base_unix.Simple_profiler.auto_write_to_txt_file
-          Filename.Infix.((baking_dir // name) ^ "_profiling.txt", max_lod)
+          Filename.Infix.
+            ((output_dir // name) ^ Profiler.profiler_file_suffix, max_lod)
       in
       Baking_profiler.init profiler_maker ;
       RPC_profiler.init profiler_maker
-  | _ -> ()
+  | None, _ -> ()
 
 module Baker = struct
   let run (cctxt : Protocol_client_context.full) ?minimal_fees
