@@ -65,5 +65,9 @@ let create ~cctxt ~sequencer_key ~smart_rollup_address ~slot_ids =
   in
   `External
     Message_format.(
-      frame_message smart_rollup_address Sequencer_signal rlp_sequencer_signal)
+      frame_message
+        (Tezos_crypto.Hashed.Smart_rollup_address.to_string
+           smart_rollup_address)
+        Sequencer_signal
+        rlp_sequencer_signal)
   |> return

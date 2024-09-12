@@ -37,4 +37,6 @@ val commited_or_included_injection_id :
     each pair consists of a DAL slot index and the level at which its
     injection was published. *)
 val signal_signed :
-  signals:(int * int32) list -> smart_rollup_address:string -> unit Lwt.t
+  signals:(int * int32) list ->
+  smart_rollup_address:Tezos_crypto.Hashed.Smart_rollup_address.t ->
+  unit Lwt.t

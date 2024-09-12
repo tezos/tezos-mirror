@@ -21,15 +21,19 @@ module Types = struct
 
   type state = {
     cctxt : Client_context.wallet;
-    smart_rollup_address : string;
+    smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
     sequencer_key : Client_keys.sk_uri;
     rollup_node_endpoint : Uri.t;
   }
 
   let of_parameters
       ({cctxt; smart_rollup_address; sequencer_key; rollup_node_endpoint} :
-        parameters) : state =
-    {cctxt; smart_rollup_address; sequencer_key; rollup_node_endpoint}
+        parameters) : state tzresult Lwt.t =
+    let open Lwt_result_syntax in
+    let*? smart_rollup_address =
+      Tezos_crypto.Hashed.Smart_rollup_address.of_string smart_rollup_address
+    in
+    return {cctxt; smart_rollup_address; sequencer_key; rollup_node_endpoint}
 end
 
 module Name = struct
@@ -180,7 +184,7 @@ module Handlers = struct
   type launch_error = error trace
 
   let on_launch _w () (parameters : Types.parameters) =
-    Lwt_result_syntax.return (Types.of_parameters parameters)
+    Types.of_parameters parameters
 
   let on_error (type a b) _w _st (_r : (a, b) Request.t) (_errs : b) :
       unit tzresult Lwt.t =

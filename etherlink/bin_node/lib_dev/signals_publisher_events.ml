@@ -58,7 +58,7 @@ let signal_signed =
     ( "signals",
       Data_encoding.(
         list (obj2 (req "slot_index" uint8) (req "published_level" int32))) )
-    ("smart_rollup_address", Data_encoding.string)
+    ("smart_rollup_address", Tezos_crypto.Hashed.Smart_rollup_address.encoding)
     ~pp1:
       Format.(
         pp_print_list ~pp_sep:pp_print_space (fun fmt (k, v) ->
