@@ -3703,6 +3703,56 @@ module Revamped = struct
     let* () = check_mempool ~validated:[oph] client2 in
 
     unit
+
+  (** This test tries to inject an operation with an old branch that is now
+      unknown by the prevalidator *)
+  let injecting_old_operation_fails =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Injecting old operation fails"
+      ~tags:[team; "mempool"; "injection"; "branch"; "fail"]
+    @@ fun protocol ->
+    log_step 1 "Initialize node and activate protocol" ;
+    let* node, client =
+      Client.init_with_node
+        ~nodes_args:[Synchronisation_threshold 0; Private_mode; Connections 0]
+        `Client
+        ()
+    in
+    (* set the max operation time to live to 1 so that block older than 1 level
+       are unknown by the node *)
+    let max_operations_ttl = 1 in
+    let* parameter_file =
+      Protocol.write_parameter_file
+        ~base:(Either.Right (protocol, None))
+        [(["max_operations_time_to_live"], `Int max_operations_ttl)]
+    in
+    let* () =
+      Client.activate_protocol_and_wait ~protocol ~parameter_file client
+    in
+
+    log_step 2 "Fetch branch hash" ;
+    let* branch = Operation.Manager.get_branch client in
+
+    log_step 3 "Bake more than max_op_ttl blocks" ;
+    let offset = 2 in
+    let* () =
+      repeat (max_operations_ttl + offset) (fun () ->
+          Client.bake_for_and_wait client)
+    in
+    (* + 1 for the activation block *)
+    let* _ = Node.wait_for_level node (max_operations_ttl + offset + 1) in
+
+    log_step 4 "Inject an operation with the old branch and wait for failure" ;
+    let* (`OpHash _) =
+      Operation.Manager.(
+        inject
+          ~branch
+          ~error:Operation_core.injection_error_unknown_branch
+          [make (transfer ())]
+          client)
+    in
+    unit
 end
 
 let check_operation_is_in_validated_mempool ops oph =
@@ -4177,72 +4227,6 @@ let force_operation_injection =
   in
   unit
 
-(** This test tries to inject an operation with an old known branch *)
-let injecting_old_operation_fails =
-  let step1 = "Initialize node and activate protocol" in
-  let step2 = "Recover counter and branch" in
-  let step3 = "Bake max_op_ttl block" in
-  let step4 = "Forge an operation with the old branch" in
-  let step5 = "Inject the operation and wait for failure" in
-  let log_step = Log.info "Step %d: %s" in
-  let max_operations_ttl = 1 in
-  Protocol.register_test
-    ~__FILE__
-    ~title:"Injecting old operation fails"
-    ~tags:[team; "mempool"; "injection"]
-  @@ fun protocol ->
-  log_step 1 step1 ;
-  let* node =
-    Node.init [Synchronisation_threshold 0; Private_mode; Connections 0]
-  in
-  let* client = Client.init ~endpoint:(Node node) () in
-  let* parameter_file =
-    Protocol.write_parameter_file
-      ~base:(Either.Right (protocol, None))
-      [(["max_operations_time_to_live"], `Int max_operations_ttl)]
-  in
-  let* () =
-    Client.activate_protocol_and_wait ~protocol ~parameter_file client
-  in
-  log_step 2 step2 ;
-  let* json =
-    Client.RPC.call client
-    @@ RPC.get_chain_block_context_contract_counter
-         ~id:Constant.bootstrap1.public_key_hash
-         ()
-  in
-  let counter = JSON.as_int json in
-  let* branch = Operation.Manager.get_branch client in
-  log_step 3 step3 ;
-  (* To avoid off-by-one mistakes *)
-  let blocks_to_bake = 2 in
-  let* () =
-    repeat (max_operations_ttl + blocks_to_bake) (fun () ->
-        Client.bake_for_and_wait client)
-  in
-  (* + 1 for the activation block *)
-  let* _ = Node.wait_for_level node (max_operations_ttl + blocks_to_bake + 1) in
-  log_step 4 step4 ;
-  let* (`Hex op_str_hex as op_hex) =
-    forge_operation
-      ~branch
-      ~fee:1000
-      ~gas_limit:1040
-      ~source:Constant.bootstrap1.public_key_hash
-      ~destination:Constant.bootstrap3.public_key_hash
-      ~counter:(counter + 1)
-      ~client
-  in
-  let (`Hex signature) =
-    Operation.sign_manager_op_hex ~signer:Constant.bootstrap1 op_hex
-  in
-  log_step 5 step5 ;
-  let*? process =
-    Client.RPC.spawn client
-    @@ RPC.post_injection_operation (Data (`String (op_str_hex ^ signature)))
-  in
-  Process.check_error ~msg:Operation_core.injection_error_unknown_branch process
-
 let register ~protocols =
   Revamped.flush_mempool protocols ;
   Revamped.recycling_branch_refused protocols ;
@@ -4280,4 +4264,4 @@ let register ~protocols =
   Revamped.refused_operations_are_not_reclassified protocols ;
   Revamped.request_operations_from_peer protocols ;
   force_operation_injection protocols ;
-  injecting_old_operation_fails protocols
+  Revamped.injecting_old_operation_fails protocols
