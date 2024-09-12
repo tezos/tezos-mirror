@@ -271,6 +271,8 @@ Smart Rollup node
 - Fix an issue which could introduce a discrepancy between the snapshot header
   and its content. (MR :gl:`!14777`)
 
+- The command ``generate openapi`` now exports mimified JSON. (MR :gl:`!14908`)
+
 Smart Rollup WASM Debugger
 --------------------------
 

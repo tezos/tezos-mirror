@@ -592,5 +592,5 @@ let shutdown () =
 let worker_status () =
   match Lwt.state worker_promise with
   | Lwt.Return _ -> `Running
-  | Lwt.Fail exn -> `Crashed (Error_monad.error_of_exn exn)
+  | Lwt.Fail exn -> `Crashed exn
   | Lwt.Sleep -> `Not_running

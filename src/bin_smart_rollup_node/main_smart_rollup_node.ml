@@ -607,7 +607,10 @@ let openapi_command =
     (prefixes ["generate"; "openapi"] @@ stop)
     (fun protocol cctxt ->
       let* openapi_json = Rpc_directory.generate_openapi ?protocol cctxt in
-      let*! () = cctxt#message "%a" Data_encoding.Json.pp openapi_json in
+      let openapi_json_str =
+        Data_encoding.Json.to_string ~minify:true openapi_json
+      in
+      let*! () = cctxt#message "%s" openapi_json_str in
       return_unit)
 
 let sc_rollup_commands () =

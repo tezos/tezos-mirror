@@ -69,4 +69,4 @@ val register_messages :
 val message_status : L2_message.id -> (status * string) option tzresult
 
 (** Returns the status of the publisher worker  *)
-val worker_status : unit -> [`Running | `Not_running | `Crashed of error]
+val worker_status : unit -> [`Running | `Not_running | `Crashed of exn]

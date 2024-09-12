@@ -110,7 +110,7 @@ type health = {
   healthy : bool;
   degraded : bool;
   l1 : l1_health;
-  active_workers : (string * [`Running | `Crashed of error]) list;
+  active_workers : (string * [`Running | `Crashed of exn]) list;
 }
 
 type version = {
@@ -162,6 +162,10 @@ module Encodings = struct
                (req "level" int32)
                (req "timestamp" Time.Protocol.encoding)))
 
+  let exn =
+    def "exception" ~description:"Exception"
+    @@ conv Printexc.to_string (fun s -> Failure s) string
+
   let health =
     conv
       (fun {healthy; degraded; l1; active_workers} ->
@@ -188,7 +192,7 @@ module Encodings = struct
                        case
                          (Tag 1)
                          ~title:"crashed"
-                         (obj1 (req "crashed" error_encoding))
+                         (obj1 (req "crashed" exn))
                          (function `Crashed e -> Some e | _ -> None)
                          (fun e -> `Crashed e);
                      ]))))
@@ -586,7 +590,9 @@ module Encodings = struct
          (obj1
             (dft
                "errors"
-               (obj2 (req "count" int31) (opt "last" trace_encoding))
+               (obj2
+                  (req "count" int31)
+                  (opt "last" Tezos_rpc.Service.error_encoding))
                (0, None)))
 
   let injector_queues =
