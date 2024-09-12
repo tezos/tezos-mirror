@@ -586,7 +586,9 @@ module Encodings = struct
          (obj1
             (dft
                "errors"
-               (obj2 (req "count" int31) (opt "last" trace_encoding))
+               (obj2
+                  (req "count" int31)
+                  (opt "last" Tezos_rpc.Service.error_encoding))
                (0, None)))
 
   let injector_queues =
