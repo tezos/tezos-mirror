@@ -6,4 +6,6 @@
 (*****************************************************************************)
 
 val update_accounts :
-  Ethereum_types.state_override option -> Evm_state.t -> Evm_state.t Lwt.t
+  Ethereum_types.state_override option ->
+  Evm_state.t ->
+  Evm_state.t tzresult Lwt.t

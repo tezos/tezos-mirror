@@ -13,24 +13,30 @@ let durable_code = Ethereum_types.hex_to_bytes
 
 let update_storage address state_diff state =
   let open Ethereum_types in
+  let open Lwt_result_syntax in
   let update key value state =
     let (Hex key) = key in
     let (Hex value) = value in
-    Evm_state.modify
-      ~key:(Durable_storage_path.Accounts.storage address key)
-      ~value
-      state
+    let*! state =
+      Evm_state.modify
+        ~key:(Durable_storage_path.Accounts.storage address key)
+        ~value
+        state
+    in
+    return state
   in
-  StorageMap.fold_s update state_diff state
+  StorageMap.fold_es update state_diff state
 
 let update_account address {Ethereum_types.balance; nonce; code; state_diff}
     state =
   let open Durable_storage_path in
-  let open Lwt_syntax in
+  let open Lwt_result_syntax in
   let update v_opt key encode state =
     match v_opt with
-    | None -> Lwt_syntax.return state
-    | Some v -> Evm_state.modify ~key ~value:(encode v) state
+    | None -> return state
+    | Some v ->
+        let*! state = Evm_state.modify ~key ~value:(encode v) state in
+        return state
   in
   let* state =
     update balance (Accounts.balance address) durable_balance state
@@ -42,5 +48,5 @@ let update_account address {Ethereum_types.balance; nonce; code; state_diff}
 
 let update_accounts state_override state =
   match state_override with
-  | None -> Lwt_syntax.return state
-  | Some so -> Ethereum_types.AddressMap.fold_s update_account so state
+  | None -> Lwt_result_syntax.return state
+  | Some so -> Ethereum_types.AddressMap.fold_es update_account so state
