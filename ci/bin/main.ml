@@ -61,6 +61,8 @@ let variables : variables =
     (* To avoid Cargo accessing the network in jobs without caching (see
        {!Common.enable_cargo_cache}), we turn of net access by default. *)
     ("CARGO_NET_OFFLINE", "true");
+    (* Reduce the verbosity of Cargo. *)
+    ("CARGO_TERM_QUIET", "true");
   ]
 
 (* Register pipelines types. Pipelines types are used to generate
