@@ -98,7 +98,7 @@ oc.build:static-x86_64-linux-binaries:
   script:
   - ./scripts/ci/build_static_binaries.sh
   after_script:
-  - sccache --stop-server || true
+  - ./scripts/ci/sccache-stop.sh
   variables:
     ARCH: x86_64
     EXECUTABLE_FILES: script-inputs/released-executables script-inputs/experimental-executables
@@ -134,7 +134,7 @@ oc.build:static-arm64-linux-binaries:
   script:
   - ./scripts/ci/build_static_binaries.sh
   after_script:
-  - sccache --stop-server || true
+  - ./scripts/ci/sccache-stop.sh
   variables:
     ARCH: arm64
     EXECUTABLE_FILES: script-inputs/released-executables script-inputs/experimental-executables
@@ -172,7 +172,7 @@ oc.build_arm64-released:
   script:
   - ./scripts/ci/build_full_unreleased.sh
   after_script:
-  - sccache --stop-server || true
+  - ./scripts/ci/sccache-stop.sh
   variables:
     ARCH: arm64
     EXECUTABLE_FILES: script-inputs/released-executables
@@ -218,7 +218,7 @@ oc.build_arm64-exp-dev-extra:
   script:
   - ./scripts/ci/build_full_unreleased.sh
   after_script:
-  - sccache --stop-server || true
+  - ./scripts/ci/sccache-stop.sh
   variables:
     ARCH: arm64
     EXECUTABLE_FILES: script-inputs/experimental-executables script-inputs/dev-executables
@@ -371,7 +371,7 @@ publish:documentation:
   script:
   - ./scripts/ci/doc_publish.sh
   after_script:
-  - sccache --stop-server || true
+  - ./scripts/ci/sccache-stop.sh
   variables:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
@@ -423,7 +423,7 @@ publish_kernel_sdk:
   - make -f kernels.mk publish-sdk-deps
   - SSL_CERT_DIR=/etc/ssl/certs CC=clang make -f kernels.mk publish-sdk
   after_script:
-  - sccache --stop-server || true
+  - ./scripts/ci/sccache-stop.sh
   variables:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache

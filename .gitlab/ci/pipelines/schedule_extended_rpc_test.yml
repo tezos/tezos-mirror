@@ -380,7 +380,7 @@ oc.build_x86_64-released:
   script:
   - ./scripts/ci/build_full_unreleased.sh
   after_script:
-  - sccache --stop-server || true
+  - ./scripts/ci/sccache-stop.sh
   variables:
     ARCH: x86_64
     EXECUTABLE_FILES: script-inputs/released-executables
@@ -424,7 +424,7 @@ oc.build_x86_64-exp-dev-extra:
   script:
   - ./scripts/ci/build_full_unreleased.sh
   after_script:
-  - sccache --stop-server || true
+  - ./scripts/ci/sccache-stop.sh
   variables:
     ARCH: x86_64
     EXECUTABLE_FILES: script-inputs/experimental-executables script-inputs/dev-executables
@@ -470,7 +470,7 @@ oc.build_kernels:
   - make -C src/riscv riscv-sandbox riscv-dummy.elf
   - make -C src/riscv/tests/ build
   after_script:
-  - sccache --stop-server || true
+  - ./scripts/ci/sccache-stop.sh
   variables:
     CC: clang
     NATIVE_TARGET: x86_64-unknown-linux-musl

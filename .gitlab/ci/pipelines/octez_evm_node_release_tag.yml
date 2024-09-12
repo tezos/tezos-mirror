@@ -75,7 +75,7 @@ oc.build:static-arm64-linux-binaries:
   script:
   - ./scripts/ci/build_static_binaries.sh
   after_script:
-  - sccache --stop-server || true
+  - ./scripts/ci/sccache-stop.sh
   variables:
     ARCH: arm64
     EXECUTABLE_FILES: script-inputs/octez-evm-node-executable
@@ -111,7 +111,7 @@ oc.build:static-x86_64-linux-binaries:
   script:
   - ./scripts/ci/build_static_binaries.sh
   after_script:
-  - sccache --stop-server || true
+  - ./scripts/ci/sccache-stop.sh
   variables:
     ARCH: x86_64
     EXECUTABLE_FILES: script-inputs/octez-evm-node-executable
