@@ -221,7 +221,9 @@ module Processing = struct
                     cache;
                   } )
         in
-        continue block_application_result cache None None
+        Tezos_protocol_environment.Environment_profiler.stop () ;
+        let report = Tezos_base.Profiler.report headless in
+        continue block_application_result cache None report
     | Preapply
         {
           chain_id;
@@ -331,7 +333,9 @@ module Processing = struct
                 header
                 operations)
         in
-        continue block_validate_result cache cached_result None
+        Tezos_protocol_environment.Environment_profiler.stop () ;
+        let report = Tezos_base.Profiler.report headless in
+        continue block_validate_result cache cached_result report
     | External_validation.Fork_test_chain
         {chain_id; context_hash; forked_header} ->
         let*! context_opt = Context_ops.checkout context_index context_hash in

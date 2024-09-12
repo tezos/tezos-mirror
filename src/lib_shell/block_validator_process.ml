@@ -488,7 +488,12 @@ module External_validator_process = struct
           simulate;
         }
     in
-    let* res, _report = send_request validator request in
+    let* res, report = send_request validator request in
+    (match report with
+    | None -> ()
+    | Some report -> (
+        try Profiler.inc Shell_profiling.block_validator_profiler report
+        with _ -> ())) ;
     return res
 
   let preapply_block validator ~chain_id ~timestamp ~protocol_data ~live_blocks
@@ -537,7 +542,12 @@ module External_validator_process = struct
           hash;
         }
     in
-    let* res, _report = send_request validator request in
+    let* res, report = send_request validator request in
+    (match report with
+    | None -> ()
+    | Some report -> (
+        try Profiler.inc Shell_profiling.block_validator_profiler report
+        with _ -> ())) ;
     return res
 
   let context_garbage_collection validator _index context_hash ~gc_lockfile_path
