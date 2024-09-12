@@ -196,6 +196,7 @@ module Internal_validator_process = struct
     mutable preapply_result :
       (Block_validation.apply_result * Tezos_protocol_environment.Context.t)
       option;
+    headless : Tezos_base.Profiler.instance;
   }
 
   let init
@@ -207,6 +208,13 @@ module Internal_validator_process = struct
         validator_environment) chain_store =
     let open Lwt_syntax in
     let* () = Events.(emit init ()) in
+    let headless =
+      Tezos_base.Profiler.instance
+        Tezos_base_unix.Simple_profiler.headless
+        Profiler.Detailed
+    in
+    Tezos_base.Profiler.(plug main) headless ;
+    Tezos_protocol_environment.Environment_profiler.plug headless ;
     return_ok
       {
         chain_store;
@@ -215,6 +223,7 @@ module Internal_validator_process = struct
         operation_metadata_size_limit;
         cache = None;
         preapply_result = None;
+        headless;
       }
 
   let kind = Single_process
