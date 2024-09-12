@@ -109,3 +109,6 @@ val empty : Stack.t
 val stack_var : int -> Stack.t
 
 val item : Base.t -> Stack.t -> Stack.t
+
+(** Clears the hash consing tables to free memory *)
+val clear_tables : unit -> unit

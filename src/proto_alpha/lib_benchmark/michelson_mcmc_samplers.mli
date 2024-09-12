@@ -60,6 +60,11 @@ val save : filename:string -> terms:michelson_sample list -> unit
     Exits with code 1 if an error arises during decoding or file manipulation. *)
 val load : filename:string -> michelson_sample list
 
+(** Appends a list of samples to a file.
+    Creates the file if non-existent.
+    Exits with code 1 if an error arises during encoding or file manipulation. *)
+val append : filename:string -> terms:michelson_sample list -> unit
+
 (** [Make_code_sampler] produces a sampler for well-typed Michelson code.
     The parameters of the functor are:
     - a module [Michelson_base] implementing samplers for basic values

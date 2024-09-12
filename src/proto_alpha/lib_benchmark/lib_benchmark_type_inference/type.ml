@@ -198,3 +198,8 @@ let empty = Stack.Table.hashcons Stack.table Empty_t
 let stack_var x = Stack.Table.hashcons Stack.table (Stack_var_t x)
 
 let item head tail = Stack.Table.hashcons Stack.table (Item_t (head, tail))
+
+(* Clear tables *)
+let clear_tables () =
+  Base.(Table.clear table) ;
+  Stack.(Table.clear table)
