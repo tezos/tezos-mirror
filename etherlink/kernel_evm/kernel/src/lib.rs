@@ -6,6 +6,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::configuration::{fetch_configuration, Configuration};
+use crate::delayed_inbox::DELAYED_INBOX_PATH;
 use crate::error::Error;
 use crate::error::UpgradeProcessError::Fallback;
 use crate::migration::storage_migration;
@@ -37,6 +38,7 @@ use tezos_smart_rollup::outbox::{
 };
 use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
+use tezos_smart_rollup_host::path::RefPath;
 use tezos_smart_rollup_host::runtime::{Runtime, ValueType};
 
 mod apply;
@@ -200,7 +202,30 @@ fn retrieve_block_fees<Host: Runtime>(host: &mut Host) -> Result<BlockFees, Erro
     Ok(block_fees)
 }
 
+const DELAYED_INBOX_MIGRATION_DONE: RefPath =
+    RefPath::assert_from(b"/__delayed_inbox_migration_done");
+const DELAYED_INBOX_BACKUP: RefPath = RefPath::assert_from(b"/__delayed_inbox_backup");
+
+fn backup_delayed_inbox_if_necessary(host: &mut impl Runtime) -> () {
+    // All errors are ignored.
+    if host
+        .store_has(&DELAYED_INBOX_MIGRATION_DONE)
+        .unwrap_or_default()
+        .is_none()
+    {
+        log!(host, Info, "Starting the delayed inbox backup");
+        let res1: Result<(), _> =
+            host.store_move(&DELAYED_INBOX_PATH, &DELAYED_INBOX_BACKUP);
+        log!(host, Info, "store_move has status {:?}", res1);
+        let res2: Result<(), _> =
+            host.store_write_all(&DELAYED_INBOX_MIGRATION_DONE, &[]);
+        log!(host, Info, "store_write_all has status {:?}", res2);
+    }
+}
+
 pub fn main<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
+    backup_delayed_inbox_if_necessary(host);
+
     let chain_id = retrieve_chain_id(host).context("Failed to retrieve chain id")?;
 
     // We always start by doing the migration if needed.
