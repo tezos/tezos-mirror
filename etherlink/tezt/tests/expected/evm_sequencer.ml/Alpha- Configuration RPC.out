@@ -13,7 +13,8 @@
   "experimental_features": {
     "drop_duplicate_on_injection": true,
     "enable_send_raw_transaction": true,
-    "node_transaction_validation": true
+    "node_transaction_validation": true,
+    "block_storage_sqlite3": true
   },
   "proxy": {
     "finalized_view": false,
@@ -59,7 +60,8 @@
   "experimental_features": {
     "drop_duplicate_on_injection": true,
     "enable_send_raw_transaction": true,
-    "node_transaction_validation": true
+    "node_transaction_validation": true,
+    "block_storage_sqlite3": true
   },
   "proxy": {
     "finalized_view": false,
@@ -98,7 +100,8 @@
   "experimental_features": {
     "drop_duplicate_on_injection": true,
     "enable_send_raw_transaction": true,
-    "node_transaction_validation": true
+    "node_transaction_validation": true,
+    "block_storage_sqlite3": true
   },
   "proxy": {
     "finalized_view": false,

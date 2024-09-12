@@ -55,6 +55,7 @@ type experimental_features = {
   drop_duplicate_on_injection : bool;
   enable_send_raw_transaction : bool;
   node_transaction_validation : bool;
+  block_storage_sqlite3 : bool;
 }
 
 type sequencer = {

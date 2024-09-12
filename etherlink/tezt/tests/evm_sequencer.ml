@@ -205,11 +205,11 @@ let ci_enabled_dal_registration =
   Register_both {extra_tags_with = []; extra_tags_without = []}
 
 (* Register all variants of a test. *)
-let register_all ?sequencer_rpc_port ?sequencer_private_rpc_port
-    ?genesis_timestamp ?time_between_blocks ?max_blueprints_lag
-    ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
-    ?delayed_inbox_timeout ?delayed_inbox_min_levels ?max_number_of_chunks
-    ?bootstrap_accounts ?sequencer ?sequencer_pool_address
+let register_all ?block_storage_sqlite3 ?sequencer_rpc_port
+    ?sequencer_private_rpc_port ?genesis_timestamp ?time_between_blocks
+    ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
+    ?catchup_cooldown ?delayed_inbox_timeout ?delayed_inbox_min_levels
+    ?max_number_of_chunks ?bootstrap_accounts ?sequencer ?sequencer_pool_address
     ?(kernels = Kernel.all) ?da_fee ?minimum_base_fee_per_gas ?preimages_dir
     ?maximum_allowed_ticks ?maximum_gas_per_transaction
     ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge ?history_mode
@@ -238,6 +238,7 @@ let register_all ?sequencer_rpc_port ?sequencer_private_rpc_port
         (fun (enable_dal, dal_tags) ->
           register_test_for_kernels
             ~__FILE__
+            ?block_storage_sqlite3
             ?sequencer_rpc_port
             ?sequencer_private_rpc_port
             ?commitment_period

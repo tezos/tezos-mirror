@@ -122,7 +122,11 @@
         boolean
         /* Enable or disable the `eth_sendRawTransaction` method. DEPRECATED:
             You should use "rpc.restricted_rpcs" instead. */,
-      "node_transaction_validation"?: boolean },
+      "node_transaction_validation"?: boolean,
+      "block_storage_sqlite3"?:
+        boolean
+        /* Store the blocks and transactions in a sqlite3 database and
+           removes them from the durable storage */ },
   "proxy"?:
     { "finalized_view"?: boolean,
       "evm_node_endpoint"?: $unistring,

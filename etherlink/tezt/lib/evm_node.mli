@@ -237,13 +237,15 @@ end
     with arguments found in the state. *)
 val spawn_init_config : ?extra_arguments:string list -> t -> Process.t
 
-(** [patch_config_with_experimental_feature ?node_transaction_validation
-    ?drop_duplicate_when_injection json_config] patches a config to add
+(** [patch_config_with_experimental_feature
+    ?node_transaction_validation ?drop_duplicate_when_injection
+    ~block_storage_sqlite3 json_config] patches a config to add
     experimental feature. Each optional argument add the correspondent
     experimental feature. *)
 val patch_config_with_experimental_feature :
   ?drop_duplicate_when_injection:bool ->
   ?node_transaction_validation:bool ->
+  ?block_storage_sqlite3:bool ->
   unit ->
   JSON.t ->
   JSON.t

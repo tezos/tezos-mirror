@@ -161,11 +161,12 @@ let run_new_observer_node ?(patch_config = Fun.id) ~sc_rollup_node evm_node =
   in
   return observer
 
-let setup_sequencer ?sequencer_rpc_port ?sequencer_private_rpc_port
-    ~mainnet_compat ?genesis_timestamp ?time_between_blocks ?max_blueprints_lag
-    ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
-    ?delayed_inbox_timeout ?delayed_inbox_min_levels ?max_number_of_chunks
-    ?commitment_period ?challenge_window
+let setup_sequencer ?block_storage_sqlite3 ?sequencer_rpc_port
+    ?sequencer_private_rpc_port ~mainnet_compat ?genesis_timestamp
+    ?time_between_blocks ?max_blueprints_lag ?max_blueprints_ahead
+    ?max_blueprints_catchup ?catchup_cooldown ?delayed_inbox_timeout
+    ?delayed_inbox_min_levels ?max_number_of_chunks ?commitment_period
+    ?challenge_window
     ?(bootstrap_accounts =
       List.map
         (fun account -> account.Eth_account.address)
@@ -254,6 +255,7 @@ let setup_sequencer ?sequencer_rpc_port ?sequencer_private_rpc_port
     Evm_node.patch_config_with_experimental_feature
       ~drop_duplicate_when_injection
       ~node_transaction_validation:true
+      ?block_storage_sqlite3
       (* When adding new experimental feature please make sure it's a
          good idea to activate it for all test or not. *)
       ()
@@ -337,16 +339,16 @@ let setup_sequencer ?sequencer_rpc_port ?sequencer_private_rpc_port
     }
 
 (* Register a single variant of a test but for all protocols. *)
-let register_test ~__FILE__ ?sequencer_rpc_port ?sequencer_private_rpc_port
-    ?genesis_timestamp ?time_between_blocks ?max_blueprints_lag
-    ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
-    ?delayed_inbox_timeout ?delayed_inbox_min_levels ?max_number_of_chunks
-    ?bootstrap_accounts ?sequencer ?sequencer_pool_address ~kernel ?da_fee
-    ?minimum_base_fee_per_gas ?preimages_dir ?maximum_allowed_ticks
-    ?maximum_gas_per_transaction ?max_blueprint_lookahead_in_seconds
-    ?enable_fa_bridge ?commitment_period ?challenge_window
-    ?(threshold_encryption = false) ?(uses = uses) ?(additional_uses = [])
-    ?history_mode ~enable_dal
+let register_test ~__FILE__ ?block_storage_sqlite3 ?sequencer_rpc_port
+    ?sequencer_private_rpc_port ?genesis_timestamp ?time_between_blocks
+    ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
+    ?catchup_cooldown ?delayed_inbox_timeout ?delayed_inbox_min_levels
+    ?max_number_of_chunks ?bootstrap_accounts ?sequencer ?sequencer_pool_address
+    ~kernel ?da_fee ?minimum_base_fee_per_gas ?preimages_dir
+    ?maximum_allowed_ticks ?maximum_gas_per_transaction
+    ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge ?commitment_period
+    ?challenge_window ?(threshold_encryption = false) ?(uses = uses)
+    ?(additional_uses = []) ?history_mode ~enable_dal
     ?(dal_slots = if enable_dal then Some [4] else None) body ~title ~tags
     protocols =
   let kernel_tag, kernel_use = Kernel.to_uses_and_tags kernel in
@@ -360,6 +362,7 @@ let register_test ~__FILE__ ?sequencer_rpc_port ?sequencer_private_rpc_port
   let body protocol =
     let* sequencer_setup =
       setup_sequencer
+        ?block_storage_sqlite3
         ?sequencer_rpc_port
         ?sequencer_private_rpc_port
         ~mainnet_compat:false
@@ -420,20 +423,22 @@ let register_test ~__FILE__ ?sequencer_rpc_port ?sequencer_private_rpc_port
       ~tags
       protocols
 
-let register_test_for_kernels ~__FILE__ ?sequencer_rpc_port
-    ?sequencer_private_rpc_port ?genesis_timestamp ?time_between_blocks
-    ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
-    ?catchup_cooldown ?delayed_inbox_timeout ?delayed_inbox_min_levels
-    ?max_number_of_chunks ?bootstrap_accounts ?sequencer ?sequencer_pool_address
-    ?(kernels = Kernel.all) ?da_fee ?minimum_base_fee_per_gas ?preimages_dir
-    ?maximum_allowed_ticks ?maximum_gas_per_transaction
-    ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge ?history_mode
-    ?commitment_period ?challenge_window ?additional_uses ~threshold_encryption
-    ~enable_dal ~title ~tags body protocols =
+let register_test_for_kernels ~__FILE__ ?block_storage_sqlite3
+    ?sequencer_rpc_port ?sequencer_private_rpc_port ?genesis_timestamp
+    ?time_between_blocks ?max_blueprints_lag ?max_blueprints_ahead
+    ?max_blueprints_catchup ?catchup_cooldown ?delayed_inbox_timeout
+    ?delayed_inbox_min_levels ?max_number_of_chunks ?bootstrap_accounts
+    ?sequencer ?sequencer_pool_address ?(kernels = Kernel.all) ?da_fee
+    ?minimum_base_fee_per_gas ?preimages_dir ?maximum_allowed_ticks
+    ?maximum_gas_per_transaction ?max_blueprint_lookahead_in_seconds
+    ?enable_fa_bridge ?history_mode ?commitment_period ?challenge_window
+    ?additional_uses ~threshold_encryption ~enable_dal ~title ~tags body
+    protocols =
   List.iter
     (fun kernel ->
       register_test
         ~__FILE__
+        ?block_storage_sqlite3
         ?sequencer_rpc_port
         ?sequencer_private_rpc_port
         ?commitment_period

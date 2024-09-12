@@ -71,6 +71,8 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
       ~fail_on_missing_blueprint:true
       ?smart_rollup_address:rollup_node_smart_rollup_address
       ~store_perm:`Read_write
+      ~block_storage_sqlite3:
+        configuration.experimental_features.block_storage_sqlite3
       ()
   in
   let smart_rollup_address = Address.to_string smart_rollup_address_typed in

@@ -74,6 +74,7 @@ let main ?kernel_path ~data_dir ~(config : Configuration.t) () =
            smart_rollup_address)
       ~fail_on_missing_blueprint:false
       ~store_perm:`Read_write
+      ~block_storage_sqlite3:config.experimental_features.block_storage_sqlite3
       ()
   in
   let* ro_ctxt =
