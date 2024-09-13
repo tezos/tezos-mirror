@@ -286,15 +286,31 @@ let init_dal_worker_state node_ctxt =
     let open Node_context in
     (Reference.get node_ctxt.current_protocol).constants.dal
   in
-  (* We initialize a bounded cache for [known_slots] large enough to contain
-     [number_of_slots] entries during [attestation_lag] * 4 (sliding) levels. *)
-  let max_retained_slots_info =
-    dal_constants.number_of_slots * dal_constants.attestation_lag * 4
+  (* Etherlink serves as primary user for the batcher service, as such its
+       constants are targetted for its usage for now. *)
+  let etherlink_max_pending_messages_size =
+    let maximum_number_of_chunks_per_blueprint = 128 in
+    let maximum_number_of_blueprints_per_second = 2 in
+    let blueprint_expiration_in_seconds =
+      (* We should keep the messages in the injection queue
+         for at least one L1 level. There is no upper bound
+         to the time between blocks but having blocks more
+         than 10 minutes apart is extremely rare *)
+      600
+    in
+    maximum_number_of_chunks_per_blueprint
+    * maximum_number_of_blueprints_per_second * blueprint_expiration_in_seconds
+  in
+  let max_remembered_recent_injections =
+    dal_constants.number_of_slots * dal_constants.attestation_lag
+    * 5 (* Give more chance for DAL slots to be signaled. *)
   in
   {
     node_ctxt;
-    recent_dal_injections = Recent_dal_injections.create max_retained_slots_info;
-    pending_messages = Pending_messages.create max_retained_slots_info;
+    recent_dal_injections =
+      Recent_dal_injections.create max_remembered_recent_injections;
+    pending_messages =
+      Pending_messages.create etherlink_max_pending_messages_size;
     dal_slot_indices = Queue.create ();
     count_messages = 0;
   }
