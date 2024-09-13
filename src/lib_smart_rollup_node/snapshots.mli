@@ -41,7 +41,7 @@ end
     of the data of the rollup node with data directory [data_dir]. The path of
     the snapshot archive is returned. If [no_checks] is [true], the integrity of
     the snapshot is not checked at the end. This function will first try to
-    cancel any GC on the target node, [rollup_node_endpoint] can be specified to
+    cancel any GC on the target node if [rollup_node_endpoint] is specified to
     communicate with it. *)
 val export :
   ?rollup_node_endpoint:Uri.t ->

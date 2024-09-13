@@ -682,51 +682,31 @@ let snapshotable_files_regexp =
   Re.Str.regexp
     "^\\(storage/.*\\|context/.*\\|wasm_2_0_0/.*\\|arith/.*\\|riscv/.*\\|context/.*\\|metadata$\\)"
 
-let get_rollup_node_endpoint rollup_node_endpoint ~data_dir =
-  let open Lwt_syntax in
-  match rollup_node_endpoint with
-  | Some uri -> return uri
-  | None -> (
-      let default =
-        Uri.make
-          ~host:Configuration.default_rpc_addr
-          ~port:Configuration.default_rpc_port
-          ()
-      in
-      let* uri_from_config =
-        let open Lwt_result_syntax in
-        let+ config = Configuration.load ~data_dir in
-        Uri.make ~host:config.rpc_addr ~port:config.rpc_port ()
-      in
-      match uri_from_config with
-      | Ok uri -> return uri
-      | Error _ -> return default)
-
-let try_cancel_gc ~rollup_node_endpoint ~data_dir =
+let maybe_cancel_gc ~rollup_node_endpoint =
   let open Lwt_syntax in
   let open Tezos_rpc_http in
   let open Tezos_rpc_http_client_unix in
-  let* rollup_node_endpoint =
-    get_rollup_node_endpoint rollup_node_endpoint ~data_dir
-  in
-  let rhttp_ctxt =
-    new RPC_client_unix.http_ctxt
-      {RPC_client_unix.default_config with endpoint = rollup_node_endpoint}
-      Media_type.all_media_types
-  in
-  let* canceled =
-    Rollup_node_services.Admin.(make_call cancel_gc) rhttp_ctxt () () ()
-  in
-  (match canceled with
-  | Ok true -> Format.eprintf "Rollup node GC canceled@."
-  | Ok false -> Format.eprintf "No ongoing GC in rollup node@."
-  | Error trace ->
-      Format.eprintf
-        "Could not cancel rollup node GC (use --rollup-node-endpoint for that) \
-         because of the following error: %a@ Continuing anyway.@."
-        pp_print_trace
-        trace) ;
-  return_unit
+  match rollup_node_endpoint with
+  | None -> return_unit
+  | Some rollup_node_endpoint ->
+      let rhttp_ctxt =
+        new RPC_client_unix.http_ctxt
+          {RPC_client_unix.default_config with endpoint = rollup_node_endpoint}
+          Media_type.all_media_types
+      in
+      let* canceled =
+        Rollup_node_services.Admin.(make_call cancel_gc) rhttp_ctxt () () ()
+      in
+      (match canceled with
+      | Ok true -> Format.eprintf "Rollup node GC canceled@."
+      | Ok false -> Format.eprintf "No ongoing GC in rollup node@."
+      | Error trace ->
+          Format.eprintf
+            "Could not cancel rollup node GC (use --rollup-node-endpoint for \
+             that) because of the following error: %a@ Continuing anyway.@."
+            pp_print_trace
+            trace) ;
+      return_unit
 
 let lock_processing ~data_dir =
   let open Lwt_result_syntax in
@@ -741,8 +721,11 @@ let lock_processing ~data_dir =
 
 let lock_all ~data_dir ~rollup_node_endpoint =
   let open Lwt_result_syntax in
-  let*! () = try_cancel_gc ~rollup_node_endpoint ~data_dir in
-  Format.eprintf "Acquiring GC lock@." ;
+  let*! () = maybe_cancel_gc ~rollup_node_endpoint in
+  Format.eprintf
+    "Acquiring GC lock\n\
+     (specify --rollup-node-endpoint for the snapshot command to take \
+     priority)@." ;
   (* Take GC lock first in order to not prevent progression of rollup node. *)
   let* gc_lock_fd =
     Lwt_lock_file.lock
