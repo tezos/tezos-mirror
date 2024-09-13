@@ -1580,13 +1580,11 @@ let jobs pipeline_type =
       in
       let job_manuals = Documentation.job_manuals ~rules ~dependencies () in
       let job_docgen = Documentation.job_docgen ~rules ~dependencies () in
-      let doc_build_dependencies =
-        Dependent
-          [Artifacts job_odoc; Artifacts job_manuals; Artifacts job_docgen]
-      in
       let job_build_all =
         Documentation.job_build_all
-          ~dependencies:doc_build_dependencies
+          ~job_odoc
+          ~job_manuals
+          ~job_docgen
           ~rules:
             (make_rules
                ~dependent:true

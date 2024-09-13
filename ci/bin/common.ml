@@ -1376,6 +1376,13 @@ module Tezt = struct
 end
 
 module Documentation = struct
+  let mk_artifact_dependencies ?(dependencies = Dependent []) jobs =
+    List.fold_right
+      (fun job dependencies ->
+        dependencies_add_artifact_dependency dependencies job)
+      jobs
+      dependencies
+
   let job_odoc ?(lite = false) ?rules ?dependencies () : tezos_job =
     let target = if lite then "odoc-lite" else "odoc" in
     job
@@ -1438,13 +1445,17 @@ module Documentation = struct
       ["make -C docs -j docexes-gen"]
     |> enable_cargo_cache |> enable_sccache
 
-  let job_build_all ?rules ?dependencies () : tezos_job =
+  let job_build_all ~job_odoc ~job_manuals ~job_docgen ?dependencies ?rules () :
+      tezos_job =
+    let dependencies =
+      mk_artifact_dependencies ?dependencies [job_odoc; job_manuals; job_docgen]
+    in
     job
       ~__POS__
       ~name:"documentation:build_all"
       ~image:Images.CI.test
       ~stage:Stages.doc
-      ?dependencies
+      ~dependencies
         (* Warning: the [documentation:linkcheck] job must have at least the same
            restrictions in the rules as [documentation:build_all], otherwise the CI
            may complain that [documentation:linkcheck] depends on [documentation:build_all]
@@ -1476,13 +1487,15 @@ module Documentation = struct
            [])
       ["make -C docs redirectcheck"; "make -C docs linkcheck"]
 
-  let job_publish_documentation ?dependencies ?rules () : tezos_job =
+  let job_publish_documentation ~job_build_all ?dependencies ?rules () :
+      tezos_job =
+    let dependencies = mk_artifact_dependencies ?dependencies [job_build_all] in
     job
       ~__POS__
       ~name:"publish:documentation"
       ~image:Images.CI.test
       ~stage:Stages.doc
-      ?dependencies
+      ~dependencies
       ~before_script:
         (before_script
            ~eval_opam:true
