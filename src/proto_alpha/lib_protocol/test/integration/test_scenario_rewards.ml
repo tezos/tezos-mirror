@@ -345,7 +345,7 @@ let test_static_timing =
          --> check_rate_evolution q_almost_equal
          --> next_cycle --> check_rate_evolution Q.lt)
 
-let begin_test_with_rewards_checks ~init_limit =
+let begin_test_with_rewards_checks ~init_limit ?edge_of_staking () =
   let set_limit name l =
     let params =
       {
@@ -357,6 +357,12 @@ let begin_test_with_rewards_checks ~init_limit =
   in
   init_constants ~reward_per_block:1_000_000_000L ()
   --> activate_ai `Force
+  --> (match edge_of_staking with
+      | Some edge_of_staking ->
+          set
+            S.Adaptive_issuance.edge_of_staking_over_delegation
+            edge_of_staking
+      | None -> Empty)
   --> begin_test ["delegate"; "faucet"]
   --> set_baker "delegate"
   --> add_account_with_funds
@@ -392,7 +398,7 @@ let test_rewards_with_limit_change =
     in
     set_delegate_params name params
   in
-  begin_test_with_rewards_checks ~init_limit:5.
+  begin_test_with_rewards_checks ~init_limit:5. ()
   --> set_limit "delegate" 0.
   --> wait_cycle_until `right_before_delegate_parameters_activation
   --> snapshot_balances "old limit" ["staker"]
@@ -439,7 +445,7 @@ let test_rewards_with_limit_change =
          --> check_balance_field "staker" `Unstaked_finalizable Tez.zero)
 
 let test_stake_with_unfinalizable_unstake_requests =
-  begin_test_with_rewards_checks ~init_limit:5.
+  begin_test_with_rewards_checks ~init_limit:5. ()
   --> set_delegate "staker" (Some "faucet")
   --> check_balance_field "staker" `Staked Tez.zero
   --> check_finalize_unstake_no_change "staker"
@@ -511,7 +517,7 @@ let test_overstake =
     --> check_rewards ~loc ~snapshot_name:"1 block" "staker" staker_diff
     --> check_rewards ~loc ~snapshot_name:"1 block-d" "delegate" delegate_diff
   in
-  begin_test_with_rewards_checks ~init_limit:3.
+  begin_test_with_rewards_checks ~init_limit:3. ~edge_of_staking:2 ()
   --> next_block_with_check_rewards
         ~loc:__LOC__
         ~staker_diff:(Q.of_int32 21_315l)

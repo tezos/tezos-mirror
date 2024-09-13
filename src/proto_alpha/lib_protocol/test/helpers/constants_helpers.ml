@@ -137,6 +137,12 @@ module Set = struct
     let activation_vote_enable activation_vote_enable (c : t) =
       adaptive_issuance {c.adaptive_issuance with activation_vote_enable} c
 
+    let edge_of_staking_over_delegation edge_of_staking_over_delegation (c : t)
+        =
+      adaptive_issuance
+        {c.adaptive_issuance with edge_of_staking_over_delegation}
+        c
+
     let autostaking_enable autostaking_enable (c : t) =
       adaptive_issuance {c.adaptive_issuance with autostaking_enable} c
 
