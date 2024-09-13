@@ -1060,7 +1060,7 @@ let test_forked_migration_bakers ~migrate_from ~migrate_to =
 let test_migration_min_delegated_in_cycle =
   (* Paris -> Quebec *)
   let _migrate_from = Protocol.ParisC in
-  let migrate_to = Protocol.Quebeca in
+  let migrate_to = Protocol.Quebecb in
 
   Protocol.register_regression_test
     ~__FILE__
