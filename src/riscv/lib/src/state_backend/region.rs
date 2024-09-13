@@ -84,6 +84,14 @@ impl<E: serde::Serialize + Elem, M: ManagerSerialise> RootHashable for Cell<E, M
     }
 }
 
+impl<E: Eq + Elem, M: ManagerRead> PartialEq for Cell<E, M> {
+    fn eq(&self, other: &Self) -> bool {
+        self.read() == other.read()
+    }
+}
+
+impl<E: Eq + Elem, M: ManagerRead> Eq for Cell<E, M> {}
+
 impl<E: Elem, M: ManagerClone> Clone for Cell<E, M> {
     fn clone(&self) -> Self {
         Self {
@@ -395,6 +403,12 @@ impl<E: serde::Serialize + Elem, const LEN: usize, M: ManagerSerialise> RootHash
 {
     fn hash(&self) -> Result<Hash, HashError> {
         Hash::blake2b_hash(self)
+    }
+}
+
+impl<E: Eq + Elem, const LEN: usize, M: ManagerRead> PartialEq for Cells<E, LEN, M> {
+    fn eq(&self, other: &Self) -> bool {
+        (0..LEN).all(|i| self.read(i) == other.read(i))
     }
 }
 

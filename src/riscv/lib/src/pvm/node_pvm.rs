@@ -86,10 +86,18 @@ pub enum PvmError {
     SerializationError(String),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct NodePvm {
     backend: InMemoryBackend<StateLayout>,
 }
+
+impl PartialEq for NodePvm {
+    fn eq(&self, other: &Self) -> bool {
+        self.state.struct_ref() == other.state.struct_ref()
+    }
+}
+
+impl Eq for NodePvm {}
 
 impl NodePvm {
     fn with_backend_mut<T, F>(&mut self, f: F) -> T

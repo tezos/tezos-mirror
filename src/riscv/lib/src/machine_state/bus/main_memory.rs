@@ -300,6 +300,13 @@ impl<L: MainMemoryLayout, M: backend::ManagerClone> Clone for MainMemory<L, M> {
     }
 }
 
+impl<L: MainMemoryLayout, M: backend::ManagerRead> PartialEq for MainMemory<L, M> {
+    fn eq(&self, other: &Self) -> bool {
+        (0..L::BYTES)
+            .all(|i| L::data_read::<u8, _>(&self.data, i) == L::data_read::<u8, _>(&other.data, i))
+    }
+}
+
 #[cfg(test)]
 pub mod tests {
     use crate::{
