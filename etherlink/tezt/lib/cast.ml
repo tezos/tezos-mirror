@@ -86,3 +86,7 @@ let gen_wallets ~number () =
 
 let calldata ?(args = []) signature =
   spawn_command_and_read_string ("calldata" :: signature :: args)
+
+let call ?(args = []) signature ~endpoint ~address =
+  spawn_command_and_read_string
+    (("call" :: address :: signature :: args) @ ["--rpc-url"; endpoint])
