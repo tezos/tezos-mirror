@@ -188,6 +188,67 @@ let test_chunked_blueprints_on_dal =
   Lwt.cancel inbox_counter_p ;
   unit
 
+let test_more_than_one_slot_per_l1_level =
+  register_test
+    ~time_between_blocks:Nothing
+    ~tags:["evm"; "sequencer"; "chunks"]
+    ~title:
+      "Sequencer publishes entire blueprints on more than one slot to the DAL"
+  @@ fun {sequencer; sc_rollup_node; client; proxy; _} _protocol ->
+  let number_of_blueprints_sent_to_inbox = ref 0 in
+  let inbox_counter_p =
+    count_blueprint_sent_on_inbox sequencer number_of_blueprints_sent_to_inbox
+  in
+  let sends =
+    List.init 3 (fun i () ->
+        build_transaction_with_large_data
+          ~source_private_key:Eth_account.bootstrap_accounts.(i).private_key
+          sequencer
+          ())
+  in
+  let* n, _txs = send_transactions_to_sequencer ~sends sequencer in
+  Check.((n = 3) int) ~error_msg:"Expected three transactions in the block" ;
+  let* () =
+    bake_until_sync ~__LOC__ ~sc_rollup_node ~client ~sequencer ~proxy ()
+  and* _smart_rollup_address, signals =
+    Evm_node.wait_for_signal_signed sequencer
+  in
+  (* We check that there was a level at which at least 2 slots were
+     published. We do so by turning the list of signals into a map of
+     levels (ML) associating to each level a set of the signaled slot
+     (SSL) indices published at this level. *)
+  let module SSL = Set.Make (Int) in
+  let module ML = Map.Make (Int) in
+  let m =
+    List.fold_left
+      (fun acc (slot_index, published_level) ->
+        ML.update
+          published_level
+          (Option.fold
+             ~none:(Some (SSL.singleton slot_index))
+             ~some:(fun slots -> Some (SSL.add slot_index slots)))
+          acc)
+      ML.empty
+      signals
+  in
+  let more_than_one_slot =
+    ML.exists (fun _ signaled_slots -> SSL.cardinal signaled_slots >= 2) m
+  in
+  Check.(
+    is_true
+      more_than_one_slot
+      ~error_msg:
+        "Only one DAL slot has been used for each L1 level, expected at least \
+         two.") ;
+  Check.(
+    (!number_of_blueprints_sent_to_inbox = 0)
+      int
+      ~error_msg:
+        "No blueprint should've been sent through the inbox, otherwise it \
+         means that the data has been sent via the catchup mechanism") ;
+  Lwt.cancel inbox_counter_p ;
+  unit
+
 let protocols = Protocol.all
 
 let () =
@@ -195,4 +256,5 @@ let () =
   (* Also run the test for slot index 0 because it is a particular
      case in the RLP encoding used to send signals to the rollup. *)
   test_publish_blueprints_on_dal protocols ~dal_slot:0 ;
-  test_chunked_blueprints_on_dal protocols
+  test_chunked_blueprints_on_dal protocols ;
+  test_more_than_one_slot_per_l1_level protocols
