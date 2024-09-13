@@ -21,4 +21,8 @@ If you want to profile Octez, several solutions are available.
 
    profiler_perf
 
+.. toctree::
+   :maxdepth: 2
+   :caption: Profiler module
 
+   profiler_module
