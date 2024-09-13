@@ -7,26 +7,26 @@
  (libraries
   tezt.core
   octez-libs.base
-  tezos-protocol-021-PsquebeC.protocol
+  tezos-protocol-021-PsQuebec.protocol
   qcheck-alcotest
-  octez-protocol-021-PsquebeC-libs.client
+  octez-protocol-021-PsQuebec-libs.client
   octez-libs.test-helpers
-  octez-protocol-021-PsquebeC-libs.test-helpers
+  octez-protocol-021-PsQuebec-libs.test-helpers
   octez-libs.base-test-helpers
-  tezos-protocol-021-PsquebeC.parameters
-  octez-protocol-021-PsquebeC-libs.plugin)
+  tezos-protocol-021-PsQuebec.parameters
+  octez-protocol-021-PsQuebec-libs.plugin)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
   -open Tezt_core
   -open Tezt_core.Base
   -open Tezos_base.TzPervasives
-  -open Tezos_protocol_021_PsquebeC
+  -open Tezos_protocol_021_PsQuebec
   -open Tezos_client_021_PsquebeC
   -open Tezos_test_helpers
   -open Tezos_021_PsquebeC_test_helpers
   -open Tezos_base_test_helpers
-  -open Tezos_protocol_021_PsquebeC_parameters
+  -open Tezos_protocol_021_PsQuebec_parameters
   -open Tezos_protocol_plugin_021_PsquebeC)
  (modules
   generator_descriptors
@@ -54,7 +54,7 @@
 
 (rule
  (alias runtest)
- (package tezos-protocol-021-PsquebeC-tests)
+ (package tezos-protocol-021-PsQuebec-tests)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe} /flaky /ci_disabled)))
 

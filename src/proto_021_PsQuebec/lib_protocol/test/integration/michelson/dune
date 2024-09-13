@@ -9,16 +9,16 @@
   tezt.core
   octez-alcotezt
   octez-libs.base
-  tezos-protocol-021-PsquebeC.protocol
-  octez-protocol-021-PsquebeC-libs.test-helpers
+  tezos-protocol-021-PsQuebec.protocol
+  octez-protocol-021-PsQuebec-libs.test-helpers
   octez-libs.base-test-helpers
-  octez-protocol-021-PsquebeC-libs.client
+  octez-protocol-021-PsQuebec-libs.client
   tezos-benchmark
   octez-libs.micheline
   tezos-benchmark-021-PsquebeC
   tezos-benchmark-type-inference-021-PsquebeC
-  octez-protocol-021-PsquebeC-libs.plugin
-  tezos-protocol-021-PsquebeC.parameters)
+  octez-protocol-021-PsQuebec-libs.plugin
+  tezos-protocol-021-PsQuebec.parameters)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -26,7 +26,7 @@
   -open Tezt_core.Base
   -open Octez_alcotezt
   -open Tezos_base.TzPervasives
-  -open Tezos_protocol_021_PsquebeC
+  -open Tezos_protocol_021_PsQuebec
   -open Tezos_021_PsquebeC_test_helpers
   -open Tezos_base_test_helpers
   -open Tezos_client_021_PsquebeC
@@ -71,7 +71,7 @@
 
 (rule
  (alias runtest)
- (package tezos-protocol-021-PsquebeC-tests)
+ (package tezos-protocol-021-PsQuebec-tests)
  (deps
   (glob_files contracts/*)
   (glob_files patched_contracts/*)

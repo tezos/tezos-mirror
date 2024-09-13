@@ -3,7 +3,7 @@
 
 (library
  (name tezos_protocol_environment_021_PsquebeC)
- (public_name tezos-protocol-021-PsquebeC.protocol.environment)
+ (public_name tezos-protocol-021-PsQuebec.protocol.environment)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.protocol-environment)
@@ -18,11 +18,11 @@
    "module Name = struct let name = \"021-PsquebeC\" end\ninclude Tezos_protocol_environment.V13.Make(Name)()\n")))
 
 (library
- (name tezos_raw_protocol_021_PsquebeC)
- (public_name tezos-protocol-021-PsquebeC.protocol.raw)
+ (name tezos_raw_protocol_021_PsQuebec)
+ (public_name tezos-protocol-021-PsQuebec.protocol.raw)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-021-PsquebeC.protocol.environment)
+  tezos-protocol-021-PsQuebec.protocol.environment)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -292,20 +292,20 @@
   Main))
 
 (library
- (name tezos_protocol_021_PsquebeC)
- (public_name tezos-protocol-021-PsquebeC.protocol)
+ (name tezos_protocol_021_PsQuebec)
+ (public_name tezos-protocol-021-PsQuebec.protocol)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.protocol-environment
   octez-proto-libs.protocol-environment.sigs
-  tezos-protocol-021-PsquebeC.protocol.raw)
+  tezos-protocol-021-PsQuebec.protocol.raw)
  (flags
   (:standard)
   -nopervasives)
- (modules Protocol Tezos_protocol_021_PsquebeC))
+ (modules Protocol Tezos_protocol_021_PsQuebec))
 
 (install
- (package tezos-protocol-021-PsquebeC)
+ (package tezos-protocol-021-PsQuebec)
  (section lib)
  (files (TEZOS_PROTOCOL as protocol/raw/TEZOS_PROTOCOL)))
 
@@ -314,10 +314,10 @@
  (action
   (write-file
    %{targets}
-   "\nlet hash = Tezos_crypto.Hashed.Protocol_hash.of_b58check_exn \"PsquebeCaYyvBEESCaXL8B8Tn8BcEhps2Zke1xMVtyr7X4qMfxT\"\nlet name = Tezos_protocol_environment_021_PsquebeC.Name.name\ninclude Tezos_raw_protocol_021_PsquebeC\ninclude Tezos_raw_protocol_021_PsquebeC.Main\n")))
+   "\nlet hash = Tezos_crypto.Hashed.Protocol_hash.of_b58check_exn \"PsquebeCaYyvBEESCaXL8B8Tn8BcEhps2Zke1xMVtyr7X4qMfxT\"\nlet name = Tezos_protocol_environment_021_PsquebeC.Name.name\ninclude Tezos_raw_protocol_021_PsQuebec\ninclude Tezos_raw_protocol_021_PsquebeC.Main\n")))
 
 (rule
- (targets tezos_protocol_021_PsquebeC.ml)
+ (targets tezos_protocol_021_PsQuebec.ml)
  (action
   (write-file
    %{targets}
@@ -592,17 +592,17 @@
  (action (run %{bin:octez-protocol-compiler} -warn-error +a .)))
 
 (library
- (name tezos_protocol_021_PsquebeC_lifted)
- (public_name tezos-protocol-021-PsquebeC.protocol.lifted)
+ (name tezos_protocol_021_PsQuebec_lifted)
+ (public_name tezos-protocol-021-PsQuebec.protocol.lifted)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.protocol-environment
   octez-proto-libs.protocol-environment.sigs
-  tezos-protocol-021-PsquebeC.protocol)
+  tezos-protocol-021-PsQuebec.protocol)
  (flags
   (:standard)
   -nopervasives
-  -open Tezos_protocol_021_PsquebeC)
+  -open Tezos_protocol_021_PsQuebec)
  (modules Lifted_protocol))
 
 (rule
@@ -613,7 +613,7 @@
    "\ninclude Environment.Lift (Protocol)\nlet hash = Protocol.hash\n")))
 
 (library
- (name tezos_protocol_021_PsquebeC_functor)
+ (name tezos_protocol_021_PsQuebec_functor)
  (libraries
   octez-proto-libs.protocol-environment
   octez-proto-libs.protocol-environment.sigs)
@@ -895,11 +895,11 @@
     (run %{bin:octez-protocol-compiler.octez-protocol-packer} %{src_dir})))))
 
 (library
- (name tezos_embedded_protocol_021_PsquebeC)
- (public_name tezos-protocol-021-PsquebeC.embedded-protocol)
+ (name tezos_embedded_protocol_021_PsQuebec)
+ (public_name tezos-protocol-021-PsQuebec.embedded-protocol)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-021-PsquebeC.protocol
+  tezos-protocol-021-PsQuebec.protocol
   octez-shell-libs.protocol-updater
   octez-proto-libs.protocol-environment)
  (library_flags (:standard -linkall))
