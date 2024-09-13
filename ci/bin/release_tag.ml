@@ -198,6 +198,13 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
       ~__POS__
       ~image:Images.CI.prebuild
       ~stage:Stages.publish_release
+      ~description:
+        "Update opam package descriptions on tezos/tezos opam-repository fork.\n\n\
+         This job does preliminary work for releasing Octez opam packages on \
+         opam repository, by pushing a branch with updated package \
+         descriptions (.opam files) to \
+         https://github.com/tezos/opam-repository. It _does not_ automatically \
+         create a corresponding pull request on the official opam repository."
       ~interruptible:false
       ?variables
       ~name:"opam:release"
@@ -302,6 +309,7 @@ let octez_evm_node_jobs ?(test = false) () =
       ~interruptible:false
       ~dependencies
       ~name:"gitlab:octez-evm-node-release"
+      ~description:"Create a GitLab release for Etherlink"
       ["./scripts/ci/create_gitlab_octez_evm_node_release.sh"]
   in
   [

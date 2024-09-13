@@ -754,8 +754,8 @@ let changeset_mir_tzt =
     [CI_DOCKER_AUTH] contains the appropriate credentials. *)
 let job_docker_authenticated ?(skip_docker_initialization = false)
     ?ci_docker_hub ?artifacts ?(variables = []) ?rules ?dependencies
-    ?image_dependencies ?arch ?tag ?allow_failure ?parallel ?retry ~__POS__
-    ~stage ~name script : tezos_job =
+    ?image_dependencies ?arch ?tag ?allow_failure ?parallel ?retry ?description
+    ~__POS__ ~stage ~name script : tezos_job =
   let docker_version = "24.0.7" in
   job
     ?rules
@@ -767,6 +767,7 @@ let job_docker_authenticated ?(skip_docker_initialization = false)
     ?allow_failure
     ?parallel
     ?retry
+    ?description
     ~__POS__
     ~image:Images_external.docker
     ~variables:
@@ -885,6 +886,7 @@ module Images = struct
         ~skip_docker_initialization:true
         ~stage
         ~name:("oc.docker:ci:" ^ arch_to_string_alt arch)
+        ~description:("Build internal CI images for " ^ arch_to_string_alt arch)
         ~ci_docker_hub:false
         ~artifacts:
           (artifacts ~reports:(reports ~dotenv:"ci_image_tag.env" ()) [])
