@@ -201,7 +201,7 @@ impl ArtifactCreate for ArtifactBuild {
     }
 
     fn set_module_info_name(&mut self, name: String) -> bool {
-        Arc::get_mut(&mut self.serializable.compile_info.module).map_or(false, |mut module_info| {
+        Arc::get_mut(&mut self.serializable.compile_info.module).map_or(false, |module_info| {
             module_info.name = Some(name.to_string());
             true
         })
