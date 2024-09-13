@@ -186,11 +186,8 @@ let produce_block_with_transactions ~sequencer_key ~cctxt ~timestamp
 (** Produces a block if we find at least one valid transaction in the transaction
     pool or if [force] is true. *)
 let produce_block_if_needed ~cctxt ~smart_rollup_address ~sequencer_key ~force
-    ~timestamp ~maximum_number_of_chunks head_info =
+    ~timestamp ~delayed_hashes ~remaining_cumulative_size head_info =
   let open Lwt_result_syntax in
-  let* delayed_hashes, remaining_cumulative_size =
-    take_delayed_transactions maximum_number_of_chunks
-  in
   let* transactions_and_objects =
     (* Low key optimization to avoid even checking the txpool if there is not
        enough space for the smallest transaction. *)
@@ -216,6 +213,17 @@ let produce_block_if_needed ~cctxt ~smart_rollup_address ~sequencer_key ~force
     return n
   else return 0
 
+let head_info_and_delayed_transactions maximum_number_of_chunks =
+  let open Lwt_result_syntax in
+  (* We need to first fetch the delayed transactions then requests the head info.
+     If the order is swapped, we might face a race condition where the delayed
+     transactions are fetched from state more recent than head info. *)
+  let* delayed_hashes, remaining_cumulative_size =
+    take_delayed_transactions maximum_number_of_chunks
+  in
+  let*! head_info = Evm_context.head_info () in
+  return (head_info, delayed_hashes, remaining_cumulative_size)
+
 let produce_block ~cctxt ~smart_rollup_address ~sequencer_key ~force ~timestamp
     ~maximum_number_of_chunks =
   let open Lwt_result_syntax in
@@ -224,7 +232,9 @@ let produce_block ~cctxt ~smart_rollup_address ~sequencer_key ~force ~timestamp
     let*! () = Block_producer_events.production_locked () in
     return 0
   else
-    let*! head_info = Evm_context.head_info () in
+    let* head_info, delayed_hashes, remaining_cumulative_size =
+      head_info_and_delayed_transactions maximum_number_of_chunks
+    in
     let is_going_to_upgrade =
       match head_info.pending_upgrade with
       | Some Evm_events.Upgrade.{hash = _; timestamp = upgrade_timestamp} ->
@@ -250,7 +260,8 @@ let produce_block ~cctxt ~smart_rollup_address ~sequencer_key ~force ~timestamp
         ~timestamp
         ~smart_rollup_address
         ~force
-        ~maximum_number_of_chunks
+        ~delayed_hashes
+        ~remaining_cumulative_size
         head_info
 
 module Handlers = struct

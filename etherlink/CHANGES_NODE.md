@@ -22,7 +22,7 @@
   inbox in its local state when `--omit-delayed-tx-events` is not provided.
   (!14855)
 - Delayed transactions are now stored on applied blueprint, instead of internal
-  evm event. Otherwise it could result in incoherent blueprints. (!14878)
+  evm event. Otherwise it could result in incoherent blueprints. (!14878, !14927)
 
 ## Version 0.3 (2024-09-10)
 
