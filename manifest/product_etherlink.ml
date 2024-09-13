@@ -213,7 +213,7 @@ let _evm_node =
     ~synopsis:
       "An implementation of a subset of Ethereum JSON-RPC API for the EVM \
        rollup"
-    ~release_status:Released
+    ~release_status:Experimental
     ~with_macos_security_framework:true
     ~deps:
       [
