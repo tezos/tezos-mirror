@@ -49,8 +49,15 @@ module Accounts : sig
   (** Path to the account's code. *)
   val code : address -> path
 
+  (** Path to the account's code hash. *)
+  val code_hash : address -> path
+
   (** Path to the account's storage at a given index. *)
   val storage : address -> path -> path
+end
+
+module Code : sig
+  val code : hash -> path
 end
 
 (** Paths related to blocks. *)

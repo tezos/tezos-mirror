@@ -59,6 +59,8 @@ module Accounts = struct
 
   let code = "/code"
 
+  let code_hash = "/code.hash"
+
   let storage = "/storage"
 
   let account (Address (Hex s)) = accounts ^ "/" ^ s
@@ -69,7 +71,19 @@ module Accounts = struct
 
   let code address = account address ^ code
 
+  let code_hash address = account address ^ code_hash
+
   let storage address index = account address ^ storage ^ "/" ^ index
+end
+
+module Code = struct
+  let codes = World_state.make "/eth_codes"
+
+  let code_storage (Hash (Hex hash)) = codes ^ "/" ^ hash
+
+  let code = "/code"
+
+  let code code_hash = code_storage code_hash ^ code
 end
 
 module Block = struct
