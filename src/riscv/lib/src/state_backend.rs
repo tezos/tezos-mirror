@@ -369,19 +369,23 @@ pub mod tests {
             (initial_checksum, manager.snapshot_regions())
         };
 
-        let (start2, snapshot2) = {
-            let placed = L::placed().into_location();
-            let mut manager = Randomised::default();
+        let snapshot2 = {
+            loop {
+                let placed = L::placed().into_location();
+                let mut manager = Randomised::default();
+                let space = L::allocate(&mut manager, placed);
 
-            let space = L::allocate(&mut manager, placed);
-            let initial_checksum = hash_state.hash_one(manager.snapshot_regions());
+                // Ensure the two states start differently.
+                if hash_state.hash_one(manager.snapshot_regions()) == start1 {
+                    continue;
+                }
 
-            f(space);
+                f(space);
 
-            (initial_checksum, manager.snapshot_regions())
+                break manager.snapshot_regions();
+            }
         };
 
-        assert_ne!(start1, start2);
         assert_eq!(snapshot1, snapshot2);
     }
 
