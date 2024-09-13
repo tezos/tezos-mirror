@@ -41,11 +41,13 @@ let count_blueprint_sent_on_inbox sequencer counter =
 (* This test is similar to {Evm_sequencer.test_publish_blueprints} but it also checks
    that all 5 blueprints sent from the sequencer were published on the
    DAL (and none on the inbox). *)
-let test_publish_blueprints_on_dal =
+let test_publish_blueprints_on_dal ~dal_slot =
   register_test
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "data"]
-    ~title:"Sequencer publishes the blueprints to the DAL"
+    ~title:
+      (sf "Sequencer publishes the blueprints on DAL slot index %d" dal_slot)
+    ~dal_slots:(Some [dal_slot])
   (* We want this test in the CI so we put no extra tags when DAL
      is active to avoid having the [ci_disabled] or [slow] tag. *)
   @@
@@ -184,5 +186,5 @@ let test_chunked_blueprints_on_dal =
 let protocols = Protocol.all
 
 let () =
-  test_publish_blueprints_on_dal protocols ;
+  test_publish_blueprints_on_dal protocols ~dal_slot:4 ;
   test_chunked_blueprints_on_dal protocols
