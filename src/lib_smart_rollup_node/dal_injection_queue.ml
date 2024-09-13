@@ -127,16 +127,17 @@ module Events = struct
       ()
 
   let inject_dal_slot_from_messages =
-    declare_3
+    declare_4
       ~section
       ~name:"inject_dal_slot_from_messages"
       ~msg:
-        "Injecting a DAL slot containing {num_messages} messages, for a total \
-         size of {data_size} bytes over {slot_size}"
+        "Injecting a DAL slot containing {num_messages} messages at index \
+         {slot_index}, for a total size of {data_size} bytes over {slot_size}"
       ~level:Debug
       ("data_size", Data_encoding.uint16)
       ("slot_size", Data_encoding.uint16)
       ("num_messages", Data_encoding.uint16)
+      ("slot_index", Data_encoding.uint16)
 
   let request_completed =
     declare_2
@@ -183,47 +184,39 @@ type state = {
          to publish than available slot indices). *)
 }
 
-let inject_slot state ~slot_content =
+let inject_slot state ~slot_index ~slot_content =
   let open Lwt_result_syntax in
   let {Node_context.dal_cctxt; _} = state.node_ctxt in
-  if Queue.is_empty state.dal_slot_indices then
-    (* No provided slot indices, no injection *)
-    let*! () = Events.(emit no_dal_slot_indices_set) () in
-    return_unit
-  else
-    (* The pop followed by a push is cycle through slot indices. *)
-    let slot_index = Queue.pop state.dal_slot_indices in
-    Queue.push slot_index state.dal_slot_indices ;
-    let* commitment, operation =
-      match dal_cctxt with
-      | Some dal_cctxt ->
-          let* commitment, commitment_proof =
-            Dal_node_client.post_slot dal_cctxt ~slot_index slot_content
-          in
-          return
-            ( commitment,
-              L1_operation.Publish_dal_commitment
-                {slot_index; commitment; commitment_proof} )
-      | None ->
-          (* This should not be reachable, as we tested that some [dal_cctxt] is set
-             at startup before launching the worker. *)
-          assert false
-    in
-    let* l1_hash =
-      Injector.check_and_add_pending_operation
-        state.node_ctxt.config.mode
-        operation
-    in
-    let* l1_hash =
-      match l1_hash with
-      | Some l1_hash -> return l1_hash
-      | None ->
-          let op = Injector.Inj_operation.make operation in
-          return op.id
-    in
-    let*! () = Events.(emit injected) (commitment, slot_index, l1_hash) in
-    Recent_dal_injections.replace state.recent_dal_injections l1_hash () ;
-    return_unit
+  let* commitment, operation =
+    match dal_cctxt with
+    | Some dal_cctxt ->
+        let* commitment, commitment_proof =
+          Dal_node_client.post_slot dal_cctxt ~slot_index slot_content
+        in
+        return
+          ( commitment,
+            L1_operation.Publish_dal_commitment
+              {slot_index; commitment; commitment_proof} )
+    | None ->
+        (* This should not be reachable, as we tested that some [dal_cctxt] is set
+           at startup before launching the worker. *)
+        assert false
+  in
+  let* l1_hash =
+    Injector.check_and_add_pending_operation
+      state.node_ctxt.config.mode
+      operation
+  in
+  let* l1_hash =
+    match l1_hash with
+    | Some l1_hash -> return l1_hash
+    | None ->
+        let op = Injector.Inj_operation.make operation in
+        return op.id
+  in
+  let*! () = Events.(emit injected) (commitment, slot_index, l1_hash) in
+  Recent_dal_injections.replace state.recent_dal_injections l1_hash () ;
+  return_unit
 
 let on_register state ~message : unit tzresult Lwt.t =
   let open Lwt_result_syntax in
@@ -253,33 +246,85 @@ let on_set_dal_slot_indices state idx =
   SI.iter (fun id -> Queue.push id state.dal_slot_indices) idx ;
   return_unit
 
-let on_produce_dal_slots state =
-  let open Lwt_result_syntax in
-  let slot_size =
-    (Reference.get state.node_ctxt.current_protocol).constants.dal
-      .cryptobox_parameters
-      .slot_size
-  in
-  let rec fill_slot accu ~remaining_size =
+(* This function pops from the injection queue the maximum number
+   of messages that fits in a DAL slot. The messages are returned
+   in the order they were popped from the queue (which is also the
+   order in which they were pushed in the queue). In the particular
+   case where there is no more pending message in the queue, the
+   returned list is empty.
+
+   Invariants:
+    - String.length (String.concat "" accu) + remaining_size = slot_size
+    - List.rev accu @ Pending_chunks.elements is invariant. *)
+let fill_slot state ~slot_size =
+  let rec fill_slot_aux accu ~remaining_size =
     match Pending_messages.peek state.pending_messages with
     | None -> List.rev accu
     | Some (_z, message) ->
         let remaining_size = remaining_size - String.length message in
-        if remaining_size < 0 then List.rev accu
+        if remaining_size < 0 then (* Max slot size reached. *)
+          List.rev accu
         else
-          (* Pop the element. *)
+          (* Pop the element to remove it. *)
           let () = ignore @@ Pending_messages.take state.pending_messages in
-          fill_slot (message :: accu) ~remaining_size
+          fill_slot_aux (message :: accu) ~remaining_size
   in
-  match fill_slot [] ~remaining_size:slot_size with
-  | [] -> return_unit (* Nothing to publish. *)
-  | slot_messages ->
-      let slot_content = String.concat "" slot_messages in
-      let*! () =
-        Events.(emit inject_dal_slot_from_messages)
-          (String.length slot_content, slot_size, List.length slot_messages)
-      in
-      inject_slot state ~slot_content
+  fill_slot_aux [] ~remaining_size:slot_size
+
+(* This function pops from the injection queue the maximum number of
+   messages that fits in remaining_num_slots DAL slots (or less if there
+   are not enough messages in the queue to fill that many slots). It
+   returns an association list mapping slot indices from state.dal_slot_indices
+   to lists of messages produced by the fill_slot function. *)
+let fill_slots state ~slot_size ~num_slots =
+  let rec fill_slots_aux accu ~remaining_num_slots =
+    if remaining_num_slots <= 0 then
+      (* All available slot indices are used. *)
+      accu
+    else
+      (* There is at least one remaining available slot index. *)
+      match fill_slot state ~slot_size with
+      | [] -> accu (* But, there is no data to publish. *)
+      | slot_messages ->
+          (* We still have data to publish. Let's associate it to the next DAL
+             slot index. *)
+          let slot_index = Queue.pop state.dal_slot_indices in
+          (* The pop followed by a push is cycle through slot indices. *)
+          Queue.push slot_index state.dal_slot_indices ;
+          fill_slots_aux
+            ((slot_index, slot_messages) :: accu)
+            ~remaining_num_slots:(remaining_num_slots - 1)
+  in
+  fill_slots_aux [] ~remaining_num_slots:num_slots
+
+(* This function is called to produce slots from pending message using the
+   function {!fill_slots} above. It then publishes those slots on DAL and posts
+   their commitments to L1. *)
+let on_produce_dal_slots state =
+  let open Lwt_result_syntax in
+  if Queue.is_empty state.dal_slot_indices then
+    (* No provided slot indices, no injection *)
+    let*! () = Events.(emit no_dal_slot_indices_set) () in
+    return_unit
+  else
+    let slot_size =
+      (Reference.get state.node_ctxt.current_protocol).constants.dal
+        .cryptobox_parameters
+        .slot_size
+    in
+    let num_slots = Queue.length state.dal_slot_indices in
+    (* Inject on all DAL slot indices in parallel. *)
+    fill_slots state ~slot_size ~num_slots
+    |> List.iter_ep (fun (slot_index, slot_chunks) ->
+           let slot_content = String.concat "" slot_chunks in
+           let*! () =
+             Events.(emit inject_dal_slot_from_messages)
+               ( String.length slot_content,
+                 slot_size,
+                 List.length slot_chunks,
+                 slot_index )
+           in
+           inject_slot state ~slot_index ~slot_content)
 
 let init_dal_worker_state node_ctxt =
   let dal_constants =
