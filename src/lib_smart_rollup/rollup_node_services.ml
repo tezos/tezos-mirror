@@ -843,7 +843,8 @@ module Local = struct
 
   let dal_batcher_injection =
     Tezos_rpc.Service.post_service
-      ~description:"Inject the given messages in the DAL queue"
+      ~description:
+        "Inject the given messages in the DAL queue, even in case of duplicates"
       ~query:Tezos_rpc.Query.empty
       ~input:
         Data_encoding.(

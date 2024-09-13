@@ -12,8 +12,7 @@ Available services:
         Return the accepted commitment associated to the given slot index and
         published at the given level. 
     - GET /levels/<int32>/slots/<int>/content
-        Retrieve the content of the slot associated with the given
-        commitment. 
+        Retrieve the content of the slot whose id is given. 
     - GET /levels/<int32>/slots/<int>/pages
         Fetch slot as list of pages 
     - GET /levels/<int32>/slots/<int>/pages/<int>/proof

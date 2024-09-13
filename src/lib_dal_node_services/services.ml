@@ -106,8 +106,7 @@ let get_slot_content :
     ; query : unit >
     service =
   Tezos_rpc.Service.get_service
-    ~description:
-      "Retrieve the content of the slot associated with the given commitment."
+    ~description:"Retrieve the content of the slot whose id is given."
     ~query:Tezos_rpc.Query.empty
     ~output:slot_encoding
     Tezos_rpc.Path.(

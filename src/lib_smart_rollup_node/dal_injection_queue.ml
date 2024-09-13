@@ -110,6 +110,14 @@ module Events = struct
       ("errors", Error_monad.trace_encoding)
       ~pp3:Error_monad.pp_print_trace
 
+  let dal_message_received =
+    declare_0
+      ~section
+      ~name:"dal_message_received"
+      ~msg:"A message to inject via DAL has been added to the injection queue"
+      ~level:Info
+      ()
+
   let no_dal_slot_indices_set =
     declare_0
       ~section
@@ -117,6 +125,18 @@ module Events = struct
       ~msg:"Cannot inject slot as no DAL slot index is set"
       ~level:Error
       ()
+
+  let inject_dal_slot_from_messages =
+    declare_3
+      ~section
+      ~name:"inject_dal_slot_from_messages"
+      ~msg:
+        "Injecting a DAL slot containing {num_messages} messages, for a total \
+         size of {data_size} bytes over {slot_size}"
+      ~level:Debug
+      ("data_size", Data_encoding.uint16)
+      ("slot_size", Data_encoding.uint16)
+      ("num_messages", Data_encoding.uint16)
 
   let request_completed =
     declare_2
@@ -133,14 +153,15 @@ end
 module Pending_messages =
   Hash_queue.Make
     (struct
-      type t = string
+      type t = int
+      (* injected messages, with the index of its injection in the pool. *)
 
-      let equal = String.equal
+      let equal = Int.equal
 
       let hash = Hashtbl.hash
     end)
     (struct
-      type t = unit
+      type t = string
     end)
 
 module Recent_dal_injections =
@@ -153,6 +174,7 @@ module Recent_dal_injections =
 type state = {
   node_ctxt : Node_context.ro;
   recent_dal_injections : Recent_dal_injections.t;
+  mutable count_messages : int;
   pending_messages : Pending_messages.t;
   dal_slot_indices : Tezos_dal_node_services.Types.slot_index Queue.t;
       (* We use a queue here to easily cycle through
@@ -205,14 +227,11 @@ let inject_slot state ~slot_content =
 
 let on_register state ~message : unit tzresult Lwt.t =
   let open Lwt_result_syntax in
-  Pending_messages.replace state.pending_messages message () ;
+  Pending_messages.replace state.pending_messages state.count_messages message ;
+  (* We don't care about overflows here. *)
+  state.count_messages <- state.count_messages + 1 ;
+  let*! () = Events.(emit dal_message_received) () in
   return_unit
-
-let on_produce_dal_slots state =
-  let open Lwt_result_syntax in
-  match Pending_messages.take state.pending_messages with
-  | None -> return_unit
-  | Some (message, ()) -> inject_slot state ~slot_content:message
 
 let on_set_dal_slot_indices state idx =
   let open Lwt_result_syntax in
@@ -234,21 +253,66 @@ let on_set_dal_slot_indices state idx =
   SI.iter (fun id -> Queue.push id state.dal_slot_indices) idx ;
   return_unit
 
+let on_produce_dal_slots state =
+  let open Lwt_result_syntax in
+  let slot_size =
+    (Reference.get state.node_ctxt.current_protocol).constants.dal
+      .cryptobox_parameters
+      .slot_size
+  in
+  let rec fill_slot accu ~remaining_size =
+    match Pending_messages.peek state.pending_messages with
+    | None -> List.rev accu
+    | Some (_z, message) ->
+        let remaining_size = remaining_size - String.length message in
+        if remaining_size < 0 then List.rev accu
+        else
+          (* Pop the element. *)
+          let () = ignore @@ Pending_messages.take state.pending_messages in
+          fill_slot (message :: accu) ~remaining_size
+  in
+  match fill_slot [] ~remaining_size:slot_size with
+  | [] -> return_unit (* Nothing to publish. *)
+  | slot_messages ->
+      let slot_content = String.concat "" slot_messages in
+      let*! () =
+        Events.(emit inject_dal_slot_from_messages)
+          (String.length slot_content, slot_size, List.length slot_messages)
+      in
+      inject_slot state ~slot_content
+
 let init_dal_worker_state node_ctxt =
   let dal_constants =
     let open Node_context in
     (Reference.get node_ctxt.current_protocol).constants.dal
   in
-  (* We initialize a bounded cache for [known_slots] large enough to contain
-     [number_of_slots] entries during [attestation_lag] * 4 (sliding) levels. *)
-  let max_retained_slots_info =
-    dal_constants.number_of_slots * dal_constants.attestation_lag * 4
+  (* Etherlink serves as primary user for the batcher service, as such its
+       constants are targetted for its usage for now. *)
+  let etherlink_max_pending_messages_size =
+    let maximum_number_of_chunks_per_blueprint = 128 in
+    let maximum_number_of_blueprints_per_second = 2 in
+    let blueprint_expiration_in_seconds =
+      (* We should keep the messages in the injection queue
+         for at least one L1 level. There is no upper bound
+         to the time between blocks but having blocks more
+         than 10 minutes apart is extremely rare *)
+      600
+    in
+    maximum_number_of_chunks_per_blueprint
+    * maximum_number_of_blueprints_per_second * blueprint_expiration_in_seconds
+  in
+  let max_remembered_recent_injections =
+    dal_constants.number_of_slots * dal_constants.attestation_lag
+    * 5 (* Give more chance for DAL slots to be signaled. *)
   in
   {
     node_ctxt;
-    recent_dal_injections = Recent_dal_injections.create max_retained_slots_info;
-    pending_messages = Pending_messages.create max_retained_slots_info;
+    recent_dal_injections =
+      Recent_dal_injections.create max_remembered_recent_injections;
+    pending_messages =
+      Pending_messages.create etherlink_max_pending_messages_size;
     dal_slot_indices = Queue.create ();
+    count_messages = 0;
   }
 
 module Types = struct
