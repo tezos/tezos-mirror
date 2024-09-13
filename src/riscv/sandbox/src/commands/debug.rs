@@ -63,7 +63,7 @@ fn debug_pvm(
     let rollup_address = SmartRollupAddress::from_b58check(opts.common.inbox.address.as_str())?;
 
     Ok(
-        debugger_app::DebuggerApp::<'_, PvmStepper<'_, '_, M1G>>::launch(
+        debugger_app::DebuggerApp::<'_, PvmStepper<'_, M1G>>::launch(
             fname,
             program,
             initrd,

@@ -14,10 +14,7 @@ use crate::{
     program::Program,
     pvm::{Pvm, PvmHooks, PvmLayout, PvmStatus},
     range_utils::bound_saturating_sub,
-    state_backend::{
-        memory_backend::{InMemoryBackend, SliceManager},
-        Backend, Layout,
-    },
+    state_backend::owned_backend::Owned,
 };
 use std::ops::Bound;
 use tezos_smart_rollup_utils::inbox::Inbox;
@@ -34,29 +31,20 @@ pub enum PvmStepperError {
 
 /// Wrapper over a PVM that lets you step through it
 pub struct PvmStepper<
-    'backend,
     'hooks,
     ML: MainMemoryLayout = M1G,
     ICL: InstructionCacheLayout = DefaultInstructionCacheLayout,
 > {
-    pvm: Pvm<ML, ICL, SliceManager<'backend>>,
+    pvm: Pvm<ML, ICL, Owned>,
     hooks: PvmHooks<'hooks>,
     inbox: Inbox,
     rollup_address: [u8; 20],
     origination_level: u32,
 }
 
-impl<'backend, 'hooks, ML: MainMemoryLayout, ICL: InstructionCacheLayout>
-    PvmStepper<'backend, 'hooks, ML, ICL>
-{
-    /// Create the state backend which the PVM needs to bind to.
-    pub fn create_backend() -> InMemoryBackend<PvmLayout<ML, ICL>> {
-        InMemoryBackend::<PvmLayout<ML, ICL>>::new().0
-    }
-
+impl<'hooks, ML: MainMemoryLayout, ICL: InstructionCacheLayout> PvmStepper<'hooks, ML, ICL> {
     /// Create a new PVM stepper.
     pub fn new(
-        backend: &'backend mut InMemoryBackend<PvmLayout<ML, ICL>>,
         program: &[u8],
         initrd: Option<&[u8]>,
         inbox: Inbox,
@@ -64,8 +52,7 @@ impl<'backend, 'hooks, ML: MainMemoryLayout, ICL: InstructionCacheLayout>
         rollup_address: [u8; 20],
         origination_level: u32,
     ) -> Result<Self, PvmStepperError> {
-        let placed = <PvmLayout<ML, ICL> as Layout>::placed().into_location();
-        let space = backend.allocate(placed);
+        let space = Owned::allocate::<PvmLayout<ML, ICL>>();
         let mut pvm = Pvm::bind(space);
 
         let program = Program::<ML>::from_elf(program)?;
@@ -137,14 +124,14 @@ impl<'backend, 'hooks, ML: MainMemoryLayout, ICL: InstructionCacheLayout>
     }
 }
 
-impl<'backend, 'hooks, ML: MainMemoryLayout, ICL: InstructionCacheLayout> Stepper
-    for PvmStepper<'backend, 'hooks, ML, ICL>
+impl<'hooks, ML: MainMemoryLayout, ICL: InstructionCacheLayout> Stepper
+    for PvmStepper<'hooks, ML, ICL>
 {
     type MainMemoryLayout = ML;
 
     type InstructionCacheLayout = ICL;
 
-    type Manager = SliceManager<'backend>;
+    type Manager = Owned;
 
     fn machine_state(
         &self,

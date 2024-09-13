@@ -176,8 +176,8 @@ impl<'a, ML: MainMemoryLayout> DebuggerApp<'a, TestStepper<'a, ML>> {
     }
 }
 
-impl<'backend, 'hooks, ML: MainMemoryLayout, ICL: InstructionCacheLayout>
-    DebuggerApp<'backend, PvmStepper<'backend, 'hooks, ML, ICL>>
+impl<'hooks, ML: MainMemoryLayout, ICL: InstructionCacheLayout>
+    DebuggerApp<'_, PvmStepper<'hooks, ML, ICL>>
 {
     /// Launch the Debugger app for a PVM.
     pub fn launch(
@@ -190,9 +190,7 @@ impl<'backend, 'hooks, ML: MainMemoryLayout, ICL: InstructionCacheLayout>
     ) -> Result<()> {
         let hooks = PvmHooks::new(|_| {});
 
-        let mut backend = PvmStepper::<'backend, 'hooks, ML, ICL>::create_backend();
-        let mut stepper = PvmStepper::<'_, '_, ML, ICL>::new(
-            &mut backend,
+        let mut stepper = PvmStepper::<'_, ML, ICL>::new(
             program,
             initrd,
             inbox,
