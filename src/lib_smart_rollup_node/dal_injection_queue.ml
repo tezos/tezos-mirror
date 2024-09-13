@@ -133,14 +133,15 @@ end
 module Pending_messages =
   Hash_queue.Make
     (struct
-      type t = string
+      type t = int
+      (* injected messages, with the index of its injection in the pool. *)
 
-      let equal = String.equal
+      let equal = Int.equal
 
       let hash = Hashtbl.hash
     end)
     (struct
-      type t = unit
+      type t = string
     end)
 
 module Recent_dal_injections =
@@ -153,6 +154,7 @@ module Recent_dal_injections =
 type state = {
   node_ctxt : Node_context.ro;
   recent_dal_injections : Recent_dal_injections.t;
+  mutable count_messages : int;
   pending_messages : Pending_messages.t;
   dal_slot_indices : Tezos_dal_node_services.Types.slot_index Queue.t;
       (* We use a queue here to easily cycle through
@@ -205,14 +207,16 @@ let inject_slot state ~slot_content =
 
 let on_register state ~message : unit tzresult Lwt.t =
   let open Lwt_result_syntax in
-  Pending_messages.replace state.pending_messages message () ;
+  Pending_messages.replace state.pending_messages state.count_messages message ;
+  (* We don't care about overflows here. *)
+  state.count_messages <- state.count_messages + 1 ;
   return_unit
 
 let on_produce_dal_slots state =
   let open Lwt_result_syntax in
   match Pending_messages.take state.pending_messages with
   | None -> return_unit
-  | Some (message, ()) -> inject_slot state ~slot_content:message
+  | Some (_z, message) -> inject_slot state ~slot_content:message
 
 let on_set_dal_slot_indices state idx =
   let open Lwt_result_syntax in
@@ -249,6 +253,7 @@ let init_dal_worker_state node_ctxt =
     recent_dal_injections = Recent_dal_injections.create max_retained_slots_info;
     pending_messages = Pending_messages.create max_retained_slots_info;
     dal_slot_indices = Queue.create ();
+    count_messages = 0;
   }
 
 module Types = struct
