@@ -10,30 +10,30 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
-  "ppx_expect"
   "octez-libs" { = version }
-  "tezos-protocol-021-PsquebeC" { = version }
   "octez-shell-libs" { = version }
-  "uri" { >= "3.1.0" }
-  "tezt" { >= "4.1.0" & < "5.0.0" }
-  "tezt-tezos" { = version }
-  "qcheck-alcotest" { >= "0.20" }
-  "octez-proto-libs" { = version }
-  "octez-version" { = version }
+  "octez-protocol-021-PsQuebec-libs" { = version }
+  "tezos-protocol-021-PsQuebec" { = version }
   "tezos-dal-node-services" { = version }
-  "lwt-canceler" { >= "0.3" & < "0.4" }
-  "lwt-exit"
-  "octez-protocol-compiler" { = version }
   "tezos-dal-node-lib" { = version }
   "tezos-dac-lib" { = version }
   "tezos-dac-client-lib" { = version }
-  "octez-injector" { = version }
   "octez-l2-libs" { = version }
-  "octez-alcotezt" { with-test & = version }
+  "octez-crawler" { = version }
+  "octez-internal-libs" { = version }
+  "aches" { >= "1.1.0" }
+  "aches-lwt" { >= "1.1.0" }
+  "octez-injector" { = version }
+  "octez-smart-rollup-node-lib" { = version }
+  "octez-riscv-pvm" { = version }
+  "octez-version" { = version }
+]
+conflicts: [
+  "checkseum" { = "0.5.0" }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Octez protocol 021-PsquebeC libraries"
+synopsis: "Protocol specific (for 021-PsQuebec) library for smart rollup node"

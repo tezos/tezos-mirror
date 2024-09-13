@@ -1,9 +1,9 @@
 bls12-381	all	7
 octez-accuser-PsParisC	exec	1
-octez-accuser-PsquebeC	exec	1
+octez-accuser-PsQuebec	exec	1
 octez-alcotezt	all	7
 octez-baker-PsParisC	exec	1
-octez-baker-PsquebeC	exec	1
+octez-baker-PsQuebec	exec	1
 octez-client	exec	1
 octez-codec	exec	1
 octez-crawler	all	4
@@ -42,7 +42,7 @@ octez-protocol-017-PtNairob-libs	all	2
 octez-protocol-018-Proxford-libs	all	2
 octez-protocol-019-PtParisB-libs	all	2
 octez-protocol-020-PsParisC-libs	all	2
-octez-protocol-021-PsquebeC-libs	all	2
+octez-protocol-021-PsQuebec-libs	all	2
 octez-protocol-alpha-libs	all	2
 octez-protocol-compiler	exec	6
 octez-riscv-api	all	7
@@ -54,7 +54,7 @@ octez-signer	exec	4
 octez-smart-rollup-node	exec	1
 octez-smart-rollup-node-Proxford	all	1
 octez-smart-rollup-node-PsParisC	all	2
-octez-smart-rollup-node-PsquebeC	all	2
+octez-smart-rollup-node-PsQuebec	all	2
 octez-smart-rollup-node-PtNairob	all	2
 octez-smart-rollup-node-PtParisB	all	2
 octez-smart-rollup-node-alpha	all	2
@@ -95,7 +95,7 @@ tezos-protocol-017-PtNairob	all	6
 tezos-protocol-018-Proxford	all	6
 tezos-protocol-019-PtParisB	all	6
 tezos-protocol-020-PsParisC	all	6
-tezos-protocol-021-PsquebeC	all	6
+tezos-protocol-021-PsQuebec	all	6
 tezos-protocol-alpha	all	6
 tezos-protocol-demo-counter	all	6
 tezos-protocol-demo-noops	all	6

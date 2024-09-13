@@ -23,8 +23,8 @@ depends: [
   "tezos-protocol-000-Ps9mPmXa" { = version }
   "tezos-protocol-020-PsParisC" { = version }
   "octez-protocol-020-PsParisC-libs" { = version }
-  "tezos-protocol-021-PsquebeC" { = version }
-  "octez-protocol-021-PsquebeC-libs" { = version }
+  "tezos-protocol-021-PsQuebec" { = version }
+  "octez-protocol-021-PsQuebec-libs" { = version }
 ]
 depopts: [
   "tezos-protocol-genesis"

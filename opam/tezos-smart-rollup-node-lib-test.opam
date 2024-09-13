@@ -20,7 +20,7 @@ depends: [
   "octez-alcotezt" {with-test}
   "octez-shell-libs" {with-test}
   "octez-smart-rollup-node-PsParisC" {with-test}
-  "octez-smart-rollup-node-PsquebeC" {with-test}
+  "octez-smart-rollup-node-PsQuebec" {with-test}
 ]
 depopts: [
   "octez-smart-rollup-node-PtNairob" {with-test}

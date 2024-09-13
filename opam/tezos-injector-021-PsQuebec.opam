@@ -11,8 +11,9 @@ depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
   "octez-libs" { = version }
-  "tezos-protocol-021-PsquebeC" { = version }
-  "octez-protocol-021-PsquebeC-libs" { = version }
+  "tezos-protocol-021-PsQuebec" { = version }
+  "octez-injector" { = version }
+  "octez-protocol-021-PsQuebec-libs" { = version }
   "octez-shell-libs" { = version }
 ]
 build: [
@@ -20,4 +21,4 @@ build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tezos/Protocol: accuser binary"
+synopsis: "Tezos/Protocol: protocol-specific library for the injector binary"

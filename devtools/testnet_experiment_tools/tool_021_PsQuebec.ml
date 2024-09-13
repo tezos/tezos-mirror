@@ -25,13 +25,13 @@
 
 open Lwt_result_syntax
 open Tezos_shell_services
-open Tezos_client_021_PsquebeC
-open Tezos_baking_021_PsquebeC
-open Tezos_protocol_021_PsquebeC
+open Tezos_client_021_PsQuebec
+open Tezos_baking_021_PsQuebec
+open Tezos_protocol_021_PsQuebec
 open Protocol
 open Alpha_context
 
-module Alpha_services = Tezos_protocol_plugin_021_PsquebeC.Plugin.Alpha_services
+module Alpha_services = Tezos_protocol_plugin_021_PsQuebec.Plugin.Alpha_services
 
 (** Sync node *)
 

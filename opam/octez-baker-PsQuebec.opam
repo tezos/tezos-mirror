@@ -11,8 +11,8 @@ depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
   "octez-libs" { = version }
-  "tezos-protocol-021-PsquebeC" { = version }
-  "octez-protocol-021-PsquebeC-libs" { = version }
+  "tezos-protocol-021-PsQuebec" { = version }
+  "octez-protocol-021-PsQuebec-libs" { = version }
   "octez-shell-libs" { = version }
 ]
 build: [

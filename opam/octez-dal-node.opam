@@ -18,7 +18,7 @@ depends: [
   "octez-l2-libs" { = version }
   "octez-crawler" { = version }
   "octez-protocol-020-PsParisC-libs" { = version }
-  "octez-protocol-021-PsquebeC-libs" { = version }
+  "octez-protocol-021-PsQuebec-libs" { = version }
 ]
 depopts: [
   "octez-protocol-alpha-libs"

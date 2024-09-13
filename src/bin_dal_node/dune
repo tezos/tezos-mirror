@@ -37,7 +37,7 @@
   octez-libs.prometheus
   octez-crawler
   octez-protocol-020-PsParisC-libs.dal
-  octez-protocol-021-PsquebeC-libs.dal
+  octez-protocol-021-PsQuebec-libs.dal
   (select void_for_linking-octez-protocol-alpha-libs-dal from
    (octez-protocol-alpha-libs.dal -> void_for_linking-octez-protocol-alpha-libs-dal.empty)
    (-> void_for_linking-octez-protocol-alpha-libs-dal.empty)))

@@ -12,16 +12,13 @@ depends: [
   "ocaml" { >= "4.14" }
   "octez-libs" { = version }
   "tezos-micheline-rewriting" { = version }
-  "tezos-benchmark" { = version }
-  "tezos-benchmark-type-inference-021-PsquebeC" { = version }
-  "tezos-protocol-021-PsquebeC" { = version }
+  "tezos-protocol-021-PsQuebec" { = version }
   "hashcons"
-  "octez-protocol-021-PsquebeC-libs" { = version }
-  "prbnmcn-stats" { = "0.0.6" }
+  "octez-protocol-021-PsQuebec-libs" { with-test & = version }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tezos/Protocol: library for writing benchmarks (protocol-specific part)"
+synopsis: "Tezos: type inference for partial Michelson expressions"

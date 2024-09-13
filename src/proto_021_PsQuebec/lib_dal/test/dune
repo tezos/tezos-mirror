@@ -2,15 +2,15 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name src_proto_021_PsquebeC_lib_dal_test_tezt_lib)
+ (name src_proto_021_PsQuebec_lib_dal_test_tezt_lib)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
   octez-libs.base
-  octez-protocol-021-PsquebeC-libs.dal
-  tezos-protocol-021-PsquebeC.protocol
+  octez-protocol-021-PsQuebec-libs.dal
+  tezos-protocol-021-PsQuebec.protocol
   octez-libs.base-test-helpers
-  octez-protocol-021-PsquebeC-libs.test-helpers
+  octez-protocol-021-PsQuebec-libs.test-helpers
   octez-alcotezt)
  (library_flags (:standard -linkall))
  (flags
@@ -18,10 +18,10 @@
   -open Tezt_core
   -open Tezt_core.Base
   -open Tezos_base.TzPervasives
-  -open Tezos_dal_021_PsquebeC
-  -open Tezos_protocol_021_PsquebeC
+  -open Tezos_dal_021_PsQuebec
+  -open Tezos_protocol_021_PsQuebec
   -open Tezos_base_test_helpers
-  -open Tezos_021_PsquebeC_test_helpers
+  -open Tezos_021_PsQuebec_test_helpers
   -open Octez_alcotezt)
  (modules test_dal_slot_frame_encoding test_helpers))
 
@@ -29,7 +29,7 @@
  (name main)
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
-  src_proto_021_PsquebeC_lib_dal_test_tezt_lib
+  src_proto_021_PsQuebec_lib_dal_test_tezt_lib
   tezt)
  (link_flags
   (:standard)
@@ -38,7 +38,7 @@
 
 (rule
  (alias runtest)
- (package octez-protocol-021-PsquebeC-libs)
+ (package octez-protocol-021-PsQuebec-libs)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe} /flaky /ci_disabled)))
 

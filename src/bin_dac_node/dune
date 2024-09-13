@@ -26,7 +26,7 @@
   octez-internal-libs.irmin_pack.unix
   octez-internal-libs.irmin
   octez-protocol-020-PsParisC-libs.dac
-  octez-protocol-021-PsquebeC-libs.dac
+  octez-protocol-021-PsQuebec-libs.dac
   (select void_for_linking-octez-protocol-alpha-libs-dac from
    (octez-protocol-alpha-libs.dac -> void_for_linking-octez-protocol-alpha-libs-dac.empty)
    (-> void_for_linking-octez-protocol-alpha-libs-dac.empty)))
