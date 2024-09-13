@@ -12,7 +12,7 @@ code base, so this is not subject to on-chain governance (see
 :doc:`voting procedure <voting>`), but it is still protocol-dependent,
 which means that it may vary with different protocols. For instance,
 the plugin code for protocol Alpha is located in file
-:src:`src/proto_021_PsquebeC/lib_plugin/plugin.ml`. Thus, a specific version
+:src:`src/proto_021_PsQuebec/lib_plugin/plugin.ml`. Thus, a specific version
 is included in the Octez node for each protocol version (recall that a
 new release of Octez is usually delivered for each new protocol
 proposal, see :doc:`../releases/releases`)

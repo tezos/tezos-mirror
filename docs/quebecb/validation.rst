@@ -71,7 +71,7 @@ specified by the :package-api:`Protocol
 module in the :doc:`protocol
 environment<../shell/protocol_environment>` ``V13``, and it is
 implemented by this protocol in the
-:package-api:`Main<tezos-protocol-021-PsquebeC/Tezos_raw_protocol_021_PsquebeC/Main/index.html>`
+:package-api:`Main<tezos-protocol-021-PsQuebec/Tezos_raw_protocol_021_PsQuebec/Main/index.html>`
 module.
 
 The rest of this document is organized as follows: we first describe
