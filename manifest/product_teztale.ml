@@ -62,6 +62,7 @@ let _teztale_server =
         octez_version_value;
         teztale_library_base |> open_;
         teztale_server_library |> open_;
+        cmdliner;
       ]
     ~release_status:Experimental
 

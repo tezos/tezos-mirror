@@ -16,7 +16,8 @@
   safepass
   octez-version.value
   lib_teztale_base
-  lib_teztale_server)
+  lib_teztale_server
+  cmdliner)
  (link_flags
   (:standard)
   (:include %{workspace_root}/macos-link-flags.sexp)
