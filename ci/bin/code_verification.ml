@@ -1595,13 +1595,7 @@ let jobs pipeline_type =
       in
       let job_documentation_linkcheck : tezos_job =
         Documentation.job_linkcheck
-          ~dependencies:
-            (Dependent
-               [
-                 Artifacts job_manuals;
-                 Artifacts job_docgen;
-                 Artifacts job_build_all;
-               ])
+          ~job_build_all
           ~rules:
             (make_rules
                ~dependent:true

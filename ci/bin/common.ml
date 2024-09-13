@@ -1493,13 +1493,14 @@ module Documentation = struct
       ["make -C docs -j sphinx"]
 
   (** Create a [documentation:linkcheck] job. *)
-  let job_linkcheck ?dependencies ?rules () : tezos_job =
+  let job_linkcheck ~job_build_all ?dependencies ?rules () : tezos_job =
+    let dependencies = mk_artifact_dependencies ?dependencies [job_build_all] in
     job
       ~__POS__
       ~name:"documentation:linkcheck"
       ~image:Images.CI.test
       ~stage:Stages.doc
-      ?dependencies
+      ~dependencies
         (* Warning: the [documentation:linkcheck] job must have at least the same
            restrictions in the rules as [documentation:build_all], otherwise the CI
            may complain that [documentation:linkcheck] depends on [documentation:build_all]

@@ -4237,13 +4237,9 @@ documentation:linkcheck:
     allow_failure: true
   needs:
   - oc.docker:ci:amd64
-  - documentation:manuals
-  - documentation:docgen
   - documentation:build_all
   dependencies:
   - oc.docker:ci:amd64
-  - documentation:manuals
-  - documentation:docgen
   - documentation:build_all
   allow_failure: true
   timeout: 60 minutes
