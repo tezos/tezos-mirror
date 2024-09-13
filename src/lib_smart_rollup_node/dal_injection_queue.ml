@@ -21,7 +21,7 @@ end
 module Dal_worker_types = struct
   module Request = struct
     type ('a, 'b) t =
-      | Register : {slot_content : string} -> (unit, error trace) t
+      | Register : {message : string} -> (unit, error trace) t
       | Produce_dal_slots : (unit, error trace) t
       | Set_dal_slot_indices :
           Tezos_dal_node_services.Types.slot_index list
@@ -42,9 +42,8 @@ module Dal_worker_types = struct
                (req "request" (constant "register"))
                (req "slot_content" string))
             (function
-              | View (Register {slot_content}) -> Some ((), slot_content)
-              | _ -> None)
-            (fun ((), slot_content) -> View (Register {slot_content}));
+              | View (Register {message}) -> Some ((), message) | _ -> None)
+            (fun ((), message) -> View (Register {message}));
           case
             (Tag 1)
             ~title:"Produce_dal_slots"
@@ -131,10 +130,10 @@ module Events = struct
       ~pp2:Worker_types.pp_status
 end
 
-module Pending_chunks =
+module Pending_messages =
   Hash_queue.Make
     (struct
-      type t = string (* slot content or chunk *)
+      type t = string
 
       let equal = String.equal
 
@@ -154,7 +153,7 @@ module Recent_dal_injections =
 type state = {
   node_ctxt : Node_context.ro;
   recent_dal_injections : Recent_dal_injections.t;
-  pending_chunks : Pending_chunks.t;
+  pending_messages : Pending_messages.t;
   dal_slot_indices : Tezos_dal_node_services.Types.slot_index Queue.t;
       (* We use a queue here to easily cycle through
          the slots and use different ones from a
@@ -204,16 +203,16 @@ let inject_slot state ~slot_content =
     Recent_dal_injections.replace state.recent_dal_injections l1_hash () ;
     return_unit
 
-let on_register state ~slot_content : unit tzresult Lwt.t =
+let on_register state ~message : unit tzresult Lwt.t =
   let open Lwt_result_syntax in
-  Pending_chunks.replace state.pending_chunks slot_content () ;
+  Pending_messages.replace state.pending_messages message () ;
   return_unit
 
 let on_produce_dal_slots state =
   let open Lwt_result_syntax in
-  match Pending_chunks.take state.pending_chunks with
+  match Pending_messages.take state.pending_messages with
   | None -> return_unit
-  | Some (slot_content, ()) -> inject_slot state ~slot_content
+  | Some (message, ()) -> inject_slot state ~slot_content:message
 
 let on_set_dal_slot_indices state idx =
   let open Lwt_result_syntax in
@@ -248,7 +247,7 @@ let init_dal_worker_state node_ctxt =
   {
     node_ctxt;
     recent_dal_injections = Recent_dal_injections.create max_retained_slots_info;
-    pending_chunks = Pending_chunks.create max_retained_slots_info;
+    pending_messages = Pending_messages.create max_retained_slots_info;
     dal_slot_indices = Queue.create ();
   }
 
@@ -272,8 +271,8 @@ module Handlers = struct
    fun w request ->
     let state = Worker.state w in
     match request with
-    | Request.Register {slot_content} ->
-        protect @@ fun () -> on_register state ~slot_content
+    | Request.Register {message} ->
+        protect @@ fun () -> on_register state ~message
     | Request.Produce_dal_slots ->
         protect @@ fun () -> on_produce_dal_slots state
     | Request.Set_dal_slot_indices idx ->
@@ -364,10 +363,10 @@ let handle_request_error rq =
   | Error (Closed (Some errs)) -> Lwt.return_error errs
   | Error (Any exn) -> Lwt.return_error [Exn exn]
 
-let register_dal_slot ~slot_content =
+let register_dal_message ~message =
   let open Lwt_result_syntax in
   let* w = lwt_map_error TzTrace.make (Lwt.return (Lazy.force worker)) in
-  Worker.Queue.push_request_and_wait w (Request.Register {slot_content})
+  Worker.Queue.push_request_and_wait w (Request.Register {message})
   |> handle_request_error
 
 let produce_dal_slots () =

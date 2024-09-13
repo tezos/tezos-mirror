@@ -843,14 +843,14 @@ module Local = struct
 
   let dal_injection =
     let input_encoding =
-      Data_encoding.(obj1 (req "slot_content" Data_encoding.Variable.string))
+      Data_encoding.(obj1 (req "content" Data_encoding.Variable.string))
     in
     Tezos_rpc.Service.post_service
-      ~description:"Inject the given slot in the DAL queue"
+      ~description:"Inject the given message in the DAL queue"
       ~query:Tezos_rpc.Query.empty
       ~input:
         Data_encoding.(
-          def "dal_slot" ~description:"Slot to inject" input_encoding)
+          def "message" ~description:"Message to inject" input_encoding)
       ~output:Data_encoding.unit
       (path / "dal" / "injection")
 
