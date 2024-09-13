@@ -467,4 +467,4 @@ module Mempool = struct
          ~predecessor_hash:head_hash)
 end
 
-(* Vanity nonce: TBD *)
+(* Vanity nonce: 5856695454559796 *)
