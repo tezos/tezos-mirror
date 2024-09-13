@@ -3,7 +3,7 @@ open Gitlab_ci.Util
 let failwith fmt = Format.kasprintf (fun s -> failwith s) fmt
 
 module Cli = struct
-  type action = Write | List_pipelines
+  type action = Write | List_pipelines | Describe_pipeline of {name : string}
 
   type config = {
     mutable verbose : bool;
@@ -51,6 +51,9 @@ module Cli = struct
           ( "--list-pipelines",
             Arg.Unit (fun () -> config.action <- List_pipelines),
             " List registered pipelines." );
+          ( "--describe-pipeline",
+            Arg.String (fun name -> config.action <- Describe_pipeline {name}),
+            "NAME Describe a pipeline." );
         ]
     in
     Arg.parse
@@ -93,6 +96,7 @@ type tezos_image =
 and tezos_job = {
   job : Gitlab_ci.Types.generic_job;
   source_position : string * int * int * int;
+  description : string option;
   stage : Stage.t;
   image_builders : tezos_job list;
 }
@@ -376,6 +380,17 @@ module Pipeline = struct
     let includes = List.map include_of_pipeline pipelines in
     (workflow, includes)
 
+  let stages pipeline =
+    let jobs = jobs pipeline in
+    let stages : (string, int) Hashtbl.t = Hashtbl.create 5 in
+    List.iter
+      (fun job ->
+        Hashtbl.replace stages (Stage.name job.stage) (Stage.index job.stage))
+      jobs ;
+    Hashtbl.to_seq stages |> List.of_seq
+    |> List.sort (fun (_n1, idx1) (_n2, idx2) -> Int.compare idx1 idx2)
+    |> List.map fst
+
   let write ?default ?variables ~filename () =
     (* Write all registered pipelines *)
     ( Fun.flip List.iter (all ()) @@ fun pipeline ->
@@ -399,19 +414,6 @@ module Pipeline = struct
             name
             filename)
         jobs ;
-      let stages =
-        let stages : (string, int) Hashtbl.t = Hashtbl.create 5 in
-        List.iter
-          (fun job ->
-            Hashtbl.replace
-              stages
-              (Stage.name job.stage)
-              (Stage.index job.stage))
-          jobs ;
-        Hashtbl.to_seq stages |> List.of_seq
-        |> List.sort (fun (_n1, idx1) (_n2, idx2) -> Int.compare idx1 idx2)
-        |> List.map fst
-      in
       let prepend_config =
         (match pipeline with
         | Pipeline _ -> []
@@ -426,7 +428,7 @@ module Pipeline = struct
                   };
                 Variables [("PIPELINE_TYPE", name)];
               ])
-        @ [Stages stages]
+        @ [Stages (stages pipeline)]
       in
       let config =
         prepend_config @ List.concat_map tezos_job_to_config_elements jobs
@@ -566,6 +568,90 @@ module Pipeline = struct
       printf "@,@[<2>  %a@]@,@," pp_print_text (description pipeline) ) ;
     close_box () ;
     print_flush ()
+
+  let markdown_table fmt ~headers ~rows =
+    let cells = List.length headers in
+    ( Fun.flip List.iteri rows @@ fun idx row ->
+      if List.length row <> cells then
+        raise
+          (Invalid_argument
+             (sf
+                "Row %d should have exactly as many cells as the header row: \
+                 %d, but has %d."
+                (idx + 1)
+                (List.length row)
+                cells)) ) ;
+    let cell_sizes =
+      List.fold_left
+        (fun max_sizes row ->
+          let row_sizes = List.map String.length row in
+          List.map2 Int.max max_sizes row_sizes)
+        (List.map String.length headers)
+        rows
+    in
+    let open Printf in
+    let print_row row =
+      fprintf fmt "|" ;
+      ( Fun.flip List.iteri row @@ fun idx cell ->
+        fprintf
+          fmt
+          " %s%s |"
+          cell
+          (String.make (List.nth cell_sizes idx - String.length cell) ' ') ) ;
+      fprintf fmt "\n"
+    in
+    (* make header *)
+    print_row headers ;
+    (* make separator between header and rows *)
+    print_row (Fun.flip List.map cell_sizes @@ fun size -> String.make size '-') ;
+    (* print rows *)
+    Fun.flip List.iter rows print_row
+
+  let shorten_description description =
+    description |> String.split_on_char '\n' |> function
+    | [] -> description
+    | l :: _ -> l
+
+  let describe_pipeline pipeline_name =
+    let pipelines = all () in
+    match
+      List.find_opt (fun pipeline -> name pipeline = pipeline_name) pipelines
+    with
+    | Some pipeline ->
+        let pipeline = add_image_builders pipeline in
+        let jobs = jobs pipeline in
+        let name = name pipeline in
+        let filename = path ~name in
+        let open Format in
+        open_vbox 0 ;
+        printf "%s (%s): %d jobs@," name filename (List.length jobs) ;
+        printf "@,@[%a@]@,@," pp_print_text (description pipeline) ;
+        close_box () ;
+        print_flush () ;
+        print_endline "Jobs in this pipeline:\n" ;
+        markdown_table
+          stdout
+          ~headers:["STAGE"; "JOB"; "DESCRIPTION"]
+          ~rows:
+            ( Fun.flip List.concat_map (stages pipeline) @@ fun stage ->
+              let jobs_of_stage =
+                List.filter (fun job -> Stage.name job.stage = stage) jobs
+              in
+              Fun.flip List.map jobs_of_stage @@ fun job ->
+              let description =
+                match job.description with
+                | None -> ""
+                | Some d -> shorten_description d
+              in
+              [stage; name_of_tezos_job job; description] )
+    | None ->
+        Printf.eprintf
+          "Pipeline '%s' does not exist.\n\nTry one of:\n"
+          pipeline_name ;
+        List.iter
+          (fun pipeline -> Printf.eprintf "- %s\n" (name pipeline))
+          pipelines ;
+        exit 1
 end
 
 module Image = struct
@@ -733,8 +819,8 @@ let enc_git_strategy = function
 let job ?arch ?after_script ?allow_failure ?artifacts ?before_script ?cache
     ?interruptible ?(dependencies = Staged []) ?(image_dependencies = [])
     ?services ?variables ?rules ?(timeout = Gitlab_ci.Types.Minutes 60) ?tag
-    ?git_strategy ?coverage ?retry ?parallel ~__POS__ ~image ~stage ~name script
-    : tezos_job =
+    ?git_strategy ?coverage ?retry ?parallel ?description ~__POS__ ~image ~stage
+    ~name script : tezos_job =
   (* The tezos/tezos CI uses singleton tags for its runners. *)
   let tag =
     match (arch, tag) with
@@ -865,9 +951,9 @@ let job ?arch ?after_script ?allow_failure ?artifacts ?before_script ?cache
       parallel;
     }
   in
-  {job = Job job; source_position = __POS__; stage; image_builders}
+  {job = Job job; source_position = __POS__; description; stage; image_builders}
 
-let trigger_job ?(dependencies = Staged []) ?rules ~__POS__ ~stage
+let trigger_job ?(dependencies = Staged []) ?rules ?description ~__POS__ ~stage
     Pipeline.
       {
         name = child_pipeline_name;
@@ -894,6 +980,7 @@ let trigger_job ?(dependencies = Staged []) ?rules ~__POS__ ~stage
   in
   {
     job = Trigger_job trigger_job;
+    description;
     source_position = __POS__;
     stage;
     image_builders = [];
