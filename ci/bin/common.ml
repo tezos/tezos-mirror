@@ -1383,6 +1383,13 @@ module Documentation = struct
       jobs
       dependencies
 
+  (** Create an odoc job.
+
+      The job will build the target [odoc] (resp. [odoc-lite]) in the
+      directory [docs] if lite is [false] (resp. [true]), which is the
+      default.
+
+      This job is one of the prerequisites to {!job_build_all}. *)
   let job_odoc ?(lite = false) ?rules ?dependencies () : tezos_job =
     let target = if lite then "odoc-lite" else "odoc" in
     job
@@ -1402,6 +1409,12 @@ module Documentation = struct
       ["make -C docs " ^ target]
     |> enable_cargo_cache |> enable_sccache
 
+  (** Create the manuals job.
+
+      This job builds the command-line interface manuals (i.e [man])
+      of octez binaries, for inclusion in the documentation.
+
+      This job is one of the prerequisites to {!job_build_all}. *)
   let job_manuals ?rules ?dependencies () : tezos_job =
     job
       ~__POS__
@@ -1423,6 +1436,13 @@ module Documentation = struct
       ["./scripts/ci/documentation:manuals.sh"]
     |> enable_cargo_cache |> enable_sccache
 
+  (** Create the docgen job.
+
+      This job builds various generated reference material, for
+      inclusion in the documentation. This includes the RPC, P2p and
+      error reference.
+
+      This job is one of the prerequisites to {!job_build_all}. *)
   let job_docgen ?rules ?dependencies () : tezos_job =
     job
       ~__POS__
@@ -1445,6 +1465,12 @@ module Documentation = struct
       ["make -C docs -j docexes-gen"]
     |> enable_cargo_cache |> enable_sccache
 
+  (** Create the [documentation:build_all] job.
+
+      This jobs builds the RST sources in docs, which will include the
+      the material from the prerequisite jobs: {!job_odoc},
+      {!job_manuals}, {!job_docgen}, on whose artifacts the
+      [documentation:build_all] job will depend. *)
   let job_build_all ~job_odoc ~job_manuals ~job_docgen ?dependencies ?rules () :
       tezos_job =
     let dependencies =
@@ -1456,10 +1482,6 @@ module Documentation = struct
       ~image:Images.CI.test
       ~stage:Stages.doc
       ~dependencies
-        (* Warning: the [documentation:linkcheck] job must have at least the same
-           restrictions in the rules as [documentation:build_all], otherwise the CI
-           may complain that [documentation:linkcheck] depends on [documentation:build_all]
-           which does not exist. *)
       ?rules
       ~before_script:(before_script ~eval_opam:true ~init_python_venv:true [])
       ~artifacts:
@@ -1470,6 +1492,7 @@ module Documentation = struct
            ["docs/_build/"])
       ["make -C docs -j sphinx"]
 
+  (** Create a [documentation:linkcheck] job. *)
   let job_linkcheck ?dependencies ?rules () : tezos_job =
     job
       ~__POS__
@@ -1477,6 +1500,10 @@ module Documentation = struct
       ~image:Images.CI.test
       ~stage:Stages.doc
       ?dependencies
+        (* Warning: the [documentation:linkcheck] job must have at least the same
+           restrictions in the rules as [documentation:build_all], otherwise the CI
+           may complain that [documentation:linkcheck] depends on [documentation:build_all]
+           which does not exist. *)
       ?rules
       ~allow_failure:Yes
       ~before_script:
@@ -1487,6 +1514,11 @@ module Documentation = struct
            [])
       ["make -C docs redirectcheck"; "make -C docs linkcheck"]
 
+  (** Create a [publish:documentation] job.
+
+      This job, for inclusion on [master_branch] pipelines, publishes
+      built documentation received as artifact from a {!job_build_all}
+      to [tezos.gitlab.io]. *)
   let job_publish_documentation ~job_build_all ?dependencies ?rules () :
       tezos_job =
     let dependencies = mk_artifact_dependencies ?dependencies [job_build_all] in
@@ -1502,6 +1534,13 @@ module Documentation = struct
              (* Load the environment poetry previously created in the docker image.
                 Give access to the Python dependencies/executables. *)
            ~init_python_venv:true
+           (* [CI_PK_GITLAB_DOC] and [CI_KH] are set in the projects
+              GitLab setting and are only available on protected
+              refs. [CI_PK_GITLAB_DOC] contains the private key used
+              as deploy key for the Octez documentation on
+              [tezos.gitlab.io]. [CI_KH] contains the host key of
+              [gitlab.com], which is not really a secret (it's
+              public!). *)
            [
              {|echo "${CI_PK_GITLAB_DOC}" > ~/.ssh/id_ed25519|};
              {|echo "${CI_KH}" > ~/.ssh/known_hosts|};
