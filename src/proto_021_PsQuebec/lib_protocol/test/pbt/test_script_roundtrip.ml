@@ -8,7 +8,7 @@
 (** Testing
     -------
     Component:    Michelson translator and ir_size
-    Invocation:   dune exec src/proto_021_PsquebeC/lib_protocol/test/pbt/main.exe \
+    Invocation:   dune exec src/proto_021_PsQuebec/lib_protocol/test/pbt/main.exe \
                   -- --file test_script_roundtrip.ml
     Subject:      PBT of the roundrip property of Michelson storages.
 *)

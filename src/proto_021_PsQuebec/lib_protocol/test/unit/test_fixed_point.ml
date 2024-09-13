@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (fixed-point decimals)
-    Invocation: dune exec src/proto_021_PsquebeC/lib_protocol/test/unit/main.exe \
+    Invocation: dune exec src/proto_021_PsQuebec/lib_protocol/test/unit/main.exe \
                   -- --file test_fixed_point.ml
     Subject:    On fixed-point decimal numbers.
 *)

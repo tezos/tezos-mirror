@@ -27,7 +27,7 @@
 (** Testing
     -------
     Component:  Protocol (voting)
-    Invocation: dune exec src/proto_021_PsquebeC/lib_protocol/test/integration/operations/main.exe \
+    Invocation: dune exec src/proto_021_PsQuebec/lib_protocol/test/integration/operations/main.exe \
                   -- --file test_voting.ml
     Subject:    On the voting process.
 

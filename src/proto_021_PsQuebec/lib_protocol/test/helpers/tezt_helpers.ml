@@ -24,7 +24,7 @@ let register_test ~__FILE__ ?(file_tags = []) ~title ?(additional_tags = [])
     ~uses_client:false
     ~uses_admin_client:false
     (fun _protocol -> f ())
-    [Quebeca]
+    [Quebecb]
 
 (** Same as [register_test], but for a test function returning [unit
     tzresult Lwt.t]. If the result is an error, the test fails. *)

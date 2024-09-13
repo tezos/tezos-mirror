@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Destination_repr
-    Invocation:   dune exec src/proto_021_PsquebeC/lib_protocol/test/unit/main.exe \
+    Invocation:   dune exec src/proto_021_PsQuebec/lib_protocol/test/unit/main.exe \
                   -- --file test_destination_repr.ml
     Subject:      To test the encoding of [Destination_repr] and assert it is
                   compatible with [Contract_repr.encoding].

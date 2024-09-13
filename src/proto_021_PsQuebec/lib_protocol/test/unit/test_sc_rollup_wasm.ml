@@ -27,7 +27,7 @@
 (** Testing
     -------
     Component:    Rollup layer 1 logic
-    Invocation:   dune exec src/proto_021_PsquebeC/lib_protocol/test/unit/main.exe \
+    Invocation:   dune exec src/proto_021_PsQuebec/lib_protocol/test/unit/main.exe \
                   -- --file test_sc_rollup_wasm.ml
     Subject:      Unit test for the Wasm PVM
 *)
@@ -321,12 +321,12 @@ let test_reveal_compat_raw_data () =
      - Update [src/lib_scoru_wasm/pvm_input_kind.ml] to add a new case
        to the type [protocol], and update the functions
        [protocol_from_raw] and [Internal_for_tests.proto_to_binary]
-       accordingly (by copy/pasting the [Quebeca] case and doing
+       accordingly (by copy/pasting the [Quebecb] case and doing
        the necessary renaming.
      - Update [src/lib_scoru_wasm/wasm_vm.ml], more precisely the
        [version_for_protocol] function, to take into account the new
        protocol. The expected result is the same as for
-       [Quebeca]. *)
+       [Quebecb]. *)
 let test_protocol_names () =
   let open Alpha_context.Sc_rollup.Inbox_message in
   let protocol_migration_message_str =
@@ -338,10 +338,10 @@ let test_protocol_names () =
     Tezos_scoru_wasm.Pvm_input_kind.from_raw_input
       protocol_migration_message_str
   in
-  assert (kind = Internal (Protocol_migration Quebeca)) ;
+  assert (kind = Internal (Protocol_migration Quebecb)) ;
   assert (
     protocol_migration_internal_message
-    = Protocol_migration Tezos_scoru_wasm.Constants.proto_quebeca_name) ;
+    = Protocol_migration Tezos_scoru_wasm.Constants.proto_quebecb_name) ;
   Lwt_result_syntax.return_unit
 
 let test_reveal_host_function_can_request_dal_pages () =

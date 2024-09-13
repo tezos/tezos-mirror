@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Plugin.Mempool
-    Invocation:   dune exec src/proto_021_PsquebeC/lib_plugin/test/main.exe \
+    Invocation:   dune exec src/proto_021_PsQuebec/lib_plugin/test/main.exe \
                   -- --file test_consensus_filter.ml
     Subject:      Unit tests the Mempool consensus filter
 *)

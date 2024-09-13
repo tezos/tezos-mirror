@@ -27,7 +27,7 @@
 (** Testing
     -------
     Component:  Protocol Sc_rollup_refutation_storage
-    Invocation: dune exec src/proto_021_PsquebeC/lib_protocol/test/unit/main.exe \
+    Invocation: dune exec src/proto_021_PsQuebec/lib_protocol/test/unit/main.exe \
                   -- --file test_sc_rollup_game.ml
     Subject:    Tests for the SCORU refutation game
 *)
