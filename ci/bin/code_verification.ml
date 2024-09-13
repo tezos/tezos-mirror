@@ -1574,104 +1574,27 @@ let jobs pipeline_type =
       let rules =
         make_rules ~changes:changeset_octez_docs ~label:"ci--docs" ()
       in
-      let job_odoc =
-        job
-          ~__POS__
-          ~name:"documentation:odoc"
-          ~image:Images.CI.test
-          ~stage:Stages.doc
-          ~dependencies:dependencies_needs_start
-          ~rules
-          ~before_script:(before_script ~eval_opam:true [])
-          ~artifacts:
-            (artifacts
-               ~when_:Always
-               ~expire_in:(Duration (Hours 1))
-               (* Path must be terminated with / to expose artifact (gitlab-org/gitlab#/36706) *)
-               ["docs/_build/api/odoc/"; "docs/odoc.log"])
-          ["make -C docs odoc-lite"]
-        |> enable_cargo_cache |> enable_sccache
-      in
-      let job_manuals =
-        job
-          ~__POS__
-          ~name:"documentation:manuals"
-          ~image:Images.CI.test
-          ~stage:Stages.doc
-          ~dependencies:dependencies_needs_start
-          ~rules
-          ~before_script:(before_script ~eval_opam:true [])
-          ~artifacts:
-            (artifacts
-               ~expire_in:(Duration (Weeks 1))
-               [
-                 "docs/*/octez-*.html";
-                 "docs/api/octez-*.txt";
-                 "docs/developer/metrics.csv";
-                 "docs/user/node-config.json";
-               ])
-          ["./scripts/ci/documentation:manuals.sh"]
-        |> enable_cargo_cache |> enable_sccache
-      in
-      let job_docgen =
-        job
-          ~__POS__
-          ~name:"documentation:docgen"
-          ~image:Images.CI.test
-          ~stage:Stages.doc
-          ~dependencies:dependencies_needs_start
-          ~rules
-          ~before_script:(before_script ~eval_opam:true [])
-          ~artifacts:
-            (artifacts
-               ~expire_in:(Duration (Weeks 1))
-               [
-                 "docs/alpha/rpc.rst";
-                 "docs/shell/rpc.rst";
-                 "docs/user/default-acl.json";
-                 "docs/api/errors.rst";
-                 "docs/shell/p2p_api.rst";
-               ])
-          ["make -C docs -j docexes-gen"]
-        |> enable_cargo_cache |> enable_sccache
-      in
+      let dependencies = dependencies_needs_start in
+      let job_odoc = Documentation.job_odoc ~rules ~dependencies () in
+      let job_manuals = Documentation.job_manuals ~rules ~dependencies () in
+      let job_docgen = Documentation.job_docgen ~rules ~dependencies () in
       let doc_build_dependencies =
         Dependent
           [Artifacts job_odoc; Artifacts job_manuals; Artifacts job_docgen]
       in
       let job_build_all =
-        job
-          ~__POS__
-          ~name:"documentation:build_all"
-          ~image:Images.CI.test
-          ~stage:Stages.doc
+        Documentation.job_build_all
           ~dependencies:doc_build_dependencies
-            (* Warning: the [documentation:linkcheck] job must have at least the same
-               restrictions in the rules as [documentation:build_all], otherwise the CI
-               may complain that [documentation:linkcheck] depends on [documentation:build_all]
-               which does not exist. *)
           ~rules:
             (make_rules
                ~dependent:true
                ~changes:changeset_octez_docs
                ~label:"ci--docs"
                ())
-          ~before_script:
-            (before_script ~eval_opam:true ~init_python_venv:true [])
-          ~artifacts:
-            (artifacts
-               ~expose_as:"Documentation - excluding old protocols"
-               ~expire_in:(Duration (Weeks 1))
-               (* Path must be terminated with / to expose artifact (gitlab-org/gitlab#/36706) *)
-               ["docs/_build/"])
-          ["make -C docs -j sphinx"]
+          ()
       in
       let job_documentation_linkcheck : tezos_job =
-        job
-          ~__POS__
-          ~name:"documentation:linkcheck"
-          ~image:Images.CI.test
-          ~stage:Stages.doc
+        Documentation.job_linkcheck
           ~dependencies:
             (Dependent
                [
@@ -1685,14 +1608,7 @@ let jobs pipeline_type =
                ~label:"ci--docs"
                ~manual:(On_changes changeset_octez_docs)
                ())
-          ~allow_failure:Yes
-          ~before_script:
-            (before_script
-               ~source_version:true
-               ~eval_opam:true
-               ~init_python_venv:true
-               [])
-          ["make -C docs redirectcheck"; "make -C docs linkcheck"]
+          ()
       in
       [
         job_odoc;

@@ -1374,3 +1374,127 @@ module Tezt = struct
              "tezt/records/*.json.broken";
            ])
 end
+
+module Documentation = struct
+  let job_odoc ?rules ?dependencies () : tezos_job =
+    job
+      ~__POS__
+      ~name:"documentation:odoc"
+      ~image:Images.CI.test
+      ~stage:Stages.doc
+      ?dependencies
+      ?rules
+      ~before_script:(before_script ~eval_opam:true [])
+      ~artifacts:
+        (artifacts
+           ~when_:Always
+           ~expire_in:(Duration (Hours 1))
+           (* Path must be terminated with / to expose artifact (gitlab-org/gitlab#/36706) *)
+           ["docs/_build/api/odoc/"; "docs/odoc.log"])
+      ["make -C docs odoc-lite"]
+    |> enable_cargo_cache |> enable_sccache
+
+  let job_manuals ?rules ?dependencies () : tezos_job =
+    job
+      ~__POS__
+      ~name:"documentation:manuals"
+      ~image:Images.CI.test
+      ~stage:Stages.doc
+      ?dependencies
+      ?rules
+      ~before_script:(before_script ~eval_opam:true [])
+      ~artifacts:
+        (artifacts
+           ~expire_in:(Duration (Weeks 1))
+           [
+             "docs/*/octez-*.html";
+             "docs/api/octez-*.txt";
+             "docs/developer/metrics.csv";
+             "docs/user/node-config.json";
+           ])
+      ["./scripts/ci/documentation:manuals.sh"]
+    |> enable_cargo_cache |> enable_sccache
+
+  let job_docgen ?rules ?dependencies () : tezos_job =
+    job
+      ~__POS__
+      ~name:"documentation:docgen"
+      ~image:Images.CI.test
+      ~stage:Stages.doc
+      ?dependencies
+      ?rules
+      ~before_script:(before_script ~eval_opam:true [])
+      ~artifacts:
+        (artifacts
+           ~expire_in:(Duration (Weeks 1))
+           [
+             "docs/alpha/rpc.rst";
+             "docs/shell/rpc.rst";
+             "docs/user/default-acl.json";
+             "docs/api/errors.rst";
+             "docs/shell/p2p_api.rst";
+           ])
+      ["make -C docs -j docexes-gen"]
+    |> enable_cargo_cache |> enable_sccache
+
+  let job_build_all ?rules ?dependencies () : tezos_job =
+    job
+      ~__POS__
+      ~name:"documentation:build_all"
+      ~image:Images.CI.test
+      ~stage:Stages.doc
+      ?dependencies
+        (* Warning: the [documentation:linkcheck] job must have at least the same
+           restrictions in the rules as [documentation:build_all], otherwise the CI
+           may complain that [documentation:linkcheck] depends on [documentation:build_all]
+           which does not exist. *)
+      ?rules
+      ~before_script:(before_script ~eval_opam:true ~init_python_venv:true [])
+      ~artifacts:
+        (artifacts
+           ~expose_as:"Documentation - excluding old protocols"
+           ~expire_in:(Duration (Weeks 1))
+           (* Path must be terminated with / to expose artifact (gitlab-org/gitlab#/36706) *)
+           ["docs/_build/"])
+      ["make -C docs -j sphinx"]
+
+  let job_linkcheck ?dependencies ?rules () : tezos_job =
+    job
+      ~__POS__
+      ~name:"documentation:linkcheck"
+      ~image:Images.CI.test
+      ~stage:Stages.doc
+      ?dependencies
+      ?rules
+      ~allow_failure:Yes
+      ~before_script:
+        (before_script
+           ~source_version:true
+           ~eval_opam:true
+           ~init_python_venv:true
+           [])
+      ["make -C docs redirectcheck"; "make -C docs linkcheck"]
+
+  let job_publish_documentation ?dependencies ?rules () : tezos_job =
+    job
+      ~__POS__
+      ~name:"publish:documentation"
+      ~image:Images.CI.test
+      ~stage:Stages.doc
+      ?dependencies
+      ~before_script:
+        (before_script
+           ~eval_opam:true
+             (* Load the environment poetry previously created in the docker image.
+                Give access to the Python dependencies/executables. *)
+           ~init_python_venv:true
+           [
+             {|echo "${CI_PK_GITLAB_DOC}" > ~/.ssh/id_ed25519|};
+             {|echo "${CI_KH}" > ~/.ssh/known_hosts|};
+             {|chmod 400 ~/.ssh/id_ed25519|};
+           ])
+      ~interruptible:false
+      ?rules
+      ["./scripts/ci/doc_publish.sh"]
+    |> enable_cargo_cache |> enable_sccache
+end

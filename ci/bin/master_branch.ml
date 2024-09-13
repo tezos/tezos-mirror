@@ -86,24 +86,8 @@ let jobs =
     |> enable_coverage_location |> enable_coverage_report
   in
   let job_publish_documentation : tezos_job =
-    job
-      ~__POS__
-      ~name:"publish:documentation"
-      ~image:Images.CI.test
-      ~stage:Stages.doc
+    Documentation.job_publish_documentation
       ~dependencies:(Dependent [])
-      ~before_script:
-        (before_script
-           ~eval_opam:true
-             (* Load the environment poetry previously created in the docker image.
-                Give access to the Python dependencies/executables. *)
-           ~init_python_venv:true
-           [
-             {|echo "${CI_PK_GITLAB_DOC}" > ~/.ssh/id_ed25519|};
-             {|echo "${CI_KH}" > ~/.ssh/known_hosts|};
-             {|chmod 400 ~/.ssh/id_ed25519|};
-           ])
-      ~interruptible:false
         (* We publish documentation [Always] -- the job has no
            dependencies and so [On_success] is actually equivalent to
            [Always], but the latter is more explicit. *)
@@ -114,7 +98,7 @@ let jobs =
             ~when_:Always
             ();
         ]
-      ["./scripts/ci/doc_publish.sh"]
+      ()
   in
   (* Smart Rollup: Kernel SDK
 
@@ -153,7 +137,7 @@ let jobs =
     (* Stage: test_coverage *)
     job_unified_coverage_default;
     (* Stage: doc *)
-    job_publish_documentation |> enable_cargo_cache |> enable_sccache;
+    job_publish_documentation;
     (* Stage: prepare_release *)
     job_docker_merge_manifests;
     (* Stage: manual *)
