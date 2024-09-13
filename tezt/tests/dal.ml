@@ -7497,8 +7497,8 @@ let rollup_node_injects_dal_slots _protocol parameters dal_node sc_node
   in
   let* () =
     Sc_rollup_node.RPC.call sc_node
-    @@ Sc_rollup_rpc.post_local_dal_injection
-         ~message:"Hello DAL from a Smart Rollup"
+    @@ Sc_rollup_rpc.post_local_dal_batcher_injection
+         ~messages:["Hello DAL from a Smart Rollup"]
   in
   (* We need to bake once to get the commitment injected and once more to have it
      included in a block. *)

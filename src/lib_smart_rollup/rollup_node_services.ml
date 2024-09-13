@@ -841,18 +841,18 @@ module Local = struct
       ~output:Encodings.message_status_output
       (path / "batcher" / "queue" /: Arg.l2_message_id)
 
-  let dal_injection =
-    let input_encoding =
-      Data_encoding.(obj1 (req "content" Data_encoding.Variable.string))
-    in
+  let dal_batcher_injection =
     Tezos_rpc.Service.post_service
-      ~description:"Inject the given message in the DAL queue"
+      ~description:"Inject the given messages in the DAL queue"
       ~query:Tezos_rpc.Query.empty
       ~input:
         Data_encoding.(
-          def "message" ~description:"Message to inject" input_encoding)
+          def
+            "messages"
+            ~description:"Messages to inject"
+            (list (string' Plain)))
       ~output:Data_encoding.unit
-      (path / "dal" / "injection")
+      (path / "dal" / "batcher" / "injection")
 
   let injector_operation_status =
     Tezos_rpc.Service.get_service

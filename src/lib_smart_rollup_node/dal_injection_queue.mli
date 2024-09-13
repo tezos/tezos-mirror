@@ -10,9 +10,9 @@
     worker. *)
 val init : _ Node_context.t -> unit tzresult Lwt.t
 
-(** [register_dal_message ~message] registers a new [message] in the
+(** [register_dal_messages ~messages] registers new [messages] in the
     queue for future injection on L1 and DAL. *)
-val register_dal_message : message:string -> unit tzresult Lwt.t
+val register_dal_messages : messages:string list -> unit tzresult Lwt.t
 
 (** [get_injection_ids ()] returns the current injection IDs known by the DAL
     injection queue.  *)

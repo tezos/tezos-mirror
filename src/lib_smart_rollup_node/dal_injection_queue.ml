@@ -363,11 +363,14 @@ let handle_request_error rq =
   | Error (Closed (Some errs)) -> Lwt.return_error errs
   | Error (Any exn) -> Lwt.return_error [Exn exn]
 
-let register_dal_message ~message =
-  let open Lwt_result_syntax in
-  let* w = lwt_map_error TzTrace.make (Lwt.return (Lazy.force worker)) in
+let register_dal_message w message =
   Worker.Queue.push_request_and_wait w (Request.Register {message})
   |> handle_request_error
+
+let register_dal_messages ~messages =
+  let open Lwt_result_syntax in
+  let* w = lwt_map_error TzTrace.make (Lwt.return (Lazy.force worker)) in
+  List.iter_es (register_dal_message w) messages
 
 let produce_dal_slots () =
   let open Lwt_result_syntax in
