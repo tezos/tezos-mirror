@@ -40,7 +40,7 @@ let connection_encoding =
           ~description:"network interface address to bind to"
           "address"
           string)
-       (req ~description:"tcp port on which listen" "port" int16)
+       (req ~description:"tcp port on which listen" "port" int31)
        (opt
           ~description:"serve in https using the given certificate"
           "tls"
