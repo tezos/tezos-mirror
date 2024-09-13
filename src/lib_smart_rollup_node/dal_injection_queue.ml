@@ -110,6 +110,14 @@ module Events = struct
       ("errors", Error_monad.trace_encoding)
       ~pp3:Error_monad.pp_print_trace
 
+  let dal_message_received =
+    declare_0
+      ~section
+      ~name:"dal_message_received"
+      ~msg:"A message to inject via DAL has been added to the injection queue"
+      ~level:Info
+      ()
+
   let no_dal_slot_indices_set =
     declare_0
       ~section
@@ -210,6 +218,7 @@ let on_register state ~message : unit tzresult Lwt.t =
   Pending_messages.replace state.pending_messages state.count_messages message ;
   (* We don't care about overflows here. *)
   state.count_messages <- state.count_messages + 1 ;
+  let*! () = Events.(emit dal_message_received) () in
   return_unit
 
 let on_produce_dal_slots state =
