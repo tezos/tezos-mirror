@@ -432,8 +432,8 @@ let register_test_for_kernels ~__FILE__ ?block_storage_sqlite3
     ?minimum_base_fee_per_gas ?preimages_dir ?maximum_allowed_ticks
     ?maximum_gas_per_transaction ?max_blueprint_lookahead_in_seconds
     ?enable_fa_bridge ?history_mode ?commitment_period ?challenge_window
-    ?additional_uses ~threshold_encryption ~enable_dal ~title ~tags body
-    protocols =
+    ?additional_uses ~threshold_encryption ~enable_dal ?dal_slots ~title ~tags
+    body protocols =
   List.iter
     (fun kernel ->
       register_test
@@ -467,6 +467,7 @@ let register_test_for_kernels ~__FILE__ ?block_storage_sqlite3
         ~threshold_encryption
         ?history_mode
         ~enable_dal
+        ?dal_slots
         ~title
         ~tags
         body

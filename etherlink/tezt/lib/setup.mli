@@ -124,6 +124,7 @@ val register_test_for_kernels :
   ?additional_uses:Tezt_wrapper.Uses.t list ->
   threshold_encryption:bool ->
   enable_dal:bool ->
+  ?dal_slots:int list option ->
   title:string ->
   tags:string list ->
   (sequencer_setup -> Protocol.t -> unit Lwt.t) ->
