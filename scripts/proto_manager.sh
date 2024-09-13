@@ -1443,6 +1443,22 @@ function hash() {
     is_snapshot=true
   fi
 
+  # set current version
+  # Starting from 018 the version value moved to `constants_repr`. To be
+  # able to snapshot older protocol the `raw_context` file is kept even
+  # if it is not strictly needed anymore.
+  echo "Setting current version in raw_context and proxy"
+
+  if [[ ${is_snapshot} == true ]]; then
+    sed -i.old.old -e "s/${previous_variant}/${new_variant}/g" \
+      -e "s/${previous_tag}/${new_tag}/g" \
+      "src/proto_${protocol_source}/lib_protocol/constants_repr.ml" \
+      "src/proto_${protocol_source}/lib_protocol/raw_context.ml" \
+      "src/proto_${protocol_source}/lib_protocol/raw_context.mli" \
+      "src/proto_${protocol_source}/lib_client/proxy.ml" \
+      "src/proto_${protocol_source}/lib_protocol/init_storage.ml"
+  fi
+  commit_no_hooks_if_changes "src: set current version"
   long_hash=$(./octez-protocol-compiler -hash-only "src/proto_${protocol_source}/lib_protocol")
   short_hash=$(echo "${long_hash}" | head -c 8)
   log_magenta "Known hash is: ${source_hash}"
