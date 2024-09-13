@@ -187,4 +187,7 @@ let protocols = Protocol.all
 
 let () =
   test_publish_blueprints_on_dal protocols ~dal_slot:4 ;
+  (* Also run the test for slot index 0 because it is a particular
+     case in the RLP encoding used to send signals to the rollup. *)
+  test_publish_blueprints_on_dal protocols ~dal_slot:0 ;
   test_chunked_blueprints_on_dal protocols
