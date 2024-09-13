@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
+(* Copyright (c) 2024 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -49,6 +50,8 @@ type repo = IStore.Repo.t
 
 type tree = IStore.tree
 
+type mut_state = tree ref
+
 type 'a raw_index = ('a, repo) Context_sigs.raw_index
 
 type 'a index = ('a, repo) Context_sigs.index
@@ -92,6 +95,10 @@ let impl_name = "Irmin"
 
 let equality_witness : (repo, tree) Context_sigs.equality_witness =
   (Context_sigs.Equality_witness.make (), Context_sigs.Equality_witness.make ())
+
+let from_imm imm_state = ref imm_state
+
+let to_imm mut_state = !mut_state
 
 let context_hash_of_hash h =
   IStore.Hash.to_raw_string h |> Smart_rollup_context_hash.of_string_exn

@@ -221,3 +221,49 @@ module Unsafe_patches = struct
 
   let apply _state (x : t) = match x with _ -> .
 end
+
+(* TODO: RV-217 Change implementation of RISCV PVM to use the Rust implementation *)
+module Mutable_state :
+  Pvm_sig.MUTABLE_STATE_S
+    with type hash = PVM.hash
+     and type t = Ctxt_wrapper.mut_state = struct
+  type t = tree ref
+
+  type hash = PVM.hash
+
+  let get_tick state = get_tick !state
+
+  let state_hash state = state_hash !state
+
+  let is_input_state ~is_reveal_enabled state =
+    is_input_state ~is_reveal_enabled !state
+
+  let set_input input state =
+    let open Lwt_syntax in
+    let* imm_state = set_input input !state in
+    state := imm_state ;
+    return_unit
+
+  let eval_many ~reveal_builtins ~write_debug ~is_reveal_enabled
+      ?stop_at_snapshot ~max_steps mut_state =
+    let open Lwt_syntax in
+    let* imm_state, steps =
+      eval_many
+        ~reveal_builtins
+        ~write_debug
+        ~is_reveal_enabled
+        ?stop_at_snapshot
+        ~max_steps
+        !mut_state
+    in
+    mut_state := imm_state ;
+    return steps
+
+  module Internal_for_tests = struct
+    let insert_failure state =
+      let open Lwt_syntax in
+      let* imm_state = Internal_for_tests.insert_failure !state in
+      state := imm_state ;
+      return_unit
+  end
+end
