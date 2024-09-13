@@ -78,7 +78,7 @@ oc.build:static-x86_64-linux-binaries:
   script:
   - ./scripts/ci/build_static_binaries.sh
   after_script:
-  - sccache --stop-server || true
+  - ./scripts/ci/sccache-stop.sh
   variables:
     ARCH: x86_64
     EXECUTABLE_FILES: script-inputs/released-executables
@@ -115,7 +115,7 @@ oc.build:static-arm64-linux-binaries:
   script:
   - ./scripts/ci/build_static_binaries.sh
   after_script:
-  - sccache --stop-server || true
+  - ./scripts/ci/sccache-stop.sh
   variables:
     ARCH: arm64
     EXECUTABLE_FILES: script-inputs/released-executables
@@ -315,7 +315,7 @@ oc.build-debian:
   - export CARGO_NET_OFFLINE=false
   - ./scripts/ci/build-debian-packages.sh binaries
   after_script:
-  - sccache --stop-server || true
+  - ./scripts/ci/sccache-stop.sh
   variables:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION-$RELEASE
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-$DISTRIBUTION-$RELEASE
@@ -358,7 +358,7 @@ oc.build-debian-current_a:
   - export CARGO_NET_OFFLINE=false
   - ./scripts/ci/build-debian-packages_current.sh A
   after_script:
-  - sccache --stop-server || true
+  - ./scripts/ci/sccache-stop.sh
   variables:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION-$RELEASE
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-$DISTRIBUTION-$RELEASE
@@ -401,7 +401,7 @@ oc.build-debian-current_b:
   - export CARGO_NET_OFFLINE=false
   - ./scripts/ci/build-debian-packages_current.sh B
   after_script:
-  - sccache --stop-server || true
+  - ./scripts/ci/sccache-stop.sh
   variables:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION-$RELEASE
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-$DISTRIBUTION-$RELEASE
@@ -536,7 +536,7 @@ oc.build-ubuntu:
   - export CARGO_NET_OFFLINE=false
   - ./scripts/ci/build-debian-packages.sh binaries
   after_script:
-  - sccache --stop-server || true
+  - ./scripts/ci/sccache-stop.sh
   variables:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION-$RELEASE
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-$DISTRIBUTION-$RELEASE
@@ -579,7 +579,7 @@ oc.build-ubuntu-current_a:
   - export CARGO_NET_OFFLINE=false
   - ./scripts/ci/build-debian-packages_current.sh A
   after_script:
-  - sccache --stop-server || true
+  - ./scripts/ci/sccache-stop.sh
   variables:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION-$RELEASE
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-$DISTRIBUTION-$RELEASE
@@ -622,7 +622,7 @@ oc.build-ubuntu-current_b:
   - export CARGO_NET_OFFLINE=false
   - ./scripts/ci/build-debian-packages_current.sh B
   after_script:
-  - sccache --stop-server || true
+  - ./scripts/ci/sccache-stop.sh
   variables:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION-$RELEASE
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-$DISTRIBUTION-$RELEASE

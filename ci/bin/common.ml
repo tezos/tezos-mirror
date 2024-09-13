@@ -287,7 +287,7 @@ let enable_sccache ?key ?error_log ?idle_timeout ?log
   |> append_cache (cache ~key [path])
   (* Starts sccache and sets [RUSTC_WRAPPER] *)
   |> append_before_script [". ./scripts/ci/sccache-start.sh"]
-  |> append_after_script ["sccache --stop-server || true"]
+  |> append_after_script ["./scripts/ci/sccache-stop.sh"]
 
 (** Allow cargo to access the network by setting [CARGO_NET_OFFLINE=false].
 

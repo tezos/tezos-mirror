@@ -238,7 +238,7 @@ oc.build_arm64-released:
   script:
   - ./scripts/ci/build_full_unreleased.sh
   after_script:
-  - sccache --stop-server || true
+  - ./scripts/ci/sccache-stop.sh
   variables:
     ARCH: arm64
     EXECUTABLE_FILES: script-inputs/released-executables
@@ -283,7 +283,7 @@ oc.build_arm64-exp-dev-extra:
   script:
   - ./scripts/ci/build_full_unreleased.sh
   after_script:
-  - sccache --stop-server || true
+  - ./scripts/ci/sccache-stop.sh
   variables:
     ARCH: arm64
     EXECUTABLE_FILES: script-inputs/experimental-executables script-inputs/dev-executables
@@ -329,7 +329,7 @@ oc.build:static-x86_64-linux-binaries:
   script:
   - ./scripts/ci/build_static_binaries.sh
   after_script:
-  - sccache --stop-server || true
+  - ./scripts/ci/sccache-stop.sh
   variables:
     ARCH: x86_64
     EXECUTABLE_FILES: script-inputs/released-executables script-inputs/experimental-executables
@@ -366,7 +366,7 @@ oc.build_x86_64-released:
   script:
   - ./scripts/ci/build_full_unreleased.sh
   after_script:
-  - sccache --stop-server || true
+  - ./scripts/ci/sccache-stop.sh
   variables:
     ARCH: x86_64
     EXECUTABLE_FILES: script-inputs/released-executables
@@ -416,7 +416,7 @@ oc.build_x86_64-exp-dev-extra:
   script:
   - ./scripts/ci/build_full_unreleased.sh
   after_script:
-  - sccache --stop-server || true
+  - ./scripts/ci/sccache-stop.sh
   variables:
     ARCH: x86_64
     EXECUTABLE_FILES: script-inputs/experimental-executables script-inputs/dev-executables
@@ -467,7 +467,7 @@ ocaml-check:
   script:
   - dune build @check --stop-on-first-error
   after_script:
-  - sccache --stop-server || true
+  - ./scripts/ci/sccache-stop.sh
   variables:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
@@ -499,7 +499,7 @@ oc.build_kernels:
   - make -C src/riscv riscv-sandbox riscv-dummy.elf
   - make -C src/riscv/tests/ build
   after_script:
-  - sccache --stop-server || true
+  - ./scripts/ci/sccache-stop.sh
   variables:
     CC: clang
     NATIVE_TARGET: x86_64-unknown-linux-musl
@@ -544,7 +544,7 @@ oc.build_dsn_node:
   script:
   - make -f etherlink.mk octez-dsn-node
   after_script:
-  - sccache --stop-server || true
+  - ./scripts/ci/sccache-stop.sh
   variables:
     CC: clang
     NATIVE_TARGET: x86_64-unknown-linux-musl
@@ -619,7 +619,7 @@ build_octez_source:
   - eval $(opam env)
   - make octez
   after_script:
-  - sccache --stop-server || true
+  - ./scripts/ci/sccache-stop.sh
   variables:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
@@ -731,7 +731,7 @@ opam:all_6:
   after_script:
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
-  - sccache --stop-server || true
+  - ./scripts/ci/sccache-stop.sh
   variables:
     RUNTEZTALIAS: "true"
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
@@ -796,7 +796,7 @@ opam:exec_6:
   after_script:
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
-  - sccache --stop-server || true
+  - ./scripts/ci/sccache-stop.sh
   variables:
     RUNTEZTALIAS: "true"
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
@@ -850,7 +850,7 @@ opam:all_2:
   after_script:
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
-  - sccache --stop-server || true
+  - ./scripts/ci/sccache-stop.sh
   variables:
     RUNTEZTALIAS: "true"
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
@@ -917,7 +917,7 @@ opam:all_1:
   after_script:
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
-  - sccache --stop-server || true
+  - ./scripts/ci/sccache-stop.sh
   variables:
     RUNTEZTALIAS: "true"
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
@@ -971,7 +971,7 @@ opam:all_3:
   after_script:
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
-  - sccache --stop-server || true
+  - ./scripts/ci/sccache-stop.sh
   variables:
     RUNTEZTALIAS: "true"
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
@@ -1038,7 +1038,7 @@ opam:exec_4:
   after_script:
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
-  - sccache --stop-server || true
+  - ./scripts/ci/sccache-stop.sh
   variables:
     RUNTEZTALIAS: "true"
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
@@ -1091,7 +1091,7 @@ opam:all_4:
   after_script:
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
-  - sccache --stop-server || true
+  - ./scripts/ci/sccache-stop.sh
   variables:
     RUNTEZTALIAS: "true"
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
@@ -1157,7 +1157,7 @@ opam:exec_1:
   after_script:
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
-  - sccache --stop-server || true
+  - ./scripts/ci/sccache-stop.sh
   variables:
     RUNTEZTALIAS: "true"
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
@@ -1222,7 +1222,7 @@ opam:all_5:
   after_script:
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
-  - sccache --stop-server || true
+  - ./scripts/ci/sccache-stop.sh
   variables:
     RUNTEZTALIAS: "true"
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
@@ -1289,7 +1289,7 @@ opam:all_7:
   after_script:
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
-  - sccache --stop-server || true
+  - ./scripts/ci/sccache-stop.sh
   variables:
     RUNTEZTALIAS: "true"
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
@@ -1347,7 +1347,7 @@ kaitai_checks:
     and Kaitai files seem to be out of sync. You might need to run `make check-kaitai-struct-files`
     and commit the resulting diff.' ; false)
   after_script:
-  - sccache --stop-server || true
+  - ./scripts/ci/sccache-stop.sh
   variables:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
@@ -1407,7 +1407,7 @@ oc.check_lift_limits_patch:
   - git apply src/bin_tps_evaluation/lift_limits.patch
   - dune build @src/proto_alpha/lib_protocol/check
   after_script:
-  - sccache --stop-server || true
+  - ./scripts/ci/sccache-stop.sh
   variables:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
@@ -1459,7 +1459,7 @@ oc.integration:compiler-rejections:
   script:
   - dune build @runtest_rejections
   after_script:
-  - sccache --stop-server || true
+  - ./scripts/ci/sccache-stop.sh
   variables:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
@@ -1511,7 +1511,7 @@ oc.script:snapshot_alpha_and_link:
   script:
   - ./scripts/ci/script:snapshot_alpha_and_link.sh
   after_script:
-  - sccache --stop-server || true
+  - ./scripts/ci/sccache-stop.sh
   variables:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
@@ -1608,7 +1608,7 @@ test_kernels:
   - make -f kernels.mk check
   - make -f kernels.mk test
   after_script:
-  - sccache --stop-server || true
+  - ./scripts/ci/sccache-stop.sh
   variables:
     CC: clang
     NATIVE_TARGET: x86_64-unknown-linux-musl
@@ -1643,7 +1643,7 @@ test_etherlink_kernel:
   - make -f etherlink.mk check
   - make -f etherlink.mk test
   after_script:
-  - sccache --stop-server || true
+  - ./scripts/ci/sccache-stop.sh
   variables:
     CC: clang
     NATIVE_TARGET: x86_64-unknown-linux-musl
@@ -1677,7 +1677,7 @@ test_etherlink_firehose:
   script:
   - make -C etherlink/firehose check
   after_script:
-  - sccache --stop-server || true
+  - ./scripts/ci/sccache-stop.sh
   variables:
     CC: clang
     NATIVE_TARGET: x86_64-unknown-linux-musl
@@ -1708,7 +1708,7 @@ check_riscv_kernels:
   script:
   - make -C src/riscv CHECK_FEATURES= check
   after_script:
-  - sccache --stop-server || true
+  - ./scripts/ci/sccache-stop.sh
   variables:
     CC: clang
     NATIVE_TARGET: x86_64-unknown-linux-musl
@@ -1743,7 +1743,7 @@ test_riscv_kernels:
   - make -C src/riscv test
   - make -C src/riscv audit
   after_script:
-  - sccache --stop-server || true
+  - ./scripts/ci/sccache-stop.sh
   variables:
     CC: clang
     NATIVE_TARGET: x86_64-unknown-linux-musl
@@ -1780,7 +1780,7 @@ test_evm_compatibility:
   - ./evm-evaluation-assessor --eth-tests ./ethereum_tests/ --resources ./etherlink/kernel_evm/evm_evaluation/resources/
     -c
   after_script:
-  - sccache --stop-server || true
+  - ./scripts/ci/sccache-stop.sh
   variables:
     CC: clang
     NATIVE_TARGET: x86_64-unknown-linux-musl
@@ -1822,7 +1822,7 @@ oc.unit:non-proto-x86_64:
   - make $MAKE_TARGETS
   - ./scripts/ci/merge_coverage.sh
   after_script:
-  - sccache --stop-server || true
+  - ./scripts/ci/sccache-stop.sh
   variables:
     ARCH: x86_64
     MAKE_TARGETS: test-nonproto-unit
@@ -1879,7 +1879,7 @@ oc.unit:other-x86_64:
   - make $MAKE_TARGETS
   - ./scripts/ci/merge_coverage.sh
   after_script:
-  - sccache --stop-server || true
+  - ./scripts/ci/sccache-stop.sh
   variables:
     ARCH: x86_64
     MAKE_TARGETS: test-other-unit
@@ -1936,7 +1936,7 @@ oc.unit:proto-x86_64:
   - make $MAKE_TARGETS
   - ./scripts/ci/merge_coverage.sh
   after_script:
-  - sccache --stop-server || true
+  - ./scripts/ci/sccache-stop.sh
   variables:
     ARCH: x86_64
     MAKE_TARGETS: test-proto-unit
@@ -1988,7 +1988,7 @@ oc.unit:non-proto-arm64:
   script:
   - make $MAKE_TARGETS
   after_script:
-  - sccache --stop-server || true
+  - ./scripts/ci/sccache-stop.sh
   variables:
     ARCH: arm64
     MAKE_TARGETS: test-nonproto-unit test-webassembly
@@ -2056,7 +2056,7 @@ oc.unit:protocol_compiles:
   script:
   - dune build @runtest_compile_protocol
   after_script:
-  - sccache --stop-server || true
+  - ./scripts/ci/sccache-stop.sh
   variables:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
@@ -2646,7 +2646,7 @@ documentation:odoc:
   script:
   - make -C docs odoc-lite
   after_script:
-  - sccache --stop-server || true
+  - ./scripts/ci/sccache-stop.sh
   variables:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
@@ -2682,7 +2682,7 @@ documentation:manuals:
   script:
   - ./scripts/ci/documentation:manuals.sh
   after_script:
-  - sccache --stop-server || true
+  - ./scripts/ci/sccache-stop.sh
   variables:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
@@ -2719,7 +2719,7 @@ documentation:docgen:
   script:
   - make -C docs -j docexes-gen
   after_script:
-  - sccache --stop-server || true
+  - ./scripts/ci/sccache-stop.sh
   variables:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache

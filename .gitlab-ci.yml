@@ -91,6 +91,7 @@ variables:
   RUNTEZTALIAS: "false"
   CARGO_HOME: $CI_PROJECT_DIR/.cargo
   CARGO_NET_OFFLINE: "true"
+  CARGO_TERM_QUIET: "true"
 
 dummy_job:
   stage: .pre
