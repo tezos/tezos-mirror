@@ -454,6 +454,153 @@ let test_persistent_state =
     ~error_msg:"The sequencer should have produced a block" ;
   unit
 
+(* Helper to setup snapshot test. This function stops the observer and sequencer
+   and exports two snapshots at one block interval. *)
+let snapshots_setup {sequencer; observer; _} =
+  Log.info "Test setup: Exporting snapshots for test." ;
+  Log.info " - Exporting older snapshot from observer." ;
+  Log.info "   - Terminate the observer." ;
+  let* () = Evm_node.terminate observer in
+  Log.info "   - Export observer snapshot." ;
+  let*! snapshot_file_before = Evm_node.export_snapshot observer in
+  Log.info " - Exporting current snapshot from sequencer." ;
+  Log.info "   - Force the sequencer to produce a block." ;
+  let*@ _ = produce_block sequencer in
+  Log.info "   - Ask for the current block." ;
+  let*@ block_number = Rpc.block_number sequencer in
+  Check.is_true
+    ~__LOC__
+    (block_number > 0l)
+    ~error_msg:"The sequencer should have produced a block" ;
+  Log.info "   - Terminate the sequencer." ;
+  let* () = Evm_node.terminate sequencer in
+  Log.info "   - Export snapshot for block %ld." block_number ;
+  let*! snapshot_file = Evm_node.export_snapshot sequencer in
+  return (snapshot_file_before, snapshot_file, block_number)
+
+let test_snapshots_lock =
+  register_all
+    ~tags:["evm"; "sequencer"; "snapshots"]
+    ~title:"Sequencer snapshots export require lock"
+    ~time_between_blocks:Nothing
+  @@ fun {sequencer; _} _protocol ->
+  Log.info "Export without stopping evm node." ;
+  let*? locked = Evm_node.export_snapshot sequencer in
+  let* () =
+    Process.check_error
+      ~msg:(rex "EVM node is locked by another process")
+      locked
+  in
+  unit
+
+let test_snapshots_import_empty =
+  register_all
+    ~tags:["evm"; "sequencer"; "snapshots"]
+    ~title:"Import sequencer snapshot in empty data dir"
+    ~time_between_blocks:Nothing
+  @@ fun ({sequencer; sc_rollup_node; _} as setup) _protocol ->
+  let* _snapshot_file_before, snapshot_file, block_number =
+    snapshots_setup setup
+  in
+  Log.info "Create new sequencer from snapshot." ;
+  let new_sequencer =
+    let mode = Evm_node.mode sequencer in
+    Evm_node.create ~mode (Sc_rollup_node.endpoint sc_rollup_node)
+  in
+  let* () = Process.check @@ Evm_node.spawn_init_config new_sequencer in
+  let*! () = Evm_node.import_snapshot new_sequencer ~snapshot_file in
+  Log.info "Start new sequencer." ;
+  let* () = Evm_node.run new_sequencer in
+  Log.info "The new sequencer should have the current block of the snapshot." ;
+  let*@ _block =
+    Rpc.get_block_by_number new_sequencer ~block:(Int32.to_string block_number)
+  in
+  Log.info "Restart old sequencer." ;
+  let* () = Evm_node.run sequencer in
+  let* () = check_head_consistency ~left:sequencer ~right:new_sequencer () in
+  Log.info "Force the new sequencer to produce a block." ;
+  let*@ _ = produce_block new_sequencer in
+  let*@ block_number2 = Rpc.block_number new_sequencer in
+  Check.((block_number2 > block_number) int32)
+    ~error_msg:
+      "The sequencer should have produced a new block but is now at %L and was \
+       previously at %R" ;
+  unit
+
+let test_snapshots_import_populated =
+  register_all
+    ~tags:["evm"; "sequencer"; "snapshots"]
+    ~title:"Import sequencer snapshot in populated data dir"
+    ~time_between_blocks:Nothing
+  @@ fun ({observer; sequencer; _} as setup) _protocol ->
+  let* _snapshot_file_before, snapshot_file, block_number =
+    snapshots_setup setup
+  in
+  Log.info "Should not be able to import snapshot in populated node." ;
+  let*? populated = Evm_node.import_snapshot observer ~snapshot_file in
+  let* () = Process.check_error ~msg:(rex "is already populated") populated in
+  Log.info "Should be able to import snapshot in populated node with --force." ;
+  let*! () = Evm_node.import_snapshot observer ~snapshot_file ~force:true in
+  Log.info "Restart sequencer." ;
+  let* () = Evm_node.run sequencer in
+  Log.info "Restart observer." ;
+  let* () = Evm_node.run observer in
+  Log.info "The new observer should have the current block of the snapshot." ;
+  let*@ _block =
+    Rpc.get_block_by_number observer ~block:(Int32.to_string block_number)
+  in
+  unit
+
+let test_snapshots_import_outdated =
+  register_all
+    ~tags:["evm"; "sequencer"; "snapshots"]
+    ~title:"Import outdated sequencer snapshot"
+    ~time_between_blocks:Nothing
+  @@ fun ({sequencer; _} as setup) _protocol ->
+  let* snapshot_file_before, _snapshot_file, _block_number =
+    snapshots_setup setup
+  in
+  Log.info "Cannot import outdated snapshot." ;
+  let*? outdated =
+    Evm_node.import_snapshot
+      sequencer
+      ~snapshot_file:snapshot_file_before
+      ~force:true
+  in
+  let* () =
+    Process.check_error ~msg:(rex "The snapshot is outdated") outdated
+  in
+  unit
+
+(* A test for the fix introduced in
+   https://gitlab.com/tezos/tezos/-/merge_requests/14794. *)
+let test_snapshots_reexport =
+  register_all
+    ~tags:["evm"; "sequencer"; "snapshots"]
+    ~title:"Import sequencer snapshot and re-export"
+    ~time_between_blocks:Nothing
+  @@ fun ({sequencer; sc_rollup_node; _} as setup) _protocol ->
+  let* _snapshot_file_before, snapshot_file, _block_number =
+    snapshots_setup setup
+  in
+  Log.info "Create new sequencer from snapshot." ;
+  let new_sequencer =
+    let mode = Evm_node.mode sequencer in
+    Evm_node.create ~mode (Sc_rollup_node.endpoint sc_rollup_node)
+  in
+  let* () = Process.check @@ Evm_node.spawn_init_config new_sequencer in
+  let*! () = Evm_node.import_snapshot new_sequencer ~snapshot_file in
+  Log.info "Re-export snapshot from new sequencer." ;
+  let*! _file = Evm_node.export_snapshot sequencer in
+  unit
+
+let test_snapshots protocols =
+  test_snapshots_lock protocols ;
+  test_snapshots_import_empty protocols ;
+  test_snapshots_import_populated protocols ;
+  test_snapshots_import_outdated protocols ;
+  test_snapshots_reexport protocols
+
 let test_publish_blueprints =
   register_all
     ~time_between_blocks:Nothing
@@ -6249,6 +6396,7 @@ let protocols = Protocol.all
 let () =
   test_remove_sequencer protocols ;
   test_persistent_state protocols ;
+  test_snapshots protocols ;
   test_patch_state [Protocol.Alpha] ;
   test_publish_blueprints protocols ;
   test_sequencer_too_ahead protocols ;

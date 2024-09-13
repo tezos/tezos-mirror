@@ -1177,6 +1177,40 @@ let patch_state evm_node ~key ~value =
       let process = Process.spawn (Uses.path Constant.octez_evm_node) @@ args in
       Process.check process
 
+let export_snapshot =
+  let cpt = ref 0 in
+  fun ?(compress_on_the_fly = false) evm_node ->
+    incr cpt ;
+    let dir = Tezt.Temp.dir "evm_snapshots" in
+    let snapshot_file = (dir // "evm-snapshot-nb%r-%l.") ^ string_of_int !cpt in
+    let args =
+      [
+        "snapshot";
+        "export";
+        "--data-dir";
+        data_dir evm_node;
+        "--snapshot-file";
+        snapshot_file;
+      ]
+      @ Cli_arg.optional_switch "compress-on-the-fly" compress_on_the_fly
+    in
+    let process = spawn_command evm_node args in
+    let parse process =
+      let* output = Process.check_and_read_stdout process in
+      match output =~* rex "Snapshot exported to ([^\n]*)" with
+      | None -> Test.fail "Snapshot export failed"
+      | Some filename -> return filename
+    in
+    Runnable.{value = process; run = parse}
+
+let import_snapshot ?(force = false) evm_node ~snapshot_file =
+  let args =
+    ["snapshot"; "import"; snapshot_file; "--data-dir"; data_dir evm_node]
+    @ Cli_arg.optional_switch "force" force
+  in
+  let process = spawn_command evm_node args in
+  Runnable.{value = process; run = Process.check}
+
 let wait_termination (evm_node : t) =
   match evm_node.status with
   | Not_running -> unit

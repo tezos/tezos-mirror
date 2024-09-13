@@ -23,6 +23,10 @@
   (!14855)
 - Delayed transactions are now stored on applied blueprint, instead of internal
   evm event. Otherwise it could result in incoherent blueprints. (!14878, !14927)
+- Fix issue that prevented importing snapshot in an already populated data
+  dir. (!14856)
+- Fix issue that prevented exporting a compressed snapshot with a user provided
+  name. (!14856)
 
 ## Version 0.3 (2024-09-10)
 

@@ -427,6 +427,16 @@ val patch_kernel : t -> string -> unit Lwt.t
     by writing [value] at [key]. *)
 val patch_state : t -> key:string -> value:string -> unit Lwt.t
 
+(** [export_snapshot evm_node] exports a snapshot of the evm node in a temporary
+    directory. It returns the path for the produced snapshot file. *)
+val export_snapshot :
+  ?compress_on_the_fly:bool -> t -> (Process.t, string) runnable
+
+(** [import_snapshot ?force evm_node ~snapshot_file] imports the snapshot
+    [snapshot_file] in the evm node.  *)
+val import_snapshot :
+  ?force:bool -> t -> snapshot_file:string -> (Process.t, unit) runnable
+
 val wait_termination : t -> unit Lwt.t
 
 (** [make_kernel_installer_config ~output ()] create the config needed for the
