@@ -312,6 +312,11 @@ module RPC : sig
   val get_level_slot_shard_content :
     slot_level:int -> slot_index:int -> shard_index:int -> string RPC_core.t
 
+  (** [unistring_to_json s] converts a possibly invalid UTF-8 string
+      into a JSON object using Data-encoding's unistring
+      representation. *)
+  val unistring_to_json : string -> JSON.u
+
   module Local : RPC_core.CALLERS with type uri_provider := local_uri_provider
 
   module Remote : RPC_core.CALLERS with type uri_provider := remote_uri_provider
