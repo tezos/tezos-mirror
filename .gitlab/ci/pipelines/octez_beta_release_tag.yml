@@ -297,7 +297,7 @@ oc.docker-build-debian-dependencies:
       - gcp_arm64
 
 oc.build-debian:
-  image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}
+  image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
   stage: build
   tags:
   - $TAGS
@@ -340,7 +340,7 @@ oc.build-debian:
       - gcp_arm64
 
 oc.build-debian-current_a:
-  image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}
+  image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
   stage: build
   tags:
   - $TAGS
@@ -383,7 +383,7 @@ oc.build-debian-current_a:
       - gcp_arm64
 
 oc.build-debian-current_b:
-  image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}
+  image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
   stage: build
   tags:
   - $TAGS
@@ -426,7 +426,7 @@ oc.build-debian-current_b:
       - gcp_arm64
 
 oc.build-data_packages:
-  image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}
+  image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
   stage: build
   tags:
   - $TAGS
@@ -518,7 +518,7 @@ oc.docker-build-ubuntu-dependencies:
       - gcp_arm64
 
 oc.build-ubuntu:
-  image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}
+  image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
   stage: build
   tags:
   - $TAGS
@@ -561,7 +561,7 @@ oc.build-ubuntu:
       - gcp_arm64
 
 oc.build-ubuntu-current_a:
-  image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}
+  image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
   stage: build
   tags:
   - $TAGS
@@ -604,7 +604,7 @@ oc.build-ubuntu-current_a:
       - gcp_arm64
 
 oc.build-ubuntu-current_b:
-  image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}
+  image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
   stage: build
   tags:
   - $TAGS
