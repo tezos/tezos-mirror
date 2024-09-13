@@ -1,7 +1,7 @@
 meta:
   id: id_021__psquebec__smart_rollup__reveal
   endian: be
-doc: ! 'Encoding id: 021-PsquebeC.smart_rollup.reveal'
+doc: ! 'Encoding id: 021-PsQuebec.smart_rollup.reveal'
 types:
   input_hash:
     seq:

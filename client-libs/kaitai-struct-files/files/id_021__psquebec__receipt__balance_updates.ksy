@@ -1,7 +1,7 @@
 meta:
   id: id_021__psquebec__receipt__balance_updates
   endian: be
-doc: ! 'Encoding id: 021-PsquebeC.receipt.balance_updates'
+doc: ! 'Encoding id: 021-PsQuebec.receipt.balance_updates'
 types:
   commitments:
     seq:

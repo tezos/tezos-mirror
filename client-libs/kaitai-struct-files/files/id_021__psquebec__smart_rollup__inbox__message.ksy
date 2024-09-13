@@ -3,7 +3,7 @@ meta:
   endian: be
   imports:
   - timestamp__protocol
-doc: ! 'Encoding id: 021-PsquebeC.smart_rollup.inbox.message'
+doc: ! 'Encoding id: 021-PsQuebec.smart_rollup.inbox.message'
 types:
   args:
     seq:

@@ -1,7 +1,7 @@
 meta:
   id: id_021__psquebec__gas
   endian: be
-doc: ! 'Encoding id: 021-PsquebeC.gas'
+doc: ! 'Encoding id: 021-PsQuebec.gas'
 types:
   n_chunk:
     seq:

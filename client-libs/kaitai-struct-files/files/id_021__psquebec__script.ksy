@@ -1,7 +1,7 @@
 meta:
   id: id_021__psquebec__script
   endian: be
-doc: ! 'Encoding id: 021-PsquebeC.script'
+doc: ! 'Encoding id: 021-PsQuebec.script'
 types:
   bytes_dyn_uint30:
     seq:

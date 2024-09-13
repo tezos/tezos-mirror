@@ -1,7 +1,7 @@
 meta:
   id: id_021__psquebec__smart_rollup__game
   endian: be
-doc: ! 'Encoding id: 021-PsquebeC.smart_rollup.game'
+doc: ! 'Encoding id: 021-PsQuebec.smart_rollup.game'
 types:
   agreed_start_chunk:
     seq:

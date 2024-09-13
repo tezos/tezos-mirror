@@ -1,7 +1,7 @@
 meta:
   id: id_021__psquebec__vote__listings
   endian: be
-doc: ! 'Encoding id: 021-PsquebeC.vote.listings'
+doc: ! 'Encoding id: 021-PsQuebec.vote.listings'
 types:
   id_021__psquebec__vote__listings:
     seq:

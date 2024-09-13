@@ -1,7 +1,7 @@
 meta:
   id: id_021__psquebec__unstaked_frozen_staker
   endian: be
-doc: ! 'Encoding id: 021-PsquebeC.unstaked_frozen_staker'
+doc: ! 'Encoding id: 021-PsQuebec.unstaked_frozen_staker'
 types:
   id_021__psquebec__contract_id:
     seq:

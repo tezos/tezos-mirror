@@ -1,7 +1,7 @@
 meta:
   id: id_021__psquebec__script__prim
   endian: be
-doc: ! 'Encoding id: 021-PsquebeC.script.prim'
+doc: ! 'Encoding id: 021-PsQuebec.script.prim'
 types:
   id_021__psquebec__michelson__v1__primitives:
     seq:

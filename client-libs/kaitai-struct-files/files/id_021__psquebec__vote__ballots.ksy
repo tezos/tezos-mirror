@@ -1,7 +1,7 @@
 meta:
   id: id_021__psquebec__vote__ballots
   endian: be
-doc: ! 'Encoding id: 021-PsquebeC.vote.ballots'
+doc: ! 'Encoding id: 021-PsQuebec.vote.ballots'
 seq:
 - id: yay
   type: s8be

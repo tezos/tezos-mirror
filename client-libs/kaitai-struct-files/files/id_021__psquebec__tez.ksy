@@ -1,7 +1,7 @@
 meta:
   id: id_021__psquebec__tez
   endian: be
-doc: ! 'Encoding id: 021-PsquebeC.tez'
+doc: ! 'Encoding id: 021-PsQuebec.tez'
 types:
   id_021__psquebec__mutez:
     seq:

@@ -2,7 +2,7 @@ meta:
   id: id_021__psquebec__errors
   endian: be
 doc: ! >-
-  Encoding id: 021-PsquebeC.errors
+  Encoding id: 021-PsQuebec.errors
 
   Description: The full list of RPC errors would be too long to include.It is
 

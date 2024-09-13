@@ -1,7 +1,7 @@
 meta:
   id: id_021__psquebec__constants__fixed
   endian: be
-doc: ! 'Encoding id: 021-PsquebeC.constants.fixed'
+doc: ! 'Encoding id: 021-PsQuebec.constants.fixed'
 types:
   int31:
     seq:

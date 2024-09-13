@@ -1,7 +1,7 @@
 meta:
   id: id_021__psquebec__smart_rollup__commmitment
   endian: be
-doc: ! 'Encoding id: 021-PsquebeC.smart_rollup.commmitment'
+doc: ! 'Encoding id: 021-PsQuebec.smart_rollup.commmitment'
 seq:
 - id: compressed_state
   size: 32

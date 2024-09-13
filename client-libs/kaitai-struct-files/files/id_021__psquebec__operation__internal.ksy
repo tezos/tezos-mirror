@@ -1,7 +1,7 @@
 meta:
   id: id_021__psquebec__operation__internal
   endian: be
-doc: ! 'Encoding id: 021-PsquebeC.operation.internal'
+doc: ! 'Encoding id: 021-PsQuebec.operation.internal'
 types:
   args:
     seq:

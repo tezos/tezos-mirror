@@ -1,7 +1,7 @@
 meta:
   id: id_021__psquebec__fitness
   endian: be
-doc: ! 'Encoding id: 021-PsquebeC.fitness'
+doc: ! 'Encoding id: 021-PsQuebec.fitness'
 types:
   locked_round:
     seq:

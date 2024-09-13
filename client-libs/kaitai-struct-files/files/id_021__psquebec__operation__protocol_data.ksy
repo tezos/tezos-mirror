@@ -4,7 +4,7 @@ meta:
   imports:
   - block_header__shell
   - operation__shell_header
-doc: ! 'Encoding id: 021-PsquebeC.operation.protocol_data'
+doc: ! 'Encoding id: 021-PsQuebec.operation.protocol_data'
 types:
   activate_account:
     seq:

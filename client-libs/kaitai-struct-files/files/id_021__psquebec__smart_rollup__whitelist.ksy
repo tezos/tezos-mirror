@@ -1,7 +1,7 @@
 meta:
   id: id_021__psquebec__smart_rollup__whitelist
   endian: be
-doc: ! 'Encoding id: 021-PsquebeC.smart_rollup.whitelist'
+doc: ! 'Encoding id: 021-PsQuebec.smart_rollup.whitelist'
 types:
   id_021__psquebec__smart_rollup__whitelist:
     seq:

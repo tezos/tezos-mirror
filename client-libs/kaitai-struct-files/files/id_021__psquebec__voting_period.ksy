@@ -1,7 +1,7 @@
 meta:
   id: id_021__psquebec__voting_period
   endian: be
-doc: ! 'Encoding id: 021-PsquebeC.voting_period'
+doc: ! 'Encoding id: 021-PsQuebec.voting_period'
 enums:
   kind_tag:
     0: proposal

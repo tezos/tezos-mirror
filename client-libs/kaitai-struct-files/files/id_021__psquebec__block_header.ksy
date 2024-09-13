@@ -3,7 +3,7 @@ meta:
   endian: be
   imports:
   - block_header__shell
-doc: ! 'Encoding id: 021-PsquebeC.block_header'
+doc: ! 'Encoding id: 021-PsQuebec.block_header'
 types:
   id_021__psquebec__block_header__alpha__full_header:
     seq:

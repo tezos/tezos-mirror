@@ -1,7 +1,7 @@
 meta:
   id: id_021__psquebec__contract
   endian: be
-doc: ! 'Encoding id: 021-PsquebeC.contract'
+doc: ! 'Encoding id: 021-PsQuebec.contract'
 types:
   id_021__psquebec__contract_id:
     seq:

@@ -1,7 +1,7 @@
 meta:
   id: id_021__psquebec__parameters
   endian: be
-doc: ! 'Encoding id: 021-PsquebeC.parameters'
+doc: ! 'Encoding id: 021-PsQuebec.parameters'
 types:
   adaptive_rewards_params:
     seq:

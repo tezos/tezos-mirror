@@ -1,7 +1,7 @@
 meta:
   id: id_021__psquebec__smart_rollup__outbox__message
   endian: be
-doc: ! 'Encoding id: 021-PsquebeC.smart_rollup.outbox.message'
+doc: ! 'Encoding id: 021-PsQuebec.smart_rollup.outbox.message'
 types:
   args:
     seq:

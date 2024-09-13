@@ -1,7 +1,7 @@
 meta:
   id: id_021__psquebec__level
   endian: be
-doc: ! 'Encoding id: 021-PsquebeC.level'
+doc: ! 'Encoding id: 021-PsQuebec.level'
 enums:
   bool:
     0: false

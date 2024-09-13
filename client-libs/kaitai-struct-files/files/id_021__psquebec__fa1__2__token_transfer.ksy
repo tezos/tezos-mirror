@@ -1,7 +1,7 @@
 meta:
   id: id_021__psquebec__fa1__2__token_transfer
   endian: be
-doc: ! 'Encoding id: 021-PsquebeC.fa1.2.token_transfer'
+doc: ! 'Encoding id: 021-PsQuebec.fa1.2.token_transfer'
 types:
   bytes_dyn_uint30:
     seq:

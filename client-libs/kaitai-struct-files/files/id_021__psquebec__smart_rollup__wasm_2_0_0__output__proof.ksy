@@ -1,7 +1,7 @@
 meta:
   id: id_021__psquebec__smart_rollup__wasm_2_0_0__output__proof
   endian: be
-doc: ! 'Encoding id: 021-PsquebeC.smart_rollup.wasm_2_0_0.output.proof'
+doc: ! 'Encoding id: 021-PsQuebec.smart_rollup.wasm_2_0_0.output.proof'
 types:
   args:
     seq:

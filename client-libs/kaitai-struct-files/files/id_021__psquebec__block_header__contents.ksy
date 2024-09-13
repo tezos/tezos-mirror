@@ -1,7 +1,7 @@
 meta:
   id: id_021__psquebec__block_header__contents
   endian: be
-doc: ! 'Encoding id: 021-PsquebeC.block_header.contents'
+doc: ! 'Encoding id: 021-PsQuebec.block_header.contents'
 types:
   id_021__psquebec__block_header__alpha__unsigned_contents:
     seq:

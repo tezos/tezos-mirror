@@ -1,7 +1,7 @@
 meta:
   id: id_021__psquebec__script__lazy_expr
   endian: be
-doc: ! 'Encoding id: 021-PsquebeC.script.lazy_expr'
+doc: ! 'Encoding id: 021-PsQuebec.script.lazy_expr'
 types:
   bytes_dyn_uint30:
     seq:
