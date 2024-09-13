@@ -36,7 +36,7 @@
 use crate::cache_utils::FenceCounter;
 use crate::machine_state::address_translation::PAGE_SIZE;
 use crate::machine_state::bus::Address;
-use crate::parser::instruction::Instr;
+use crate::parser::instruction::{Instr, InstrCacheable};
 use crate::parser::{parse, parse_compressed_instruction, parse_uncompressed_instruction};
 use crate::state_backend::{
     self, AllocatedOf, Atom, Cell, CellRead, CellWrite, Choreographer, Elem, Layout, LazyCell,
@@ -51,7 +51,7 @@ pub type CachedLayout = (Atom<FenceCounter>, Atom<u64>, Atom<Unparsed>);
 pub struct Cached<M: ManagerBase> {
     fence_counter: Cell<FenceCounter, M>,
     phys_addr: Cell<Address, M>,
-    instr: LazyCell<Unparsed, (Instr, Unparsed), M>,
+    instr: LazyCell<Unparsed, (InstrCacheable, Unparsed), M>,
 }
 
 impl<M: ManagerBase> Cached<M> {
@@ -124,7 +124,7 @@ impl Elem for Unparsed {
     }
 }
 
-impl From<Unparsed> for (Instr, Unparsed) {
+impl From<Unparsed> for (InstrCacheable, Unparsed) {
     fn from(unparsed: Unparsed) -> Self {
         let bytes = unparsed.0;
         let upper = bytes as u16;
@@ -134,12 +134,22 @@ impl From<Unparsed> for (Instr, Unparsed) {
         })
         .unwrap();
 
-        (instr, unparsed)
+        match instr {
+            Instr::Cacheable(i) => (i, unparsed),
+            // As written, this code path is unreachable.
+            // We can convert it into a static requirement by allowing
+            // errors on bind, instead
+            //
+            // TODO RV-221: on bind, we should error if an instruction's
+            //      bytes correspond to an Uncacheable instruction, rather
+            //      than returning an 'Unknown' instruction.
+            Instr::Uncacheable(_) => (InstrCacheable::Unknown { instr: bytes }, unparsed),
+        }
     }
 }
 
-impl From<(Instr, Unparsed)> for Unparsed {
-    fn from((_, unparsed): (Instr, Unparsed)) -> Self {
+impl From<(InstrCacheable, Unparsed)> for Unparsed {
+    fn from((_, unparsed): (InstrCacheable, Unparsed)) -> Self {
         unparsed
     }
 }
@@ -336,7 +346,7 @@ impl<ICL: InstructionCacheLayout, M: ManagerBase> InstructionCache<ICL, M> {
 
     /// Fetch the cached instruction at the given address, if an entry exists.
     #[inline(always)]
-    pub fn fetch_instr(&self, phys_addr: Address) -> Option<Instr>
+    pub fn fetch_instr(&self, phys_addr: Address) -> Option<InstrCacheable>
     where
         M: ManagerRead,
     {
@@ -391,6 +401,9 @@ impl<ICL: InstructionCacheLayout, M: ManagerBase> InstructionCache<ICL, M> {
     where
         M: ManagerReadWrite,
     {
+        let Instr::Cacheable(instr) = instr else {
+            return;
+        };
         let fence_counter = self.fence_counter.read();
 
         let cached = ICL::entry_mut(&mut self.entries, phys_addr);
@@ -454,7 +467,7 @@ mod tests {
         );
 
         let compressed_bytes = 0x4505;
-        let compressed = Instr::Cacheable(InstrCacheable::CLi(CIBTypeArgs { rd_rs1: a0, imm: 1 }));
+        let compressed = InstrCacheable::CLi(CIBTypeArgs { rd_rs1: a0, imm: 1 });
 
         let uncompressed_bytes = 0x00533423;
 
@@ -481,14 +494,14 @@ mod tests {
         let mut backend = create_backend!(TestInstructionCacheLayout, F);
 
         let compressed_bytes = 0x4505;
-        let compressed = Instr::Cacheable(InstrCacheable::CLi(CIBTypeArgs { rd_rs1: a0, imm: 1 }));
+        let compressed = InstrCacheable::CLi(CIBTypeArgs { rd_rs1: a0, imm: 1 });
 
         let uncompressed_bytes = 0x00533423;
-        let uncompressed = Instr::Cacheable(InstrCacheable::Sd(SBTypeArgs {
+        let uncompressed = InstrCacheable::Sd(SBTypeArgs {
             rs1: t1,
             rs2: t0,
             imm: 8,
-        }));
+        });
 
         let phys_addr_uncompressed = 6;
         let phys_addr_compressed = 8;

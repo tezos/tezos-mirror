@@ -466,13 +466,23 @@ pub enum InstrCacheable {
     UnknownCompressed { instr: u16 },
 }
 
-#[derive(Debug, PartialEq, Clone, Copy, EnumTag)]
+/// Instructions that may invalidate the Instruction Cache cannot be
+/// stored in that cache, and are split out to statically ensure this.
+#[derive(Debug, PartialEq, Eq, Clone, Copy, EnumTag, Hash)]
 pub enum InstrUncacheable {
     // Zifencei instructions
     FenceI,
 }
 
-#[derive(Debug, PartialEq, Clone, Copy, EnumTag)]
+/// RISC-V parsed instructions.
+///
+/// Along with legal instructions, potentially
+/// illegal instructions are parsed as `Instr::Cacheable::(InstrCacheable::Unknown)`
+/// or `Instr::Cacheable::(InstrCacheable::UnknownCompressed)`.
+/// These instructions are successfully parsed, but must not be interpreted.
+///
+/// Any `Instr::Cacheable` may be written to & fetched from the Instruction Cache.
+#[derive(Debug, PartialEq, Eq, Clone, Copy, EnumTag, Hash)]
 pub enum Instr {
     Cacheable(InstrCacheable),
     Uncacheable(InstrUncacheable),

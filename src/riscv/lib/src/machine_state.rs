@@ -388,7 +388,7 @@ impl<ML: main_memory::MainMemoryLayout, ICL: InstructionCacheLayout, M: backend:
         Ok(instr)
     }
 
-    /// Advance [`MachineState`] by executing an [`Instr`]
+    /// Advance [`MachineState`] by executing an [`InstrCacheable`].
     fn run_instr_cacheable(
         &mut self,
         instr: &InstrCacheable,
@@ -664,7 +664,7 @@ impl<ML: main_memory::MainMemoryLayout, ICL: InstructionCacheLayout, M: backend:
         }
     }
 
-    /// Advance [`MachineState`] by executing an [`Instr`]
+    /// Advance [`MachineState`] by executing an [`InstrUncacheable`].
     fn run_instr_uncacheable(
         &mut self,
         instr: &InstrUncacheable,
@@ -703,7 +703,7 @@ impl<ML: main_memory::MainMemoryLayout, ICL: InstructionCacheLayout, M: backend:
         M: backend::ManagerReadWrite,
     {
         match self.instruction_cache.fetch_instr(phys_addr).as_ref() {
-            Some(instr) => self.run_instr(instr),
+            Some(instr) => self.run_instr_cacheable(instr),
             None => self
                 .fetch_instr(current_mode, satp, instr_pc, phys_addr)
                 .and_then(|instr| self.run_instr(&instr)),
