@@ -323,7 +323,6 @@ let jobs pipeline_type =
         ~before_script:(before_script ~take_ownership:true ~eval_opam:true [])
         [
           "make --silent -C manifest check";
-          "./scripts/lint.sh --check-gitlab-ci-yml";
           (* Check that the opam-repo images' Alpine version corresponds to
              the value in scripts/version.sh. *)
           "./scripts/ci/check_alpine_version.sh";

@@ -148,7 +148,6 @@ sanity_ci:
   - eval $(opam env)
   script:
   - make --silent -C manifest check
-  - ./scripts/lint.sh --check-gitlab-ci-yml
   - ./scripts/ci/check_alpine_version.sh
   - make --silent -C ci check
 
