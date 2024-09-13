@@ -180,7 +180,7 @@ let dal_injected_operations_statuses :
       unit,
       unit,
       (Tezos_crypto.Hashed.Injector_operations_hash.t
-      * Octez_smart_rollup__Rollup_node_services.message_status)
+      * Rollup_node_services.message_status)
       list )
     Service.service =
   Tezos_rpc.Service.get_service
@@ -334,7 +334,7 @@ let publish_on_dal :
 let get_injected_dal_operations_statuses :
     rollup_node_endpoint:Uri.t ->
     (Tezos_crypto.Hashed.Injector_operations_hash.t
-    * Octez_smart_rollup__Rollup_node_services.message_status)
+    * Rollup_node_services.message_status)
     list
     tzresult
     Lwt.t =
