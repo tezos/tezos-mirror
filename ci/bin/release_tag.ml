@@ -32,7 +32,7 @@ open Common
     - All release tag pipelines types publish [Release] type Docker builds.
     - No release tag pipelines include experimental binaries.
     - [Release_tag] and [Beta_release_tag] pipelines creates GitLab
-    and publishes releases. [Non_release_tag] pipelines creates the
+    and publishes releases. [Non_release_tag] pipelines create the
     GitLab release but do not publish them.
     - Only [Release_tag] pipelines publish to opam. *)
 type release_tag_pipeline_type =

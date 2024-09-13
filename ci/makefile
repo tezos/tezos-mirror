@@ -1,18 +1,26 @@
 .PHONY: all
-all:  # Regenerate GitLab CI configuration.
-	cd .. && ${MAKE} -C manifest && . ./scripts/version.sh && dune exec ci/bin/main.exe
+all: manifest # Regenerate GitLab CI configuration.
+	cd .. && . ./scripts/version.sh && dune exec ci/bin/main.exe
 
 .PHONY: verbose
-verbose: # Regenerate GitLab CI configuration with verbose output.
-	cd .. && ${MAKE} -C manifest && . ./scripts/version.sh && dune exec ci/bin/main.exe -- --verbose
+verbose: manifest # Regenerate GitLab CI configuration with verbose output.
+	cd .. && . ./scripts/version.sh && dune exec ci/bin/main.exe -- --verbose
 
 .PHONY: inline-source-info
-inline-source-info: # Regenerate GitLab CI configuration, inlining source information in generated files.
-	cd .. && ${MAKE} -C manifest && . ./scripts/version.sh && dune exec ci/bin/main.exe -- --inline-source-info
+inline-source-info: manifest # Regenerate GitLab CI configuration, inlining source information in generated files.
+	cd .. && . ./scripts/version.sh && dune exec ci/bin/main.exe -- --inline-source-info
 
 .PHONY: remove-extra-files
-remove-extra-files: # Regenerate GitLab CI configuration and remove any non-generated files.
-	cd .. && ${MAKE} -C manifest && . ./scripts/version.sh && dune exec ci/bin/main.exe -- --remove-extra-files
+remove-extra-files: manifest # Regenerate GitLab CI configuration and remove any non-generated files.
+	cd .. && . ./scripts/version.sh && dune exec ci/bin/main.exe -- --remove-extra-files
+
+.PHONY: list-pipelines
+list-pipelines: manifest # List and describe the set of registered pipelines
+	cd .. && . ./scripts/version.sh && dune exec ci/bin/main.exe -- --list-pipelines
+
+.PHONY: manifest
+manifest:
+	cd .. && ${MAKE} --silent -C manifest
 
 .PHONY: docker-do-%
 docker-do-%:
@@ -34,6 +42,9 @@ docker-inline-source-info: docker-do-inline-source-info # Build the target 'inli
 .PHONY: docker-remove-extra-files
 docker-remove-extra-files: docker-do-remove-extra-files # Build the target 'remove-extra-files' using the 'build' Docker image.
 
+.PHONY: docker-list-pipelines
+docker-list-pipelines: docker-do-list-pipelines # Build the target 'list-pipelines' using the 'build' Docker image.
+
 .PHONY: check
 check: all # Used in the CI to verify that [.gitlab-ci.yml] is up to date.
 	@if [ $$(git status --porcelain | wc -l) -ne 0 ]; then ( \
@@ -48,4 +59,4 @@ check: all # Used in the CI to verify that [.gitlab-ci.yml] is up to date.
 help: # Display this help.
 	@echo "GitLab CI configuration generator. Available targets:"
 	@echo
-	@grep '^[^[:space:]]\+:.*#' makefile | sed 's/^\([^[:space:]]\+\):.*# \(.*\)/ - \1: \2/'
+	@grep '^[^[:space:]]\+:.*#' makefile | sed 's/:.*# /:/' | column -t -s':'
