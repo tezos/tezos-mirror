@@ -39,8 +39,8 @@ use crate::{
     cache_utils::FenceCounter,
     machine_state::{bus::Address, csregisters::CSRRepr, mode::Mode},
     state_backend::{
-        AllocatedOf, Atom, Cell, ManagerBase, ManagerRead, ManagerReadWrite, ManagerWrite, Many,
-        Ref,
+        AllocatedOf, Atom, Cell, ManagerBase, ManagerClone, ManagerRead, ManagerReadWrite,
+        ManagerWrite, Many, Ref,
     },
 };
 use strum::EnumCount;
@@ -170,6 +170,18 @@ impl<M: ManagerBase> Cached<M> {
     }
 }
 
+impl<M: ManagerClone> Clone for Cached<M> {
+    fn clone(&self) -> Self {
+        Self {
+            mode: self.mode.clone(),
+            fence_counter: self.fence_counter.clone(),
+            satp: self.satp.clone(),
+            virt_page: self.virt_page.clone(),
+            phys_page: self.phys_page.clone(),
+        }
+    }
+}
+
 /// Caching 65,536 pages of 4 KiB each is 768 MiB of memory cached. The cache state size for this
 /// chosen configuration is 6 MiB.
 const PAGES_BITS: usize = 16;
@@ -285,6 +297,15 @@ impl<M: ManagerBase> AccessCache<M> {
     }
 }
 
+impl<M: ManagerClone> Clone for AccessCache<M> {
+    fn clone(&self) -> Self {
+        Self {
+            fence_counter: self.fence_counter.clone(),
+            entries: self.entries.clone(),
+        }
+    }
+}
+
 /// Number of access types
 const NUM_ACCESS_TYPES: usize = AccessType::COUNT;
 
@@ -374,6 +395,14 @@ impl<M: ManagerBase> TranslationCache<M> {
     {
         let access_type_index = access_type_index(access_type);
         self.entries[access_type_index].cache_translation(satp, mode, virt_addr, phys_addr);
+    }
+}
+
+impl<M: ManagerClone> Clone for TranslationCache<M> {
+    fn clone(&self) -> Self {
+        Self {
+            entries: self.entries.clone(),
+        }
     }
 }
 

@@ -247,6 +247,21 @@ impl<
     }
 }
 
+impl<
+        ML: main_memory::MainMemoryLayout,
+        CL: machine_state::CacheLayouts,
+        M: state_backend::ManagerClone,
+    > Clone for Pvm<ML, CL, M>
+{
+    fn clone(&self) -> Self {
+        Self {
+            version: self.version.clone(),
+            machine_state: self.machine_state.clone(),
+            status: self.status.clone(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -117,6 +117,15 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::ManagerBase> Bus<ML, M> {
     }
 }
 
+impl<ML: main_memory::MainMemoryLayout, M: backend::ManagerClone> Clone for Bus<ML, M> {
+    fn clone(&self) -> Self {
+        Self {
+            devices: self.devices.clone(),
+            memory: self.memory.clone(),
+        }
+    }
+}
+
 /// Address of where the main memory starts.
 pub fn start_of_main_memory<ML: main_memory::MainMemoryLayout>() -> Address {
     AddressSpace::MainMemory.start::<ML>()

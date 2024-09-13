@@ -44,6 +44,14 @@ impl<M: backend::ManagerBase> Devices<M> {
     }
 }
 
+impl<M: backend::ManagerClone> Clone for Devices<M> {
+    fn clone(&self) -> Self {
+        Self {
+            _placeholder: self._placeholder.clone(),
+        }
+    }
+}
+
 impl<E: backend::Elem, M: backend::ManagerBase> AddressableRead<E> for Devices<M> {
     fn read(&self, _addr: super::Address) -> Result<E, super::OutOfBounds> {
         Err(super::OutOfBounds)

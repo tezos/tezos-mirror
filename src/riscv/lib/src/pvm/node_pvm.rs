@@ -68,6 +68,18 @@ impl<M: state_backend::ManagerBase> State<M> {
     }
 }
 
+impl<M: state_backend::ManagerClone> Clone for State<M> {
+    fn clone(&self) -> Self {
+        Self {
+            pvm: self.pvm.clone(),
+            level_is_set: self.level_is_set.clone(),
+            level: self.level.clone(),
+            message_counter: self.message_counter.clone(),
+            tick: self.tick.clone(),
+        }
+    }
+}
+
 #[derive(Error, Debug)]
 pub enum PvmError {
     #[error("Serialization error: {0}")]

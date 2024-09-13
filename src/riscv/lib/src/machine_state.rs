@@ -18,8 +18,6 @@ pub mod reservation_set;
 #[cfg(test)]
 extern crate proptest;
 
-pub use self::cache_layouts::{CacheLayouts, DefaultCacheLayouts, TestCacheLayouts};
-use self::instruction_cache::InstructionCache;
 use crate::{
     bits::u64,
     devicetree,
@@ -42,7 +40,9 @@ use address_translation::{
     translation_cache::{TranslationCache, TranslationCacheLayout},
     PAGE_SIZE,
 };
+pub use cache_layouts::{CacheLayouts, DefaultCacheLayouts, TestCacheLayouts};
 use csregisters::{values::CSRValue, CSRRepr};
+use instruction_cache::InstructionCache;
 use mode::Mode;
 use std::ops::Bound;
 
@@ -63,6 +63,18 @@ pub struct MachineCoreState<ML: main_memory::MainMemoryLayout, M: backend::Manag
     pub translation_cache: TranslationCache<M>,
 }
 
+impl<ML: main_memory::MainMemoryLayout, M: backend::ManagerClone> Clone
+    for MachineCoreState<ML, M>
+{
+    fn clone(&self) -> Self {
+        Self {
+            hart: self.hart.clone(),
+            bus: self.bus.clone(),
+            translation_cache: self.translation_cache.clone(),
+        }
+    }
+}
+
 /// Layout for the machine state - everything required to fetch & run instructions.
 pub type MachineStateLayout<ML, CL> = (
     MachineCoreStateLayout<ML>,
@@ -77,6 +89,17 @@ pub struct MachineState<
 > {
     pub core: MachineCoreState<ML, M>,
     pub instruction_cache: InstructionCache<CL::InstructionCacheLayout, M>,
+}
+
+impl<ML: main_memory::MainMemoryLayout, CL: CacheLayouts, M: backend::ManagerClone> Clone
+    for MachineState<ML, CL, M>
+{
+    fn clone(&self) -> Self {
+        Self {
+            core: self.core.clone(),
+            instruction_cache: self.instruction_cache.clone(),
+        }
+    }
 }
 
 /// How to modify the program counter

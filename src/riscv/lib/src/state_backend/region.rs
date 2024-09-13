@@ -156,7 +156,7 @@ impl<E: Elem, T: Copy, M: ManagerClone> Clone for LazyCell<E, T, M> {
     fn clone(&self) -> Self {
         Self {
             inner: self.inner.clone(),
-            value: std::cell::Cell::new(self.value.get()),
+            value: self.value.clone(),
         }
     }
 }

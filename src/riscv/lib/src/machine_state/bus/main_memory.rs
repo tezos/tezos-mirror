@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 use std::mem;
 
 /// Configuration object for memory size
+#[derive(Clone)]
 pub enum Sizes<const BYTES: usize> {}
 
 /// Generates a variant of [Sizes] with all length parameters instantiated.
@@ -90,6 +91,9 @@ pub trait MainMemoryLayout: backend::Layout {
     fn deserialise_data<'de, M: ManagerDeserialise, D: serde::Deserializer<'de>>(
         deserializer: D,
     ) -> Result<Self::Data<M>, D::Error>;
+
+    /// Clone the dynamic region.
+    fn clone_data<M: backend::ManagerClone>(data: &Self::Data<M>) -> Self::Data<M>;
 }
 
 impl<const BYTES: usize> MainMemoryLayout for Sizes<BYTES> {
@@ -151,6 +155,10 @@ impl<const BYTES: usize> MainMemoryLayout for Sizes<BYTES> {
         deserializer: D,
     ) -> Result<Self::Data<M>, D::Error> {
         serde::Deserialize::deserialize(deserializer)
+    }
+
+    fn clone_data<M: backend::ManagerClone>(data: &Self::Data<M>) -> Self::Data<M> {
+        data.clone()
     }
 }
 
@@ -281,6 +289,14 @@ impl<L: MainMemoryLayout, M: ManagerSerialise> RootHashable for MainMemory<L, M>
     // TODO RV-230: Finer-grained hashing for memory
     fn hash(&self) -> Result<Hash, HashError> {
         Hash::blake2b_hash(self)
+    }
+}
+
+impl<L: MainMemoryLayout, M: backend::ManagerClone> Clone for MainMemory<L, M> {
+    fn clone(&self) -> Self {
+        Self {
+            data: L::clone_data(&self.data),
+        }
     }
 }
 

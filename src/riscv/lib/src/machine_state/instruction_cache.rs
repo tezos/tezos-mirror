@@ -33,14 +33,17 @@
 //! translation changes - as the upper address may no longer point
 //! to the same relative physical address.
 
-use crate::cache_utils::{FenceCounter, Sizes, Unparsed};
-use crate::machine_state::address_translation::PAGE_SIZE;
-use crate::machine_state::bus::Address;
-use crate::parser::instruction::{Instr, InstrCacheable};
-use crate::parser::{parse_compressed_instruction, parse_uncompressed_instruction};
-use crate::state_backend::{
-    self, AllocatedOf, Atom, Cell, CellWrite, LazyCell, ManagerBase, ManagerRead, ManagerReadWrite,
-    ManagerWrite, Ref,
+use crate::{
+    cache_utils::{FenceCounter, Sizes, Unparsed},
+    machine_state::{address_translation::PAGE_SIZE, bus::Address},
+    parser::{
+        instruction::{Instr, InstrCacheable},
+        parse_compressed_instruction, parse_uncompressed_instruction,
+    },
+    state_backend::{
+        self, AllocatedOf, Atom, Cell, CellWrite, LazyCell, ManagerBase, ManagerClone, ManagerRead,
+        ManagerReadWrite, ManagerWrite, Ref,
+    },
 };
 
 /// The layout of an entry in the instruction cache.
@@ -93,6 +96,16 @@ impl<M: ManagerBase> Cached<M> {
     }
 }
 
+impl<M: ManagerClone> Clone for Cached<M> {
+    fn clone(&self) -> Self {
+        Self {
+            fence_counter: self.fence_counter.clone(),
+            phys_addr: self.phys_addr.clone(),
+            instr: self.instr.clone(),
+        }
+    }
+}
+
 /// The default instruction cache index bits.
 pub const DEFAULT_CACHE_BITS: usize = 16;
 
@@ -132,6 +145,8 @@ pub trait InstructionCacheLayout: state_backend::Layout {
         Self: Sized;
 
     fn cache_index(address: Address) -> usize;
+
+    fn clone_entries<M: ManagerClone>(entries: &Self::Entries<M>) -> Self::Entries<M>;
 }
 
 pub type Layout<const BITS: usize, const SIZE: usize> =
@@ -181,6 +196,10 @@ impl<const BITS: usize, const SIZE: usize> InstructionCacheLayout for Layout<BIT
 
     fn cache_index(address: Address) -> usize {
         Sizes::<BITS, SIZE, CachedLayout>::cache_index(address)
+    }
+
+    fn clone_entries<M: ManagerClone>(entries: &Self::Entries<M>) -> Self::Entries<M> {
+        entries.clone()
     }
 }
 
@@ -292,6 +311,15 @@ impl<ICL: InstructionCacheLayout, M: ManagerBase> InstructionCache<ICL, M> {
         cached.instr.write((instr, unparsed));
         cached.phys_addr.write(phys_addr);
         cached.fence_counter.write(fence_counter);
+    }
+}
+
+impl<ICL: InstructionCacheLayout, M: ManagerClone> Clone for InstructionCache<ICL, M> {
+    fn clone(&self) -> Self {
+        Self {
+            fence_counter: self.fence_counter.clone(),
+            entries: ICL::clone_entries(&self.entries),
+        }
     }
 }
 

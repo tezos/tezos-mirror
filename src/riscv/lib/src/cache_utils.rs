@@ -117,6 +117,7 @@ impl From<(InstrCacheable, Unparsed)> for Unparsed {
 /// Configuration object for the size of a cache indexed by physical address.
 ///
 /// *NB* you should ensure `SIZE == 1 << BITS`, otherwise a compilation error will occur.
+#[derive(Clone)]
 pub struct Sizes<const BITS: usize, const SIZE: usize, CachedLayout>(
     PhantomData<CachedLayout>,
     Infallible,

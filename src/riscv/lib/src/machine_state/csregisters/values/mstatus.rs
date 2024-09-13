@@ -10,8 +10,8 @@ use crate::{
         xstatus::{ExtensionValue, MPPValue, MStatus, SPPValue, XLenValue},
     },
     state_backend::{
-        AllocatedOf, Atom, Cell, EffectCell, EnumCell, EnumCellLayout, ManagerBase, ManagerRead,
-        ManagerReadWrite, ManagerWrite, Ref,
+        AllocatedOf, Atom, Cell, EffectCell, EnumCell, EnumCellLayout, ManagerBase, ManagerClone,
+        ManagerRead, ManagerReadWrite, ManagerWrite, Ref,
     },
     struct_layout,
 };
@@ -92,6 +92,32 @@ impl<M: ManagerBase> MStatusValue<M> {
             sxl: self.sxl.struct_ref(),
             sbe: self.sbe.struct_ref(),
             mbe: self.mbe.struct_ref(),
+        }
+    }
+}
+
+impl<M: ManagerClone> Clone for MStatusValue<M> {
+    fn clone(&self) -> Self {
+        Self {
+            sie: self.sie.clone(),
+            mie: self.mie.clone(),
+            spie: self.spie.clone(),
+            ube: self.ube.clone(),
+            mpie: self.mpie.clone(),
+            spp: self.spp.clone(),
+            mpp: self.mpp.clone(),
+            fs: self.fs.clone(),
+            xs: self.xs.clone(),
+            mprv: self.mprv.clone(),
+            sum: self.sum.clone(),
+            mxr: self.mxr.clone(),
+            tvm: self.tvm.clone(),
+            tw: self.tw.clone(),
+            tsr: self.tsr.clone(),
+            uxl: self.uxl.clone(),
+            sxl: self.sxl.clone(),
+            sbe: self.sbe.clone(),
+            mbe: self.mbe.clone(),
         }
     }
 }
