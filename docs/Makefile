@@ -15,17 +15,17 @@ P2PDOCEXE     = $(TOPBUILDDIR)/default/docs/$(DOCGENDIR)/p2p_doc.exe
 RPCDOCEXE     = $(TOPBUILDDIR)/default/docs/$(DOCGENDIR)/rpc_doc.exe
 ERRDOCEXE     = $(TOPBUILDDIR)/default/docs/$(DOCERRORDIR)/error_doc.exe
 
-NAMED_PROTOS  = paris quebeca
+NAMED_PROTOS  = paris quebecb
 PROTOCOLS     = $(NAMED_PROTOS) alpha
 
 # The following variables names are lowercase, so their names can be computed
 # from the names of the corresponding protocol directories
 paris_long    = PsParisCZo7KAh1Z1smVd9ZMZ1HHn5gkzbM94V3PLCpknFWhUAi
-quebeca_long  = PsquebeCaYyvBEESCaXL8B8Tn8BcEhps2Zke1xMVtyr7X4qMfxT
+quebecb_long  = PsQuebecBo3zZmhQT7KdEQ2RRDtncE6gQFRPgwkKEyC1ea995G1
 alpha_long    = ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 
 paris_short   = PsParisC
-quebeca_short = PsquebeC
+quebecb_short = PsQuebec
 alpha_short   = alpha
 
 SCRIPTSDIR    = scripts
@@ -134,7 +134,7 @@ redirectcheck:
 # - on each other protocol including alpha, also checking label defs (option -l)
 .PHONY: xrefscheck
 xrefscheck:
-	$(CHECKXREFS) quebeca
+	$(CHECKXREFS) quebecb
 	$(CHECKXREFS) paris
 	$(CHECKXREFS) -l alpha
 
@@ -302,5 +302,5 @@ clean:
 	@-rm -Rf "$(BUILDDIR)" linkcheck odoc.log
 	@-rm -f $(ERRDOCEXE) $(RPCDOCEXE) $(P2PDOCEXE)
 	@-rm -Rf api/errors.rst developer/metrics.csv user/node-config.json alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst user/default-acl.json CHANGES-dev.rst
-	@-rm -Rf api/octez-*.html api/octez-*.txt paris/octez-*.html alpha/octez-*.html quebeca/octez-*.html
+	@-rm -Rf api/octez-*.html api/octez-*.txt paris/octez-*.html alpha/octez-*.html quebecb/octez-*.html
 	@-rm -Rf ../openapi-tmp
