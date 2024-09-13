@@ -133,6 +133,22 @@ let test_publish_blueprints_on_dal ~dal_slot =
   Lwt.cancel signal_counter_p ;
   unit
 
+(* We aim to send data big enough to trigger splitting in multiple
+   chunks, or multiple slots. Chunks size depends on the size of
+   messages in the inbox, which is for now of 4096 bytes. We build
+   transactions that are far bigger so that we can be sure they will
+   be added to a blueprint that will be chunked. *)
+let build_transaction_with_large_data
+    ?(source_private_key = Eth_account.bootstrap_accounts.(0).private_key)
+    ?(to_public_key = Eth_account.bootstrap_accounts.(0).address) sequencer =
+  let data = String.make 100_000 '0' in
+  Eth_cli.transaction_send
+    ~source_private_key
+    ~to_public_key
+    ~value:Wei.zero
+    ~data
+    ~endpoint:(Evm_node.endpoint sequencer)
+
 let test_chunked_blueprints_on_dal =
   register_test
     ~time_between_blocks:Nothing
@@ -140,26 +156,15 @@ let test_chunked_blueprints_on_dal =
     ~title:
       "Sequencer publishes entire blueprints of more than one chunk to the DAL"
   @@ fun {sequencer; sc_rollup_node; client; proxy; _} _protocol ->
-  (* Send data big enough to trigger splitting in multiple chunks. *)
   let number_of_blueprints_sent_to_inbox = ref 0 in
 
   let inbox_counter_p =
     count_blueprint_sent_on_inbox sequencer number_of_blueprints_sent_to_inbox
   in
 
-  (* Chunks size depends on the size of messages in the inbox, which is for now
-     of 4096 bytes. Let's make a transaction that is far bigger so that we can
-     be sure it will be added to a blueprint that will be chunked. *)
-  let data = String.make 64896 '0' in
-  let to_public_key = Eth_account.bootstrap_accounts.(1).address in
   let* _tx_hash =
     send_transaction_to_sequencer
-      (Eth_cli.transaction_send
-         ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
-         ~to_public_key
-         ~value:Wei.zero
-         ~data
-         ~endpoint:(Evm_node.endpoint sequencer))
+      (build_transaction_with_large_data sequencer)
       sequencer
   and* _level, nb_chunks =
     Evm_node.wait_for_blueprint_injected_on_dal sequencer
