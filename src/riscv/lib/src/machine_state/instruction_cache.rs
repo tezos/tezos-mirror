@@ -415,7 +415,7 @@ mod tests {
     use crate::{
         backend_test, create_backend, create_state,
         machine_state::registers::{a0, t0, t1},
-        parser::instruction::{CIBTypeArgs, SBTypeArgs},
+        parser::instruction::{CIBTypeArgs, InstrCacheable, SBTypeArgs},
     };
 
     // Ensure that the initialised values for the instruction cache (ie phys_addr = 0)
@@ -454,7 +454,7 @@ mod tests {
         );
 
         let compressed_bytes = 0x4505;
-        let compressed = Instr::CLi(CIBTypeArgs { rd_rs1: a0, imm: 1 });
+        let compressed = Instr::Cacheable(InstrCacheable::CLi(CIBTypeArgs { rd_rs1: a0, imm: 1 }));
 
         let uncompressed_bytes = 0x00533423;
 
@@ -481,14 +481,14 @@ mod tests {
         let mut backend = create_backend!(TestInstructionCacheLayout, F);
 
         let compressed_bytes = 0x4505;
-        let compressed = Instr::CLi(CIBTypeArgs { rd_rs1: a0, imm: 1 });
+        let compressed = Instr::Cacheable(InstrCacheable::CLi(CIBTypeArgs { rd_rs1: a0, imm: 1 }));
 
         let uncompressed_bytes = 0x00533423;
-        let uncompressed = Instr::Sd(SBTypeArgs {
+        let uncompressed = Instr::Cacheable(InstrCacheable::Sd(SBTypeArgs {
             rs1: t1,
             rs2: t0,
             imm: 8,
-        });
+        }));
 
         let phys_addr_uncompressed = 6;
         let phys_addr_compressed = 8;

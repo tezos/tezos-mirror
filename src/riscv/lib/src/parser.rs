@@ -485,8 +485,8 @@ const FM_8: u32 = 0b1000;
 /// Parse an uncompressed instruction from a u32.
 #[inline]
 pub const fn parse_uncompressed_instruction(instr: u32) -> Instr {
-    use Instr::*;
-    match opcode(instr) {
+    use InstrCacheable::*;
+    let i = match opcode(instr) {
         // R-type instructions
         OP_ARITH => match funct3(instr) {
             F3_0 => match funct7(instr) {
@@ -619,7 +619,7 @@ pub const fn parse_uncompressed_instruction(instr: u32) -> Instr {
                 FM_8 => fence_instr!(FenceTso, instr),
                 _ => Unknown { instr },
             },
-            F3_1 => FenceI,
+            F3_1 => return Instr::Uncacheable(InstrUncacheable::FenceI),
             _ => Unknown { instr },
         },
         OP_SYS => match funct3(instr) {
@@ -852,13 +852,16 @@ pub const fn parse_uncompressed_instruction(instr: u32) -> Instr {
             _ => Unknown { instr },
         },
         _ => Unknown { instr },
-    }
+    };
+
+    Instr::Cacheable(i)
 }
 
 const NUM_COMPRESSED_INSTRUCTIONS: usize = (u16::MAX as usize) + 1;
 
 static COMPRESSED_JUMP_TABLE: [Instr; NUM_COMPRESSED_INSTRUCTIONS] = {
-    let mut table = [Instr::Unknown { instr: 0 }; NUM_COMPRESSED_INSTRUCTIONS];
+    let mut table =
+        [Instr::Cacheable(InstrCacheable::Unknown { instr: 0 }); NUM_COMPRESSED_INSTRUCTIONS];
     let mut i = 0;
 
     while i < u16::MAX {
@@ -1091,8 +1094,8 @@ const C_Q1_3: u16 = 0b11;
 
 #[inline]
 const fn parse_compressed_instruction_inner(instr: u16) -> Instr {
-    use Instr::*;
-    match c_opcode(instr) {
+    use InstrCacheable::*;
+    let i = match c_opcode(instr) {
         OP_C0 => match c_funct3(instr) {
             C_F3_1 => CFld(FLoadArgs {
                 rd: c_f_rdp_rs2p(instr),
@@ -1155,7 +1158,7 @@ const fn parse_compressed_instruction_inner(instr: u16) -> Instr {
             },
             C_F3_3 => {
                 if u16::bits_subset(instr, 6, 2) == 0 && !u16::bit(instr, 12) {
-                    return UnknownCompressed { instr };
+                    return Instr::Cacheable(UnknownCompressed { instr });
                 };
                 match c_rd_rs1(instr) {
                     x2 => CAddi16sp(CJTypeArgs {
@@ -1235,7 +1238,9 @@ const fn parse_compressed_instruction_inner(instr: u16) -> Instr {
             _ => UnknownCompressed { instr },
         },
         _ => UnknownCompressed { instr },
-    }
+    };
+
+    Instr::Cacheable(i)
 }
 
 /// Parse a compressed instruction from a u16.
@@ -1291,7 +1296,7 @@ mod tests {
     use std::collections::HashMap;
 
     use super::{
-        instruction::{CsrArgs, ITypeArgs, Instr::*, SBTypeArgs, UJTypeArgs},
+        instruction::{CsrArgs, ITypeArgs, Instr, InstrCacheable::*, SBTypeArgs, UJTypeArgs},
         parse_block,
     };
     use crate::{
@@ -1316,17 +1321,17 @@ mod tests {
         ];
 
         let expected = [
-            Jal(UJTypeArgs { rd: x0, imm: 0x50 }),
-            Csrrs(CsrArgs {
+            Instr::Cacheable(Jal(UJTypeArgs { rd: x0, imm: 0x50 })),
+            Instr::Cacheable(Csrrs(CsrArgs {
                 rd: x30,
                 rs1: x0,
                 csr: mcause,
-            }),
-            Addi(ITypeArgs {
+            })),
+            Instr::Cacheable(Addi(ITypeArgs {
                 rd: x31,
                 rs1: x0,
                 imm: 0x8,
-            }),
+            })),
         ];
         let instructions = parse_block(&bytes);
         assert_eq!(instructions, expected)
@@ -1348,35 +1353,35 @@ mod tests {
             0x0, 0x9b, 0x83, 0x3, 0x34, 0x63, 0x10, 0x74, 0x12,
         ];
         let expected = [
-            Addi(ITypeArgs {
+            Instr::Cacheable(Addi(ITypeArgs {
                 rd: x3,
                 rs1: x0,
                 imm: 21,
-            }),
-            CLui(CIBTypeArgs {
+            })),
+            Instr::Cacheable(CLui(CIBTypeArgs {
                 rd_rs1: x8,
                 imm: 0x1 << 12,
-            }),
-            Addiw(ITypeArgs {
+            })),
+            Instr::Cacheable(Addiw(ITypeArgs {
                 rd: x8,
                 rs1: x8,
                 imm: 564,
-            }),
-            CSlli(CIBTypeArgs { rd_rs1: x8, imm: 4 }),
-            Lui(UJTypeArgs {
+            })),
+            Instr::Cacheable(CSlli(CIBTypeArgs { rd_rs1: x8, imm: 4 })),
+            Instr::Cacheable(Lui(UJTypeArgs {
                 rd: x7,
                 imm: 0x12 << 12,
-            }),
-            Addiw(ITypeArgs {
+            })),
+            Instr::Cacheable(Addiw(ITypeArgs {
                 rd: x7,
                 rs1: x7,
                 imm: 832,
-            }),
-            Bne(SBTypeArgs {
+            })),
+            Instr::Cacheable(Bne(SBTypeArgs {
                 rs1: x8,
                 rs2: x7,
                 imm: 288,
-            }),
+            })),
         ];
         let instructions = parse_block(&bytes);
         assert_eq!(instructions, expected)
@@ -1387,13 +1392,13 @@ mod tests {
     fn test_3() {
         let bytes: [u8; 5] = [0x1, 0x5, 0x64, 0x1b, 0x4];
         let expected = [
-            UnknownCompressed {
+            Instr::Cacheable(UnknownCompressed {
                 instr: u16::from_le_bytes([0x1, 0x5]),
-            },
-            CAddi4spn(CIBTypeArgs {
+            }),
+            Instr::Cacheable(CAddi4spn(CIBTypeArgs {
                 rd_rs1: x9,
                 imm: 444,
-            }),
+            })),
         ];
         let instructions = parse_block(&bytes);
         assert_eq!(instructions, expected)
@@ -1403,7 +1408,7 @@ mod tests {
     #[test]
     fn test_4() {
         let bytes: [u8; 6] = [0x6f, 0x0, 0x0, 0x5, 0x73, 0x2f];
-        let expected = [Jal(UJTypeArgs { rd: x0, imm: 0x50 })];
+        let expected = [Instr::Cacheable(Jal(UJTypeArgs { rd: x0, imm: 0x50 }))];
         let instructions = parse_block(&bytes);
         assert_eq!(instructions, expected)
     }
@@ -1414,14 +1419,14 @@ mod tests {
     fn test_5() {
         let bytes: [u8; 8] = [0x13, 0x15, 0xf5, 0x01, 0x13, 0x15, 0xf5, 0x21];
         let expected = [
-            Slli(ITypeArgs {
+            Instr::Cacheable(Slli(ITypeArgs {
                 rd: x10,
                 rs1: x10,
                 imm: 31,
-            }),
-            Unknown {
+            })),
+            Instr::Cacheable(Unknown {
                 instr: u32::from_le_bytes([0x13, 0x15, 0xf5, 0x21]),
-            },
+            }),
         ];
         let instructions = parse_block(&bytes);
         assert_eq!(instructions, expected)
@@ -1431,7 +1436,7 @@ mod tests {
     #[test]
     fn test_6() {
         let bytes: [u8; 4] = [0x73, 0x00, 0x20, 0x70];
-        let expected = [Mnret];
+        let expected = [Instr::Cacheable(Mnret)];
         let instructions = parse_block(&bytes);
         assert_eq!(instructions, expected)
     }

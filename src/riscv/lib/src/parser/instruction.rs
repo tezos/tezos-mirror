@@ -230,7 +230,7 @@ pub struct CSSDTypeArgs {
 /// illegal instructions are parsed as `Unknown` or `UnknownCompressed`.
 /// These instructions are successfully parsed, but must not be interpreted.
 #[derive(Debug, PartialEq, Eq, Clone, Copy, EnumTag, Hash)]
-pub enum Instr {
+pub enum InstrCacheable {
     // RV64I R-type instructions
     Add(RTypeArgs),
     Sub(RTypeArgs),
@@ -409,9 +409,6 @@ pub enum Instr {
     Csrrsi(CsriArgs),
     Csrrci(CsriArgs),
 
-    // Zifencei instructions
-    FenceI,
-
     // Privileged instructions
     // Trap-Return
     Mret,
@@ -469,11 +466,22 @@ pub enum Instr {
     UnknownCompressed { instr: u16 },
 }
 
-use Instr::*;
+#[derive(Debug, PartialEq, Clone, Copy, EnumTag)]
+pub enum InstrUncacheable {
+    // Zifencei instructions
+    FenceI,
+}
 
-impl Instr {
+#[derive(Debug, PartialEq, Clone, Copy, EnumTag)]
+pub enum Instr {
+    Cacheable(InstrCacheable),
+    Uncacheable(InstrUncacheable),
+}
+
+impl InstrCacheable {
     /// Return the width of the instruction in bytes.
-    pub fn width(&self) -> u64 {
+    pub const fn width(&self) -> u64 {
+        use InstrCacheable::*;
         match self {
             // 4 bytes instructions
             Add(_)
@@ -632,7 +640,6 @@ impl Instr {
             | Csrrwi(_)
             | Csrrsi(_)
             | Csrrci(_)
-            | FenceI
             | Mret
             | Sret
             | Mnret
@@ -679,6 +686,27 @@ impl Instr {
             | CFsd(_)
             | CFsdsp(_)
             | UnknownCompressed { instr: _ } => 2,
+        }
+    }
+}
+
+impl InstrUncacheable {
+    /// Return the width of the instruction in bytes.
+    pub const fn width(&self) -> u64 {
+        use InstrUncacheable::*;
+        match self {
+            FenceI => 4,
+        }
+    }
+}
+
+impl Instr {
+    /// Return the width of the instruction in bytes.
+    pub const fn width(&self) -> u64 {
+        use Instr::*;
+        match self {
+            Cacheable(c) => c.width(),
+            Uncacheable(u) => u.width(),
         }
     }
 }
@@ -856,8 +884,9 @@ impl fmt::Display for FenceSet {
 
 /// An objdump-style prettyprinter for parsed instructions, used in testing
 /// the parser against objdump.
-impl fmt::Display for Instr {
+impl fmt::Display for InstrCacheable {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use InstrCacheable::*;
         match self {
             // RV64I R-type instructions
             Add(args) => r_instr!(f, "add", args),
@@ -1073,9 +1102,6 @@ impl fmt::Display for Instr {
             Csrrsi(args) => csri_instr!(f, "csrrsi", args),
             Csrrci(args) => csri_instr!(f, "csrrci", args),
 
-            // Zifencei instructions
-            FenceI => write!(f, "fence.i"),
-
             // Privileged instructions
             // Trap-Return
             Mret => write!(f, "mret"),
@@ -1137,6 +1163,25 @@ impl fmt::Display for Instr {
 
             Unknown { instr } => write!(f, "unknown {:x}", instr),
             UnknownCompressed { instr } => write!(f, "unknown.c {:x}", instr),
+        }
+    }
+}
+
+impl fmt::Display for InstrUncacheable {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use InstrUncacheable::*;
+        match self {
+            // Zifencei instructions
+            FenceI => write!(f, "fence.i"),
+        }
+    }
+}
+
+impl fmt::Display for Instr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Cacheable(i) => i.fmt(f),
+            Self::Uncacheable(i) => i.fmt(f),
         }
     }
 }

@@ -26,7 +26,10 @@ use crate::{
         csregisters::CSRegister,
         hart_state::{HartState, HartStateLayout},
     },
-    parser::{instruction::Instr, is_compressed},
+    parser::{
+        instruction::{Instr, InstrCacheable, InstrUncacheable},
+        is_compressed,
+    },
     program::Program,
     range_utils::{bound_saturating_sub, less_than_bound, unwrap_bound},
     state_backend::{self as backend},
@@ -386,7 +389,10 @@ impl<ML: main_memory::MainMemoryLayout, ICL: InstructionCacheLayout, M: backend:
     }
 
     /// Advance [`MachineState`] by executing an [`Instr`]
-    fn run_instr(&mut self, instr: &Instr) -> Result<ProgramCounterUpdate, Exception>
+    fn run_instr_cacheable(
+        &mut self,
+        instr: &InstrCacheable,
+    ) -> Result<ProgramCounterUpdate, Exception>
     where
         M: backend::ManagerReadWrite,
     {
@@ -394,254 +400,294 @@ impl<ML: main_memory::MainMemoryLayout, ICL: InstructionCacheLayout, M: backend:
 
         match instr {
             // RV64I R-type instructions
-            Instr::Add(args) => run_r_type_instr!(self, instr, args, run_add),
-            Instr::Sub(args) => run_r_type_instr!(self, instr, args, run_sub),
-            Instr::Xor(args) => run_r_type_instr!(self, instr, args, run_xor),
-            Instr::Or(args) => run_r_type_instr!(self, instr, args, run_or),
-            Instr::And(args) => run_r_type_instr!(self, instr, args, run_and),
-            Instr::Sll(args) => run_r_type_instr!(self, instr, args, run_sll),
-            Instr::Srl(args) => run_r_type_instr!(self, instr, args, run_srl),
-            Instr::Sra(args) => run_r_type_instr!(self, instr, args, run_sra),
-            Instr::Slt(args) => run_r_type_instr!(self, instr, args, run_slt),
-            Instr::Sltu(args) => run_r_type_instr!(self, instr, args, run_sltu),
-            Instr::Addw(args) => run_r_type_instr!(self, instr, args, run_addw),
-            Instr::Subw(args) => run_r_type_instr!(self, instr, args, run_subw),
-            Instr::Sllw(args) => run_r_type_instr!(self, instr, args, run_sllw),
-            Instr::Srlw(args) => run_r_type_instr!(self, instr, args, run_srlw),
-            Instr::Sraw(args) => run_r_type_instr!(self, instr, args, run_sraw),
+            InstrCacheable::Add(args) => run_r_type_instr!(self, instr, args, run_add),
+            InstrCacheable::Sub(args) => run_r_type_instr!(self, instr, args, run_sub),
+            InstrCacheable::Xor(args) => run_r_type_instr!(self, instr, args, run_xor),
+            InstrCacheable::Or(args) => run_r_type_instr!(self, instr, args, run_or),
+            InstrCacheable::And(args) => run_r_type_instr!(self, instr, args, run_and),
+            InstrCacheable::Sll(args) => run_r_type_instr!(self, instr, args, run_sll),
+            InstrCacheable::Srl(args) => run_r_type_instr!(self, instr, args, run_srl),
+            InstrCacheable::Sra(args) => run_r_type_instr!(self, instr, args, run_sra),
+            InstrCacheable::Slt(args) => run_r_type_instr!(self, instr, args, run_slt),
+            InstrCacheable::Sltu(args) => run_r_type_instr!(self, instr, args, run_sltu),
+            InstrCacheable::Addw(args) => run_r_type_instr!(self, instr, args, run_addw),
+            InstrCacheable::Subw(args) => run_r_type_instr!(self, instr, args, run_subw),
+            InstrCacheable::Sllw(args) => run_r_type_instr!(self, instr, args, run_sllw),
+            InstrCacheable::Srlw(args) => run_r_type_instr!(self, instr, args, run_srlw),
+            InstrCacheable::Sraw(args) => run_r_type_instr!(self, instr, args, run_sraw),
 
             // RV64I I-type instructions
-            Instr::Addi(args) => run_i_type_instr!(self, instr, args, run_addi),
-            Instr::Addiw(args) => run_i_type_instr!(self, instr, args, run_addiw),
-            Instr::Xori(args) => run_i_type_instr!(self, instr, args, run_xori),
-            Instr::Ori(args) => run_i_type_instr!(self, instr, args, run_ori),
-            Instr::Andi(args) => run_i_type_instr!(self, instr, args, run_andi),
-            Instr::Slli(args) => run_i_type_instr!(self, instr, args, run_slli),
-            Instr::Srli(args) => run_i_type_instr!(self, instr, args, run_srli),
-            Instr::Srai(args) => run_i_type_instr!(self, instr, args, run_srai),
-            Instr::Slliw(args) => run_i_type_instr!(self, instr, args, run_slliw),
-            Instr::Srliw(args) => run_i_type_instr!(self, instr, args, run_srliw),
-            Instr::Sraiw(args) => run_i_type_instr!(self, instr, args, run_sraiw),
-            Instr::Slti(args) => run_i_type_instr!(self, instr, args, run_slti),
-            Instr::Sltiu(args) => run_i_type_instr!(self, instr, args, run_sltiu),
-            Instr::Lb(args) => run_load_instr!(self, instr, args, run_lb),
-            Instr::Lh(args) => run_load_instr!(self, instr, args, run_lh),
-            Instr::Lw(args) => run_load_instr!(self, instr, args, run_lw),
-            Instr::Lbu(args) => run_load_instr!(self, instr, args, run_lbu),
-            Instr::Lhu(args) => run_load_instr!(self, instr, args, run_lhu),
-            Instr::Lwu(args) => run_load_instr!(self, instr, args, run_lwu),
-            Instr::Ld(args) => run_load_instr!(self, instr, args, run_ld),
-            Instr::Fence(args) => {
+            InstrCacheable::Addi(args) => run_i_type_instr!(self, instr, args, run_addi),
+            InstrCacheable::Addiw(args) => run_i_type_instr!(self, instr, args, run_addiw),
+            InstrCacheable::Xori(args) => run_i_type_instr!(self, instr, args, run_xori),
+            InstrCacheable::Ori(args) => run_i_type_instr!(self, instr, args, run_ori),
+            InstrCacheable::Andi(args) => run_i_type_instr!(self, instr, args, run_andi),
+            InstrCacheable::Slli(args) => run_i_type_instr!(self, instr, args, run_slli),
+            InstrCacheable::Srli(args) => run_i_type_instr!(self, instr, args, run_srli),
+            InstrCacheable::Srai(args) => run_i_type_instr!(self, instr, args, run_srai),
+            InstrCacheable::Slliw(args) => run_i_type_instr!(self, instr, args, run_slliw),
+            InstrCacheable::Srliw(args) => run_i_type_instr!(self, instr, args, run_srliw),
+            InstrCacheable::Sraiw(args) => run_i_type_instr!(self, instr, args, run_sraiw),
+            InstrCacheable::Slti(args) => run_i_type_instr!(self, instr, args, run_slti),
+            InstrCacheable::Sltiu(args) => run_i_type_instr!(self, instr, args, run_sltiu),
+            InstrCacheable::Lb(args) => run_load_instr!(self, instr, args, run_lb),
+            InstrCacheable::Lh(args) => run_load_instr!(self, instr, args, run_lh),
+            InstrCacheable::Lw(args) => run_load_instr!(self, instr, args, run_lw),
+            InstrCacheable::Lbu(args) => run_load_instr!(self, instr, args, run_lbu),
+            InstrCacheable::Lhu(args) => run_load_instr!(self, instr, args, run_lhu),
+            InstrCacheable::Lwu(args) => run_load_instr!(self, instr, args, run_lwu),
+            InstrCacheable::Ld(args) => run_load_instr!(self, instr, args, run_ld),
+            InstrCacheable::Fence(args) => {
                 self.run_fence(args.pred, args.succ);
                 Ok(Add(instr.width()))
             }
-            Instr::FenceTso(_args) => Err(Exception::IllegalInstruction),
-            Instr::Ecall => run_syscall_instr!(self, run_ecall),
-            Instr::Ebreak => run_syscall_instr!(self, run_ebreak),
+            InstrCacheable::FenceTso(_args) => Err(Exception::IllegalInstruction),
+            InstrCacheable::Ecall => run_syscall_instr!(self, run_ecall),
+            InstrCacheable::Ebreak => run_syscall_instr!(self, run_ebreak),
 
             // RV64I S-type instructions
-            Instr::Sb(args) => run_store_instr!(self, instr, args, run_sb),
-            Instr::Sh(args) => run_store_instr!(self, instr, args, run_sh),
-            Instr::Sw(args) => run_store_instr!(self, instr, args, run_sw),
-            Instr::Sd(args) => run_store_instr!(self, instr, args, run_sd),
+            InstrCacheable::Sb(args) => run_store_instr!(self, instr, args, run_sb),
+            InstrCacheable::Sh(args) => run_store_instr!(self, instr, args, run_sh),
+            InstrCacheable::Sw(args) => run_store_instr!(self, instr, args, run_sw),
+            InstrCacheable::Sd(args) => run_store_instr!(self, instr, args, run_sd),
 
             // RV64I B-type instructions
-            Instr::Beq(args) => run_b_type_instr!(self, args, run_beq),
-            Instr::Bne(args) => run_b_type_instr!(self, args, run_bne),
-            Instr::Blt(args) => run_b_type_instr!(self, args, run_blt),
-            Instr::Bge(args) => run_b_type_instr!(self, args, run_bge),
-            Instr::Bltu(args) => run_b_type_instr!(self, args, run_bltu),
-            Instr::Bgeu(args) => run_b_type_instr!(self, args, run_bgeu),
+            InstrCacheable::Beq(args) => run_b_type_instr!(self, args, run_beq),
+            InstrCacheable::Bne(args) => run_b_type_instr!(self, args, run_bne),
+            InstrCacheable::Blt(args) => run_b_type_instr!(self, args, run_blt),
+            InstrCacheable::Bge(args) => run_b_type_instr!(self, args, run_bge),
+            InstrCacheable::Bltu(args) => run_b_type_instr!(self, args, run_bltu),
+            InstrCacheable::Bgeu(args) => run_b_type_instr!(self, args, run_bgeu),
 
             // RV64I U-type instructions
-            Instr::Lui(args) => run_u_type_instr!(self, instr, args, xregisters.run_lui),
-            Instr::Auipc(args) => run_u_type_instr!(self, instr, args, run_auipc),
+            InstrCacheable::Lui(args) => run_u_type_instr!(self, instr, args, xregisters.run_lui),
+            InstrCacheable::Auipc(args) => run_u_type_instr!(self, instr, args, run_auipc),
 
             // RV64I jump instructions
-            Instr::Jal(args) => Ok(Set(self.hart.run_jal(args.imm, args.rd))),
-            Instr::Jalr(args) => Ok(Set(self.hart.run_jalr(args.imm, args.rs1, args.rd))),
+            InstrCacheable::Jal(args) => Ok(Set(self.hart.run_jal(args.imm, args.rd))),
+            InstrCacheable::Jalr(args) => Ok(Set(self.hart.run_jalr(args.imm, args.rs1, args.rd))),
 
             // RV64A atomic instructions
-            Instr::Lrw(args) => run_amo_instr!(self, instr, args, run_lrw),
-            Instr::Scw(args) => run_amo_instr!(self, instr, args, run_scw),
-            Instr::Amoswapw(args) => run_amo_instr!(self, instr, args, run_amoswapw),
-            Instr::Amoaddw(args) => run_amo_instr!(self, instr, args, run_amoaddw),
-            Instr::Amoxorw(args) => run_amo_instr!(self, instr, args, run_amoxorw),
-            Instr::Amoandw(args) => run_amo_instr!(self, instr, args, run_amoandw),
-            Instr::Amoorw(args) => run_amo_instr!(self, instr, args, run_amoorw),
-            Instr::Amominw(args) => run_amo_instr!(self, instr, args, run_amominw),
-            Instr::Amomaxw(args) => run_amo_instr!(self, instr, args, run_amomaxw),
-            Instr::Amominuw(args) => run_amo_instr!(self, instr, args, run_amominuw),
-            Instr::Amomaxuw(args) => run_amo_instr!(self, instr, args, run_amomaxuw),
-            Instr::Lrd(args) => run_amo_instr!(self, instr, args, run_lrd),
-            Instr::Scd(args) => run_amo_instr!(self, instr, args, run_scd),
-            Instr::Amoswapd(args) => run_amo_instr!(self, instr, args, run_amoswapd),
-            Instr::Amoaddd(args) => run_amo_instr!(self, instr, args, run_amoaddd),
-            Instr::Amoxord(args) => run_amo_instr!(self, instr, args, run_amoxord),
-            Instr::Amoandd(args) => run_amo_instr!(self, instr, args, run_amoandd),
-            Instr::Amoord(args) => run_amo_instr!(self, instr, args, run_amoord),
-            Instr::Amomind(args) => run_amo_instr!(self, instr, args, run_amomind),
-            Instr::Amomaxd(args) => run_amo_instr!(self, instr, args, run_amomaxd),
-            Instr::Amominud(args) => run_amo_instr!(self, instr, args, run_amominud),
-            Instr::Amomaxud(args) => run_amo_instr!(self, instr, args, run_amomaxud),
+            InstrCacheable::Lrw(args) => run_amo_instr!(self, instr, args, run_lrw),
+            InstrCacheable::Scw(args) => run_amo_instr!(self, instr, args, run_scw),
+            InstrCacheable::Amoswapw(args) => run_amo_instr!(self, instr, args, run_amoswapw),
+            InstrCacheable::Amoaddw(args) => run_amo_instr!(self, instr, args, run_amoaddw),
+            InstrCacheable::Amoxorw(args) => run_amo_instr!(self, instr, args, run_amoxorw),
+            InstrCacheable::Amoandw(args) => run_amo_instr!(self, instr, args, run_amoandw),
+            InstrCacheable::Amoorw(args) => run_amo_instr!(self, instr, args, run_amoorw),
+            InstrCacheable::Amominw(args) => run_amo_instr!(self, instr, args, run_amominw),
+            InstrCacheable::Amomaxw(args) => run_amo_instr!(self, instr, args, run_amomaxw),
+            InstrCacheable::Amominuw(args) => run_amo_instr!(self, instr, args, run_amominuw),
+            InstrCacheable::Amomaxuw(args) => run_amo_instr!(self, instr, args, run_amomaxuw),
+            InstrCacheable::Lrd(args) => run_amo_instr!(self, instr, args, run_lrd),
+            InstrCacheable::Scd(args) => run_amo_instr!(self, instr, args, run_scd),
+            InstrCacheable::Amoswapd(args) => run_amo_instr!(self, instr, args, run_amoswapd),
+            InstrCacheable::Amoaddd(args) => run_amo_instr!(self, instr, args, run_amoaddd),
+            InstrCacheable::Amoxord(args) => run_amo_instr!(self, instr, args, run_amoxord),
+            InstrCacheable::Amoandd(args) => run_amo_instr!(self, instr, args, run_amoandd),
+            InstrCacheable::Amoord(args) => run_amo_instr!(self, instr, args, run_amoord),
+            InstrCacheable::Amomind(args) => run_amo_instr!(self, instr, args, run_amomind),
+            InstrCacheable::Amomaxd(args) => run_amo_instr!(self, instr, args, run_amomaxd),
+            InstrCacheable::Amominud(args) => run_amo_instr!(self, instr, args, run_amominud),
+            InstrCacheable::Amomaxud(args) => run_amo_instr!(self, instr, args, run_amomaxud),
 
             // RV64M multiplication and division instructions
-            Instr::Rem(args) => run_r_type_instr!(self, instr, args, run_rem),
-            Instr::Remu(args) => run_r_type_instr!(self, instr, args, run_remu),
-            Instr::Remw(args) => run_r_type_instr!(self, instr, args, run_remw),
-            Instr::Remuw(args) => run_r_type_instr!(self, instr, args, run_remuw),
-            Instr::Div(args) => run_r_type_instr!(self, instr, args, run_div),
-            Instr::Divu(args) => run_r_type_instr!(self, instr, args, run_divu),
-            Instr::Divw(args) => run_r_type_instr!(self, instr, args, run_divw),
-            Instr::Divuw(args) => run_r_type_instr!(self, instr, args, run_divuw),
-            Instr::Mul(args) => run_r_type_instr!(self, instr, args, run_mul),
-            Instr::Mulh(args) => run_r_type_instr!(self, instr, args, run_mulh),
-            Instr::Mulhsu(args) => run_r_type_instr!(self, instr, args, run_mulhsu),
-            Instr::Mulhu(args) => run_r_type_instr!(self, instr, args, run_mulhu),
-            Instr::Mulw(args) => run_r_type_instr!(self, instr, args, run_mulw),
+            InstrCacheable::Rem(args) => run_r_type_instr!(self, instr, args, run_rem),
+            InstrCacheable::Remu(args) => run_r_type_instr!(self, instr, args, run_remu),
+            InstrCacheable::Remw(args) => run_r_type_instr!(self, instr, args, run_remw),
+            InstrCacheable::Remuw(args) => run_r_type_instr!(self, instr, args, run_remuw),
+            InstrCacheable::Div(args) => run_r_type_instr!(self, instr, args, run_div),
+            InstrCacheable::Divu(args) => run_r_type_instr!(self, instr, args, run_divu),
+            InstrCacheable::Divw(args) => run_r_type_instr!(self, instr, args, run_divw),
+            InstrCacheable::Divuw(args) => run_r_type_instr!(self, instr, args, run_divuw),
+            InstrCacheable::Mul(args) => run_r_type_instr!(self, instr, args, run_mul),
+            InstrCacheable::Mulh(args) => run_r_type_instr!(self, instr, args, run_mulh),
+            InstrCacheable::Mulhsu(args) => run_r_type_instr!(self, instr, args, run_mulhsu),
+            InstrCacheable::Mulhu(args) => run_r_type_instr!(self, instr, args, run_mulhu),
+            InstrCacheable::Mulw(args) => run_r_type_instr!(self, instr, args, run_mulw),
 
             // RV64F instructions
-            Instr::FclassS(args) => run_f_x_instr!(self, instr, args, run_fclass_s),
-            Instr::Feqs(args) => run_f_r_instr!(self, instr, args, run_feq_s),
-            Instr::Fles(args) => run_f_r_instr!(self, instr, args, run_fle_s),
-            Instr::Flts(args) => run_f_r_instr!(self, instr, args, run_flt_s),
-            Instr::Fadds(args) => run_f_r_instr!(self, instr, args, run_fadd_s, rs2, rm),
-            Instr::Fsubs(args) => run_f_r_instr!(self, instr, args, run_fsub_s, rs2, rm),
-            Instr::Fmuls(args) => run_f_r_instr!(self, instr, args, run_fmul_s, rs2, rm),
-            Instr::Fdivs(args) => run_f_r_instr!(self, instr, args, run_fdiv_s, rs2, rm),
-            Instr::Fsqrts(args) => run_f_r_instr!(self, instr, args, run_fsqrt_s, rm),
-            Instr::Fmins(args) => run_f_r_instr!(self, instr, args, run_fmin_s),
-            Instr::Fmaxs(args) => run_f_r_instr!(self, instr, args, run_fmax_s),
-            Instr::Fmadds(args) => run_f_r_instr!(self, instr, args, run_fmadd_s, rs2, rs3, rm),
-            Instr::Fmsubs(args) => run_f_r_instr!(self, instr, args, run_fmsub_s, rs2, rs3, rm),
-            Instr::Fnmsubs(args) => run_f_r_instr!(self, instr, args, run_fnmsub_s, rs2, rs3, rm),
-            Instr::Fnmadds(args) => run_f_r_instr!(self, instr, args, run_fnmadd_s, rs2, rs3, rm),
-            Instr::Flw(args) => run_load_instr!(self, instr, args, run_flw),
-            Instr::Fsw(args) => run_store_instr!(self, instr, args, run_fsw),
-            Instr::Fcvtsw(args) => run_f_x_instr!(self, instr, args, run_fcvt_s_w, rm),
-            Instr::Fcvtswu(args) => run_f_x_instr!(self, instr, args, run_fcvt_s_wu, rm),
-            Instr::Fcvtsl(args) => run_f_x_instr!(self, instr, args, run_fcvt_s_l, rm),
-            Instr::Fcvtslu(args) => run_f_x_instr!(self, instr, args, run_fcvt_s_lu, rm),
-            Instr::Fcvtws(args) => run_f_x_instr!(self, instr, args, run_fcvt_w_s, rm),
-            Instr::Fcvtwus(args) => run_f_x_instr!(self, instr, args, run_fcvt_wu_s, rm),
-            Instr::Fcvtls(args) => run_f_x_instr!(self, instr, args, run_fcvt_l_s, rm),
-            Instr::Fcvtlus(args) => run_f_x_instr!(self, instr, args, run_fcvt_lu_s, rm),
-            Instr::Fsgnjs(args) => run_f_r_instr!(self, instr, args, run_fsgnj_s),
-            Instr::Fsgnjns(args) => run_f_r_instr!(self, instr, args, run_fsgnjn_s),
-            Instr::Fsgnjxs(args) => run_f_r_instr!(self, instr, args, run_fsgnjx_s),
-            Instr::FmvXW(args) => run_f_x_instr!(self, instr, args, run_fmv_x_w),
-            Instr::FmvWX(args) => run_f_x_instr!(self, instr, args, run_fmv_w_x),
+            InstrCacheable::FclassS(args) => run_f_x_instr!(self, instr, args, run_fclass_s),
+            InstrCacheable::Feqs(args) => run_f_r_instr!(self, instr, args, run_feq_s),
+            InstrCacheable::Fles(args) => run_f_r_instr!(self, instr, args, run_fle_s),
+            InstrCacheable::Flts(args) => run_f_r_instr!(self, instr, args, run_flt_s),
+            InstrCacheable::Fadds(args) => run_f_r_instr!(self, instr, args, run_fadd_s, rs2, rm),
+            InstrCacheable::Fsubs(args) => run_f_r_instr!(self, instr, args, run_fsub_s, rs2, rm),
+            InstrCacheable::Fmuls(args) => run_f_r_instr!(self, instr, args, run_fmul_s, rs2, rm),
+            InstrCacheable::Fdivs(args) => run_f_r_instr!(self, instr, args, run_fdiv_s, rs2, rm),
+            InstrCacheable::Fsqrts(args) => run_f_r_instr!(self, instr, args, run_fsqrt_s, rm),
+            InstrCacheable::Fmins(args) => run_f_r_instr!(self, instr, args, run_fmin_s),
+            InstrCacheable::Fmaxs(args) => run_f_r_instr!(self, instr, args, run_fmax_s),
+            InstrCacheable::Fmadds(args) => {
+                run_f_r_instr!(self, instr, args, run_fmadd_s, rs2, rs3, rm)
+            }
+            InstrCacheable::Fmsubs(args) => {
+                run_f_r_instr!(self, instr, args, run_fmsub_s, rs2, rs3, rm)
+            }
+            InstrCacheable::Fnmsubs(args) => {
+                run_f_r_instr!(self, instr, args, run_fnmsub_s, rs2, rs3, rm)
+            }
+            InstrCacheable::Fnmadds(args) => {
+                run_f_r_instr!(self, instr, args, run_fnmadd_s, rs2, rs3, rm)
+            }
+            InstrCacheable::Flw(args) => run_load_instr!(self, instr, args, run_flw),
+            InstrCacheable::Fsw(args) => run_store_instr!(self, instr, args, run_fsw),
+            InstrCacheable::Fcvtsw(args) => run_f_x_instr!(self, instr, args, run_fcvt_s_w, rm),
+            InstrCacheable::Fcvtswu(args) => run_f_x_instr!(self, instr, args, run_fcvt_s_wu, rm),
+            InstrCacheable::Fcvtsl(args) => run_f_x_instr!(self, instr, args, run_fcvt_s_l, rm),
+            InstrCacheable::Fcvtslu(args) => run_f_x_instr!(self, instr, args, run_fcvt_s_lu, rm),
+            InstrCacheable::Fcvtws(args) => run_f_x_instr!(self, instr, args, run_fcvt_w_s, rm),
+            InstrCacheable::Fcvtwus(args) => run_f_x_instr!(self, instr, args, run_fcvt_wu_s, rm),
+            InstrCacheable::Fcvtls(args) => run_f_x_instr!(self, instr, args, run_fcvt_l_s, rm),
+            InstrCacheable::Fcvtlus(args) => run_f_x_instr!(self, instr, args, run_fcvt_lu_s, rm),
+            InstrCacheable::Fsgnjs(args) => run_f_r_instr!(self, instr, args, run_fsgnj_s),
+            InstrCacheable::Fsgnjns(args) => run_f_r_instr!(self, instr, args, run_fsgnjn_s),
+            InstrCacheable::Fsgnjxs(args) => run_f_r_instr!(self, instr, args, run_fsgnjx_s),
+            InstrCacheable::FmvXW(args) => run_f_x_instr!(self, instr, args, run_fmv_x_w),
+            InstrCacheable::FmvWX(args) => run_f_x_instr!(self, instr, args, run_fmv_w_x),
 
             // RV64D instructions
-            Instr::FclassD(args) => run_f_x_instr!(self, instr, args, run_fclass_d),
-            Instr::Feqd(args) => run_f_r_instr!(self, instr, args, run_feq_d),
-            Instr::Fled(args) => run_f_r_instr!(self, instr, args, run_fle_d),
-            Instr::Fltd(args) => run_f_r_instr!(self, instr, args, run_flt_d),
-            Instr::Faddd(args) => run_f_r_instr!(self, instr, args, run_fadd_d, rs2, rm),
-            Instr::Fsubd(args) => run_f_r_instr!(self, instr, args, run_fsub_d, rs2, rm),
-            Instr::Fmuld(args) => run_f_r_instr!(self, instr, args, run_fmul_d, rs2, rm),
-            Instr::Fdivd(args) => run_f_r_instr!(self, instr, args, run_fdiv_d, rs2, rm),
-            Instr::Fsqrtd(args) => run_f_r_instr!(self, instr, args, run_fsqrt_d, rm),
-            Instr::Fmind(args) => run_f_r_instr!(self, instr, args, run_fmin_d),
-            Instr::Fmaxd(args) => run_f_r_instr!(self, instr, args, run_fmax_d),
-            Instr::Fmaddd(args) => run_f_r_instr!(self, instr, args, run_fmadd_d, rs2, rs3, rm),
-            Instr::Fmsubd(args) => run_f_r_instr!(self, instr, args, run_fmsub_d, rs2, rs3, rm),
-            Instr::Fnmsubd(args) => run_f_r_instr!(self, instr, args, run_fnmsub_d, rs2, rs3, rm),
-            Instr::Fnmaddd(args) => run_f_r_instr!(self, instr, args, run_fnmadd_d, rs2, rs3, rm),
-            Instr::Fld(args) => run_load_instr!(self, instr, args, run_fld),
-            Instr::Fsd(args) => run_store_instr!(self, instr, args, run_fsd),
-            Instr::Fcvtdw(args) => run_f_x_instr!(self, instr, args, run_fcvt_d_w, rm),
-            Instr::Fcvtdwu(args) => run_f_x_instr!(self, instr, args, run_fcvt_d_wu, rm),
-            Instr::Fcvtdl(args) => run_f_x_instr!(self, instr, args, run_fcvt_d_l, rm),
-            Instr::Fcvtdlu(args) => run_f_x_instr!(self, instr, args, run_fcvt_d_lu, rm),
-            Instr::Fcvtds(args) => run_f_r_instr!(self, instr, args, run_fcvt_d_s, rm),
-            Instr::Fcvtsd(args) => run_f_r_instr!(self, instr, args, run_fcvt_s_d, rm),
-            Instr::Fcvtwd(args) => run_f_x_instr!(self, instr, args, run_fcvt_w_d, rm),
-            Instr::Fcvtwud(args) => run_f_x_instr!(self, instr, args, run_fcvt_wu_d, rm),
-            Instr::Fcvtld(args) => run_f_x_instr!(self, instr, args, run_fcvt_l_d, rm),
-            Instr::Fcvtlud(args) => run_f_x_instr!(self, instr, args, run_fcvt_lu_d, rm),
-            Instr::Fsgnjd(args) => run_f_r_instr!(self, instr, args, run_fsgnj_d),
-            Instr::Fsgnjnd(args) => run_f_r_instr!(self, instr, args, run_fsgnjn_d),
-            Instr::Fsgnjxd(args) => run_f_r_instr!(self, instr, args, run_fsgnjx_d),
-            Instr::FmvXD(args) => run_f_x_instr!(self, instr, args, run_fmv_x_d),
-            Instr::FmvDX(args) => run_f_x_instr!(self, instr, args, run_fmv_d_x),
+            InstrCacheable::FclassD(args) => run_f_x_instr!(self, instr, args, run_fclass_d),
+            InstrCacheable::Feqd(args) => run_f_r_instr!(self, instr, args, run_feq_d),
+            InstrCacheable::Fled(args) => run_f_r_instr!(self, instr, args, run_fle_d),
+            InstrCacheable::Fltd(args) => run_f_r_instr!(self, instr, args, run_flt_d),
+            InstrCacheable::Faddd(args) => run_f_r_instr!(self, instr, args, run_fadd_d, rs2, rm),
+            InstrCacheable::Fsubd(args) => run_f_r_instr!(self, instr, args, run_fsub_d, rs2, rm),
+            InstrCacheable::Fmuld(args) => run_f_r_instr!(self, instr, args, run_fmul_d, rs2, rm),
+            InstrCacheable::Fdivd(args) => run_f_r_instr!(self, instr, args, run_fdiv_d, rs2, rm),
+            InstrCacheable::Fsqrtd(args) => run_f_r_instr!(self, instr, args, run_fsqrt_d, rm),
+            InstrCacheable::Fmind(args) => run_f_r_instr!(self, instr, args, run_fmin_d),
+            InstrCacheable::Fmaxd(args) => run_f_r_instr!(self, instr, args, run_fmax_d),
+            InstrCacheable::Fmaddd(args) => {
+                run_f_r_instr!(self, instr, args, run_fmadd_d, rs2, rs3, rm)
+            }
+            InstrCacheable::Fmsubd(args) => {
+                run_f_r_instr!(self, instr, args, run_fmsub_d, rs2, rs3, rm)
+            }
+            InstrCacheable::Fnmsubd(args) => {
+                run_f_r_instr!(self, instr, args, run_fnmsub_d, rs2, rs3, rm)
+            }
+            InstrCacheable::Fnmaddd(args) => {
+                run_f_r_instr!(self, instr, args, run_fnmadd_d, rs2, rs3, rm)
+            }
+            InstrCacheable::Fld(args) => run_load_instr!(self, instr, args, run_fld),
+            InstrCacheable::Fsd(args) => run_store_instr!(self, instr, args, run_fsd),
+            InstrCacheable::Fcvtdw(args) => run_f_x_instr!(self, instr, args, run_fcvt_d_w, rm),
+            InstrCacheable::Fcvtdwu(args) => run_f_x_instr!(self, instr, args, run_fcvt_d_wu, rm),
+            InstrCacheable::Fcvtdl(args) => run_f_x_instr!(self, instr, args, run_fcvt_d_l, rm),
+            InstrCacheable::Fcvtdlu(args) => run_f_x_instr!(self, instr, args, run_fcvt_d_lu, rm),
+            InstrCacheable::Fcvtds(args) => run_f_r_instr!(self, instr, args, run_fcvt_d_s, rm),
+            InstrCacheable::Fcvtsd(args) => run_f_r_instr!(self, instr, args, run_fcvt_s_d, rm),
+            InstrCacheable::Fcvtwd(args) => run_f_x_instr!(self, instr, args, run_fcvt_w_d, rm),
+            InstrCacheable::Fcvtwud(args) => run_f_x_instr!(self, instr, args, run_fcvt_wu_d, rm),
+            InstrCacheable::Fcvtld(args) => run_f_x_instr!(self, instr, args, run_fcvt_l_d, rm),
+            InstrCacheable::Fcvtlud(args) => run_f_x_instr!(self, instr, args, run_fcvt_lu_d, rm),
+            InstrCacheable::Fsgnjd(args) => run_f_r_instr!(self, instr, args, run_fsgnj_d),
+            InstrCacheable::Fsgnjnd(args) => run_f_r_instr!(self, instr, args, run_fsgnjn_d),
+            InstrCacheable::Fsgnjxd(args) => run_f_r_instr!(self, instr, args, run_fsgnjx_d),
+            InstrCacheable::FmvXD(args) => run_f_x_instr!(self, instr, args, run_fmv_x_d),
+            InstrCacheable::FmvDX(args) => run_f_x_instr!(self, instr, args, run_fmv_d_x),
 
             // Zicsr instructions
-            Instr::Csrrw(args) => run_csr_instr!(self, instr, args, run_csrrw),
-            Instr::Csrrs(args) => run_csr_instr!(self, instr, args, run_csrrs),
-            Instr::Csrrc(args) => run_csr_instr!(self, instr, args, run_csrrc),
-            Instr::Csrrwi(args) => run_csr_imm_instr!(self, instr, args, run_csrrwi),
-            Instr::Csrrsi(args) => run_csr_imm_instr!(self, instr, args, run_csrrsi),
-            Instr::Csrrci(args) => run_csr_imm_instr!(self, instr, args, run_csrrci),
-
-            // Zifencei instructions
-            Instr::FenceI => run_no_args_instr!(self, instr, run_fencei),
+            InstrCacheable::Csrrw(args) => run_csr_instr!(self, instr, args, run_csrrw),
+            InstrCacheable::Csrrs(args) => run_csr_instr!(self, instr, args, run_csrrs),
+            InstrCacheable::Csrrc(args) => run_csr_instr!(self, instr, args, run_csrrc),
+            InstrCacheable::Csrrwi(args) => run_csr_imm_instr!(self, instr, args, run_csrrwi),
+            InstrCacheable::Csrrsi(args) => run_csr_imm_instr!(self, instr, args, run_csrrsi),
+            InstrCacheable::Csrrci(args) => run_csr_imm_instr!(self, instr, args, run_csrrci),
 
             // Privileged instructions
             // Trap-Return
-            Instr::Mret => run_xret_instr!(self, run_mret),
-            Instr::Sret => run_xret_instr!(self, run_sret),
+            InstrCacheable::Mret => run_xret_instr!(self, run_mret),
+            InstrCacheable::Sret => run_xret_instr!(self, run_sret),
             // Currently not implemented instruction (part of Smrnmi extension)
-            Instr::Mnret => Err(Exception::IllegalInstruction),
+            InstrCacheable::Mnret => Err(Exception::IllegalInstruction),
             // Interrupt-Management
-            Instr::Wfi => run_no_args_instr!(self, instr, run_wfi),
+            InstrCacheable::Wfi => run_no_args_instr!(self, instr, run_wfi),
             // Supervisor Memory-Management
-            Instr::SFenceVma { asid, vaddr } => {
+            InstrCacheable::SFenceVma { asid, vaddr } => {
                 self.run_sfence_vma(*asid, *vaddr)?;
                 Ok(ProgramCounterUpdate::Add(instr.width()))
             }
 
             // RV32C compressed instructions
-            Instr::CLw(args) => run_load_instr!(self, instr, args, run_clw),
-            Instr::CLwsp(args) => run_ci_load_sp_instr!(self, instr, args, run_clwsp),
-            Instr::CSw(args) => run_store_instr!(self, instr, args, run_csw),
-            Instr::CSwsp(args) => run_css_instr!(self, instr, args, run_cswsp),
-            Instr::CJ(args) => Ok(Set(self.hart.run_cj(args.imm))),
-            Instr::CJr(args) => Ok(Set(self.hart.run_cjr(args.rs1))),
-            Instr::CJalr(args) => Ok(Set(self.hart.run_cjalr(args.rs1))),
-            Instr::CBeqz(args) => run_cb_type_instr!(self, args, run_cbeqz),
-            Instr::CBnez(args) => run_cb_type_instr!(self, args, run_cbnez),
-            Instr::CLi(args) => run_ci_type_instr!(self, instr, args, run_cli),
-            Instr::CLui(args) => run_ci_type_instr!(self, instr, args, run_clui),
-            Instr::CAddi(args) => run_ci_type_instr!(self, instr, args, run_caddi),
-            Instr::CAddi16sp(args) => {
+            InstrCacheable::CLw(args) => run_load_instr!(self, instr, args, run_clw),
+            InstrCacheable::CLwsp(args) => run_ci_load_sp_instr!(self, instr, args, run_clwsp),
+            InstrCacheable::CSw(args) => run_store_instr!(self, instr, args, run_csw),
+            InstrCacheable::CSwsp(args) => run_css_instr!(self, instr, args, run_cswsp),
+            InstrCacheable::CJ(args) => Ok(Set(self.hart.run_cj(args.imm))),
+            InstrCacheable::CJr(args) => Ok(Set(self.hart.run_cjr(args.rs1))),
+            InstrCacheable::CJalr(args) => Ok(Set(self.hart.run_cjalr(args.rs1))),
+            InstrCacheable::CBeqz(args) => run_cb_type_instr!(self, args, run_cbeqz),
+            InstrCacheable::CBnez(args) => run_cb_type_instr!(self, args, run_cbnez),
+            InstrCacheable::CLi(args) => run_ci_type_instr!(self, instr, args, run_cli),
+            InstrCacheable::CLui(args) => run_ci_type_instr!(self, instr, args, run_clui),
+            InstrCacheable::CAddi(args) => run_ci_type_instr!(self, instr, args, run_caddi),
+            InstrCacheable::CAddi16sp(args) => {
                 self.hart.xregisters.run_caddi16sp(args.imm);
                 Ok(ProgramCounterUpdate::Add(instr.width()))
             }
-            Instr::CAddi4spn(args) => run_ci_type_instr!(self, instr, args, run_caddi4spn),
-            Instr::CSlli(args) => run_ci_type_instr!(self, instr, args, run_cslli),
-            Instr::CSrli(args) => run_ci_type_instr!(self, instr, args, run_csrli),
-            Instr::CSrai(args) => run_ci_type_instr!(self, instr, args, run_csrai),
-            Instr::CAndi(args) => run_ci_type_instr!(self, instr, args, run_candi),
-            Instr::CMv(args) => run_cr_type_instr!(self, instr, args, run_cmv),
-            Instr::CAdd(args) => run_cr_type_instr!(self, instr, args, run_cadd),
-            Instr::CAnd(args) => run_cr_type_instr!(self, instr, args, run_cand),
-            Instr::CXor(args) => run_cr_type_instr!(self, instr, args, run_cxor),
-            Instr::COr(args) => run_cr_type_instr!(self, instr, args, run_cor),
-            Instr::CSub(args) => run_cr_type_instr!(self, instr, args, run_csub),
-            Instr::CEbreak => run_syscall_instr!(self, run_cebreak),
-            Instr::CNop => {
+            InstrCacheable::CAddi4spn(args) => run_ci_type_instr!(self, instr, args, run_caddi4spn),
+            InstrCacheable::CSlli(args) => run_ci_type_instr!(self, instr, args, run_cslli),
+            InstrCacheable::CSrli(args) => run_ci_type_instr!(self, instr, args, run_csrli),
+            InstrCacheable::CSrai(args) => run_ci_type_instr!(self, instr, args, run_csrai),
+            InstrCacheable::CAndi(args) => run_ci_type_instr!(self, instr, args, run_candi),
+            InstrCacheable::CMv(args) => run_cr_type_instr!(self, instr, args, run_cmv),
+            InstrCacheable::CAdd(args) => run_cr_type_instr!(self, instr, args, run_cadd),
+            InstrCacheable::CAnd(args) => run_cr_type_instr!(self, instr, args, run_cand),
+            InstrCacheable::CXor(args) => run_cr_type_instr!(self, instr, args, run_cxor),
+            InstrCacheable::COr(args) => run_cr_type_instr!(self, instr, args, run_cor),
+            InstrCacheable::CSub(args) => run_cr_type_instr!(self, instr, args, run_csub),
+            InstrCacheable::CEbreak => run_syscall_instr!(self, run_cebreak),
+            InstrCacheable::CNop => {
                 self.run_cnop();
                 Ok(ProgramCounterUpdate::Add(instr.width()))
             }
 
             // RV64C compressed instructions
-            Instr::CLd(args) => run_load_instr!(self, instr, args, run_cld),
-            Instr::CLdsp(args) => run_ci_load_sp_instr!(self, instr, args, run_cldsp),
-            Instr::CSd(args) => run_store_instr!(self, instr, args, run_csd),
-            Instr::CSdsp(args) => run_css_instr!(self, instr, args, run_csdsp),
-            Instr::CAddiw(args) => run_ci_type_instr!(self, instr, args, run_caddiw),
-            Instr::CAddw(args) => run_cr_type_instr!(self, instr, args, run_caddw),
-            Instr::CSubw(args) => run_cr_type_instr!(self, instr, args, run_csubw),
+            InstrCacheable::CLd(args) => run_load_instr!(self, instr, args, run_cld),
+            InstrCacheable::CLdsp(args) => run_ci_load_sp_instr!(self, instr, args, run_cldsp),
+            InstrCacheable::CSd(args) => run_store_instr!(self, instr, args, run_csd),
+            InstrCacheable::CSdsp(args) => run_css_instr!(self, instr, args, run_csdsp),
+            InstrCacheable::CAddiw(args) => run_ci_type_instr!(self, instr, args, run_caddiw),
+            InstrCacheable::CAddw(args) => run_cr_type_instr!(self, instr, args, run_caddw),
+            InstrCacheable::CSubw(args) => run_cr_type_instr!(self, instr, args, run_csubw),
 
             // RV64DC compressed instructions
-            Instr::CFld(args) => run_load_instr!(self, instr, args, run_cfld),
-            Instr::CFldsp(args) => run_ci_load_sp_instr!(self, instr, args, run_cfldsp),
-            Instr::CFsd(args) => run_store_instr!(self, instr, args, run_cfsd),
-            Instr::CFsdsp(args) => run_css_instr!(self, instr, args, run_cfsdsp),
+            InstrCacheable::CFld(args) => run_load_instr!(self, instr, args, run_cfld),
+            InstrCacheable::CFldsp(args) => run_ci_load_sp_instr!(self, instr, args, run_cfldsp),
+            InstrCacheable::CFsd(args) => run_store_instr!(self, instr, args, run_cfsd),
+            InstrCacheable::CFsdsp(args) => run_css_instr!(self, instr, args, run_cfsdsp),
 
-            Instr::Unknown { instr: _ } => Err(Exception::IllegalInstruction),
-            Instr::UnknownCompressed { instr: _ } => Err(Exception::IllegalInstruction),
+            InstrCacheable::Unknown { instr: _ } => Err(Exception::IllegalInstruction),
+            InstrCacheable::UnknownCompressed { instr: _ } => Err(Exception::IllegalInstruction),
+        }
+    }
+
+    /// Advance [`MachineState`] by executing an [`Instr`]
+    fn run_instr_uncacheable(
+        &mut self,
+        instr: &InstrUncacheable,
+    ) -> Result<ProgramCounterUpdate, Exception>
+    where
+        M: backend::ManagerReadWrite,
+    {
+        use ProgramCounterUpdate::Add;
+
+        match instr {
+            // Zifencei instructions
+            InstrUncacheable::FenceI => run_no_args_instr!(self, instr, run_fencei),
+        }
+    }
+
+    /// Advance [`MachineState`] by executing an [`Instr`]
+    fn run_instr(&mut self, instr: &Instr) -> Result<ProgramCounterUpdate, Exception>
+    where
+        M: backend::ManagerReadWrite,
+    {
+        match instr {
+            Instr::Cacheable(i) => self.run_instr_cacheable(i),
+            Instr::Uncacheable(i) => self.run_instr_uncacheable(i),
         }
     }
 
@@ -945,7 +991,7 @@ mod tests {
             registers::{a0, a1, a2, t0, t1, t2, zero},
         },
         parser::{
-            instruction::{CIBTypeArgs, ITypeArgs, Instr, SBTypeArgs},
+            instruction::{CIBTypeArgs, ITypeArgs, Instr, InstrCacheable, SBTypeArgs},
             parse_block,
         },
         traps::{EnvironException, Exception, Interrupt, TrapContext},
@@ -1283,33 +1329,33 @@ mod tests {
         const I_WRITE_T1_TO_ADDRESS_T0: u32 = 0b0011000101010000000100011;
         assert_eq!(
             parse_block(&I_WRITE_T1_TO_ADDRESS_T0.to_le_bytes()),
-            [Instr::Sw(SBTypeArgs {
+            [Instr::Cacheable(InstrCacheable::Sw(SBTypeArgs {
                 rs1: t0,
                 rs2: t1,
                 imm: 0
-            })]
+            }))]
         );
 
         // Instruction that loads 6 into t2.
         const I_LOAD_6_INTO_T2: u32 = 0b11000000000001110010011;
         assert_eq!(
             parse_block(&I_LOAD_6_INTO_T2.to_le_bytes()),
-            [Instr::Addi(ITypeArgs {
+            [Instr::Cacheable(InstrCacheable::Addi(ITypeArgs {
                 rd: t2,
                 rs1: zero,
                 imm: 6
-            })]
+            }))]
         );
 
         // Instruction that loads 5 into t2.
         const I_LOAD_5_INTO_T2: u32 = 0b10100000000001110010011;
         assert_eq!(
             parse_block(&I_LOAD_5_INTO_T2.to_le_bytes()),
-            [Instr::Addi(ITypeArgs {
+            [Instr::Cacheable(InstrCacheable::Addi(ITypeArgs {
                 rd: t2,
                 rs1: zero,
                 imm: 5
-            })]
+            }))]
         );
 
         let mut backend = create_backend!(MachineStateLayout<M1K, TestInstructionCacheLayout>, F);
@@ -1497,13 +1543,13 @@ mod tests {
         assert_eq!(
             parse_block(instrs0.as_slice()),
             [
-                Instr::Sd(SBTypeArgs {
+                Instr::Cacheable(InstrCacheable::Sd(SBTypeArgs {
                     rs1: t1,
                     rs2: t0,
                     imm: 8
-                }),
-                Instr::CLi(CIBTypeArgs { rd_rs1: a0, imm: 1 }),
-                Instr::UnknownCompressed { instr: 0 }
+                })),
+                Instr::Cacheable(InstrCacheable::CLi(CIBTypeArgs { rd_rs1: a0, imm: 1 })),
+                Instr::Cacheable(InstrCacheable::UnknownCompressed { instr: 0 })
             ]
         );
 
@@ -1518,13 +1564,13 @@ mod tests {
         assert_eq!(
             parse_block(instrs1.as_slice()),
             [
-                Instr::Sd(SBTypeArgs {
+                Instr::Cacheable(InstrCacheable::Sd(SBTypeArgs {
                     rs1: t1,
                     rs2: t0,
                     imm: 8
-                }),
-                Instr::CLi(CIBTypeArgs { rd_rs1: a0, imm: 2 }),
-                Instr::UnknownCompressed { instr: 0 }
+                })),
+                Instr::Cacheable(InstrCacheable::CLi(CIBTypeArgs { rd_rs1: a0, imm: 2 })),
+                Instr::Cacheable(InstrCacheable::UnknownCompressed { instr: 0 })
             ]
         );
 
