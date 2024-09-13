@@ -322,13 +322,13 @@ let jobs pipeline_type =
         ~dependencies
         ~before_script:(before_script ~take_ownership:true ~eval_opam:true [])
         [
-          "make -C manifest check";
+          "make --silent -C manifest check";
           "./scripts/lint.sh --check-gitlab-ci-yml";
           (* Check that the opam-repo images' Alpine version corresponds to
              the value in scripts/version.sh. *)
           "./scripts/ci/check_alpine_version.sh";
           (* Check that .gitlab-ci.yml is up to date. *)
-          "make -C ci check";
+          "make --silent -C ci check";
         ]
     in
     let job_nix : tezos_job =
