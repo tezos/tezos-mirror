@@ -39,8 +39,8 @@ use crate::machine_state::bus::Address;
 use crate::parser::instruction::{Instr, InstrCacheable};
 use crate::parser::{parse, parse_compressed_instruction, parse_uncompressed_instruction};
 use crate::state_backend::{
-    self, AllocatedOf, Atom, Cell, CellRead, CellWrite, Choreographer, Elem, Layout, LazyCell,
-    ManagerAlloc, ManagerBase, ManagerRead, ManagerReadWrite, ManagerWrite, Many, Placed, Ref,
+    self, AllocatedOf, Atom, Cell, CellWrite, Choreographer, Elem, Layout, LazyCell, ManagerAlloc,
+    ManagerBase, ManagerRead, ManagerReadWrite, ManagerWrite, Many, Placed, Ref,
 };
 use std::convert::Infallible;
 
@@ -346,7 +346,7 @@ impl<ICL: InstructionCacheLayout, M: ManagerBase> InstructionCache<ICL, M> {
 
     /// Fetch the cached instruction at the given address, if an entry exists.
     #[inline(always)]
-    pub fn fetch_instr(&self, phys_addr: Address) -> Option<InstrCacheable>
+    pub fn fetch_instr(&mut self, phys_addr: Address) -> Option<&InstrCacheable>
     where
         M: ManagerRead,
     {
@@ -354,12 +354,12 @@ impl<ICL: InstructionCacheLayout, M: ManagerBase> InstructionCache<ICL, M> {
             return None;
         }
 
-        let cached = ICL::entry(&self.entries, phys_addr);
+        let cached = ICL::entry_mut(&mut self.entries, phys_addr);
 
-        if cached.fence_counter.read() == self.fence_counter.read()
-            && cached.phys_addr.read() == phys_addr
+        if cached.phys_addr.read() == phys_addr
+            && cached.fence_counter.read() == self.fence_counter.read()
         {
-            let (instr, _) = cached.instr.read();
+            let instr = &cached.instr.read_ref().0;
             Some(instr)
         } else {
             None
@@ -437,7 +437,7 @@ mod tests {
     // devices).
     backend_test!(test_fetch_before_cache_misses, F, {
         let mut backend = create_backend!(TestInstructionCacheLayout, F);
-        let state = create_state!(
+        let mut state = create_state!(
             InstructionCache,
             TestInstructionCacheLayout,
             F,
@@ -475,12 +475,12 @@ mod tests {
 
         // Compressed instruction can be cached
         state.cache_compressed(phys_addr, compressed_bytes);
-        assert_eq!(Some(compressed), state.fetch_instr(phys_addr));
+        assert_eq!(Some(&compressed), state.fetch_instr(phys_addr));
 
         // Caching an uncompressed instruction across page boundary should fail - the old
         // uncompressed instruction is still there.
         state.cache_uncompressed(phys_addr, uncompressed_bytes);
-        assert_eq!(Some(compressed), state.fetch_instr(phys_addr));
+        assert_eq!(Some(&compressed), state.fetch_instr(phys_addr));
     });
 
     // Ensure
@@ -516,18 +516,18 @@ mod tests {
             );
 
             state.cache_compressed(phys_addr_compressed, compressed_bytes);
-            assert_eq!(Some(compressed), state.fetch_instr(phys_addr_compressed));
+            assert_eq!(Some(&compressed), state.fetch_instr(phys_addr_compressed));
 
             state.cache_uncompressed(phys_addr_uncompressed, uncompressed_bytes);
             assert_eq!(
-                Some(uncompressed),
+                Some(&uncompressed),
                 state.fetch_instr(phys_addr_uncompressed)
             );
         }
 
         // Rebind state
         {
-            let state = create_state!(
+            let mut state = create_state!(
                 InstructionCache,
                 TestInstructionCacheLayout,
                 F,
@@ -535,9 +535,9 @@ mod tests {
                 TestInstructionCacheLayout
             );
 
-            assert_eq!(Some(compressed), state.fetch_instr(phys_addr_compressed));
+            assert_eq!(Some(&compressed), state.fetch_instr(phys_addr_compressed));
             assert_eq!(
-                Some(uncompressed),
+                Some(&uncompressed),
                 state.fetch_instr(phys_addr_uncompressed)
             );
         }
