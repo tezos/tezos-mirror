@@ -27,8 +27,6 @@ type state = {
   mutable cooldown : int;
       (** Do not try to catch-up if [cooldown] is not equal to 0 *)
   enable_dal : bool;
-  dal_slots : int list option;
-  mutable dal_last_used : Z.t;
 }
 
 module Types = struct
@@ -115,7 +113,6 @@ module Worker = struct
 
   let publish_on_dal state level chunks =
     let open Lwt_result_syntax in
-    state.dal_last_used <- level ;
     let payload = Sequencer_blueprint.create_dal_payload chunks in
     let nb_chunks = List.length chunks in
     let*! () = Blueprint_events.blueprint_injected_on_DAL ~level ~nb_chunks in
@@ -128,7 +125,7 @@ module Worker = struct
 
   let publish_on_dal_precondition state use_dal_if_enabled level chunks =
     state.enable_dal && use_dal_if_enabled
-    && state.dal_last_used < level
+    && Z.(zero < level)
     && List.length chunks
        < Sequencer_blueprint.maximum_unsigned_chunks_per_dal_slot
 
@@ -277,8 +274,6 @@ module Handlers = struct
         catchup_cooldown;
         keep_alive;
         enable_dal = Option.is_some dal_slots;
-        dal_slots;
-        dal_last_used = Z.zero;
       }
 
   let on_request :
