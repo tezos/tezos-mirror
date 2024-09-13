@@ -64,6 +64,7 @@ type error +=
   | No_refutation_coordinator
   | Could_not_acquire_lock of string
   | Patch_durable_storage_on_commitment of int32
+  | Dal_message_too_big of {slot_size : int; message_size : int}
 
 type error +=
   | Could_not_open_preimage_file of String.t
@@ -609,4 +610,26 @@ let () =
     Data_encoding.(obj1 (req "level" int32))
     (function
       | Patch_durable_storage_on_commitment level -> Some level | _ -> None)
-    (fun level -> Patch_durable_storage_on_commitment level)
+    (fun level -> Patch_durable_storage_on_commitment level) ;
+
+  register_error_kind
+    ~id:"sc_rollup.node.dal_message_too_big"
+    ~title:"Dal message too big"
+    ~description:
+      "The DAL injection worker received a message whose length exceeds slot \
+       size."
+    ~pp:(fun ppf (slot_size, message_size) ->
+      Format.fprintf
+        ppf
+        "The DAL injection worker received a %d bytes message length, but a \
+         DAL slot size is %d."
+        message_size
+        slot_size)
+    `Permanent
+    Data_encoding.(obj2 (req "slot_size" int31) (req "message_size" int31))
+    (function
+      | Dal_message_too_big {slot_size; message_size} ->
+          Some (slot_size, message_size)
+      | _ -> None)
+    (fun (slot_size, message_size) ->
+      Dal_message_too_big {slot_size; message_size})

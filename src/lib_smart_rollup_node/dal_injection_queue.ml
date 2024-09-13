@@ -122,6 +122,17 @@ module Events = struct
       ~level:Info
       ()
 
+  let dal_message_size_too_big =
+    declare_2
+      ~section
+      ~name:"dal_message_size_too_big"
+      ~msg:
+        "The size of a received message to inject via DAL has {message_size} \
+         bytes while slot size is {slot_size}"
+      ~level:Info
+      ("slot_size", Data_encoding.int31)
+      ("message_size", Data_encoding.int31)
+
   let no_dal_slot_indices_set =
     declare_0
       ~section
@@ -226,11 +237,23 @@ let inject_slot state ~slot_index ~slot_content =
 
 let on_register state ~message : unit tzresult Lwt.t =
   let open Lwt_result_syntax in
-  Pending_messages.replace state.pending_messages state.count_messages message ;
-  (* We don't care about overflows here. *)
-  state.count_messages <- state.count_messages + 1 ;
-  let*! () = Events.(emit dal_message_received) () in
-  return_unit
+  let slot_size =
+    (Reference.get state.node_ctxt.current_protocol).constants.dal
+      .cryptobox_parameters
+      .slot_size
+  in
+  let message_size = String.length message in
+  if message_size > slot_size then
+    let*! () =
+      Events.(emit dal_message_size_too_big) (slot_size, message_size)
+    in
+    tzfail @@ Rollup_node_errors.Dal_message_too_big {slot_size; message_size}
+  else (
+    Pending_messages.replace state.pending_messages state.count_messages message ;
+    (* We don't care about overflows here. *)
+    state.count_messages <- state.count_messages + 1 ;
+    let*! () = Events.(emit dal_message_received) () in
+    return_unit)
 
 let on_set_dal_slot_indices state idx =
   let open Lwt_result_syntax in
