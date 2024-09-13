@@ -85,20 +85,30 @@ let jobs =
       ]
     |> enable_coverage_location |> enable_coverage_report
   in
-  let job_publish_documentation : tezos_job =
-    Documentation.job_publish_documentation
-      ~dependencies:(Dependent [])
-        (* We publish documentation [Always] -- the job has no
-           dependencies and so [On_success] is actually equivalent to
-           [Always], but the latter is more explicit. *)
-      ~rules:
-        [
-          job_rule
-            ~changes:(Changeset.encode changeset_octez_docs)
-            ~when_:Always
-            ();
-        ]
-      ()
+  let jobs_documentation : tezos_job list =
+    let rules =
+      [job_rule ~changes:(Changeset.encode changeset_octez_docs) ()]
+    in
+    let dependencies = Dependent [] in
+    let job_odoc = Documentation.job_odoc ~rules ~dependencies () in
+    let job_manuals = Documentation.job_manuals ~rules ~dependencies () in
+    let job_docgen = Documentation.job_docgen ~rules ~dependencies () in
+    let doc_build_dependencies =
+      Dependent
+        [Artifacts job_odoc; Artifacts job_manuals; Artifacts job_docgen]
+    in
+    let job_build_all =
+      Documentation.job_build_all ~dependencies:doc_build_dependencies ~rules ()
+    in
+    let job_publish_documentation : tezos_job =
+      Documentation.job_publish_documentation
+        ~dependencies:(Dependent [Artifacts job_build_all])
+        ~rules
+        ()
+    in
+    [
+      job_odoc; job_manuals; job_docgen; job_build_all; job_publish_documentation;
+    ]
   in
   (* Smart Rollup: Kernel SDK
 
@@ -136,10 +146,12 @@ let jobs =
     job_docker_arm64_experimental;
     (* Stage: test_coverage *)
     job_unified_coverage_default;
-    (* Stage: doc *)
-    job_publish_documentation;
-    (* Stage: prepare_release *)
-    job_docker_merge_manifests;
-    (* Stage: manual *)
-    job_publish_kernel_sdk;
   ]
+  (* Stage: doc *)
+  @ jobs_documentation
+  @ [
+      (* Stage: prepare_release *)
+      job_docker_merge_manifests;
+      (* Stage: manual *)
+      job_publish_kernel_sdk;
+    ]

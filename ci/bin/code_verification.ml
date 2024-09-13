@@ -1575,7 +1575,9 @@ let jobs pipeline_type =
         make_rules ~changes:changeset_octez_docs ~label:"ci--docs" ()
       in
       let dependencies = dependencies_needs_start in
-      let job_odoc = Documentation.job_odoc ~rules ~dependencies () in
+      let job_odoc =
+        Documentation.job_odoc ~rules ~dependencies ~lite:true ()
+      in
       let job_manuals = Documentation.job_manuals ~rules ~dependencies () in
       let job_docgen = Documentation.job_docgen ~rules ~dependencies () in
       let doc_build_dependencies =

@@ -1376,7 +1376,8 @@ module Tezt = struct
 end
 
 module Documentation = struct
-  let job_odoc ?rules ?dependencies () : tezos_job =
+  let job_odoc ?(lite = false) ?rules ?dependencies () : tezos_job =
+    let target = if lite then "odoc-lite" else "odoc" in
     job
       ~__POS__
       ~name:"documentation:odoc"
@@ -1391,7 +1392,7 @@ module Documentation = struct
            ~expire_in:(Duration (Hours 1))
            (* Path must be terminated with / to expose artifact (gitlab-org/gitlab#/36706) *)
            ["docs/_build/api/odoc/"; "docs/odoc.log"])
-      ["make -C docs odoc-lite"]
+      ["make -C docs " ^ target]
     |> enable_cargo_cache |> enable_sccache
 
   let job_manuals ?rules ?dependencies () : tezos_job =

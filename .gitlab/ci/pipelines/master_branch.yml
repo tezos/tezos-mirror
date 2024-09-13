@@ -322,6 +322,220 @@ oc.unified_coverage:
     expose_as: Coverage report
   coverage: '/Coverage: ([^%]+%)/'
 
+documentation:odoc:
+  image: ${ci_image_name}/test:${ci_image_tag}
+  stage: doc
+  tags:
+  - gcp
+  rules:
+  - changes:
+    - .gitlab-ci.yml
+    - .gitlab/**/*
+    - brassaia/**/*
+    - client-libs/**/*
+    - data-encoding/**/*
+    - docs/**/*
+    - dune
+    - dune-project
+    - dune-workspace
+    - etherlink/**/*
+    - irmin/**/*
+    - script-inputs/**/*/
+    - scripts/**/*/
+    - src/**/*
+    - tezt/**/*
+    - vendors/**/*
+    when: on_success
+  needs:
+  - oc.docker:ci:amd64
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  before_script:
+  - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - make -C docs odoc
+  after_script:
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+  artifacts:
+    expire_in: 1 hour
+    paths:
+    - docs/_build/api/odoc/
+    - docs/odoc.log
+    when: always
+
+documentation:manuals:
+  image: ${ci_image_name}/test:${ci_image_tag}
+  stage: doc
+  tags:
+  - gcp
+  rules:
+  - changes:
+    - .gitlab-ci.yml
+    - .gitlab/**/*
+    - brassaia/**/*
+    - client-libs/**/*
+    - data-encoding/**/*
+    - docs/**/*
+    - dune
+    - dune-project
+    - dune-workspace
+    - etherlink/**/*
+    - irmin/**/*
+    - script-inputs/**/*/
+    - scripts/**/*/
+    - src/**/*
+    - tezt/**/*
+    - vendors/**/*
+    when: on_success
+  needs:
+  - oc.docker:ci:amd64
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  before_script:
+  - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - ./scripts/ci/documentation:manuals.sh
+  after_script:
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - docs/*/octez-*.html
+    - docs/api/octez-*.txt
+    - docs/developer/metrics.csv
+    - docs/user/node-config.json
+
+documentation:docgen:
+  image: ${ci_image_name}/test:${ci_image_tag}
+  stage: doc
+  tags:
+  - gcp
+  rules:
+  - changes:
+    - .gitlab-ci.yml
+    - .gitlab/**/*
+    - brassaia/**/*
+    - client-libs/**/*
+    - data-encoding/**/*
+    - docs/**/*
+    - dune
+    - dune-project
+    - dune-workspace
+    - etherlink/**/*
+    - irmin/**/*
+    - script-inputs/**/*/
+    - scripts/**/*/
+    - src/**/*
+    - tezt/**/*
+    - vendors/**/*
+    when: on_success
+  needs:
+  - oc.docker:ci:amd64
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  before_script:
+  - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - make -C docs -j docexes-gen
+  after_script:
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - docs/alpha/rpc.rst
+    - docs/shell/rpc.rst
+    - docs/user/default-acl.json
+    - docs/api/errors.rst
+    - docs/shell/p2p_api.rst
+
+documentation:build_all:
+  image: ${ci_image_name}/test:${ci_image_tag}
+  stage: doc
+  tags:
+  - gcp
+  rules:
+  - changes:
+    - .gitlab-ci.yml
+    - .gitlab/**/*
+    - brassaia/**/*
+    - client-libs/**/*
+    - data-encoding/**/*
+    - docs/**/*
+    - dune
+    - dune-project
+    - dune-workspace
+    - etherlink/**/*
+    - irmin/**/*
+    - script-inputs/**/*/
+    - scripts/**/*/
+    - src/**/*
+    - tezt/**/*
+    - vendors/**/*
+    when: on_success
+  needs:
+  - oc.docker:ci:amd64
+  - documentation:odoc
+  - documentation:manuals
+  - documentation:docgen
+  dependencies:
+  - oc.docker:ci:amd64
+  - documentation:odoc
+  - documentation:manuals
+  - documentation:docgen
+  timeout: 60 minutes
+  before_script:
+  - eval $(opam env)
+  - . $HOME/.venv/bin/activate
+  script:
+  - make -C docs -j sphinx
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - docs/_build/
+    expose_as: Documentation - excluding old protocols
+
 publish:documentation:
   image: ${ci_image_name}/test:${ci_image_tag}
   stage: doc
@@ -345,11 +559,13 @@ publish:documentation:
     - src/**/*
     - tezt/**/*
     - vendors/**/*
-    when: always
+    when: on_success
   needs:
   - oc.docker:ci:amd64
+  - documentation:build_all
   dependencies:
   - oc.docker:ci:amd64
+  - documentation:build_all
   timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
