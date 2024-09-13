@@ -270,7 +270,7 @@ module M018 = Proxford_machine.M
 module M019 = PtParisB_machine.M
 module M020 = PsParisC_machine.M
 module Malpha = Alpha_machine.M
-module M021 = PsquebeC_machine.M
+module M021 = PsQuebec_machine.M
 
 module Client_config = struct
   include Client_config
