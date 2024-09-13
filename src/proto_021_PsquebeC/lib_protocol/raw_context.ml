@@ -883,8 +883,8 @@ let prepare ~level ~predecessor_timestamp ~timestamp ~adaptive_issuance_enable
 
 type previous_protocol =
   | Genesis of Parameters_repr.t
-  | Quebeca
-  | (* Quebeca predecessor *) ParisC_020 (* Quebeca predecessor *)
+  | Quebecb
+  | (* Quebecb predecessor *) ParisC_020 (* Quebecb predecessor *)
 
 let check_and_update_protocol_version ctxt =
   let open Lwt_result_syntax in
@@ -900,9 +900,9 @@ let check_and_update_protocol_version ctxt =
         else if Compare.String.(s = "genesis") then
           let+ param, ctxt = get_proto_param ctxt in
           (Genesis param, ctxt)
-        else if Compare.String.(s = "quebeca") then return (Quebeca, ctxt)
-        else if (* Quebeca predecessor *) Compare.String.(s = "paris_020") then
-          return (ParisC_020, ctxt) (* Quebeca predecessor *)
+        else if Compare.String.(s = "quebecb") then return (Quebecb, ctxt)
+        else if (* Quebecb predecessor *) Compare.String.(s = "paris_020") then
+          return (ParisC_020, ctxt) (* Quebecb predecessor *)
         else Lwt.return @@ storage_error (Incompatible_protocol_version s)
   in
   let*! ctxt =
@@ -1023,8 +1023,8 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
         let* ctxt = set_cycle_eras ctxt cycle_eras in
         let*! result = add_constants ctxt param.constants in
         return (result, None)
-    (* Start of Quebeca stitching. Comment used for automatic snapshot *)
-    | Quebeca ->
+    (* Start of Quebecb stitching. Comment used for automatic snapshot *)
+    | Quebecb ->
         let module Previous = Constants_parametric_repr in
         let* c = get_constants ctxt in
         let dal =
@@ -1307,7 +1307,7 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
            it should be removed in beta when stabilising *)
         let*! c = get_previous_protocol_constants ctxt in
         return (ctxt, Some c)
-    (* End of Quebeca stitching. Comment used for automatic snapshot *)
+    (* End of Quebecb stitching. Comment used for automatic snapshot *)
     (* Start of beta predecessor stitching. Comment used for automatic snapshot *)
     | ParisC_020 ->
         let*! c = get_previous_protocol_constants ctxt in

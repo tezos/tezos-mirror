@@ -24,7 +24,7 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
-let version_value = "quebeca_021"
+let version_value = "quebecb_021"
 
 let version = "v1"
 
