@@ -127,16 +127,17 @@ module Events = struct
       ()
 
   let inject_dal_slot_from_messages =
-    declare_3
+    declare_4
       ~section
       ~name:"inject_dal_slot_from_messages"
       ~msg:
-        "Injecting a DAL slot containing {num_messages} messages, for a total \
-         size of {data_size} bytes over {slot_size}"
+        "Injecting a DAL slot containing {num_messages} messages at index \
+         {slot_index}, for a total size of {data_size} bytes over {slot_size}"
       ~level:Debug
       ("data_size", Data_encoding.uint16)
       ("slot_size", Data_encoding.uint16)
       ("num_messages", Data_encoding.uint16)
+      ("slot_index", Data_encoding.uint16)
 
   let request_completed =
     declare_2
@@ -318,7 +319,10 @@ let on_produce_dal_slots state =
            let slot_content = String.concat "" slot_chunks in
            let*! () =
              Events.(emit inject_dal_slot_from_messages)
-               (String.length slot_content, slot_size, List.length slot_chunks)
+               ( String.length slot_content,
+                 slot_size,
+                 List.length slot_chunks,
+                 slot_index )
            in
            inject_slot state ~slot_index ~slot_content)
 
