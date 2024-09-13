@@ -126,6 +126,18 @@ module Events = struct
       ~level:Error
       ()
 
+  let inject_dal_slot_from_messages =
+    declare_3
+      ~section
+      ~name:"inject_dal_slot_from_messages"
+      ~msg:
+        "Injecting a DAL slot containing {num_messages} messages, for a total \
+         size of {data_size} bytes over {slot_size}"
+      ~level:Debug
+      ("data_size", Data_encoding.uint16)
+      ("slot_size", Data_encoding.uint16)
+      ("num_messages", Data_encoding.uint16)
+
   let request_completed =
     declare_2
       ~section
@@ -221,12 +233,6 @@ let on_register state ~message : unit tzresult Lwt.t =
   let*! () = Events.(emit dal_message_received) () in
   return_unit
 
-let on_produce_dal_slots state =
-  let open Lwt_result_syntax in
-  match Pending_messages.take state.pending_messages with
-  | None -> return_unit
-  | Some (_z, message) -> inject_slot state ~slot_content:message
-
 let on_set_dal_slot_indices state idx =
   let open Lwt_result_syntax in
   let module SI = Set.Make (Int) in
@@ -246,6 +252,34 @@ let on_set_dal_slot_indices state idx =
   Queue.clear state.dal_slot_indices ;
   SI.iter (fun id -> Queue.push id state.dal_slot_indices) idx ;
   return_unit
+
+let on_produce_dal_slots state =
+  let open Lwt_result_syntax in
+  let slot_size =
+    (Reference.get state.node_ctxt.current_protocol).constants.dal
+      .cryptobox_parameters
+      .slot_size
+  in
+  let rec fill_slot accu ~remaining_size =
+    match Pending_messages.peek state.pending_messages with
+    | None -> List.rev accu
+    | Some (_z, message) ->
+        let remaining_size = remaining_size - String.length message in
+        if remaining_size < 0 then List.rev accu
+        else
+          (* Pop the element. *)
+          let () = ignore @@ Pending_messages.take state.pending_messages in
+          fill_slot (message :: accu) ~remaining_size
+  in
+  match fill_slot [] ~remaining_size:slot_size with
+  | [] -> return_unit (* Nothing to publish. *)
+  | slot_messages ->
+      let slot_content = String.concat "" slot_messages in
+      let*! () =
+        Events.(emit inject_dal_slot_from_messages)
+          (String.length slot_content, slot_size, List.length slot_messages)
+      in
+      inject_slot state ~slot_content
 
 let init_dal_worker_state node_ctxt =
   let dal_constants =
