@@ -808,6 +808,7 @@ module Images = struct
         ~__POS__
         ~stage
         ~name:"oc.docker:client-libs-dependencies"
+        ~description:"Build internal client-libs-dependencies images"
           (* This image is not built for external use. *)
         ~ci_docker_hub:false
           (* Handle docker initialization, if necessary, in [./scripts/ci/docker_client_libs_dependencies_build.sh]. *)
@@ -835,6 +836,8 @@ module Images = struct
         ~skip_docker_initialization:true
         ~stage
         ~name:("oc.docker:rust-toolchain:" ^ arch_to_string_alt arch)
+        ~description:
+          ("Build internal rust-toolchain images for " ^ arch_to_string_alt arch)
         ~ci_docker_hub:false
         ~artifacts:
           (artifacts
