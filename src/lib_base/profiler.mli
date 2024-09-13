@@ -23,7 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** This profiling library declares a high-level interface meant to
+(** {1:doc-profiler Profiler} *)
+
+(** {2 Summary}
+
+    This profiling library declares a high-level interface meant to
     be used to instrument code in order to measure the time spent in
     the different parts in such a way to yield a (human-)processable
     report. This module declares a generic interface (driver) that
@@ -43,6 +47,8 @@
     to support [Lwt] function calls. *)
 
 module StringMap : Map.S with type key = string
+
+(** {2 Types and utility functions} *)
 
 type time = {
   wall : float;  (** Wall-clock time: total time elapsed. *)
@@ -92,6 +98,13 @@ val report_encoding : report Data_encoding.t
 
 type (_, _) kind = ..
 
+(** {2:driver Driver}
+
+    The [Driver] is a signature that, when instantiated, specifies the behaviour
+    of any profiler. This means that all profilers should implement this set of
+    functions with their specifities.
+
+    Example: this driver writes text files in a unix filesystem *)
 module type DRIVER = sig
   (** Parameters to launch an instance of the driver. *)
   type config
@@ -140,8 +153,16 @@ end
 
 type 'a driver = (module DRIVER with type config = 'a)
 
+(** {2:instance Instance}
+
+    A specific instance of a {!section-driver} implementation.
+
+    Example: this driver that writes text files in a unix filesystem will
+    write them in this specific file with this specific level of details *)
 type instance
 
+(** [instance driver params] will instantiate the [driver] with
+    the given [params] *)
 val instance : 'a driver -> 'a -> instance
 
 val time : instance -> time
@@ -152,43 +173,82 @@ val report_s : instance -> report Lwt.t
 
 val close : instance -> unit
 
+(** {2 Profiler}
+
+    The profiler is an API that needs to be attached to a backend.
+    A backend is composed of:
+    - a {!section-driver}
+    - a {!section-instance} *)
 type profiler
 
+(** [plug profiler instance] plugs [profiler] to [instance] *)
 val plug : profiler -> instance -> unit
 
+(** [unplug profiler instance] unplugs [profiler] from [instance] *)
 val unplug : profiler -> instance -> unit
 
+(** [close_and_unplug profiler instance] closes [profiler] and
+    unplugs it from [instance] *)
 val close_and_unplug : profiler -> instance -> unit
 
+(** [close_and_unplug_all profiler] closes [profiler] and
+    unplugs it from all instances it was plugged to *)
 val close_and_unplug_all : profiler -> unit
 
+(** [plugged profiler] returns all the instances plugged to [profiler] *)
 val plugged : profiler -> instance list
 
+(** Open a sequence in the current sequence.
+    If currently aggregating (not all aggregation scopes are closed),
+    this has the same semantics as {!aggregate} instead. *)
 val record : profiler -> ?lod:lod -> string -> unit
 
+(** Open an aggregation node in the current sequence. *)
 val aggregate : profiler -> ?lod:lod -> string -> unit
 
+(** Close the most recently opened sequence or aggregation scope. *)
 val stop : profiler -> unit
 
+(** Record a timestamp in the most recently opened sequence. *)
 val stamp : profiler -> ?lod:lod -> string -> unit
 
+(** Count this event's occurences in the most recent sequence. *)
 val mark : profiler -> ?lod:lod -> string list -> unit
 
+(** Sum the time spent in this event in the most recent sequence. *)
 val span : profiler -> ?lod:lod -> span -> string list -> unit
 
+(** Include a report in the current sequence. *)
 val inc : profiler -> report -> unit
 
+(** [record_f profiler ?lod label f] will call:
+    {[
+      record profiler ?lod name;
+      f ();
+      stop ();
+    ]} *)
 val record_f : profiler -> ?lod:lod -> string -> (unit -> 'a) -> 'a
 
+(** Same as [record_s] but for Lwt function *)
 val record_s : profiler -> ?lod:lod -> string -> (unit -> 'a Lwt.t) -> 'a Lwt.t
 
+(** [aggregate_f profiler ?lod label f] will call:
+    {[
+      aggregate profiler ?lod name;
+      f ();
+      stop ();
+    ]} *)
 val aggregate_f : profiler -> ?lod:lod -> string -> (unit -> 'a) -> 'a
 
+(** Same as [aggregate_f] but for Lwt functions *)
 val aggregate_s :
   profiler -> ?lod:lod -> string -> (unit -> 'a Lwt.t) -> 'a Lwt.t
 
+(** [span_f profiler ?lod label_list f] will compute [span] but
+    specifically around [f] *)
 val span_f : profiler -> ?lod:lod -> string list -> (unit -> 'a) -> 'a
 
+(** Same as [span_f] but for Lwt functions *)
 val span_s :
   profiler -> ?lod:lod -> string list -> (unit -> 'a Lwt.t) -> 'a Lwt.t
 
@@ -197,48 +257,94 @@ val with_new_profiler : 'a driver -> 'a -> (profiler -> 'r) -> 'r * report list
 val with_new_profiler_s :
   'a driver -> 'a -> (profiler -> 'r Lwt.t) -> ('r * report list) Lwt.t
 
+(** [unplugged ()] returns a new profiler *)
 val unplugged : unit -> profiler
 
 val main : profiler
 
+(** {2 Global Profiler} *)
 module type GLOBAL_PROFILER = sig
   type nonrec lod = lod = Terse | Detailed | Verbose
 
+  (** {3 Plugging} *)
+
+  (** [plug instance] plugs the profiler stored in the module to [instance] *)
   val plug : instance -> unit
 
+  (** [unplug instance] unplugs the profiler stored in the module
+      from [instance] *)
   val unplug : instance -> unit
 
+  (** [close_and_unplug instance] closes the profiler stored in the module and
+      unplugs it from [instance] *)
   val close_and_unplug : instance -> unit
 
+  (** [close_and_unplug_all ()] closes the profiler stored in the module and
+      unplugs it from all instances it was plugged to *)
   val close_and_unplug_all : unit -> unit
 
+  (** [plugged ()] returns all the instances plugged to the profiler stored
+      in the module *)
   val plugged : unit -> instance list
 
+  (** {3 Sequences} *)
+
+  (** Open a sequence in the current sequence.
+      If currently aggregating (not all aggregation scopes are closed),
+      this has the same semantics as {!aggregate} instead. *)
   val record : ?lod:lod -> string -> unit
 
+  (** Open an aggregation node in the current sequence. *)
   val aggregate : ?lod:lod -> string -> unit
 
+  (** Close the most recently opened sequence or aggregation scope. *)
   val stop : unit -> unit
 
+  (** {3 Profiling} *)
+
+  (** Record a timestamp in the most recently opened sequence. *)
   val stamp : ?lod:lod -> string -> unit
 
+  (** Count this event's occurences in the most recent sequence. *)
   val mark : ?lod:lod -> string list -> unit
 
+  (** Sum the time spent in this event in the most recent sequence. *)
   val span : ?lod:lod -> span -> string list -> unit
 
+  (** Include a report in the current sequence. *)
   val inc : report -> unit
 
+  (** [record_f ?lod label f] will call:
+      {[
+        record ?lod name;
+        f ();
+        stop ();
+      ]} *)
   val record_f : ?lod:lod -> string -> (unit -> 'a) -> 'a
 
+  (** Same as [record_f] but for Lwt function *)
   val record_s : ?lod:lod -> string -> (unit -> 'a Lwt.t) -> 'a Lwt.t
 
+  (** [aggregate_f ?lod label f] will call:
+      {[
+        aggregate ?lod name;
+        f ();
+        stop ();
+      ]} *)
   val aggregate_f : ?lod:lod -> string -> (unit -> 'a) -> 'a
 
+  (** Same as [aggregate_f] but for Lwt functions *)
   val aggregate_s : ?lod:lod -> string -> (unit -> 'a Lwt.t) -> 'a Lwt.t
 
+  (** [span_f ?lod label_list f] will compute [span] but specifically
+      around [f] *)
   val span_f : ?lod:lod -> string list -> (unit -> 'a) -> 'a
 
+  (** Same as [span_f] but for Lwt functions *)
   val span_s : ?lod:lod -> string list -> (unit -> 'a Lwt.t) -> 'a Lwt.t
 end
 
+(** [wrap profiler] stores [profiler] in a [GLOBAL_PROFILER] module
+    allowing to use the [profiler] functions without having to provide it
+    as a parameter *)
 val wrap : profiler -> (module GLOBAL_PROFILER)
