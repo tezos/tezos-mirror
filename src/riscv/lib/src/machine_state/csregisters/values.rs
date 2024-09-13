@@ -3,9 +3,10 @@
 // SPDX-License-Identifier: MIT
 
 mod mstatus;
+mod xip;
 
 use super::{
-    effects::{handle_csr_effect, NoEffect, XipEffect},
+    effects::{handle_csr_effect, NoEffect},
     root::RootCSRegister,
     CSRegisters,
 };
@@ -18,6 +19,7 @@ use crate::{
 };
 use mstatus::MStatusLayout;
 pub(super) use mstatus::MStatusValue;
+use xip::{XipCell, XipCellLayout};
 
 /// Representation of a value in a CSR
 pub type CSRRepr = u64;
@@ -59,23 +61,21 @@ impl Bits64 for CSRValue {
 
 type RawValue<M> = EffectCell<CSRRepr, NoEffect, M>;
 
-type MipValue<M> = EffectCell<CSRRepr, XipEffect, M>;
-
 /// Values of all control and state registers
-pub type CSRValues<M> = CSRValuesF<RawValue<M>, MStatusValue<M>, MipValue<M>>;
+pub type CSRValues<M> = CSRValuesF<RawValue<M>, MStatusValue<M>, XipCell>;
 
 impl<M: ManagerBase> CSRValues<M> {
     /// Bind the CSR values to the given allocated regions.
     pub fn bind(space: AllocatedOf<CSRValuesLayout, M>) -> Self {
-        space.map(MStatusValue::bind, EffectCell::bind, EffectCell::bind)
+        space.map(MStatusValue::bind, XipCell::bind::<M>, EffectCell::bind)
     }
 
     /// Obtain a structure with references to the bound regions of this type.
     pub fn struct_ref(&self) -> AllocatedOf<CSRValuesLayout, Ref<'_, M>> {
         self.as_ref().map(
             |mstatus| mstatus.struct_ref(),
+            |xip| xip.struct_ref(),
             |raw| raw.struct_ref(),
-            |mip| mip.struct_ref(),
         )
     }
 }
@@ -88,7 +88,7 @@ impl<M: ManagerBase> CSRegisters<M> {
         M: ManagerRead,
     {
         self.registers
-            .select_ref(csr, MStatusValue::read, MipValue::read, RawValue::read)
+            .select_ref(csr, MStatusValue::read, XipCell::read, RawValue::read)
     }
 
     /// Perform a general write of a CSR.
@@ -133,20 +133,20 @@ impl Layout for CSRValuesLayout {
     type Placed = CSRValuesF<
         PlacedOf<EffectCellLayout<CSRRepr>>,
         PlacedOf<MStatusLayout>,
-        PlacedOf<EffectCellLayout<CSRRepr>>,
+        PlacedOf<XipCellLayout>,
     >;
 
     type Allocated<M: ManagerBase> = CSRValuesF<
         AllocatedOf<EffectCellLayout<CSRRepr>, M>,
         AllocatedOf<MStatusLayout, M>,
-        AllocatedOf<EffectCellLayout<CSRRepr>, M>,
+        AllocatedOf<XipCellLayout, M>,
     >;
 
     fn place_with(alloc: &mut Choreographer) -> Self::Placed {
         let alloc = std::cell::RefCell::new(alloc);
         Self::Placed::new(
             || MStatusLayout::place_with(&mut alloc.borrow_mut()),
-            || EffectCellLayout::<CSRRepr>::place_with(&mut alloc.borrow_mut()),
+            || XipCellLayout::place_with(&mut alloc.borrow_mut()),
             || EffectCellLayout::<CSRRepr>::place_with(&mut alloc.borrow_mut()),
         )
     }
@@ -155,7 +155,7 @@ impl Layout for CSRValuesLayout {
         let backend = std::cell::RefCell::new(backend);
         placed.map(
             |placed| MStatusLayout::allocate(*backend.borrow_mut(), placed),
-            |placed| EffectCellLayout::<CSRRepr>::allocate(*backend.borrow_mut(), placed),
+            |placed| XipCellLayout::allocate(*backend.borrow_mut(), placed),
             |placed| EffectCellLayout::<CSRRepr>::allocate(*backend.borrow_mut(), placed),
         )
     }

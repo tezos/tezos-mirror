@@ -109,12 +109,7 @@ where
     M: backend::ManagerReadWrite,
 {
     /// `WFI` instruction
-    ///
-    /// It is a no-op for us since interrupt detection is currently based
-    /// only on checking mip/mie/mstatus
-    pub fn run_wfi(&self) {
-        // no-op
-    }
+    pub fn run_wfi(&self) {}
 
     /// `SFENCE.VMA` instruction
     ///

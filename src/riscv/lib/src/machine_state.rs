@@ -994,7 +994,7 @@ mod tests {
             instruction::{CIBTypeArgs, ITypeArgs, Instr, InstrCacheable, SBTypeArgs},
             parse_block,
         },
-        traps::{EnvironException, Exception, Interrupt, TrapContext},
+        traps::{EnvironException, Exception, TrapContext},
     };
     use crate::{bits::u64, machine_state::bus::main_memory::M1K};
     use proptest::{prop_assert_eq, proptest};
@@ -1137,60 +1137,6 @@ mod tests {
         });
     });
 
-    backend_test!(test_step_inter_mm, F, {
-        let mut backend = create_backend!(MachineStateLayout<T1K, TestInstructionCacheLayout>, F);
-        let state = create_state!(MachineState, MachineStateLayout<T1K, TestInstructionCacheLayout>, F, backend, T1K, TestInstructionCacheLayout);
-        let state_cell = std::cell::RefCell::new(state);
-
-        proptest!(|(
-            pc_addr_offset in 0..200_u64,
-            stvec_offset in 10..20_u64,
-            mtvec_offset in 25..35_u64,
-        )| {
-            // Raise interrupt, take trap from M-mode to M-mode
-            // (test delegation doesn't take place even if enabled by registers)
-            let mut state = state_cell.borrow_mut();
-            state.reset();
-
-            let init_pc_addr = bus::start_of_main_memory::<T1K>() + pc_addr_offset * 4;
-            let stvec_addr = init_pc_addr + 4 * stvec_offset;
-            let mtvec_addr = init_pc_addr + 4 * mtvec_offset;
-            const AUIPC: u64 = 0b001_0111;
-
-            // stvec is in BASE mode
-            state.hart.csregisters.write(CSRegister::stvec, stvec_addr);
-            // mtvec is in VECTORED mode
-            state.hart.csregisters.write(CSRegister::mtvec, mtvec_addr | 1);
-            let mie = u64::set_bit(u64::set_bit(0u64, Interrupt::MachineTimer.exception_code() as usize, true), Interrupt::MachineExternal.exception_code() as usize, true);
-            let mip = u64::set_bit(u64::set_bit(u64::set_bit(0u64, Interrupt::SupervisorTimer.exception_code() as usize, true), Interrupt::MachineExternal.exception_code() as usize, true), Interrupt::SupervisorSoftware.exception_code() as usize, true);
-            let mideleg_val = 1 << Interrupt::MachineExternal.exception_code() |
-                1 << Interrupt::SupervisorSoftware.exception_code() |
-                1 << Interrupt::MachineTimer.exception_code();
-            // The interrupt taken is MachineExternal. theoretically, mideleg delegates this trap,
-            // but because it is a machine interupt it will still be handled in M-mode.
-            state.hart.csregisters.write(CSRegister::mip, mip);
-            state.hart.csregisters.write(CSRegister::mie, mie);
-            state.hart.csregisters.write(CSRegister::mideleg, mideleg_val);
-            let mstatus = state.hart.csregisters.read::<MStatus>(CSRegister::mstatus).with_mie(true);
-            state.hart.csregisters.write(CSRegister::mstatus, mstatus);
-            state.hart.mode.write(Mode::Machine);
-            // it doesn't really matter where the pc is since we will take an interrupt
-            state.hart.pc.write(init_pc_addr);
-            state.hart.xregisters.write(a1, AUIPC);
-            state.hart.xregisters.write(a2, mtvec_addr + 4 * 11);
-            state.run_sw(0, a2, a1).expect("Storing instruction should succeed");
-            state.step().expect("should not raise environment exception");
-            let mstatus: MStatus = state.hart.csregisters.read(CSRegister::mstatus);
-            assert_eq!(state.hart.mode.read(), Mode::Machine);
-            assert_eq!(state.hart.pc.read(), mtvec_addr + 4 * 11 + 4);
-            // We are coming from the interrupt handler actually
-            assert_eq!(mstatus.mpp(), xstatus::MPPValue::Machine);
-            assert_eq!(state.hart.csregisters.read::<CSRRepr>(CSRegister::mepc), init_pc_addr);
-            assert_eq!(state.hart.csregisters.read::<CSRRepr>(CSRegister::mcause), 1 << 63 | 11);
-            assert_eq!(state.hart.csregisters.read::<CSRRepr>(CSRegister::mip), mip ^ 1 << 11);
-        });
-    });
-
     backend_test!(test_step_exc_us, F, {
         let mut backend = create_backend!(MachineStateLayout<T1K, TestInstructionCacheLayout>, F);
         let state = create_state!(MachineState, MachineStateLayout<T1K, TestInstructionCacheLayout>, F, backend, T1K, TestInstructionCacheLayout);
@@ -1228,84 +1174,6 @@ mod tests {
             assert_eq!(mstatus.spp(), xstatus::SPPValue::User);
             assert_eq!(state.hart.csregisters.read::<CSRRepr>(CSRegister::sepc), bad_address);
             assert_eq!(state.hart.csregisters.read::<CSRRepr>(CSRegister::scause), 1);
-        });
-    });
-
-    backend_test!(test_step_trap_usm, F, {
-        let mut backend = create_backend!(MachineStateLayout<T1K, TestInstructionCacheLayout>, F);
-        let state = create_state!(MachineState, MachineStateLayout<T1K, TestInstructionCacheLayout>, F, backend, T1K, TestInstructionCacheLayout);
-        let state_cell = std::cell::RefCell::new(state);
-
-        proptest!(|(
-            pc_addr_offset in 0..200_u64,
-            stvec_offset in 10..20_u64,
-            mtvec_offset in 25..35_u64,
-        )| {
-            // TEST: Raise interrupt from U to S, then exception from S to M
-            // this will be tested by reading mcause and scause, the interrupt will set scause
-            // and the exception will set mcause
-            // interrupt delegation will delegate the SEI, but not MSI, testing the priority as well
-            let mut state = state_cell.borrow_mut();
-            state.reset();
-
-            let init_pc_addr = bus::start_of_main_memory::<T1K>() + pc_addr_offset * 4;
-            let stvec_addr = init_pc_addr + 4 * stvec_offset;
-            let mtvec_addr = init_pc_addr + 4 * mtvec_offset;
-            const AUIPC: u64 = 0b001_0111;
-            const T1_ENC: u64 = 0b110;
-            const T2_ENC: u64 = 0b111;
-            const OP_LB: u64 = 0b000_0011;
-            // stvec is in VECTORED mode
-            state.hart.csregisters.write(CSRegister::stvec, stvec_addr | 1);
-            // mtvec is in BASE mode
-            state.hart.csregisters.write(CSRegister::mtvec, mtvec_addr);
-            let mie = u64::set_bit(u64::set_bit(0u64, Interrupt::MachineSoftware.exception_code() as usize, true), Interrupt::SupervisorExternal.exception_code() as usize, true);
-            let mip = u64::set_bit(u64::set_bit(0u64, Interrupt::SupervisorTimer.exception_code() as usize, true), Interrupt::SupervisorExternal.exception_code() as usize, true);
-            let mideleg_val = 1 << Interrupt::SupervisorExternal.exception_code() |
-                1 << Interrupt::MachineExternal.exception_code() |
-                1 << Interrupt::MachineTimer.exception_code();
-            let medeleg_val = 1 << Exception::IllegalInstruction.exception_code() |
-                1 << Exception::EnvCallFromSMode.exception_code() |
-                1 << Exception::EnvCallFromMMode.exception_code();
-            state.hart.csregisters.write(CSRegister::mideleg, mideleg_val);
-            state.hart.csregisters.write(CSRegister::medeleg, medeleg_val);
-            state.hart.csregisters.write(CSRegister::mip, mip);
-            state.hart.csregisters.write(CSRegister::mie, mie);
-            let mstatus: MStatus = state.hart.csregisters.read(CSRegister::mstatus);
-            let mstatus = mstatus.with_sie(true);
-            state.hart.csregisters.write(CSRegister::mstatus, mstatus);
-            state.hart.mode.write(Mode::User);
-            state.hart.pc.write(init_pc_addr);
-
-            // normally this instruction shouldnt raise exception
-            state.hart.xregisters.write(a1, AUIPC);
-            state.hart.xregisters.write(a2, init_pc_addr);
-            state.run_sw(0, a2, a1).expect("Storing instruction should succeed");
-            // but the interrupt will jump here which will further raise an exception
-            // this is LB instruction trying to load into t1 the byte at t2 (0x333).
-            // this instruction raises LoadAccessFault(0x333)
-            // load in t2 the address 0x333
-            state.hart.xregisters.write(t2, 0x333);
-            state.hart.xregisters.write(a1, T2_ENC << 15 | T1_ENC << 7 | OP_LB);
-            state.hart.xregisters.write(a2, stvec_addr + 4 * 9);
-            state.run_sw(0, a2, a1).expect("Storing instruction should succeed");
-
-            state.step().expect("should not raise environment exception");
-            // pc should be mtvec_addr since exceptions aren't offset (by VECTORED mode)
-            // even in VECTORED mode, only interrupts
-            let mstatus: MStatus = state.hart.csregisters.read(CSRegister::mstatus);
-            assert_eq!(state.hart.mode.read(), Mode::Machine);
-            assert_eq!(state.hart.pc.read(), mtvec_addr);
-            // We are coming from the interrupt handler actually
-            assert_eq!(mstatus.mpp(), xstatus::MPPValue::Supervisor);
-            assert_eq!(mstatus.spp(), xstatus::SPPValue::User);
-            assert_eq!(state.hart.csregisters.read::<CSRRepr>(CSRegister::sepc), init_pc_addr);
-            assert_eq!(state.hart.csregisters.read::<CSRRepr>(CSRegister::mepc), stvec_addr + 4 * 9);
-            assert_eq!(state.hart.csregisters.read::<CSRRepr>(CSRegister::scause), 1 << 63 | 9);
-            assert_eq!(state.hart.csregisters.read::<CSRRepr>(CSRegister::mcause), 5);
-            assert_eq!(state.hart.csregisters.read::<CSRRepr>(CSRegister::mtval), 0x333);
-            assert_eq!(state.hart.csregisters.read::<CSRRepr>(CSRegister::stval), 0);
-            assert_eq!(state.hart.csregisters.read::<CSRRepr>(CSRegister::mip), mip ^ 1 << 9);
         });
     });
 

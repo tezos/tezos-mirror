@@ -31,6 +31,20 @@ pub trait Layout {
     ) -> Self::Allocated<M>;
 }
 
+impl Layout for () {
+    type Placed = ();
+
+    fn place_with(_alloc: &mut Choreographer) -> Self::Placed {}
+
+    type Allocated<M: super::ManagerBase> = ();
+
+    fn allocate<M: super::ManagerAlloc>(
+        _backend: &mut M,
+        _placed: Self::Placed,
+    ) -> Self::Allocated<M> {
+    }
+}
+
 /// `L::Placed`
 pub type PlacedOf<L> = <L as Layout>::Placed;
 
