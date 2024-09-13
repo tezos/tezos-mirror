@@ -1170,7 +1170,7 @@ opam:all_6:
       - tezos-protocol-demo-noops
       - tezos-protocol-demo-counter
       - tezos-protocol-alpha
-      - tezos-protocol-021-PsquebeC
+      - tezos-protocol-021-PsQuebec
       - tezos-protocol-020-PsParisC
       - tezos-protocol-019-PtParisB
       - tezos-protocol-018-Proxford
@@ -1323,10 +1323,10 @@ opam:all_2:
       - octez-smart-rollup-node-alpha
       - octez-smart-rollup-node-PtParisB
       - octez-smart-rollup-node-PtNairob
-      - octez-smart-rollup-node-PsquebeC
+      - octez-smart-rollup-node-PsQuebec
       - octez-smart-rollup-node-PsParisC
       - octez-protocol-alpha-libs
-      - octez-protocol-021-PsquebeC-libs
+      - octez-protocol-021-PsQuebec-libs
       - octez-protocol-020-PsParisC-libs
       - octez-protocol-019-PtParisB-libs
       - octez-protocol-018-Proxford-libs
@@ -1714,9 +1714,9 @@ opam:exec_1:
       - octez-dac-client
       - octez-codec
       - octez-client
-      - octez-baker-PsquebeC
+      - octez-baker-PsQuebec
       - octez-baker-PsParisC
-      - octez-accuser-PsquebeC
+      - octez-accuser-PsQuebec
       - octez-accuser-PsParisC
 
 opam:all_5:
