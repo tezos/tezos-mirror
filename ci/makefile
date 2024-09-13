@@ -59,4 +59,4 @@ check: all # Used in the CI to verify that [.gitlab-ci.yml] is up to date.
 help: # Display this help.
 	@echo "GitLab CI configuration generator. Available targets:"
 	@echo
-	@grep '^[^[:space:]]\+:.*#' makefile | sed 's/^\([^[:space:]]\+\):.*# \(.*\)/ - \1: \2/'
+	@grep '^[^[:space:]]\+:.*#' makefile | sed 's/:.*# /: /'
