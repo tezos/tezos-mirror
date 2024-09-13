@@ -10,9 +10,8 @@
 use crate::{
     machine_state::{
         bus::main_memory::MainMemoryLayout,
-        instruction_cache::InstructionCacheLayout,
         registers::{sp, x0, XRegister, XRegisters},
-        MachineState,
+        MachineCoreState,
     },
     state_backend as backend,
     traps::Exception,
@@ -50,10 +49,9 @@ where
     }
 }
 
-impl<ML, ICL, M> MachineState<ML, ICL, M>
+impl<ML, M> MachineCoreState<ML, M>
 where
     ML: MainMemoryLayout,
-    ICL: InstructionCacheLayout,
     M: backend::ManagerReadWrite,
 {
     /// `C.LD` CL-type compressed instruction

@@ -11,7 +11,9 @@ use crate::{
         bus::main_memory::{MainMemoryLayout, M1G},
         instruction_cache::{InstructionCacheLayout, TestInstructionCacheLayout},
     },
-    machine_state::{mode, MachineError, MachineState, MachineStateLayout, StepManyResult},
+    machine_state::{
+        mode, MachineCoreState, MachineError, MachineState, MachineStateLayout, StepManyResult,
+    },
     program::Program,
     state_backend::owned_backend::Owned,
     traps::EnvironException,
@@ -161,10 +163,8 @@ impl<ML: MainMemoryLayout> Stepper for TestStepper<ML, TestInstructionCacheLayou
     type Manager = Owned;
 
     #[inline(always)]
-    fn machine_state(
-        &self,
-    ) -> &MachineState<Self::MainMemoryLayout, Self::InstructionCacheLayout, Self::Manager> {
-        &self.machine_state
+    fn machine_state(&self) -> &MachineCoreState<Self::MainMemoryLayout, Self::Manager> {
+        &self.machine_state.core
     }
 
     type StepResult = TestStepperResult;

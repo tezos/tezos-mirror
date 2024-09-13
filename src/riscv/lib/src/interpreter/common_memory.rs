@@ -6,18 +6,16 @@
 use crate::{
     machine_state::{
         bus::{main_memory::MainMemoryLayout, AddressableRead, AddressableWrite, OutOfBounds},
-        instruction_cache::InstructionCacheLayout,
         registers::XRegister,
-        AccessType, MachineState,
+        AccessType, MachineCoreState,
     },
     state_backend as backend,
     traps::Exception,
 };
 
-impl<ML, ICL, M> MachineState<ML, ICL, M>
+impl<ML, M> MachineCoreState<ML, M>
 where
     ML: MainMemoryLayout,
-    ICL: InstructionCacheLayout,
     M: backend::ManagerReadWrite,
 {
     /// Generic read function for loading `mem::size_of<T>` bytes from `address`
