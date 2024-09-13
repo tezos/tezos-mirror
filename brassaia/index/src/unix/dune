@@ -15,4 +15,5 @@
   semaphore-compat)
  (flags
   (:standard)
-  -w -66-68))
+  -w -66-68)
+ (foreign_stubs (language c) (names pread pwrite)))

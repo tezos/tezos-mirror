@@ -2008,6 +2008,8 @@ let brassaia_index_unix =
     ~path:"brassaia/index/src/unix"
     ~deps:[optint; mtime; rusage; lwt; lwt_unix; index; semaphore_compat]
     ~flags:(Flags.standard ~disable_warnings:[66; 68] ())
+    ~foreign_stubs:
+      {language = C; flags = []; include_dirs = []; names = ["pread"; "pwrite"]}
 
 let brassaia_pack_unix =
   octez_lib
