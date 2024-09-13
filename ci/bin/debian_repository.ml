@@ -17,7 +17,8 @@ open Tezos_ci
 open Common
 
 let build_debian_packages_image =
-  Image.mk_external ~image_path:"$DEP_IMAGE:${CI_COMMIT_REF_SLUG}"
+  Image.mk_external
+    ~image_path:"$DEP_IMAGE:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}"
 
 (** These are the set of Debian release-architecture combinations for
     which we build deb packages in the job

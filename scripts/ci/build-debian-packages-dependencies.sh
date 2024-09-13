@@ -43,7 +43,13 @@ docker build \
   -t "$LOCAL_IMAGE_NAME" \
   .
 
-LATEST_TAG="${CI_COMMIT_REF_SLUG}"
+# The LATEST_TAG is used to compile the images in the CI pipelines
+# where we want to make sure to always have the latest available
+# image ( we use IfNotPresent as pull policy )
+# The LATEST_TAG_GENERIC tag is used for the docker cache and
+# general use where we can control the pull policy
+LATEST_TAG="${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}"
+LATEST_TAG_GENERIC="${CI_COMMIT_REF_SLUG}"
 
 echo "Checking for existance of image $DEP_IMAGE:$LATEST_TAG"
 docker buildx imagetools inspect "$DEP_IMAGE:$LATEST_TAG" || export IMAGE_EXISTS="false"
@@ -62,12 +68,16 @@ else
     # local image and the image that was in the old manifest
     docker buildx imagetools create \
       -t "${DEP_IMAGE}:$LATEST_TAG" \
+      -t "${DEP_IMAGE}:$LATEST_TAG_GENERIC" \
       "$LOCAL_IMAGE_NAME" \
       "$DEP_IMAGE@$OTHER_SHA"
   else
     # we associate to "$DEP_IMAGE:$LATEST_TAG" the latest image with tag
     # "$LOCAL_IMAGE_NAME" and replace the old one.
-    docker buildx imagetools create -t "$DEP_IMAGE:$LATEST_TAG" "$LOCAL_IMAGE_NAME"
+    docker buildx imagetools create \
+      -t "$DEP_IMAGE:$LATEST_TAG" \
+      -t "$DEP_IMAGE:$LATEST_TAG_GENERIC" \
+      "$LOCAL_IMAGE_NAME"
   fi
 fi
 
