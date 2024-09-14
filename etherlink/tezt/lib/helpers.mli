@@ -227,6 +227,13 @@ val init_sequencer_sandbox :
   unit ->
   Evm_node.t Lwt.t
 
-(** [send_transaction_to_sequencer send evm_node] sends the transaction using
-    [send] and produces a block to include it. *)
+(** [send_transaction_to_sequencer send evm_node] sends the
+    transaction using [send] and produces a block to include it. *)
 val send_transaction_to_sequencer : (unit -> 'a Lwt.t) -> Evm_node.t -> 'a Lwt.t
+
+(** [send_transactions_to_sequencer sends evm_node] sends the
+    transactions using [sends] and produces a block to include them.
+    Returns the number of transactions included in the block together
+    with the results of [sends]. *)
+val send_transactions_to_sequencer :
+  sends:(unit -> 'a Lwt.t) list -> Evm_node.t -> (int * 'a list) Lwt.t
