@@ -100,9 +100,7 @@ fn run_pvm<R>(
         let _written = console.write(&[c]).unwrap();
     });
 
-    let mut backend = PvmStepper::<'_, '_, M1G, DefaultInstructionCacheLayout>::create_backend();
-    let stepper = PvmStepper::<'_, '_, M1G, DefaultInstructionCacheLayout>::new(
-        &mut backend,
+    let stepper = PvmStepper::<'_, M1G, DefaultInstructionCacheLayout>::new(
         program,
         initrd,
         inbox.build(),
