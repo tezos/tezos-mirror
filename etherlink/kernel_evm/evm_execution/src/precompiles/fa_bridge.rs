@@ -121,7 +121,7 @@ pub fn fa_bridge_precompile<Host: Runtime>(
     if transfer
         .as_ref()
         .map(|t| !t.value.is_zero())
-        .unwrap_or(false)
+        .unwrap_or(true)
     {
         return Ok(precompile_outcome_error!(
             "FA withdrawal: unexpected value transfer {:?}",
@@ -219,7 +219,7 @@ mod tests {
             &mut mock_runtime,
             &mut evm_account_storage,
             H160::from_low_u64_be(1),
-            None,
+            Some(U256::zero()),
             vec![0x00, 0x01, 0x02, 0x03],
             None,
             false,
@@ -351,7 +351,7 @@ mod tests {
             &mut mock_runtime,
             &mut evm_account_storage,
             H160::from_low_u64_be(1),
-            None,
+            Some(U256::zero()),
             vec![0x80, 0xfc, 0x1f, 0xe3],
             None,
             false,
@@ -404,7 +404,7 @@ mod tests {
             &mut mock_runtime,
             &mut evm_account_storage,
             ticket_owner,
-            None,
+            Some(U256::zero()),
             input,
             Some(30_000_000),
             false,
