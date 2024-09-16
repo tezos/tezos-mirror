@@ -58,3 +58,11 @@ val gen_wallets : number:int -> unit -> wallet list Lwt.t
 
 (** [calldata ?args signature] returns the encoded calldata. *)
 val calldata : ?args:string list -> string -> string Lwt.t
+
+(** [call ?args signature ~endpoint ~address] calls [address] at [endpoint]. *)
+val call :
+  ?args:string list ->
+  string ->
+  endpoint:string ->
+  address:string ->
+  string Lwt.t

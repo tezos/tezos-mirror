@@ -298,6 +298,7 @@ type setup_mode =
       return_sequencer : bool;
       time_between_blocks : Evm_node.time_between_blocks option;
       sequencer : Account.key;
+      max_blueprints_ahead : int option;
     }
   | Setup_proxy
 
@@ -454,7 +455,9 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
               let* l = next_rollup_node_level ~sc_rollup_node ~client in
               return (Ok l)),
             evm_node )
-    | Setup_sequencer {return_sequencer; time_between_blocks; sequencer} ->
+    | Setup_sequencer
+        {return_sequencer; time_between_blocks; sequencer; max_blueprints_ahead}
+      ->
         let private_rpc_port = Some (Port.fresh ()) in
         let sequencer_mode =
           Evm_node.Sequencer
@@ -466,7 +469,7 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
               sequencer = sequencer.alias;
               genesis_timestamp = None;
               max_blueprints_lag = None;
-              max_blueprints_ahead = None;
+              max_blueprints_ahead;
               max_blueprints_catchup = None;
               catchup_cooldown = None;
               max_number_of_chunks;
@@ -607,7 +610,8 @@ let register_sequencer ?(return_sequencer = false) ~title ~tags ?kernels
     ?additional_uses ?additional_config ?admin ?commitment_period
     ?challenge_window ?bootstrap_accounts ?da_fee_per_byte
     ?minimum_base_fee_per_gas ?time_between_blocks ?whitelist
-    ?rollup_operator_key ?maximum_allowed_ticks ?restricted_rpcs f protocols =
+    ?rollup_operator_key ?maximum_allowed_ticks ?restricted_rpcs
+    ?max_blueprints_ahead f protocols =
   let register ~enable_dal : unit =
     register_test
       ~title
@@ -634,6 +638,7 @@ let register_sequencer ?(return_sequencer = false) ~title ~tags ?kernels
              return_sequencer;
              time_between_blocks;
              sequencer = Constant.bootstrap1;
+             max_blueprints_ahead;
            })
   in
   register ~enable_dal:false ;
@@ -642,8 +647,8 @@ let register_sequencer ?(return_sequencer = false) ~title ~tags ?kernels
 let register_both ~title ~tags ?kernels ?additional_uses ?additional_config
     ?admin ?commitment_period ?challenge_window ?bootstrap_accounts
     ?da_fee_per_byte ?minimum_base_fee_per_gas ?time_between_blocks ?whitelist
-    ?rollup_operator_key ?maximum_allowed_ticks ?restricted_rpcs f protocols :
-    unit =
+    ?rollup_operator_key ?maximum_allowed_ticks ?restricted_rpcs
+    ?max_blueprints_ahead f protocols : unit =
   register_proxy
     ~title
     ~tags
@@ -679,6 +684,7 @@ let register_both ~title ~tags ?kernels ?additional_uses ?additional_config
     ?rollup_operator_key
     ?maximum_allowed_ticks
     ?restricted_rpcs
+    ?max_blueprints_ahead
     f
     protocols
 
@@ -5514,57 +5520,67 @@ let test_reveal_storage =
     ~error_msg:"Head should be the same in the copy" ;
   unit
 
-let call_get_hash ~address ~block_number {produce_block; endpoint; _} =
-  let* blockhash_resolved = blockhash () in
-  let call_get_hash block_number =
-    Eth_cli.contract_call
-      ~endpoint
-      ~abi_label:blockhash_resolved.label
-      ~address
-      ~method_call:(Printf.sprintf "getHash(%d)" block_number)
-  in
-  wait_for_application ~produce_block (call_get_hash block_number)
+let call_get_hash ~address ~block_number endpoint =
+  Cast.call
+    ~args:[string_of_int block_number]
+    ~endpoint
+    ~address
+    "getHash(uint256)"
 
 let test_blockhash_opcode =
-  Protocol.register_test
-    ~__FILE__
+  register_both
+    ~time_between_blocks:Nothing
+    ~max_blueprints_ahead:300
     ~tags:["evm"; "blockhash"; "opcode"]
-    ~uses:(fun _protocol ->
-      [
-        Constant.octez_smart_rollup_node;
-        Constant.octez_evm_node;
-        Constant.smart_rollup_installer;
-        Constant.WASM.evm_kernel;
-      ])
     ~title:"Check if blockhash opcode returns the actual hash of the block"
-  @@ fun protocol ->
-  let* ({produce_block; endpoint; _} as evm_setup) =
-    setup_evm_kernel ~admin:None protocol
+  @@ fun ~protocol:_
+             ~evm_setup:({produce_block; endpoint; evm_node; _} as evm_setup) ->
+  let* blockhash_resolved = blockhash () in
+  let* address, _tx =
+    deploy
+      ~contract:blockhash_resolved
+      ~sender:Eth_account.bootstrap_accounts.(0)
+      evm_setup
   in
+  let*@ head = Rpc.block_number evm_node in
+  let head = Int32.to_int head in
+  (* The BLOCKHASH opcode gets the hash of the most 256 recent complete blocks. *)
   let* () =
-    repeat 3 (fun () ->
+    repeat 256 (fun () ->
         let*@ _ = produce_block () in
         unit)
   in
-  let sender = Eth_account.bootstrap_accounts.(0) in
-  let* blockhash_resolved = blockhash () in
-  let* address, tx = deploy ~contract:blockhash_resolved ~sender evm_setup in
-  let* () = check_tx_succeeded ~endpoint ~tx in
-  let* expected_block_hash =
-    let* block = Eth_cli.get_block ~block_id:"2" ~endpoint in
-    return block.hash
+
+  let rec check_block_hash level =
+    if level > head + 256 then (
+      let* found_block_hash =
+        call_get_hash ~address ~block_number:level endpoint
+      in
+      Check.(
+        (found_block_hash
+       = "0x0000000000000000000000000000000000000000000000000000000000000000")
+          string)
+        ~error_msg:
+          "The BLOCKHASH opcode should return 0x00..00 when the block is \
+           incomplete, but for %L" ;
+      unit)
+    else
+      let*@ {hash = expected_block_hash; _} =
+        Rpc.get_block_by_number ~block:(string_of_int level) evm_node
+      in
+      let* found_block_hash =
+        call_get_hash ~address ~block_number:level endpoint
+      in
+      Check.((found_block_hash = expected_block_hash) string)
+        ~error_msg:
+          (sf
+             "The block hash should be the same when called from an RPC and \
+              return by the BLOCKHASH opcode, got %%L, but %%R was expected \
+              for level %d."
+             level) ;
+      check_block_hash (level + 1)
   in
-  (* The client's response is read from stdout, we have to remove the new line
-     symbol. *)
-  let* block_hash =
-    call_get_hash ~address ~block_number:2 evm_setup
-    |> Lwt.map (fun s -> String.sub s 0 (String.length s - 1))
-  in
-  Check.((block_hash = expected_block_hash) string)
-    ~error_msg:
-      "The block hash should be the same when called from an RPC and return by \
-       the BLOCKHASH opcode, got %L, but %R was expected." ;
-  unit
+  check_block_hash (head + 1)
 
 let test_block_constants_opcode =
   register_both
@@ -5729,6 +5745,7 @@ let test_tx_pool_timeout =
         return_sequencer = false;
         time_between_blocks = Some Nothing;
         sequencer = sequencer_admin;
+        max_blueprints_ahead = None;
       }
   in
   let ttl = 15 in
@@ -5819,6 +5836,7 @@ let test_tx_pool_address_boundaries =
         return_sequencer = true;
         time_between_blocks = Some Nothing;
         sequencer = sequencer_admin;
+        max_blueprints_ahead = None;
       }
   in
   let* {evm_node = sequencer_node; produce_block; _} =
@@ -5930,6 +5948,7 @@ let test_tx_pool_transaction_size_exceeded =
              to set to [false]. *);
         time_between_blocks = Some Nothing;
         sequencer = sequencer_admin;
+        max_blueprints_ahead = None;
       }
   in
   let* {evm_node = sequencer_node; _} =
