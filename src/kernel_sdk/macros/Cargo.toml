@@ -20,7 +20,7 @@ default = []
 native-kernel = []
 
 [dependencies]
-proc-macro-error = "1.0.4"
+proc-macro-error2 = "2.0.1"
 quote = "1.0.36"
 
 [dependencies.syn]
@@ -34,12 +34,12 @@ version = "3.1.0"
 version = "0.2.2"
 path = "../sdk"
 features = [
-    "std",
-    "crypto",
-    "panic-hook",
-    "data-encoding",
-    "proto-alpha",
-    "experimental-host-in-memory-store",
-    "native-kernel",
-    "extra",
+	"std",
+	"crypto",
+	"panic-hook",
+	"data-encoding",
+	"proto-alpha",
+	"experimental-host-in-memory-store",
+	"native-kernel",
+	"extra",
 ]
