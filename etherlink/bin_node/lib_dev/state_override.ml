@@ -33,7 +33,9 @@ let update_storage address state_diff state =
     let (Hex value) = value in
     if String.length value = 64 then
       let*? key = Durable_storage_path.Accounts.storage_e address key in
-      let*! state = Evm_state.modify ~key ~value state in
+      let*! state =
+        Evm_state.modify ~key ~value:(hex_to_bytes (Hex value)) state
+      in
       return state
     else tzfail (Invalid_storage_value value)
   in
