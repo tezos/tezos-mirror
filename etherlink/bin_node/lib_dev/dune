@@ -16,10 +16,7 @@
   octez-evm-node-libs.evm_node_lib_dev_encoding
   lwt-watcher
   lwt-exit
-  caqti
-  caqti-lwt
-  caqti-lwt.unix
-  caqti-driver-sqlite3
+  octez-l2-libs.sqlite
   octez-shell-libs.client-base
   octez-evm-node-libs.evm_node_config
   octez-libs.context.sigs
@@ -41,6 +38,7 @@
   -open Tezos_workers
   -open Tezos_stdlib_unix
   -open Evm_node_lib_dev_encoding
+  -open Octez_sqlite
   -open Tezos_client_base
   -open Evm_node_config
   -open Tezos_scoru_wasm_helpers

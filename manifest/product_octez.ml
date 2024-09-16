@@ -4428,6 +4428,7 @@ let octez_sqlite =
         caqti;
         caqti_lwt;
         caqti_lwt_unix;
+        caqti_sqlite;
       ]
     ~linkall:true
     ~conflicts:[Conflicts.checkseum]

@@ -9,7 +9,8 @@
   octez-libs.error-monad
   caqti
   caqti-lwt
-  caqti-lwt.unix)
+  caqti-lwt.unix
+  caqti-driver-sqlite3)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

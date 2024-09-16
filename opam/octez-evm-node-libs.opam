@@ -20,8 +20,6 @@ depends: [
   "octez-version"
   "lwt-watcher" { = "0.2" }
   "lwt-exit"
-  "caqti"
-  "caqti-driver-sqlite3" { >= "2.0.1" }
   "octez-smart-rollup-wasm-debugger-lib"
   "tezos-dal-node-services"
 ]

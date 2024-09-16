@@ -16,6 +16,7 @@
   octez-version.value
   octez-shell-libs.client-base
   octez-shell-libs.client-base-unix
+  octez-l2-libs.sqlite
   octez-evm-node-libs.evm_node_lib_dev
   octez-evm-node-libs.evm_node_config)
  (link_flags
@@ -29,4 +30,5 @@
   -open Tezos_rpc_http
   -open Tezos_client_base
   -open Tezos_client_base_unix
+  -open Octez_sqlite
   -open Evm_node_config))

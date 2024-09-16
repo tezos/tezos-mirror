@@ -209,10 +209,7 @@ let evm_node_lib_dev =
         evm_node_lib_dev_encoding |> open_;
         lwt_watcher;
         lwt_exit;
-        caqti;
-        caqti_lwt;
-        caqti_lwt_unix;
-        caqti_sqlite;
+        octez_sqlite |> open_;
         octez_client_base |> open_;
         evm_node_config |> open_;
         octez_context_sigs;
@@ -293,6 +290,7 @@ let _evm_node =
         octez_version_value;
         octez_client_base |> open_;
         octez_client_base_unix |> open_;
+        octez_sqlite |> open_;
         evm_node_lib_dev;
         evm_node_config |> open_;
       ]
