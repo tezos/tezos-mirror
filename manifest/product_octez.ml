@@ -4415,6 +4415,23 @@ let octez_layer2_store =
     ~linkall:true
     ~conflicts:[Conflicts.checkseum]
 
+let octez_sqlite =
+  octez_l2_lib
+    "sqlite"
+    ~internal_name:"octez_sqlite"
+    ~path:"src/lib_sqlite"
+    ~synopsis:"SQLite wrappers and helpers"
+    ~deps:
+      [
+        octez_error_monad |> open_ |> open_ ~m:"TzLwtreslib"
+        |> open_ ~m:"Error_monad";
+        caqti;
+        caqti_lwt;
+        caqti_lwt_unix;
+      ]
+    ~linkall:true
+    ~conflicts:[Conflicts.checkseum]
+
 let _octez_layer2_indexed_store_test =
   tezt
     ["test_indexed_store"]
