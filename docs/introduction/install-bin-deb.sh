@@ -108,7 +108,6 @@ if [ -n "$PREFIX" ]; then
 else
   # [install octez current packages]
   sudo apt-get install -y octez-smartrollup
-  sudo apt-get install -y octez-evmnode
 fi
 
 # [test executables]
