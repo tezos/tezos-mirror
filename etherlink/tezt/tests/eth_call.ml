@@ -340,10 +340,122 @@ let test_call_state_override_state_diff =
 
   unit
 
+let test_call_state_override_state =
+  register
+    ~kernels:[Latest] (* Not a kernel specific test. *)
+    ~tags:["evm"; "state_override"; "state_replace"; "eth_call"]
+    ~title:"Can override completely account storage in eth_call"
+  @@ fun {sequencer; _} _protocol ->
+  (*
+      This test checks that the simulation allows state override.
+      To do so we deploy a contract with a value in storage, and call it with an
+      alternative storage that changes that value.
+  *)
+  let* constant = Solidity_contracts.state_override_tester_readable () in
+  let* () = Eth_cli.add_abi ~label:constant.label ~abi:constant.abi () in
+  (* Deploy the contract. *)
+  let* contract, _tx_hash =
+    send_transaction_to_sequencer
+      (fun () ->
+        Eth_cli.deploy
+          ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+          ~endpoint:(Evm_node.endpoint sequencer)
+          ~abi:constant.abi
+          ~bin:constant.bin)
+      sequencer
+  in
+
+  (* helpers *)
+  let call_method m =
+    let* calldata = Cast.calldata m in
+    return (`O [("to", `String contract); ("data", `String calldata)])
+  in
+  let make_call ?(override = []) m =
+    let* call = call_method m in
+    Evm_node.call_evm_rpc
+      sequencer
+      {method_ = "eth_call"; parameters = `A (call :: override)}
+  in
+  let check_value call_result expected =
+    Check.(
+      (Evm_node.extract_result call_result |> JSON.as_string = expected) string)
+      ~error_msg:"Expected result %R but got %L "
+  in
+
+  (* Check the starting contract storage *)
+  let* call_result = make_call "getCount()" in
+  check_value
+    call_result
+    "0x000000000000000000000000000000000000000000000000000000000000002a" ;
+  let* call_result = make_call "const2()" in
+  check_value
+    call_result
+    "0x00000000000000000000000000000000000000000000000000000000ffffffff" ;
+  let* call_result = make_call "sep()" in
+  check_value
+    call_result
+    "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff" ;
+  let* call_result = make_call "const3()" in
+  check_value
+    call_result
+    "0x00000000000000000000000000000000000000000000000000000000ffffffff" ;
+
+  (* try again with an override *)
+  let state =
+    `O
+      [
+        ( "0x0000000000000000000000000000000000000000000000000000000000000000",
+          `String
+            "0x0000000000000000000000000000000000000000000000001111111122222222"
+        );
+      ]
+  in
+  let override = [`O [(contract, `O [("state", state)])]] in
+  let* call_result = make_call ~override "getCount()" in
+  check_value
+    call_result
+    "0x0000000000000000000000000000000000000000000000000000000022222222" ;
+  (* const2 is stored in same memory slot so should change *)
+  let* call_result = make_call ~override "const2()" in
+  check_value
+    call_result
+    "0x0000000000000000000000000000000000000000000000000000000011111111" ;
+  (* sep is stored in a distinct memory slot but we replaced everything *)
+  let* call_result = make_call ~override "sep()" in
+  check_value
+    call_result
+    "0x0000000000000000000000000000000000000000000000000000000000000000" ;
+  (* const3 is stored in a distinct memory slot but we replaced everything *)
+  let* call_result = make_call ~override "const3()" in
+  check_value
+    call_result
+    "0x0000000000000000000000000000000000000000000000000000000000000000" ;
+
+  (* try with an invalid override *)
+  let invalid =
+    `O
+      [
+        ( "0x00",
+          `String
+            "0x0000000000000000000000000000000000000000000000000000000000000000"
+        );
+      ]
+  in
+  let override = [`O [(contract, `O [("state_diff", invalid)])]] in
+  let* call_result = make_call ~override "getCount()" in
+  Check.(
+    (Evm_node.extract_error_message call_result
+    |> JSON.as_string = "Error:\n  00 is not a valid storage key\n")
+      string)
+    ~error_msg:"Expected error %R but got %L " ;
+
+  unit
+
 let protocols = Protocol.all
 
 let () =
   test_call_state_override_code protocols ;
   test_call_state_override_nonce protocols ;
   test_call_state_override_state_diff protocols ;
+  test_call_state_override_state protocols ;
   test_call_state_override_balance protocols

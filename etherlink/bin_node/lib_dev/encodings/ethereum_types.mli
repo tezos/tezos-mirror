@@ -243,6 +243,7 @@ type state_account_override = {
   nonce : quantity option;
   code : hex option;
   state_diff : hex StorageMap.t;
+  state : hex StorageMap.t;
 }
 
 type state_override = state_account_override AddressMap.t

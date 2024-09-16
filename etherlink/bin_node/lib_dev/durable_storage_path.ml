@@ -119,6 +119,8 @@ module Accounts = struct
     if String.length index = 64 then
       concat_e address (storage_path ^ "/" ^ index)
     else Result_syntax.tzfail (Invalid_key index)
+
+  let storage_dir_e address = concat_e address storage_path
 end
 
 module Code = struct
