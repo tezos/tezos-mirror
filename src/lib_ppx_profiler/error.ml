@@ -13,7 +13,7 @@ type error =
   | Invalid_span of Key.t
   | Invalid_stop of Key.t
   | Improper_let_binding of Ppxlib.expression
-  | Malformed_attribute
+  | Malformed_attribute of Ppxlib.expression
 
 let error loc err =
   let msg, hint =
@@ -71,11 +71,14 @@ let error loc err =
             "@[<v 2>Expecting a let binding expression.@,Found %a@."
             Pprintast.expression
             expr )
-    | Malformed_attribute ->
+    | Malformed_attribute expr ->
         ( "Malformed attribute.",
-          Format.sprintf
+          Format.asprintf
             "@[<v 2>Accepted attributes payload are:@,\
              - `[@profiling.mark [<list of strings>]]'@,\
-             - `[@profiling.aggregate_* <string or ident>]'" )
+             - `[@profiling.aggregate_* <string or ident>]@,\
+             Found %a@.'"
+            Pprintast.expression
+            expr )
   in
   Location.raise_errorf ~loc "profiling_ppx: %s\nHint: %s" msg hint

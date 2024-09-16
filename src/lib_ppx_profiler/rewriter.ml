@@ -157,49 +157,49 @@ end = struct
     | Stop of content
 
   let aggregate_s key location =
-    match key with
+    match Key.content key with
     | Key.Ident _ | Key.String _ | Key.Apply _ -> Aggregate_s {key; location}
     | _ -> Error.error location (Error.Invalid_aggregate key)
 
   let aggregate_f key location =
-    match key with
+    match Key.content key with
     | Key.Ident _ | Key.String _ | Key.Apply _ -> Aggregate_f {key; location}
     | _ -> Error.error location (Error.Invalid_aggregate key)
 
   let mark key location =
-    match key with
+    match Key.content key with
     | Key.List _ -> Mark {key; location}
     | _ -> Error.error location (Error.Invalid_mark key)
 
   let record key location =
-    match key with
+    match Key.content key with
     | Key.Ident _ | Key.String _ | Key.Apply _ -> Record {key; location}
     | _ -> Error.error location (Error.Invalid_record key)
 
   let record_f key location =
-    match key with
+    match Key.content key with
     | Key.Ident _ | Key.String _ | Key.Apply _ -> Record_f {key; location}
     | _ -> Error.error location (Error.Invalid_record key)
 
   let record_s key location =
-    match key with
+    match Key.content key with
     | Key.Ident _ | Key.String _ | Key.Apply _ -> Record_s {key; location}
     | _ -> Error.error location (Error.Invalid_record key)
 
   let reset_block_section key location =
-    match key with
+    match Key.content key with
     | Key.Ident _ | Key.String _ | Key.Apply _ ->
         Reset_block_section {key; location}
     | _ -> Error.error location (Error.Invalid_record key)
 
   let span_s key location =
-    match key with
+    match Key.content key with
     | Key.List _ -> Span_s {key; location}
     | Key.Apply _ -> Span_s {key; location}
     | _ -> Error.error location (Error.Invalid_span key)
 
   let stop key location =
-    match key with
+    match Key.content key with
     | Key.Empty -> Stop {key; location}
     | _ -> Error.error location (Error.Invalid_stop key)
 
@@ -275,33 +275,60 @@ end = struct
     | [%expr []] -> Some []
     | _ -> None
 
-  let extract_key_from_payload loc payload =
-    match payload with
-    | Ppxlib.PStr [] ->
+  let extract_content_from_structure loc structure =
+    match structure with
+    | [%expr []] ->
         (* [@ppx] *)
         Key.Empty
-    | Ppxlib.PStr
-        [
-          [%stri
-            [%e? {pexp_desc = Pexp_constant (Pconst_string (label, _, _)); _}]];
-        ] ->
+    | [%expr [%e? {pexp_desc = Pexp_constant (Pconst_string (label, _, _)); _}]]
+      ->
         (* [@ppx "label"] *)
         Key.String label
-    | Ppxlib.PStr
-        [[%stri [%e? {pexp_desc = Pexp_ident {txt = Lident ident; _}; _}]]] ->
+    | [%expr [%e? {pexp_desc = Pexp_ident {txt = Lident ident; _}; _}]] ->
         (* [@ppx ident] *)
         Key.Ident ident
-    | Ppxlib.PStr
-        [[%stri [%e? {pexp_desc = Pexp_apply (fun_name, fun_args); _}]]] ->
+    | [%expr [%e? {pexp_desc = Pexp_apply (fun_name, fun_args); _}]] ->
         (* [@ppx fun_name fun_arg1 fun_arg2 ...] *)
         let fun_args = List.map snd fun_args in
         Key.Apply (fun_name, fun_args)
-    | Ppxlib.PStr [[%stri [%e? expr]]] -> (
+    | [%expr [%e? expr]] -> (
         (* [@ppx ["label1"; "label2"; ...]] *)
         match extract_list expr with
         | Some labels -> Key.List labels
-        | None -> Error.error loc (Error.Invalid_mark (Key.Other expr)))
-    | _ -> Error.error loc (Error.Invalid_payload payload)
+        | None -> Error.error loc Error.(Malformed_attribute structure))
+
+  let extract_key_from_payload loc payload =
+    match payload with
+    | Ppxlib.PStr
+        [
+          [%stri
+            [%e?
+              {
+                pexp_desc =
+                  Pexp_construct ({txt = Lident label; _}, Some structure);
+                _;
+              }]];
+        ]
+      when not (String.equal label "::") ->
+        (* If the construct is "::" the payload attribute is a list but there's a trick:
+           - [ [@profiler.mark Terse ["label"]] ] is a [Construct("Terse", Some expression)]
+           - [ [@profiler.mark ["label"]] ] is a [Construct("::", Some expression)]
+           The AST handles [Terse ...] and [ ["label"] ] in the same way so we
+           need to make sure that we don't include the list case in this branch *)
+        (* [@ppx Terse|Detailed|Verbose ...] *)
+        Key.
+          {
+            label = Some label;
+            content = extract_content_from_structure loc structure;
+          }
+    | Ppxlib.PStr [[%stri [%e? structure]]] ->
+        (* [@ppx ...] *)
+        Key.
+          {label = None; content = extract_content_from_structure loc structure}
+    | Ppxlib.PStr [] ->
+        (* [@ppx] *)
+        Key.{label = None; content = Key.Empty}
+    | _ -> Error.error loc (Invalid_payload payload)
 
   let of_attribute ({Ppxlib.attr_payload; attr_loc; _} as attribute) =
     match Ppxlib_helper.get_attribute_name attribute |> of_string with

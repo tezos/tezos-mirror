@@ -13,7 +13,7 @@ type error =
   | Invalid_span of Key.t
   | Invalid_stop of Key.t
   | Improper_let_binding of Ppxlib.expression
-  | Malformed_attribute
+  | Malformed_attribute of Ppxlib.expression
 
 (** Raise a located error *)
 val error : Location.t -> error -> 'a
