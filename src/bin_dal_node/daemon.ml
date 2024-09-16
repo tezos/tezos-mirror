@@ -26,7 +26,7 @@
 let fetch_dal_config cctxt =
   let open Lwt_syntax in
   let delay = 0.1 in
-  let delay_max = 10. *. 60.0 in
+  let delay_max = 20.0 in
   let rec retry delay =
     let* r = Config_services.dal_config cctxt in
     match r with
