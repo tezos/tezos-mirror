@@ -12,6 +12,11 @@
 - Add a flag `--no-sync` to the observer command. If the flag is set, the observer
   does not synchronise with the EVM node endpoint. (!14889)
 
+#### RPCs
+
+- Completes state override option of `eth_call` RPC, by adding `state` and
+  `stateDiff`, similar to go-ethereum. (!14869, !14921)
+
 #### Metrics
 
 - Add the `smart_rollup_address` label to the `octez_evm_node_info` metrics. (!14906)
