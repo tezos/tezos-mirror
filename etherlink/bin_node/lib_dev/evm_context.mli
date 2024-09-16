@@ -54,22 +54,25 @@ val start :
   (init_status * Address.t) tzresult Lwt.t
 
 (** [init_from_rollup_node ~omit_delayed_tx_events ~data_dir
-    ~rollup_node_data_dir ?reconstruct_from_boot_sector ()]
+    ~rollup_node_data_dir ()]
     initialises the irmin context and metadata of the evm using the
     latest known evm state of the given rollup node. if
     [omit_delayed_tx_events] dont populate the delayed tx event from
-    the state into the db.
-
-
-    If [reconstruct_from_boot_sector] is provided all messages contained in
-    the [rollup_node_data_dir] will be replayed to produce intermediate states.
-*)
+    the state into the db. *)
 val init_from_rollup_node :
   omit_delayed_tx_events:bool ->
   data_dir:string ->
   rollup_node_data_dir:string ->
-  ?reconstruct_from_boot_sector:string ->
   unit ->
+  unit tzresult Lwt.t
+
+(** [reconstruct ~data_dir ~rollup_node_data_dir ~boot_sector] replays all
+    L1 blocks of [rollup_node_data_dir] since the genesis. Populates the
+    new [data_dir] with a full history. *)
+val reconstruct :
+  data_dir:string ->
+  rollup_node_data_dir:string ->
+  boot_sector:string ->
   unit tzresult Lwt.t
 
 (** [reset ~data_dir ~l2_level] reset the sequencer storage to

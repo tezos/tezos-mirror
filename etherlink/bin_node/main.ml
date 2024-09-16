@@ -1312,12 +1312,18 @@ let init_from_rollup_node_command =
     (fun (data_dir, omit_delayed_tx_events, reconstruct_from_boot_sector)
          rollup_node_data_dir
          () ->
-      Evm_node_lib_dev.Evm_context.init_from_rollup_node
-        ~omit_delayed_tx_events
-        ~data_dir
-        ~rollup_node_data_dir
-        ?reconstruct_from_boot_sector
-        ())
+      match reconstruct_from_boot_sector with
+      | Some boot_sector ->
+          Evm_node_lib_dev.Evm_context.reconstruct
+            ~data_dir
+            ~rollup_node_data_dir
+            ~boot_sector
+      | None ->
+          Evm_node_lib_dev.Evm_context.init_from_rollup_node
+            ~omit_delayed_tx_events
+            ~data_dir
+            ~rollup_node_data_dir
+            ())
 
 let dump_to_rlp_command =
   let open Tezos_clic in
