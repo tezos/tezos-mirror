@@ -14,6 +14,7 @@
   octez-protocol-021-PsQuebec-libs.plugin
   octez-proto-libs.protocol-environment
   octez-shell-libs.shell-services
+  octez-node-config
   octez-shell-libs.client-base
   octez-protocol-021-PsQuebec-libs.client
   octez-shell-libs.client-commands

@@ -14,6 +14,7 @@
   octez-protocol-020-PsParisC-libs.plugin
   octez-proto-libs.protocol-environment
   octez-shell-libs.shell-services
+  octez-node-config
   octez-shell-libs.client-base
   octez-protocol-020-PsParisC-libs.client
   octez-shell-libs.client-commands
