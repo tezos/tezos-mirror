@@ -238,6 +238,27 @@ oc.build:rpm:amd64:
       - fedora:39
       - rockylinux:9.3
 
+homebrew release:
+  image: debian:bookworm
+  stage: build
+  tags:
+  - gcp
+  needs: []
+  dependencies: []
+  timeout: 60 minutes
+  script:
+  - ./scripts/ci/install-gsutil.sh
+  - apt install -y git build-essential
+  - ./scripts/packaging/homebrew_install.sh
+  - eval $(/home/linuxbrew/.linuxbrew/bin/brew shellenv)
+  - ./scripts/packaging/homebrew_release.sh
+  artifacts:
+    name: build-$CI_COMMIT_REF_SLUG
+    expire_in: 1 day
+    paths:
+    - scripts/packaging/Formula/octez.rb
+    when: on_success
+
 docker:merge_manifests:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
   stage: prepare_release
@@ -266,6 +287,7 @@ gitlab:publish:
   needs:
   - oc.build:static-x86_64-linux-binaries
   - oc.build:static-arm64-linux-binaries
+  - homebrew release
   - oc.build:rpm:amd64
   - oc.build-ubuntu-current_a
   - oc.build-debian-current_a
@@ -274,6 +296,7 @@ gitlab:publish:
   dependencies:
   - oc.build:static-x86_64-linux-binaries
   - oc.build:static-arm64-linux-binaries
+  - homebrew release
   - oc.build:rpm:amd64
   - oc.build-ubuntu-current_a
   - oc.build-debian-current_a
@@ -479,7 +502,8 @@ apt_repo_debian_current:
   timeout: 60 minutes
   before_script:
   - . ./scripts/version.sh
-  - ./scripts/ci/prepare-apt-repo.sh
+  - ./scripts/ci/install-gsutil.sh
+  - apt install -y apt-utils debsigs
   script:
   - ./scripts/ci/create_debian_repo.sh debian bookworm
   variables:
@@ -500,7 +524,8 @@ apt_repo_debian:
   timeout: 60 minutes
   before_script:
   - . ./scripts/version.sh
-  - ./scripts/ci/prepare-apt-repo.sh
+  - ./scripts/ci/install-gsutil.sh
+  - apt install -y apt-utils debsigs
   script:
   - ./scripts/ci/create_debian_repo.sh debian bookworm
   variables:
@@ -681,7 +706,8 @@ apt_repo_ubuntu_current:
   timeout: 60 minutes
   before_script:
   - . ./scripts/version.sh
-  - ./scripts/ci/prepare-apt-repo.sh
+  - ./scripts/ci/install-gsutil.sh
+  - apt install -y apt-utils debsigs
   script:
   - ./scripts/ci/create_debian_repo.sh ubuntu noble jammy
   variables:
@@ -702,7 +728,8 @@ apt_repo_ubuntu:
   timeout: 60 minutes
   before_script:
   - . ./scripts/version.sh
-  - ./scripts/ci/prepare-apt-repo.sh
+  - ./scripts/ci/install-gsutil.sh
+  - apt install -y apt-utils debsigs
   script:
   - ./scripts/ci/create_debian_repo.sh ubuntu noble jammy
   variables:

@@ -67,7 +67,9 @@ let make_job_apt_repo ?rules ~__POS__ ~name ?(stage = Stages.publishing)
     ~name
     ~image
     ~before_script:
-      (before_script ~source_version:true ["./scripts/ci/prepare-apt-repo.sh"])
+      (before_script
+         ~source_version:true
+         ["./scripts/ci/install-gsutil.sh"; "apt install -y apt-utils debsigs"])
     ~variables
     script
 

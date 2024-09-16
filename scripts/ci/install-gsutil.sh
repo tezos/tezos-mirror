@@ -1,11 +1,11 @@
 #!/bin/sh
 
-# Install depedendencies for the apt_repo job
+# Install depedendencies to use gsutils
 
 export DEBIAN_FRONTEND=noninteractive
 
 apt-get update
-apt-get install -y apt-utils debsigs gnupg curl
+apt-get install -y gnupg curl
 
 # Install google-cloud-cli so we can upload packages to the Google Cloud Storage bucket.
 gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg \
