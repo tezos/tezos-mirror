@@ -158,44 +158,43 @@ end = struct
 
   let aggregate_s key location =
     match Key.content key with
-    | Key.Ident _ | Key.String _ | Key.Apply _ -> Aggregate_s {key; location}
+    | Key.Apply _ | Key.Ident _ | Key.String _ -> Aggregate_s {key; location}
     | _ -> Error.error location (Error.Invalid_aggregate key)
 
   let aggregate_f key location =
     match Key.content key with
-    | Key.Ident _ | Key.String _ | Key.Apply _ -> Aggregate_f {key; location}
+    | Key.Apply _ | Key.Ident _ | Key.String _ -> Aggregate_f {key; location}
     | _ -> Error.error location (Error.Invalid_aggregate key)
 
   let mark key location =
     match Key.content key with
-    | Key.List _ -> Mark {key; location}
+    | Key.Apply _ | Key.Ident _ | Key.List _ -> Mark {key; location}
     | _ -> Error.error location (Error.Invalid_mark key)
 
   let record key location =
     match Key.content key with
-    | Key.Ident _ | Key.String _ | Key.Apply _ -> Record {key; location}
+    | Key.Apply _ | Key.Ident _ | Key.String _ -> Record {key; location}
     | _ -> Error.error location (Error.Invalid_record key)
 
   let record_f key location =
     match Key.content key with
-    | Key.Ident _ | Key.String _ | Key.Apply _ -> Record_f {key; location}
+    | Key.Apply _ | Key.Ident _ | Key.String _ -> Record_f {key; location}
     | _ -> Error.error location (Error.Invalid_record key)
 
   let record_s key location =
     match Key.content key with
-    | Key.Ident _ | Key.String _ | Key.Apply _ -> Record_s {key; location}
+    | Key.Apply _ | Key.Ident _ | Key.String _ -> Record_s {key; location}
     | _ -> Error.error location (Error.Invalid_record key)
 
   let reset_block_section key location =
     match Key.content key with
-    | Key.Ident _ | Key.String _ | Key.Apply _ ->
+    | Key.Apply _ | Key.Ident _ | Key.String _ ->
         Reset_block_section {key; location}
     | _ -> Error.error location (Error.Invalid_record key)
 
   let span_s key location =
     match Key.content key with
-    | Key.List _ -> Span_s {key; location}
-    | Key.Apply _ -> Span_s {key; location}
+    | Key.Apply _ | Key.Ident _ | Key.List _ -> Span_s {key; location}
     | _ -> Error.error location (Error.Invalid_span key)
 
   let stop key location =
