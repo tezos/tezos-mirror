@@ -84,7 +84,6 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
 
   let*! head = Evm_context.head_info () in
   let (Qty next_blueprint_number) = head.next_blueprint_number in
-  Metrics.set_level ~level:(Z.pred next_blueprint_number) ;
   let* () =
     Option.iter_es
       (fun _ ->
