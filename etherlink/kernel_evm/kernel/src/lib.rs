@@ -407,6 +407,7 @@ mod tests {
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_evm_runtime::safe_storage::SafeStorage;
 
+    use tezos_evm_runtime::runtime::Runtime;
     use tezos_smart_rollup::michelson::ticket::FA2_1Ticket;
     use tezos_smart_rollup::michelson::{
         MichelsonBytes, MichelsonContract, MichelsonNat, MichelsonOption, MichelsonPair,
@@ -414,11 +415,11 @@ mod tests {
     use tezos_smart_rollup::outbox::{OutboxMessage, OutboxMessageTransaction};
     use tezos_smart_rollup::types::{Contract, Entrypoint};
     use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
-    use tezos_smart_rollup_debug::Runtime;
     use tezos_smart_rollup_encoding::inbox::ExternalMessageFrame;
     use tezos_smart_rollup_encoding::smart_rollup::SmartRollupAddress;
     use tezos_smart_rollup_encoding::timestamp::Timestamp;
     use tezos_smart_rollup_host::path::RefPath;
+    use tezos_smart_rollup_host::runtime::Runtime as SdkRuntime; // Used to put traits interface in the scope
     use tezos_smart_rollup_mock::TransferMetadata;
 
     const DUMMY_CHAIN_ID: U256 = U256::one();
@@ -675,10 +676,8 @@ mod tests {
     #[test]
     fn test_xtz_withdrawal_applied() {
         // init host
-        let mut mock_host = MockKernelHost::default();
-        let mut safe_storage = SafeStorage {
-            host: &mut mock_host,
-        };
+        let mut host = MockKernelHost::default();
+        let mut safe_storage = SafeStorage { host: &mut host };
         safe_storage
             .store_write_all(
                 &NATIVE_TOKEN_TICKETER_PATH,

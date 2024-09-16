@@ -13,7 +13,7 @@
 
 use evm::{Context, Handler, Transfer};
 use primitive_types::{H160, U256};
-use tezos_smart_rollup_host::runtime::Runtime;
+use tezos_evm_runtime::runtime::Runtime;
 
 use crate::{
     fa_bridge::{execute_fa_withdrawal, withdrawal::FaWithdrawal},
@@ -45,7 +45,7 @@ pub const FA_WITHDRAWAL_PRECOMPILE_TICKS_SLOPE: u64 = 700;
 ///
 /// An execution of a single outbox message carrying a FA withdrawal
 /// costs around 0.0025ꜩ on L1; the equivalent amount of gas units on L2 is:
-///  
+///
 ///  0.0025 * 10^18 / GAS_PRICE
 ///
 /// Multiplying the numerator by 2 for a safe reserve and this is our cost in Wei.
@@ -160,7 +160,7 @@ mod tests {
     use alloy_sol_types::SolCall;
     use evm::{Config, ExitError};
     use primitive_types::{H160, U256};
-    use tezos_smart_rollup_mock::MockHost;
+    use tezos_evm_runtime::runtime::MockKernelHost;
 
     use crate::{
         account_storage::{init_account_storage, EthereumAccountStorage},
@@ -178,7 +178,7 @@ mod tests {
     };
 
     fn execute_precompile(
-        host: &mut MockHost,
+        host: &mut MockKernelHost,
         evm_account_storage: &mut EthereumAccountStorage,
         caller: H160,
         value: Option<U256>,
@@ -190,7 +190,7 @@ mod tests {
         let config = Config::shanghai();
         let callee = FA_BRIDGE_PRECOMPILE_ADDRESS;
 
-        let precompiles = precompiles::precompile_set::<MockHost>(true);
+        let precompiles = precompiles::precompile_set::<MockKernelHost>(true);
 
         let mut handler = EvmHandler::new(
             host,
@@ -212,7 +212,7 @@ mod tests {
 
     #[test]
     fn fa_bridge_precompile_fails_due_to_bad_selector() {
-        let mut mock_runtime = MockHost::default();
+        let mut mock_runtime = MockKernelHost::default();
         let mut evm_account_storage = init_account_storage().unwrap();
 
         let outcome = execute_precompile(
@@ -232,7 +232,7 @@ mod tests {
 
     #[test]
     fn fa_bridge_precompile_fails_due_to_low_gas_limit() {
-        let mut mock_runtime = MockHost::default();
+        let mut mock_runtime = MockKernelHost::default();
         let mut evm_account_storage = init_account_storage().unwrap();
 
         let outcome = execute_precompile(
@@ -253,7 +253,7 @@ mod tests {
 
     #[test]
     fn fa_bridge_precompile_fails_due_to_non_zero_value() {
-        let mut mock_runtime = MockHost::default();
+        let mut mock_runtime = MockKernelHost::default();
         let mut evm_account_storage = init_account_storage().unwrap();
 
         let caller = H160::from_low_u64_be(1);
@@ -281,7 +281,7 @@ mod tests {
 
     #[test]
     fn fa_bridge_precompile_fails_due_to_static_call() {
-        let mut mock_runtime = MockHost::default();
+        let mut mock_runtime = MockKernelHost::default();
         let mut evm_account_storage = init_account_storage().unwrap();
 
         let caller = H160::from_low_u64_be(1);
@@ -302,7 +302,7 @@ mod tests {
 
     #[test]
     fn fa_bridge_precompile_fails_due_to_delegate_call() {
-        let mut mock_runtime = MockHost::default();
+        let mut mock_runtime = MockKernelHost::default();
         let mut evm_account_storage = init_account_storage().unwrap();
 
         let caller = H160::from_low_u64_be(1);
@@ -310,7 +310,7 @@ mod tests {
         let block = dummy_first_block();
         let config = Config::shanghai();
 
-        let precompiles = precompiles::precompile_set::<MockHost>(true);
+        let precompiles = precompiles::precompile_set::<MockKernelHost>(true);
 
         let mut handler = EvmHandler::new(
             &mut mock_runtime,
@@ -344,7 +344,7 @@ mod tests {
 
     #[test]
     fn fa_bridge_precompile_fails_due_to_invalid_input() {
-        let mut mock_runtime = MockHost::default();
+        let mut mock_runtime = MockKernelHost::default();
         let mut evm_account_storage = init_account_storage().unwrap();
 
         let outcome = execute_precompile(
@@ -364,7 +364,7 @@ mod tests {
 
     #[test]
     fn fa_bridge_precompile_succeeds_without_l2_proxy_contract() {
-        let mut mock_runtime = MockHost::default();
+        let mut mock_runtime = MockKernelHost::default();
         let mut evm_account_storage = init_account_storage().unwrap();
 
         let ticket_owner = H160::from_low_u64_be(1);

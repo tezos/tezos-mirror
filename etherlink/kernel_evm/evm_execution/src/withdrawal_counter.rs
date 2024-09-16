@@ -11,7 +11,9 @@
 //! revertable updates (if withdrawal fails the counter won't increment).
 
 use primitive_types::U256;
-use tezos_smart_rollup_host::{path::RefPath, runtime::Runtime};
+
+use tezos_evm_runtime::runtime::Runtime;
+use tezos_smart_rollup_host::path::RefPath;
 use tezos_storage::{read_u256_le_default, write_u256_le};
 
 use crate::account_storage::{AccountStorageError, EthereumAccount};
@@ -47,8 +49,8 @@ impl WithdrawalCounter for EthereumAccount {
 #[cfg(test)]
 mod tests {
     use primitive_types::U256;
+    use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup_host::path::RefPath;
-    use tezos_smart_rollup_mock::MockHost;
     use tezos_storage::read_u256_le_default;
 
     use crate::{account_storage::EthereumAccount, precompiles::SYSTEM_ACCOUNT_ADDRESS};
@@ -57,7 +59,7 @@ mod tests {
 
     #[test]
     fn withdrawal_counter_initializes_and_increments() {
-        let mut mock_host = MockHost::default();
+        let mut mock_host = MockKernelHost::default();
 
         let mut account = EthereumAccount::from_address(&SYSTEM_ACCOUNT_ADDRESS).unwrap();
         let path = b"/evm/world_state/eth_accounts/0000000000000000000000000000000000000000/withdrawal_counter";

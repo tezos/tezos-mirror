@@ -4,10 +4,8 @@ use anyhow::{Context, Result};
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpIterator, RlpStream};
 use std::marker::PhantomData;
 use tezos_ethereum::rlp_helpers::{append_option, decode_field, decode_option, next};
-use tezos_smart_rollup_host::{
-    path::{concat, OwnedPath, Path},
-    runtime::Runtime,
-};
+use tezos_evm_runtime::runtime::Runtime;
+use tezos_smart_rollup_host::path::{concat, OwnedPath, Path};
 use tezos_storage::{read_optional_rlp, read_rlp, store_rlp};
 
 /// Doubly linked list using the durable storage.
@@ -452,9 +450,9 @@ mod tests {
     use rlp::{Decodable, DecoderError, Encodable};
     use std::collections::HashMap;
     use tezos_ethereum::transaction::TRANSACTION_HASH_SIZE;
+    use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup_debug::Runtime;
     use tezos_smart_rollup_host::path::RefPath;
-    use tezos_smart_rollup_mock::MockHost;
 
     #[derive(Clone)]
     struct Hash([u8; TRANSACTION_HASH_SIZE]);
@@ -481,7 +479,11 @@ mod tests {
         }
     }
 
-    fn assert_length(host: &MockHost, list: &LinkedList<Hash, u8>, expected_len: u64) {
+    fn assert_length(
+        host: &MockKernelHost,
+        list: &LinkedList<Hash, u8>,
+        expected_len: u64,
+    ) {
         // Both the linked list pointers and the element pointers lies under
         // the `list.path`.
         let keys = host.store_count_subkeys(&list.path).unwrap_or(0u64);
@@ -495,7 +497,7 @@ mod tests {
 
     #[test]
     fn test_empty() {
-        let host = MockHost::default();
+        let host = MockKernelHost::default();
         let path = RefPath::assert_from(b"/list");
         let list =
             LinkedList::<Hash, u8>::new(&path, &host).expect("list should be created");
@@ -504,7 +506,7 @@ mod tests {
 
     #[test]
     fn test_find_returns_none_when_empty() {
-        let host = MockHost::default();
+        let host = MockKernelHost::default();
         let path = RefPath::assert_from(b"/list");
         let list = LinkedList::new(&path, &host).expect("list should be created");
         let hash = Hash([0; TRANSACTION_HASH_SIZE]);
@@ -514,7 +516,7 @@ mod tests {
 
     #[test]
     fn test_insert() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let path = RefPath::assert_from(b"/list");
         let mut list = LinkedList::new(&path, &host).expect("list should be created");
         let id = Hash([0x0; TRANSACTION_HASH_SIZE]);
@@ -533,7 +535,7 @@ mod tests {
 
     #[test]
     fn test_remove() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let path = RefPath::assert_from(b"/list");
         let mut list = LinkedList::new(&path, &host).expect("list should be created");
         let id = Hash([0x0; TRANSACTION_HASH_SIZE]);
@@ -553,7 +555,7 @@ mod tests {
 
     #[test]
     fn test_remove_nothing() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let path = RefPath::assert_from(b"/list");
         let mut list = LinkedList::new(&path, &host).expect("list should be created");
         let id = Hash([0x0; TRANSACTION_HASH_SIZE]);
@@ -566,7 +568,7 @@ mod tests {
 
     #[test]
     fn test_first() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let path = RefPath::assert_from(b"/list");
         let mut list = LinkedList::new(&path, &host).expect("list should be created");
         let id = Hash([0x0; TRANSACTION_HASH_SIZE]);
@@ -585,7 +587,7 @@ mod tests {
 
     #[test]
     fn test_first_when_only_two_elements() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let path = RefPath::assert_from(b"/list");
         let mut list = LinkedList::new(&path, &host).expect("list should be created");
         let id_1 = Hash([0x0; TRANSACTION_HASH_SIZE]);
@@ -606,7 +608,7 @@ mod tests {
 
     #[test]
     fn test_first_after_two_push() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let path = RefPath::assert_from(b"/list");
         let mut list = LinkedList::new(&path, &host).expect("list should be created");
         let id_1 = Hash([0x0; TRANSACTION_HASH_SIZE]);
@@ -628,7 +630,7 @@ mod tests {
 
     #[test]
     fn test_delete() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let path = RefPath::assert_from(b"/list");
         let mut list: LinkedList<Hash, u8> =
             LinkedList::new(&path, &host).expect("list should be created");
@@ -646,8 +648,8 @@ mod tests {
 
     fn fill_list(
         elements: &HashMap<[u8; TRANSACTION_HASH_SIZE], u8>,
-    ) -> (MockHost, LinkedList<Hash, u8>) {
-        let mut host = MockHost::default();
+    ) -> (MockKernelHost, LinkedList<Hash, u8>) {
+        let mut host = MockKernelHost::default();
         let path = RefPath::assert_from(b"/list");
         let mut list = LinkedList::new(&path, &host).expect("list should be created");
         for (id, elt) in elements {
@@ -677,7 +679,7 @@ mod tests {
 
         #[test]
         fn test_push_element_create_non_empty_list(elements in elements()) {
-            let mut host = MockHost::default();
+            let mut host = MockKernelHost::default();
             let path = RefPath::assert_from(b"/list");
             let mut list = LinkedList::new(&path, &host).expect("list should be created");
             assert!(list.is_empty());
@@ -689,7 +691,7 @@ mod tests {
 
         #[test]
         fn test_remove_from_empty_creates_empty_list(elements: Vec<[u8; TRANSACTION_HASH_SIZE]>) {
-            let mut host = MockHost::default();
+            let mut host = MockKernelHost::default();
             let path = RefPath::assert_from(b"/list");
             let mut list = LinkedList::new(&path, &host).expect("list should be created");
             assert!(list.is_empty());
@@ -722,7 +724,7 @@ mod tests {
 
         #[test]
         fn test_list_is_kept_between_reboots(elements in elements()) {
-            let mut host = MockHost::default();
+            let mut host = MockKernelHost::default();
             let path = RefPath::assert_from(b"/list");
             for (id, elt) in &elements {
                 let mut list = LinkedList::new(&path, &host).expect("list should be created");
@@ -742,7 +744,7 @@ mod tests {
 
         #[test]
         fn test_pop_first_after_push(elements in elements()) {
-            let mut host = MockHost::default();
+            let mut host = MockKernelHost::default();
             let path = RefPath::assert_from(b"/list");
             let mut list = LinkedList::new(&path, &host).expect("list should be created");
 
@@ -755,7 +757,7 @@ mod tests {
 
         #[test]
         fn test_pop_first_keep_the_order(elements in elements()) {
-            let mut host = MockHost::default();
+            let mut host = MockKernelHost::default();
             let path = RefPath::assert_from(b"/list");
             let mut list = LinkedList::new(&path, &host).expect("list should be created");
 

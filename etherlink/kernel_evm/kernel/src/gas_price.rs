@@ -10,8 +10,8 @@ use crate::storage::{read_minimum_base_fee_per_gas, store_base_fee_per_gas};
 use primitive_types::U256;
 use softfloat::F64;
 use tezos_ethereum::block::BlockFees;
+use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
-use tezos_smart_rollup_host::runtime::Runtime;
 
 // actual ~34M, allow some overhead for less effecient ERC20 transfers.
 const ERC20_TICKS: u64 = 40_000_000;

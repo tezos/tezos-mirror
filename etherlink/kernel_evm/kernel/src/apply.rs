@@ -26,9 +26,9 @@ use tezos_ethereum::transaction::{TransactionHash, TransactionType};
 use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_ethereum::tx_signature::TxSignature;
 use tezos_evm_logging::{log, Level::*};
+use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup::outbox::{OutboxMessage, OutboxQueue};
 use tezos_smart_rollup_host::path::{Path, RefPath};
-use tezos_smart_rollup_host::runtime::Runtime;
 
 use crate::bridge::{execute_deposit, Deposit};
 use crate::configuration::Limits;
@@ -693,7 +693,6 @@ pub fn apply_transaction<Host: Runtime>(
 
 #[cfg(test)]
 mod tests {
-    use std::vec;
 
     use crate::{apply::Validity, configuration::Limits, fees::gas_for_fees};
     use evm_execution::account_storage::{account_path, EthereumAccountStorage};
@@ -703,8 +702,8 @@ mod tests {
         transaction::TransactionType,
         tx_common::EthereumTransactionCommon,
     };
+    use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup_encoding::timestamp::Timestamp;
-    use tezos_smart_rollup_mock::MockHost;
 
     use super::is_valid_ethereum_transaction_common;
 
@@ -731,7 +730,7 @@ mod tests {
     }
 
     fn set_balance(
-        host: &mut MockHost,
+        host: &mut MockKernelHost,
         evm_account_storage: &mut EthereumAccountStorage,
         address: &H160,
         balance: U256,
@@ -790,7 +789,7 @@ mod tests {
 
     #[test]
     fn test_tx_is_valid() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let mut evm_account_storage =
             evm_execution::account_storage::init_account_storage().unwrap();
         let block_constants = mock_block_constants();
@@ -823,7 +822,7 @@ mod tests {
 
     #[test]
     fn test_tx_is_invalid_cannot_prepay() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let mut evm_account_storage =
             evm_execution::account_storage::init_account_storage().unwrap();
         let block_constants = mock_block_constants();
@@ -858,7 +857,7 @@ mod tests {
 
     #[test]
     fn test_tx_is_invalid_signature() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let mut evm_account_storage =
             evm_execution::account_storage::init_account_storage().unwrap();
         let block_constants = mock_block_constants();
@@ -893,7 +892,7 @@ mod tests {
 
     #[test]
     fn test_tx_is_invalid_wrong_nonce() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let mut evm_account_storage =
             evm_execution::account_storage::init_account_storage().unwrap();
         let block_constants = mock_block_constants();
@@ -930,7 +929,7 @@ mod tests {
 
     #[test]
     fn test_tx_is_invalid_wrong_chain_id() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let mut evm_account_storage =
             evm_execution::account_storage::init_account_storage().unwrap();
         let block_constants = mock_block_constants();
@@ -965,7 +964,7 @@ mod tests {
 
     #[test]
     fn test_tx_is_invalid_max_fee_less_than_base_fee() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let mut evm_account_storage =
             evm_execution::account_storage::init_account_storage().unwrap();
         let block_constants = mock_block_constants();
@@ -1000,7 +999,7 @@ mod tests {
 
     #[test]
     fn test_tx_invalid_not_enough_gas_for_fee() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let mut evm_account_storage =
             evm_execution::account_storage::init_account_storage().unwrap();
         let block_constants = mock_block_constants();

@@ -15,8 +15,9 @@ use rlp::{Decodable, Encodable};
 
 use tezos_crypto_rs::hash::{ContractKt1Hash, HashTrait};
 use tezos_ethereum::rlp_helpers::FromRlpBytes;
+use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_host::path::*;
-use tezos_smart_rollup_host::runtime::{Runtime, RuntimeError, ValueType};
+use tezos_smart_rollup_host::runtime::{RuntimeError, ValueType};
 
 /// The size of one 256 bit word. Size in bytes.
 pub const WORD_SIZE: usize = 32usize;

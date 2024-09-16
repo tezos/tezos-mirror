@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: MIT
 
 use tezos_evm_logging::{log, Level::*};
+use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
-use tezos_smart_rollup_host::runtime::Runtime;
 use tezos_smart_rollup_host::{path::RefPath, runtime::RuntimeError, KERNEL_BOOT_PATH};
 
 use crate::upgrade::KERNEL_ROOT_HASH;

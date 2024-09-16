@@ -24,7 +24,7 @@ use primitive_types::{H160, H256, U256};
 use tezos_ethereum::access_list::AccessListItem;
 use tezos_ethereum::block::BlockFees;
 use tezos_ethereum::tx_common::EthereumTransactionCommon;
-use tezos_smart_rollup_host::runtime::Runtime;
+use tezos_evm_runtime::runtime::Runtime;
 
 use std::mem::size_of;
 
@@ -311,7 +311,7 @@ mod tests {
     use evm::ExitSucceed;
     use evm_execution::account_storage::{account_path, EthereumAccountStorage};
     use primitive_types::{H160, U256};
-    use tezos_smart_rollup_mock::MockHost;
+    use tezos_evm_runtime::runtime::MockKernelHost;
 
     use proptest::prelude::*;
 
@@ -362,7 +362,7 @@ mod tests {
     #[test]
     fn apply_updates_balances_no_sequencer() {
         // Arrange
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let mut evm_account_storage =
             evm_execution::account_storage::init_account_storage().unwrap();
 
@@ -399,7 +399,7 @@ mod tests {
     #[test]
     fn apply_updates_balances_with_sequencer() {
         // Arrange
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let sequencer_address =
             address_from_str("0123456789ABCDEF0123456789ABCDEF01234567");
 
@@ -456,7 +456,7 @@ mod tests {
     #[test]
     fn apply_fails_user_charge_too_large() {
         // Arrange
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let mut evm_account_storage =
             evm_execution::account_storage::init_account_storage().unwrap();
 
@@ -510,7 +510,7 @@ mod tests {
     }
 
     fn get_balance(
-        host: &mut MockHost,
+        host: &mut MockKernelHost,
         evm_account_storage: &mut EthereumAccountStorage,
         address: H160,
     ) -> U256 {
@@ -521,7 +521,7 @@ mod tests {
     }
 
     fn set_balance(
-        host: &mut MockHost,
+        host: &mut MockKernelHost,
         evm_account_storage: &mut EthereumAccountStorage,
         address: H160,
         balance: U256,

@@ -6,8 +6,9 @@
 use rlp::DecoderError;
 use tezos_evm_logging::log;
 use tezos_evm_logging::Level::Error;
+use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_host::path::{concat, OwnedPath, PathError, RefPath};
-use tezos_smart_rollup_host::runtime::{Runtime, RuntimeError};
+use tezos_smart_rollup_host::runtime::RuntimeError;
 use tezos_smart_rollup_storage::StorageError;
 use tezos_storage::{error::Error as GenStorageError, read_u64_le, write_u64_le};
 use thiserror::Error;
@@ -164,12 +165,12 @@ impl IndexableStorage {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup_host::path::RefPath;
-    use tezos_smart_rollup_mock::MockHost;
 
     #[test]
     fn test_indexable_empty() {
-        let host = MockHost::default();
+        let host = MockKernelHost::default();
         let values = RefPath::assert_from(b"/values");
         let storage = IndexableStorage::new(&values).expect("Path to index is invalid");
 
@@ -178,7 +179,7 @@ mod tests {
 
     #[test]
     fn test_indexing_new_value() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let values = RefPath::assert_from(b"/values");
         let storage = IndexableStorage::new(&values).expect("Path to index is invalid");
 
@@ -195,7 +196,7 @@ mod tests {
 
     #[test]
     fn test_get_out_of_bounds() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let values = RefPath::assert_from(b"/values");
         let storage = IndexableStorage::new(&values).expect("Path to index is invalid");
 

@@ -8,9 +8,9 @@ use crate::precompiles::tick_model;
 use crate::{handler::EvmHandler, precompiles::PrecompileOutcome, EthereumError};
 use evm::{Context, Transfer};
 use evm::{ExitReason, ExitSucceed};
-use host::runtime::Runtime;
 use tezos_evm_logging::log;
 use tezos_evm_logging::Level::Debug;
+use tezos_evm_runtime::runtime::Runtime;
 
 // Implementation of 0x02 precompiled (identity)
 pub fn identity_precompile<Host: Runtime>(

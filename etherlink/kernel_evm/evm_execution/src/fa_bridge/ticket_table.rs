@@ -9,10 +9,8 @@
 
 use crate::account_storage::{account_path, AccountStorageError, EthereumAccount};
 use primitive_types::{H160, H256, U256};
-use tezos_smart_rollup_host::{
-    path::{concat, OwnedPath, RefPath},
-    runtime::Runtime,
-};
+use tezos_evm_runtime::runtime::Runtime;
+use tezos_smart_rollup_host::path::{concat, OwnedPath, RefPath};
 use tezos_storage::{path_from_h256, read_u256_le_default, write_u256_le};
 
 /// Path where global ticket table is stored
@@ -86,8 +84,8 @@ impl TicketTable for EthereumAccount {
 
 #[cfg(test)]
 mod tests {
+    use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup_host::path::RefPath;
-    use tezos_smart_rollup_mock::MockHost;
     use tezos_storage::read_u256_le_default;
 
     use crate::precompiles::SYSTEM_ACCOUNT_ADDRESS;
@@ -96,7 +94,7 @@ mod tests {
 
     #[test]
     fn ticket_table_balance_add_succeeds() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
 
         let mut account = EthereumAccount::from_address(&SYSTEM_ACCOUNT_ADDRESS).unwrap();
 
@@ -123,7 +121,7 @@ mod tests {
 
     #[test]
     fn ticket_table_balance_add_overflows() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
 
         let mut account = EthereumAccount::from_address(&SYSTEM_ACCOUNT_ADDRESS).unwrap();
 

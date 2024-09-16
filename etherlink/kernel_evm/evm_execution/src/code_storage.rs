@@ -7,7 +7,7 @@
 
 use host::path::{concat, OwnedPath, RefPath};
 use primitive_types::{H256, U256};
-use tezos_smart_rollup_host::runtime::Runtime;
+use tezos_evm_runtime::runtime::Runtime;
 use tezos_storage::helpers::bytes_hash;
 use tezos_storage::{error::Error as GenStorageError, read_u64_le, write_u64_le};
 
@@ -144,13 +144,13 @@ impl CodeStorage {
 #[cfg(test)]
 mod test {
     use crate::account_storage;
-    use tezos_smart_rollup_mock::MockHost;
+    use tezos_evm_runtime::runtime::MockKernelHost;
 
     use super::*;
 
     #[test]
     fn test_empty_contract_hash_matches_default() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let empty_code: Vec<u8> = vec![];
         let empty_code_hash: H256 = account_storage::CODE_HASH_DEFAULT;
 
@@ -162,7 +162,7 @@ mod test {
 
     #[test]
     fn test_get_code_matches_given() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let code: Vec<u8> = (0..100).collect();
         let code_hash =
             CodeStorage::add(&mut host, &code).expect("Could not create code storage");
@@ -172,7 +172,7 @@ mod test {
 
     #[test]
     fn test_code_ref_is_incremented() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let code: Vec<u8> = (0..100).collect();
         let code_hash =
             CodeStorage::add(&mut host, &code).expect("Could not create code storage");
@@ -200,7 +200,7 @@ mod test {
 
     #[test]
     fn test_code_is_deleted() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let code_hash: H256 = account_storage::CODE_HASH_DEFAULT;
 
         let code_storage =

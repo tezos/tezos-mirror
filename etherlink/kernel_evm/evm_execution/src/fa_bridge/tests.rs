@@ -6,7 +6,7 @@ use alloy_primitives::FixedBytes;
 use alloy_sol_types::SolEvent;
 use evm::ExitError;
 use primitive_types::{H160, U256};
-use tezos_smart_rollup_mock::MockHost;
+use tezos_evm_runtime::runtime::MockKernelHost;
 
 use crate::{
     account_storage::{account_path, init_account_storage},
@@ -21,7 +21,7 @@ use crate::{
 
 #[test]
 fn fa_deposit_reached_wrapper_contract() {
-    let mut mock_runtime = MockHost::default();
+    let mut mock_runtime = MockKernelHost::default();
     let mut evm_account_storage = init_account_storage().unwrap();
 
     let caller = H160::zero();
@@ -101,7 +101,7 @@ fn fa_deposit_reached_wrapper_contract() {
 
 #[test]
 fn fa_deposit_refused_due_non_existing_contract() {
-    let mut mock_runtime = MockHost::default();
+    let mut mock_runtime = MockKernelHost::default();
     let mut evm_account_storage = init_account_storage().unwrap();
 
     let caller = H160::zero();
@@ -158,7 +158,7 @@ fn fa_deposit_refused_due_non_existing_contract() {
 
 #[test]
 fn fa_deposit_refused_non_compatible_interface() {
-    let mut mock_runtime = MockHost::default();
+    let mut mock_runtime = MockKernelHost::default();
     let mut evm_account_storage = init_account_storage().unwrap();
 
     let caller = H160::zero();
@@ -222,7 +222,7 @@ fn fa_deposit_refused_non_compatible_interface() {
 
 #[test]
 fn fa_deposit_proxy_state_reverted_if_ticket_balance_overflows() {
-    let mut mock_runtime = MockHost::default();
+    let mut mock_runtime = MockKernelHost::default();
     let mut evm_account_storage = init_account_storage().unwrap();
 
     let caller = H160::zero();
@@ -283,7 +283,7 @@ fn fa_deposit_proxy_state_reverted_if_ticket_balance_overflows() {
 
 #[test]
 fn fa_withdrawal_executed_via_l2_proxy_contract() {
-    let mut mock_runtime = MockHost::default();
+    let mut mock_runtime = MockKernelHost::default();
     let mut evm_account_storage = init_account_storage().unwrap();
 
     let sender = H160::from_low_u64_be(1);
@@ -371,7 +371,7 @@ fn fa_withdrawal_executed_via_l2_proxy_contract() {
 
 #[test]
 fn fa_withdrawal_fails_due_to_faulty_l2_proxy() {
-    let mut mock_runtime = MockHost::default();
+    let mut mock_runtime = MockKernelHost::default();
     let mut evm_account_storage = init_account_storage().unwrap();
 
     let sender = H160::from_low_u64_be(1);
@@ -424,7 +424,7 @@ fn fa_withdrawal_fails_due_to_faulty_l2_proxy() {
 
 #[test]
 fn fa_withdrawal_fails_due_to_insufficient_balance() {
-    let mut mock_runtime = MockHost::default();
+    let mut mock_runtime = MockKernelHost::default();
     let mut evm_account_storage = init_account_storage().unwrap();
 
     let sender = H160::from_low_u64_be(1);

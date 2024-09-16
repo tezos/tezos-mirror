@@ -7,18 +7,18 @@ pub use alloy_sol_types::SolCall;
 use alloy_sol_types::{sol, SolConstructor};
 use crypto::hash::ContractKt1Hash;
 use evm::Config;
-use host::runtime::Runtime;
 use primitive_types::{H160, H256, U256};
 use tezos_data_encoding::enc::BinWriter;
 use tezos_ethereum::{
     block::{BlockConstants, BlockFees},
     Log,
 };
+use tezos_evm_runtime::runtime::MockKernelHost;
+use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_encoding::{
     contract::Contract,
     michelson::{ticket::FA2_1Ticket, MichelsonOption, MichelsonPair},
 };
-use tezos_smart_rollup_mock::MockHost;
 use tezos_storage::read_u256_le_default;
 
 use crate::{
@@ -51,7 +51,7 @@ const MOCK_WRAPPER_BYTECODE: &[u8] =
 
 /// Create a smart contract in the storage with the mocked token code
 pub fn deploy_mock_wrapper(
-    host: &mut MockHost,
+    host: &mut MockKernelHost,
     evm_account_storage: &mut EthereumAccountStorage,
     ticket: &FA2_1Ticket,
     caller: &H160,
@@ -67,7 +67,7 @@ pub fn deploy_mock_wrapper(
     ));
 
     let block = dummy_block_constants();
-    let precompiles = precompile_set::<MockHost>(false);
+    let precompiles = precompile_set::<MockKernelHost>(false);
 
     set_balance(host, evm_account_storage, caller, U256::from(1_000_000));
     run_transaction(
@@ -94,13 +94,13 @@ pub fn deploy_mock_wrapper(
 
 /// Execute FA deposit
 pub fn run_fa_deposit(
-    host: &mut MockHost,
+    host: &mut MockKernelHost,
     evm_account_storage: &mut EthereumAccountStorage,
     deposit: &FaDeposit,
     caller: &H160,
 ) -> ExecutionOutcome {
     let block = dummy_block_constants();
-    let precompiles = precompile_set::<MockHost>(false);
+    let precompiles = precompile_set::<MockKernelHost>(false);
 
     execute_fa_deposit(
         host,
@@ -140,7 +140,7 @@ pub fn dummy_fa_deposit(ticket: FA2_1Ticket, proxy: Option<H160>) -> FaDeposit {
 ///     }
 /// }
 pub fn get_storage_flag(
-    host: &MockHost,
+    host: &MockKernelHost,
     evm_account_storage: &EthereumAccountStorage,
     proxy: H160,
 ) -> u32 {
@@ -323,13 +323,13 @@ pub fn dummy_fa_withdrawal(
 
 /// Execute FA withdrawal directly without going through the precompile
 pub fn fa_bridge_precompile_call_withdraw(
-    host: &mut MockHost,
+    host: &mut MockKernelHost,
     evm_account_storage: &mut EthereumAccountStorage,
     withdrawal: FaWithdrawal,
     caller: H160,
 ) -> ExecutionOutcome {
     let block = dummy_first_block();
-    let precompiles = precompiles::precompile_set::<MockHost>(false);
+    let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
     let config = Config::shanghai();
 
     let mut handler = EvmHandler::new(

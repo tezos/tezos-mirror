@@ -30,6 +30,7 @@ use tezos_ethereum::{
     tx_common::EthereumTransactionCommon,
 };
 use tezos_evm_logging::{log, Level::*};
+use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_encoding::{
     contract::Contract,
     inbox::{
@@ -39,7 +40,6 @@ use tezos_smart_rollup_encoding::{
     public_key::PublicKey,
 };
 use tezos_smart_rollup_host::input::Message;
-use tezos_smart_rollup_host::runtime::Runtime;
 
 /// On an option, either the value, or if `None`, interrupt and return the
 /// default value of the return type instead.
@@ -813,14 +813,14 @@ impl<Mode: Parsable> InputResult<Mode> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup_host::input::Message;
-    use tezos_smart_rollup_mock::MockHost;
 
     const ZERO_SMART_ROLLUP_ADDRESS: [u8; 20] = [0; 20];
 
     #[test]
     fn parse_unparsable_transaction() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
 
         let message = Message::new(0, 0, vec![1, 9, 32, 58, 59, 30]);
         assert_eq!(

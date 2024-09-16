@@ -4,13 +4,22 @@
 
 use std::{cell::RefCell, io::Write};
 
-use tezos_smart_rollup_mock::MockHost;
+use tezos_evm_runtime::{
+    internal_runtime::{ExtendedRuntime, InternalRuntime},
+    runtime::MockKernelHost,
+};
+use tezos_smart_rollup_host::{
+    dal_parameters::RollupDalParameters,
+    input::Message,
+    metadata::RollupMetadata,
+    path::Path,
+    runtime::{Runtime as SdkRuntime, RuntimeError, ValueType},
+};
 
-use core::slice::from_raw_parts;
-use tezos_smart_rollup_core::smart_rollup_core::{ReadInputMessageInfo, SmartRollupCore};
+use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
 
 pub struct EvalHost {
-    pub host: MockHost,
+    pub host: MockKernelHost,
     pub buffer: RefCell<Vec<u8>>,
 }
 
@@ -18,123 +27,193 @@ impl EvalHost {
     /// Create a new instance of the `MockHost`, additionally provide the buffer
     /// where the logs will be outputed.
     pub fn default_with_buffer(buffer: RefCell<Vec<u8>>) -> Self {
-        let host = MockHost::default();
+        let host = MockKernelHost::default();
         Self { host, buffer }
     }
 }
 
-unsafe impl SmartRollupCore for EvalHost {
-    unsafe fn read_input(
-        &self,
-        message_info: *mut ReadInputMessageInfo,
-        dst: *mut u8,
-        max_bytes: usize,
-    ) -> i32 {
-        self.host.read_input(message_info, dst, max_bytes)
+impl SdkRuntime for EvalHost {
+    #[inline(always)]
+    fn write_output(&mut self, from: &[u8]) -> Result<(), RuntimeError> {
+        self.host.write_output(from)
     }
 
-    unsafe fn write_debug(&self, src: *const u8, num_bytes: usize) {
-        let debug_out = from_raw_parts(src, num_bytes).to_vec();
-
-        let debug = String::from_utf8(debug_out).expect("unexpected non-utf8 debug log");
-
+    #[inline(always)]
+    fn write_debug(&self, data: &str) {
         let mut unboxed_buffer = self.buffer.borrow_mut();
-        if let Err(e) = write!(*unboxed_buffer, "{}", &debug) {
+        if let Err(e) = write!(*unboxed_buffer, "{}", data) {
             eprint!("Error due to: {}", e)
         }
     }
 
-    unsafe fn write_output(&self, src: *const u8, num_bytes: usize) -> i32 {
-        self.host.write_output(src, num_bytes)
+    #[inline(always)]
+    fn read_input(&mut self) -> Result<Option<Message>, RuntimeError> {
+        self.host.read_input()
     }
 
-    unsafe fn store_has(&self, path: *const u8, len: usize) -> i32 {
-        self.host.store_has(path, len)
+    #[inline(always)]
+    fn store_has<T: Path>(&self, path: &T) -> Result<Option<ValueType>, RuntimeError> {
+        self.host.store_has(path)
     }
 
-    unsafe fn store_read(
+    #[inline(always)]
+    fn store_read<T: Path>(
         &self,
-        path: *const u8,
-        len: usize,
-        offset: usize,
-        dst: *mut u8,
+        path: &T,
+        from_offset: usize,
         max_bytes: usize,
-    ) -> i32 {
-        self.host.store_read(path, len, offset, dst, max_bytes)
+    ) -> Result<Vec<u8>, RuntimeError> {
+        self.host.store_read(path, from_offset, max_bytes)
     }
 
-    unsafe fn store_write(
+    #[inline(always)]
+    fn store_read_slice<T: Path>(
         &self,
-        path: *const u8,
-        len: usize,
-        offset: usize,
-        src: *const u8,
-        num_bytes: usize,
-    ) -> i32 {
-        self.host.store_write(path, len, offset, src, num_bytes)
+        path: &T,
+        from_offset: usize,
+        buffer: &mut [u8],
+    ) -> Result<usize, RuntimeError> {
+        self.host.store_read_slice(path, from_offset, buffer)
     }
 
-    unsafe fn store_delete(&self, path: *const u8, len: usize) -> i32 {
-        self.host.store_delete(path, len)
+    #[inline(always)]
+    fn store_read_all(&self, path: &impl Path) -> Result<Vec<u8>, RuntimeError> {
+        self.host.store_read_all(path)
     }
 
-    unsafe fn store_delete_value(&self, path: *const u8, len: usize) -> i32 {
-        self.host.store_delete_value(path, len)
+    #[inline(always)]
+    fn store_write<T: Path>(
+        &mut self,
+        path: &T,
+        src: &[u8],
+        at_offset: usize,
+    ) -> Result<(), RuntimeError> {
+        self.host.store_write(path, src, at_offset)
     }
 
-    unsafe fn store_list_size(&self, path: *const u8, len: usize) -> i64 {
-        self.host.store_list_size(path, len)
+    #[inline(always)]
+    fn store_write_all<T: Path>(
+        &mut self,
+        path: &T,
+        src: &[u8],
+    ) -> Result<(), RuntimeError> {
+        self.host.store_write_all(path, src)
     }
 
-    unsafe fn store_move(
+    #[inline(always)]
+    fn store_delete<T: Path>(&mut self, path: &T) -> Result<(), RuntimeError> {
+        self.host.store_delete(path)
+    }
+
+    #[inline(always)]
+    fn store_delete_value<T: Path>(&mut self, path: &T) -> Result<(), RuntimeError> {
+        self.host.store_delete_value(path)
+    }
+
+    #[inline(always)]
+    fn store_count_subkeys<T: Path>(&self, prefix: &T) -> Result<u64, RuntimeError> {
+        self.host.store_count_subkeys(prefix)
+    }
+
+    #[inline(always)]
+    fn store_move(
+        &mut self,
+        from_path: &impl Path,
+        to_path: &impl Path,
+    ) -> Result<(), RuntimeError> {
+        self.host.store_move(from_path, to_path)
+    }
+
+    #[inline(always)]
+    fn store_copy(
+        &mut self,
+        from_path: &impl Path,
+        to_path: &impl Path,
+    ) -> Result<(), RuntimeError> {
+        self.host.store_copy(from_path, to_path)
+    }
+
+    #[inline(always)]
+    fn reveal_preimage(
         &self,
-        from_path: *const u8,
-        from_path_len: usize,
-        to_path: *const u8,
-        to_path_len: usize,
-    ) -> i32 {
+        hash: &[u8; PREIMAGE_HASH_SIZE],
+        destination: &mut [u8],
+    ) -> Result<usize, RuntimeError> {
+        self.host.reveal_preimage(hash, destination)
+    }
+
+    #[inline(always)]
+    fn store_value_size(&self, path: &impl Path) -> Result<usize, RuntimeError> {
+        self.host.store_value_size(path)
+    }
+
+    #[inline(always)]
+    fn mark_for_reboot(&mut self) -> Result<(), RuntimeError> {
+        self.host.mark_for_reboot()
+    }
+
+    #[inline(always)]
+    fn reveal_metadata(&self) -> RollupMetadata {
+        self.host.reveal_metadata()
+    }
+
+    #[inline(always)]
+    fn reveal_dal_page(
+        &self,
+        published_level: i32,
+        slot_index: u8,
+        page_index: i16,
+        destination: &mut [u8],
+    ) -> Result<usize, RuntimeError> {
         self.host
-            .store_move(from_path, from_path_len, to_path, to_path_len)
+            .reveal_dal_page(published_level, slot_index, page_index, destination)
     }
 
-    unsafe fn store_copy(
-        &self,
-        from_path: *const u8,
-        from_path_len: usize,
-        to_path: *const u8,
-        to_path_len: usize,
-    ) -> i32 {
-        self.host
-            .store_copy(from_path, from_path_len, to_path, to_path_len)
+    #[inline(always)]
+    fn reveal_dal_parameters(&self) -> RollupDalParameters {
+        self.host.reveal_dal_parameters()
     }
 
-    unsafe fn reveal_preimage(
-        &self,
-        hash_addr: *const u8,
-        hash_len: usize,
-        destination_addr: *mut u8,
-        max_bytes: usize,
-    ) -> i32 {
-        self.host
-            .reveal_preimage(hash_addr, hash_len, destination_addr, max_bytes)
+    #[inline(always)]
+    fn last_run_aborted(&self) -> Result<bool, RuntimeError> {
+        self.host.last_run_aborted()
     }
 
-    unsafe fn store_value_size(&self, path: *const u8, path_len: usize) -> i32 {
-        self.host.store_value_size(path, path_len)
+    #[inline(always)]
+    fn upgrade_failed(&self) -> Result<bool, RuntimeError> {
+        self.host.upgrade_failed()
     }
 
-    unsafe fn reveal_metadata(&self, destination_addr: *mut u8, max_bytes: usize) -> i32 {
-        self.host.reveal_metadata(destination_addr, max_bytes)
+    #[inline(always)]
+    fn restart_forced(&self) -> Result<bool, RuntimeError> {
+        self.host.restart_forced()
     }
 
-    unsafe fn reveal(
-        &self,
-        _payload_addr: *const u8,
-        _payload_len: usize,
-        _destination_addr: *mut u8,
-        _max_bytes: usize,
-    ) -> i32 {
-        // TODO: https://gitlab.com/tezos/tezos/-/issues/6171
-        unimplemented!("The `reveal` host function is not yet mocked.")
+    #[inline(always)]
+    fn reboot_left(&self) -> Result<u32, RuntimeError> {
+        self.host.reboot_left()
+    }
+
+    #[inline(always)]
+    fn runtime_version(&self) -> Result<String, RuntimeError> {
+        self.host.runtime_version()
+    }
+}
+
+impl InternalRuntime for EvalHost {
+    fn __internal_store_get_hash<T: tezos_smart_rollup_host::path::Path>(
+        &mut self,
+        path: &T,
+    ) -> Result<Vec<u8>, tezos_smart_rollup_host::runtime::RuntimeError> {
+        self.host.__internal_store_get_hash(path)
+    }
+}
+
+impl ExtendedRuntime for EvalHost {
+    fn store_get_hash<T: tezos_smart_rollup_host::path::Path>(
+        &mut self,
+        path: &T,
+    ) -> Result<Vec<u8>, tezos_smart_rollup_host::runtime::RuntimeError> {
+        self.host.store_get_hash(path)
     }
 }

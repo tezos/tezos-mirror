@@ -30,10 +30,10 @@ use ecdsa::ecrecover_precompile;
 use evm::{Context, ExitReason, Handler, Transfer};
 use fa_bridge::fa_bridge_precompile;
 use hash::{ripemd160_precompile, sha256_precompile};
-use host::runtime::Runtime;
 use identity::identity_precompile;
 use modexp::modexp_precompile;
 use primitive_types::H160;
+use tezos_evm_runtime::runtime::Runtime;
 use withdrawal::withdrawal_precompile;
 use zero_knowledge::{ecadd_precompile, ecmul_precompile, ecpairing_precompile};
 
@@ -272,14 +272,14 @@ mod test_helpers {
     use primitive_types::{H160, U256};
     use tezos_ethereum::block::BlockConstants;
     use tezos_ethereum::block::BlockFees;
-    use tezos_smart_rollup_mock::MockHost;
+    use tezos_evm_runtime::runtime::MockKernelHost;
 
     use super::precompile_set;
     const DUMMY_ALLOCATED_TICKS: u64 = 100_000_000;
     pub const DUMMY_TICKETER: &str = "KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5";
 
     pub fn set_balance(
-        host: &mut MockHost,
+        host: &mut MockKernelHost,
         evm_account_storage: &mut EthereumAccountStorage,
         address: &H160,
         balance: U256,
@@ -307,7 +307,7 @@ mod test_helpers {
         is_static: bool,
     ) -> Result<ExecutionOutcome, EthereumError> {
         let caller = H160::from_low_u64_be(118u64);
-        let mut mock_runtime = MockHost::default();
+        let mut mock_runtime = MockKernelHost::default();
         let block_fees = BlockFees::new(
             U256::from(21000),
             U256::from(21000),
@@ -321,7 +321,7 @@ mod test_helpers {
             H160::zero(),
         );
         let mut evm_account_storage = init_evm_account_storage().unwrap();
-        let precompiles = precompile_set::<MockHost>(false);
+        let precompiles = precompile_set::<MockKernelHost>(false);
         let config = Config::shanghai();
         let gas_price = U256::from(21000);
 
@@ -365,7 +365,7 @@ mod test_helpers {
         )
     }
 
-    fn set_ticketer(host: &mut MockHost, address: &str) {
+    fn set_ticketer(host: &mut MockKernelHost, address: &str) {
         host.store_write(&NATIVE_TOKEN_TICKETER_PATH, address.as_bytes(), 0)
             .unwrap();
     }

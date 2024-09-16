@@ -22,10 +22,8 @@ use tezos_ethereum::{
     wei::eth_from_mutez,
 };
 use tezos_evm_logging::{log, Level::Info};
-use tezos_smart_rollup::{
-    host::Runtime,
-    michelson::{ticket::FA2_1Ticket, MichelsonBytes},
-};
+use tezos_evm_runtime::runtime::Runtime;
+use tezos_smart_rollup::michelson::{ticket::FA2_1Ticket, MichelsonBytes};
 
 use crate::tick_model;
 
@@ -224,7 +222,7 @@ mod tests {
     use evm_execution::account_storage::init_account_storage;
     use primitive_types::{H160, U256};
     use rlp::Decodable;
-    use tezos_smart_rollup_mock::MockHost;
+    use tezos_evm_runtime::runtime::MockKernelHost;
 
     use crate::{bridge::DEPOSIT_EVENT_TOPIC, CONFIG};
 
@@ -275,7 +273,7 @@ mod tests {
 
     #[test]
     fn deposit_execution_outcome_contains_event() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let mut evm_account_storage = init_account_storage().unwrap();
 
         let deposit = dummy_deposit();
@@ -302,7 +300,7 @@ mod tests {
 
     #[test]
     fn deposit_execution_fails_due_to_balance_overflow() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let mut evm_account_storage = init_account_storage().unwrap();
 
         let mut deposit = dummy_deposit();

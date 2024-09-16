@@ -21,5 +21,6 @@ tezos_crypto_rs.workspace = true
 sha3.workspace = true
 
 tezos_ethereum.workspace = true
+tezos-evm-runtime.workspace = true
 tezos-smart-rollup-host.workspace = true
 tezos-smart-rollup-storage.workspace = true
