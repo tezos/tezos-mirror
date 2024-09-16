@@ -84,14 +84,28 @@ let data_dir_not_found =
     ~level:Warning
     ("path", Data_encoding.(string))
 
-let retry_fetching_node_config =
+let retry_fetching_node_config level prefix =
   declare_2
     ~section
-    ~name:"retry_fetching_config"
-    ~msg:"Cannot fetch config from l1 node at {endpoint}, retrying in {delay}s"
-    ~level:Error
+    ~name:(prefix ^ "retry_fetching_config")
+    ~msg:"cannot fetch config from l1 node at {endpoint}, retrying in {delay}s"
+    ~level
     ("endpoint", Data_encoding.string)
     ("delay", Data_encoding.float)
+
+let retry_fetching_node_config_notice =
+  retry_fetching_node_config Internal_event.Notice "notice"
+
+let retry_fetching_node_config_warning =
+  retry_fetching_node_config Internal_event.Warning "warning"
+
+let fetched_config_success =
+  declare_1
+    ~section
+    ~name:"fetched_config_success"
+    ~msg:"success fetching config from l1 node at {endpoint}"
+    ~level:Notice
+    ("endpoint", Data_encoding.string)
 
 let failed_to_persist_profiles =
   declare_2
