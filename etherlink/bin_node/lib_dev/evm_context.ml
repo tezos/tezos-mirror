@@ -1516,6 +1516,11 @@ let start ?kernel_path ~data_dir ~preimages ~preimages_endpoint
   let*! () = Blueprint_events.publisher_is_ready () in
   Lwt.wakeup worker_waker worker ;
   let*! init_status in
+  let*! head_info in
+  let (Qty finalized_number) = !head_info.finalized_number in
+  let (Qty next_blueprint_number) = !head_info.next_blueprint_number in
+  Metrics.set_level ~level:(Z.pred next_blueprint_number) ;
+  Metrics.set_confirmed_level ~level:finalized_number ;
   let*! () = Evm_context_events.ready () in
   return init_status
 

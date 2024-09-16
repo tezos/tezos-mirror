@@ -12,6 +12,20 @@ let install_finalizer_rpc server_public_finalizer =
   let* () = server_public_finalizer () in
   Misc.unwrap_error_monad @@ fun () -> Tx_pool.shutdown ()
 
+let set_metrics_level (ctxt : Evm_ro_context.t) =
+  let open Lwt_result_syntax in
+  let+ candidate = Evm_store.(use ctxt.store Context_hashes.find_latest) in
+  match candidate with
+  | Some (Qty latest, _) -> Metrics.set_level ~level:latest
+  | None -> ()
+
+let set_metrics_confirmed_level (ctxt : Evm_ro_context.t) =
+  let open Lwt_result_syntax in
+  let+ candidate = Evm_store.(use ctxt.store Context_hashes.find_finalized) in
+  match candidate with
+  | Some (Qty finalized, _) -> Metrics.set_confirmed_level ~level:finalized
+  | None -> ()
+
 let main ~data_dir ~evm_node_endpoint ~(config : Configuration.t) =
   let open Lwt_result_syntax in
   let* time_between_blocks =
@@ -45,6 +59,10 @@ let main ~data_dir ~evm_node_endpoint ~(config : Configuration.t) =
         max_number_of_chunks = None;
       }
   in
+
+  let* () = set_metrics_level ctxt in
+  let* () = set_metrics_confirmed_level ctxt in
+
   Metrics.init
     ~mode:"rpc"
     ~tx_pool_size_info:Tx_pool.size_info
@@ -74,6 +92,7 @@ let main ~data_dir ~evm_node_endpoint ~(config : Configuration.t) =
     when_ (Option.is_some blueprint.kernel_upgrade) @@ fun () ->
     Evm_ro_context.preload_kernel_from_level ctxt (Qty number)
   in
-  Metrics.set_level ~level:number ;
   Blueprints_watcher.notify blueprint ;
+  Metrics.set_level ~level:number ;
+  let* () = set_metrics_confirmed_level ctxt in
   return_unit
