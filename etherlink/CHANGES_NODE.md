@@ -38,6 +38,8 @@
 
 - Delayed transactions are now stored on applied blueprint, instead of internal
   evm event. Otherwise it could result in incoherent blueprints. (!14878, !14927)
+- Nodes connected to an upstream EVM node wil now use the content-type
+  `octet-stream` (in place of JSON). (!14949)
 
 ## Version 0.3 (2024-09-10)
 

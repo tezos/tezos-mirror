@@ -106,7 +106,7 @@ let register get_next_blueprint_number find_blueprint smart_rollup_address
 
 let get_smart_rollup_address ~evm_node_endpoint =
   Tezos_rpc_http_client_unix.RPC_client_unix.call_service
-    [Media_type.json]
+    [Media_type.octet_stream]
     ~base:evm_node_endpoint
     get_smart_rollup_address_service
     ()
@@ -117,7 +117,7 @@ let get_time_between_blocks ?fallback ~evm_node_endpoint () =
   let open Lwt_result_syntax in
   let*! res =
     Tezos_rpc_http_client_unix.RPC_client_unix.call_service
-      [Media_type.json]
+      [Media_type.octet_stream]
       ~base:evm_node_endpoint
       get_time_between_blocks
       ()
@@ -133,7 +133,7 @@ let get_time_between_blocks ?fallback ~evm_node_endpoint () =
 
 let get_blueprint ~evm_node_endpoint Ethereum_types.(Qty level) =
   Tezos_rpc_http_client_unix.RPC_client_unix.call_service
-    [Media_type.json]
+    [Media_type.octet_stream]
     ~base:evm_node_endpoint
     get_blueprint_service
     ((), Z.to_int64 level)
@@ -146,7 +146,7 @@ let monitor_blueprints ~evm_node_endpoint Ethereum_types.(Qty level) =
   let on_chunk v = push (Some v) and on_close () = push None in
   let* _spill_all =
     Tezos_rpc_http_client_unix.RPC_client_unix.call_streamed_service
-      [Media_type.json]
+      [Media_type.octet_stream]
       ~base:evm_node_endpoint
       blueprint_watcher_service
       ~on_chunk
