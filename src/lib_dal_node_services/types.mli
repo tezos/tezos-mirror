@@ -357,7 +357,7 @@ module Version : sig
 end
 
 module Health : sig
-  type status = Up | Degraded | Down | Ok | Ko
+  type status = (* TODO: missing doc strings *) Up | Degraded | Down | Ok | Ko
 
   type t = {status : status; checks : (string * status) list}
 
