@@ -74,6 +74,10 @@ pub mod test_utils;
 /// the equivalent amount of gas is 0.0005 * 10^18 / 10^9 = 500_000
 ///
 /// Multiplying by two to enable more involved proxy contract implementations.
+///
+/// /!\ Note that if the EVM gas changes over future upgrades, we might break
+/// compatibility with contract relying on this gas limit. If the EVM consumes
+/// more gas in the future, we need to increase this gas limit as well. /!\
 pub const FA_DEPOSIT_PROXY_GAS_LIMIT: u64 = 1_000_000;
 
 /// Overapproximation of the amount of ticks for updating
