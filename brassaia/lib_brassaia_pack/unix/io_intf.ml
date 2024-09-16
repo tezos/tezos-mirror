@@ -156,7 +156,5 @@ module type S = sig
 end
 
 module type Sigs = sig
-  module type S = S
-
   module Unix : S with type misc_error = Unix.error * string * string
 end

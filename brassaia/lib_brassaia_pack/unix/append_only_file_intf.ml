@@ -15,6 +15,7 @@
  *)
 
 open Import
+module Io = Io.Unix
 
 module type S = sig
   (** Abstraction for brassaia-pack's append only files (i.e. suffix and dict).
@@ -24,9 +25,6 @@ module type S = sig
 
       It comprises a persistent file, an append buffer and take care of
       automatically shifting offsets to deal with legacy file headers. *)
-
-  module Io : Io.S
-  module Errs : Io_errors.S
 
   type t
 
@@ -184,9 +182,4 @@ module type S = sig
   val path : t -> string
 end
 
-module type Sigs = sig
-  module type S = S
-
-  module Make (Io : Io.S) (Errs : Io_errors.S with module Io = Io) :
-    S with module Io = Io and module Errs = Errs
-end
+module type Sigs = S

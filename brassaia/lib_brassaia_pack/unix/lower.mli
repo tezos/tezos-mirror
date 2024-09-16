@@ -14,5 +14,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-include Lower_intf.Sigs
+include Lower_intf.S
+
+type volume_identifier = string [@@deriving brassaia]
+
 (** @inline *)

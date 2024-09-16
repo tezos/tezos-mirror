@@ -21,7 +21,7 @@ module Make (Args : Gc_args.S) = struct
   module Args = Args
   open Args
   module Io = File_manager.Io
-  module Ao = Append_only_file.Make (Io) (Errs)
+  module Ao = Append_only_file
   module Worker = Gc_worker.Make (Args)
 
   type t = {
@@ -30,8 +30,8 @@ module Make (Args : Gc_args.S) = struct
     task : Async.t;
     unlink : bool;
     new_suffix_start_offset : int63;
-    resolver : (Stats.Latest_gc.stats, Errs.t) result Lwt.u;
-    promise : (Stats.Latest_gc.stats, Errs.t) result Lwt.t;
+    resolver : (Stats.Latest_gc.stats, Io_errors.t) result Lwt.u;
+    promise : (Stats.Latest_gc.stats, Io_errors.t) result Lwt.t;
     dispatcher : Dispatcher.t;
     file_manager : File_manager.t;
     contents : read Contents_store.t;
@@ -239,16 +239,19 @@ module Make (Args : Gc_args.S) = struct
       Ok string
     in
     let read_error err =
-      `Corrupted_gc_result_file (Brassaia.Type.to_string Errs.t err)
+      `Corrupted_gc_result_file (Brassaia.Type.to_string Io_errors.t err)
     in
-    let gc_error err = `Gc_process_error (Brassaia.Type.to_string Errs.t err) in
+    let gc_error err =
+      `Gc_process_error (Brassaia.Type.to_string Io_errors.t err)
+    in
     let* s = read_file () |> Result.map_error read_error in
     match Brassaia.Type.of_json_string Worker.gc_output_t s with
     | Error (`Msg error) -> Error (`Corrupted_gc_result_file error)
     | Ok ok -> ok |> Result.map_error gc_error
 
   let clean_after_abort t =
-    File_manager.cleanup t.file_manager |> Errs.log_if_error "clean_after_abort"
+    File_manager.cleanup t.file_manager
+    |> Io_errors.log_if_error "clean_after_abort"
 
   let finalise ~wait t =
     match t.resulting_stats with
@@ -328,7 +331,7 @@ module Make (Args : Gc_args.S) = struct
             mapping_end_poff = Some gc_results.mapping_size;
           }
     | _ ->
-        let r = gc_errors status gc_output |> Errs.raise_if_error in
+        let r = gc_errors status gc_output |> Io_errors.raise_if_error in
         Lwt.return r
 
   let on_finalise t f =

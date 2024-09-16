@@ -42,14 +42,14 @@ module Make
   val finalise :
     wait:bool ->
     t ->
-    ([> `Running | `Finalised of Stats.Latest_gc.stats ], Args.Errs.t) result
+    ([> `Running | `Finalised of Stats.Latest_gc.stats ], Io_errors.t) result
     Lwt.t
   (** [finalise ~wait t] returns the state of the GC process.
 
       If [wait = true], the call will block until GC finishes. *)
 
   val on_finalise :
-    t -> ((Stats.Latest_gc.stats, Args.Errs.t) result -> unit Lwt.t) -> unit
+    t -> ((Stats.Latest_gc.stats, Io_errors.t) result -> unit Lwt.t) -> unit
   (** Attaches a callback to the GC process, which will be called when the GC
       finalises. *)
 

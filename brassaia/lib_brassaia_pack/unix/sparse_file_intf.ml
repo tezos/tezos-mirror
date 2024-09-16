@@ -17,8 +17,8 @@
 open! Import
 
 module type S = sig
-  module Io : Io.S
-  module Errs : Io_errors.S with module Io = Io
+  module Io : module type of Io.Unix
+  module Errs : Io_errors.S
 
   type t
   type open_error := [ Io.open_error | `Corrupted_mapping_file of string ]
@@ -150,8 +150,4 @@ module type S = sig
   end
 end
 
-module type Sigs = sig
-  module type S = S
-
-  module Make (Io : Io.S) : S with module Io = Io
-end
+module type Sigs = S

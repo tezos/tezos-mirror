@@ -19,9 +19,9 @@ open! Import
 type volume_identifier = string [@@deriving brassaia]
 
 module type Volume = sig
-  module Io : Io.S
-  module Errs : Io_errors.S
-  module Sparse : Sparse_file.S
+  module Io = Io.Unix
+  module Errs = Io_errors
+  module Sparse = Sparse_file
 
   type t
 
@@ -49,9 +49,9 @@ module type Volume = sig
 end
 
 module type S = sig
-  module Io : Io.S
+  module Io = Io.Unix
   module Errs : Io_errors.S
-  module Volume : Volume with module Io = Io
+  module Volume : Volume
 
   type t
   type open_error = [ Volume.open_error | `Volume_missing of string ]
@@ -176,16 +176,4 @@ module type S = sig
   val cleanup : generation:int -> t -> (unit, [> `Sys_error of string ]) result
   (** [cleanup ~generation t] will attempt to cleanup the appendable volume if a
       GC crash has occurred. *)
-end
-
-module type Sigs = sig
-  module type S = S
-
-  type nonrec volume_identifier = volume_identifier [@@deriving brassaia]
-
-  module Make_volume (Io : Io.S) (Errs : Io_errors.S with module Io = Io) :
-    Volume with module Io = Io and module Errs = Errs
-
-  module Make (Io : Io.S) (Errs : Io_errors.S with module Io = Io) :
-    S with module Io = Io and module Errs = Errs
 end

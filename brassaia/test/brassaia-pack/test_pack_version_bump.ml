@@ -28,8 +28,8 @@ module Private = struct
   (* the following modules are necessary to expose the File_manager.*)
   module Index = Brassaia_pack_unix.Index.Make (Schema.Hash)
   module Io = Brassaia_pack_unix.Io.Unix
-  module Errs = Brassaia_pack_unix.Io_errors.Make (Io)
-  module File_manager = Brassaia_pack_unix.File_manager.Make (Io) (Index) (Errs)
+  module Io_errors = Brassaia_pack_unix.Io_errors
+  module File_manager = Brassaia_pack_unix.File_manager.Make (Index)
 end
 
 module Util = struct
@@ -93,7 +93,7 @@ module Util = struct
   (** Get the version of the underlying file; file is assumed to exist; file is
       assumed to be an Brassaia_pack.IO.Unix file *)
   let io_get_version ~root : [ `V1 | `V2 | `V3 | `V4 | `V5 ] =
-    File_manager.version ~root |> Errs.raise_if_error
+    File_manager.version ~root |> Io_errors.raise_if_error
 
   let alco_check_version ~pos:_ ~expected ~actual =
     Alcotest.check_repr Brassaia_pack.Version.t "" expected actual

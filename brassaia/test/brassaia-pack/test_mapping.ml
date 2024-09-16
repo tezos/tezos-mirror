@@ -17,8 +17,8 @@
 open! Import
 module Int63 = Optint.Int63
 module Io = Brassaia_pack_unix.Io.Unix
-module Errs = Brassaia_pack_unix.Io_errors.Make (Io)
-module Sparse_file = Brassaia_pack_unix.Sparse_file.Make (Io)
+module Io_errors = Brassaia_pack_unix.Io_errors
+module Sparse_file = Brassaia_pack_unix.Sparse_file
 
 let test_dir = Filename.concat "_build" "test-pack-mapping"
 
@@ -34,7 +34,9 @@ let process_on_disk pairs =
   Io.unlink mapping |> ignore;
   let data = Brassaia_pack.Layout.V5.prefix ~root:test_dir ~generation:1 in
   Io.unlink data |> ignore;
-  let sparse = Sparse_file.Ao.create ~mapping ~data |> Errs.raise_if_error in
+  let sparse =
+    Sparse_file.Ao.create ~mapping ~data |> Io_errors.raise_if_error
+  in
   List.iter
     (fun (off, len) ->
       Format.printf "%i (+%i) => %i@." off len (off + len);
@@ -43,15 +45,15 @@ let process_on_disk pairs =
       Sparse_file.Ao.append_seq_exn sparse ~off str)
     (List.rev pairs);
   let mapping_size = Int63.to_int (Sparse_file.Ao.mapping_size sparse) in
-  Sparse_file.Ao.flush sparse |> Errs.raise_if_error;
-  Sparse_file.Ao.close sparse |> Errs.raise_if_error;
+  Sparse_file.Ao.flush sparse |> Io_errors.raise_if_error;
+  Sparse_file.Ao.close sparse |> Io_errors.raise_if_error;
   let sparse =
-    Sparse_file.open_ro ~mapping_size ~mapping ~data |> Errs.raise_if_error
+    Sparse_file.open_ro ~mapping_size ~mapping ~data |> Io_errors.raise_if_error
   in
   let l = ref [] in
   let f ~off ~len = l := (Int63.to_int off, len) :: !l in
-  Sparse_file.iter sparse f |> Errs.raise_if_error;
-  Sparse_file.close sparse |> Errs.raise_if_error;
+  Sparse_file.iter sparse f |> Io_errors.raise_if_error;
+  Sparse_file.close sparse |> Io_errors.raise_if_error;
   !l |> List.rev
 
 (** Emulate the behaviour of the [Mapping_file] routines to process [pairs] *)

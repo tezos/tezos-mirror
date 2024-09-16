@@ -15,7 +15,6 @@
  *)
 
 open! Import
-open Io_intf
 module Syscalls = Brassaia_index_unix.Index_unix.Syscalls
 
 (* File utils, taken from index.unix package.
@@ -47,8 +46,6 @@ module Util = struct
     in
     aux fd_offset 0 length
 end
-
-module type S = S
 
 module Unix = struct
   type misc_error = Unix.error * string * string

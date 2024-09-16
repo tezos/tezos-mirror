@@ -25,10 +25,9 @@ module Io = Brassaia_pack_unix.Io.Unix
 let ( let$ ) res f = f @@ Result.get_ok res
 
 module Direct_tc = struct
-  module Control = Brassaia_pack_unix.Control_file.Volume (Io)
-  module Errs = Brassaia_pack_unix.Io_errors.Make (Io)
-  module Lower = Brassaia_pack_unix.Lower.Make (Io) (Errs)
-  module Sparse = Brassaia_pack_unix.Sparse_file.Make (Io)
+  module Control = Brassaia_pack_unix.Control_file.Volume
+  module Lower = Brassaia_pack_unix.Lower
+  module Sparse = Brassaia_pack_unix.Sparse_file
 
   let create_control volume_path payload =
     let path = Brassaia_pack.Layout.V5.Volume.control ~root:volume_path in
@@ -188,7 +187,7 @@ module Store_tc = struct
     let open Store.Internal in
     file_manager repo
     |> File_manager.lower
-    |> Option.map File_manager.Lower.volume_num
+    |> Option.map Lower.volume_num
     |> Option.value ~default:0
 
   let volume_path repo offset =
@@ -197,11 +196,11 @@ module Store_tc = struct
     let volume =
       match lower with
       | None -> Alcotest.fail "expected lower"
-      | Some l -> File_manager.Lower.find_volume ~off:offset l
+      | Some l -> Lower.find_volume ~off:offset l
     in
     match volume with
     | None -> Alcotest.fail "expected volume"
-    | Some v -> File_manager.Lower.Volume.path v
+    | Some v -> Lower.Volume.path v
 
   let generation repo =
     let open Store.Internal in

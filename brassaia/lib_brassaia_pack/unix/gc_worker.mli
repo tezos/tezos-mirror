@@ -48,6 +48,6 @@ module Make
   }
   [@@deriving brassaia]
 
-  type gc_output = (gc_results, Args.Errs.t) result [@@deriving brassaia]
+  type gc_output = (gc_results, Io_errors.t) result [@@deriving brassaia]
 end
 with module Args := Args
