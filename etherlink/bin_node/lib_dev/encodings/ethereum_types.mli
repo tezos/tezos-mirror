@@ -232,10 +232,17 @@ type txpool = {
 
 val txpool_encoding : txpool Data_encoding.t
 
+module StorageMap : sig
+  include Map.S with type key = hex
+
+  val associative_array_encoding : 'a Data_encoding.t -> 'a t Data_encoding.t
+end
+
 type state_account_override = {
   balance : quantity option;
   nonce : quantity option;
   code : hex option;
+  state_diff : hex StorageMap.t;
 }
 
 type state_override = state_account_override AddressMap.t

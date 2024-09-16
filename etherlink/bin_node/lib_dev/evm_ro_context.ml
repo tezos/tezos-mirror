@@ -205,7 +205,7 @@ struct
           ~destination:Ctxt.ctxt.smart_rollup_address
           ()
       in
-      let*! simulate_state =
+      let* simulate_state =
         State_override.update_accounts state_override simulate_state
       in
       let* raw_insights =

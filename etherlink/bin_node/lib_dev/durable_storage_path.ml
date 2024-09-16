@@ -51,29 +51,74 @@ let sequencer_key = EVM.make "/sequencer"
 let maximum_gas_per_transaction = EVM.make "/maximum_gas_per_transaction"
 
 module Accounts = struct
-  let accounts = World_state.make "/eth_accounts"
+  let accounts_path = World_state.make "/eth_accounts"
 
-  let balance = "/balance"
+  let balance_path = "/balance"
 
-  let nonce = "/nonce"
+  let nonce_path = "/nonce"
 
-  let code = "/code"
+  let code_path = "/code"
 
   let code_hash = "/code.hash"
 
-  let storage = "/storage"
+  let storage_path = "/storage"
 
-  let account (Address (Hex s)) = accounts ^ "/" ^ s
+  let account (Address (Hex s)) = accounts_path ^ "/" ^ s
 
-  let balance address = account address ^ balance
+  let balance address = account address ^ balance_path
 
-  let nonce address = account address ^ nonce
+  let nonce address = account address ^ nonce_path
 
-  let code address = account address ^ code
+  let code address = account address ^ code_path
 
   let code_hash address = account address ^ code_hash
 
-  let storage address index = account address ^ storage ^ "/" ^ index
+  let storage address index = account address ^ storage_path ^ "/" ^ index
+
+  type error += Invalid_address of string | Invalid_key of string
+
+  let () =
+    register_error_kind
+      `Permanent
+      ~id:"durable_storage_invalid_address"
+      ~title:"Invalid address"
+      ~description:"Tried to access the account storage of an invalid address."
+      ~pp:(fun ppf path ->
+        Format.fprintf ppf "No account storage for invalid address %s" path)
+      Data_encoding.(obj1 (req "durable_storage_invalid_address" string))
+      (function Invalid_address path -> Some path | _ -> None)
+      (fun path -> Invalid_address path) ;
+    register_error_kind
+      `Permanent
+      ~id:"durable_storage_invalid_key"
+      ~title:"Invalid storage key"
+      ~description:"Tried to access an invalid key in an account storage."
+      ~pp:(fun ppf path ->
+        Format.fprintf ppf "%s is not a valid storage key" path)
+      Data_encoding.(obj1 (req "durable_storage_invalid_key" string))
+      (function Invalid_key path -> Some path | _ -> None)
+      (fun path -> Invalid_key path)
+
+  let account_e (Address (Hex s)) =
+    let open Result_syntax in
+    if String.length s = 40 then return (accounts_path ^ "/" ^ s)
+    else tzfail (Invalid_address s)
+
+  let concat_e address path =
+    let open Result_syntax in
+    let* address_path = account_e address in
+    return (address_path ^ path)
+
+  let balance_e address = concat_e address balance_path
+
+  let nonce_e address = concat_e address nonce_path
+
+  let code_e address = concat_e address code_path
+
+  let storage_e address index =
+    if String.length index = 64 then
+      concat_e address (storage_path ^ "/" ^ index)
+    else Result_syntax.tzfail (Invalid_key index)
 end
 
 module Code = struct
