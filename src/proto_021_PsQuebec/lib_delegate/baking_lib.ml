@@ -304,13 +304,16 @@ let propose_at_next_level ~minimal_timestamp state =
         state.global_state.operation_worker
     in
     let kind = Fresh pool in
+    let force_apply =
+      Round.(minimal_round >= state.global_state.config.force_apply_from_round)
+    in
     let block_to_bake =
       {
         predecessor = state.level_state.latest_proposal.block;
         round = minimal_round;
         delegate;
         kind;
-        force_apply = state.global_state.config.force_apply;
+        force_apply;
       }
     in
     let* prepared_block =
@@ -360,9 +363,9 @@ let attestation_quorum state =
        - Yes :: repropose block with right payload and preattestations for current round
        - No  :: repropose fresh block for current round *)
 let propose (cctxt : Protocol_client_context.full) ?minimal_fees
-    ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?force_apply
-    ?(force = false) ?(minimal_timestamp = false) ?extra_operations
-    ?context_path ?state_recorder delegates =
+    ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte
+    ?force_apply_from_round ?(force = false) ?(minimal_timestamp = false)
+    ?extra_operations ?context_path ?state_recorder delegates =
   let open Lwt_result_syntax in
   let*! () = Events.(emit Baking_events.Delegates.delegates_used delegates) in
   let cache = Baking_cache.Block_cache.create 10 in
@@ -373,7 +376,7 @@ let propose (cctxt : Protocol_client_context.full) ?minimal_fees
       ?minimal_nanotez_per_gas_unit
       ?minimal_nanotez_per_byte
       ?context_path
-      ?force_apply
+      ?force_apply_from_round
       ~force
       ?extra_operations
       ?state_recorder
@@ -691,13 +694,16 @@ let rec baking_minimal_timestamp ~count state
          signed_attestations.signed_consensus_votes)
   in
   let kind = Fresh pool in
+  let force_apply =
+    Round.(minimal_round >= state.global_state.config.force_apply_from_round)
+  in
   let block_to_bake =
     {
       predecessor = latest_proposal.block;
       round = minimal_round;
       delegate;
       kind;
-      force_apply = state.global_state.config.force_apply;
+      force_apply;
     }
   in
   let* prepared_block =
@@ -757,10 +763,10 @@ let rec baking_minimal_timestamp ~count state
     baking_minimal_timestamp ~count:(pred count) new_state block_stream
 
 let bake (cctxt : Protocol_client_context.full) ?minimal_fees
-    ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?force_apply ?force
-    ?(minimal_timestamp = false) ?extra_operations
-    ?(monitor_node_mempool = true) ?context_path ?dal_node_endpoint ?(count = 1)
-    ?votes ?state_recorder delegates =
+    ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte
+    ?force_apply_from_round ?force ?(minimal_timestamp = false)
+    ?extra_operations ?(monitor_node_mempool = true) ?context_path
+    ?dal_node_endpoint ?(count = 1) ?votes ?state_recorder delegates =
   let open Lwt_result_syntax in
   let*! () = Events.(emit Baking_events.Delegates.delegates_used delegates) in
   let config =
@@ -769,7 +775,7 @@ let bake (cctxt : Protocol_client_context.full) ?minimal_fees
       ?minimal_nanotez_per_gas_unit
       ?minimal_nanotez_per_byte
       ?context_path
-      ?force_apply
+      ?force_apply_from_round
       ?force
       ?extra_operations
       ?dal_node_endpoint
