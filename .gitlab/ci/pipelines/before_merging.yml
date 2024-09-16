@@ -4820,7 +4820,7 @@ oc.build:homebrew:
   script:
   - apt install -y autoconf cmake libev-dev libffi-dev libgmp-dev libprotobuf-dev
     libsqlite3-dev protobuf-compiler libhidapi-dev pkg-config zlib1g-dev libpq-dev
-  - brew install -v scripts/packaging/Formula/octez.rb
+  - ./scripts/packaging/test_homebrew_install.sh
   variables:
     CARGO_NET_OFFLINE: "false"
 

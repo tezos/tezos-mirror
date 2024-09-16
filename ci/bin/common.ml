@@ -1131,7 +1131,7 @@ let job_build_homebrew ?rules ~__POS__ ~name ?(stage = Stages.build)
       "apt install -y autoconf cmake libev-dev libffi-dev libgmp-dev \
        libprotobuf-dev libsqlite3-dev protobuf-compiler libhidapi-dev \
        pkg-config zlib1g-dev libpq-dev";
-      "brew install -v scripts/packaging/Formula/octez.rb";
+      "./scripts/packaging/test_homebrew_install.sh";
     ]
   |> enable_networked_cargo
 

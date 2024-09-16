@@ -30,9 +30,8 @@ fi
 
 # prepare target dir
 
-# if it's a release tag, then it can be a RC release or a final release
 if [ -n "${gitlab_release_no_v:-}" ]; then
-  # It a release tag, this can be either a real or test release
+  # if it's a release tag, then it can be a RC release or a final release
   if [ -n "${gitlab_release_rc_version}" ]; then
     # Release candidate
     TARGETDIR="public/homebrew/RC/Formula"
