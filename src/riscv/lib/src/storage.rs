@@ -3,9 +3,9 @@
 //
 // SPDX-License-Identifier: MIT
 
+pub(crate) mod binary;
 mod chunked_io;
 
-use bincode::{deserialize, serialize};
 use std::{
     io::{self, Write},
     path::{Path, PathBuf},
@@ -139,7 +139,7 @@ impl Repo {
         }
 
         // A commit contains the list of all chunks needed to reconstruct `data`.
-        let commit_bytes = serialize(&commit)?;
+        let commit_bytes = binary::serialise(&commit)?;
         self.backend.store(&commit_bytes)
     }
 
@@ -150,19 +150,19 @@ impl Repo {
     ) -> Result<Hash, StorageError> {
         let chunk_hashes = {
             let mut writer = chunked_io::ChunkWriter::new(&mut self.backend);
-            bincode::serialize_into(&mut writer, subject)?;
+            binary::serialise_into(subject, &mut writer)?;
             writer.finalise()?
         };
 
         // A commit contains the list of all chunks needed to reconstruct the underlying data.
-        let commit_bytes = serialize(&chunk_hashes)?;
+        let commit_bytes = binary::serialise(&chunk_hashes)?;
         self.backend.store(&commit_bytes)
     }
 
     /// Checkout the bytes committed under `id`, if the commit exists.
     pub fn checkout(&self, id: &Hash) -> Result<Vec<u8>, StorageError> {
         let bytes = self.backend.load(id)?;
-        let commit: Vec<Hash> = deserialize(&bytes)?;
+        let commit: Vec<Hash> = binary::deserialise(&bytes)?;
         let mut bytes = Vec::new();
         for hash in commit {
             let mut chunk = self.backend.load(&hash).map_err(|e| {
@@ -183,7 +183,7 @@ impl Repo {
         id: &Hash,
     ) -> Result<S, StorageError> {
         let reader = chunked_io::ChunkedReader::new(&self.backend, id)?;
-        Ok(bincode::deserialize_from(reader)?)
+        Ok(binary::deserialise_from(reader)?)
     }
 
     /// A snapshot is a new repo to which only `id` has been committed.
@@ -196,7 +196,7 @@ impl Repo {
             return Err(StorageError::InvalidRepo);
         };
         let bytes = self.backend.load(id)?;
-        let commit: Vec<Hash> = deserialize(&bytes)?;
+        let commit: Vec<Hash> = binary::deserialise(&bytes)?;
         for chunk in commit {
             self.backend.copy(&chunk, path)?;
         }

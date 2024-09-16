@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use super::{Hash, StorageError, Store, CHUNK_SIZE};
+use super::{binary, Hash, StorageError, Store, CHUNK_SIZE};
 use std::{
     cmp,
     collections::VecDeque,
@@ -83,7 +83,7 @@ impl<'a> ChunkedReader<'a> {
     /// Create a new reader that pulls the chunks from the given [`Store`].
     pub fn new(store: &'a Store, hash: &Hash) -> Result<Self, StorageError> {
         let raw_hashes = store.load(hash)?;
-        let hashes = bincode::deserialize(raw_hashes.as_slice())?;
+        let hashes = binary::deserialise(raw_hashes.as_slice())?;
         Ok(Self {
             store,
             hashes,
