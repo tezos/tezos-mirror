@@ -6,6 +6,7 @@
 (*****************************************************************************)
 
 type error =
+  | Invalid_action of string
   | Invalid_payload of Parsetree.payload
   | Invalid_aggregate of Key.t
   | Invalid_mark of Key.t
@@ -18,6 +19,14 @@ type error =
 let error loc err =
   let msg, hint =
     match err with
+    | Invalid_action action ->
+        ( "Invalid action.",
+          Format.asprintf
+            "@[<v 2>Accepted actions are aggregate, aggregate_s, aggregate_f, \
+             mark, record, record_f, record_s, reset_block_section, span, \
+             span_f, span_s, stamp and stop]@,\
+             Found: %s@."
+            action )
     | Invalid_payload payload ->
         ( "Invalid or empty attribute payload.",
           Format.asprintf

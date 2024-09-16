@@ -42,7 +42,7 @@ module rec Constants : sig
   val filter_out_all_handled_attributes :
     Parsetree.attribute list -> Parsetree.attribute list
 end = struct
-  (* This rewriter handles ppxes starting with profiling. *)
+  (* This rewriter handles ppxes starting with profiler. *)
   let namespace = "profiler"
 
   type t = {action : string; attribute_name : string}
@@ -240,12 +240,22 @@ end = struct
     ]
     |> List.map (fun (const, fn) -> (Constants.get_attribute const, fn))
 
-  let of_string =
+  let of_string loc =
     let module StringMap = Map.Make (String) in
     let association_constant_rewriter =
       association_constant_rewriter |> List.to_seq |> StringMap.of_seq
     in
-    fun attribute -> StringMap.find_opt attribute association_constant_rewriter
+    fun attribute ->
+      match StringMap.find_opt attribute association_constant_rewriter with
+      | Some res -> Some res
+      | None ->
+          (* Raise an Error if the ppx starts with [@profiler.action ...]
+             but action is not handled by this ppx *)
+          if String.starts_with ~prefix:"profiler." attribute then
+            match String.split_on_char '.' attribute with
+            | [_; action] -> Error.error loc Error.(Invalid_action action)
+            | _ -> None
+          else None
 
   (** Transforms a rewriter in an OCaml function call:
       - [@profiler.aggregate_s ...] will create a proper
@@ -331,7 +341,7 @@ end = struct
     | _ -> Error.error loc (Invalid_payload payload)
 
   let of_attribute ({Ppxlib.attr_payload; attr_loc; _} as attribute) =
-    match Ppxlib_helper.get_attribute_name attribute |> of_string with
+    match Ppxlib_helper.get_attribute_name attribute |> of_string attr_loc with
     | Some rewriter ->
         let key = extract_key_from_payload attr_loc attr_payload in
         Some (rewriter key attr_loc)
