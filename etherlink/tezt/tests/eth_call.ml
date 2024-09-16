@@ -300,7 +300,7 @@ let test_call_state_override_state_diff =
       [
         ( "0x0000000000000000000000000000000000000000000000000000000000000000",
           `String
-            "0x0000000000000000000000000000000000000000000000000000000000000000"
+            "0x0000000000000000000000000000000000000000000000001111111122222222"
         );
       ]
   in
@@ -308,12 +308,12 @@ let test_call_state_override_state_diff =
   let* call_result = make_call ~override "getCount()" in
   check_value
     call_result
-    "0x0000000000000000000000000000000000000000000000000000000000000000" ;
+    "0x0000000000000000000000000000000000000000000000000000000022222222" ;
   (* const2 is stored in same memory slot so should change *)
   let* call_result = make_call ~override "const2()" in
   check_value
     call_result
-    "0x0000000000000000000000000000000000000000000000000000000000000000" ;
+    "0x0000000000000000000000000000000000000000000000000000000011111111" ;
   (* const3 is stored in a distinct memory slot so should be unchanged *)
   let* call_result = make_call ~override "const3()" in
   check_value
