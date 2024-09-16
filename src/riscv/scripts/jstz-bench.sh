@@ -92,7 +92,7 @@ run_jstz_riscv() {
     --initrd jstz/target/riscv64gc-unknown-hermit/release/jstz \
     --inbox-file "$RUN_INBOX" \
     --address "$DEFAULT_ROLLUP_ADDRESS" \
-    --timings > "$LOG" 2> /dev/null
+    --timings > "$LOG"
 }
 
 ##########
