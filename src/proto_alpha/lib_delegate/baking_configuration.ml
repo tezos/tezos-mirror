@@ -89,7 +89,7 @@ type t = {
   retries_on_failure : int;
   user_activated_upgrades : (int32 * Protocol_hash.t) list;
   per_block_votes : per_block_votes_config;
-  force_apply : bool;
+  force_apply_from_round : Round.t;
   force : bool;
   state_recorder : state_recorder_config;
   extra_operations : Operations_source.t option;
@@ -127,7 +127,7 @@ let default_votes_config =
 
 let default_force = false
 
-let default_force_apply = false
+let default_force_apply_from_round = Round.(succ @@ succ @@ succ zero)
 
 let default_state_recorder_config = Memory
 
@@ -145,7 +145,7 @@ let default_config =
     retries_on_failure = default_retries_on_failure_config;
     user_activated_upgrades = default_user_activated_upgrades;
     per_block_votes = default_votes_config;
-    force_apply = default_force_apply;
+    force_apply_from_round = default_force_apply_from_round;
     force = default_force;
     state_recorder = default_state_recorder_config;
     extra_operations = default_extra_operations;
@@ -161,7 +161,7 @@ let make ?(minimal_fees = default_fees_config.minimal_fees)
     ?(nonce = default_nonce_config) ?context_path
     ?(retries_on_failure = default_retries_on_failure_config)
     ?(user_activated_upgrades = default_user_activated_upgrades)
-    ?(votes = default_votes_config) ?(force_apply = default_force_apply)
+    ?(votes = default_votes_config) ?force_apply_from_round
     ?(force = default_force) ?(state_recorder = default_state_recorder_config)
     ?extra_operations ?dal_node_endpoint
     ?(dal_node_timeout_percentage = default_dal_node_timeout_percentage)
@@ -174,6 +174,14 @@ let make ?(minimal_fees = default_fees_config.minimal_fees)
     | None -> Node
     | Some context_path -> Local {context_path}
   in
+  let force_apply_from_round =
+    match force_apply_from_round with
+    | Some round -> (
+        match Round.of_int round with
+        | Ok round -> round
+        | Error _ -> default_force_apply_from_round)
+    | None -> default_force_apply_from_round
+  in
   {
     fees;
     validation;
@@ -181,7 +189,7 @@ let make ?(minimal_fees = default_fees_config.minimal_fees)
     retries_on_failure;
     user_activated_upgrades;
     per_block_votes = votes;
-    force_apply;
+    force_apply_from_round;
     force;
     state_recorder;
     extra_operations;
@@ -272,7 +280,7 @@ let per_block_votes_config_encoding =
 
 let force_config_encoding = Data_encoding.bool
 
-let force_apply_config_encoding = Data_encoding.bool
+let force_apply_from_round_config_encoding = Round.encoding
 
 let state_recorder_config_encoding =
   let open Data_encoding in
@@ -307,7 +315,7 @@ let encoding : t Data_encoding.t =
               retries_on_failure;
               user_activated_upgrades;
               per_block_votes;
-              force_apply;
+              force_apply_from_round;
               force;
               state_recorder;
               extra_operations;
@@ -321,7 +329,7 @@ let encoding : t Data_encoding.t =
              retries_on_failure,
              user_activated_upgrades,
              per_block_votes,
-             force_apply,
+             force_apply_from_round,
              force,
              state_recorder,
              pre_emptive_forge_time ),
@@ -332,7 +340,7 @@ let encoding : t Data_encoding.t =
                 retries_on_failure,
                 user_activated_upgrades,
                 per_block_votes,
-                force_apply,
+                force_apply_from_round,
                 force,
                 state_recorder,
                 pre_emptive_forge_time ),
@@ -345,7 +353,7 @@ let encoding : t Data_encoding.t =
            retries_on_failure;
            user_activated_upgrades;
            per_block_votes;
-           force_apply;
+           force_apply_from_round;
            force;
            state_recorder;
            extra_operations;
@@ -363,7 +371,9 @@ let encoding : t Data_encoding.t =
                 "user_activated_upgrades"
                 user_activate_upgrades_config_encoding)
              (req "votes" per_block_votes_config_encoding)
-             (req "force_apply" force_apply_config_encoding)
+             (req
+                "force_apply_from_round"
+                force_apply_from_round_config_encoding)
              (req "force" force_config_encoding)
              (req "state_recorder" state_recorder_config_encoding)
              (req "pre_emptive_forge_time" Time.System.Span.encoding))

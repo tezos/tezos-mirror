@@ -37,7 +37,7 @@ module Baker : sig
     ?dal_node_endpoint:Uri.t ->
     ?dal_node_timeout_percentage:int ->
     ?pre_emptive_forge_time:Q.t ->
-    ?force_apply:bool ->
+    ?force_apply_from_round:int ->
     ?context_path:string ->
     ?state_recorder:Baking_configuration.state_recorder_config ->
     chain:Shell_services.chain ->

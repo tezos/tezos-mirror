@@ -178,6 +178,12 @@ Baker
   baker will wait for ``0.5`` seconds for the DAL attestations' status. (MR
   :gl:`!14480`)
 
+- **Breaking_change** The baker now accepts a new argument,
+  ``--force_apply_from_round <round>``, which replaces ``--force-apply``.
+  Previously, the baker applied blocks from round 0 if ``--force_apply`` was
+  used, and from round 1 otherwise. The default is now set to 3 and can be
+  adjusted using ``--force_apply_from_round <round>``. (MR :gl:`!14875`)
+
 Accuser
 -------
 

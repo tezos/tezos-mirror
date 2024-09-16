@@ -298,7 +298,9 @@ let prepare_block (global_state : global_state) (block_to_bake : block_to_bake)
   in
   let*! () =
     Events.(
-      emit forging_block (Int32.succ predecessor.shell.level, round, delegate))
+      emit
+        forging_block
+        (Int32.succ predecessor.shell.level, round, delegate, force_apply))
   in
   let* injection_level =
     Plugin.RPC.current_level

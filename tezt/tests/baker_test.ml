@@ -34,6 +34,27 @@ let team = Tag.layer1
 
 let hooks = Tezos_regression.hooks
 
+let log_step counter msg =
+  let color = Log.Color.(bold ++ FG.blue) in
+  let prefix = "step" ^ string_of_int counter in
+  Log.info ~color ~prefix msg
+
+(* [fetch_baking_rights client lvl] calls the baking_rights RPC and returns the
+   result as an association list. The list associates each round number with the
+   public key hash of the delegate holding baking rights for that round. *)
+let fetch_baking_rights client level =
+  let* baking_rights_json =
+    Client.RPC.call client @@ RPC.get_chain_block_helper_baking_rights ~level ()
+  in
+  return
+  @@ List.map
+       JSON.(
+         fun json ->
+           let round = json |-> "round" |> as_int in
+           let delegate_pkh = json |-> "delegate" |> as_string in
+           (round, delegate_pkh))
+       JSON.(as_list baking_rights_json)
+
 let check_node_version_check_bypass_test =
   Protocol.register_test
     ~__FILE__
@@ -115,7 +136,7 @@ let baker_reward_test =
       in
       unit)
 
-let baker_test ?force_apply protocol ~keys =
+let baker_test protocol ~keys =
   let* parameter_file =
     Protocol.write_parameter_file
       ~bootstrap_accounts:(List.map (fun k -> (k, None)) keys)
@@ -133,7 +154,7 @@ let baker_test ?force_apply protocol ~keys =
   in
   let level_2_promise = Node.wait_for_level node 2 in
   let level_3_promise = Node.wait_for_level node 3 in
-  let* baker = Baker.init ?force_apply ~protocol node client in
+  let* baker = Baker.init ~protocol node client in
   Log.info "Wait for new head." ;
   Baker.log_events baker ;
   let* _ = level_2_promise in
@@ -181,7 +202,7 @@ let baker_stresstest_apply =
   let* node, client =
     Client.init_with_protocol `Client ~protocol () ~timestamp:Now
   in
-  let* _ = Baker.init ~force_apply:true ~protocol node client in
+  let* _ = Baker.init ~force_apply_from_round:0 ~protocol node client in
   let* _ = Node.wait_for_level node 3 in
   (* Use a large tps, to have failing operations too *)
   let* () = Client.stresstest ~tps:25 ~transfers:100 client in
@@ -291,6 +312,100 @@ let baker_check_consensus_branch =
       unit)
     ops
 
+(** Test that blocks are applied only if round >= [force_apply_from_round]. *)
+let force_apply_from_round =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Baker check force apply from round"
+    ~tags:[team; "baker"; "force_apply_from_round"]
+    ~supports:Protocol.(From_protocol 021)
+    ~uses:(fun protocol -> [Protocol.baker protocol])
+  @@ fun protocol ->
+  log_step 1 "initialize a node and a client with protocol" ;
+  let* node, client =
+    Client.init_with_protocol `Client ~protocol () ~timestamp:Now
+  in
+
+  log_step 2 "wait for level 1" ;
+  let* _ = Node.wait_for_level node 1 in
+
+  log_step 3 "find suitable delegate and rounds" ;
+  let force_apply_from_round = 3 in
+  let* baking_rights_at_level_3 = fetch_baking_rights client 2 in
+  (* pick the delegate that has baking rights at level 3 round 1 *)
+  let delegate = List.assoc 1 baking_rights_at_level_3 in
+  (* find the smallest level (>= 4) where [delegate] first baking round is
+     greater or equal than [force_apply_from_round]. *)
+  let rec loop level =
+    let* baking_rights = fetch_baking_rights client level in
+    match
+      List.find_opt (fun (_, delegate') -> delegate = delegate') baking_rights
+    with
+    | Some (round, _) when round >= force_apply_from_round ->
+        return (level, round)
+    | _ -> loop (succ level)
+  in
+  let* level, round = loop 4 in
+  Log.info
+    "delegate %s has baking rights for level 3 round 1 and level %d round %d"
+    delegate
+    level
+    round ;
+
+  log_step
+    5
+    "spawn a baker with delegate %s and force_apply_from_round %d"
+    delegate
+    force_apply_from_round ;
+  let* baker =
+    Baker.init
+      ~protocol
+      ~force_apply_from_round
+      ~delegates:[delegate]
+      node
+      client
+  in
+
+  (* fail if a block is applied at a round < [force_apply_from_round] *)
+  Baker.on_event baker (fun Baker.{name; value; _} ->
+      if name = "forging_block.v0" then
+        let round = JSON.(value |-> "round" |> as_int) in
+        let level = JSON.(value |-> "level" |> as_int) in
+        let force_apply = JSON.(value |-> "force_apply" |> as_bool) in
+        if force_apply && round < force_apply_from_round then
+          Test.fail
+            "block at level %d round %d shouldn't have been applied"
+            level
+            round) ;
+
+  (* a promise that resolves on event forging_block when
+     (force_apply = true && round = [round] && level = [level]) *)
+  let forced_application_promise =
+    Baker.wait_for baker "forging_block.v0" (fun json ->
+        let round' = JSON.(json |-> "round" |> as_int) in
+        let level' = JSON.(json |-> "level" |> as_int) in
+        let force_apply = JSON.(json |-> "force_apply" |> as_bool) in
+        if force_apply && level = level' && round = round' then Some ()
+        else None)
+  in
+
+  let* _ = Node.wait_for_level node level in
+  log_step
+    6
+    "level %d round %d has been baked, check that block has been forged with \
+     force_apply = true"
+    level
+    round ;
+
+  (* promise should be fulfilled *)
+  if Lwt.state forced_application_promise <> Lwt.Return () then
+    Tezt.Test.fail
+      "level %d has been baked at round >= %d and block wasn't forged with \
+       force_apply = true"
+      level
+      round ;
+  unit
+
 let register ~protocols =
   check_node_version_check_bypass_test protocols ;
   check_node_version_allowed_test protocols ;
@@ -301,4 +416,5 @@ let register ~protocols =
   baker_stresstest_apply protocols ;
   baker_bls_test protocols ;
   baker_remote_test protocols ;
-  baker_check_consensus_branch protocols
+  baker_check_consensus_branch protocols ;
+  force_apply_from_round protocols
