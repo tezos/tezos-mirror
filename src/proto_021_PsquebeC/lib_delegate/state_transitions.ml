@@ -531,9 +531,9 @@ let prepare_block_to_bake ~attestations ?last_proposal
   let kind = Fresh operation_pool in
   let* () = Events.(emit preparing_fresh_block (delegate, round)) in
   let force_apply =
-    state.global_state.config.force_apply || Round.(round <> zero)
-    (* This is used as a safety net by applying blocks on round > 0, in case
-       validation-only did not produce a correct round-0 block. *)
+    (* This is used as a safety net by applying blocks in case validation-only
+       did not produce correct block. *)
+    Round.(round >= state.global_state.config.force_apply_from_round)
   in
   let block_to_bake : block_to_bake =
     {predecessor; round; delegate; kind; force_apply}
@@ -636,9 +636,9 @@ let propose_block_action state delegate round ~last_proposal =
         Reproposal {consensus_operations; payload_hash; payload_round; payload}
       in
       let force_apply =
-        true
-        (* This is used as a safety net by applying blocks on round > 0, in case
-           validation-only did not produce a correct round-0 block. *)
+        (* This is used as a safety net by applying blocks in case validation-only
+           did not produce correct block. *)
+        Round.(round >= state.global_state.config.force_apply_from_round)
       in
       let block_to_bake =
         {predecessor = proposal.predecessor; round; delegate; kind; force_apply}
