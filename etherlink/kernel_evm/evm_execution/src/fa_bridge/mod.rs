@@ -37,14 +37,17 @@ use deposit::FaDeposit;
 use evm::{Config, ExitReason};
 use primitive_types::{H160, U256};
 use tezos_ethereum::block::BlockConstants;
-use tezos_evm_logging::{log, Level::Info};
+use tezos_evm_logging::{
+    log,
+    Level::{Debug, Info},
+};
 use tezos_evm_runtime::runtime::Runtime;
 use ticket_table::TicketTable;
 use withdrawal::FaWithdrawal;
 
 use crate::{
     account_storage::EthereumAccountStorage,
-    handler::{CreateOutcome, EvmHandler, ExecutionOutcome},
+    handler::{CreateOutcome, EvmHandler, ExecutionOutcome, Withdrawal},
     precompiles::{PrecompileBTreeMap, PrecompileOutcome, SYSTEM_ACCOUNT_ADDRESS},
     trace::TracerInput,
     transaction::TransactionContext,
@@ -186,6 +189,36 @@ pub fn execute_fa_deposit<'a, Host: Runtime>(
     Ok(outcome)
 }
 
+/// Execute the FA withdrawal within an execution layer. It aborts as soon as possible
+/// on errors and the caller is responsible of cleaning up intermediate layer in
+/// case of errors (i.e. using `end_inter_transaction`). It also can return the
+/// withdrawal if it was succesful.
+fn execute_layered_fa_withdrawal<Host: Runtime>(
+    handler: &mut EvmHandler<Host>,
+    caller: H160,
+    withdrawal: FaWithdrawal,
+) -> Result<(ExitReason, Option<Withdrawal>), EthereumError> {
+    let (mut exit_status, _, _) = inner_execute_withdrawal(handler, &withdrawal)?;
+
+    // Withdrawal execution might fail because of non sufficient balance
+    // so we need to rollback the entire transaction in that case.
+    if exit_status.is_succeed() {
+        // In most cases sender is user's EOA and ticket owner is ERC wrapper contract
+        if withdrawal.ticket_owner != withdrawal.sender {
+            // If the proxy call fails we need to rollback the entire transaction
+            (exit_status, _, _) = inner_execute_proxy(
+                handler,
+                caller,
+                withdrawal.ticket_owner,
+                withdrawal.calldata(),
+            )?;
+        }
+        Ok((exit_status, Some(withdrawal.into_outbox_message())))
+    } else {
+        Ok((exit_status, None))
+    }
+}
+
 /// Executes FA withdrawal.
 ///
 /// From the EVM perspective this is a precompile contract
@@ -205,34 +238,75 @@ pub fn execute_fa_withdrawal<Host: Runtime>(
         withdrawal.display()
     );
 
-    let mut withdrawals = Vec::with_capacity(1);
+    if handler.can_begin_inter_transaction_call_stack() {
+        // Create a new transaction layer with 63/64 of the remaining gas.
+        let gas_limit = handler.nested_call_gas_limit(None);
 
-    let (mut exit_status, _, _) = inner_execute_withdrawal(handler, &withdrawal)?;
-
-    // Withdrawal execution might fail because of non sufficient balance
-    // so we need to rollback the entire transaction in that case.
-    if exit_status.is_succeed() {
-        // In most cases sender is user's EOA and ticket owner is ERC wrapper contract
-        if withdrawal.ticket_owner != withdrawal.sender {
-            // If the proxy call fails we need to rollback the entire transaction
-            (exit_status, _, _) = inner_execute_proxy(
-                handler,
-                caller,
-                withdrawal.ticket_owner,
-                withdrawal.calldata(),
-            )?;
+        if let Err(err) = handler.record_cost(gas_limit.unwrap_or_default()) {
+            log!(
+                handler.borrow_host(),
+                Debug,
+                "Not enough gas for create. Required at least: {:?} ({:?})",
+                gas_limit,
+                err
+            );
+            return Ok(PrecompileOutcome {
+                exit_status: ExitReason::Error(evm::ExitError::OutOfGas),
+                withdrawals: vec![],
+                output: vec![],
+                // Precompile and inner proxy calls have already registered their costs
+                estimated_ticks: 0,
+            });
         }
-        // Submit outbox message to the queue
-        withdrawals.push(withdrawal.into_outbox_message())
-    }
 
-    Ok(PrecompileOutcome {
-        exit_status,
-        withdrawals,
-        output: vec![],
-        // Precompile and inner proxy calls have already registered their costs
-        estimated_ticks: 0,
-    })
+        handler.begin_inter_transaction(false, gas_limit)?;
+
+        // Execute the withdrawal in the transaction layer and clean it based
+        // on the result.
+        let (end_inter_transaction_result, withdrawals) =
+            match execute_layered_fa_withdrawal(handler, caller, withdrawal) {
+                Ok((exit_status, withdrawal_opt)) => {
+                    let withdrawals = match withdrawal_opt {
+                        Some(withdrawal) => vec![withdrawal],
+                        None => vec![],
+                    };
+                    (
+                        handler.end_inter_transaction::<EthereumError>(Ok((
+                            exit_status,
+                            None,
+                            vec![],
+                        ))),
+                        withdrawals,
+                    )
+                }
+                Err(err) => (
+                    handler.end_inter_transaction::<EthereumError>(Err(err)),
+                    vec![],
+                ),
+            };
+        // Transforms the transaction clean up result into a Sputnik call exit
+        // type.
+        match end_inter_transaction_result {
+            evm::Capture::Exit((exit_status, _, _)) => {
+                Ok(PrecompileOutcome {
+                    exit_status,
+                    withdrawals,
+                    output: vec![],
+                    // Precompile and inner proxy calls have already registered their costs
+                    estimated_ticks: 0,
+                })
+            }
+            evm::Capture::Trap(err) => Err(err),
+        }
+    } else {
+        Ok(PrecompileOutcome {
+            exit_status: ExitReason::Error(evm::ExitError::CallTooDeep),
+            withdrawals: vec![],
+            output: vec![],
+            // Precompile and inner proxy calls have already registered their costs
+            estimated_ticks: 0,
+        })
+    }
 }
 
 /// Updates ticket table according to the deposit and actual ticket owner.
