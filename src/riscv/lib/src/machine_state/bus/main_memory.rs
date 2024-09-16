@@ -278,9 +278,10 @@ pub mod tests {
     use crate::{
         backend_test, create_backend,
         machine_state::{
-            backend::{tests::test_determinism, Backend, Layout},
-            bus::{AddressableRead, AddressableWrite},
+            backend::{tests::test_determinism, Layout},
+            bus::AddressableWrite,
         },
+        state_backend::test_helpers::TestBackend,
     };
 
     gen_memory_layout!(T1K = 1 KiB);
@@ -293,7 +294,10 @@ pub mod tests {
 
         macro_rules! check_address {
             ($ty:ty, $addr:expr, $value:expr) => {
-                assert_eq!(AddressableRead::<$ty>::read(&memory, $addr), Ok($value));
+                assert_eq!(
+                    $crate::machine_state::bus::AddressableRead::<$ty>::read(&memory, $addr),
+                    Ok($value)
+                );
             };
         }
 

@@ -127,22 +127,6 @@ impl<L: Layout> backend::Backend for InMemoryBackend<L> {
     }
 }
 
-impl<L: Layout> backend::BackendFull for InMemoryBackend<L> {
-    fn region<E: backend::Elem, const LEN: usize>(
-        &self,
-        loc: &backend::Location<[E; LEN]>,
-    ) -> &[u8] {
-        &self.borrow()[loc.offset()..][..loc.size()]
-    }
-
-    fn region_mut<E: backend::Elem, const LEN: usize>(
-        &mut self,
-        loc: &backend::Location<[E; LEN]>,
-    ) -> &mut [u8] {
-        &mut self.borrow_mut()[loc.offset()..][..loc.size()]
-    }
-}
-
 /// Manager for in-memory backing storage
 pub struct SliceManager<'backend> {
     backing_storage: usize,
@@ -562,8 +546,26 @@ impl backend::ManagerSerialise for SliceManagerRO<'_> {
 }
 
 pub mod test_helpers {
-    use super::InMemoryBackend;
-    use crate::state_backend::{test_helpers::TestBackendFactory, Layout};
+    use super::{InMemoryBackend, SliceManager};
+    use crate::state_backend::{
+        test_helpers::{TestBackend, TestBackendBase, TestBackendFactory},
+        Backend, Layout,
+    };
+
+    impl<L: Layout> TestBackendBase for InMemoryBackend<L> {
+        type Manager<'backend> = SliceManager<'backend>;
+    }
+
+    impl<L: Layout> TestBackend for InMemoryBackend<L> {
+        type Layout = L;
+
+        fn allocate(
+            &mut self,
+            placed: crate::state_backend::PlacedOf<Self::Layout>,
+        ) -> crate::state_backend::AllocatedOf<Self::Layout, Self::Manager<'_>> {
+            Backend::allocate(self, placed)
+        }
+    }
 
     pub struct InMemoryBackendFactory;
 
