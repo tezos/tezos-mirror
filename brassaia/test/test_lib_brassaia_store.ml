@@ -37,7 +37,7 @@ type t = {
 
 let wrap_context_init f _ =
   let base_dir = Tezt.Temp.dir "tezos_test_" in
-  let root = Filename.concat base_dir "context" in
+  let root = Filename.concat base_dir "brassaia_context" in
   let* index = Context.init root in
   let*!! genesis =
     Context.commit_genesis index ~chain_id ~time:genesis_time
