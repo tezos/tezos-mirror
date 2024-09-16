@@ -350,7 +350,7 @@ let sources_param =
          "name of the delegate owning the attestation/baking right or name of \
           the consensus key signing on the delegate's behalf")
 
-let endpoint_arg =
+let dal_node_endpoint_arg =
   let open Lwt_result_syntax in
   Tezos_clic.arg
     ~long:"dal-node"
@@ -527,7 +527,7 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
          context_path_arg
          adaptive_issuance_vote_arg
          do_not_monitor_node_mempool_arg
-         endpoint_arg
+         dal_node_endpoint_arg
          block_count_arg
          state_recorder_switch_arg)
       (prefixes ["bake"; "for"] @@ sources_param)
@@ -689,6 +689,27 @@ let lookup_default_vote_file_path (cctxt : Protocol_client_context.full) =
   let base_dir_file = Filename.Infix.(cctxt#get_base_dir // default_filename) in
   when_s file_exists base_dir_file @@ fun () -> return_none
 
+(* Running a DAL node is mandatory on some networks. This function checks that
+   a DAL node endpoint was given, and that the specified DAL node is "healthy",
+   (the DAL's nodes 'health' RPC is used for that). *)
+let check_dal_node cctxt dal_node_rpc_ctxt =
+  let open Lwt_result_syntax in
+  let* node_config = Octez_node_config.Node_services.config cctxt () in
+  let mandatory (_chain_name : Distributed_db_version.Name.t) =
+    (* for now there's no network for which the DAL is mandatory *)
+    false
+  in
+  if mandatory node_config.blockchain_network.chain_name then
+    match dal_node_rpc_ctxt with
+    | None -> tzfail No_dal_node_endpoint
+    | Some ctxt -> (
+        let* health = Node_rpc.get_dal_health ctxt in
+        let open Tezos_dal_node_services.Types.Health in
+        match health.status with
+        | Up -> return_unit
+        | _ -> tzfail (Unhealthy_dal_node {health}))
+  else return_unit
+
 type baking_mode = Local of {local_data_dir_path : string} | Remote
 
 let baker_args =
@@ -705,7 +726,7 @@ let baker_args =
     adaptive_issuance_vote_arg
     per_block_vote_file_arg
     operations_arg
-    endpoint_arg
+    dal_node_endpoint_arg
     dal_node_timeout_percentage_arg
     state_recorder_switch_arg
     pre_emptive_forge_time_arg
@@ -753,6 +774,7 @@ let run_baker
        Treat case when no endpoint was given and DAL is enabled *)
     Option.map create_dal_node_rpc_ctxt dal_node_endpoint
   in
+  let* () = check_dal_node cctxt dal_node_rpc_ctxt in
   let* delegates = get_delegates cctxt sources in
   let context_path =
     match baking_mode with
