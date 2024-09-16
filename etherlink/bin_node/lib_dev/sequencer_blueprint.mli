@@ -33,10 +33,10 @@ val prepare :
 val create_inbox_payload :
   smart_rollup_address:string -> chunks:t list -> Blueprint_types.payload
 
-(** [create_dal_payload chunks] encodes the chunks into a message that can be
-    read from a DAL slot by the kernel. The chunks are prefixed by a tag
-    and concatenated. *)
-val create_dal_payload : t list -> string
+(** [create_dal_payloads chunks] encodes the chunks into messages that
+    can be read from DAL slots by the kernel. The chunks are prefixed
+    by a tag. *)
+val create_dal_payloads : t list -> string list
 
 (** [maximum_usable_size_in_blueprint chunks_count] returns the available space
     for transactions in a blueprint composed of [chunks_count] chunks. *)
@@ -45,7 +45,3 @@ val maximum_usable_space_in_blueprint : int -> int
 (* [maximum_chunks_per_l1_level] is the maximum number of chunks the inbox of a L1 block can
    hold at once. *)
 val maximum_chunks_per_l1_level : int
-
-(* [maximum_unsigned_chunks_per_dal_slot] is the maximum number of unsigned
-   chunks a DAL slot can hold at once. *)
-val maximum_unsigned_chunks_per_dal_slot : int

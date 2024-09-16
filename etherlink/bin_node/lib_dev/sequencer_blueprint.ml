@@ -36,24 +36,10 @@ let max_chunk_size =
   Message_format.usable_size_in_message - blueprint_number_size - nb_chunks_size
   - chunk_index_size - rlp_tags_size - signature_size
 
-let max_unsigned_chunk_size =
-  Message_format.usable_size_in_message - signature_size
-
 let maximum_usable_space_in_blueprint chunks_count =
   chunks_count * max_chunk_size
 
 let maximum_chunks_per_l1_level = 512 * 1024 / 4096
-
-(* Number of unsigned chunks that can fit in a DAL slot of 128KB, considering
-   that each chunk is prefixed with a tag.
-
-   This constant is hardcoded for now, but it should be parametric in the future
-   over the size of a DAL slot.
-
-   TODO: https://gitlab.com/tezos/tezos/-/issues/7492
-*)
-let maximum_unsigned_chunks_per_dal_slot =
-  128 * 1024 / (max_unsigned_chunk_size + Message_format.tag_size)
 
 let encode_transaction raw =
   let open Rlp in
@@ -193,20 +179,10 @@ let create_inbox_payload ~smart_rollup_address ~chunks : Blueprint_types.payload
       |> prepare_message smart_rollup_address Message_format.Blueprint_chunk)
     chunks
 
-let create_dal_payload chunks =
-  (* The buffer is preallocated with roughly the size to contain the chunks +
-     the tag. Buffer will handle reallocating if necessary. *)
-  let payload =
-    Buffer.create
-      (List.length chunks * (max_unsigned_chunk_size + Message_format.tag_size))
-  in
-  List.iter
+let create_dal_payloads chunks =
+  List.map
     (fun {unsigned_chunk; signature = _} ->
-      let encoded_chunk =
-        unsigned_chunk_to_rlp unsigned_chunk |> Rlp.encode |> Bytes.to_string
-      in
-      Buffer.add_string
-        payload
-        (Message_format.frame_dal_message Blueprint_chunk encoded_chunk))
-    chunks ;
-  Buffer.contents payload
+      unsigned_chunk_to_rlp unsigned_chunk
+      |> Rlp.encode |> Bytes.to_string
+      |> Message_format.frame_dal_message Blueprint_chunk)
+    chunks

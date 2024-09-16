@@ -21,15 +21,19 @@ module Types = struct
 
   type state = {
     cctxt : Client_context.wallet;
-    smart_rollup_address : string;
+    smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
     sequencer_key : Client_keys.sk_uri;
     rollup_node_endpoint : Uri.t;
   }
 
   let of_parameters
       ({cctxt; smart_rollup_address; sequencer_key; rollup_node_endpoint} :
-        parameters) : state =
-    {cctxt; smart_rollup_address; sequencer_key; rollup_node_endpoint}
+        parameters) : state tzresult Lwt.t =
+    let open Lwt_result_syntax in
+    let*? smart_rollup_address =
+      Tezos_crypto.Hashed.Smart_rollup_address.of_string smart_rollup_address
+    in
+    return {cctxt; smart_rollup_address; sequencer_key; rollup_node_endpoint}
 end
 
 module Name = struct
@@ -73,6 +77,46 @@ end
 module Worker = struct
   include Worker.MakeSingle (Name) (Request) (Types)
 
+  (** [is_signal_injection_ready ~finalized_level (injection_id,
+      status)] takes as input the current finalized level, and a
+      manager operation injected by the rollup node identified by
+      [injection_id] and whose injection status is [status].
+
+      It returns [Some (injection_id, slot_id)] if the operation is
+      the DAL publication of the slot identified by [slot_id] and is
+      old enough for the slot to be importable by the rollup, if
+      attested. We rely on the [finalized_level] in order to avoid any
+      reorg that could occur during the attestation period.
+
+      In all other cases (the operation is not a DAL publication, it
+      failed, or is not yet old enough), the function returns
+      [None]. *)
+  let is_signal_injection_ready ~finalized_level (injection_id, status) =
+    let is_after_attestation_period ~published_level =
+      Int32.to_int published_level + attestation_lag
+      <= Int32.to_int finalized_level
+    in
+    match status with
+    | Rollup_node_services.Committed
+        {
+          finalized;
+          l1_level = published_level;
+          op = Publish_dal_commitment {slot_index; _};
+          _;
+        }
+    | Included
+        {
+          finalized;
+          l1_level = published_level;
+          op = Publish_dal_commitment {slot_index; _};
+          _;
+        }
+      when finalized && is_after_attestation_period ~published_level ->
+        Some (injection_id, (slot_index, published_level))
+    | Unknown | Pending_batch | Pending_injection _ | Injected _ | Included _
+    | Committed _ ->
+        None
+
   let new_rollup_block worker finalized_level =
     let open Lwt_result_syntax in
     let state = state worker in
@@ -80,71 +124,47 @@ module Worker = struct
       Rollup_services.get_injected_dal_operations_statuses
         ~rollup_node_endpoint:state.rollup_node_endpoint
     in
-    statuses
-    |> List.iter_es (fun (injection_id, status) ->
-           (* [is_after_attestation_period ~published_level] is true if
-              the published level is old enough, w.r.t to the last
-              finalized level, to not be waiting for attestation
-              anymore; this means that the DAL slot is either attested
-              (and thus can be imported by the kernel) or unattested
-              (in which case importing in the kernel does nothing). We
-              rely on the [finalized_level] in order to avoid any
-              reorg that could occur during the attestation period. *)
-           let is_after_attestation_period ~published_level =
-             Int32.to_int published_level + attestation_lag
-             <= Int32.to_int finalized_level
-           in
-           match status with
-           | Rollup_node_services.Committed
-               {
-                 finalized;
-                 l1_level = published_level;
-                 op = Publish_dal_commitment {slot_index; _};
-                 _;
-               }
-           | Included
-               {
-                 finalized;
-                 l1_level = published_level;
-                 op = Publish_dal_commitment {slot_index; _};
-                 _;
-               }
-             when finalized && is_after_attestation_period ~published_level ->
-               let*! () =
-                 Signals_publisher_events.commited_or_included_injection_id
-                   ~injector_op_hash:injection_id
-                   ~published_level
-               in
-               let* () =
-                 Rollup_services.forget_dal_injection_id
-                   ~rollup_node_endpoint:state.rollup_node_endpoint
-                   injection_id
-               in
-               let*! () =
-                 Signals_publisher_events.untracking
-                   ~injector_op_hash:injection_id
-               in
-               let* payload =
-                 Sequencer_signal.create
-                   ~cctxt:state.cctxt
-                   ~sequencer_key:state.sequencer_key
-                   ~smart_rollup_address:state.smart_rollup_address
-                   ~slot_ids:[(slot_index, published_level)]
-               in
-               let*! () =
-                 Signals_publisher_events.signal_signed
-                   ~injector_op_hash:injection_id
-                   ~published_level
-                   ~slot_index
-                   ~smart_rollup_address:state.smart_rollup_address
-               in
-               Rollup_services.publish
-                 ~keep_alive:false
-                 ~rollup_node_endpoint:state.rollup_node_endpoint
-                 [payload]
-           | Unknown | Pending_batch | Pending_injection _ | Injected _
-           | Included _ | Committed _ ->
-               return_unit)
+    let ready_injections =
+      List.filter_map (is_signal_injection_ready ~finalized_level) statuses
+    in
+    unless (List.is_empty ready_injections) (fun () ->
+        let* () =
+          List.iter_es
+            (fun (injection_id, (_slot_index, published_level)) ->
+              let*! () =
+                Signals_publisher_events.commited_or_included_injection_id
+                  ~injector_op_hash:injection_id
+                  ~published_level
+              in
+              let* () =
+                Rollup_services.forget_dal_injection_id
+                  ~rollup_node_endpoint:state.rollup_node_endpoint
+                  injection_id
+              in
+              let*! () =
+                Signals_publisher_events.untracking
+                  ~injector_op_hash:injection_id
+              in
+              return_unit)
+            ready_injections
+        in
+        let signals = List.map snd ready_injections in
+        let* payload =
+          Sequencer_signal.create
+            ~cctxt:state.cctxt
+            ~sequencer_key:state.sequencer_key
+            ~smart_rollup_address:state.smart_rollup_address
+            ~slot_ids:signals
+        in
+        let*! () =
+          Signals_publisher_events.signal_signed
+            ~signals
+            ~smart_rollup_address:state.smart_rollup_address
+        in
+        Rollup_services.publish
+          ~keep_alive:false
+          ~rollup_node_endpoint:state.rollup_node_endpoint
+          [payload])
 end
 
 type worker = Worker.infinite Worker.queue Worker.t
@@ -164,7 +184,7 @@ module Handlers = struct
   type launch_error = error trace
 
   let on_launch _w () (parameters : Types.parameters) =
-    Lwt_result_syntax.return (Types.of_parameters parameters)
+    Types.of_parameters parameters
 
   let on_error (type a b) _w _st (_r : (a, b) Request.t) (_errs : b) :
       unit tzresult Lwt.t =

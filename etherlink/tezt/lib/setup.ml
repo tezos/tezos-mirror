@@ -349,8 +349,8 @@ let register_test ~__FILE__ ?block_storage_sqlite3 ?sequencer_rpc_port
     ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge ?commitment_period
     ?challenge_window ?(threshold_encryption = false) ?(uses = uses)
     ?(additional_uses = []) ?history_mode ~enable_dal
-    ?(dal_slots = if enable_dal then Some [4] else None) body ~title ~tags
-    protocols =
+    ?(dal_slots = if enable_dal then Some [0; 1; 2; 3] else None) body ~title
+    ~tags protocols =
   let kernel_tag, kernel_use = Kernel.to_uses_and_tags kernel in
   let tags = kernel_tag :: tags in
   let additional_uses =

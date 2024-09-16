@@ -305,6 +305,22 @@ let wait_for_blueprint_injected_on_dal ?timeout evm_node =
          let nb_chunks = json |-> "nb_chunks" |> as_int in
          Some (level, nb_chunks))
 
+let wait_for_signal_signed ?timeout evm_node =
+  let open JSON in
+  let as_slot_index_and_published_level json =
+    (json |-> "slot_index" |> as_int, json |-> "published_level" |> as_int)
+  in
+  wait_for_event ?timeout evm_node ~event:"signal_publisher_signal_signed.v0"
+  @@ JSON.(
+       fun json ->
+         let smart_rollup_address =
+           json |-> "smart_rollup_address" |> as_string
+         in
+         let signals = json |-> "signals" |> as_list in
+         Some
+           ( smart_rollup_address,
+             List.map as_slot_index_and_published_level signals ))
+
 let wait_for_rollup_node_follower_disabled ?timeout evm_node =
   wait_for_event ?timeout evm_node ~event:"rollup_node_follower_disabled.v0"
   @@ Fun.const (Some ())

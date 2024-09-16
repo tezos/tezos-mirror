@@ -134,8 +134,8 @@ module Events = struct
         "Injecting a DAL slot containing {num_messages} messages at index \
          {slot_index}, for a total size of {data_size} bytes over {slot_size}"
       ~level:Debug
-      ("data_size", Data_encoding.uint16)
-      ("slot_size", Data_encoding.uint16)
+      ("data_size", Data_encoding.int31)
+      ("slot_size", Data_encoding.int31)
       ("num_messages", Data_encoding.uint16)
       ("slot_index", Data_encoding.uint16)
 

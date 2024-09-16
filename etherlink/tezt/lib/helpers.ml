@@ -435,14 +435,37 @@ let init_sequencer_sandbox ?set_account_code ?da_fee_per_byte
   in
   Evm_node.init ?patch_config ~mode:sequencer_mode Uri.(empty |> to_string)
 
-let send_transaction_to_sequencer (transaction : unit -> 'a Lwt.t) sequencer :
-    'a Lwt.t =
-  let open Rpc.Syntax in
+(* Send the transaction but doesn't wait to be mined and does not
+   produce a block after sending the transaction. *)
+let send_transaction_to_sequencer_dont_produce_block
+    (transaction : unit -> 'a Lwt.t) sequencer =
   let wait_for = Evm_node.wait_for_tx_pool_add_transaction sequencer in
-  (* Send the transaction but doesn't wait to be mined. *)
   let transaction = transaction () in
   let* _ = wait_for in
-  (* Once the transaction is in the transaction pool the next block will include it. *)
+  Lwt.return transaction
+
+let send_transactions_to_sequencer ~(sends : (unit -> 'a Lwt.t) list) sequencer
+    =
+  let open Rpc.Syntax in
+  let* res =
+    Lwt_list.map_s
+      (fun tx -> send_transaction_to_sequencer_dont_produce_block tx sequencer)
+      sends
+  in
+  (* Once the transactions are in the transaction pool the next block
+     will include them. *)
+  let*@ n = produce_block sequencer in
+  (* Resolve the transactions sends to make sure they were included. *)
+  let* transactions = Lwt.all res in
+  Lwt.return (n, transactions)
+
+let send_transaction_to_sequencer (transaction : unit -> 'a Lwt.t) sequencer =
+  let open Rpc.Syntax in
+  let* transaction =
+    send_transaction_to_sequencer_dont_produce_block transaction sequencer
+  in
+  (* Once the transaction us in the transaction pool the next block
+     will include it. *)
   let*@ _ = produce_block sequencer in
-  (* Resolve the transaction send to make sure it was included. *)
+  (* Resolve the transaction sends to make sure they were included. *)
   transaction

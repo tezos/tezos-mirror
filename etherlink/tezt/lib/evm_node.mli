@@ -201,6 +201,13 @@ val wait_for_blueprint_injected : ?timeout:float -> t -> int -> unit Lwt.t
 val wait_for_blueprint_injected_on_dal :
   ?timeout:float -> t -> (int * int) Lwt.t
 
+(** [wait_for_signal_signed ~timeout evm_node] waits until (at least)
+    a signal has been signed and returns the smart rollup address for
+    which the signal has been signed together with the slot indices
+    and the published levels that have been signaled. *)
+val wait_for_signal_signed :
+  ?timeout:float -> t -> (string * (int * int) list) Lwt.t
+
 val wait_for_pending_upgrade : ?timeout:float -> t -> (string * string) Lwt.t
 
 val wait_for_successful_upgrade : ?timeout:float -> t -> (string * int) Lwt.t
