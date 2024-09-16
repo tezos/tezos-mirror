@@ -11,13 +11,14 @@ use std::path::Path;
 use std::time::Duration;
 use tezos_smart_rollup::utils::inbox::file::{InboxFile, Message};
 
-// Three levels:
-// 1. Deployment & Minting
-// 2. Transfers
+// Three sets of messages:
+// 1. Deployment
+// 2. Minting & Transfers
 // 3. Balance Checks
-const EXPECTED_LEVELS: usize = 3;
+// ... but all contained in one level
+const EXPECTED_LEVELS: usize = 1;
 
-pub fn handle_results(inbox: Box<Path>, logs: Box<Path>) -> Result<()> {
+pub fn handle_results(inbox: Box<Path>, logs: Box<Path>, expected_transfers: usize) -> Result<()> {
     let inbox = InboxFile::load(&inbox)?;
 
     let logs = read_to_string(&logs)?
@@ -37,67 +38,51 @@ pub fn handle_results(inbox: Box<Path>, logs: Box<Path>) -> Result<()> {
         .into());
     }
 
-    let [level_1, level_2, level_3] = levels.try_into().unwrap();
+    let [results]: [_; EXPECTED_LEVELS] = levels.try_into().unwrap();
 
-    check_deploy(level_1)?;
-    let num_transfers = transfer_metrics(level_2, &inbox.0[1])?;
-    balance_sanity_check(level_3, &inbox.0[2], num_transfers)?;
+    check_deploy(&results)?;
+    check_transfer_metrics(&results, expected_transfers)?;
+    check_balances(
+        &results,
+        &inbox.0[0][2 + expected_transfers..],
+        expected_transfers,
+    )?;
 
     Ok(())
 }
 
-fn check_deploy(level: Level) -> Result<()> {
+fn check_deploy(level: &Level) -> Result<()> {
     if level.deployments.len() != 1 {
-        return Err("Level 1: expected FA2 contract deployment".into());
+        return Err("Expected FA2 contract deployment".into());
     }
 
-    if level.executions.len() != 1 {
-        return Err("Level 1: expected FA2 token minting".into());
-    }
-
-    if !level.logs.is_empty() {
-        return Err(format!("Level 1: unexpected smart function logs {:?}", level.logs).into());
+    if level.executions.is_empty() {
+        return Err("Expected FA2 token minting".into());
     }
 
     Ok(())
 }
 
-fn minimal_sanity(level_index: usize, level: &Level, messages: &[Message]) -> Result<()> {
-    if !level.deployments.is_empty() {
+fn check_transfer_metrics(level: &Level, expected_transfers: usize) -> Result<()> {
+    if expected_transfers + 1 != level.executions.len() {
         return Err(format!(
-            "Level {level_index}: expected no contract deployments, got {}",
-            level.deployments.len()
+            "Expected {expected_transfers} transfers, got {}",
+            level.executions.len() - 1
         )
         .into());
     }
 
-    if level.executions.len() != messages.len() {
-        return Err(format!(
-            "Level {level_index}: expected {} transfers, got {}",
-            messages.len(),
-            level.executions.len()
-        )
-        .into());
-    }
-
-    Ok(())
-}
-
-fn transfer_metrics(level: Level, messages: &[Message]) -> Result<usize> {
-    minimal_sanity(2, &level, messages)?;
-
-    if !level.logs.is_empty() {
-        return Err(format!("Level 1: unexpected smart function logs {:?}", level.logs).into());
-    }
-
-    let transfers = messages.len();
-    let tps = (transfers as f64) / level.duration.as_secs_f64();
+    let transfers = level.executions.len() - 1;
+    // The first execution is the minting call. We collect the time elapsed at the _end_ of the
+    // minting, all the way up to the _end_ of the last execution (transfer).
+    let duration = level.executions[transfers].elapsed - level.executions[0].elapsed;
+    let tps = (transfers as f64) / duration.as_secs_f64();
     println!(
         "{transfers} FA2 transfers took {:?} @ {tps:.3} TPS",
-        level.duration
+        duration
     );
 
-    Ok(transfers)
+    Ok(())
 }
 
 // The generated transfers (for a number of accounts N), has a target final state:
@@ -107,16 +92,14 @@ fn transfer_metrics(level: Level, messages: &[Message]) -> Result<usize> {
 //
 // Therefore, if an account has `0` of a token, there's a transfer missing below this maximum
 // number.
-fn balance_sanity_check(level: Level, messages: &[Message], num_transfers: usize) -> Result<()> {
-    minimal_sanity(3, &level, messages)?;
-
+fn check_balances(level: &Level, messages: &[Message], num_transfers: usize) -> Result<()> {
     let re = Regex::new(r#"^.*"([\w0-9]+) has ([0-9]+) of token ([0-9]+)".*$"#).unwrap();
 
     let mut accounts = HashSet::new();
     let mut tokens = HashSet::new();
     let mut skipped_receives = 0;
 
-    for m in level.logs.iter().map(|l| &l.message) {
+    for m in level.balance_checks.iter().map(|l| &l.message) {
         for (_, [address, balance, token]) in re.captures_iter(m).map(|c| c.extract()) {
             accounts.insert(address);
             tokens.insert(token.parse::<usize>()?);
@@ -167,25 +150,24 @@ fn logs_to_levels(logs: Vec<LogType>) -> Result<Vec<Level>> {
 
     let mut level = Level::default();
 
+    let mut balance_checks = Vec::new();
     for line in logs.into_iter() {
         match line {
-            LogType::StartOfLevel(l) => {
-                if level == Level::default() {
-                    level.duration = l.elapsed
-                } else {
+            LogType::StartOfLevel(_) => {
+                if level != Level::default() {
                     return Err(
                         format!("StartOfLevel message not at start of level {level:?}").into(),
                     );
                 }
             }
-            LogType::EndOfLevel(l) => {
-                level.duration = l.elapsed - level.duration;
+            LogType::EndOfLevel(_) => {
                 levels.push(level);
                 level = Default::default();
             }
             LogType::Deploy(l) => level.deployments.push(l),
-            LogType::Success(l) => level.executions.push(l),
-            LogType::SmartFunctionLog(l) => level.logs.push(l),
+            LogType::Success(l) if balance_checks.is_empty() => level.executions.push(l),
+            LogType::Success(_) => level.balance_checks.append(&mut balance_checks),
+            LogType::SmartFunctionLog(l) => balance_checks.push(l),
         }
     }
 
@@ -222,6 +204,7 @@ impl LogLine {
     }
 }
 
+#[derive(Debug)]
 enum LogType {
     StartOfLevel(LogLine),
     Deploy(LogLine),
@@ -238,8 +221,7 @@ const LOG: &str = "[JSTZ:SMART_FUNCTION:LOG]";
 
 #[derive(Default, Debug, PartialEq)]
 struct Level {
-    duration: Duration,
     deployments: Vec<LogLine>,
     executions: Vec<LogLine>,
-    logs: Vec<LogLine>,
+    balance_checks: Vec<LogLine>,
 }

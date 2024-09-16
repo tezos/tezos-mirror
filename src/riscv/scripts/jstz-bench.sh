@@ -135,7 +135,7 @@ run_jstz() {
 
 collect() {
   echo -e "\033[1m"
-  ./jstz/inbox-bench results --inbox-file "$INBOX_FILE" --log-file "$LOG"
+  ./jstz/inbox-bench results --inbox-file "$INBOX_FILE" --log-file "$LOG" --expected-transfers "$TX"
   echo -e "\033[0m"
 }
 

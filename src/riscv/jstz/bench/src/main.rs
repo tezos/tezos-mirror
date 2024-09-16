@@ -48,6 +48,8 @@ enum Commands {
         inbox_file: Box<Path>,
         #[arg(long)]
         log_file: Box<Path>,
+        #[arg(long)]
+        expected_transfers: usize,
     },
 }
 
@@ -66,7 +68,8 @@ fn main() -> Result<()> {
         Commands::Results {
             inbox_file,
             log_file,
-        } => handle_results(inbox_file, log_file)?,
+            expected_transfers,
+        } => handle_results(inbox_file, log_file, expected_transfers)?,
     }
 
     Ok(())
