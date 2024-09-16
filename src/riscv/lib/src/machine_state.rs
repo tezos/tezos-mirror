@@ -1274,7 +1274,11 @@ mod tests {
 
     // Test that the machine state does not behave differently when potential ephermeral state is
     // reset that may impact instruction caching.
-    backend_test!(test_instruction_cache, F, {
+    #[test]
+    fn test_instruction_cache() {
+        // TODO: RV-210: Generalise for all testable backends.
+        type F = crate::state_backend::memory_backend::test_helpers::InMemoryBackendFactory;
+
         // Instruction that writes the value in t1 to the address t0.
         const I_WRITE_T1_TO_ADDRESS_T0: u32 = 0b0011000101010000000100011;
         assert_eq!(
@@ -1362,11 +1366,15 @@ mod tests {
         // The two backends should have the same state.
         assert_eq!(result, alt_result);
         assert_eq!(backend, alt_backend);
-    });
+    }
 
     // Test that the machine state does not behave differently when potential ephermeral state is
     // reset that may impact instruction address translation caching.
-    backend_test!(test_instruction_address_cache, F, {
+    #[test]
+    fn test_instruction_address_cache() {
+        // TODO: RV-210: Generalise for all testable backends.
+        type F = crate::state_backend::memory_backend::test_helpers::InMemoryBackendFactory;
+
         let mut backend = create_backend!(MachineStateLayout<M1M, TestInstructionCacheLayout>, F);
 
         // Specify the physcal memory layout.
@@ -1568,5 +1576,5 @@ mod tests {
         assert_eq!(result, 1);
         assert_eq!(result, alt_result);
         assert_eq!(backend, alt_backend);
-    });
+    }
 }
