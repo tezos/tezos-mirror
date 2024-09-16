@@ -46,6 +46,7 @@ let rewrite rewriters t =
       | Rewriter.Aggregate_f content
       | Rewriter.Record_f content
       | Rewriter.Record_s content
+      | Rewriter.Span_f content
       | Rewriter.Span_s content ->
           add_wrapping_function
             expr
