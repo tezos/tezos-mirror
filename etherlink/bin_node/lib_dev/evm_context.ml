@@ -122,7 +122,6 @@ module Request = struct
     | Earliest_state : (Evm_state.t option, tztrace) t
     | Earliest_number : (Ethereum_types.quantity option, tztrace) t
     | Reconstruct : {
-        reconstruct_from_boot_sector : string;
         rollup_node_data_dir : string;
         genesis_level : int32;
         finalized_level : int32;
@@ -270,28 +269,16 @@ module Request = struct
         case
           (Tag 12)
           ~title:"Reconstruct"
-          (obj5
+          (obj4
              (req "request" (constant "reconstruct"))
-             (req "reconstruct_from_boot_sector" string)
              (req "rollup_node_data_dir" string)
              (req "genesis_level" int32)
              (req "finalized_level" int32))
           (function
             | View
                 (Reconstruct
-                  {
-                    reconstruct_from_boot_sector;
-                    rollup_node_data_dir;
-                    genesis_level;
-                    finalized_level;
-                    _;
-                  }) ->
-                Some
-                  ( (),
-                    reconstruct_from_boot_sector,
-                    rollup_node_data_dir,
-                    genesis_level,
-                    finalized_level )
+                  {rollup_node_data_dir; genesis_level; finalized_level; _}) ->
+                Some ((), rollup_node_data_dir, genesis_level, finalized_level)
             | _ -> None)
           (fun _ ->
             assert false
@@ -1131,9 +1118,8 @@ module State = struct
       return evm_state
     else return evm_state
 
-  let reconstruct_history ctxt ~reconstruct_from_boot_sector
-      ~rollup_node_data_dir ~genesis_level ~finalized_level ~levels_to_hashes
-      ~l2_blocks =
+  let reconstruct_history ctxt ~rollup_node_data_dir ~genesis_level
+      ~finalized_level ~levels_to_hashes ~l2_blocks =
     let open Lwt_result_syntax in
     (* Smart Rollups do not process messages of genesis level. *)
     let first_level = Int32.succ genesis_level in
@@ -1200,17 +1186,13 @@ module State = struct
           evm_state
           (Int32.succ tezos_level)
     in
-    (* Create a fresh evm state where the blocks will be applied one by one. *)
-    let* fresh_evm_state =
-      Evm_state.init ~kernel:reconstruct_from_boot_sector
-    in
     (* We perform a first reboot to reveal the kernel. *)
     let* evm_state =
       Evm_state.execute
         ~data_dir:ctxt.data_dir
         ~log_file:"reconstruct"
         ~config
-        fresh_evm_state
+        ctxt.session.evm_state
         []
     in
     let* evm_state = replace_mainnet_kernel_if_needed ctxt evm_state in
@@ -1421,7 +1403,6 @@ module Handlers = struct
         | None -> return_none)
     | Reconstruct
         {
-          reconstruct_from_boot_sector;
           rollup_node_data_dir;
           genesis_level;
           finalized_level;
@@ -1432,7 +1413,6 @@ module Handlers = struct
         let ctxt = Worker.state self in
         State.reconstruct_history
           ctxt
-          ~reconstruct_from_boot_sector
           ~rollup_node_data_dir
           ~genesis_level
           ~finalized_level
@@ -1745,6 +1725,7 @@ let reconstruct ~data_dir ~rollup_node_data_dir ~boot_sector =
   in
   let* _loaded =
     start
+      ~kernel_path:boot_sector
       ~data_dir
       ~preimages:Filename.Infix.(rollup_node_data_dir // "wasm_2_0_0")
       ~preimages_endpoint:None
@@ -1757,7 +1738,6 @@ let reconstruct ~data_dir ~rollup_node_data_dir ~boot_sector =
   worker_wait_for_request
     (Reconstruct
        {
-         reconstruct_from_boot_sector = boot_sector;
          rollup_node_data_dir;
          genesis_level;
          finalized_level;
