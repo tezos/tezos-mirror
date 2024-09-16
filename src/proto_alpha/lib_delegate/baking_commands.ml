@@ -379,6 +379,16 @@ let block_count_arg =
     ~default:"1"
   @@ Client_proto_args.positive_int_parameter ()
 
+let create_dal_node_rpc_ctxt endpoint =
+  let open Tezos_rpc_http_client_unix in
+  let rpc_config =
+    {Tezos_rpc_http_client_unix.RPC_client_unix.default_config with endpoint}
+  in
+  let media_types =
+    Tezos_rpc_http.Media_type.Command_line.of_command_line rpc_config.media_type
+  in
+  new RPC_client_unix.http_ctxt rpc_config media_types
+
 let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
     =
   let open Lwt_result_syntax in
@@ -537,8 +547,12 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
            pkhs
            cctxt ->
         let* delegates = get_delegates cctxt pkhs in
+        let dal_node_rpc_ctxt =
+          Option.map create_dal_node_rpc_ctxt dal_node_endpoint
+        in
         Baking_lib.bake
           cctxt
+          ?dal_node_rpc_ctxt
           ~minimal_nanotez_per_gas_unit
           ~minimal_timestamp
           ~minimal_nanotez_per_byte
@@ -548,7 +562,6 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
           ~monitor_node_mempool:(not do_not_monitor_node_mempool)
           ?extra_operations
           ?context_path
-          ?dal_node_endpoint
           ~count:block_count
           ?votes:
             (Option.map
@@ -735,6 +748,11 @@ let run_baker
       ~default_adaptive_issuance_vote:adaptive_issuance_vote
       ~per_block_vote_file
   in
+  let dal_node_rpc_ctxt =
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/4674
+       Treat case when no endpoint was given and DAL is enabled *)
+    Option.map create_dal_node_rpc_ctxt dal_node_endpoint
+  in
   let* delegates = get_delegates cctxt sources in
   let context_path =
     match baking_mode with
@@ -744,12 +762,12 @@ let run_baker
   in
   Client_daemon.Baker.run
     cctxt
+    ?dal_node_rpc_ctxt
     ~minimal_fees
     ~minimal_nanotez_per_gas_unit
     ~minimal_nanotez_per_byte
     ~votes
     ?extra_operations
-    ?dal_node_endpoint
     ?dal_node_timeout_percentage
     ?pre_emptive_forge_time
     ?force_apply_from_round
