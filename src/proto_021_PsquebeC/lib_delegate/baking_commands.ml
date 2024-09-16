@@ -195,11 +195,14 @@ let context_path_arg =
        'preapply' RPC."
     string_parameter
 
-let force_apply_switch_arg =
-  Tezos_clic.switch
-    ~long:"force-apply"
-    ~doc:"Force the baker to not only validate but also apply operations."
-    ()
+let force_apply_from_round_arg =
+  Tezos_clic.arg
+    ~long:"force-apply-from-round"
+    ~placeholder:"round"
+    ~doc:
+      "Force the baker to not only validate but also apply operations starting \
+       from the specified round."
+    int_parameter
 
 let attestation_force_switch_arg =
   Tezos_clic.switch
@@ -508,7 +511,7 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
          minimal_nanotez_per_gas_unit_arg
          minimal_nanotez_per_byte_arg
          minimal_timestamp_switch
-         force_apply_switch_arg
+         force_apply_from_round_arg
          force_switch
          operations_arg
          context_path_arg
@@ -522,7 +525,7 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
              minimal_nanotez_per_gas_unit,
              minimal_nanotez_per_byte,
              minimal_timestamp,
-             force_apply,
+             force_apply_from_round,
              force,
              extra_operations,
              context_path,
@@ -540,7 +543,7 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
           ~minimal_timestamp
           ~minimal_nanotez_per_byte
           ~minimal_fees
-          ~force_apply
+          ?force_apply_from_round
           ~force
           ~monitor_node_mempool:(not do_not_monitor_node_mempool)
           ?extra_operations
@@ -581,7 +584,7 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
          minimal_nanotez_per_gas_unit_arg
          minimal_nanotez_per_byte_arg
          minimal_timestamp_switch
-         force_apply_switch_arg
+         force_apply_from_round_arg
          force_switch
          operations_arg
          context_path_arg
@@ -591,7 +594,7 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
              minimal_nanotez_per_gas_unit,
              minimal_nanotez_per_byte,
              minimal_timestamp,
-             force_apply,
+             force_apply_from_round,
              force,
              extra_operations,
              context_path,
@@ -605,7 +608,7 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
           ~minimal_timestamp
           ~minimal_nanotez_per_byte
           ~minimal_fees
-          ~force_apply
+          ?force_apply_from_round
           ~force
           ?extra_operations
           ?context_path
@@ -683,7 +686,7 @@ let baker_args =
     minimal_fees_arg
     minimal_nanotez_per_gas_unit_arg
     minimal_nanotez_per_byte_arg
-    force_apply_switch_arg
+    force_apply_from_round_arg
     keep_alive_arg
     liquidity_baking_toggle_vote_arg
     adaptive_issuance_vote_arg
@@ -701,7 +704,7 @@ let run_baker
       minimal_fees,
       minimal_nanotez_per_gas_unit,
       minimal_nanotez_per_byte,
-      force_apply,
+      force_apply_from_round,
       keep_alive,
       liquidity_baking_vote,
       adaptive_issuance_vote,
@@ -749,7 +752,7 @@ let run_baker
     ?dal_node_endpoint
     ?dal_node_timeout_percentage
     ?pre_emptive_forge_time
-    ~force_apply
+    ?force_apply_from_round
     ~chain:cctxt#chain
     ?context_path
     ~keep_alive

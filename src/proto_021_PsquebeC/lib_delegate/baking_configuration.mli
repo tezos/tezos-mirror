@@ -64,7 +64,7 @@ type t = {
   retries_on_failure : int;
   user_activated_upgrades : (int32 * Protocol_hash.t) list;
   per_block_votes : per_block_votes_config;
-  force_apply : bool;
+  force_apply_from_round : Protocol.Alpha_context.Round.t;
   force : bool;
   state_recorder : state_recorder_config;
   extra_operations : Operations_source.t option;
@@ -85,7 +85,7 @@ val default_user_activated_upgrades : (int32 * Protocol_hash.t) list
 
 val default_votes_config : per_block_votes_config
 
-val default_force_apply : bool
+val default_force_apply_from_round : Protocol.Alpha_context.Round.t
 
 val default_force : bool
 
@@ -106,7 +106,7 @@ val make :
   ?retries_on_failure:int ->
   ?user_activated_upgrades:(int32 * Protocol_hash.t) list ->
   ?votes:per_block_votes_config ->
-  ?force_apply:bool ->
+  ?force_apply_from_round:int ->
   ?force:bool ->
   ?state_recorder:state_recorder_config ->
   ?extra_operations:Operations_source.t ->

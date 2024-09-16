@@ -32,7 +32,7 @@ val bake :
   ?minimal_fees:Tez.t ->
   ?minimal_nanotez_per_gas_unit:Q.t ->
   ?minimal_nanotez_per_byte:Q.t ->
-  ?force_apply:bool ->
+  ?force_apply_from_round:int ->
   ?force:bool ->
   ?minimal_timestamp:bool ->
   ?extra_operations:Baking_configuration.Operations_source.t ->
@@ -63,7 +63,7 @@ val propose :
   ?minimal_fees:Tez.t ->
   ?minimal_nanotez_per_gas_unit:Q.t ->
   ?minimal_nanotez_per_byte:Q.t ->
-  ?force_apply:bool ->
+  ?force_apply_from_round:int ->
   ?force:bool ->
   ?minimal_timestamp:bool ->
   ?extra_operations:Baking_configuration.Operations_source.t ->
