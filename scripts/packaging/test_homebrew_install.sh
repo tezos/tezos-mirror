@@ -3,10 +3,10 @@
 
 set -ue
 
-# This script assume that homebrew is correctly installed
+# This script assumes that homebrew is correctly installed
 # using the script ./scripts/packaging/homebrew_install.sh
 # and creates a formula scripts/packaging/Formula/octez.rb
-# that is ready to be installed with brew
+# that is ready to be installed with brew.
 
 # If it's a protected branch the value of $bucket will
 # be set accordingly but the CI.
@@ -60,5 +60,3 @@ curl -q "https://$BUCKET.storage.googleapis.com/$TARGETDIR/octez.rb" -O
 brew install -v ./octez.rb
 
 octez-node --version
-
-#brew audit --strict octez

@@ -239,7 +239,7 @@ oc.build:rpm:amd64:
       - fedora:39
       - rockylinux:9.3
 
-homebrew release:
+oc.install-release-homebrew:
   image: debian:bookworm
   stage: build
   tags:
@@ -257,7 +257,7 @@ homebrew release:
     name: build-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
     paths:
-    - scripts/packaging/Formula/octez.rb
+    - public/homebrew/*
     when: on_success
 
 docker:merge_manifests:
@@ -288,7 +288,7 @@ gitlab:release:
   needs:
   - oc.build:static-x86_64-linux-binaries
   - oc.build:static-arm64-linux-binaries
-  - homebrew release
+  - oc.install-release-homebrew
   - oc.build:rpm:amd64
   - oc.build-ubuntu-current_a
   - oc.build-debian-current_a
@@ -297,7 +297,7 @@ gitlab:release:
   dependencies:
   - oc.build:static-x86_64-linux-binaries
   - oc.build:static-arm64-linux-binaries
-  - homebrew release
+  - oc.install-release-homebrew
   - oc.build:rpm:amd64
   - oc.build-ubuntu-current_a
   - oc.build-debian-current_a

@@ -831,6 +831,22 @@ let jobs pipeline_type =
         Rpm_repository.child_pipeline_full
     in
 
+    let job_homebrew_trigger_auto =
+      trigger_job
+        ~__POS__
+        ~rules:(make_rules ~manual:No ~changes:changeset_homebrew ())
+        ~stage:Stages.test
+        ~dependencies:dependencies_needs_start
+        Homebrew.child_pipeline_full_auto
+    in
+    let job_homebrew_trigger_full =
+      trigger_job
+        ~__POS__
+        ~rules:(make_rules ~manual:No ~changes:changeset_homebrew ())
+        ~stage:Stages.test
+        ~dependencies:dependencies_needs_start
+        Homebrew.child_pipeline_full
+    in
     (* check that ksy files are still up-to-date with octez *)
     let job_kaitai_checks : tezos_job =
       job
@@ -1613,9 +1629,17 @@ let jobs pipeline_type =
     let jobs_debian =
       match pipeline_type with
       | Before_merging | Merge_train ->
-          [job_debian_repository_trigger_auto; job_rpm_repository_trigger_auto]
+          [
+            job_debian_repository_trigger_auto;
+            job_rpm_repository_trigger_auto;
+            job_homebrew_trigger_auto;
+          ]
       | Schedule_extended_test ->
-          [job_debian_repository_trigger_full; job_rpm_repository_trigger_full]
+          [
+            job_debian_repository_trigger_full;
+            job_rpm_repository_trigger_full;
+            job_homebrew_trigger_full;
+          ]
     in
     jobs_debian @ jobs_misc @ jobs_kernels @ jobs_unit @ jobs_install_octez
     @ jobs_tezt
@@ -1811,6 +1835,16 @@ let jobs pipeline_type =
         ~stage:Stages.manual
         Rpm_repository.child_pipeline_partial
     in
+    let job_homebrew_repository_trigger : tezos_job =
+      (* We leave the possibility to run this pipeline manually, in particular
+         to generate the formula on scheduled pipelines *)
+      trigger_job
+        ~__POS__
+        ~rules:(make_rules ~manual:Yes ())
+        ~dependencies:(Dependent [])
+        ~stage:Stages.manual
+        Homebrew.child_pipeline_full
+    in
     match pipeline_type with
     | Before_merging | Merge_train ->
         (* Note: manual jobs in stage [manual] (which is the final
@@ -1849,15 +1883,6 @@ let jobs pipeline_type =
             ~stage:Stages.manual
             ()
         in
-        let job_build_homebrew_manual =
-          job_build_homebrew
-            ~__POS__
-            ~name:"oc.build:homebrew"
-            ~rules:(make_rules ~manual:Yes ())
-            ~dependencies:(Dependent [])
-            ~stage:Stages.manual
-            ()
-        in
         let job_docker_verify_test_amd64 : tezos_job =
           job_docker_authenticated
             ~__POS__
@@ -1883,13 +1908,12 @@ let jobs pipeline_type =
             job_docker_amd64_test_manual;
             job_docker_arm64_test_manual;
             job_build_rpm_amd64_manual;
-            job_build_homebrew_manual;
           ]
           @ [job_docker_verify_test_arm64; job_docker_verify_test_amd64]
         in
         if pipeline_type = Merge_train then jobs
         else
-          job_rpm_repository_trigger_partial
+          job_homebrew_repository_trigger :: job_rpm_repository_trigger_partial
           :: job_debian_repository_trigger_partial :: jobs
     (* No manual jobs on the scheduled pipeline *)
     | Schedule_extended_test -> []

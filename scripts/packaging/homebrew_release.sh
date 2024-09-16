@@ -1,9 +1,9 @@
 #!/bin/sh
 #
 
-# This script assume that homebrew is correctly installed
+# This script assumes that homebrew is correctly installed
 # using the script ./scripts/packaging/homebrew_install.sh
-# and creates a formula scripts/packaging/Formula/octez.rb
+# and creates a formula scripts/packaging/octez/homebrew/Formula/octez.rb
 # that is ready to be installed with brew
 
 set -ue
@@ -14,8 +14,8 @@ BUCKET="$GCP_LINUX_PACKAGES_BUCKET"
 
 # set version
 
-. scripts/version.sh
-. scripts/ci/octez-release.sh
+. ./scripts/version.sh
+. ./scripts/ci/octez-release.sh
 
 # fetch tags for releases
 git fetch -q --tags
@@ -71,8 +71,8 @@ mkdir -p "$TARGETDIR"
 #shellcheck disable=SC2046
 eval $(scripts/active_protocols.sh)
 sed "s|%%VERSION%%|$VERSION|; \
- s|%%CI_MERGE_REQUEST_SOURCE_PROJECT_URL%%|$CI_MERGE_REQUEST_SOURCE_PROJECT_URL|; \
- s|%%CI_COMMIT_REF_NAME%%|$CI_COMMIT_REF_NAME|; \
+ s|%%CI_MERGE_REQUEST_SOURCE_PROJECT_URL%%|${CI_MERGE_REQUEST_SOURCE_PROJECT_URL:-$CI_PROJECT_URL}|; \
+ s|%%CI_COMMIT_REF_NAME%%|${CI_COMMIT_REF_NAME:-master}|; \
  s|%%CI_PROJECT_NAMESPACE%%|$CI_PROJECT_NAMESPACE|; \
  s|%%PROTO_CURRENT%%|$PROTO_CURRENT|; s|%%PROTO_NEXT%%|$PROTO_NEXT|" \
   scripts/packaging/octez/homebrew/Formula/octez.rb.template > "$TARGETDIR/octez.rb"

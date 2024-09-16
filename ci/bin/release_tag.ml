@@ -99,11 +99,11 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
         ~expire_in:(Duration (Days 1))
         ~name:"build-$CI_COMMIT_REF_SLUG"
         ~when_:On_success
-        ["scripts/packaging/Formula/octez.rb"]
+        ["public/homebrew/*"]
     in
     job
       ~__POS__
-      ~name:"homebrew release"
+      ~name:"oc.install-release-homebrew"
       ~arch:Amd64
       ~dependencies:(Dependent [])
       ~image:Images.debian_bookworm
