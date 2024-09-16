@@ -29,6 +29,7 @@ open Protocol.Alpha_context
 
 val bake :
   Protocol_client_context.full ->
+  ?dal_node_rpc_ctxt:Tezos_rpc.Context.generic ->
   ?minimal_fees:Tez.t ->
   ?minimal_nanotez_per_gas_unit:Q.t ->
   ?minimal_nanotez_per_byte:Q.t ->
@@ -38,7 +39,6 @@ val bake :
   ?extra_operations:Baking_configuration.Operations_source.t ->
   ?monitor_node_mempool:bool ->
   ?context_path:string ->
-  ?dal_node_endpoint:Uri.t ->
   (* Number of baked blocks. Defaults to 1. *)
   ?count:int ->
   ?votes:Baking_configuration.per_block_votes_config ->

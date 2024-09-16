@@ -29,12 +29,12 @@
 module Baker : sig
   val run :
     Protocol_client_context.full ->
+    ?dal_node_rpc_ctxt:Tezos_rpc.Context.generic ->
     ?minimal_fees:Protocol.Alpha_context.Tez.t ->
     ?minimal_nanotez_per_gas_unit:Q.t ->
     ?minimal_nanotez_per_byte:Q.t ->
     ?votes:Baking_configuration.per_block_votes_config ->
     ?extra_operations:Baking_configuration.Operations_source.t ->
-    ?dal_node_endpoint:Uri.t ->
     ?dal_node_timeout_percentage:int ->
     ?pre_emptive_forge_time:Q.t ->
     ?force_apply_from_round:int ->
