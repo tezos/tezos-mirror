@@ -429,6 +429,17 @@ let changeset_octez_docker_changes_or_master =
 let changeset_hadolint_docker_files =
   Changeset.make ["build.Dockerfile"; "Dockerfile"]
 
+let changeset_debian_packages =
+  Changeset.(
+    make
+      [
+        "scripts/packaging/**/*";
+        "debian-deps-build.Dockerfile";
+        "scripts/ci/build-debian-packages_current.sh";
+        "scripts/ci/build-debian-packages-dependencies.sh";
+        "scripts/ci/build-debian-packages.sh";
+      ])
+
 (** The set of [changes:] that select opam jobs.
 
     Note: unlike all other changesets, this one does not include {!changeset_base}.
