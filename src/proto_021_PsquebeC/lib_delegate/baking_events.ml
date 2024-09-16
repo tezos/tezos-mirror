@@ -916,17 +916,20 @@ module Actions = struct
       ("delegate", Baking_state.consensus_key_and_delegate_encoding)
 
   let forging_block =
-    declare_3
+    declare_4
       ~section
       ~name:"forging_block"
       ~level:Info
-      ~msg:"forging block at level {level}, round {round} for {delegate}"
+      ~msg:
+        "forging block at level {level}, round {round} for {delegate} (force \
+         apply: {force_apply})"
       ~pp1:pp_int32
       ~pp2:Round.pp
       ~pp3:Baking_state.pp_consensus_key_and_delegate
       ("level", Data_encoding.int32)
       ("round", Round.encoding)
       ("delegate", Baking_state.consensus_key_and_delegate_encoding)
+      ("force_apply", Data_encoding.bool)
 
   let delayed_block_injection =
     declare_4
