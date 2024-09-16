@@ -1076,10 +1076,29 @@ type state_account_override = {
   nonce : quantity option;
   code : hex option;
   state_diff : hex StorageMap.t;
-  state : hex StorageMap.t;
+  state : hex StorageMap.t option;
+      (* For [state] we make the distinction between
+         * the option was set with an empty state (`Some StorageMap.empty`)
+         * the option was not set (`None`).
+         The former means the state needs to be erased, the other means the
+         option was not set and can be ignored.
+      *)
 }
 
 type state_override = state_account_override AddressMap.t
+
+(* Encode a <possibly empty state> into a `Some <possibly empty map>`.
+
+   This specialized encoding is necessary because `Data_encoding.option` cannot
+   be combined with `StorageMap.associative_array_encoding` as both are
+   nullable.
+*)
+let state_encoding =
+  let open Data_encoding in
+  conv
+    (function Some s -> s | None -> StorageMap.empty)
+    (fun s -> Some s)
+    (StorageMap.associative_array_encoding hex_encoding)
 
 let state_account_override_encoding =
   let open Data_encoding in
@@ -1092,10 +1111,7 @@ let state_account_override_encoding =
        (opt "balance" quantity_encoding)
        (opt "nonce" quantity_encoding)
        (opt "code" hex_encoding)
-       (dft
-          "state"
-          (StorageMap.associative_array_encoding hex_encoding)
-          StorageMap.empty)
+       (dft "state" state_encoding None)
        (dft
           "state_diff"
           (StorageMap.associative_array_encoding hex_encoding)

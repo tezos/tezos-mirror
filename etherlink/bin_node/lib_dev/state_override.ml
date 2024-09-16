@@ -52,18 +52,19 @@ let update_storage address state_diff state =
 
 let replace_storage address state_override state =
   let open Lwt_result_syntax in
-  if Ethereum_types.StorageMap.is_empty state_override then return state
-  else
-    let*? key = Durable_storage_path.Accounts.storage_dir_e address in
-    let*! state =
-      Evm_state.delete ~kind:Tezos_scoru_wasm.Durable.Directory state key
-    in
-    update_storage address state_override state
+  match state_override with
+  | None -> return state
+  | Some state_override ->
+      let*? key = Durable_storage_path.Accounts.storage_dir_e address in
+      let*! state =
+        Evm_state.delete ~kind:Tezos_scoru_wasm.Durable.Directory state key
+      in
+      update_storage address state_override state
 
 let is_invalid state_override =
   let open Ethereum_types in
   not
-    (StorageMap.is_empty state_override.state
+    (Option.is_none state_override.state
     || StorageMap.is_empty state_override.state_diff)
 
 let update_account address state_override evm_state =
