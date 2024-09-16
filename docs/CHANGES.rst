@@ -87,6 +87,35 @@ Node
   automatically trigger the maintenance whenever it is the most
   suitable. (MR :gl:`!14503`)
 
+- **Breaking change** Bumped the node’s storage version to
+  ``3.2``. This new version changes the store’s representation,
+  allowing the storage to scale to the increasing number of blocks per
+  cycles, thus paving the way to reducing even more the block
+  time. Upgrading to this new version must be done manually (using the
+  ``octez-node upgrade storage`` command) and is irreversible. (MR
+  :gl:`!14211`)
+
+- **Breaking change** Bumped the snapshot version from ``7`` to ``8``,
+  in order to support the changes introduced by the ``3.2`` storage
+  version. Snapshots of version ``7`` exported with previous versions
+  of Octez (``v20``) can still be imported. Snapshots of version ``8``
+  are not retro-compatible with previous octez versions (MR
+  :gl:`!14398`).
+
+- Environment variable ``TEZOS_USE_YES_CRYPTO_I_KNOW_WHAT_I_AM_DOING`` can be
+  set to ``yes`` or ``y`` to use yes-crypto in testing. With yes-cryptography
+  activated, signatures are faked and always considered valid. This should be
+  used for testing purposes only and/or with extreme care. This can put your
+  software at risk of being considered faulty/malicious if it fake signs
+  and exploited by attackers if it fake-checks signatures.
+
+- To avoid misusage of ``TEZOS_USE_YES_CRYPTO_I_KNOW_WHAT_I_AM_DOING``
+  environment variable, if it is set to 'yes' or 'y', nodes must explicitly be
+  launched with the ``--allow-yes-crypto`` argument to run.
+
+- **Breaking change** removed the ``octez-proxy-server`` binary. The
+  feature is subsumed by the external RPC server.
+
 Client
 ------
 
@@ -101,6 +130,11 @@ Client
   longer supported starting from protocol following ParisC. (MR :gl:`!13454`)
 
 - **Breaking change** Removed read-write commands specific to ParisB. (MR :gl:`!14033`)
+
+- **Breaking change** Removed all bls key related command in favor of
+  generics one. All keys that were generated with ``bls gen keys`` can
+  be used with usual command of the octez-client (``list``, ``known``,
+  ``sign``, ...).  (MR :gl:`!14417`)
 
 Baker
 -----
@@ -129,6 +163,12 @@ Baker
   means that if there are 5 seconds left till the end of the round, then the
   baker will wait for ``0.5`` seconds for the DAL attestations' status. (MR
   :gl:`!14480`)
+
+- **Breaking_change** The baker now accepts a new argument,
+  ``--force_apply_from_round <round>``, which replaces ``--force-apply``.
+  Previously, the baker applied blocks from round 0 if ``--force_apply`` was
+  used, and from round 1 otherwise. The default is now set to 3 and can be
+  adjusted using ``--force_apply_from_round <round>``. (MR :gl:`!14875`)
 
 Accuser
 -------
@@ -200,6 +240,26 @@ Smart Rollup node
 
 - Introduced the 6th version of the WASM PVM. (MR :gl:`!14493`)
 
+- New RPC ``GET /admin/cancel_gc`` to cancel any on-going garbage collection in
+  the rollup node. (MR :gl:`!14693`)
+
+- Refined GC for rollup node is now triggered every ~3 days to make it less
+  wasteful on resources. Gc is not run anymore after importing an archive
+  snapshot in a full node. (MR :gl:`!14717`)
+
+- The command ``snapshot export`` tries to cancel ongoing GC, if any. Add
+  ``--rollup-node-endpoint`` to specify the RPC server endpoint, if the address
+  and port of the running node have been changed via command-line arguments. (MR
+  :gl:`!14694`)
+
+- Fix an issue which could introduce a discrepancy between the snapshot header
+  and its content. (MR :gl:`!14777`)
+
+- The command ``generate openapi`` now exports mimified JSON. (MR :gl:`!14908`)
+
+- The rollup node can be configured to execute outbox message automatically with
+  filters. (MRs :gl:`!14498`, :gl:`!14499`)
+
 Data Availability Layer (DAL)
 -----------------------------
 
@@ -238,9 +298,26 @@ DAL node
   - ``GET /shard/<c>/<s>`` is now ``GET /levels/<l>/slots/<i>/shards/<s>/content`` (MR :gl:`!13095`),
   - ``POST /slot`` is now ``POST /slots`` (MR :gl:`!12949`),
   - ``GET /slot/pages/<c>`` is now ``GET /levels/<l>/slots/<i>/pages`` (MR :gl:`!12880`),
-  - ``GET /commitments/<c>/headers`` is now ``GET /levels/<l>/slots/<i>/status`` (MR :gl:`!13055`).
+  - ``GET /commitments/<c>/headers`` is now ``GET /levels/<l>/slots/<i>/status`` (MR :gl:`!13055`),
+  - ``GET /p2p/peers/list`` is now ``GET /p2p/peers`` (MR :gl:`!14521`).
+
+- Two new RPCs have been added:
+
+  - ``GET /p2p/gossipsub/slot_indexes/peers``
+  - ``GET /p2p/gossipsub/pkhs/peers``
+
+  These two new RPCs are similar to ``GET /p2p/gossipsub/topics/`` but instead of
+  grouping peers by topic they group them by slot indices or attester's public key
+  hashes (``pkhs``) appearing in the relevant topics. (MR :gl:`!14504`)
+
+- In the output of ``GET /p2p/peers/info``, the field ``"point"`` has been renamed
+  to ``"peer"``. (MR :gl:`!14521`)
 
 - A new RPC ``GET /health`` has been added to check the status on the node (MR :gl:`!14670`).
+
+- An optional ``slot_index`` numerical query argument has been added to
+  RPC ``POST /slots``. When provided, the DAL node checks that its
+  profile allows to publish data on the given slot index (MR :gl:`!14825`).
 
 Miscellaneous
 -------------
