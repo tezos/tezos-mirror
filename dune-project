@@ -13,6 +13,7 @@
 (package (name octez-accuser-PsParisC))
 (package (name octez-accuser-PsquebeC))
 (package (name octez-accuser-alpha))
+(package (name octez-agnostic-baker))
 (package (name octez-alcotezt))
 (package (name octez-baker-PsParisC))
 (package (name octez-baker-PsquebeC))
