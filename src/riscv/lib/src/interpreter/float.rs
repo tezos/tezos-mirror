@@ -523,7 +523,7 @@ where
 
 /// There are 5 supported rounding modes
 #[allow(clippy::upper_case_acronyms)]
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 pub enum RoundingMode {
     /// Round to Nearest, ties to Even
     RNE,

@@ -1136,10 +1136,10 @@ const fn parse_compressed_instruction_inner(instr: u16) -> Instr {
         OP_C1 => match c_funct3(instr) {
             C_F3_0 => match (ci_imm(instr), c_rd_rs1(instr)) {
                 // "C.ADDI is only valid when rd != x0 and nzimm != 0.
-                // The code points with rd == x0 encode the C.NOP instruction;
-                // the remaining code points with nzimm == 0 encode HINTs."
-                (_, x0) => CNop,
-                (0, _) => UnknownCompressed { instr },
+                // The code points with rd == x0 and nzimm == 0 encode the C.NOP instruction;
+                // the remaining code points with nzimm != 0 encode HINTs."
+                (0, x0) => CNop,
+                (0, _) | (_, x0) => UnknownCompressed { instr },
                 (imm, rd_rs1) => CAddi(CIBTypeArgs { rd_rs1, imm }),
             },
             C_F3_1 => match (ci_imm(instr), c_rd_rs1(instr)) {
@@ -1288,6 +1288,8 @@ pub fn parse_segment(contents: &[u8], range: Range<usize>) -> Vec<Instr> {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use super::{
         instruction::{CsrArgs, ITypeArgs, Instr::*, SBTypeArgs, UJTypeArgs},
         parse_block,
@@ -1441,6 +1443,25 @@ mod tests {
             assert_eq!(
                 parse_compressed_instruction(i),
                 parse_compressed_instruction_inner(i)
+            );
+        }
+    }
+
+    // Ensure parsing correctly is 1:2:1.
+    #[test]
+    fn test_unparse_compressed() {
+        let mut reverse = HashMap::new();
+
+        for i in 0..=u16::MAX {
+            reverse.insert(parse_compressed_instruction(i), i);
+        }
+
+        for i in 0..=u16::MAX {
+            assert_eq!(
+                Some(&i),
+                reverse.get(&parse_compressed_instruction(i)),
+                "Failed {i} {}",
+                parse_compressed_instruction(i)
             );
         }
     }

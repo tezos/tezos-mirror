@@ -55,6 +55,7 @@ pub enum Privilege {
     strum::EnumIter,
     TryFromPrimitive,
     strum::Display,
+    Hash,
 )]
 #[repr(usize)]
 pub enum CSRegister {
