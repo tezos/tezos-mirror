@@ -62,6 +62,7 @@ and Rewriter : sig
     | Span of content
     | Span_f of content
     | Span_s of content
+    | Stamp of content
     | Stop of content
 
   val to_constant : t -> Constants.t

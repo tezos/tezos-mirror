@@ -41,6 +41,9 @@ module rec Constants : sig
   (** Constant representing [@profiler.span_s] *)
   val span_s_constant : t
 
+  (** Constant representing [@profiler.stamp] *)
+  val stamp_constant : t
+
   (** Constant representing [@profiler.stop] *)
   val stop_constant : t
 
@@ -92,6 +95,9 @@ end = struct
 
   (* [@profiler.span_s] *)
   let span_s_constant = create_constant "span_s"
+
+  (* [@profiler.stamp] *)
+  let stamp_constant = create_constant "stamp"
 
   (* [@profiler.stop] *)
   let stop_constant = create_constant "stop"
@@ -154,6 +160,7 @@ and Rewriter : sig
     | Span of content
     | Span_f of content
     | Span_s of content
+    | Stamp of content
     | Stop of content
 
   val to_constant : t -> Constants.t
@@ -181,6 +188,7 @@ end = struct
     | Span of content
     | Span_f of content
     | Span_s of content
+    | Stamp of content
     | Stop of content
 
   let aggregate key location =
@@ -239,6 +247,11 @@ end = struct
     | Key.Apply _ | Key.Ident _ | Key.List _ -> Span_s {key; location}
     | _ -> Error.error location (Error.Invalid_span key)
 
+  let stamp key location =
+    match Key.content key with
+    | Key.Apply _ | Key.Ident _ | Key.String _ -> Stamp {key; location}
+    | _ -> Error.error location (Error.Invalid_span key)
+
   let stop key location =
     match Key.content key with
     | Key.Empty -> Stop {key; location}
@@ -256,6 +269,7 @@ end = struct
     | Span c
     | Span_f c
     | Span_s c
+    | Stamp c
     | Stop c ->
         c.location
 
@@ -271,6 +285,7 @@ end = struct
     | Span _ -> Constants.span_constant
     | Span_f _ -> Constants.span_f_constant
     | Span_s _ -> Constants.span_s_constant
+    | Stamp _ -> Constants.stamp_constant
     | Stop _ -> Constants.stop_constant
 
   let association_constant_rewriter =
@@ -286,6 +301,7 @@ end = struct
       (Constants.span_constant, span);
       (Constants.span_f_constant, span_f);
       (Constants.span_s_constant, span_s);
+      (Constants.stamp_constant, stamp);
       (Constants.stop_constant, stop);
     ]
     |> List.map (fun (const, fn) -> (Constants.get_attribute const, fn))
@@ -328,6 +344,7 @@ end = struct
             | Span _ -> "span"
             | Span_f _ -> "span_f"
             | Span_s _ -> "span_s"
+            | Stamp _ -> "stamp"
             | Stop _ -> "stop" )
       in
       Ppxlib.Ast_helper.Exp.ident {txt = lident; loc}

@@ -56,7 +56,8 @@ let rewrite rewriters t =
             loc
             (Rewriter.get_key content)
       (* Functions that have a ~lod parameter *)
-      | Rewriter.Mark content | Rewriter.Record content ->
+      | Rewriter.Mark content | Rewriter.Record content | Rewriter.Stamp content
+        ->
           add_unit_function
             ~lod:true
             expr
