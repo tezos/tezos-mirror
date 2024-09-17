@@ -3,7 +3,9 @@
 //
 // SPDX-License-Identifier: MIT
 
-use bincode::{deserialize, serialize};
+pub(crate) mod binary;
+mod chunked_io;
+
 use std::{
     io::{self, Write},
     path::{Path, PathBuf},
@@ -137,14 +139,30 @@ impl Repo {
         }
 
         // A commit contains the list of all chunks needed to reconstruct `data`.
-        let commit_bytes = serialize(&commit)?;
+        let commit_bytes = binary::serialise(&commit)?;
+        self.backend.store(&commit_bytes)
+    }
+
+    /// Commit something serialisable and return the commit ID.
+    pub fn commit_serialised(
+        &mut self,
+        subject: &impl serde::Serialize,
+    ) -> Result<Hash, StorageError> {
+        let chunk_hashes = {
+            let mut writer = chunked_io::ChunkWriter::new(&mut self.backend);
+            binary::serialise_into(subject, &mut writer)?;
+            writer.finalise()?
+        };
+
+        // A commit contains the list of all chunks needed to reconstruct the underlying data.
+        let commit_bytes = binary::serialise(&chunk_hashes)?;
         self.backend.store(&commit_bytes)
     }
 
     /// Checkout the bytes committed under `id`, if the commit exists.
     pub fn checkout(&self, id: &Hash) -> Result<Vec<u8>, StorageError> {
         let bytes = self.backend.load(id)?;
-        let commit: Vec<Hash> = deserialize(&bytes)?;
+        let commit: Vec<Hash> = binary::deserialise(&bytes)?;
         let mut bytes = Vec::new();
         for hash in commit {
             let mut chunk = self.backend.load(&hash).map_err(|e| {
@@ -159,6 +177,15 @@ impl Repo {
         Ok(bytes)
     }
 
+    /// Checkout something deserialisable from the store.
+    pub fn checkout_serialised<S: serde::de::DeserializeOwned>(
+        &self,
+        id: &Hash,
+    ) -> Result<S, StorageError> {
+        let reader = chunked_io::ChunkedReader::new(&self.backend, id)?;
+        Ok(binary::deserialise_from(reader)?)
+    }
+
     /// A snapshot is a new repo to which only `id` has been committed.
     pub fn export_snapshot(&self, id: &Hash, path: impl AsRef<Path>) -> Result<(), StorageError> {
         // Only export a snapshot to a new or empty directory
@@ -169,7 +196,7 @@ impl Repo {
             return Err(StorageError::InvalidRepo);
         };
         let bytes = self.backend.load(id)?;
-        let commit: Vec<Hash> = deserialize(&bytes)?;
+        let commit: Vec<Hash> = binary::deserialise(&bytes)?;
         for chunk in commit {
             self.backend.copy(&chunk, path)?;
         }
