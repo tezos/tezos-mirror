@@ -368,7 +368,7 @@ let translate_ops info =
             {
               delegate = pkh;
               first_slot;
-              endorsing_power = power;
+              attesting_power = power;
               operations = translate pkh_ops;
             }
           :: acc)

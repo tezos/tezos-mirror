@@ -109,7 +109,7 @@ let add_inclusion_in_block block_hash validators delegate_operations =
     List.fold_left
       (fun (acc, missing)
            Data.Delegate_operations.(
-             {delegate; first_slot; endorsing_power; operations} as delegate_ops) ->
+             {delegate; first_slot; attesting_power; operations} as delegate_ops) ->
         match
           List.partition
             (fun op ->
@@ -124,7 +124,7 @@ let add_inclusion_in_block block_hash validators delegate_operations =
                 {
                   delegate;
                   first_slot;
-                  endorsing_power;
+                  attesting_power;
                   operations =
                     add_to_operations
                       block_hash
@@ -149,7 +149,7 @@ let add_inclusion_in_block block_hash validators delegate_operations =
             {
               delegate;
               first_slot = 0;
-              endorsing_power = op.Consensus_ops.power;
+              attesting_power = op.Consensus_ops.power;
               operations =
                 [
                   {
@@ -352,7 +352,7 @@ let dump_received logger path ?unaccurate level received_ops =
           List.fold_left
             (fun (acc, missing)
                  Data.Delegate_operations.(
-                   {delegate; first_slot; endorsing_power; operations} as
+                   {delegate; first_slot; attesting_power; operations} as
                    delegate_ops) ->
               match
                 List.partition
@@ -368,7 +368,7 @@ let dump_received logger path ?unaccurate level received_ops =
                       {
                         delegate;
                         first_slot;
-                        endorsing_power;
+                        attesting_power;
                         operations = merge_operations operations new_operations;
                       }
                     :: acc,
@@ -388,7 +388,7 @@ let dump_received logger path ?unaccurate level received_ops =
                        {
                          delegate = right.Consensus_ops.address;
                          first_slot = right.Consensus_ops.first_slot;
-                         endorsing_power = right.Consensus_ops.power;
+                         attesting_power = right.Consensus_ops.power;
                          operations =
                            List.rev_map
                              (fun Consensus_ops.

@@ -72,7 +72,7 @@ module Define (Services : Protocol_machinery.PROTOCOL_SERVICES) = struct
 
   let rights_of ctxt level =
     let cctx = Services.wrap_full ctxt in
-    Services.endorsing_rights cctx ~reference_level:level level
+    Services.attesting_rights cctx ~reference_level:level level
 
   let () = Protocol_hash.Table.add rights_machine Services.hash rights_of
 
@@ -193,7 +193,7 @@ module Define (Services : Protocol_machinery.PROTOCOL_SERVICES) = struct
     Services.BlockIdMap.iter_ep
       (fun _ (level, attestations) ->
         let* rights =
-          Services.endorsing_rights cctx' ~reference_level:current_level level
+          Services.attesting_rights cctx' ~reference_level:current_level level
         in
         let items, missing = couple_ops_to_rights attestations rights in
         let full = Compare.Int32.(current_level = level) in

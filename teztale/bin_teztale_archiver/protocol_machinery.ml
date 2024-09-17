@@ -12,7 +12,7 @@ module type PROTOCOL_SERVICES = sig
 
   val wrap_full : Tezos_client_base.Client_context.full -> wrap_full
 
-  val endorsing_rights :
+  val attesting_rights :
     wrap_full ->
     reference_level:Int32.t ->
     Int32.t ->

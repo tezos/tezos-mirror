@@ -36,7 +36,7 @@ module Mutex : sig
 
   val operations_inclusion : Lwt_mutex.t
 
-  val endorsing_rights : Lwt_mutex.t
+  val attesting_rights : Lwt_mutex.t
 
   val cycles : Lwt_mutex.t
 
@@ -52,7 +52,7 @@ val maybe_insert_source : (string, unit, [`Zero]) Caqti_request.t
 val maybe_insert_delegate :
   (Tezos_crypto.Signature.public_key_hash, unit, [`Zero]) Caqti_request.t
 
-val maybe_insert_endorsing_right :
+val maybe_insert_attesting_right :
   ( int32 * int * int * Tezos_crypto.Signature.public_key_hash,
     unit,
     [`Zero] )

@@ -504,7 +504,7 @@ let format_block_op level delegate
     (op : Lib_teztale_base.Consensus_ops.operation) =
   ((level, op.hash, op.kind = Attestation, op.round), delegate)
 
-let endorsing_rights_callback =
+let attesting_rights_callback =
   let module Cache =
     Aches.Vache.Set (Aches.Vache.LRU_Precise) (Aches.Vache.Strong)
       (struct
@@ -529,7 +529,7 @@ let endorsing_rights_callback =
           return_unit
         else
           let* () =
-            maybe_with_metrics conf "maybe_insert_endorsing_right__list"
+            maybe_with_metrics conf "maybe_insert_attesting_right__list"
             @@ fun () ->
             Caqti_lwt_unix.Pool.use
               (fun (module Db : Caqti_lwt.CONNECTION) ->
@@ -550,8 +550,8 @@ let endorsing_rights_callback =
                     rights
                 in
                 without_cache
-                  Sql_requests.Mutex.endorsing_rights
-                  Sql_requests.maybe_insert_endorsing_right
+                  Sql_requests.Mutex.attesting_rights
+                  Sql_requests.maybe_insert_attesting_right
                   (module Db)
                   conf
                   rights)
@@ -887,10 +887,10 @@ let import_callback ~logger conf db_pool g data =
         let* () =
           Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
             (fun Lib_teztale_base.Data.Delegate_operations.
-                   {delegate; first_slot; endorsing_power; _} ->
+                   {delegate; first_slot; attesting_power; _} ->
               Db.exec
-                Sql_requests.maybe_insert_endorsing_right
-                (level, first_slot, endorsing_power, delegate))
+                Sql_requests.maybe_insert_attesting_right
+                (level, first_slot, attesting_power, delegate))
             data.Lib_teztale_base.Data.delegate_operations
         in
         (* blocks *)
@@ -1048,7 +1048,7 @@ let routes :
             with_data
               Lib_teztale_base.Consensus_ops.rights_encoding
               body
-              (endorsing_rights_callback ~logger conf db_pool g)) );
+              (attesting_rights_callback ~logger conf db_pool g)) );
     ( Re.seq [Re.str "/"; Re.group (Re.rep1 Re.digit); Re.str "/block"],
       fun g ~logger ~conf ~admins:_ ~users db_pool header meth body ->
         post_only_endpoint !users header meth (fun source ->
