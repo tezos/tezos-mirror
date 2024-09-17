@@ -8,11 +8,14 @@
 module rec Constants : sig
   type t
 
-  (** Constant representing [@profiler.aggregate_s] *)
-  val aggregate_s_constant : t
+  (** Constant representing [@profiler.aggregate] *)
+  val aggregate_constant : t
 
   (** Constant representing [@profiler.aggregate_f] *)
   val aggregate_f_constant : t
+
+  (** Constant representing [@profiler.aggregate_s] *)
+  val aggregate_s_constant : t
 
   (** Constant representing [@profiler.mark] *)
   val mark_constant : t
@@ -54,11 +57,14 @@ end = struct
     let attribute_name = namespace ^ "." ^ action in
     {action; attribute_name}
 
-  (* [@profiler.aggregate_s] *)
-  let aggregate_s_constant = create_constant "aggregate_s"
+  (* [@profiler.aggregate] *)
+  let aggregate_constant = create_constant "aggregate"
 
   (* [@profiler.aggregate_f] *)
   let aggregate_f_constant = create_constant "aggregate_f"
+
+  (* [@profiler.aggregate_s] *)
+  let aggregate_s_constant = create_constant "aggregate_s"
 
   (* [@profiler.mark] *)
   let mark_constant = create_constant "mark"
@@ -92,8 +98,9 @@ end = struct
      defined above *)
   let constants =
     [
-      aggregate_s_constant;
+      aggregate_constant;
       aggregate_f_constant;
+      aggregate_s_constant;
       mark_constant;
       record_constant;
       record_f_constant;
@@ -129,8 +136,9 @@ and Rewriter : sig
   val get_key : content -> Key.t
 
   type t =
-    | Aggregate_s of content
+    | Aggregate of content
     | Aggregate_f of content
+    | Aggregate_s of content
     | Mark of content
     | Record of content
     | Record_f of content
@@ -154,8 +162,9 @@ end = struct
   let get_key content = content.key
 
   type t =
-    | Aggregate_s of content
+    | Aggregate of content
     | Aggregate_f of content
+    | Aggregate_s of content
     | Mark of content
     | Record of content
     | Record_f of content
@@ -165,14 +174,19 @@ end = struct
     | Span_s of content
     | Stop of content
 
-  let aggregate_s key location =
+  let aggregate key location =
     match Key.content key with
-    | Key.Apply _ | Key.Ident _ | Key.String _ -> Aggregate_s {key; location}
+    | Key.Apply _ | Key.Ident _ | Key.String _ -> Aggregate {key; location}
     | _ -> Error.error location (Error.Invalid_aggregate key)
 
   let aggregate_f key location =
     match Key.content key with
     | Key.Apply _ | Key.Ident _ | Key.String _ -> Aggregate_f {key; location}
+    | _ -> Error.error location (Error.Invalid_aggregate key)
+
+  let aggregate_s key location =
+    match Key.content key with
+    | Key.Apply _ | Key.Ident _ | Key.String _ -> Aggregate_s {key; location}
     | _ -> Error.error location (Error.Invalid_aggregate key)
 
   let mark key location =
@@ -217,8 +231,9 @@ end = struct
     | _ -> Error.error location (Error.Invalid_stop key)
 
   let get_location = function
-    | Aggregate_s c
+    | Aggregate c
     | Aggregate_f c
+    | Aggregate_s c
     | Mark c
     | Record c
     | Record_f c
@@ -230,6 +245,7 @@ end = struct
         c.location
 
   let to_constant = function
+    | Aggregate _ -> Constants.aggregate_constant
     | Aggregate_f _ -> Constants.aggregate_f_constant
     | Aggregate_s _ -> Constants.aggregate_s_constant
     | Mark _ -> Constants.mark_constant
@@ -243,6 +259,7 @@ end = struct
 
   let association_constant_rewriter =
     [
+      (Constants.aggregate_constant, aggregate);
       (Constants.aggregate_f_constant, aggregate_f);
       (Constants.aggregate_s_constant, aggregate_s);
       (Constants.mark_constant, mark);
@@ -283,6 +300,7 @@ end = struct
         Ppxlib.Ldot
           ( profiler_module,
             match t with
+            | Aggregate _ -> "aggregate"
             | Aggregate_f _ -> "aggregate_f"
             | Aggregate_s _ -> "aggregate_s"
             | Mark _ -> "mark"

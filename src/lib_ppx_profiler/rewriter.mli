@@ -51,8 +51,9 @@ and Rewriter : sig
 
   (** Possible rewriters *)
   type t =
-    | Aggregate_s of content
+    | Aggregate of content
     | Aggregate_f of content
+    | Aggregate_s of content
     | Mark of content
     | Record of content
     | Record_f of content

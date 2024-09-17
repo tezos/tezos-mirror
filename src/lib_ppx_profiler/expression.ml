@@ -42,8 +42,9 @@ let rewrite rewriters t =
   List.fold_left
     (fun expr rewriter ->
       match rewriter with
-      | Rewriter.Aggregate_s content
+      | Rewriter.Aggregate content
       | Rewriter.Aggregate_f content
+      | Rewriter.Aggregate_s content
       | Rewriter.Record_f content
       | Rewriter.Record_s content
       | Rewriter.Span_f content
