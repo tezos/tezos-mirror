@@ -1890,6 +1890,39 @@ opam:all_7:
       - octez-alcotezt
       - bls12-381
 
+trigger:debian_repository_partial_auto:
+  stage: test
+  rules:
+  - changes:
+    - debian-deps-build.Dockerfile
+    - scripts/ci/build-debian-packages-dependencies.sh
+    - scripts/ci/build-debian-packages.sh
+    - scripts/ci/build-debian-packages_current.sh
+    - scripts/packaging/**/*
+    when: on_success
+  needs:
+  - job: trigger
+  - job: sanity_ci
+    optional: true
+  - job: docker:hadolint
+    optional: true
+  - job: oc.ocaml_fmt
+    optional: true
+  - job: oc.semgrep
+    optional: true
+  - job: oc.misc_checks
+    optional: true
+  - job: check_rust_fmt
+    optional: true
+  - job: documentation:rst-check
+    optional: true
+  - job: nix
+    optional: true
+  - job: commit_titles
+    optional: true
+  trigger:
+    include: .gitlab/ci/pipelines/debian_repository_partial_auto.yml
+
 kaitai_checks:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
@@ -2377,39 +2410,6 @@ oc.test-liquidity-baking-scripts:
   - eval $(opam env)
   script:
   - ./scripts/ci/test_liquidity_baking_scripts.sh
-
-trigger:debian_repository_partial_auto:
-  stage: test
-  rules:
-  - changes:
-    - debian-deps-build.Dockerfile
-    - scripts/ci/build-debian-packages-dependencies.sh
-    - scripts/ci/build-debian-packages.sh
-    - scripts/ci/build-debian-packages_current.sh
-    - scripts/packaging/**/*
-    when: on_success
-  needs:
-  - job: trigger
-  - job: sanity_ci
-    optional: true
-  - job: docker:hadolint
-    optional: true
-  - job: oc.ocaml_fmt
-    optional: true
-  - job: oc.semgrep
-    optional: true
-  - job: oc.misc_checks
-    optional: true
-  - job: check_rust_fmt
-    optional: true
-  - job: documentation:rst-check
-    optional: true
-  - job: nix
-    optional: true
-  - job: commit_titles
-    optional: true
-  trigger:
-    include: .gitlab/ci/pipelines/debian_repository_partial_auto.yml
 
 test_kernels:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
@@ -4262,6 +4262,15 @@ documentation:linkcheck:
   - make -C docs redirectcheck
   - make -C docs linkcheck
 
+trigger:debian_repository_partial:
+  stage: manual
+  rules:
+  - when: manual
+    allow_failure: true
+  needs: []
+  trigger:
+    include: .gitlab/ci/pipelines/debian_repository_partial.yml
+
 oc.docker:amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
   stage: manual
@@ -4395,22 +4404,6 @@ oc.build:homebrew:
   - brew install -v scripts/packaging/Formula/octez.rb
   variables:
     CARGO_NET_OFFLINE: "false"
-
-trigger:debian_repository_partial:
-  stage: manual
-  rules:
-  - changes:
-    - debian-deps-build.Dockerfile
-    - scripts/ci/build-debian-packages-dependencies.sh
-    - scripts/ci/build-debian-packages.sh
-    - scripts/ci/build-debian-packages_current.sh
-    - scripts/packaging/**/*
-    when: never
-  - when: manual
-    allow_failure: true
-  needs: []
-  trigger:
-    include: .gitlab/ci/pipelines/debian_repository_partial.yml
 
 oc.script.docker_verify_image_arm64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0

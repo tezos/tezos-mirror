@@ -38,9 +38,12 @@ open Common
 
 (** Variants of the code verification pipeline.
 
-    Encodes the conditional [before_merging] pipeline and its
-    unconditional variant [schedule_extended_test]. *)
-type code_verification_pipeline = Before_merging | Schedule_extended_test
+    Encodes the conditional [before_merging] pipeline, the [merge_train]
+    and its unconditional variant [schedule_extended_test]. *)
+type code_verification_pipeline =
+  | Before_merging
+  | Schedule_extended_test
+  | Merge_train
 
 (** Configuration of manual jobs for [make_rules] *)
 type manual =
@@ -64,7 +67,7 @@ let opam_rules pipeline_type ~only_final_pipeline ?batch_index () =
   in
   match pipeline_type with
   | Schedule_extended_test -> [job_rule ~when_ ()]
-  | Before_merging ->
+  | Before_merging | Merge_train ->
       [
         job_rule ~if_:(Rules.has_mr_label "ci--opam") ~when_ ();
         job_rule
@@ -214,7 +217,7 @@ let jobs pipeline_type =
            -- unless they are dependent on a previous job (which is
            not [job_start] defined below), in the pipeline. *)
         [job_rule ~when_:(if dependent then On_success else Always) ()]
-    | Before_merging -> (
+    | Before_merging | Merge_train -> (
         (* MR labels can be used to force tests to run. *)
         (if final_pipeline_disable then
            [job_rule ~if_:Rules.is_final_pipeline ~when_:Never ()]
@@ -265,7 +268,7 @@ let jobs pipeline_type =
           schedule_extended_test ()
         in
         ([], make_dependencies)
-    | Before_merging ->
+    | Before_merging | Merge_train ->
         (* Define the [start] job
 
            §1: The purpose of this job is to launch the CI manually in certain cases.
@@ -420,9 +423,10 @@ let jobs pipeline_type =
         (* The license check only applies to new files (in the sense
            of [git add]), so can only run in [before_merging]
            pipelines. *)
-        if pipeline_type = Before_merging then
-          ["./scripts/ci/lint_check_licenses.sh"]
-        else [])
+        match pipeline_type with
+        | Before_merging | Merge_train ->
+            ["./scripts/ci/lint_check_licenses.sh"]
+        | Schedule_extended_test -> [])
     in
     let job_check_rust_fmt : tezos_job =
       job
@@ -458,7 +462,7 @@ let jobs pipeline_type =
     in
     let mr_only_jobs =
       match pipeline_type with
-      | Before_merging ->
+      | Before_merging | Merge_train ->
           [
             (* This job shall only run in pipelines for MRs because it's not
                sensitive to changes in time. *)
@@ -468,7 +472,7 @@ let jobs pipeline_type =
                unmutable) *)
             job_commit_titles;
           ]
-      | _ -> []
+      | Schedule_extended_test -> []
     in
     [
       job_sanity_ci;
@@ -546,7 +550,7 @@ let jobs pipeline_type =
   let job_select_tezts =
     (* Scheduled pipelines execute all tezt tests: no need for [job_select_tezts]. *)
     match pipeline_type with
-    | Before_merging ->
+    | Before_merging | Merge_train ->
         Some
           (Tezt.job_select_tezts
              ~rules:(make_rules ~changes:changeset_octez ())
@@ -578,7 +582,7 @@ let jobs pipeline_type =
       | Schedule_extended_test ->
           let job_build_rpm_amd64 = job_build_rpm_amd64 () in
           [job_build_rpm_amd64]
-      | Before_merging -> []
+      | Before_merging | Merge_train -> []
     in
     let job_ocaml_check : tezos_job =
       job
@@ -698,7 +702,15 @@ let jobs pipeline_type =
   let test =
     (* This job triggers the debian child pipeline automatically if any
        files in the changeset is modified. It's the same as
-       job_debian_repository_trigger that can be run manually *)
+       job_debian_repository_trigger that can be run manually.
+        We want both:
+        - to trigger the debian repository test automatically when relevant
+          files change, if the whole pipeline was triggered;
+        - and to be able to trigger the debian repository test manually,
+          whether relevant files changed or not, without having to trigger the
+          whole pipeline.
+        To achieve that we need to duplicate the job, because
+        it needs two different sets of dependencies. *)
     let job_debian_repository_trigger_auto =
       trigger_job
         ~__POS__
@@ -707,6 +719,14 @@ let jobs pipeline_type =
         ~dependencies:dependencies_needs_start
         Debian_repository.child_pipeline_partial_auto
     in
+    let job_debian_repository_trigger_full : tezos_job =
+      trigger_job
+        ~__POS__
+        ~dependencies:(Dependent [])
+        ~stage:Stages.test
+        Debian_repository.child_pipeline_full
+    in
+
     (* check that ksy files are still up-to-date with octez *)
     let job_kaitai_checks : tezos_job =
       job
@@ -1450,16 +1470,21 @@ let jobs pipeline_type =
         job_oc_script_test_release_versions;
         job_oc_script_b58_prefix;
         job_oc_test_liquidity_baking_scripts;
-        job_debian_repository_trigger_auto;
       ]
     in
-    jobs_misc @ jobs_kernels @ jobs_unit @ jobs_install_octez @ jobs_tezt
+    let jobs_debian =
+      match pipeline_type with
+      | Before_merging | Merge_train -> [job_debian_repository_trigger_auto]
+      | Schedule_extended_test -> [job_debian_repository_trigger_full]
+    in
+    jobs_debian @ jobs_misc @ jobs_kernels @ jobs_unit @ jobs_install_octez
+    @ jobs_tezt
   in
 
   (*Coverage jobs *)
   let coverage =
     match pipeline_type with
-    | Before_merging ->
+    | Before_merging | Merge_train ->
         (* Write the name of each job that produces coverage as input for other scripts.
            Only includes the stem of the name: parallel jobs only appear once.
            E.g. as [tezt], not [tezt X/Y]. *)
@@ -1560,7 +1585,7 @@ let jobs pipeline_type =
               ~project:"tezos/tezos"
               ~branch:"master";
           ]
-      | Before_merging ->
+      | Before_merging | Merge_train ->
           [
             job_install_python
               ~__POS__
@@ -1624,27 +1649,19 @@ let jobs pipeline_type =
        and tested. There is a similar job job_debian_repository_trigger_auto
        in the test stage that is started automatically if any files related to
        packaging is changed. *)
-    let job_debian_repository_trigger : tezos_job =
+    let job_debian_repository_trigger_partial : tezos_job =
+      (* Same as [job_debian_repository_trigger_auto] but manual,
+         so that one can trigger it without triggering the whole main pipeline.
+         See comment near the definition of [job_debian_repository_trigger_auto]. *)
       trigger_job
         ~__POS__
-        ~rules:
-          ([
-             (* Make sure we do not run the pipeline twice.
-                As in manual and auto *)
-             job_rule
-               ~changes:(Changeset.encode changeset_debian_packages)
-               ~when_:Never
-               ();
-           ]
-          @ make_rules ~manual:Yes ())
+        ~rules:(make_rules ~manual:Yes ())
         ~dependencies:(Dependent [])
         ~stage:Stages.manual
-        (match pipeline_type with
-        | Before_merging -> Debian_repository.child_pipeline_partial
-        | Schedule_extended_test -> Debian_repository.child_pipeline_full)
+        Debian_repository.child_pipeline_partial
     in
     match pipeline_type with
-    | Before_merging ->
+    | Before_merging | Merge_train ->
         (* Note: manual jobs in stage [manual] (which is the final
            stage) in [Before_merging] pipelines should be [Dependent]
            by default, and in particular [Dependent []] if they have
@@ -1710,16 +1727,18 @@ let jobs pipeline_type =
             ~dependencies:(Dependent [Job job_docker_arm64_test_manual])
             ["./scripts/ci/docker_verify_signature.sh"]
         in
-
-        [
-          job_docker_amd64_test_manual;
-          job_docker_arm64_test_manual;
-          job_build_rpm_amd64_manual;
-          job_build_homebrew_manual;
-          job_debian_repository_trigger;
-        ]
-        @ [job_docker_verify_test_arm64; job_docker_verify_test_amd64]
+        let jobs =
+          [
+            job_docker_amd64_test_manual;
+            job_docker_arm64_test_manual;
+            job_build_rpm_amd64_manual;
+            job_build_homebrew_manual;
+          ]
+          @ [job_docker_verify_test_arm64; job_docker_verify_test_amd64]
+        in
+        if pipeline_type = Merge_train then jobs
+        else job_debian_repository_trigger_partial :: jobs
     (* No manual jobs on the scheduled pipeline *)
-    | Schedule_extended_test -> [job_debian_repository_trigger]
+    | Schedule_extended_test -> []
   in
   start_stage @ sanity @ build @ packaging @ test @ coverage @ doc @ manual
