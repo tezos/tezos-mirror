@@ -7554,6 +7554,213 @@ let rollup_node_injects_dal_slots _protocol parameters dal_node sc_node
         "Expecting a status for 1 operation, got %d@."
         (List.length statuses)
 
+(** This test verifies the optimal publication of DAL slots from a batch of
+    messages into the DAL node and L1 via the rollup node DAL injector.
+
+    The test ensures that:
+    - DAL slots are published at the appropriate slot indices (0, 1, 2) and levels;
+    - Messages are grouped efficiently into DAL slots.
+
+    More precisely, we inject a list of messages into the rollup node's DAL
+    injector worker and check that:
+
+    - The first four chunks (with a name prefix [slot0_] below) fit exactly into
+    one slot. They are published at some level L, with slot index 0.
+
+    - The next three chunks (with a name prefix [slot1_]), which don't fully
+    fill a DAL slot, are combined into a slot and published at level L, with slot
+    index 1. In fact, the following message in the queue (namely [slot2_ck1]) is
+    one byte too big to fit in the same slot as these messages. So, the latter
+    is published into slot index 2 of the same level L (it cannot be combined
+    with the remaining messages as well).
+
+    - All available slot indices being used at level L, the remaining messages
+    are considered at level L+1. The two last messages are published at slot
+    indices 0 and 1, respectively. Message [slot3_ck_full] fits in a slot, so
+    there is no need to combine it with other slots. As for
+    [slot4_ck_almost_empty], which only occupies 1 byte, there are no remaining
+    messages that could be combined with it.
+
+    The test checks that the correct number of DAL slots are published and
+    verifies the length of the messages within the slots.
+*)
+let rollup_batches_and_publishes_optimal_dal_slots _protocol parameters dal_node
+    sc_node sc_rollup_address _node client _pvm_name =
+  let client = Client.with_dal_node client ~dal_node in
+  let* () = Sc_rollup_node.run sc_node sc_rollup_address [] in
+  let slot_size = parameters.Dal.Parameters.cryptobox.slot_size in
+
+  (* We create some messages below with various sizes. *)
+  Check.(
+    (slot_size mod 4 = 0)
+      int
+      ~error_msg:"Expected DAL slots size to be a multiple of 4") ;
+  let chunks_size = slot_size / 4 in
+
+  let slot0_ck1 = String.make chunks_size 'A' in
+  let slot0_ck2 = slot0_ck1 in
+  let slot0_ck3 = slot0_ck2 in
+  let slot0_ck4 = slot0_ck3 in
+
+  let slot1_ck1 = String.make chunks_size 'B' in
+  let slot1_ck2 = slot1_ck1 in
+  let slot1_ck3 = slot1_ck2 in
+  let slot2_ck1 = String.make (chunks_size + 1) 'C' in
+
+  let slot3_ck_full = String.make slot_size 'D' in
+  let slot4_ck_almost_empty = String.make 1 'E' in
+
+  (* We define an order of addition of the messages into the DAL injection queue
+     and group them in the way they are expected to be packed into DAL slots. *)
+  let annotated_messages =
+    [
+      [slot0_ck1; slot0_ck2; slot0_ck3; slot0_ck4];
+      [slot1_ck1; slot1_ck2; slot1_ck3];
+      [slot2_ck1];
+      [slot3_ck_full];
+      [slot4_ck_almost_empty];
+    ]
+  in
+
+  (* We derive from [annotated_messages] the raw list of messages that will be
+     injected with RPC [post_local_dal_batcher_injection] below.*)
+  let messages = List.concat annotated_messages in
+
+  (* We define the expected number of total, valid and discarded messages as well
+     as the number of expected DAL slots to publish. *)
+  let total_num_messages = List.length messages in
+  let expected_number_of_injected_dal_slots = List.length annotated_messages in
+
+  (* We start by informing the DAL injector of the rollup node that we want to
+     publish on slots indices 0, 1 and 2. *)
+  let* () =
+    Sc_rollup_node.RPC.call sc_node
+    @@ Sc_rollup_rpc.post_dal_slot_indices ~slot_indices:[0; 1; 2]
+  in
+
+  (* This promise will count the number of successfully injected messages. We
+     expected seeing [total_num_messages] events [dal_message_received] before
+     the promise resolves. *)
+  let wait_dal_message_received =
+    let countdown = ref total_num_messages in
+    Sc_rollup_node.wait_for sc_node "dal_message_received.v0" (fun _ ->
+        decr countdown ;
+        if !countdown = 0 then Some () else None)
+  in
+  (* Given a number [expected_num_published_slots] of slots to publish, this
+     function returns a promise that resolves once the corresponding number of
+     expected events [inject_dal_slot_from_messages] are seen. The function
+     returns the payloads of the events in a list as tuples: [(data_size,
+     num_messages, published_level, slot_index)]. *)
+  let wait_inject_dal_slot_from_messages ~expected_num_published_slots =
+    let open JSON in
+    let countdown = ref expected_num_published_slots in
+    let published = ref [] in
+    let* () =
+      Sc_rollup_node.wait_for
+        sc_node
+        "inject_dal_slot_from_messages.v0"
+        (fun json ->
+          let data_size = get "data_size" json |> as_int in
+          let num_messages = get "num_messages" json |> as_int in
+          let level = get "level" json |> as_int in
+          (* The slot was injected at leve [level]. We assume that it will be
+             included at the next level, which will be the "published
+             level". *)
+          let published_level = level + 1 in
+          let slot_index = get "slot_index" json |> as_int in
+          published :=
+            (data_size, num_messages, published_level, slot_index) :: !published ;
+          decr countdown ;
+          if !countdown = 0 then Some () else None)
+    in
+    Lwt.return (List.rev !published)
+  in
+  (* We finally inject the messages via post_local_dal_batcher_injection into
+     the DAL injection queue. *)
+  let* () =
+    Sc_rollup_node.RPC.call sc_node
+    @@ Sc_rollup_rpc.post_local_dal_batcher_injection ~messages
+  in
+
+  (* We wait until all injected messages are processed. *)
+  let* () = wait_dal_message_received in
+
+  (* Before baking one block and triggering the three first slots publication,
+     we create the promise that will track the [inject_dal_slot_from_messages]
+     events and return injected slots information. *)
+  let* published_slots_1 =
+    let wait_inject_dal_slot_from_messages_first_level =
+      wait_inject_dal_slot_from_messages ~expected_num_published_slots:3
+    in
+    let* () = bake_for client in
+    let* level = Client.level client in
+    let* _level = Sc_rollup_node.wait_for_level ~timeout:10. sc_node level in
+    wait_inject_dal_slot_from_messages_first_level
+  in
+
+  (* Once the three first slots are published, we do the same thing for the two
+     other expected slots at the next level. *)
+  let* published_slots_2 =
+    let wait_inject_dal_slot_from_messages_second_level =
+      wait_inject_dal_slot_from_messages ~expected_num_published_slots:2
+    in
+    let* () = bake_for client in
+    let* level = Client.level client in
+    let* _level = Sc_rollup_node.wait_for_level ~timeout:10. sc_node level in
+    wait_inject_dal_slot_from_messages_second_level
+  in
+
+  (* We sort the resulting published slots information by level and slot
+     indices. *)
+  let published_slots =
+    published_slots_2 @ published_slots_1
+    |> List.fast_sort
+         (fun
+           (_data_size, _num_messages, level, slot_index)
+           (_data_size', _num_messages', level', slot_index')
+         ->
+           let c = level - level' in
+           if c <> 0 then c else slot_index - slot_index')
+  in
+
+  (* We check that all messages are published. *)
+  let count_published_messages =
+    List.fold_left
+      (fun acc (_data_size, num_messages, _level, _slot_index) ->
+        num_messages + acc)
+      0
+      published_slots
+  in
+  Check.(
+    (total_num_messages = count_published_messages)
+      int
+      ~error_msg:"Expected number of batched messages %L. Got %R") ;
+
+  (* We check that the published number of DAL slots is as expected. *)
+  Check.(
+    (expected_number_of_injected_dal_slots = List.length published_slots)
+      int
+      ~error_msg:"Expected published DAL slots is %L. Got %R") ;
+
+  (* Finally, we check that published slots have the expected size w.r.t. to our
+     initial packs of messages. *)
+  let rec check_packs published_slots annotated_messages =
+    match (published_slots, annotated_messages) with
+    | [], [] -> ()
+    | ( (data_size, _num_messages, _level, _slot_index) :: published_slots,
+        pack :: annotated_messages ) ->
+        let sz = List.fold_left (fun sz msg -> sz + String.length msg) 0 pack in
+        Check.(
+          (sz = data_size)
+            int
+            ~error_msg:"Expected published DAL slots size is %L. Got %R") ;
+        check_packs published_slots annotated_messages
+    | [], _ | _, [] -> Test.fail "Unreachable case"
+  in
+  check_packs published_slots annotated_messages ;
+  unit
+
 let slot_producer ~slot_index ~slot_size ~from ~into dal_node l1_node l1_client
     =
   let loop ~from ~into ~task =
@@ -8196,6 +8403,19 @@ let register ~protocols =
     rollup_node_injects_dal_slots
     ~producer_profiles:[0]
       (* It it sufficient for a single baker here to receive some shards here to
+         declare the slot available. Otherwise the test might be flaky as we
+         bake with a timestamp in the past. *)
+    ~attestation_threshold:1
+    protocols ;
+
+  scenario_with_all_nodes
+    "Rollup batches and injects optimal DAL slots"
+    ~regression:false
+    ~pvm_name:"wasm_2_0_0"
+    ~commitment_period:5
+    rollup_batches_and_publishes_optimal_dal_slots
+    ~producer_profiles:[0; 1; 2]
+      (* It it sufficient for a single baker to receive some shards here to
          declare the slot available. Otherwise the test might be flaky as we
          bake with a timestamp in the past. *)
     ~attestation_threshold:1

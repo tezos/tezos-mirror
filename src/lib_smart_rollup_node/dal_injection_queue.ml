@@ -22,7 +22,7 @@ module Dal_worker_types = struct
   module Request = struct
     type ('a, 'b) t =
       | Register : {message : string} -> (unit, error trace) t
-      | Produce_dal_slots : (unit, error trace) t
+      | Produce_dal_slots : int32 -> (unit, error trace) t
       | Set_dal_slot_indices :
           Tezos_dal_node_services.Types.slot_index list
           -> (unit, error trace) t
@@ -47,9 +47,12 @@ module Dal_worker_types = struct
           case
             (Tag 1)
             ~title:"Produce_dal_slots"
-            (obj1 (req "request" (constant "produce_dal_slots")))
-            (function View Produce_dal_slots -> Some () | _ -> None)
-            (fun () -> View Produce_dal_slots);
+            (obj2
+               (req "request" (constant "produce_dal_slots"))
+               (req "level" int32))
+            (function
+              | View (Produce_dal_slots level) -> Some ((), level) | _ -> None)
+            (fun ((), level) -> View (Produce_dal_slots level));
           case
             (Tag 2)
             ~title:"Set_dal_slot_indices"
@@ -64,7 +67,8 @@ module Dal_worker_types = struct
     let pp ppf (View r) =
       match r with
       | Register _ -> Format.fprintf ppf "register slot injection request"
-      | Produce_dal_slots -> Format.fprintf ppf "produce DAL slots"
+      | Produce_dal_slots level ->
+          Format.fprintf ppf "produce DAL slots at level %ld" level
       | Set_dal_slot_indices idx ->
           Format.fprintf
             ppf
@@ -118,6 +122,17 @@ module Events = struct
       ~level:Info
       ()
 
+  let dal_message_size_too_big =
+    declare_2
+      ~section
+      ~name:"dal_message_size_too_big"
+      ~msg:
+        "The size of a received message to inject via DAL has {message_size} \
+         bytes while slot size is {slot_size}"
+      ~level:Info
+      ("slot_size", Data_encoding.int31)
+      ("message_size", Data_encoding.int31)
+
   let no_dal_slot_indices_set =
     declare_0
       ~section
@@ -127,16 +142,18 @@ module Events = struct
       ()
 
   let inject_dal_slot_from_messages =
-    declare_4
+    declare_5
       ~section
       ~name:"inject_dal_slot_from_messages"
       ~msg:
         "Injecting a DAL slot containing {num_messages} messages at index \
-         {slot_index}, for a total size of {data_size} bytes over {slot_size}"
-      ~level:Debug
+         {slot_index} on top of level {level}, for a total size of {data_size} \
+         bytes over {slot_size}"
+      ~level:Info
       ("data_size", Data_encoding.int31)
       ("slot_size", Data_encoding.int31)
       ("num_messages", Data_encoding.uint16)
+      ("level", Data_encoding.int32)
       ("slot_index", Data_encoding.uint16)
 
   let request_completed =
@@ -220,11 +237,23 @@ let inject_slot state ~slot_index ~slot_content =
 
 let on_register state ~message : unit tzresult Lwt.t =
   let open Lwt_result_syntax in
-  Pending_messages.replace state.pending_messages state.count_messages message ;
-  (* We don't care about overflows here. *)
-  state.count_messages <- state.count_messages + 1 ;
-  let*! () = Events.(emit dal_message_received) () in
-  return_unit
+  let slot_size =
+    (Reference.get state.node_ctxt.current_protocol).constants.dal
+      .cryptobox_parameters
+      .slot_size
+  in
+  let message_size = String.length message in
+  if message_size > slot_size then
+    let*! () =
+      Events.(emit dal_message_size_too_big) (slot_size, message_size)
+    in
+    tzfail @@ Rollup_node_errors.Dal_message_too_big {slot_size; message_size}
+  else (
+    Pending_messages.replace state.pending_messages state.count_messages message ;
+    (* We don't care about overflows here. *)
+    state.count_messages <- state.count_messages + 1 ;
+    let*! () = Events.(emit dal_message_received) () in
+    return_unit)
 
 let on_set_dal_slot_indices state idx =
   let open Lwt_result_syntax in
@@ -300,7 +329,7 @@ let fill_slots state ~slot_size ~num_slots =
 (* This function is called to produce slots from pending message using the
    function {!fill_slots} above. It then publishes those slots on DAL and posts
    their commitments to L1. *)
-let on_produce_dal_slots state =
+let on_produce_dal_slots state ~level =
   let open Lwt_result_syntax in
   if Queue.is_empty state.dal_slot_indices then
     (* No provided slot indices, no injection *)
@@ -322,6 +351,7 @@ let on_produce_dal_slots state =
                ( String.length slot_content,
                  slot_size,
                  List.length slot_chunks,
+                 level,
                  slot_index )
            in
            inject_slot state ~slot_index ~slot_content)
@@ -382,8 +412,8 @@ module Handlers = struct
     match request with
     | Request.Register {message} ->
         protect @@ fun () -> on_register state ~message
-    | Request.Produce_dal_slots ->
-        protect @@ fun () -> on_produce_dal_slots state
+    | Request.Produce_dal_slots level ->
+        protect @@ fun () -> on_produce_dal_slots state ~level
     | Request.Set_dal_slot_indices idx ->
         protect @@ fun () -> on_set_dal_slot_indices state idx
 
@@ -401,7 +431,7 @@ module Handlers = struct
     | Request.Register _ ->
         let*! () = Events.(emit request_failed) (Request.view r, st, errs) in
         return_unit
-    | Request.Produce_dal_slots ->
+    | Request.Produce_dal_slots _ ->
         let*! () = Events.(emit request_failed) (Request.view r, st, errs) in
         return_unit
     | Request.Set_dal_slot_indices _ ->
@@ -410,7 +440,8 @@ module Handlers = struct
 
   let on_completion _w r _ st =
     match Request.view r with
-    | Request.View (Register _ | Produce_dal_slots | Set_dal_slot_indices _) ->
+    | Request.View (Register _ | Produce_dal_slots _ | Set_dal_slot_indices _)
+      ->
         Events.(emit request_completed) (Request.view r, st)
 
   let on_no_request _ = Lwt.return_unit
@@ -481,7 +512,7 @@ let register_dal_messages ~messages =
   let* w = lwt_map_error TzTrace.make (Lwt.return (Lazy.force worker)) in
   List.iter_es (register_dal_message w) messages
 
-let produce_dal_slots () =
+let produce_dal_slots ~level =
   let open Lwt_result_syntax in
   match Lazy.force worker with
   | Error Rollup_node_errors.No_dal_injector ->
@@ -489,7 +520,7 @@ let produce_dal_slots () =
       return_unit
   | Error e -> tzfail e
   | Ok w ->
-      Worker.Queue.push_request_and_wait w Request.Produce_dal_slots
+      Worker.Queue.push_request_and_wait w Request.(Produce_dal_slots level)
       |> handle_request_error
 
 let set_dal_slot_indices idx =

@@ -22,9 +22,9 @@ val get_injection_ids : unit -> Injector.Inj_operation.id list tzresult
     information from the DAL injection queue, if it exists. *)
 val forget_injection_id : Injector_sigs.Id.t -> unit tzresult
 
-(** [produce_dal_slots ()] produces and injects DAL slots from the pending data
-    injected to the DAL injection queue. *)
-val produce_dal_slots : unit -> unit tzresult Lwt.t
+(** [produce_dal_slots ~level] produces and injects DAL slots on top of block at
+    level [level] from the pending data injected to the DAL injection queue. *)
+val produce_dal_slots : level:int32 -> unit tzresult Lwt.t
 
 (** [set_dal_slot_indices idx] sets the list of slot indices on which the
     DAL injection worker will publish DAL slots. *)
