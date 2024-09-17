@@ -32,6 +32,9 @@ module rec Constants : sig
   (** Constant representing [@profiler.reset_block_section] *)
   val reset_block_section_constant : t
 
+  (** Constant representing [@profiler.span] *)
+  val span_constant : t
+
   (** Constant representing [@profiler.span_f] *)
   val span_f_constant : t
 
@@ -81,6 +84,9 @@ end = struct
   (* [@profiler.reset_block_section] *)
   let reset_block_section_constant = create_constant "reset_block_section"
 
+  (* [@profiler.span] *)
+  let span_constant = create_constant "span"
+
   (* [@profiler.span_s] *)
   let span_f_constant = create_constant "span_f"
 
@@ -106,6 +112,7 @@ end = struct
       record_f_constant;
       record_s_constant;
       reset_block_section_constant;
+      span_constant;
       span_f_constant;
       span_s_constant;
       stop_constant;
@@ -144,6 +151,7 @@ and Rewriter : sig
     | Record_f of content
     | Record_s of content
     | Reset_block_section of content
+    | Span of content
     | Span_f of content
     | Span_s of content
     | Stop of content
@@ -170,6 +178,7 @@ end = struct
     | Record_f of content
     | Record_s of content
     | Reset_block_section of content
+    | Span of content
     | Span_f of content
     | Span_s of content
     | Stop of content
@@ -215,6 +224,11 @@ end = struct
         Reset_block_section {key; location}
     | _ -> Error.error location (Error.Invalid_record key)
 
+  let span key location =
+    match Key.content key with
+    | Key.Apply _ | Key.Ident _ | Key.List _ -> Span {key; location}
+    | _ -> Error.error location (Error.Invalid_span key)
+
   let span_f key location =
     match Key.content key with
     | Key.Apply _ | Key.Ident _ | Key.List _ -> Span_f {key; location}
@@ -239,6 +253,7 @@ end = struct
     | Record_f c
     | Record_s c
     | Reset_block_section c
+    | Span c
     | Span_f c
     | Span_s c
     | Stop c ->
@@ -253,6 +268,7 @@ end = struct
     | Record_f _ -> Constants.record_f_constant
     | Record_s _ -> Constants.record_s_constant
     | Reset_block_section _ -> Constants.record_s_constant
+    | Span _ -> Constants.span_constant
     | Span_f _ -> Constants.span_f_constant
     | Span_s _ -> Constants.span_s_constant
     | Stop _ -> Constants.stop_constant
@@ -267,6 +283,7 @@ end = struct
       (Constants.record_f_constant, record_f);
       (Constants.record_s_constant, record_s);
       (Constants.reset_block_section_constant, reset_block_section);
+      (Constants.span_constant, span);
       (Constants.span_f_constant, span_f);
       (Constants.span_s_constant, span_s);
       (Constants.stop_constant, stop);
@@ -308,6 +325,7 @@ end = struct
             | Record_f _ -> "record_f"
             | Record_s _ -> "record_s"
             | Reset_block_section _ -> "reset_block_section"
+            | Span _ -> "span"
             | Span_f _ -> "span_f"
             | Span_s _ -> "span_s"
             | Stop _ -> "stop" )

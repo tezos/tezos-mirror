@@ -59,6 +59,7 @@ and Rewriter : sig
     | Record_f of content
     | Record_s of content
     | Reset_block_section of content
+    | Span of content
     | Span_f of content
     | Span_s of content
     | Stop of content
