@@ -320,20 +320,46 @@ let perform_dal_benchmarks snoop =
   let* benches = Snoop.(list_benchmarks ~mode:All ~tags:[Dal] snoop) in
   perform_benchmarks [] snoop benches
 
-let main protocol =
+let perform_io_benchmarks snoop io_data_dir io_cache_dir =
+  let patches =
+    [
+      ( rex ".*",
+        fun (_json, parameters) ->
+          let data_dir =
+            Option.fold
+              ~none:[]
+              ~some:(fun x -> [("tezos_data_dir", Ezjsonm.string x)])
+              io_data_dir
+          in
+          let cache_dir =
+            Option.fold
+              ~none:[]
+              ~some:(fun x -> [("cache_dir", Ezjsonm.string x)])
+              io_cache_dir
+          in
+          let json = Ezjsonm.dict (data_dir @ cache_dir) in
+          return (Some json, parameters) );
+    ]
+  in
+  let benches = ["io/READ"; "io/WRITE"] in
+  perform_benchmarks patches snoop benches
+
+let main ~io_only_flag ?io_data_dir ?io_cache_dir protocol =
   Log.info "Entering Perform_inference.main" ;
   let snoop = Snoop.create () in
-  let* () = perform_misc_benchmarks snoop in
-  let* () = perform_interpreter_benchmarks snoop protocol in
-  let* () = perform_typechecker_benchmarks snoop protocol in
-  let* () = perform_tickets_benchmarks snoop protocol in
-  let* () = perform_global_constants_benchmarks snoop in
-  let* () = perform_cache_benchmarks snoop in
-  let* () = perform_encoding_benchmarks snoop protocol in
-  let* () = perform_big_map_benchmarks snoop protocol in
-  let* () = perform_skip_list_benchmarks snoop protocol in
-  let* () = perform_carbonated_map_benchmarks snoop protocol in
-  let* () = perform_sc_rollup_benchmarks snoop protocol in
-  let* () = perform_shell_micheline_benchmarks snoop in
-  let* () = perform_dal_benchmarks snoop in
-  perform_sapling_benchmarks snoop
+  if io_only_flag then perform_io_benchmarks snoop io_data_dir io_cache_dir
+  else
+    let* () = perform_misc_benchmarks snoop in
+    let* () = perform_interpreter_benchmarks snoop protocol in
+    let* () = perform_typechecker_benchmarks snoop protocol in
+    let* () = perform_tickets_benchmarks snoop protocol in
+    let* () = perform_global_constants_benchmarks snoop in
+    let* () = perform_cache_benchmarks snoop in
+    let* () = perform_encoding_benchmarks snoop protocol in
+    let* () = perform_big_map_benchmarks snoop protocol in
+    let* () = perform_skip_list_benchmarks snoop protocol in
+    let* () = perform_carbonated_map_benchmarks snoop protocol in
+    let* () = perform_sc_rollup_benchmarks snoop protocol in
+    let* () = perform_shell_micheline_benchmarks snoop in
+    let* () = perform_dal_benchmarks snoop in
+    perform_sapling_benchmarks snoop
