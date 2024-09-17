@@ -18,6 +18,10 @@ type state = Storage.State.t
 
 type status = Api.status
 
+type reveal_data = Api.reveal_data
+
+type input = Api.input
+
 (* The kernel debug logging function (`string -> unit Lwt.t`) passed by the node
  * to [compute_step] and [compute_step_many] cannot be passed directly
  * to the Rust backend, which expects a `u8 -> ()` function and cannot run Lwt
@@ -68,16 +72,4 @@ let get_current_level state = Lwt.return (Api.octez_riscv_get_level state)
 
 let state_hash state = Api.octez_riscv_state_hash state
 
-let set_input state level message_counter payload =
-  Lwt.return
-    (Api.octez_riscv_set_input_message
-       state
-       level
-       message_counter
-       (Bytes.of_string payload))
-
-let set_metadata state address origination_level =
-  Lwt.return (Api.octez_riscv_set_metadata state address origination_level)
-
-let reveal_raw_data state raw_data =
-  Lwt.return (Api.octez_riscv_reveal_raw_data state raw_data)
+let set_input state input = Lwt.return (Api.octez_riscv_set_input state input)

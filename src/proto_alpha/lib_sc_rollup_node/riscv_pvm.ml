@@ -76,21 +76,22 @@ module PVM :
                  (Raw_level.of_int32_exn level, Z.of_int64 message_counter)))
     | WaitingForMetadata -> return Sc_rollup.(Needs_reveal Reveal_metadata)
 
-  let set_input input state =
+  let to_pvm_input (input : Sc_rollup.input) : Backend.input =
     match input with
     | Sc_rollup.Inbox_message {inbox_level; message_counter; payload} ->
-        Backend.set_input
-          state
-          (Raw_level.to_int32 inbox_level)
-          (Z.to_int64 message_counter)
-          (Sc_rollup.Inbox_message.unsafe_to_string payload)
+        InboxMessage
+          ( Raw_level.to_int32 inbox_level,
+            Z.to_int64 message_counter,
+            Sc_rollup.Inbox_message.unsafe_to_string payload )
     | Sc_rollup.(Reveal (Metadata {address; origination_level})) ->
-        Backend.set_metadata
-          state
-          (Sc_rollup.Address.to_bytes address)
-          (Raw_level.to_int32 origination_level)
-    | Sc_rollup.(Reveal (Raw_data data)) -> Backend.reveal_raw_data state data
+        Reveal
+          (Metadata
+             ( Sc_rollup.Address.to_bytes address,
+               Raw_level.to_int32 origination_level ))
+    | Sc_rollup.(Reveal (Raw_data data)) -> Reveal (RawData data)
     | _ -> assert false
+
+  let set_input input state = Backend.set_input state (to_pvm_input input)
 
   let eval state = Backend.compute_step state
 
