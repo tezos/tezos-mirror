@@ -15,7 +15,7 @@
 #### RPCs
 
 - Completes state override option of `eth_call` RPC, by adding `state` and
-  `stateDiff`, similar to go-ethereum. (!14869, !14921)
+  `stateDiff`, similar to go-ethereum. (!14869, !14921, !14970)
 
 #### Metrics
 
