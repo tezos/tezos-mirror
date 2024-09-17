@@ -1223,11 +1223,22 @@ let callback ~conf ~admins ~users db_pool _connection request body =
             try Filename.concat (Filename.dirname fname) (Unix.readlink fname)
             with _ -> fname
           in
-          Cohttp_lwt_unix.Server.respond_file
-            ~headers:
+          let headers =
+            Cohttp.Header.add_list
               (Cohttp.Header.init_with "content-type" (Magic_mime.lookup fname))
-            ~fname
-            ())
+              [
+                ("Access-Control-Allow-Origin", "*");
+                ("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+                ( "Access-Control-Allow-Headers",
+                  "Access-Control-Allow-Headers, Origin,Accept, \
+                   X-Requested-With, Content-Type, \
+                   Access-Control-Request-Method, \
+                   Access-Control-Request-Headers" );
+                ( "Cache-Control",
+                  "no-store, no-cache, must-revalidate, max-age=0" );
+              ]
+          in
+          Cohttp_lwt_unix.Server.respond_file ~headers ~fname ())
 
 (* Must exists somewhere but where ! *)
 let print_location f ((fl, fc), (tl, tc)) =
