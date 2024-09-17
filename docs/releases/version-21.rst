@@ -34,6 +34,23 @@ which they can solve using the following command::
 
 This operation should only take up to 10s in nodes operating in Rolling history mode, which is the recommended setup for bakers. However, it may require around 10 minutes for nodes operating on Full and Archive modes, depending on the performance of the machine. Users must be aware of the downtime during the upgrade that may impact their services.
 
+Faster propagation of lower round block proposals
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+In previous Octez versions, the baker binary applied the block they
+were creating from round 1 and beyond. This was a safety measure in
+case the created block was valid but not applicable by the nodes.
+The experience with the past 4 protocols proved that this safety net
+was over-dimensioned, as no such issues were detected ever since.
+Hence, starting with v21 and the Quebec protocol proposal, the Octez
+baker binary will only apply rounds 3 and above block proposals, as
+the new safety net.
+
+Not applying round 1 -- 2 block proposals by default while creating
+them will allow for faster propagation and earlier consensus
+agreement. See `here <../../quebeca/cli-commands.html#baker-manual>`__
+for further details on how bakers can fine-tune this parameter.
+
 DAL node
 ~~~~~~~~
 
