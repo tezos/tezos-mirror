@@ -57,6 +57,7 @@ pub struct Deposit {
 impl Deposit {
     /// Parses a deposit from a ticket transfer (internal inbox message).
     /// The "entrypoint" type is pair of ticket (FA2.1) and bytes (receiver address).
+    #[cfg_attr(feature = "benchmark", inline(never))]
     pub fn try_parse(
         ticket: FA2_1Ticket,
         receiver: MichelsonBytes,
