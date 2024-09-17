@@ -55,6 +55,7 @@ val set_name : t -> string -> unit
     If [is_directory] is set, then the whole source is copied, including
     subdirectories. *)
 val copy :
+  ?refresh:bool ->
   ?is_directory:bool ->
   ?destination:string ->
   t ->

@@ -239,15 +239,15 @@ let copy =
      scenario. This optimisation ease the writing of scenario so that copy can
      always be called before using the file copied. *)
   let already_copied = Hashtbl.create 11 in
-  fun ?(is_directory = false) ?destination agent ~source ->
+  fun ?(refresh = false) ?(is_directory = false) ?destination agent ~source ->
     Log.info "COPY %s" source ;
     let destination =
       Option.value ~default:(path_of agent source) destination
     in
     match Hashtbl.find_opt already_copied (agent, destination) with
-    | Some promise -> promise
-    | None ->
-        (* Octez images use alpine, we can't copy binaries from our local setup. *)
+    | Some promise when not refresh -> promise
+    | Some _ | None ->
+        (* Octez images uses alpine, so we can't copy binaries from our local setup. *)
         let* is_binary_file = is_binary source in
         let octez_release_image =
           match agent.configuration.docker_image with
