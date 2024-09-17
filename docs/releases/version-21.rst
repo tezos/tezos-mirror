@@ -10,6 +10,8 @@ The two candidates differ only in their version of the Quebec protocol proposal:
 
 Please see the following announcement for more details on `Quebec A and Quebec B protocol proposal variants <https://research-development.nomadic-labs.com/quebec-announcement.html>`__.
 
+Note that starting from v21, Octez releases will not distribute the ``octez-evm-node``. You can refer to the `Etherlink documentation <https://docs.etherlink.com/network/evm-nodes>`__ for information on how to get its latest version.
+
 Should any of these protocol proposal variants be chosen during the current `Proposal governance period <https://www.tezosagora.org/period/130>`_, and the corresponding release candidate be stable enough, it will be released as ``Octez v21.0``.
 
 Changes
@@ -61,6 +63,22 @@ disconnections. Also, after a restart, the DAL node cleans-up its storage and
 catches up the Octez node. Finally, the DAL node can now start one of the 4 profiles:
 bootstrap, attester, operator, and observer; the last two profiles match the
 corresponding modes of an accompanying smart rollup node.
+
+Smart Rollup Node
+~~~~~~~~~~~~~~~~~
+
+Octez v21.0 brings forth many quality of life improvements to the Smart Rollup
+node, driven by the deployment of Etherlink Mainnet beta in May. These include:
+
+- The rollup node's *garbage collector* (the mechanism enabling it to only keep
+  most recent rollup states) is now leaner and more reliable.
+- New exposed metrics which can be used to monitor the rollup state (notably
+  its commitments) and the node’s health.
+- Opt-in automated execution of outbox messages automatically. This allows for
+  an improved UX for decentralized applications relying on the outbox of a
+  Smart Rollup, like the Etherlink native bridge.
+
+Please see the Changelog for further information and other optimizations.
 
 Update Instructions
 -------------------
