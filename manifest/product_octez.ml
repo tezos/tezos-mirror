@@ -3157,11 +3157,14 @@ let octez_protocol_environment_structs =
       ]
 
 let octez_protocol_environment =
+  let (PPX {preprocess; preprocessor_deps}) = ppx_profiler in
   octez_proto_lib
     "protocol-environment"
     ~internal_name:"tezos_protocol_environment"
     ~path:"src/lib_protocol_environment"
     ~documentation:[Dune.[S "package"; S "octez-proto-libs"]]
+    ~preprocess
+    ~preprocessor_deps
     ~deps:
       [
         zarith;

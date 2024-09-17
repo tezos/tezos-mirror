@@ -177,6 +177,7 @@ struct
   module CamlinternalFormatBasics = CamlinternalFormatBasics
   include Stdlib
   module Pervasives = Stdlib
+  module Profiler = Environment_profiler
 
   module Logging = struct
     type level = Internal_event.level =
@@ -307,7 +308,26 @@ struct
   module Secp256k1 = Tezos_crypto.Signature.Secp256k1
   module P256 = Tezos_crypto.Signature.P256
   module Bls = Tezos_crypto.Signature.Bls
-  module Signature = Tezos_crypto.Signature.V1
+
+  module Signature = struct
+    include Tezos_crypto.Signature.V1
+
+    let check ?watermark pk s bytes =
+      (check
+         ?watermark
+         pk
+         s
+         bytes
+       [@profiler.span_f
+         [
+           (match (pk : public_key) with
+           | Ed25519 _ -> "check_signature_ed25519"
+           | Secp256k1 _ -> "check_signature_secp256k1"
+           | P256 _ -> "check_signature_p256"
+           | Bls _ -> "check_signature_bls");
+         ]])
+  end
+
   module Timelock = Tezos_crypto.Timelock_legacy
   module Vdf = Class_group_vdf.Vdf_self_contained
 
@@ -1206,33 +1226,40 @@ struct
       in
       let*? f = wrap_tzresult r in
       return (fun x ->
-          let*! r = f x in
-          Lwt.return (wrap_tzresult r))
+          (let*! r = f x in
+           Lwt.return (wrap_tzresult r))
+          [@profiler.record_s
+            Format.asprintf "load_key(%s)" (Context.Cache.identifier_of_key x)])
 
     (** Ensure that the cache is correctly loaded in memory
         before running any operations. *)
     let load_predecessor_cache predecessor_context chain_id mode
         (predecessor_header : Block_header.shell_header) cache =
       let open Lwt_result_syntax in
-      let predecessor_hash, timestamp =
-        match mode with
-        | Application block_header | Partial_validation block_header ->
-            (block_header.shell.predecessor, block_header.shell.timestamp)
-        | Construction {predecessor_hash; timestamp; _}
-        | Partial_construction {predecessor_hash; timestamp} ->
-            (predecessor_hash, timestamp)
-      in
-      let* value_of_key =
-        value_of_key
-          ~chain_id
-          ~predecessor_context
-          ~predecessor_timestamp:predecessor_header.timestamp
-          ~predecessor_level:predecessor_header.level
-          ~predecessor_fitness:predecessor_header.fitness
-          ~predecessor:predecessor_hash
-          ~timestamp
-      in
-      Context.load_cache predecessor_hash predecessor_context cache value_of_key
+      (let predecessor_hash, timestamp =
+         match mode with
+         | Application block_header | Partial_validation block_header ->
+             (block_header.shell.predecessor, block_header.shell.timestamp)
+         | Construction {predecessor_hash; timestamp; _}
+         | Partial_construction {predecessor_hash; timestamp} ->
+             (predecessor_hash, timestamp)
+       in
+       let* value_of_key =
+         value_of_key
+           ~chain_id
+           ~predecessor_context
+           ~predecessor_timestamp:predecessor_header.timestamp
+           ~predecessor_level:predecessor_header.level
+           ~predecessor_fitness:predecessor_header.fitness
+           ~predecessor:predecessor_hash
+           ~timestamp
+       in
+       Context.load_cache
+         predecessor_hash
+         predecessor_context
+         cache
+         value_of_key)
+      [@profiler.record_s "load_predecessor_cache"]
 
     let begin_validation ctxt chain_id mode ~predecessor ~cache =
       let open Lwt_result_syntax in
