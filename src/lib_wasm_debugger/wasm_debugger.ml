@@ -24,6 +24,8 @@
 (*****************************************************************************)
 
 module Make (Wasm : Wasm_utils_intf.S) = struct
+  let write_debug_default = Commands.write_debug_default
+
   module Commands = Commands.Make (Wasm)
 
   let parse_binary_module name module_ =
@@ -156,13 +158,20 @@ module Make (Wasm : Wasm_utils_intf.S) = struct
   (* REPL main loop: reads an input, does something out of it, then loops. *)
   let repl tree inboxes level config =
     let open Lwt_result_syntax in
+    let write_debug = write_debug_default config in
     let rec loop tree inboxes level =
       let*! () = Lwt_io.printf "> " in
       let*! input = Option.catch_s (fun () -> Lwt_io.read_line Lwt_io.stdin) in
       match input with
       | Some command ->
           let* ctx =
-            Commands.handle_command command config tree inboxes level
+            Commands.handle_command
+              ~write_debug
+              command
+              config
+              tree
+              inboxes
+              level
           in
           Option.fold_f
             ~none:(fun () -> return tree)
@@ -305,6 +314,14 @@ module Make (Wasm : Wasm_utils_intf.S) = struct
     let open Tezos_clic in
     switch ~doc:"Hides the kernel debug messages." ~long:"no-kernel-debug" ()
 
+  let timings_file_arg =
+    let open Tezos_clic in
+    arg
+      ~doc:"Write timed debug messages to this file"
+      ~long:"timings-file"
+      ~placeholder:"timings.log"
+      (Tezos_clic.parameter (fun _ -> Lwt_result.return))
+
   let flamecharts_directory_arg =
     let open Tezos_clic in
     arg
@@ -336,7 +353,7 @@ module Make (Wasm : Wasm_utils_intf.S) = struct
 
   let global_options =
     Tezos_clic.(
-      args10
+      args11
         wasm_arg
         input_arg
         rollup_arg
@@ -346,7 +363,8 @@ module Make (Wasm : Wasm_utils_intf.S) = struct
         no_kernel_debug_flag
         plugins_arg
         installer_config_arg
-        flamecharts_directory_arg)
+        flamecharts_directory_arg
+        timings_file_arg)
 
   let handle_plugin_file f =
     try Dynlink.loadfile f with
@@ -370,7 +388,8 @@ module Make (Wasm : Wasm_utils_intf.S) = struct
              no_kernel_debug_flag,
              plugins,
              installer_config,
-             flamecharts_directory ),
+             flamecharts_directory,
+             timings_file ),
            _ ) =
       Tezos_clic.parse_global_options global_options () args
     in
@@ -386,6 +405,7 @@ module Make (Wasm : Wasm_utils_intf.S) = struct
         ?preimage_directory
         ?dal_pages_directory
         ?flamecharts_directory
+        ?timings_file
         ~kernel_debug:(not no_kernel_debug_flag)
         ()
     in
