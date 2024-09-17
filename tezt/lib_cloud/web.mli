@@ -20,3 +20,7 @@ val push_metric :
   t -> ?labels:(string * string) list -> name:string -> float -> unit
 
 val write : t -> agents:Agent.t List.t -> unit Lwt.t
+
+type service = {name : string; url : string}
+
+val add_service : t -> agents:Agent.t List.t -> service -> unit Lwt.t

@@ -5,11 +5,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type service = {name : string; url : string}
+
 type t = {
   process : Process.t;
   dir : string;
   monitoring : bool;
   prometheus : bool;
+  mutable services : service list;
 }
 
 let pp_docker_image fmt = function
@@ -89,7 +92,7 @@ let debugging ~agents =
                {|
 ```bash
 %s
-```            
+```
             |}
                (string_vm_command agent)
            in
@@ -102,9 +105,9 @@ let debugging ~agents =
            in
            Printf.sprintf
              {|
-## %s 
+## %s
 Connect on the VM:
-%s 
+%s
 
 Connect on the Docker:
 %s
@@ -157,14 +160,22 @@ let grafana ~agents =
     Format.asprintf "# Grafana\n [Grafana dashboard](http://%s:3000)\n" domain
   else "Grafana disabled. Use `--grafana` to activate it.\n"
 
-let markdown_content ~agents =
+let service {name; url} =
+  Format.asprintf
+    "# %s\n [%s](%s)\n"
+    (String.capitalize_ascii name)
+    (String.lowercase_ascii name)
+    url
+
+let markdown_content ~agents ~services =
   [
     configuration ~agents;
     grafana ~agents;
     prometheus ~agents;
     monitoring ~agents;
-    debugging ~agents;
   ]
+  @ List.map service services
+  @ [debugging ~agents]
   |> String.concat "\n"
 
 let index dir = dir // "index.md"
@@ -172,7 +183,7 @@ let index dir = dir // "index.md"
 let write t ~agents =
   (* The content is formatted in markdown and will be rendered in html via
      pandoc. *)
-  let content = markdown_content ~agents in
+  let content = markdown_content ~agents ~services:t.services in
   let dir = t.dir in
   let index = index dir in
   Base.with_open_out index (fun oc -> output_string oc content) ;
@@ -189,6 +200,10 @@ let write t ~agents =
       "index.html";
       "-s";
     ]
+
+let add_service t ~agents service =
+  t.services <- service :: t.services ;
+  write t ~agents
 
 let run () =
   let* () =
@@ -210,7 +225,7 @@ let run () =
         Filename.dirname index;
       ]
   in
-  Lwt.return {process; dir; monitoring; prometheus}
+  Lwt.return {process; dir; monitoring; prometheus; services = []}
 
 let start ~agents =
   let* t = run () in

@@ -583,13 +583,14 @@ let agents t =
 
 let get_configuration = Agent.configuration
 
+let write_website t =
+  match t.website with
+  | None -> Lwt.return_unit
+  | Some website -> Web.write website ~agents:t.agents
+
 let set_agent_name t agent name =
   Agent.set_name agent name ;
-  let* () =
-    match t.website with
-    | None -> Lwt.return_unit
-    | Some website -> Web.write website ~agents:t.agents
-  in
+  let* () = write_website t in
   match t.prometheus with
   | None -> Lwt.return_unit
   | Some prometheus -> Prometheus.reload prometheus
@@ -611,3 +612,8 @@ let add_prometheus_source t ?metric_path ~job_name targets =
       in
       let targets = List.map prometheus_target targets in
       Prometheus.add_source prometheus ?metric_path ~job_name targets
+
+let add_service t ~name ~url =
+  match t.website with
+  | None -> Lwt.return_unit
+  | Some web -> Web.add_service web ~agents:t.agents {name; url}

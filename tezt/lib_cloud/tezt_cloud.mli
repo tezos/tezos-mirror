@@ -80,6 +80,8 @@ module Cloud : sig
       points to scrap. Each point can have a name defined by [app_name]. *)
   val add_prometheus_source :
     t -> ?metric_path:string -> job_name:string -> target list -> unit Lwt.t
+
+  val add_service : t -> name:string -> url:string -> unit Lwt.t
 end
 
 (** [register ~tags] register a set of jobs that can be used for setting
