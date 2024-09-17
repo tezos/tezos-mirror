@@ -17,6 +17,7 @@ module Server : sig
     interface : interface;
     users : user list;
     admin : user;
+    public_directory : string option;
   }
 
   (** Expose paths of the files involved in the test:
@@ -27,7 +28,7 @@ module Server : sig
 
   type t = {process : Process.t; filenames : filenames; conf : conf}
 
-  (** [run ?runner ?path ?name ?address ?port ?users ?admin ()]
+  (** [run ?runner ?path ?name ?address ?port ?users ?admin ?public_directory ()]
 
       Spawn a teztale server with some given parameters:
       - runner: runner used to spawn the process
@@ -39,6 +40,7 @@ module Server : sig
         users once the server is started using the {!add_user} function.
       - admin: credential used for adming tasks such as adding an allowed archiver
         default is [admin:password]
+      - public_directory: TODO
   *)
   val run :
     ?runner:Runner.t ->
@@ -48,6 +50,7 @@ module Server : sig
     ?port:int ->
     ?users:user list ->
     ?admin:user ->
+    ?public_directory:string ->
     unit ->
     t Lwt.t
 
