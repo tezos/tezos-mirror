@@ -428,8 +428,8 @@ let replay ~internal_events ~singleprocess ~strict
                process_path = Sys.executable_name;
              })
       in
-      let commit_genesis =
-        Block_validator_process.commit_genesis validator_process
+      let commit_genesis ~chain_id =
+        Block_validator_process.commit_genesis validator_process ~chain_id
       in
       let* store =
         Store.init
@@ -500,13 +500,10 @@ let run ?verbosity ~singleprocess ~strict ~operation_metadata_size_limit
         | "verbose" -> Profiler.Verbose
         | _ -> Profiler.Terse
       in
-      let instance =
-        Profiler.instance
-          Tezos_base_unix.Simple_profiler.auto_write_to_txt_file
-          Filename.Infix.(config.data_dir // "/node_profiling.txt", max_lod)
+      let profiler_maker =
+        Tezos_shell.Profiler_directory.profiler_maker config.data_dir max_lod
       in
-      Tezos_base.Profiler.(plug main) instance ;
-      Tezos_protocol_environment.Environment_profiler.plug instance
+      Shell_profiling.activate_all ~profiler_maker
   | _ -> ()) ;
   Updater.init (Data_version.protocol_dir config.data_dir) ;
   Lwt_exit.(

@@ -28,6 +28,14 @@
 open Block_validator_worker_state
 open Block_validator_errors
 
+module Profiler = struct
+  include (val Profiler.wrap Shell_profiling.block_validator_profiler)
+
+  let[@warning "-32"] reset_block_section =
+    Shell_profiling.create_reset_block_section
+      Shell_profiling.block_validator_profiler
+end
+
 type validation_result =
   | Already_committed
   | Already_known_invalid of error trace
@@ -149,22 +157,23 @@ let check_chain_liveness chain_db hash (header : Block_header.t) =
 
 let check_operations_merkle_root hash header operations =
   let open Result_syntax in
-  let fail_unless b e = if b then return_unit else tzfail e in
-  let computed_hash =
-    let hashes = List.map (List.map Operation.hash) operations in
-    Operation_list_list_hash.compute
-      (List.map Operation_list_hash.compute hashes)
-  in
-  fail_unless
-    (Operation_list_list_hash.equal
-       computed_hash
-       header.Block_header.shell.operations_hash)
-    (Inconsistent_operations_hash
-       {
-         block = hash;
-         expected = header.shell.operations_hash;
-         found = computed_hash;
-       })
+  (let fail_unless b e = if b then return_unit else tzfail e in
+   let computed_hash =
+     let hashes = List.map (List.map Operation.hash) operations in
+     Operation_list_list_hash.compute
+       (List.map Operation_list_hash.compute hashes)
+   in
+   fail_unless
+     (Operation_list_list_hash.equal
+        computed_hash
+        header.Block_header.shell.operations_hash)
+     (Inconsistent_operations_hash
+        {
+          block = hash;
+          expected = header.shell.operations_hash;
+          found = computed_hash;
+        }))
+  [@profiler.span_f ["checks"; "merkle_root"]]
 
 (* [with_retry_to_load_protocol bv peer f] tries to call [f], if it fails with an
    [Unavailable_protocol] error, it fetches the protocol from the [peer] and retries
@@ -324,11 +333,13 @@ let on_validation_request w
       advertise_after_validation;
     } =
   let open Lwt_result_syntax in
+  () [@profiler.reset_block_section hash] ;
   let bv = Worker.state w in
   let chain_store = Distributed_db.chain_store chain_db in
   let*! b = Store.Block.is_known_valid chain_store hash in
   match b with
-  | true -> return Already_committed
+  | true ->
+      return Already_committed [@profiler.mark ["checks"; "already_commited"]]
   | false -> (
       (* This check might be redundant as operation paths are already
          checked when each pass is received from the network. However,
@@ -349,7 +360,10 @@ let on_validation_request w
           | Some {errors; _} -> return (Already_known_invalid errors)
           | None -> (
               let* pred =
-                Store.Block.read_block chain_store header.shell.predecessor
+                (Store.Block.read_block
+                   chain_store
+                   header.shell.predecessor
+                 [@profiler.record_s "read_predecessor"])
               in
               let*! mempool = Store.Chain.mempool chain_store in
               let bv_operations =
@@ -426,7 +440,8 @@ let on_validation_request w
                         hash
                         header
                         operations
-                        application_result))))
+                        application_result [@profiler.record_s "commit_block"]))
+          ))
 
 let on_preapplication_request w
     {
@@ -654,6 +669,7 @@ let validate_and_apply w ?canceler ?peer ?(notify_new_block = fun _ -> ())
     ~advertise_after_validation chain_db hash (header : Block_header.t)
     operations =
   let open Lwt_syntax in
+  () [@profiler.reset_block_section hash] ;
   let chain_store = Distributed_db.chain_store chain_db in
   let* b = Store.Block.is_known_valid chain_store hash in
   match b with
@@ -664,8 +680,9 @@ let validate_and_apply w ?canceler ?peer ?(notify_new_block = fun _ -> ())
       let* r =
         let open Lwt_result_syntax in
         let* () =
-          check_chain_liveness chain_db hash header
-          |> Lwt_result.map_error (fun e -> Worker.Request_error e)
+          (check_chain_liveness chain_db hash header
+          |> Lwt_result.map_error (fun e -> Worker.Request_error e))
+          [@profiler.span_s ["checks"; "chain_liveness"]]
         in
         Worker.Queue.push_request_and_wait
           w

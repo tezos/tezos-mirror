@@ -20,7 +20,8 @@ module type EXTERNAL_PROCESSING = sig
     parameters ->
     state ->
     'response request ->
-    [`Continue of 'response tzresult * state | `Stop] Lwt.t
+    [`Continue of ('response * Profiler.report option) tzresult * state | `Stop]
+    Lwt.t
 end
 
 module Make
@@ -153,7 +154,11 @@ struct
           let*! () =
             Lwt_unix_socket.send
               output
-              (Error_monad.result_encoding (Params.result_encoding recved))
+              (Error_monad.result_encoding
+                 Data_encoding.(
+                   tup2
+                     (Params.result_encoding recved)
+                     (option Profiler.report_encoding)))
               res
           in
           loop state

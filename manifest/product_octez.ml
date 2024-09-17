@@ -3443,12 +3443,15 @@ let octez_protocol_updater =
       ]
 
 let octez_validation =
+  let (PPX {preprocess; preprocessor_deps}) = ppx_profiler in
   octez_shell_lib
     "validation"
     ~internal_name:"tezos_validation"
     ~path:"src/lib_validation"
     ~synopsis:"Library for block validation"
     ~time_measurement_ppx:true
+    ~preprocess
+    ~preprocessor_deps
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";

@@ -24,6 +24,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Profiler = Tezos_protocol_environment.Environment_profiler
+
 module Events = struct
   open Internal_event.Simple
 
@@ -49,6 +51,7 @@ module Processing = struct
     cache : Context_ops.Environment_context.block_cache option;
     cached_result :
       (Block_validation.apply_result * Context_ops.Environment_context.t) option;
+    headless : Tezos_base.Profiler.instance;
   }
 
   let load_protocol proto protocol_root =
@@ -104,14 +107,23 @@ module Processing = struct
         ~readonly
         context_root
     in
-    return {context_index; cache = None; cached_result = None}
+    let headless =
+      Tezos_base.Profiler.instance
+        Tezos_base_unix.Simple_profiler.headless
+        Profiler.Detailed
+    in
+    Tezos_base.Profiler.(plug main) headless ;
+    Tezos_protocol_environment.Environment_profiler.plug headless ;
+    return {context_index; cache = None; cached_result = None; headless}
 
   let handle_request :
       type a.
       External_validation.parameters ->
       state ->
       a External_validation.request ->
-      [`Continue of a tzresult * state | `Stop] Lwt.t =
+      [ `Continue of (a * Tezos_base.Profiler.report option) tzresult * state
+      | `Stop ]
+      Lwt.t =
    fun {
          protocol_root;
          genesis;
@@ -120,10 +132,14 @@ module Processing = struct
          operation_metadata_size_limit;
          _;
        }
-       {context_index; cache; cached_result} ->
+       {context_index; cache; cached_result; headless} ->
     let open Lwt_result_syntax in
-    let continue res cache cached_result =
-      Lwt.return (`Continue (res, {context_index; cache; cached_result}))
+    let continue res cache cached_result report =
+      let res =
+        match res with Error errs -> Error errs | Ok res -> Ok (res, report)
+      in
+      Lwt.return
+        (`Continue (res, {context_index; cache; cached_result; headless}))
     in
     function
     | Commit_genesis {chain_id} ->
@@ -135,7 +151,7 @@ module Processing = struct
                 ~time:genesis.time
                 ~protocol:genesis.protocol)
         in
-        continue commit cache None
+        continue commit cache None None
     | Apply
         {
           chain_id;
@@ -149,6 +165,7 @@ module Processing = struct
           should_validate;
           simulate;
         } ->
+        () [@profiler.record "apply_block"] ;
         let*! block_application_result =
           let* predecessor_context =
             Error_monad.catch_es (fun () ->
@@ -207,7 +224,9 @@ module Processing = struct
                     cache;
                   } )
         in
-        continue block_application_result cache None
+        Tezos_protocol_environment.Environment_profiler.stop () ;
+        let report = Tezos_base.Profiler.report headless in
+        continue block_application_result cache None report
     | Preapply
         {
           chain_id;
@@ -272,7 +291,7 @@ module Processing = struct
               Lwt.return (Ok res, Some last_preapplied_context)
           | Error _ as err -> Lwt.return (err, None)
         in
-        continue res cache cachable_result
+        continue res cache cachable_result None
     | External_validation.Validate
         {
           chain_id;
@@ -283,6 +302,7 @@ module Processing = struct
           operations;
           _;
         } ->
+        () [@profiler.record "validate_block"] ;
         let*! block_validate_result =
           let* predecessor_context =
             Error_monad.catch_es (fun () ->
@@ -317,7 +337,9 @@ module Processing = struct
                 header
                 operations)
         in
-        continue block_validate_result cache cached_result
+        Tezos_protocol_environment.Environment_profiler.stop () ;
+        let report = Tezos_base.Profiler.report headless in
+        continue block_validate_result cache cached_result report
     | External_validation.Fork_test_chain
         {chain_id; context_hash; forked_header} ->
         let*! context_opt = Context_ops.checkout context_index context_hash in
@@ -330,7 +352,7 @@ module Processing = struct
               tzfail
                 (Block_validator_errors.Failed_to_checkout_context context_hash)
         in
-        continue res cache cached_result
+        continue res cache cached_result None
     | External_validation.Context_garbage_collection
         {context_hash; gc_lockfile_path} ->
         let*! () = Context_ops.gc context_index context_hash in
@@ -356,10 +378,10 @@ module Processing = struct
             (fun () -> Lwt_unix.close lockfile)
         in
         let () = Lwt.dont_wait gc_waiter (fun _exn -> ()) in
-        continue (Ok ()) cache cached_result
+        continue (Ok ()) cache cached_result None
     | External_validation.Context_split ->
         let*! () = Context_ops.split context_index in
-        continue (Ok ()) cache cached_result
+        continue (Ok ()) cache cached_result None
     | External_validation.Terminate ->
         let*! () = Lwt_io.flush_all () in
         Lwt.return `Stop
@@ -367,7 +389,7 @@ module Processing = struct
         let*! res =
           Tezos_base_unix.Internal_event_unix.Configuration.reapply config
         in
-        continue res cache cached_result
+        continue res cache cached_result None
 end
 
 include

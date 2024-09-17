@@ -196,6 +196,7 @@ module Internal_validator_process = struct
     mutable preapply_result :
       (Block_validation.apply_result * Tezos_protocol_environment.Context.t)
       option;
+    headless : Tezos_base.Profiler.instance;
   }
 
   let init
@@ -207,6 +208,13 @@ module Internal_validator_process = struct
         validator_environment) chain_store =
     let open Lwt_syntax in
     let* () = Events.(emit init ()) in
+    let headless =
+      Tezos_base.Profiler.instance
+        Tezos_base_unix.Simple_profiler.headless
+        Profiler.Detailed
+    in
+    Tezos_base.Profiler.(plug main) headless ;
+    Tezos_protocol_environment.Environment_profiler.plug headless ;
     return_ok
       {
         chain_store;
@@ -215,6 +223,7 @@ module Internal_validator_process = struct
         operation_metadata_size_limit;
         cache = None;
         preapply_result = None;
+        headless;
       }
 
   let kind = Single_process
@@ -318,6 +327,12 @@ module Internal_validator_process = struct
         Events.(emit validation_success (block_hash, timespan))
       else Events.(emit application_success (block_hash, timespan))
     in
+    let report = Tezos_base.Profiler.report validator.headless in
+    (match report with
+    | None -> ()
+    | Some report -> (
+        try Profiler.inc Shell_profiling.block_validator_profiler report
+        with _ -> ())) ;
     return result
 
   let preapply_block validator ~chain_id ~timestamp ~protocol_data ~live_blocks
@@ -405,15 +420,24 @@ module Internal_validator_process = struct
           `Inherited (block_cache, predecessor_resulting_context_hash)
     in
     let predecessor_block_hash = Store.Block.hash predecessor in
-    Block_validation.validate
-      ~chain_id
-      ~predecessor_block_header
-      ~predecessor_block_hash
-      ~predecessor_context
-      ~predecessor_resulting_context_hash
-      ~cache
-      header
-      operations
+    let* res =
+      Block_validation.validate
+        ~chain_id
+        ~predecessor_block_header
+        ~predecessor_block_hash
+        ~predecessor_context
+        ~predecessor_resulting_context_hash
+        ~cache
+        header
+        operations
+    in
+    let report = Tezos_base.Profiler.report validator.headless in
+    (match report with
+    | None -> ()
+    | Some report -> (
+        try Profiler.inc Shell_profiling.block_validator_profiler report
+        with _ -> ())) ;
+    return res
 
   let context_garbage_collection _validator context_index context_hash
       ~gc_lockfile_path:_ =
@@ -479,13 +503,20 @@ module External_validator_process = struct
           simulate;
         }
     in
-    send_request validator request
+    let* res, report = send_request validator request in
+    (match report with
+    | None -> ()
+    | Some report -> (
+        try Profiler.inc Shell_profiling.block_validator_profiler report
+        with _ -> ())) ;
+    return res
 
   let preapply_block validator ~chain_id ~timestamp ~protocol_data ~live_blocks
       ~live_operations ~predecessor_shell_header ~predecessor_hash
       ~predecessor_max_operations_ttl ~predecessor_block_metadata_hash
       ~predecessor_ops_metadata_hash ~predecessor_resulting_context_hash
       operations =
+    let open Lwt_result_syntax in
     let request =
       External_validation.Preapply
         {
@@ -503,7 +534,8 @@ module External_validator_process = struct
           operations;
         }
     in
-    send_request validator request
+    let* res, _report = send_request validator request in
+    return res
 
   let validate_block validator chain_store ~predecessor header hash operations =
     let open Lwt_result_syntax in
@@ -525,37 +557,55 @@ module External_validator_process = struct
           hash;
         }
     in
-    send_request validator request
+    let* res, report = send_request validator request in
+    (match report with
+    | None -> ()
+    | Some report -> (
+        try Profiler.inc Shell_profiling.block_validator_profiler report
+        with _ -> ())) ;
+    return res
 
   let context_garbage_collection validator _index context_hash ~gc_lockfile_path
       =
+    let open Lwt_result_syntax in
     let request =
       External_validation.Context_garbage_collection
         {context_hash; gc_lockfile_path}
     in
-    send_request validator request
+    let* (), _report = send_request validator request in
+    return_unit
 
   let context_split validator _index =
+    let open Lwt_result_syntax in
     let request = External_validation.Context_split in
-    send_request validator request
+    let* (), _report = send_request validator request in
+    return_unit
 
   let commit_genesis validator ~chain_id =
+    let open Lwt_result_syntax in
     let request = External_validation.Commit_genesis {chain_id} in
-    send_request validator request
+    let* res, _report = send_request validator request in
+    return res
 
   let init_test_chain validator chain_id forking_block =
+    let open Lwt_result_syntax in
     let forked_header = Store.Block.header forking_block in
     let context_hash = forked_header.shell.context in
     let request =
       External_validation.Fork_test_chain
         {chain_id; context_hash; forked_header}
     in
-    send_request validator request
+    let* res, _report = send_request validator request in
+    return res
 
   let reconfigure_event_logging validator config =
-    send_request
-      validator
-      (External_validation.Reconfigure_event_logging config)
+    let open Lwt_result_syntax in
+    let* (), _report =
+      send_request
+        validator
+        (External_validation.Reconfigure_event_logging config)
+    in
+    return_unit
 end
 
 let init validator_kind =

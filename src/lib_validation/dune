@@ -15,6 +15,8 @@
   octez-shell-libs.protocol-updater
   octez-libs.stdlib-unix
   octez-version.value)
+ (preprocess (pps octez-libs.ppx_profiler))
+ (preprocessor_deps (env_var TEZOS_PPX_PROFILER))
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
