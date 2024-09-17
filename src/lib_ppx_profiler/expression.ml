@@ -42,10 +42,13 @@ let rewrite rewriters t =
   List.fold_left
     (fun expr rewriter ->
       match rewriter with
-      | Rewriter.Aggregate_s content
+      | Rewriter.Aggregate content
       | Rewriter.Aggregate_f content
+      | Rewriter.Aggregate_s content
       | Rewriter.Record_f content
       | Rewriter.Record_s content
+      | Rewriter.Span content
+      | Rewriter.Span_f content
       | Rewriter.Span_s content ->
           add_wrapping_function
             expr
@@ -53,7 +56,8 @@ let rewrite rewriters t =
             loc
             (Rewriter.get_key content)
       (* Functions that have a ~lod parameter *)
-      | Rewriter.Mark content | Rewriter.Record content ->
+      | Rewriter.Mark content | Rewriter.Record content | Rewriter.Stamp content
+        ->
           add_unit_function
             ~lod:true
             expr

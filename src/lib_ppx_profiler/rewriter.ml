@@ -8,11 +8,14 @@
 module rec Constants : sig
   type t
 
-  (** Constant representing [@profiler.aggregate_s] *)
-  val aggregate_s_constant : t
+  (** Constant representing [@profiler.aggregate] *)
+  val aggregate_constant : t
 
   (** Constant representing [@profiler.aggregate_f] *)
   val aggregate_f_constant : t
+
+  (** Constant representing [@profiler.aggregate_s] *)
+  val aggregate_s_constant : t
 
   (** Constant representing [@profiler.mark] *)
   val mark_constant : t
@@ -29,8 +32,17 @@ module rec Constants : sig
   (** Constant representing [@profiler.reset_block_section] *)
   val reset_block_section_constant : t
 
+  (** Constant representing [@profiler.span] *)
+  val span_constant : t
+
+  (** Constant representing [@profiler.span_f] *)
+  val span_f_constant : t
+
   (** Constant representing [@profiler.span_s] *)
   val span_s_constant : t
+
+  (** Constant representing [@profiler.stamp] *)
+  val stamp_constant : t
 
   (** Constant representing [@profiler.stop] *)
   val stop_constant : t
@@ -42,7 +54,7 @@ module rec Constants : sig
   val filter_out_all_handled_attributes :
     Parsetree.attribute list -> Parsetree.attribute list
 end = struct
-  (* This rewriter handles ppxes starting with profiling. *)
+  (* This rewriter handles ppxes starting with profiler. *)
   let namespace = "profiler"
 
   type t = {action : string; attribute_name : string}
@@ -51,11 +63,14 @@ end = struct
     let attribute_name = namespace ^ "." ^ action in
     {action; attribute_name}
 
-  (* [@profiler.aggregate_s] *)
-  let aggregate_s_constant = create_constant "aggregate_s"
+  (* [@profiler.aggregate] *)
+  let aggregate_constant = create_constant "aggregate"
 
   (* [@profiler.aggregate_f] *)
   let aggregate_f_constant = create_constant "aggregate_f"
+
+  (* [@profiler.aggregate_s] *)
+  let aggregate_s_constant = create_constant "aggregate_s"
 
   (* [@profiler.mark] *)
   let mark_constant = create_constant "mark"
@@ -72,8 +87,17 @@ end = struct
   (* [@profiler.reset_block_section] *)
   let reset_block_section_constant = create_constant "reset_block_section"
 
+  (* [@profiler.span] *)
+  let span_constant = create_constant "span"
+
+  (* [@profiler.span_s] *)
+  let span_f_constant = create_constant "span_f"
+
   (* [@profiler.span_s] *)
   let span_s_constant = create_constant "span_s"
+
+  (* [@profiler.stamp] *)
+  let stamp_constant = create_constant "stamp"
 
   (* [@profiler.stop] *)
   let stop_constant = create_constant "stop"
@@ -86,13 +110,16 @@ end = struct
      defined above *)
   let constants =
     [
-      aggregate_s_constant;
+      aggregate_constant;
       aggregate_f_constant;
+      aggregate_s_constant;
       mark_constant;
       record_constant;
       record_f_constant;
       record_s_constant;
       reset_block_section_constant;
+      span_constant;
+      span_f_constant;
       span_s_constant;
       stop_constant;
     ]
@@ -122,14 +149,18 @@ and Rewriter : sig
   val get_key : content -> Key.t
 
   type t =
-    | Aggregate_s of content
+    | Aggregate of content
     | Aggregate_f of content
+    | Aggregate_s of content
     | Mark of content
     | Record of content
     | Record_f of content
     | Record_s of content
     | Reset_block_section of content
+    | Span of content
+    | Span_f of content
     | Span_s of content
+    | Stamp of content
     | Stop of content
 
   val to_constant : t -> Constants.t
@@ -146,56 +177,79 @@ end = struct
   let get_key content = content.key
 
   type t =
-    | Aggregate_s of content
+    | Aggregate of content
     | Aggregate_f of content
+    | Aggregate_s of content
     | Mark of content
     | Record of content
     | Record_f of content
     | Record_s of content
     | Reset_block_section of content
+    | Span of content
+    | Span_f of content
     | Span_s of content
+    | Stamp of content
     | Stop of content
 
-  let aggregate_s key location =
+  let aggregate key location =
     match Key.content key with
-    | Key.Ident _ | Key.String _ | Key.Apply _ -> Aggregate_s {key; location}
+    | Key.Apply _ | Key.Ident _ | Key.String _ -> Aggregate {key; location}
     | _ -> Error.error location (Error.Invalid_aggregate key)
 
   let aggregate_f key location =
     match Key.content key with
-    | Key.Ident _ | Key.String _ | Key.Apply _ -> Aggregate_f {key; location}
+    | Key.Apply _ | Key.Ident _ | Key.String _ -> Aggregate_f {key; location}
+    | _ -> Error.error location (Error.Invalid_aggregate key)
+
+  let aggregate_s key location =
+    match Key.content key with
+    | Key.Apply _ | Key.Ident _ | Key.String _ -> Aggregate_s {key; location}
     | _ -> Error.error location (Error.Invalid_aggregate key)
 
   let mark key location =
     match Key.content key with
-    | Key.List _ -> Mark {key; location}
+    | Key.Apply _ | Key.Ident _ | Key.List _ -> Mark {key; location}
     | _ -> Error.error location (Error.Invalid_mark key)
 
   let record key location =
     match Key.content key with
-    | Key.Ident _ | Key.String _ | Key.Apply _ -> Record {key; location}
+    | Key.Apply _ | Key.Ident _ | Key.String _ -> Record {key; location}
     | _ -> Error.error location (Error.Invalid_record key)
 
   let record_f key location =
     match Key.content key with
-    | Key.Ident _ | Key.String _ | Key.Apply _ -> Record_f {key; location}
+    | Key.Apply _ | Key.Ident _ | Key.String _ -> Record_f {key; location}
     | _ -> Error.error location (Error.Invalid_record key)
 
   let record_s key location =
     match Key.content key with
-    | Key.Ident _ | Key.String _ | Key.Apply _ -> Record_s {key; location}
+    | Key.Apply _ | Key.Ident _ | Key.String _ -> Record_s {key; location}
     | _ -> Error.error location (Error.Invalid_record key)
 
   let reset_block_section key location =
     match Key.content key with
-    | Key.Ident _ | Key.String _ | Key.Apply _ ->
+    | Key.Apply _ | Key.Ident _ | Key.String _ ->
         Reset_block_section {key; location}
     | _ -> Error.error location (Error.Invalid_record key)
 
+  let span key location =
+    match Key.content key with
+    | Key.Apply _ | Key.Ident _ | Key.List _ -> Span {key; location}
+    | _ -> Error.error location (Error.Invalid_span key)
+
+  let span_f key location =
+    match Key.content key with
+    | Key.Apply _ | Key.Ident _ | Key.List _ -> Span_f {key; location}
+    | _ -> Error.error location (Error.Invalid_span key)
+
   let span_s key location =
     match Key.content key with
-    | Key.List _ -> Span_s {key; location}
-    | Key.Apply _ -> Span_s {key; location}
+    | Key.Apply _ | Key.Ident _ | Key.List _ -> Span_s {key; location}
+    | _ -> Error.error location (Error.Invalid_span key)
+
+  let stamp key location =
+    match Key.content key with
+    | Key.Apply _ | Key.Ident _ | Key.String _ -> Stamp {key; location}
     | _ -> Error.error location (Error.Invalid_span key)
 
   let stop key location =
@@ -204,18 +258,23 @@ end = struct
     | _ -> Error.error location (Error.Invalid_stop key)
 
   let get_location = function
-    | Aggregate_s c
+    | Aggregate c
     | Aggregate_f c
+    | Aggregate_s c
     | Mark c
     | Record c
     | Record_f c
     | Record_s c
     | Reset_block_section c
+    | Span c
+    | Span_f c
     | Span_s c
+    | Stamp c
     | Stop c ->
         c.location
 
   let to_constant = function
+    | Aggregate _ -> Constants.aggregate_constant
     | Aggregate_f _ -> Constants.aggregate_f_constant
     | Aggregate_s _ -> Constants.aggregate_s_constant
     | Mark _ -> Constants.mark_constant
@@ -223,11 +282,15 @@ end = struct
     | Record_f _ -> Constants.record_f_constant
     | Record_s _ -> Constants.record_s_constant
     | Reset_block_section _ -> Constants.record_s_constant
+    | Span _ -> Constants.span_constant
+    | Span_f _ -> Constants.span_f_constant
     | Span_s _ -> Constants.span_s_constant
+    | Stamp _ -> Constants.stamp_constant
     | Stop _ -> Constants.stop_constant
 
   let association_constant_rewriter =
     [
+      (Constants.aggregate_constant, aggregate);
       (Constants.aggregate_f_constant, aggregate_f);
       (Constants.aggregate_s_constant, aggregate_s);
       (Constants.mark_constant, mark);
@@ -235,17 +298,30 @@ end = struct
       (Constants.record_f_constant, record_f);
       (Constants.record_s_constant, record_s);
       (Constants.reset_block_section_constant, reset_block_section);
+      (Constants.span_constant, span);
+      (Constants.span_f_constant, span_f);
       (Constants.span_s_constant, span_s);
+      (Constants.stamp_constant, stamp);
       (Constants.stop_constant, stop);
     ]
     |> List.map (fun (const, fn) -> (Constants.get_attribute const, fn))
 
-  let of_string =
+  let of_string loc =
     let module StringMap = Map.Make (String) in
     let association_constant_rewriter =
       association_constant_rewriter |> List.to_seq |> StringMap.of_seq
     in
-    fun attribute -> StringMap.find_opt attribute association_constant_rewriter
+    fun attribute ->
+      match StringMap.find_opt attribute association_constant_rewriter with
+      | Some res -> Some res
+      | None ->
+          (* Raise an Error if the ppx starts with [@profiler.action ...]
+             but action is not handled by this ppx *)
+          if String.starts_with ~prefix:"profiler." attribute then
+            match String.split_on_char '.' attribute with
+            | [_; action] -> Error.error loc Error.(Invalid_action action)
+            | _ -> None
+          else None
 
   (** Transforms a rewriter in an OCaml function call:
       - [@profiler.aggregate_s ...] will create a proper
@@ -257,6 +333,7 @@ end = struct
         Ppxlib.Ldot
           ( profiler_module,
             match t with
+            | Aggregate _ -> "aggregate"
             | Aggregate_f _ -> "aggregate_f"
             | Aggregate_s _ -> "aggregate_s"
             | Mark _ -> "mark"
@@ -264,7 +341,10 @@ end = struct
             | Record_f _ -> "record_f"
             | Record_s _ -> "record_s"
             | Reset_block_section _ -> "reset_block_section"
+            | Span _ -> "span"
+            | Span_f _ -> "span_f"
             | Span_s _ -> "span_s"
+            | Stamp _ -> "stamp"
             | Stop _ -> "stop" )
       in
       Ppxlib.Ast_helper.Exp.ident {txt = lident; loc}
@@ -331,7 +411,7 @@ end = struct
     | _ -> Error.error loc (Invalid_payload payload)
 
   let of_attribute ({Ppxlib.attr_payload; attr_loc; _} as attribute) =
-    match Ppxlib_helper.get_attribute_name attribute |> of_string with
+    match Ppxlib_helper.get_attribute_name attribute |> of_string attr_loc with
     | Some rewriter ->
         let key = extract_key_from_payload attr_loc attr_payload in
         Some (rewriter key attr_loc)
