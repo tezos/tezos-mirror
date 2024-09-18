@@ -298,6 +298,19 @@ where
                         if with_logs {
                             call_trace.add_logs(Some(result.logs.clone()))
                         }
+                        match result.result {
+                            ExecutionResult::CallReverted(ref error) => {
+                                call_trace.add_error(Some(error.clone()))
+                            }
+                            ExecutionResult::Error(ref exit_error) => call_trace
+                                .add_error(Some(format!("{:?}", exit_error).into())),
+                            ExecutionResult::FatalError(ref fatal_error) => call_trace
+                                .add_error(Some(format!("{:?}", fatal_error).into())),
+                            ExecutionResult::OutOfTicks => {
+                                call_trace.add_error(Some("OutOfTicks".into()))
+                            }
+                            _ => (),
+                        };
 
                         tracer::store_call_trace(
                             handler.host,
