@@ -187,10 +187,31 @@ let default_tx_pool_tx_per_addr_limit = Int64.of_int 16
 let default_blueprints_publisher_config =
   {
     max_blueprints_lag = 50;
+    (* When the sequencer is more than max_blueprints_lag L2
+       levels ahead of the rollup, a cath-up mechanism is
+       triggered. It consists in resending some blueprints on the
+       inbox. *)
     max_blueprints_ahead = 100;
+    (* When the sequencer is more than max_blueprints_ahead L2 levels
+       ahead of the rollup, it locks its tx_pool for some time. This
+       has the effect of considerably slowing down the creation of L2
+       blocks.
+
+       For this parameter to make sense, it should be
+       significantly larger than max_blueprints_lag. *)
     max_blueprints_catchup = 50;
+    (* This is the maximum number of blueprints that the sequencer
+       resends at each L1 level during catch up. *)
     catchup_cooldown = 1;
+    (* When the catch-up mechanism is triggered, it deactivates itself
+       for [catchup_cooldown] L1 levels. *)
     dal_slots = None;
+    (* If this is None, the DAL will not be used by the
+       sequencer. Otherwise, this is the list of DAL slot indices on
+       which the rollup node will try to publish DAL slots. It should
+       be included in the dal_slots list of the kernel configuration
+       otherwise the kernel will ignore any DAL slots published on
+       forbidden indices. *)
   }
 
 let default_fee_history = {max_count = None; max_past = None}
