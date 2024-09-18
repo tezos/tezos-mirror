@@ -268,6 +268,14 @@ linkcheck_allowed_redirects = dict(
             r'https://www.reddit.com/r/tezos/',
             r'https://www.reddit.com/r/tezos/[?]rdt=[0-9]+',
         ),
+        (
+            r'https://ocaml\.org/api/.*',
+            r'https://ocaml\.org/manual/[0-9.]+/api/.*',
+        ),
+        (
+            r'https://ocaml\.org/manual/.*',
+            r'https://ocaml\.org/manual/[0-9.]+/.*',
+        ),
         # 2. permanent redidections, maybe fix one day
         (r'https://bitheap\.org/cram/', r'https://github\.com/aiiie/cram'),
     ]

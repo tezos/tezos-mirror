@@ -2,7 +2,7 @@ Verifying Octez Docker Images with Cosign
 ==========================================
 
 `Cosign <https://github.com/sigstore/cosign>`_ is a tool developed by `Sigstore
-<https://sigstore.dev/>`_ to sign and verify container images and other
+<https://www.sigstore.dev/>`_ to sign and verify container images and other
 artifacts. This document provides instructions on how to verify Docker images of Octez
 signed using Cosign.
 
@@ -11,8 +11,8 @@ Prerequisites
 Before you can verify Docker images signed with Cosign, ensure you have
 Docker and Cosign installed on your system.
 
-- `Docker Installation Guide <https://docs.docker.com/get-docker/>`_
-- `Cosign Installation Guide <https://docs.sigstore.dev/cosign/installation/>`_
+- `Docker Installation Guide <https://docs.docker.com/get-started/get-docker/>`_
+- `Cosign Installation Guide <https://docs.sigstore.dev/cosign/system_config/installation/>`_
 
 Obtaining the Public Key
 ------------------------

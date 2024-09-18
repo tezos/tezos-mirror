@@ -856,10 +856,10 @@ The available options are:
      - Description
    * - Singlepass
      - ``singlepass``
-     - `When to use Singlepass <https://github.com/wasmerio/wasmer/tree/master/lib/compiler-singlepass#when-to-use-singlepass>`_
+     - `When to use Singlepass <https://github.com/wasmerio/wasmer/tree/main/lib/compiler-singlepass#when-to-use-singlepass>`_
    * - Cranelift
      - ``cranelift``
-     - `When to use Cranelift <https://github.com/wasmerio/wasmer/tree/master/lib/compiler-cranelift#when-to-use-cranelift>`_
+     - `When to use Cranelift <https://github.com/wasmerio/wasmer/tree/main/lib/compiler-cranelift#when-to-use-cranelift>`_
 
 Note that while the rollup node is generally capable of using Wasmer's
 LLVM-based compiler, Octez does not currently ship with it.
