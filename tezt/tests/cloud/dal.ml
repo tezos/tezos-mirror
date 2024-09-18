@@ -1692,16 +1692,16 @@ let init_etherlink_dal_node ~bootstrap ~next_agent ~name ~dal_slots ~network =
           network
           agent
       in
-      let* dal_node = Dal_node.Agent.create ~name ~node agent in
+      let* default_dal_node = Dal_node.Agent.create ~name ~node agent in
       let* () =
         Dal_node.init_config
           ~expected_pow:(Network.expected_pow Cli.network)
           ~producer_profiles:dal_slots
           ~peers:[bootstrap.dal_node_p2p_endpoint]
-          dal_node
+          default_dal_node
       in
-      let* () = Dal_node.Agent.run ~memtrace:Cli.memtrace dal_node in
-      some dal_node
+      let* () = Dal_node.Agent.run ~memtrace:Cli.memtrace default_dal_node in
+      some default_dal_node
 
 let init_etherlink_operator_setup cloud configuration name ~bootstrap ~dal_slots
     account agent next_agent =
