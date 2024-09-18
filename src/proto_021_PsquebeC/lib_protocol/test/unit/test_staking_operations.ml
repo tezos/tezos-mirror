@@ -81,6 +81,34 @@ let create_delegate_and_staker ~self_delegate_staker ?amount () =
   let* b = Block.bake ~operation:set_delegate b in
   return (b, delegate, staker)
 
+let check_balances b ~staker ~spendable ~staked ?(unstaked_frozen = Tez.zero)
+    ?(unstaked_finalizable = Tez.zero) () =
+  let open Lwt_result_syntax in
+  let equal_tez_option ~loc a b =
+    let a = Option.value ~default:Tez.zero a in
+    Assert.equal_tez ~loc a b
+  in
+  let* computed_spendable = Context.Contract.balance (B b) staker in
+  let* () = Assert.equal_tez ~loc:__LOC__ spendable computed_spendable in
+  let* computed_staked = Context.Contract.staked_balance (B b) staker in
+  let* () = equal_tez_option ~loc:__LOC__ computed_staked staked in
+  let* computed_unstaked_frozen =
+    Context.Contract.unstaked_frozen_balance (B b) staker
+  in
+  let* () =
+    equal_tez_option ~loc:__LOC__ computed_unstaked_frozen unstaked_frozen
+  in
+  let* computed_unstaked_finalizable =
+    Context.Contract.unstaked_finalizable_balance (B b) staker
+  in
+  let* () =
+    equal_tez_option
+      ~loc:__LOC__
+      computed_unstaked_finalizable
+      unstaked_finalizable
+  in
+  return_unit
+
 (* stake with inconsistent pkh (source <> destination) *)
 let () =
   register_test ~title:"stake with inconsistent pkh" @@ fun () ->
@@ -100,3 +128,39 @@ let () =
   Assert.proto_error ~loc:__LOC__ b (function
       | Protocol.Apply.Invalid_self_transaction_destination -> true
       | _ -> false)
+
+(* low balance for staked amount itself *)
+let stake_low_spendable_balance ~self_delegate_staker =
+  let open Lwt_result_syntax in
+  let amount = Tez_helpers.of_int 10_000 in
+  let* b, _delegate, staker =
+    create_delegate_and_staker ~self_delegate_staker ~amount ()
+  in
+  let* () = check_balances b ~staker ~spendable:amount ~staked:Tez.zero () in
+  let* stake =
+    Op.transaction
+      ~entrypoint:Protocol.Alpha_context.Entrypoint.stake
+      ~fee:Tez.zero
+      (B b)
+      staker
+      staker
+      amount
+  in
+  if self_delegate_staker then
+    let* b = Block.bake ~operation:stake b in
+    let* () = check_balances b ~staker ~spendable:Tez.zero ~staked:amount () in
+    return_unit
+  else
+    let*! b = Block.bake ~operation:stake b in
+    Assert.proto_error ~loc:__LOC__ b (function
+        | Protocol.Contract_storage.Empty_implicit_delegated_contract c ->
+            Signature.Public_key_hash.(c = Account.pkh_of_contract_exn staker)
+        | _ -> false)
+
+let () =
+  register_test ~title:"stake with low spendable balance (external staker)"
+  @@ fun () -> stake_low_spendable_balance ~self_delegate_staker:false
+
+let () =
+  register_test ~title:"stake with low spendable balance (self delegate)"
+  @@ fun () -> stake_low_spendable_balance ~self_delegate_staker:true
