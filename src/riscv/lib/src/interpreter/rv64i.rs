@@ -351,7 +351,7 @@ where
 #[cfg(test)]
 mod tests {
     use crate::{
-        backend_test, create_backend, create_state,
+        backend_test, create_state,
         machine_state::{
             bus::{devices::DEVICES_ADDRESS_SPACE_LENGTH, main_memory::tests::T1K},
             hart_state::{HartState, HartStateLayout},
@@ -367,8 +367,7 @@ mod tests {
             imm in any::<i64>(),
             reg_val in any::<i64>())|
         {
-            let mut backend = create_backend!(HartStateLayout, F);
-            let mut state = create_state!(HartState, F, backend);
+            let mut state = create_state!(HartState, F);
 
             state.xregisters.write(a0, reg_val as u64);
             state.xregisters.write(t0, imm as u64);
@@ -393,8 +392,7 @@ mod tests {
             v1 in any::<i64>(),
             v2 in any::<i64>())|
         {
-            let mut backend = create_backend!(HartStateLayout, F);
-            let mut state = create_state!(HartState, F, backend);
+            let mut state = create_state!(HartState, F);
 
             state.xregisters.write(t0, v1 as u64);
             state.xregisters.write(a0, v2 as u64);
@@ -464,8 +462,7 @@ mod tests {
     }
 
     backend_test!(test_shift, F, {
-        let mut backend = create_backend!(HartStateLayout, F);
-        let mut state = create_state!(HartState, F, backend);
+        let mut state = create_state!(HartState, F);
 
         // imm = 0
         test_both_shift_instr!(
@@ -609,8 +606,7 @@ mod tests {
     });
 
     backend_test!(test_shift_w, F, {
-        let mut backend = create_backend!(HartStateLayout, F);
-        let mut state = create_state!(HartState, F, backend);
+        let mut state = create_state!(HartState, F);
 
         // imm = 0
         test_both_shift_instr!(
@@ -755,14 +751,7 @@ mod tests {
     });
 
     backend_test!(test_load_store, F, {
-        let mut backend = create_backend!(MachineCoreStateLayout<T1K>, F);
-        let state = create_state!(
-            MachineCoreState,
-            MachineCoreStateLayout<T1K>,
-            F,
-            backend,
-            T1K
-        );
+        let state = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
         let state_cell = std::cell::RefCell::new(state);
 
         proptest!(|(

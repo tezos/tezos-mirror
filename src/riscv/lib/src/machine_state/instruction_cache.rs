@@ -336,7 +336,7 @@ const fn cacheable_uncompressed(phys_addr: Address) -> bool {
 mod tests {
     use super::*;
     use crate::{
-        backend_test, create_backend, create_state,
+        backend_test, create_state,
         machine_state::registers::{a0, t0, t1},
         parser::instruction::{CIBTypeArgs, InstrCacheable, SBTypeArgs},
         state_backend::test_helpers::copy_via_serde,
@@ -349,12 +349,10 @@ mod tests {
     // `UnknownInstr` being executed, rather than an `OutOfBounds` error (for reading from
     // devices).
     backend_test!(test_fetch_before_cache_misses, F, {
-        let mut backend = create_backend!(TestInstructionCacheLayout, F);
         let mut state = create_state!(
             InstructionCache,
             TestInstructionCacheLayout,
             F,
-            backend,
             TestInstructionCacheLayout
         );
 
@@ -370,12 +368,10 @@ mod tests {
     // we do not invalidate the instruction cache, although the physical address of
     // the second half of the instruction does actually change!
     backend_test!(test_never_cache_across_page_boundaries, F, {
-        let mut backend = create_backend!(TestInstructionCacheLayout, F);
         let mut state = create_state!(
             InstructionCache,
             TestInstructionCacheLayout,
             F,
-            backend,
             TestInstructionCacheLayout
         );
 
@@ -418,7 +414,6 @@ mod tests {
                 InstructionCache,
                 TestInstructionCacheLayout,
                 F,
-                backend,
                 TestInstructionCacheLayout
             );
 

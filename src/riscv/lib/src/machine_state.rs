@@ -1052,7 +1052,7 @@ mod tests {
     use crate::{
         backend_test,
         bits::{Bits64, FixedWidthBits},
-        create_backend, create_state,
+        create_state,
         machine_state::{
             address_translation::pte::{PPNField, PageTableEntry},
             bus::{main_memory::M1M, start_of_main_memory, AddressableWrite},
@@ -1084,8 +1084,7 @@ mod tests {
     }
 
     backend_test!(test_step, F, {
-        let mut backend = create_backend!(MachineStateLayout<T1K, TestCacheLayouts>, F);
-        let state = create_state!(MachineState, MachineStateLayout<T1K, TestCacheLayouts>, F, backend, T1K, TestCacheLayouts);
+        let state = create_state!(MachineState, MachineStateLayout<T1K, TestCacheLayouts>, F, T1K, TestCacheLayouts);
         let state_cell = std::cell::RefCell::new(state);
 
         proptest!(|(
@@ -1132,8 +1131,7 @@ mod tests {
     });
 
     backend_test!(test_step_env_exc, F, {
-        let mut backend = create_backend!(MachineStateLayout<T1K, TestCacheLayouts>, F);
-        let state = create_state!(MachineState, MachineStateLayout<T1K, TestCacheLayouts>, F, backend, T1K, TestCacheLayouts);
+        let state = create_state!(MachineState, MachineStateLayout<T1K, TestCacheLayouts>, F, T1K, TestCacheLayouts);
         let state_cell = std::cell::RefCell::new(state);
 
         proptest!(|(
@@ -1169,8 +1167,7 @@ mod tests {
     });
 
     backend_test!(test_step_exc_mm, F, {
-        let mut backend = create_backend!(MachineStateLayout<T1K, TestCacheLayouts>, F);
-        let state = create_state!(MachineState, MachineStateLayout<T1K, TestCacheLayouts>, F, backend, T1K, TestCacheLayouts);
+        let state = create_state!(MachineState, MachineStateLayout<T1K, TestCacheLayouts>, F, T1K, TestCacheLayouts);
         let state_cell = std::cell::RefCell::new(state);
 
         proptest!(|(
@@ -1213,8 +1210,7 @@ mod tests {
     });
 
     backend_test!(test_step_exc_us, F, {
-        let mut backend = create_backend!(MachineStateLayout<T1K, TestCacheLayouts>, F);
-        let state = create_state!(MachineState, MachineStateLayout<T1K, TestCacheLayouts>, F, backend, T1K, TestCacheLayouts);
+        let state = create_state!(MachineState, MachineStateLayout<T1K, TestCacheLayouts>, F, T1K, TestCacheLayouts);
         let state_cell = std::cell::RefCell::new(state);
 
         proptest!(|(
@@ -1304,14 +1300,7 @@ mod tests {
 
         // Configure the machine state.
         let base_state = {
-            let mut state = create_state!(
-                MachineState,
-                LocalLayout,
-                F,
-                backend,
-                M1K,
-                TestCacheLayouts
-            );
+            let mut state = create_state!(MachineState, LocalLayout, F, M1K, TestCacheLayouts);
             state.reset();
 
             let start_ram = start_of_main_memory::<M1K>();
@@ -1541,13 +1530,8 @@ mod tests {
 
         // Configure the state backend.
         let base_state = {
-            let mut state: LocalMachineState<F> = create_state!(
-                MachineState,
-                LocalLayout,
-                F,
-                backend,
-                M1M,
-                TestCacheLayouts);
+            let mut state: LocalMachineState<F> =
+                create_state!(MachineState, LocalLayout, F, M1M, TestCacheLayouts);
             state.reset();
 
             state

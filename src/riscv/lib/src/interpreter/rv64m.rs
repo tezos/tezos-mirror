@@ -102,7 +102,7 @@ where
 #[cfg(test)]
 mod test {
     use crate::{
-        backend_test, create_backend, create_state,
+        backend_test, create_state,
         machine_state::registers::{a0, a1, a2, a3, XRegisters, XRegistersLayout},
     };
     use proptest::{prelude::any, prop_assert_eq, proptest};
@@ -112,8 +112,7 @@ mod test {
             r1_val in any::<u64>(),
             r2_val in any::<u64>(),
         )| {
-            let mut backend = create_backend!(XRegistersLayout, F);
-            let mut state = create_state!(XRegisters, F, backend);
+            let mut state = create_state!(XRegisters, F);
 
             state.write(a0, r1_val);
             state.write(a1, r2_val);
@@ -133,8 +132,7 @@ mod test {
             r1_val in any::<u64>(),
             r2_val in any::<u64>(),
         )| {
-            let mut backend = create_backend!(XRegistersLayout, F);
-            let mut state = create_state!(XRegisters, F, backend);
+            let mut state = create_state!(XRegisters, F);
 
             state.write(a0, r1_val);
             state.write(a1, r2_val);

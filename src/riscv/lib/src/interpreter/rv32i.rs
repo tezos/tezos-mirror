@@ -372,7 +372,7 @@ where
 #[cfg(test)]
 mod tests {
     use crate::{
-        backend_test, create_backend, create_state,
+        backend_test, create_state,
         machine_state::{
             bus::{main_memory::tests::T1K, Address},
             csregisters::{
@@ -415,8 +415,7 @@ mod tests {
         ];
 
         for (imm, rs1, rd, res) in imm_rs1_rd_res {
-            let mut backend = create_backend!(HartStateLayout, F);
-            let mut state = create_state!(HartState, F, backend);
+            let mut state = create_state!(HartState, F);
 
             state.xregisters.write(a0, rs1);
             state.xregisters.write(t0, imm as u64);
@@ -445,8 +444,7 @@ mod tests {
         ];
 
         for (init_pc, imm, res, rd) in pc_imm_res_rd {
-            let mut backend = create_backend!(HartStateLayout, F);
-            let mut state = create_state!(HartState, F, backend);
+            let mut state = create_state!(HartState, F);
 
             // U-type immediate only has upper 20 bits set, the lower 12 being set to 0
             assert_eq!(imm, ((imm >> 20) & 0xF_FFFF) << 20);
@@ -489,8 +487,7 @@ mod tests {
             let branch_pc = init_pc.wrapping_add(imm as u64);
             let next_pc = init_pc.wrapping_add(4);
 
-            let mut backend = create_backend!(HartStateLayout, F);
-            let mut state = create_state!(HartState, F, backend);
+            let mut state = create_state!(HartState, F);
 
             // BEQ - different
             test_branch_instr!(state, run_beq, imm, t1, r1_val, t2, r2_val, init_pc, next_pc);
@@ -534,8 +531,7 @@ mod tests {
             let branch_pc = init_pc.wrapping_add(imm as u64);
             let next_pc = init_pc.wrapping_add(4);
 
-            let mut backend = create_backend!(HartStateLayout, F);
-            let mut state = create_state!(HartState, F, backend);
+            let mut state = create_state!(HartState, F);
 
             // lhs < rhs
             test_branch_instr!(state, run_blt, imm, t1, 0, t2, 1, init_pc, branch_pc);
@@ -566,8 +562,7 @@ mod tests {
 
     backend_test!(test_bitwise, F, {
         proptest!(|(val in any::<u64>(), imm in any::<u64>())| {
-            let mut backend = create_backend!(XRegistersLayout, F);
-            let mut state = create_state!(XRegisters, F, backend);
+            let mut state = create_state!(XRegisters, F);
 
             // The sign-extension of an immediate on 12 bits has bits 31:11 equal the sign-bit
             let prefix_mask = 0xFFFF_FFFF_FFFF_F800;
@@ -602,8 +597,7 @@ mod tests {
 
     backend_test!(test_bitwise_reg, F, {
         proptest!(|(v1 in any::<u64>(), v2 in any::<u64>())| {
-            let mut backend = create_backend!(XRegistersLayout, F);
-            let mut state = create_state!(XRegisters, F, backend);
+            let mut state = create_state!(XRegisters, F);
 
             state.write(a0, v1);
             state.write(t3, v2);
@@ -644,8 +638,7 @@ mod tests {
             let branch_pc = init_pc.wrapping_add(imm as u64);
             let next_pc = init_pc.wrapping_add(4);
 
-            let mut backend = create_backend!(HartStateLayout, F);
-            let mut state = create_state!(HartState, F, backend);
+            let mut state = create_state!(HartState, F);
 
             // lhs < rhs
             test_branch_instr!(state, run_bltu, imm, t1, r1_val, t2, r2_val, init_pc, branch_pc);
@@ -684,28 +677,14 @@ mod tests {
     });
 
     backend_test!(test_ebreak, F, {
-        let mut backend = create_backend!(MachineCoreStateLayout<T1K>, F);
-        let state = create_state!(
-            MachineCoreState,
-            MachineCoreStateLayout<T1K>,
-            F,
-            backend,
-            T1K
-        );
+        let state = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
 
         let ret_val = state.hart.run_ebreak();
         assert_eq!(ret_val, Exception::Breakpoint);
     });
 
     backend_test!(test_fence, F, {
-        let mut backend = create_backend!(MachineCoreStateLayout<T1K>, F);
-        let state = create_state!(
-            MachineCoreState,
-            MachineCoreStateLayout<T1K>,
-            F,
-            backend,
-            T1K
-        );
+        let state = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
         let state_cell = std::cell::RefCell::new(state);
 
         proptest!(|(
@@ -727,8 +706,7 @@ mod tests {
     });
 
     backend_test!(test_ecall, F, {
-        let mut backend = create_backend!(HartStateLayout, F);
-        let mut state = create_state!(HartState, F, backend);
+        let mut state = create_state!(HartState, F);
 
         let mode_exc = [
             (Mode::User, Exception::EnvCallFromUMode),
@@ -767,8 +745,7 @@ mod tests {
             ),
         ];
         for (init_pc, imm, init_rs1, rs1, rd, res_pc, res_rd) in ipc_imm_irs1_rs1_rd_fpc_frd {
-            let mut backend = create_backend!(HartStateLayout, F);
-            let mut state = create_state!(HartState, F, backend);
+            let mut state = create_state!(HartState, F);
 
             state.pc.write(init_pc);
             state.xregisters.write(rs1, init_rs1);
@@ -795,8 +772,7 @@ mod tests {
             ),
         ];
         for (init_pc, imm, rd, res_pc, res_rd) in ipc_imm_rd_fpc_frd {
-            let mut backend = create_backend!(HartStateLayout, F);
-            let mut state = create_state!(HartState, F, backend);
+            let mut state = create_state!(HartState, F);
 
             state.pc.write(init_pc);
             let new_pc = state.run_jal(imm, rd);
@@ -809,8 +785,7 @@ mod tests {
 
     backend_test!(test_lui, F, {
         proptest!(|(imm in any::<i64>())| {
-            let mut backend = create_backend!(XRegistersLayout, F);
-            let mut xregs = create_state!(XRegisters, F, backend);
+            let mut xregs = create_state!(XRegisters, F);
             xregs.write(a2, 0);
             xregs.write(a4, 0);
 
@@ -826,8 +801,7 @@ mod tests {
     });
 
     backend_test!(test_slt, F, {
-        let mut backend = create_backend!(XRegistersLayout, F);
-        let mut xregs = create_state!(XRegisters, F, backend);
+        let mut xregs = create_state!(XRegisters, F);
 
         let v1_v2_exp_expu = [
             (0, 0, 0, 0),
@@ -856,8 +830,7 @@ mod tests {
             mepc in any::<Address>(),
             sepc in any::<Address>(),
         )| {
-            let mut backend = create_backend!(HartStateLayout, F);
-            let mut state = create_state!(HartState, F, backend);
+            let mut state = create_state!(HartState, F);
 
             // 4-byte align
             let mepc = mepc & !0b11;

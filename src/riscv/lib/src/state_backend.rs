@@ -415,22 +415,13 @@ pub mod tests {
         assert_eq!(snapshot1, snapshot2);
     }
 
-    /// Given a `StateLayout` and a [`TestBackendFactory`] type,
-    /// create the backend for that layout.
-    #[macro_export]
-    macro_rules! create_backend {
-        ($StateLayout:ty, $Factory:ty) => {
-            ()
-        };
-    }
-
     /// Given a `State<M: Manager>`, optionally its `StateLayout`,
     /// a [`TestBackendFactory`] type, a `backend` created with `create_backend!` macro,
     /// create the location and return the created `State<M>`.
     #[macro_export]
     macro_rules! create_state {
         // For an extra generic in the state (MachineState for example)
-        ($State:tt, $StateLayout:ty, $Factory:ty, $backend:ident $(, $ExtraGenerics:ty)*) => {
+        ($State:tt, $StateLayout:ty, $Factory:ty $(, $ExtraGenerics:ty)*) => {
             {
                 let new_state =
                     $State::<
@@ -444,8 +435,8 @@ pub mod tests {
             }
         };
 
-        ($State:tt, $Factory:ty, $backend:ident) => {
-            create_state!($State, paste::paste!([<$State Layout>]), $Factory, $backend)
+        ($State:tt, $Factory:ty) => {
+            create_state!($State, paste::paste!([<$State Layout>]), $Factory)
         };
     }
 
@@ -466,8 +457,6 @@ pub mod tests {
             }
         }
 
-        let mut backend = create_backend!(ExampleLayout, F);
-
         let (first_loc, second_loc) = ExampleLayout::placed().into_location();
         let first_loc = first_loc.as_array();
 
@@ -480,7 +469,7 @@ pub mod tests {
         let first_value: u64 = rand::random();
         let second_value: [u32; 4] = rand::random();
 
-        let mut instance = create_state!(Example, ExampleLayout, F, backend);
+        let mut instance = create_state!(Example, ExampleLayout, F);
 
         instance.first.write(first_value);
         assert_eq!(instance.first.read(), first_value);

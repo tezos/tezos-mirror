@@ -137,7 +137,7 @@ where
 #[cfg(test)]
 mod tests {
     use crate::{
-        backend_test, create_backend, create_state,
+        backend_test, create_state,
         machine_state::{
             bus::main_memory::tests::T1K,
             csregisters::{xstatus, CSRRepr, CSRegister},
@@ -150,8 +150,7 @@ mod tests {
 
     backend_test!(test_sfence, F, {
         type L = MachineCoreStateLayout<T1K>;
-        let mut backend = create_backend!(L, F);
-        let mut state = create_state!(MachineCoreState, L, F, backend, T1K);
+        let mut state = create_state!(MachineCoreState, L, F, T1K);
 
         let run_test = |state: &mut MachineCoreState<_, _>,
                         mode: Mode,

@@ -1670,7 +1670,7 @@ mod tests {
     use crate::{
         backend_test,
         bits::Bits64,
-        create_backend, create_state,
+        create_state,
         machine_state::{
             backend::tests::test_determinism,
             csregisters::{
@@ -1894,8 +1894,7 @@ mod tests {
     }
 
     backend_test!(test_write_read, F, {
-        let mut backend = create_backend!(CSRegistersLayout, F);
-        let mut csrs = create_state!(CSRegisters, CSRegistersLayout, F, backend);
+        let mut csrs = create_state!(CSRegisters, CSRegistersLayout, F);
 
         // write to MBE, SXL, UXL, MPP, MPIE, XS, SPP (through mstatus)
         csrs.write(
@@ -1975,8 +1974,7 @@ mod tests {
     });
 
     backend_test!(test_xip_xie, F, {
-        let mut backend = create_backend!(CSRegistersLayout, F);
-        let mut csrs = create_state!(CSRegisters, CSRegistersLayout, F, backend);
+        let mut csrs = create_state!(CSRegisters, CSRegistersLayout, F);
 
         let mtip: u64 = 1 << Interrupt::MachineTimer.exception_code();
         let msip: u64 = 1 << Interrupt::MachineSoftware.exception_code();
@@ -2003,8 +2001,7 @@ mod tests {
     }
 
     backend_test!(test_fcsr, F, {
-        let mut backend = create_backend!(CSRegistersLayout, F);
-        let mut csrs = create_state!(CSRegisters, CSRegistersLayout, F, backend);
+        let mut csrs = create_state!(CSRegisters, CSRegistersLayout, F);
 
         // check starting values
         assert_eq!(0, csrs.read::<CSRRepr>(CSRegister::fcsr));
