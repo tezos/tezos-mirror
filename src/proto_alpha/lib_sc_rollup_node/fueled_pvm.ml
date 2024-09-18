@@ -176,8 +176,8 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
                dal_parameters)
     in
     let eval_tick_consume_fuel fuel failing_ticks state =
-      let max_steps = F.max_ticks fuel in
-      let normal_eval ?(max_steps = max_steps) state fuel =
+      let normal_eval state fuel =
+        let max_steps = F.max_ticks fuel in
         Lwt.catch
           (fun () ->
             (* This call to the PVM implementation of [eval_many] should never return running more
@@ -204,11 +204,8 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
             | Error_wrapper error -> Lwt.return (Error error)
             | exn -> Lwt.reraise exn)
       in
-      let normal_eval_wrapper ?(max_steps = max_steps) state fuel one_step_eval
-          =
-        let>* state, xticks, fticks, remaining_fuel =
-          normal_eval ~max_steps state fuel
-        in
+      let normal_eval_wrapper state fuel one_step_eval =
+        let>* state, xticks, fticks, remaining_fuel = normal_eval state fuel in
         return (state, xticks, fticks, remaining_fuel, one_step_eval)
       in
       let failure_insertion_eval state tick =
@@ -231,9 +228,8 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
             return (state, xtick, failing_ticks', fuel, Some one_step_eval)
           else
             (* Jump just before the tick where we'll insert a failure.
-               Nevertheless, we don't execute more than [max_steps]. *)
-            let max_steps = Int64.max 0L max_steps |> Int64.min max_steps in
-            normal_eval_wrapper ~max_steps state fuel (Some one_step_eval)
+               Nevertheless, we don't execute more than [fuel] steps. *)
+            normal_eval_wrapper state fuel (Some one_step_eval)
       | _ -> normal_eval_wrapper state fuel None
     in
     let abort (state : PVM.tree) fuel current_tick =
