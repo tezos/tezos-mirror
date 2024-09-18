@@ -13,6 +13,7 @@ use super::{
 use crate::{
     bits::Bits64,
     state_backend::{
+        hash::{Hash, HashError, RootHashable},
         AllocatedOf, Choreographer, EffectCell, EffectCellLayout, Layout, ManagerAlloc,
         ManagerBase, ManagerRead, ManagerReadWrite, ManagerWrite, PlacedOf, Ref,
     },
@@ -1390,6 +1391,14 @@ impl<Raw, MStatus, MIP> CSRValuesF<Raw, MStatus, MIP> {
             RootCSRegister::dscratch0 => fold_raw(&mut self.dscratch0),
             RootCSRegister::dscratch1 => fold_raw(&mut self.dscratch1),
         }
+    }
+}
+
+impl<Raw: serde::Serialize, MStatus: serde::Serialize, MIP: serde::Serialize> RootHashable
+    for CSRValuesF<Raw, MStatus, MIP>
+{
+    fn hash(&self) -> Result<Hash, HashError> {
+        Hash::blake2b_hash(self)
     }
 }
 
