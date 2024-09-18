@@ -32,7 +32,7 @@ impl<T> From<MutableState<T>> for ImmutableState<T> {
 impl<T> ImmutableState<T> {
     /// Create a mutable state from an immutable state
     #[inline]
-    pub fn as_mut_state(&self) -> MutableState<T> {
+    pub fn to_mut_state(&self) -> MutableState<T> {
         MutableState::Borrowed(self.0.clone())
     }
 
@@ -83,7 +83,7 @@ impl<T> From<ImmutableState<T>> for MutableState<T> {
 impl<T> MutableState<T> {
     /// Create an immutable state from a mutable state
     #[inline]
-    pub fn as_imm_state(&self) -> ImmutableState<T>
+    pub fn to_imm_state(&self) -> ImmutableState<T>
     where
         T: Clone,
     {

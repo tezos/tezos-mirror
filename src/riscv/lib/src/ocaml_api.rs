@@ -79,16 +79,26 @@ impl From<Status> for PvmStatus {
     }
 }
 
+impl<'a> PvmHooks<'a> {
+    fn from_printer(printer: ocaml::Value, gc: &'a ocaml::Runtime) -> PvmHooks<'a> {
+        let putchar = move |c: u8| unsafe {
+            ocaml::Value::call(&printer, gc, [ocaml::Int::from(c)])
+                .expect("compute_step: putchar error")
+        };
+        PvmHooks::new(putchar)
+    }
+}
+
 #[ocaml::func]
 #[ocaml::sig("state -> mut_state")]
 pub fn octez_riscv_from_imm(state: Pointer<State>) -> Pointer<MutState> {
-    state.as_ref().as_mut_state().into()
+    state.as_ref().to_mut_state().into()
 }
 
 #[ocaml::func]
 #[ocaml::sig("mut_state -> state")]
-pub fn octe_riscv_to_imm(state: Pointer<MutState>) -> Pointer<State> {
-    state.as_ref().as_imm_state().into()
+pub fn octez_riscv_to_imm(state: Pointer<MutState>) -> Pointer<State> {
+    state.as_ref().to_imm_state().into()
 }
 
 #[ocaml::func]
@@ -171,8 +181,7 @@ pub fn octez_riscv_get_status(state: Pointer<State>) -> Status {
 #[ocaml::func]
 #[ocaml::sig("mut_state -> status")]
 pub fn octez_riscv_mut_get_status(state: Pointer<MutState>) -> Status {
-    let status = state.apply_ro(|pvm| pvm.get_status());
-    status.into()
+    state.apply_ro(NodePvm::get_status).into()
 }
 
 #[ocaml::func]
@@ -193,12 +202,7 @@ pub fn octez_riscv_compute_step_with_debug(
     state: Pointer<State>,
     printer: ocaml::Value,
 ) -> Pointer<State> {
-    let printer = ocaml::function!(printer, (a: ocaml::Int) -> ());
-    let putchar = move |c: u8| {
-        let c = c as isize;
-        printer(gc, &c).expect("compute_step: putchar error")
-    };
-    let mut hooks = PvmHooks::new(putchar);
+    let mut hooks = PvmHooks::from_printer(printer, gc);
 
     apply_imm(state, |pvm| pvm.compute_step(&mut hooks)).0
 }
@@ -209,19 +213,16 @@ pub fn octez_riscv_compute_step_many(
     max_steps: usize,
     state: Pointer<State>,
 ) -> (Pointer<State>, i64) {
-    let mut default_pvm_hooks = PvmHooks::default();
-
     apply_imm(state, |pvm| {
-        pvm.compute_step_many(&mut default_pvm_hooks, max_steps)
+        pvm.compute_step_many(&mut PvmHooks::default(), max_steps)
     })
 }
 
 #[ocaml::func]
 #[ocaml::sig("int64 -> mut_state -> int64")]
 pub fn octez_riscv_mut_compute_step_many(max_steps: usize, state: Pointer<MutState>) -> i64 {
-    let mut default_pvm_hooks = PvmHooks::default();
     apply_mut(state, |pvm| {
-        pvm.compute_step_many(&mut default_pvm_hooks, max_steps)
+        pvm.compute_step_many(&mut PvmHooks::default(), max_steps)
     })
 }
 
@@ -232,12 +233,7 @@ pub fn octez_riscv_compute_step_many_with_debug(
     state: Pointer<State>,
     printer: ocaml::Value,
 ) -> (Pointer<State>, i64) {
-    let printer = ocaml::function!(printer, (a: ocaml::Int) -> ());
-    let putchar = move |c: u8| {
-        let c = c as isize;
-        printer(gc, &c).expect("compute_step_many: putchar error")
-    };
-    let mut hooks = PvmHooks::new(putchar);
+    let mut hooks = PvmHooks::from_printer(printer, gc);
 
     apply_imm(state, |pvm| pvm.compute_step_many(&mut hooks, max_steps))
 }
@@ -249,12 +245,8 @@ pub fn octez_riscv_mut_compute_step_many_with_debug(
     state: Pointer<MutState>,
     printer: ocaml::Value,
 ) -> i64 {
-    let printer = ocaml::function!(printer, (a: ocaml::Int) -> ());
-    let putchar = move |c: u8| {
-        let c = c as isize;
-        printer(gc, &c).expect("compute_step_many: putchar error")
-    };
-    let mut hooks = PvmHooks::new(putchar);
+    let mut hooks = PvmHooks::from_printer(printer, gc);
+
     apply_mut(state, |pvm| pvm.compute_step_many(&mut hooks, max_steps))
 }
 
@@ -267,7 +259,7 @@ pub fn octez_riscv_get_tick(state: Pointer<State>) -> u64 {
 #[ocaml::func]
 #[ocaml::sig("mut_state -> int64")]
 pub fn octez_riscv_mut_get_tick(state: Pointer<MutState>) -> u64 {
-    state.apply_ro(|pvm| pvm.get_tick())
+    state.apply_ro(NodePvm::get_tick)
 }
 
 #[ocaml::func]
@@ -279,7 +271,7 @@ pub fn octez_riscv_get_level(state: Pointer<State>) -> Option<u32> {
 #[ocaml::func]
 #[ocaml::sig("mut_state -> int32 option")]
 pub fn octez_riscv_mut_get_level(state: Pointer<MutState>) -> Option<u32> {
-    state.apply_ro(|pvm| pvm.get_current_level())
+    state.apply_ro(NodePvm::get_current_level)
 }
 
 fn verify_checksum(contents: &[u8], checksum: &str) -> bool {
@@ -342,34 +334,19 @@ pub fn octez_riscv_state_hash(state: Pointer<State>) -> [u8; 32] {
 }
 
 #[ocaml::func]
-#[ocaml::sig("state -> input -> state")]
-pub fn octez_riscv_set_input(state: Pointer<State>, input: Input) -> Pointer<State> {
-    let (new_ptr_state, _) = match input {
-        Input::InboxMessage(level, message_counter, payload) => apply_imm(state, |pvm| {
-            pvm.set_input_message(level, message_counter, payload.to_vec())
-        }),
-        Input::Reveal(RevealData::Metadata(address, origination_level)) => {
-            let address: &[u8; 20] = address.try_into().expect("Unexpected rollup address size");
-            apply_imm(state, |pvm| pvm.set_metadata(address, origination_level))
-        }
-        _ => {
-            // TODO: RV-110. Support all revelations in set_input method
-            todo!()
-        }
-    };
-    new_ptr_state
+#[ocaml::sig("mut_state -> bytes")]
+pub fn octez_riscv_mut_state_hash(state: Pointer<MutState>) -> [u8; 32] {
+    state.apply_ro(NodePvm::hash).into()
 }
 
-#[ocaml::func]
-#[ocaml::sig("mut_state -> input -> unit")]
-pub fn octez_riscv_mut_set_input(state: Pointer<MutState>, input: Input) -> () {
+fn apply_set_input(pvm: &mut NodePvm, input: Input) {
     match input {
-        Input::InboxMessage(level, message_counter, payload) => apply_mut(state, |pvm| {
+        Input::InboxMessage(level, message_counter, payload) => {
             pvm.set_input_message(level, message_counter, payload.to_vec())
-        }),
+        }
         Input::Reveal(RevealData::Metadata(address, origination_level)) => {
             let address: &[u8; 20] = address.try_into().expect("Unexpected rollup address size");
-            apply_mut(state, |pvm| pvm.set_metadata(address, origination_level))
+            pvm.set_metadata(address, origination_level)
         }
         _ => {
             // TODO: RV-110. Support all revelations in set_input method
@@ -379,16 +356,15 @@ pub fn octez_riscv_mut_set_input(state: Pointer<MutState>, input: Input) -> () {
 }
 
 #[ocaml::func]
-#[ocaml::sig("mut_state -> bytes")]
-pub fn octez_riscv_mut_state_hash(state: Pointer<MutState>) -> [u8; 32] {
-    state.apply_ro(|pvm| pvm.hash().into())
+#[ocaml::sig("state -> input -> state")]
+pub fn octez_riscv_set_input(state: Pointer<State>, input: Input) -> Pointer<State> {
+    apply_imm(state, |pvm| apply_set_input(pvm, input)).0
 }
 
 #[ocaml::func]
-#[ocaml::sig("mut_state -> string -> unit")]
-pub fn octez_riscv_mut_reveal_raw_data(_state: Pointer<MutState>, _data: &[u8]) -> () {
-    // TODO: RV-110. Support all revelations in set_input method
-    todo!()
+#[ocaml::sig("mut_state -> input -> unit")]
+pub fn octez_riscv_mut_set_input(state: Pointer<MutState>, input: Input) -> () {
+    apply_mut(state, |pvm| apply_set_input(pvm, input))
 }
 
 #[ocaml::func]
@@ -400,7 +376,7 @@ pub fn octez_riscv_get_message_counter(state: Pointer<State>) -> u64 {
 #[ocaml::func]
 #[ocaml::sig("mut_state -> int64")]
 pub fn octez_riscv_mut_get_message_counter(state: Pointer<MutState>) -> u64 {
-    state.apply_ro(|pvm| pvm.get_message_counter())
+    state.apply_ro(NodePvm::get_message_counter)
 }
 
 #[ocaml::func]
