@@ -23,7 +23,11 @@ let mapper =
       inherit Ppxlib.Ast_traverse.map as super
 
       method! expression e =
-        let detected_rewriters = Rewriter.extract_rewriters e.pexp_attributes in
+        let detected_rewriters =
+          (* The list of attributes is reverted to make sure that we preprocess
+             them from left to right *)
+          Rewriter.extract_rewriters (List.rev e.pexp_attributes)
+        in
         (* Remove the handled attributes that have been transformed in rewriters *)
         Expression.remove_attributes e
         (* Transform the expression with the help of the list of rewriters *)
