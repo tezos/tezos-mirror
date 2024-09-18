@@ -63,6 +63,12 @@ unsafe fn reveal_dal_page(
 ) -> i32 {
     let state = host.state.borrow();
     let params = state.get_dal_parameters();
+    // If the asked level is not old enough, the DAL slot
+    // cannot yet be attested. We return 0 in this case to
+    // mimic the host function.
+    if published_level as u64 + params.attestation_lag > host.level() as u64 {
+        return 0;
+    }
     let page_size = params.page_size as usize;
     let len = min(max_bytes, page_size);
     let start = ((page_index as u64) * params.page_size) as usize;
@@ -297,6 +303,8 @@ unsafe impl SmartRollupCore for MockHost {
 #[cfg(test)]
 mod tests {
 
+    use std::iter::repeat_with;
+
     use super::MockHost;
 
     use crate::state::HostState;
@@ -495,8 +503,15 @@ mod tests {
         let slot_index = 4;
         mock.set_dal_slot(published_level, slot_index, &data);
 
-        // Read the slot completely
         let dal_parameters = mock.reveal_dal_parameters();
+
+        // First bump the level by attestation_lag so that the slot is old enough to be attested
+        let attestation_lag = dal_parameters.attestation_lag as usize;
+        let () = repeat_with(|| mock.bump_level())
+            .take(attestation_lag + 1)
+            .collect();
+
+        // Read the slot completely
         let slot_size = dal_parameters.slot_size as usize;
         let page_size = dal_parameters.page_size as usize;
         let mut slot = vec![0; slot_size];
@@ -521,5 +536,86 @@ mod tests {
         assert_eq!(slot.len(), slot_size);
         assert_eq!(&data, data_in_slot);
         assert!(padding.iter().all(|b| *b == 0));
+    }
+
+    fn publish_and_fetch_slot(
+        mock: &mut MockHost,
+        published_level: i32,
+        page_buffer: &mut [u8],
+    ) -> usize {
+        let data = vec![b'v'; 100];
+        let slot_index = 4;
+        assert!(
+            published_level > 0,
+            "Cannot publish a slot at a negative level"
+        );
+        mock.set_dal_slot(published_level, slot_index, &data);
+
+        // The slot is in an attestable state, so we can read its content
+        mock.reveal_dal_page(published_level, slot_index, 0, page_buffer)
+            .expect("Reveal of attested slot shouldn't fail")
+    }
+
+    fn assert_unattestable_dal_slot(mock: &mut MockHost, published_level: i32) {
+        let dal_parameters = mock.reveal_dal_parameters();
+        let page_size = dal_parameters.page_size as usize;
+        let mut page_buffer = vec![0; page_size];
+        let page_len = publish_and_fetch_slot(mock, published_level, &mut page_buffer);
+
+        assert_eq!(page_len, 0);
+        assert!(page_buffer.iter().all(|b| *b == 0));
+    }
+
+    fn assert_attestable_dal_slot(mock: &mut MockHost, published_level: i32) {
+        let dal_parameters = mock.reveal_dal_parameters();
+        let page_size = dal_parameters.page_size as usize;
+        let mut page_buffer = vec![0; page_size];
+        let page_len = publish_and_fetch_slot(mock, published_level, &mut page_buffer);
+
+        assert_eq!(page_len, page_size);
+        assert!(page_buffer[..100].iter().all(|b| *b == b'v'));
+    }
+
+    fn bump_levels(mock: &mut MockHost, levels: u32) {
+        repeat_with(|| mock.bump_level())
+            .take(levels as usize)
+            .collect()
+    }
+
+    #[test]
+    fn unattestable_dal_slots_are_empty() {
+        let mut mock = MockHost::default();
+        // We'll use the same slot index and data all along the test, as they
+        // are not relevant..
+
+        let dal_parameters = mock.reveal_dal_parameters();
+        let attestation_lag = dal_parameters.attestation_lag as u32;
+
+        // Let's first test with a DAL slot published before the current level
+        // with the attestation lag exceeded.
+        let published_level = (mock.level() - attestation_lag) as i32;
+        assert_attestable_dal_slot(&mut mock, published_level);
+
+        // Then let's test with a DAL slot where the attestation lag hasn't been
+        // exceeded yet.
+        let published_level = (mock.level() - (attestation_lag - 1)) as i32;
+        assert_unattestable_dal_slot(&mut mock, published_level);
+
+        // Now, let's move forward to the level where it should be attestable
+        bump_levels(&mut mock, attestation_lag - 1);
+        assert_attestable_dal_slot(&mut mock, published_level);
+
+        // The DAL slot will now be published in the future
+        let published_level = (mock.level() + 1) as i32;
+        assert_unattestable_dal_slot(&mut mock, published_level);
+
+        // Now, let's move at the same level, it shouldn't be attestable
+        bump_levels(&mut mock, 1);
+        assert_unattestable_dal_slot(&mut mock, published_level);
+
+        // Finally, let's move forward of `attestation_lag` levels, the DAL slot
+        // should now be available
+        bump_levels(&mut mock, attestation_lag);
+        assert_attestable_dal_slot(&mut mock, published_level);
     }
 }
