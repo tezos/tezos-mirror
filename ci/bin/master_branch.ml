@@ -85,36 +85,23 @@ let jobs =
       ]
     |> enable_coverage_location |> enable_coverage_report
   in
-  let job_publish_documentation : tezos_job =
-    job
-      ~__POS__
-      ~name:"publish:documentation"
-      ~image:Images.CI.test
-      ~stage:Stages.doc
-      ~dependencies:(Dependent [])
-      ~before_script:
-        (before_script
-           ~eval_opam:true
-             (* Load the environment poetry previously created in the docker image.
-                Give access to the Python dependencies/executables. *)
-           ~init_python_venv:true
-           [
-             {|echo "${CI_PK_GITLAB_DOC}" > ~/.ssh/id_ed25519|};
-             {|echo "${CI_KH}" > ~/.ssh/known_hosts|};
-             {|chmod 400 ~/.ssh/id_ed25519|};
-           ])
-      ~interruptible:false
-        (* We publish documentation [Always] -- the job has no
-           dependencies and so [On_success] is actually equivalent to
-           [Always], but the latter is more explicit. *)
-      ~rules:
-        [
-          job_rule
-            ~changes:(Changeset.encode changeset_octez_docs)
-            ~when_:Always
-            ();
-        ]
-      ["./scripts/ci/doc_publish.sh"]
+  let jobs_documentation : tezos_job list =
+    let rules =
+      [job_rule ~changes:(Changeset.encode changeset_octez_docs) ()]
+    in
+    let dependencies = Dependent [] in
+    let job_odoc = Documentation.job_odoc ~rules ~dependencies () in
+    let job_manuals = Documentation.job_manuals ~rules ~dependencies () in
+    let job_docgen = Documentation.job_docgen ~rules ~dependencies () in
+    let job_build_all =
+      Documentation.job_build_all ~job_odoc ~job_manuals ~job_docgen ~rules ()
+    in
+    let job_publish_documentation : tezos_job =
+      Documentation.job_publish_documentation ~job_build_all ~rules ()
+    in
+    [
+      job_odoc; job_manuals; job_docgen; job_build_all; job_publish_documentation;
+    ]
   in
   (* Smart Rollup: Kernel SDK
 
@@ -152,10 +139,12 @@ let jobs =
     job_docker_arm64_experimental;
     (* Stage: test_coverage *)
     job_unified_coverage_default;
-    (* Stage: doc *)
-    job_publish_documentation |> enable_cargo_cache |> enable_sccache;
-    (* Stage: prepare_release *)
-    job_docker_merge_manifests;
-    (* Stage: manual *)
-    job_publish_kernel_sdk;
   ]
+  (* Stage: doc *)
+  @ jobs_documentation
+  @ [
+      (* Stage: prepare_release *)
+      job_docker_merge_manifests;
+      (* Stage: manual *)
+      job_publish_kernel_sdk;
+    ]
