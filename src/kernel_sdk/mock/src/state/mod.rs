@@ -161,6 +161,15 @@ impl HostState {
     ) -> Option<&Vec<u8>> {
         self.store.0.retrieve_dal_slot(published_level, slot_index)
     }
+
+    pub(crate) fn set_dal_slot(
+        &mut self,
+        published_level: i32,
+        slot_index: u8,
+        data: Vec<u8>,
+    ) {
+        self.store.0.set_dal_slot(published_level, slot_index, data)
+    }
 }
 
 #[cfg(test)]
@@ -581,5 +590,18 @@ mod tests {
             .handle_store_read(path.as_bytes(), 0, 4)
             .unwrap();
         assert_eq!(read_back, [4, 0, 0, 0]);
+    }
+
+    #[test]
+    fn set_and_get_dal_slot() {
+        let mut state = HostState::default();
+        let data = vec![b'z'; 512];
+        let published_level = 10;
+        let slot_index = 4;
+        state.set_dal_slot(published_level, slot_index, data.clone());
+        let data_in_slot = state
+            .get_dal_slot(published_level, slot_index)
+            .expect("Slot should contain data");
+        assert_eq!(&data, data_in_slot);
     }
 }

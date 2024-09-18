@@ -196,6 +196,10 @@ impl Store {
     ) -> Option<&Vec<u8>> {
         self.dal_slots.get(&(published_level, slot_index))
     }
+
+    pub fn set_dal_slot(&mut self, published_level: i32, slot_index: u8, data: Vec<u8>) {
+        self.dal_slots.insert((published_level, slot_index), data);
+    }
 }
 
 fn path_steps(path: &str) -> impl Iterator<Item = &'_ str> {
