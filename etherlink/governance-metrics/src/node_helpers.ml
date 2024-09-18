@@ -28,6 +28,14 @@ let level_encoding =
     (fun (level, ()) -> level)
     (merge_objs (obj1 (req "level" int31)) unit)
 
+type header = {level : int}
+
+let header_encoding =
+  conv
+    (fun _ -> failwith_unused_encoding ~__FUNCTION__)
+    (fun (level, ()) -> {level})
+    (merge_objs (obj1 (req "level" int31)) unit)
+
 type view_input = {
   contract : string;
   view : string;
@@ -63,6 +71,23 @@ let call_service ~base ?(media_types = Media_type.all_media_types) rpc b c input
     c
     input
 
+let make_streamed_call ~base rpc =
+  let open Lwt_result_syntax in
+  let stream, push = Lwt_stream.create () in
+  let on_chunk v = push (Some v) and on_close () = push None in
+  let* _spill_all =
+    Tezos_rpc_http_client_unix.RPC_client_unix.call_streamed_service
+      [Media_type.json]
+      ~base
+      rpc
+      ~on_chunk
+      ~on_close
+      ()
+      ()
+      ()
+  in
+  return stream
+
 module Path = struct
   open Path
 
@@ -77,6 +102,8 @@ module Path = struct
   let micheline_view = head / "helpers" / "scripts" / "run_script_view"
 
   let storage ~contract = head / "context" / "contracts" / contract / "storage"
+
+  let monitor_heads = root / "monitor" / "heads" / "main"
 end
 
 module Services = struct
@@ -108,9 +135,18 @@ module Services = struct
       ~query:Query.empty
       ~output:micheline_encoding
       Path.(storage ~contract)
+
+  let monitor_head =
+    Service.get_service
+      ~description:"Monitor streamed L1 blocks"
+      ~query:Tezos_rpc.Query.empty
+      ~output:header_encoding
+      Path.monitor_heads
 end
 
 module RPC = struct
+  exception Monitoring_heads_timed_out
+
   let chain_id base =
     let open Lwt_result_syntax in
     let*! answer = call_service ~base Services.chain_id () () () in
@@ -146,4 +182,21 @@ module RPC = struct
         let*? res = decode contract in
         return res
     | Error trace -> fail trace
+
+  let monitor_heads ~process base =
+    let open Lwt_result_syntax in
+    let timeout_monitor () =
+      let*! () = Lwt_unix.sleep 30. in
+      Lwt.fail Monitoring_heads_timed_out
+    in
+    let* stream = make_streamed_call ~base Services.monitor_head in
+    let rec read_stream stream =
+      let*! chunk = Lwt.pick [Lwt_stream.get stream; timeout_monitor ()] in
+      match chunk with
+      | None -> Lwt_result.return ()
+      | Some chunk ->
+          let* () = process chunk in
+          read_stream stream
+    in
+    read_stream stream
 end

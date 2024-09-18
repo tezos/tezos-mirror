@@ -5,6 +5,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type header = {level : int}
+
 module RPC : sig
   (** [chain_id base] returns the L1 chain identifier. *)
   val chain_id : Uri.t -> string tzresult Lwt.t
@@ -26,4 +28,9 @@ module RPC : sig
     decode:(Tezos_micheline.Micheline_parser.node -> 'a tzresult) ->
     Uri.t ->
     'a tzresult Lwt.t
+
+  (** [monitor_heads ~process base] will monitor each head (streamed chunk) and
+      apply [process] on the received chunk. *)
+  val monitor_heads :
+    process:(header -> unit tzresult Lwt.t) -> Uri.t -> unit tzresult Lwt.t
 end
