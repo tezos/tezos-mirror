@@ -28,8 +28,10 @@
     of being included in external reports or manipulated directly. *)
 val headless : Profiler.lod Profiler.driver
 
-(** Driver printing its report to a file whenever a toplevel section
-    ends. *)
+(** Driver printing its report in plain text to a file whenever a toplevel
+    section ends. *)
 val auto_write_to_txt_file : (string * Profiler.lod) Profiler.driver
 
+(** Driver printing its report in JSON to a file whenever a toplevel
+    section ends. *)
 val auto_write_to_json_file : (string * Profiler.lod) Profiler.driver
