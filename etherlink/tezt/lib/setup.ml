@@ -31,6 +31,7 @@ type sequencer_setup = {
   boot_sector : string;
   kernel : Uses.t;
   enable_dal : bool;
+  dal_slots : int list option;
 }
 
 let uses _protocol =
@@ -336,6 +337,7 @@ let setup_sequencer ?block_storage_sqlite3 ?sequencer_rpc_port
       boot_sector = output;
       kernel;
       enable_dal;
+      dal_slots;
     }
 
 (* Register a single variant of a test but for all protocols. *)
