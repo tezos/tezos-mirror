@@ -4,13 +4,27 @@
 
 ### Features
 
+### Bug fixes
+
+### Internals
+
+## Version 0.4 (2024-09-18)
+
+The main addition of this release is an initial support for the
+`go-ethereum`-specific “state overrides” feature. `eth_call` now supports
+overriding the balance, nonce, state (both with `state` and `stateDiff` keys)
+and code of arbitrary address. It also contains a number of bug fixes and
+miscellaneous improvements.
+
+### Features
+
 #### CLI
 
 - Support string interpolation in `--snapshot-file` (for command `snapshot
-  export`): `%r` will be replace by the short rollup address, `%R` by the full
+  export`): `%r` will be replaced by the short rollup address, `%R` by the full
   rollup address, and `%l` by the current level. (!14854 !14886)
 - Add a flag `--no-sync` to the observer command. If the flag is set, the observer
-  does not synchronise with the EVM node endpoint. (!14889)
+  does not synchronize with the EVM node endpoint. (!14889)
 
 #### RPCs
 
@@ -28,23 +42,26 @@
 - Fix `init from rollup node` command failing to store items of the delayed
   inbox in its local state when `--omit-delayed-tx-events` is not provided.
   (!14855)
-- Fix issue that prevented importing snapshot in an already populated data
-  dir. (!14856)
-- Fix issue that prevented exporting a compressed snapshot with a user provided
-  name. (!14856)
+- Fix the issue that prevented importing snapshot in an already populated data
+  directory. (!14856)
+- Fix the issue that prevented exporting a compressed snapshot with a user
+  provided name. (!14856)
 
 #### Metrics
 
 - Fix `octez_evm_node_level` and `octez_evm_node_confirmed_level` not being
   correctly initialized on startup. These values are now correctly set before
-  the RPC servers are started. (!)
+  the RPC servers are started. (!14956)
 
-#### Internals
+### Internals
 
-- Delayed transactions are now stored on applied blueprint, instead of internal
-  evm event. Otherwise it could result in incoherent blueprints. (!14878, !14927)
-- Nodes connected to an upstream EVM node wil now use the content-type
-  `octet-stream` (in place of JSON). (!14949)
+- Delayed transactions are systematically attached to the blueprint that
+  includes them, instead of the current head of the EVM node when they are
+  inserted in the delayed inbox. This prevents the propagation of inconsistent
+  blueprints when a sequencer does not include every item of the delayed inbox
+  at once. (!14878, !14927)
+- Nodes connected to an upstream EVM node will now use the content-type
+  `octet-stream` (instead of JSON). (!14949)
 
 ## Version 0.3 (2024-09-10)
 
