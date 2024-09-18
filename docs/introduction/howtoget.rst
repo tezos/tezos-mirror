@@ -191,7 +191,7 @@ For example using ``yum``::
 
 .. _using_docker_images:
 
-Using Docker Images And Docker-Compose
+Using Docker images and docker-compose
 --------------------------------------
 
 For every change committed in the GitLab repository, Docker images are
@@ -209,16 +209,16 @@ You can verify if the images are correctly signed using the Cosign utility, as e
 
 One way to run those Docker images is with `docker-compose <https://docs.docker.com/compose>`_.
 We provide ``docker-compose`` files for all active
-protocols. You can pick one and start with the following command (we'll assume alpha on this guide):
+protocols in directory :src:`scripts/docker`. You can pick one and start with the following command (where ``$PROTO`` is the protocol of your choice):
 
 ::
 
     cd scripts/docker
     export LIQUIDITY_BAKING_VOTE=pass # You can choose between 'on', 'pass' or 'off'.
-    docker-compose -f alpha.yml up
+    docker-compose -f $PROTO.yml up
 
 The above command will launch a node, a client, a baker, and an accuser for
-the Alpha protocol.
+the given protocol.
 
 You can open a new shell session and run ``docker ps`` in it, to display all the available containers, e.g.::
 
@@ -231,7 +231,7 @@ The node's RPC interface will be available on localhost and can be queried with 
 
 ::
 
-    docker exec node-alpha octez-client rpc list
+    docker exec octez-node-$PROTO octez-client rpc list
 
 Building Docker Images Locally
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -262,9 +262,9 @@ environment variables:
 - ``NODE_RPC_ADDR``: The RPC address **inside the container** the node binds to (defaults to ``[::]``).
 - ``PROTOCOL``: The protocol used.
 
-These variables can be set in the docker-compose file, as demonstrated in ``alpha.yml``::
+These variables can be set in the docker-compose file, as demonstrated in :src:`scripts/docker/alpha.yml`::
 
-    node:
+    octez-node:
       ...
       environment:
         PROTOCOL: alpha
@@ -276,8 +276,8 @@ If the above options are not enough, you can always replace the default ``entryp
 
     version: "3"
     services:
-      node:
-        container_name: node-alpha
+      octez-node:
+        container_name: octez-node-alpha
         entrypoint: /bin/sh
         command: /etc/my-init-script.sh
         volumes:
