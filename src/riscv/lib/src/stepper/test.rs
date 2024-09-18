@@ -13,10 +13,7 @@ use crate::{
     },
     machine_state::{mode, MachineError, MachineState, MachineStateLayout, StepManyResult},
     program::Program,
-    state_backend::{
-        memory_backend::{InMemoryBackend, SliceManager},
-        Backend, Layout,
-    },
+    state_backend::owned_backend::Owned,
     traps::EnvironException,
 };
 use derive_more::{Error, From};
@@ -78,42 +75,23 @@ pub type TestStepperLayout<ML = M1G, ICL = TestInstructionCacheLayout> =
     (PosixStateLayout, MachineStateLayout<ML, ICL>);
 
 pub struct TestStepper<
-    'a,
     ML: MainMemoryLayout = M1G,
     ICL: InstructionCacheLayout = TestInstructionCacheLayout,
 > {
-    machine_state: MachineState<ML, ICL, SliceManager<'a>>,
-    posix_state: PosixState<SliceManager<'a>>,
+    machine_state: MachineState<ML, ICL, Owned>,
+    posix_state: PosixState<Owned>,
 }
 
-impl<'a, ML: MainMemoryLayout> TestStepper<'a, ML> {
-    /// In order to create an [Interpreter], a memory backend must first be generated.
-    /// Currently, the size of the main memory to be allocated is fixed at 1GB.
-    pub fn create_backend() -> InMemoryBackend<TestStepperLayout<ML>> {
-        InMemoryBackend::<TestStepperLayout<ML>>::new().0
-    }
-
-    fn bind_states(backend: &'a mut InMemoryBackend<TestStepperLayout<ML>>) -> Self {
-        let placed = TestStepperLayout::<ML>::placed().into_location();
-        let (posix_space, machine_state_space) = backend.allocate(placed);
-        let posix_state = PosixState::bind(posix_space);
-        let machine_state = MachineState::bind(machine_state_space);
-        Self {
-            posix_state,
-            machine_state,
-        }
-    }
-
+impl<ML: MainMemoryLayout> TestStepper<ML> {
     /// Initialise an interpreter with a given [program], starting execution in [mode].
     /// An initial ramdisk can also optionally be passed.
     #[inline]
     pub fn new(
-        backend: &'a mut InMemoryBackend<TestStepperLayout<ML>>,
         program: &[u8],
         initrd: Option<&[u8]>,
         mode: mode::Mode,
     ) -> Result<Self, TestStepperError> {
-        Ok(Self::new_with_parsed_program(backend, program, initrd, mode)?.0)
+        Ok(Self::new_with_parsed_program(program, initrd, mode)?.0)
     }
 
     /// Initialise an interpreter with a given [program], starting execution in [mode].
@@ -121,12 +99,17 @@ impl<'a, ML: MainMemoryLayout> TestStepper<'a, ML> {
     /// and the fully parsed program.
     #[inline]
     pub fn new_with_parsed_program(
-        backend: &'a mut InMemoryBackend<TestStepperLayout<ML>>,
         program: &[u8],
         initrd: Option<&[u8]>,
         mode: mode::Mode,
     ) -> Result<(Self, BTreeMap<u64, String>), TestStepperError> {
-        let mut stepper = Self::bind_states(backend);
+        let (posix_space, machine_state_space) = Owned::allocate::<TestStepperLayout<ML>>();
+        let posix_state = PosixState::bind(posix_space);
+        let machine_state = MachineState::bind(machine_state_space);
+        let mut stepper = Self {
+            posix_state,
+            machine_state,
+        };
 
         // By default the Posix EE expects to exit in a specific privilege mode.
         stepper.posix_state.set_exit_mode(mode);
@@ -170,12 +153,12 @@ impl<'a, ML: MainMemoryLayout> TestStepper<'a, ML> {
     }
 }
 
-impl<'a, ML: MainMemoryLayout> Stepper for TestStepper<'a, ML, TestInstructionCacheLayout> {
+impl<ML: MainMemoryLayout> Stepper for TestStepper<ML, TestInstructionCacheLayout> {
     type MainMemoryLayout = ML;
 
     type InstructionCacheLayout = TestInstructionCacheLayout;
 
-    type Manager = SliceManager<'a>;
+    type Manager = Owned;
 
     #[inline(always)]
     fn machine_state(

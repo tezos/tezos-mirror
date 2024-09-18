@@ -157,16 +157,15 @@ pub struct DebuggerApp<'a, S: Stepper> {
     state: DebuggerState,
 }
 
-impl<'a, ML: MainMemoryLayout> DebuggerApp<'a, TestStepper<'a, ML>> {
+impl<'a, ML: MainMemoryLayout> DebuggerApp<'a, TestStepper<ML>> {
     pub fn launch(
         fname: &str,
         program: &[u8],
         initrd: Option<&[u8]>,
         exit_mode: Mode,
     ) -> Result<()> {
-        let mut backend = TestStepper::<'_, ML>::create_backend();
         let (mut interpreter, prog) =
-            TestStepper::new_with_parsed_program(&mut backend, program, initrd, exit_mode)?;
+            TestStepper::<ML>::new_with_parsed_program(program, initrd, exit_mode)?;
         let symbols = kernel_loader::get_elf_symbols::<ML>(program)?;
         errors::install_hooks()?;
         let terminal = tui::init()?;

@@ -39,14 +39,12 @@ fn debug_test(
     initrd: Option<&[u8]>,
     opts: &DebugOptions,
 ) -> Result<(), Box<dyn Error>> {
-    Ok(
-        debugger_app::DebuggerApp::<'_, TestStepper<'_, M1G>>::launch(
-            fname,
-            program,
-            initrd,
-            posix_exit_mode(&opts.common.posix_exit_mode),
-        )?,
-    )
+    Ok(debugger_app::DebuggerApp::<'_, TestStepper<M1G>>::launch(
+        fname,
+        program,
+        initrd,
+        posix_exit_mode(&opts.common.posix_exit_mode),
+    )?)
 }
 
 fn debug_pvm(
