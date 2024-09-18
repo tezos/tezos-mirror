@@ -5437,6 +5437,7 @@ end = struct
             ("test_percentage", N.(number >= 019));
             ("test_full_staking_balance_repr", N.(number >= 019));
             ("test_slashing_percentage", N.(number >= 019));
+            ("test_staking_operations", N.(number >= 021));
           ]
           |> conditional_list
         in
