@@ -1640,8 +1640,14 @@ let init_observer cloud configuration ~bootstrap teztale ~slot_index i agent =
 
 let init_etherlink_dal_node ~bootstrap ~next_agent ~name ~dal_slots ~network =
   match dal_slots with
-  | [] -> none
+  | [] ->
+      toplog "Etherlink will run without DAL support" ;
+      none
   | [_] ->
+      (* On a single DAL slot index, we launch a single DAL node for
+         this index on a dedicated VM and give it directly as endpoint
+         to the rollup node. *)
+      toplog "Etherlink sequencer will run its own DAL node" ;
       let name = Format.asprintf "etherlink-%s-dal-operator" name in
       let* agent = next_agent ~name in
       let* node =
@@ -1663,6 +1669,19 @@ let init_etherlink_dal_node ~bootstrap ~next_agent ~name ~dal_slots ~network =
       let* () = Dal_node.run dal_node in
       some dal_node
   | _ :: _ :: _ ->
+      (* On several slot indices, we launch one observer DAL node per
+         slot index + an operator DAL node on no index + a reverse proxy
+         which is passed as endpoint to the rollup node.  The operator
+         DAL node runs on the same VM than the reverse proxy, the
+         observer DAL nodes run on dedicated VMs. *)
+      toplog
+        "Etherlink will run with DAL support on indices %a"
+        (Format.pp_print_list
+           ~pp_sep:(fun out () -> Format.fprintf out ",")
+           Format.pp_print_int)
+        dal_slots ;
+      toplog "Etherlink sequencer will use a reverse proxy" ;
+
       let name = Format.asprintf "etherlink-%s-dal-operator" name in
       let* agent = next_agent ~name in
       let* node =
