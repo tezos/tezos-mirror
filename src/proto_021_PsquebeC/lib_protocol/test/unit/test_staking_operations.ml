@@ -230,3 +230,96 @@ let () =
     ~title:"fees with low spendable balance and non-zero staked (self delegate)"
   @@ fun () ->
   fee_low_spendable_balance_non_zero_staked ~self_delegate_staker:true
+
+(* low balance for fees with non-zero unfinalizable unstake *)
+(* non-zero unfinalizable unstake ==> unstaked_frozen <> zero *)
+let fee_low_spendable_balance_non_zero_unfinalizable_unstake
+    ~self_delegate_staker =
+  let open Lwt_result_syntax in
+  let amount = Tez_helpers.of_int 10_000 in
+  let* b, _delegate, staker =
+    create_delegate_and_staker ~self_delegate_staker ~amount ()
+  in
+  let* () = check_balances b ~staker ~spendable:amount ~staked:Tez.zero () in
+
+  let fee = Tez_helpers.of_int 5 in
+  let amount_minus_fee = Tez_helpers.(amount -! fee) in
+  let* stake =
+    Op.transaction
+      ~entrypoint:Protocol.Alpha_context.Entrypoint.stake
+      ~fee:Tez.zero
+      (B b)
+      staker
+      staker
+      amount_minus_fee
+  in
+  let* b = Block.bake ~operation:stake b in
+  let* () =
+    check_balances b ~staker ~spendable:fee ~staked:amount_minus_fee ()
+  in
+
+  let* unstake =
+    Op.transaction
+      ~entrypoint:Protocol.Alpha_context.Entrypoint.unstake
+      ~fee:Tez.zero
+      (B b)
+      staker
+      staker
+      amount_minus_fee
+  in
+  let* b = Block.bake ~operation:unstake b in
+  let* () =
+    check_balances
+      b
+      ~staker
+      ~spendable:fee
+      ~staked:Tez.zero
+      ~unstaked_frozen:amount_minus_fee
+      ()
+  in
+
+  let* finalize =
+    Op.transaction
+      ~entrypoint:Protocol.Alpha_context.Entrypoint.finalize_unstake
+      ~fee
+      (B b)
+      staker
+      staker
+      Tez_helpers.zero
+  in
+  if self_delegate_staker then
+    let* b = Block.bake ~operation:finalize b in
+    let* () =
+      check_balances
+        b
+        ~staker
+        ~spendable:Tez.zero
+        ~staked:Tez.zero
+        ~unstaked_frozen:amount_minus_fee
+        ()
+    in
+    return_unit
+  else
+    let*! b = Block.bake ~operation:finalize b in
+    Assert.proto_error ~loc:__LOC__ b (function
+        | Protocol.Contract_storage.Empty_implicit_delegated_contract c ->
+            Signature.Public_key_hash.(c = Account.pkh_of_contract_exn staker)
+        | _ -> false)
+
+let () =
+  register_test
+    ~title:
+      "fees with low spendable balance and non-zero unfinalizable unstake \
+       (external staker)"
+  @@ fun () ->
+  fee_low_spendable_balance_non_zero_unfinalizable_unstake
+    ~self_delegate_staker:false
+
+let () =
+  register_test
+    ~title:
+      "fees with low spendable balance and non-zero unfinalizable unstake \
+       (self delegate)"
+  @@ fun () ->
+  fee_low_spendable_balance_non_zero_unfinalizable_unstake
+    ~self_delegate_staker:true
