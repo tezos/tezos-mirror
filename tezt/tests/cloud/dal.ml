@@ -1641,7 +1641,28 @@ let init_observer cloud configuration ~bootstrap teztale ~slot_index i agent =
 let init_etherlink_dal_node ~bootstrap ~next_agent ~name ~dal_slots ~network =
   match dal_slots with
   | [] -> none
-  | dal_slots ->
+  | [_] ->
+      let name = Format.asprintf "etherlink-%s-dal-operator" name in
+      let* agent = next_agent ~name in
+      let* node =
+        Node.init
+          ~name
+          ~arguments:
+            [Peer bootstrap.node_p2p_endpoint; History_mode (Rolling (Some 79))]
+          network
+          agent
+      in
+      let* dal_node = Dal_node.Agent.create ~name ~node agent in
+      let* () =
+        Dal_node.init_config
+          ~expected_pow:(Network.expected_pow Cli.network)
+          ~producer_profiles:dal_slots
+          ~peers:[bootstrap.dal_node_p2p_endpoint]
+          dal_node
+      in
+      let* () = Dal_node.run dal_node in
+      some dal_node
+  | _ :: _ :: _ ->
       let name = Format.asprintf "etherlink-%s-dal-operator" name in
       let* agent = next_agent ~name in
       let* node =
