@@ -40,7 +40,7 @@ transaction and produce the zero-knowledge proofs, which are
 computationally too intensive for an embedded device.
 
 More details can be found in the `specification document
-<https://github.com/zcash/zips/blob/main/protocol/sapling.pdf>`_.
+<https://zips.z.cash/protocol/protocol.pdf>`_.
 
 Shielded transactions
 ~~~~~~~~~~~~~~~~~~~~~
@@ -358,7 +358,7 @@ It can be generated from a mnemonic using `BIP39
 that it can be recovered in case of loss using the mnemonic.
 Alternatively it is possible to derive new keys from existing ones
 using `ZIP32
-<https://github.com/zcash/zips/blob/main/zip-0032.rst>`_, a Sapling
+<https://github.com/zcash/zips/blob/main/zips/zip-0032.rst>`_, a Sapling
 variant of `BIP32
 <https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki>`_ for
 hierarchical deterministic wallets. As usual, in this case it is
