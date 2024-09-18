@@ -13,31 +13,30 @@ mkdir -p /run/octez-baker
 case "${1}" in
 configure)
   # if $2 is empty, then we're doing a fresh install.
-  # Ohtwerwise we're upgrading
-  if [ -z "${2:-}" ]; then
-    echo "Fresh installation of the Octez baker"
+  # if $DPKG_RUNNING_VERSION" is empty a reconfigure
+  # Otherwise we're upgrading
+  if [ -z "${2:-}" ] || [ -z "$DPKG_RUNNING_VERSION" ]; then
+    echo "Fresh installation (or reconfigure) of the Octez baker"
 
     db_get octez-baker/liquidity-vote
-    echo "LQVOTE=${RET}"
     echo "LQVOTE=${RET}" > /etc/default/octez-baker-active
     echo "LQVOTE=${RET}" > /etc/default/octez-baker-next
 
     db_get octez-baker/baker-key
-    echo "BAKER_KEY=${RET}"
     echo "BAKER_KEY=${RET}" >> /etc/default/octez-baker-active
     echo "BAKER_KEY=${RET}" >> /etc/default/octez-baker-next
 
     db_get octez-baker/baker-active-protocol
-    echo "Active PROTOCOL=${RET}"
     echo "PROTOCOL=${RET}" >> /etc/default/octez-baker-active
 
     db_get octez-baker/baker-next-protocol
     if [ -n "${RET:-}" ]; then
-      echo "Next PROTOCOL=${RET}"
       echo "PROTOCOL=${RET}" >> /etc/default/octez-baker-next
     else
       echo "#PROTOCOL=${RET}" >> /etc/default/octez-baker-next
     fi
+    mkdir -p /var/tezos/.tezos-client
+    chown tezos:tezos /var/tezos/.tezos-client
   else
     # the configure script is called with the version of the old
     # package in case of upgrade. We display a message to the user
@@ -48,12 +47,10 @@ configure)
       echo "Setting defaults /etc/default/octez-baker-*"
 
       db_get octez-baker/liquidity-vote
-      echo "LQVOTE=${RET}"
       echo "LQVOTE=${RET}" > /etc/default/octez-baker-active
       echo "LQVOTE=${RET}" > /etc/default/octez-baker-next
 
       db_get octez-baker/baker-key
-      echo "BAKER_KEY=${RET}"
       echo "BAKER_KEY=${RET}" >> /etc/default/octez-baker-active
       echo "BAKER_KEY=${RET}" >> /etc/default/octez-baker-next
 

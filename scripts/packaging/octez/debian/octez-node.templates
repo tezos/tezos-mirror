@@ -1,28 +1,61 @@
 Template: octez-node/history-mode
-Description: The type of node you wish to install:
- - Full (default mode with 1 additional cycle). The node stores the minimal data
-   since the genesis required to reconstruct (or ‘replay’) the complete chain’s
-   ledger state.
+Description: Select a mode for the node:
+ The node can run in the following history modes:
  .
- - Archive: This is the heaviest mode as it keeps the whole chain data to be able
-   to query any information stored on the chain since the genesis.
-   It is particularly suitable for indexers or block explorers.
+ Rolling: Store only a rolling fragment of blockchain data so the node can
+ validate new blocks and stay in sync with the blockchain head. This mode
+ initializes the fastest and requires the least disk space.
  .
- - Rolling: This is the lightest mode as it only maintains a minimal rolling
-   fragment of the chain data so the node can still validate new blocks and
-   synchronize with the head.
+ Full (default): Store the minimum data to reconstruct the current state of the
+ blockchain's ledger plus the full data for one previous cycle. This mode is
+ appropriate for most uses including bakers and dApp developers who need a
+ private node.
  .
- Source: https://tezos.gitlab.io/user/history_modes.html
-Type: string
-Default: full
+ Archive: Store the data from every block since genesis. This mode is
+ appropriate to support tools that need historical data, such as indexers and
+ block explorers. This mode requires the most disk space.
+ .
+ Documentation: https://tezos.gitlab.io/user/history_modes.html
+Type: select
+Choices: rolling, full, archive
 
 Template: octez-node/network
-Description: The network you want to connect:
- - mainnet
- - testnet
- - ghostnet
-Type: string
-Default: mainnet
+Description: Select a network:
+ The node can connect to the following networks:
+ .
+ Mainnet: The primary Tezos network where real transactions run and contracts run
+ with real value.
+ .
+ Ghostnet: A long-running test network that upgrades to the next version of the
+ Tezos protocol before Mainnet; bakers and developers use it for staging and
+ testing upgrades.
+ .
+ Other testnets are available, but to use them you must configure the node
+ manually. For a complete list, see https://teztnets.com.
+ .
+ Documentation: https://tezos.gitlab.io/user/multinetwork.html
+Type: select
+Choices: mainnet, ghostnet
+
+Template: octez-node/snapshot_warning
+Type: note
+Description: Important: Download and import a snapshot before starting the node
+ Before starting the node, you must import a recent snapshot of the current
+ blockchain state. If you start the node without importing a snapshot, it must
+ process every block since the blockchain genesis, which takes a very long
+ time.
+ .
+ You can download the latest snapshot from a trusted source (some suggestions in
+ snapshots doc linked below) and import it using the following command:
+   sudo su tezos -c "octez-node snapshot import <snapshot_file>"
+ .
+ After importing the snapshot, you can start the node using the following
+ command:
+   sudo systemctl start octez-node
+ .
+ - https://tezos.gitlab.io/user/snapshots.html
+ .
+ - https://tezos.gitlab.io/introduction/services.html
 
 Template: octez-node/purge_warning
 Description: Do you really want to remove all data:
@@ -32,14 +65,21 @@ Description: Do you really want to remove all data:
  packages will be removed.
  .
  Enter "yes" to confirm.
-Type: string
-Default: no
+Type: select
+Choices: no, yes
 
 Template: octez-node/configure
 Description: Skipping node init:
- Enter "yes" to skip.
-Type: string
-Default: no
+ If you skip the node initialization, you will need to configure the node
+ manually before starting the service. No default configuration will be
+ performed.
+ .
+ For example using the command:
+    sudo su tezos -c "octez-node config init ..."
+ .
+ And setting the desidered storage mode and network.
+Type: select
+Choices: no, yes
 
 Template: octez-node/upgrade_note_current
 Type: note
