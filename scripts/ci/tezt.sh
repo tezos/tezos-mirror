@@ -21,4 +21,16 @@ if [ $TEZT_EXIT_CODE -eq 3 ]; then
   exit 0
 fi
 
+if [ -n "$DATADOG_API_KEY" ]; then
+  if [ -f "$JUNIT" ]; then
+    echo "Uploading JUNIT=$JUNIT to Datadog..."
+    DD_ENV=ci DATADOG_SITE=datadoghq.eu datadog-ci junit upload --service octez "$JUNIT"
+    echo "datadog-cli exit code: $?"
+  else
+    echo "JUNIT=$JUNIT does not exist, will not try to send it to Datadog."
+  fi
+else
+  echo "DATADOG_API_KEY is not set, will not try to send JUNIT=$JUNIT."
+fi
+
 exit "$TEZT_EXIT_CODE"
