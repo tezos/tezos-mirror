@@ -34,6 +34,8 @@ Beta and Testnet, and allows users to deposit and withdraw FA 2.1 tokens.
   benefits from the same implementation to read/write primitives. (!14735)
 - Adds a storage for account's code. Code are referenced by their code
   hash. (!14369)
+- Enable LTO (Link Time Optimization) during compilation to reduce tick consumption
+  and improve execution speed. (!14933)
 
 ### Bug fixes
 

@@ -278,6 +278,7 @@ impl InputHandler for ProxyInput {
         Ok(())
     }
 
+    #[cfg_attr(feature = "benchmark", inline(never))]
     fn handle_fa_deposit<Host: Runtime>(
         host: &mut Host,
         fa_deposit: FaDeposit,
@@ -379,6 +380,7 @@ impl InputHandler for SequencerInput {
         delayed_inbox.save_transaction(host, tx, previous_timestamp, level)
     }
 
+    #[cfg_attr(feature = "benchmark", inline(never))]
     fn handle_fa_deposit<Host: Runtime>(
         host: &mut Host,
         fa_deposit: FaDeposit,
@@ -456,6 +458,7 @@ fn handle_deposit<Host: Runtime>(
     })
 }
 
+#[cfg_attr(feature = "benchmark", inline(never))]
 fn handle_fa_deposit<Host: Runtime>(
     host: &mut Host,
     fa_deposit: FaDeposit,

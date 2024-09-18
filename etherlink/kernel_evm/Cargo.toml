@@ -92,3 +92,8 @@ alloy-sol-types = { version = "0.7.6", default-features = false, features = [
   "json",
 ] }
 alloy-primitives = { version = "0.7.6", default-features = false }
+
+[profile.release]
+# Will apply heavy LTO which attempts to perform optimizations across all crates
+# within the dependency graph.
+lto = true

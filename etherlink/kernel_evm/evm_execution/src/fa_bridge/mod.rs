@@ -120,6 +120,7 @@ macro_rules! create_outcome_error {
 /// other contract. Therefore we assume there is no open
 /// account storage transaction, and we can open one.
 #[allow(clippy::too_many_arguments)]
+#[cfg_attr(feature = "benchmark", inline(never))]
 pub fn execute_fa_deposit<'a, Host: Runtime>(
     host: &'a mut Host,
     block: &'a BlockConstants,
