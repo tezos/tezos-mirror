@@ -2232,6 +2232,7 @@ dependencies = [
  "paste",
  "rustc_apfloat",
  "serde",
+ "serde_json",
  "sha2 0.10.8",
  "strum 0.26.2",
  "tezos-smart-rollup-constants",

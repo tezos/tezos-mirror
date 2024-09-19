@@ -175,6 +175,13 @@ impl ManagerSerialise for Owned {
         region: &Self::Region<E, LEN>,
         serializer: S,
     ) -> Result<S::Ok, S::Error> {
+        // A special encoding for single-element regions helps clean up encoding for serialisation
+        // formats that contain structures. For example, JSON, where single-element regions would
+        // be represented as array singletons.
+        if LEN == 1 {
+            return region[0].serialize(serializer);
+        }
+
         // We're serialising this as a fixed-sized tuple because otherwise `bincode` would prefix
         // the length of this array, which is not needed.
         let mut serializer = serializer.serialize_tuple(LEN)?;
@@ -203,6 +210,18 @@ impl ManagerDeserialise for Owned {
     >(
         deserializer: D,
     ) -> Result<Self::Region<E, LEN>, D::Error> {
+        // A special encoding for single-element regions helps clean up encoding for serialisation
+        // formats that contain structures. For example, JSON, where single-element regions would
+        // be represented as array singletons.
+        if LEN == 1 {
+            let values = unsafe {
+                let mut values: [MaybeUninit<E>; LEN] = mem::zeroed();
+                values[0].write(E::deserialize(deserializer)?);
+                values.map(|value| value.assume_init())
+            };
+            return Ok(values);
+        }
+
         struct Inner<E, const LEN: usize>(PhantomData<E>);
 
         impl<'de, E: serde::Deserialize<'de> + Sized, const LEN: usize> serde::de::Visitor<'de>
@@ -340,5 +359,15 @@ pub mod test_helpers {
             let bytes_after = bincode::serialize(&cells_after).unwrap();
             assert_eq!(bytes, bytes_after);
         });
+    }
+
+    /// Ensure that [`Cell`] serialises in a way that represents the underlying element
+    /// directly instead of wrapping it into an array (as it is an array under the hood).
+    #[test]
+    fn cell_direct_serialise() {
+        let cell: Cell<u64, Owned> = Cell::bind([42]);
+        let json_value = serde_json::to_value(cell).unwrap();
+        let expected_json_value = serde_json::json!(42);
+        assert_eq!(json_value, expected_json_value);
     }
 }
