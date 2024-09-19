@@ -15,6 +15,7 @@ type tx =
       arguments : string list;
       address : string;
     }
+  | Create of {data : string}
 
 let spawn arguments = Process.spawn "cast" arguments
 
@@ -31,6 +32,7 @@ let cast_transaction ?expect_failure ~source_private_key ?endpoint ?chain_id
     match tx with
     | CallTo {signature; arguments; address} ->
         address :: (Option.to_list signature @ arguments)
+    | Create {data} -> ["--create"; data]
   in
   let options =
     ["--private-key"; source_private_key]
@@ -56,6 +58,23 @@ let craft_tx ~source_private_key ~chain_id ~nonce ~value ~gas ~gas_price
       ~chain_id
       ~nonce
       ~value
+      ~gas
+      ~gas_price
+      ?priority_fee
+      tx
+  in
+  return (String.sub encoded_tx 2 (String.length encoded_tx - 2))
+
+let craft_deploy_tx ~source_private_key ~chain_id ~nonce ?value ~gas ~gas_price
+    ?(legacy = true) ~data () =
+  let priority_fee = if legacy then None else Some 1 in
+  let tx = Create {data} in
+  let* encoded_tx =
+    cast_transaction
+      ~source_private_key
+      ~chain_id
+      ~nonce
+      ?value
       ~gas
       ~gas_price
       ?priority_fee
