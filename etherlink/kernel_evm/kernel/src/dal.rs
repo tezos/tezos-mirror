@@ -285,6 +285,45 @@ pub mod tests {
         host.host.set_dal_slot(published_level, slot_index, &slot)
     }
 
+    #[derive(PartialEq)]
+    enum InsertAt {
+        Start,
+        End,
+        AfterChunk(u16),
+    }
+
+    fn prepare_invalid_dal_slot(
+        host: &mut MockKernelHost,
+        chunks: &[UnsignedSequencerBlueprint],
+        published_level: i32,
+        slot_index: u8,
+        invalid_data: &[u8],
+        insert_at: InsertAt,
+    ) {
+        let mut slot =
+            Vec::with_capacity((MAX_CHUNK_SIZE + 1) * chunks.len() + invalid_data.len());
+
+        if insert_at == InsertAt::Start {
+            slot.extend_from_slice(invalid_data);
+        }
+
+        for chunk in chunks {
+            let bytes = chunk.rlp_bytes();
+            slot.push(DAL_BLUEPRINT_INPUT_TAG);
+            slot.extend_from_slice(&bytes);
+
+            if insert_at == InsertAt::AfterChunk(chunk.chunk_index) {
+                slot.extend_from_slice(invalid_data);
+            }
+        }
+
+        if insert_at == InsertAt::End {
+            slot.extend_from_slice(invalid_data);
+        }
+
+        host.host.set_dal_slot(published_level, slot_index, &slot)
+    }
+
     #[test]
     fn test_parse_regular_slot() {
         let mut host = MockKernelHost::default();
@@ -309,5 +348,124 @@ pub mod tests {
         );
 
         assert_eq!(Some(chunks), chunks_from_slot)
+    }
+
+    fn make_invalid_slot(
+        invalid_data: &[u8],
+        insert_at: InsertAt,
+    ) -> (
+        Vec<UnsignedSequencerBlueprint>,
+        Option<Vec<UnsignedSequencerBlueprint>>,
+    ) {
+        let mut host = MockKernelHost::default();
+
+        let blueprint = dummy_big_blueprint(100);
+        let chunks = chunk_blueprint(blueprint);
+
+        assert!(
+            chunks.len() >= 2,
+            "Blueprint is composed of {} chunks, but at least two are required for the test to make sense",
+            chunks.len()
+        );
+
+        let dal_parameters = host.reveal_dal_parameters();
+        let published_level = host.host.level() - (dal_parameters.attestation_lag as u32);
+        prepare_invalid_dal_slot(
+            &mut host,
+            &chunks,
+            published_level as i32,
+            0,
+            invalid_data,
+            insert_at,
+        );
+
+        let chunks_from_slot = fetch_and_parse_sequencer_blueprint_from_dal(
+            &mut host,
+            &dal_parameters,
+            0,
+            published_level,
+        );
+
+        (chunks, chunks_from_slot)
+    }
+
+    #[test]
+    fn test_parse_slot_with_invalid_last_data() {
+        let invalid_data = vec![2; 10];
+        let (chunks, parsed_chunks) = make_invalid_slot(&invalid_data, InsertAt::End);
+
+        assert_eq!(Some(chunks), parsed_chunks)
+    }
+
+    #[test]
+    fn test_parse_slot_with_invalid_last_chunk() {
+        // The tag announces a chunk, the data is not an RLP encoded chunk
+        let mut invalid_data = vec![DAL_BLUEPRINT_INPUT_TAG];
+        invalid_data.extend_from_slice(dummy_transaction(0).rlp_bytes().as_ref());
+        let (chunks, parsed_chunks) = make_invalid_slot(&invalid_data, InsertAt::End);
+
+        assert_eq!(Some(chunks), parsed_chunks)
+    }
+
+    #[test]
+    fn test_parse_slot_with_invalid_first_data() {
+        let invalid_data = vec![2; 10];
+        let (_chunks, parsed_chunks) = make_invalid_slot(&invalid_data, InsertAt::Start);
+
+        assert_eq!(Some(vec![]), parsed_chunks)
+    }
+
+    #[test]
+    fn test_parse_slot_with_invalid_first_chunk() {
+        // The tag announces a chunk, the data is not an RLP encoded chunk
+        let mut invalid_data = vec![DAL_BLUEPRINT_INPUT_TAG];
+        invalid_data.extend_from_slice(dummy_transaction(0).rlp_bytes().as_ref());
+        let (_chunks, parsed_chunks) = make_invalid_slot(&invalid_data, InsertAt::Start);
+
+        assert_eq!(Some(vec![]), parsed_chunks)
+    }
+
+    #[test]
+    fn test_parse_slot_with_padding_at_start() {
+        // The first byte being 0, the slot is parsed as padding
+        let mut invalid_data = vec![0; 1];
+        invalid_data.extend_from_slice(dummy_transaction(0).rlp_bytes().as_ref());
+        let (_chunks, parsed_chunks) = make_invalid_slot(&invalid_data, InsertAt::Start);
+
+        assert_eq!(Some(vec![]), parsed_chunks)
+    }
+
+    #[test]
+    fn test_parse_slot_with_invalid_data_after_first_chunk() {
+        let invalid_data = vec![2; 10];
+        let (chunks, parsed_chunks) =
+            make_invalid_slot(&invalid_data, InsertAt::AfterChunk(0));
+
+        let expected_chunks = vec![chunks[0].clone()];
+        assert_eq!(Some(expected_chunks), parsed_chunks)
+    }
+
+    #[test]
+    fn test_parse_slot_with_invalid_chunk_after_first_chunk() {
+        // The tag announces a chunk, the data is not an RLP encoded chunk
+        let mut invalid_data = vec![DAL_BLUEPRINT_INPUT_TAG];
+        invalid_data.extend_from_slice(dummy_transaction(0).rlp_bytes().as_ref());
+        let (chunks, parsed_chunks) =
+            make_invalid_slot(&invalid_data, InsertAt::AfterChunk(0));
+
+        let expected_chunks = vec![chunks[0].clone()];
+        assert_eq!(Some(expected_chunks), parsed_chunks)
+    }
+
+    #[test]
+    fn test_parse_slot_with_padding_after_first_chunk() {
+        // The first byte being 0, the slot is parsed as padding
+        let mut invalid_data = vec![0; 1];
+        invalid_data.extend_from_slice(dummy_transaction(0).rlp_bytes().as_ref());
+        let (chunks, parsed_chunks) =
+            make_invalid_slot(&invalid_data, InsertAt::AfterChunk(0));
+
+        let expected_chunks = vec![chunks[0].clone()];
+        assert_eq!(Some(expected_chunks), parsed_chunks)
     }
 }
