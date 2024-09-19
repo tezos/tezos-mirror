@@ -10,7 +10,7 @@
 )))]
 
 use quanta::Instant;
-use serde::Serialize;
+use serde::{ser::SerializeStruct, Serialize};
 use std::io::{StdoutLock, Write};
 use std::time::Duration;
 
@@ -35,7 +35,7 @@ impl<'a> Console<'a> {
             lock: std::io::stdout().lock(),
             options: ConsoleOptions::Timing {
                 line: LogLine {
-                    message: String::new(),
+                    message: Vec::new(),
                     elapsed: Duration::ZERO,
                 },
                 start: Instant::now(),
@@ -61,7 +61,7 @@ impl Write for Console<'_> {
                         self.lock.write_all(&[b'\n'])?;
                         line.message.truncate(0);
                     } else {
-                        line.message.push((*c).into());
+                        line.message.push(*c);
                     }
                     written += 1;
                 }
@@ -92,8 +92,23 @@ enum ConsoleOptions {
     Timing { line: LogLine, start: Instant },
 }
 
-#[derive(Serialize)]
 struct LogLine {
     elapsed: Duration,
-    message: String,
+    message: Vec<u8>,
+}
+
+impl Serialize for LogLine {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut serializer = serializer.serialize_struct("LogLine", 2)?;
+
+        serializer.serialize_field("elapsed", &self.elapsed)?;
+
+        let message = String::from_utf8_lossy(&self.message);
+        serializer.serialize_field("message", message.as_ref())?;
+
+        serializer.end()
+    }
 }

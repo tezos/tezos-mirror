@@ -231,8 +231,8 @@ enum LogType {
 }
 
 const SOL: &str = "Message: Internal(StartOfLevel)";
-const DEPLOY: &str = "[ð\u{9f}\u{93}\u{9c}] Smart function deployed";
-const SUCCESS: &str = "ð\u{9f}\u{9a}\u{80} Smart function executed successfully";
+const DEPLOY: &str = "[📜] Smart function deployed";
+const SUCCESS: &str = "🚀 Smart function executed successfully";
 const EOL: &str = "Internal message: end of level";
 const LOG: &str = "[JSTZ:SMART_FUNCTION:LOG]";
 
