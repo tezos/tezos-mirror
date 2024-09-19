@@ -47,7 +47,35 @@ val craft_tx :
   unit ->
   string Lwt.t
 
-(** Wallet is a struct containing private key and Ethereum address 
+(** [craft_deploy_tx ~source_private_key ~chain_id ~nonce ~value ~gas
+    ~gas_price ?legacy ~data ()]
+    crafts and signs a transaction from [source_private_key] that create a
+    contract with bytecode [data].
+    Returns the rlp-encoded transaction. If [legacy] is false the transaction
+    will be an eip1559 transaction.     example:
+    [craft_deploy_tx
+      ~source_private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~value:Wei.zero
+      ~gas:25_000
+      ~gas_price:1_000_000
+      ~legacy:false
+      ~data:"0xaa...aa"
+      ()] *)
+val craft_deploy_tx :
+  source_private_key:string ->
+  chain_id:int ->
+  nonce:int ->
+  ?value:Wei.t ->
+  gas:int ->
+  gas_price:int ->
+  ?legacy:bool ->
+  data:string ->
+  unit ->
+  string Lwt.t
+
+(** Wallet is a struct containing private key and Ethereum address
     derived from it (NOTE that public key is not included). *)
 type wallet = {address : string; private_key : string}
 

@@ -5027,6 +5027,63 @@ let test_trace_transaction_call_trace =
       ~error_msg:"Wrong gas, expected %R but got %L") ;
   unit
 
+let test_trace_transaction_calltracer_failed_create =
+  register_all
+    ~kernels:[Latest]
+    ~tags:["evm"; "rpc"; "trace"; "call_trace"; "fail"]
+    ~title:
+      "debug_traceTransaction with calltracer returns an error when contract \
+       creation reverts but is included"
+    ~da_fee:Wei.zero
+    ~time_between_blocks:Nothing
+  @@ fun {sequencer; _} _protocol ->
+  let endpoint = Evm_node.endpoint sequencer in
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let* call_types = Solidity_contracts.call_types () in
+  let* () = Eth_cli.add_abi ~label:call_types.label ~abi:call_types.abi () in
+  let* _contract_address, create_tx =
+    send_transaction_to_sequencer
+      (fun () ->
+        Eth_cli.deploy
+          ~source_private_key:sender.Eth_account.private_key
+          ~endpoint
+          ~abi:call_types.label
+          ~bin:call_types.bin)
+      sequencer
+  in
+  let* _ = produce_block sequencer in
+  let*@! {Transaction.gas; _} =
+    Rpc.get_transaction_by_hash ~transaction_hash:create_tx sequencer
+  in
+  let gas = Int64.to_int gas in
+  let not_enough_gas = gas - (gas / 10) in
+  let data = read_file call_types.bin in
+  let* raw_tx =
+    Cast.craft_deploy_tx
+      ~chain_id:1337
+      ~gas_price:1_000_000_000
+      ~nonce:1
+      ~source_private_key:sender.Eth_account.private_key
+      ~gas:not_enough_gas
+      ~data
+      ()
+  in
+  let*@ tx_hash = Rpc.send_raw_transaction ~raw_tx sequencer in
+  let*@ size = produce_block sequencer in
+  Check.((size = 1) int)
+    ~error_msg:"Expected %R transactions in the block, got %L" ;
+  let*@ trace_result =
+    Rpc.trace_transaction
+      ~tracer:"callTracer"
+      ~transaction_hash:tx_hash
+      sequencer
+  in
+  Check.(
+    (JSON.(trace_result |-> "error" |> as_string) = "OutOfGas")
+      string
+      ~error_msg:"Trace should report an error. Expected %R but got %L") ;
+  unit
+
 let test_trace_transaction_calltracer_all_types =
   register_all
     ~kernels:[Latest]
@@ -6498,4 +6555,5 @@ let () =
   test_proxy_node_can_forward_to_evm_endpoint protocols ;
   test_tx_pool_replacing_transactions protocols ;
   test_da_fees_after_execution protocols ;
+  test_trace_transaction_calltracer_failed_create protocols ;
   test_configuration_service [Protocol.Alpha]
