@@ -486,4 +486,40 @@ mod tests {
         assert_ne!(new_value_in_store, initial_value_in_store);
         assert_eq!(new_value_in_store, smaller_value);
     }
+
+    #[test]
+    fn dal_slot_are_padded_with_zeroes() {
+        let mut mock = MockHost::default();
+        let data = vec![b'v'; 100];
+        let published_level = (mock.level()) as i32;
+        let slot_index = 4;
+        mock.set_dal_slot(published_level, slot_index, &data);
+
+        // Read the slot completely
+        let dal_parameters = mock.reveal_dal_parameters();
+        let slot_size = dal_parameters.slot_size as usize;
+        let page_size = dal_parameters.page_size as usize;
+        let mut slot = vec![0; slot_size];
+        let number_of_pages = (slot_size / page_size) as i16;
+        let mut offset = 0;
+        for page_index in 0..number_of_pages {
+            let page_len = mock
+                .reveal_dal_page(
+                    published_level,
+                    slot_index,
+                    page_index,
+                    &mut slot[offset..(offset + page_size)],
+                )
+                .expect("Page is expected to be readable");
+            offset += page_len;
+            assert_eq!(page_len, page_size)
+        }
+
+        let data_in_slot = &slot[..100];
+        let padding = &slot[100..];
+
+        assert_eq!(slot.len(), slot_size);
+        assert_eq!(&data, data_in_slot);
+        assert!(padding.iter().all(|b| *b == 0));
+    }
 }

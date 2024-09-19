@@ -307,6 +307,22 @@ impl MockHost {
 
         self.as_mut().add_input(inbox_message);
     }
+
+    ////Set the content of the given DAL slot with the data. Adds the necessary
+    /// padding to fill the slot completely.
+    pub fn set_dal_slot(&mut self, published_level: i32, slot_index: u8, data: &[u8]) {
+        let slot_size = self.as_mut().get_dal_parameters().slot_size;
+        let mut slot = vec![0_u8; slot_size as usize];
+        assert!(
+            data.len() <= (slot_size as usize),
+            "Data of size {} cannot fit in a DAL slot of size {}",
+            data.len(),
+            slot_size
+        );
+        slot[..data.len()].as_mut().copy_from_slice(data);
+        self.as_mut()
+            .set_dal_slot(published_level, slot_index, slot);
+    }
 }
 
 fn info_for_level(level: i32) -> inbox::InfoPerLevel {
