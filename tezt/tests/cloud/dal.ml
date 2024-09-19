@@ -122,7 +122,9 @@ module Network = struct
     match network with
     | Sandbox -> Lwt.return 1
     | Testnet _ ->
-        let* json = RPC_core.call endpoint (RPC.get_chain_block_header ()) in
+        let* json =
+          RPC_core.call endpoint (RPC.get_chain_block_header_shell ())
+        in
         JSON.(json |-> "level" |> as_int) |> Lwt.return
 
   let expected_pow = function Testnet _ -> 26. | Sandbox -> 0.
@@ -933,7 +935,8 @@ let get_metrics t infos_per_level metrics =
 
 let get_infos_per_level client ~level =
   let block = string_of_int level in
-  let* header = Client.RPC.call client @@ RPC.get_chain_block_header ~block ()
+  let* header =
+    Client.RPC.call client @@ RPC.get_chain_block_header_shell ~block ()
   and* metadata =
     Client.RPC.call client @@ RPC.get_chain_block_metadata_raw ~block ()
   and* operations =
