@@ -603,6 +603,11 @@ type t = {
   configuration : configuration;
   cloud : Cloud.t;
   bootstrap : bootstrap;
+  some_node_rpc_endpoint : Endpoint.t;
+  (* endpoint to be used for get various information about L1; for testnets, it
+     is a public endpoint only if no L1 node is run by the scenario, in contrast
+     to [bootstrap.node_rpp_endpoint] which is a public endpoint when the
+     '--bootstrap' argument is not provided *)
   bakers : baker list;
   producers : producer list;
   observers : observer list;
@@ -1833,6 +1838,20 @@ let init_etherlink cloud configuration ~bootstrap etherlink_rollup_operator_key
   in
   return {operator; accounts; producers}
 
+let obtain_some_node_rpc_endpoint agent network (bootstrap : bootstrap)
+    (bakers : baker list) (producers : producer list)
+    (observers : observer list) etherlink =
+  match (agent, network) with
+  | None, Network.Testnet _ -> (
+      match (bakers, producers, observers, etherlink) with
+      | baker :: _, _, _, _ -> Node.as_rpc_endpoint baker.node
+      | [], producer :: _, _, _ -> Node.as_rpc_endpoint producer.node
+      | [], [], observer :: _, _ -> Node.as_rpc_endpoint observer.node
+      | [], [], [], Some etherlink ->
+          Node.as_rpc_endpoint etherlink.operator.node
+      | [], [], [], None -> bootstrap.node_rpc_endpoint)
+  | _ -> bootstrap.node_rpc_endpoint
+
 let init ~(configuration : configuration) cloud next_agent =
   let () = toplog "Init" in
   let* bootstrap_agent =
@@ -1952,11 +1971,22 @@ let init ~(configuration : configuration) cloud next_agent =
   let disconnection_state =
     Option.map Disconnect.init configuration.disconnect
   in
+  let some_node_rpc_endpoint =
+    obtain_some_node_rpc_endpoint
+      bootstrap_agent
+      configuration.network
+      bootstrap
+      bakers
+      producers
+      observers
+      etherlink
+  in
   Lwt.return
     {
       cloud;
       configuration;
       bootstrap;
+      some_node_rpc_endpoint;
       bakers;
       producers;
       observers;
