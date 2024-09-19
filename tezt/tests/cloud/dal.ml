@@ -943,24 +943,20 @@ let get_infos_per_level client ~level =
   let attested_commitments =
     JSON.(metadata |-> "dal_attestation" |> as_string |> Z.of_string)
   in
-  let manager_operations = JSON.(operations |=> 3 |> as_list) in
+  let manager_operation_batches = JSON.(operations |=> 3 |> as_list) in
   let is_published_commitment operation =
-    JSON.(
-      operation |-> "contents" |=> 0 |-> "kind" |> as_string
-      = "dal_publish_commitment")
+    JSON.(operation |-> "kind" |> as_string = "dal_publish_commitment")
   in
   let get_commitment operation =
-    JSON.(
-      operation |-> "contents" |=> 0 |-> "slot_header" |-> "commitment"
-      |> as_string)
+    JSON.(operation |-> "slot_header" |-> "commitment" |> as_string)
   in
   let get_slot_index operation =
-    JSON.(
-      operation |-> "contents" |=> 0 |-> "slot_header" |-> "slot_index"
-      |> as_int)
+    JSON.(operation |-> "slot_header" |-> "slot_index" |> as_int)
   in
   let published_commitments =
-    manager_operations |> List.to_seq
+    manager_operation_batches |> List.to_seq
+    |> Seq.concat_map (fun batch ->
+           JSON.(batch |-> "contents" |> as_list |> List.to_seq))
     |> Seq.filter is_published_commitment
     |> Seq.map (fun operation ->
            (get_slot_index operation, get_commitment operation))
