@@ -13,7 +13,7 @@ use alloc::borrow::Cow;
 use alloc::collections::TryReserveError;
 use crypto::hash::{ContractKt1Hash, HashTrait};
 use evm::executor::stack::PrecompileFailure;
-use handler::{EvmHandler, ExecutionResult};
+use handler::{EvmHandler, ExecutionOutcome, ExecutionResult};
 use host::path::RefPath;
 use primitive_types::{H160, H256, U256};
 use tezos_ethereum::block::BlockConstants;
@@ -149,6 +149,89 @@ fn trace_outcome<Host: Runtime>(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
+fn call_trace_outcome<Host: Runtime>(
+    handler: EvmHandler<Host>,
+    base_call_type: &str,
+    call_data: Vec<u8>,
+    caller: H160,
+    address: Option<H160>,
+    value: Option<U256>,
+    gas_limit: Option<u64>,
+    with_logs: bool,
+    result: &ExecutionOutcome,
+    transaction_hash: Option<H256>,
+) -> Result<(), EthereumError> {
+    let mut call_trace = CallTrace::new_minimal_trace(
+        base_call_type.into(),
+        caller,
+        value.unwrap_or_default(),
+        result.gas_used,
+        call_data,
+        0, // Initial call, we start at depth 0.
+    );
+
+    if base_call_type != "CREATE" {
+        call_trace.add_to(address);
+    } else {
+        call_trace.add_to(result.new_address());
+    }
+
+    call_trace.add_gas(gas_limit);
+    call_trace.add_output(result.output().as_ref().map(|res| res.to_vec()));
+
+    if with_logs {
+        call_trace.add_logs(Some(result.logs.clone()))
+    }
+    match result.result {
+        ExecutionResult::CallReverted(ref error) => {
+            call_trace.add_error(Some(error.clone()))
+        }
+        ExecutionResult::Error(ref exit_error) => {
+            call_trace.add_error(Some(format!("{:?}", exit_error).into()))
+        }
+        ExecutionResult::FatalError(ref fatal_error) => {
+            call_trace.add_error(Some(format!("{:?}", fatal_error).into()))
+        }
+        ExecutionResult::OutOfTicks => call_trace.add_error(Some("OutOfTicks".into())),
+        ExecutionResult::TransferSucceeded
+        | ExecutionResult::CallSucceeded(_, _)
+        | ExecutionResult::ContractDeployed(_, _) => (),
+    };
+
+    tracer::store_call_trace(handler.host, call_trace, &transaction_hash)?;
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn call_trace_error<Host: Runtime>(
+    handler: EvmHandler<Host>,
+    base_call_type: &str,
+    call_data: Vec<u8>,
+    caller: H160,
+    address: Option<H160>,
+    value: Option<U256>,
+    gas_limit: Option<u64>,
+    e: &EthereumError,
+    transaction_hash: Option<H256>,
+) -> Result<(), EthereumError> {
+    let mut call_trace = CallTrace::new_minimal_trace(
+        base_call_type.into(),
+        caller,
+        value.unwrap_or_default(),
+        0,
+        call_data,
+        0, // Initial call, we start at depth 0.
+    );
+
+    call_trace.add_to(address);
+    call_trace.add_gas(gas_limit);
+    call_trace.add_error(Some(format!("{:?}", e).into()));
+
+    tracer::store_call_trace(handler.host, call_trace, &transaction_hash)?;
+    Ok(())
+}
+
 /// Execute an Ethereum Transaction
 ///
 /// The function returns `Err` only if something is wrong with the kernel and/or the
@@ -276,46 +359,17 @@ where
                         config: CallTracerConfig { with_logs, .. },
                     })) = tracer
                     {
-                        let mut call_trace = CallTrace::new_minimal_trace(
-                            base_call_type.into(),
-                            caller,
-                            value.unwrap_or_default(),
-                            result.gas_used,
+                        call_trace_outcome(
+                            handler,
+                            base_call_type,
                             call_data,
-                            0, // Initial call, we start at depth 0.
-                        );
-
-                        if base_call_type != "CREATE" {
-                            call_trace.add_to(address);
-                        } else {
-                            call_trace.add_to(result.new_address());
-                        }
-
-                        call_trace.add_gas(gas_limit);
-                        call_trace
-                            .add_output(result.output().as_ref().map(|res| res.to_vec()));
-
-                        if with_logs {
-                            call_trace.add_logs(Some(result.logs.clone()))
-                        }
-                        match result.result {
-                            ExecutionResult::CallReverted(ref error) => {
-                                call_trace.add_error(Some(error.clone()))
-                            }
-                            ExecutionResult::Error(ref exit_error) => call_trace
-                                .add_error(Some(format!("{:?}", exit_error).into())),
-                            ExecutionResult::FatalError(ref fatal_error) => call_trace
-                                .add_error(Some(format!("{:?}", fatal_error).into())),
-                            ExecutionResult::OutOfTicks => {
-                                call_trace.add_error(Some("OutOfTicks".into()))
-                            }
-                            _ => (),
-                        };
-
-                        tracer::store_call_trace(
-                            handler.host,
-                            call_trace,
-                            &transaction_hash,
+                            caller,
+                            address,
+                            value,
+                            gas_limit,
+                            with_logs,
+                            &result,
+                            transaction_hash,
                         )?;
                     }
                 }
@@ -335,23 +389,16 @@ where
                         ..
                     })) = tracer
                     {
-                        let mut call_trace = CallTrace::new_minimal_trace(
-                            base_call_type.into(),
-                            caller,
-                            value.unwrap_or_default(),
-                            0,
+                        call_trace_error(
+                            handler,
+                            base_call_type,
                             call_data,
-                            0, // Initial call, we start at depth 0.
-                        );
-
-                        call_trace.add_to(address);
-                        call_trace.add_gas(gas_limit);
-                        call_trace.add_error(Some(format!("{:?}", e).into()));
-
-                        tracer::store_call_trace(
-                            handler.host,
-                            call_trace,
-                            &transaction_hash,
+                            caller,
+                            address,
+                            value,
+                            gas_limit,
+                            &e,
+                            transaction_hash,
                         )?;
                     }
                 }
@@ -366,7 +413,6 @@ where
         Ok(None)
     }
 }
-
 pub const NATIVE_TOKEN_TICKETER_PATH: RefPath =
     RefPath::assert_from(b"/evm/world_state/ticketer");
 
