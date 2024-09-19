@@ -9,6 +9,10 @@
     given when executing the program. *)
 val start_server : config:Configuration.configuration -> unit -> unit Lwt.t
 
+(** [set_current_l1_level value] will set the metric related to the current L1
+    level with [value]. *)
+val set_current_l1_level : int -> unit
+
 type governance_contract = Sequencer | Kernel | Security_kernel
 
 (** Helper to provide the actual contract address associated to the governance

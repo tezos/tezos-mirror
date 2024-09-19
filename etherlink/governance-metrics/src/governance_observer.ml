@@ -45,7 +45,7 @@ let process_contracts_configuration ~config =
   let*! () = Event.contract_metrics "security kernel configuration" in
   return_unit
 
-let rec contract_storage_state_process ~config ~contract ~chain_id =
+let contract_storage_state_process ~config ~contract ~chain_id =
   let open Lwt_result_syntax in
   let* voting_state =
     RPC.micheline_view
@@ -71,8 +71,7 @@ let rec contract_storage_state_process ~config ~contract ~chain_id =
     Event.contract_metrics @@ "voting state for "
     ^ governance_to_string contract
   in
-  let*! () = Lwt_unix.sleep 5. in
-  contract_storage_state_process ~config ~contract ~chain_id
+  return_unit
 
 let main ~config () =
   let open Lwt_result_syntax in
@@ -85,40 +84,29 @@ let main ~config () =
         Format.eprintf "Metrics server error: %s\n@." (Printexc.to_string exn))
   in
   let* () = process_contracts_configuration ~config in
-  let*! chain_id = RPC.chain_id config.endpoint in
-  match chain_id with
-  | Ok chain_id ->
-      let () =
-        Lwt.dont_wait
-          (fun () ->
-            let*! _ =
-              contract_storage_state_process
-                ~config
-                ~contract:Sequencer
-                ~chain_id
-            in
-            Lwt.return_unit)
-          (fun exn ->
-            Format.eprintf
-              "Sequencer storage state process error: %s\n@."
-              (Printexc.to_string exn))
-      in
-      let () =
-        Lwt.dont_wait
-          (fun () ->
-            let*! _ =
-              contract_storage_state_process ~config ~contract:Kernel ~chain_id
-            in
-            Lwt.return_unit)
-          (fun exn ->
-            Format.eprintf
-              "Kernel storage state process error: %s\n@."
-              (Printexc.to_string exn))
-      in
+  let* chain_id = RPC.chain_id config.endpoint in
+  (* Head monitoring.
+     This part will be the clock of our execution. Each detected
+     fresh head will trigger a process to update several metrics. *)
+  let process {level} =
+    let* () =
+      contract_storage_state_process ~config ~contract:Sequencer ~chain_id
+    in
+    let* () =
+      contract_storage_state_process ~config ~contract:Kernel ~chain_id
+    in
+    let* () =
       contract_storage_state_process ~config ~contract:Security_kernel ~chain_id
-  | Error trace ->
-      let*! () = Event.storage_state_error "Failed to GET chain ID" in
-      fail trace
+    in
+    set_current_l1_level level ;
+    return_unit
+  in
+  let rec governance_obsv_process () =
+    let* () = RPC.monitor_heads ~process config.endpoint in
+    let*! () = Event.monitor_head_restart () in
+    governance_obsv_process ()
+  in
+  governance_obsv_process ()
 
 let run =
   let open Tezos_clic in

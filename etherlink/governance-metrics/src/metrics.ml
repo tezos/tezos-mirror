@@ -64,6 +64,11 @@ let start_server ~config () =
     ~mode
     (Cohttp_lwt_unix.Server.make ~callback ())
 
+let current_l1_level_register =
+  v_gauge ~help:"Current L1 Level" "current_l1_level"
+
+let set_current_l1_level = set_gauge current_l1_level_register Int.to_float
+
 type governance_contract = Sequencer | Kernel | Security_kernel
 
 let governance_to_contract ~config = function

@@ -11,6 +11,9 @@ val starting_observer : unit -> unit Lwt.t
 (** Event to notify about the metric server starting its execution. *)
 val starting_metrics_server : unit -> unit Lwt.t
 
+(** Event to notify that head monitoring is re-starting its execution. *)
+val monitor_head_restart : unit -> unit Lwt.t
+
 (** Debug event to give information on when a contract metric was successfully
     set. *)
 val contract_metrics : string -> unit Lwt.t

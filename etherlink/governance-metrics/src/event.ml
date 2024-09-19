@@ -26,6 +26,14 @@ module Simple = struct
       ~msg:"Starting Prometheus' metrics server"
       ()
 
+  let monitor_head_restart =
+    declare_0
+      ~section
+      ~level:Notice
+      ~name:"monitor_head_restart"
+      ~msg:"Head monitoring process exited, trying to restart it"
+      ()
+
   let contract_metrics =
     declare_1
       ~section
@@ -48,6 +56,8 @@ end
 let starting_observer = Simple.(emit starting_observer)
 
 let starting_metrics_server = Simple.(emit starting_metrics_server)
+
+let monitor_head_restart = Simple.(emit monitor_head_restart)
 
 let contract_metrics metrics = Simple.(emit contract_metrics metrics)
 
