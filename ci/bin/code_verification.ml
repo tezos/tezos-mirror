@@ -598,7 +598,7 @@ let jobs pipeline_type =
            the log and to reduce time to merge of other MRs further
            down the merge train. *)
         ["dune build @check --stop-on-first-error"]
-      |> enable_cargo_cache |> enable_sccache
+      |> enable_cargo_cache |> enable_sccache |> enable_dune_cache
     in
     let build_octez_source =
       (* We check compilation of the octez tarball on scheduled
