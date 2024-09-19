@@ -234,6 +234,7 @@ where
     }
 
     /// Generic `BEQ` w.r.t. instruction width
+    #[inline(always)]
     pub(super) fn run_beq_impl<const INSTR_WIDTH: u64>(
         &mut self,
         imm: i64,
