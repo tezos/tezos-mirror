@@ -1233,7 +1233,7 @@ let init_testnet cloud (configuration : configuration) teztale agent
   Lwt.return
     (bootstrap, baker_accounts, producer_accounts, etherlink_rollup_operator_key)
 
-let init_bootstrap_and_activate_protocol cloud (configuration : configuration)
+let init_sandbox_and_activate_protocol cloud (configuration : configuration)
     agent =
   let dal_bootstrap_node_net_port = Agent.next_available_port agent in
   let dal_config : Cryptobox.Config.t =
@@ -1870,7 +1870,7 @@ let init ~(configuration : configuration) cloud next_agent =
     match configuration.network with
     | Network.Sandbox ->
         let bootstrap_agent = Option.get bootstrap_agent in
-        init_bootstrap_and_activate_protocol cloud configuration bootstrap_agent
+        init_sandbox_and_activate_protocol cloud configuration bootstrap_agent
     | Testnet testnet ->
         let () = toplog "Init: initializting, testnet case" in
         init_testnet cloud configuration teztale bootstrap_agent testnet
