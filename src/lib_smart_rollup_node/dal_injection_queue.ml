@@ -189,12 +189,46 @@ module Recent_dal_injections =
       type t = unit
     end)
 
+module Slot_index_queue = struct
+  include Queue
+
+  type t = Tezos_dal_node_services.Types.slot_index Queue.t
+
+  let name = "dal_injection_queue_slot_indices"
+
+  let replace node_ctxt t slot_indices =
+    let open Lwt_result_syntax in
+    let current_protocol =
+      Reference.get node_ctxt.Node_context.current_protocol
+    in
+    let number_of_slots = current_protocol.constants.dal.number_of_slots in
+    let module SI = Set.Make (Int) in
+    (* remove duplicates *)
+    let slot_indices = SI.of_list slot_indices in
+    let* () =
+      SI.iter_es
+        (fun slot_index ->
+          fail_unless (slot_index >= 0 && slot_index < number_of_slots)
+          @@ error_of_fmt "Slot index %d out of range" slot_index)
+        slot_indices
+    in
+    Queue.clear t ;
+    SI.iter (fun slot_index -> Queue.push slot_index t) slot_indices ;
+    return_unit
+
+  let next t =
+    (* The pop followed by a push is cycle through slot indices. *)
+    let slot_index = Queue.pop t in
+    Queue.push slot_index t ;
+    slot_index
+end
+
 type state = {
   node_ctxt : Node_context.ro;
   recent_dal_injections : Recent_dal_injections.t;
   mutable count_messages : int;
   pending_messages : Pending_messages.t;
-  dal_slot_indices : Tezos_dal_node_services.Types.slot_index Queue.t;
+  dal_slot_indices : Slot_index_queue.t;
       (* We use a queue here to easily cycle through
          the slots and use different ones from a
          level to another (in case we have less data
@@ -259,25 +293,8 @@ let on_register state ~message : unit tzresult Lwt.t =
     let*! () = Events.(emit dal_message_received) () in
     return_unit)
 
-let on_set_dal_slot_indices state idx =
-  let open Lwt_result_syntax in
-  let module SI = Set.Make (Int) in
-  (* remove duplicates *)
-  let idx = SI.of_list idx in
-  let number_of_slots =
-    (Reference.get state.node_ctxt.current_protocol).constants.dal
-      .number_of_slots
-  in
-  let* () =
-    SI.iter_es
-      (fun slot_index ->
-        fail_unless (slot_index >= 0 && slot_index < number_of_slots)
-        @@ error_of_fmt "Slot index %d out of range" slot_index)
-      idx
-  in
-  Queue.clear state.dal_slot_indices ;
-  SI.iter (fun id -> Queue.push id state.dal_slot_indices) idx ;
-  return_unit
+let on_set_dal_slot_indices {dal_slot_indices; node_ctxt; _} idx =
+  Slot_index_queue.replace node_ctxt dal_slot_indices idx
 
 (* This function pops from the injection queue the maximum number
    of messages that fits in a DAL slot. The messages are returned
@@ -323,9 +340,7 @@ let fill_slots state ~slot_size ~num_slots =
       | slot_messages ->
           (* We still have data to publish. Let's associate it to the next DAL
              slot index. *)
-          let slot_index = Queue.pop state.dal_slot_indices in
-          (* The pop followed by a push is cycle through slot indices. *)
-          Queue.push slot_index state.dal_slot_indices ;
+          let slot_index = Slot_index_queue.next state.dal_slot_indices in
           fill_slots_aux
             ((slot_index, slot_messages) :: accu)
             ~remaining_num_slots:(remaining_num_slots - 1)
@@ -337,7 +352,7 @@ let fill_slots state ~slot_size ~num_slots =
    their commitments to L1. *)
 let on_produce_dal_slots state ~level =
   let open Lwt_result_syntax in
-  if Queue.is_empty state.dal_slot_indices then
+  if Slot_index_queue.is_empty state.dal_slot_indices then
     (* No provided slot indices, no injection *)
     let*! () = Events.(emit no_dal_slot_indices_set) () in
     return_unit
@@ -347,7 +362,7 @@ let on_produce_dal_slots state ~level =
         .cryptobox_parameters
         .slot_size
     in
-    let num_slots = Queue.length state.dal_slot_indices in
+    let num_slots = Slot_index_queue.length state.dal_slot_indices in
     (* Inject on all DAL slot indices in parallel. *)
     fill_slots state ~slot_size ~num_slots
     |> List.iter_ep (fun (slot_index, slot_chunks) ->
@@ -363,6 +378,7 @@ let on_produce_dal_slots state ~level =
            inject_slot state ~slot_index ~slot_content)
 
 let init_dal_worker_state node_ctxt =
+  let open Lwt_result_syntax in
   let dal_constants =
     let open Node_context in
     (Reference.get node_ctxt.current_protocol).constants.dal
@@ -386,15 +402,16 @@ let init_dal_worker_state node_ctxt =
     dal_constants.number_of_slots * dal_constants.attestation_lag
     * 5 (* Give more chance for DAL slots to be signaled. *)
   in
-  {
-    node_ctxt;
-    recent_dal_injections =
-      Recent_dal_injections.create max_remembered_recent_injections;
-    pending_messages =
-      Pending_messages.create etherlink_max_pending_messages_size;
-    dal_slot_indices = Queue.create ();
-    count_messages = 0;
-  }
+  return
+    {
+      node_ctxt;
+      recent_dal_injections =
+        Recent_dal_injections.create max_remembered_recent_injections;
+      pending_messages =
+        Pending_messages.create etherlink_max_pending_messages_size;
+      dal_slot_indices = Slot_index_queue.create ();
+      count_messages = 0;
+    }
 
 module Types = struct
   type nonrec state = state
@@ -425,10 +442,7 @@ module Handlers = struct
 
   type launch_error = error trace
 
-  let on_launch _w () Types.{node_ctxt} =
-    let open Lwt_result_syntax in
-    let state = init_dal_worker_state node_ctxt in
-    return state
+  let on_launch _w () Types.{node_ctxt} = init_dal_worker_state node_ctxt
 
   let on_error (type a b) _w st (r : (a, b) Request.t) (errs : b) :
       unit tzresult Lwt.t =
