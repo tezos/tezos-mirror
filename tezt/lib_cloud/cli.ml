@@ -219,3 +219,11 @@ let dns =
     ~unset_long:"no-dns"
     ~description:"Associate a domain name with the website"
     (proxy && website)
+
+let octez_release =
+  Clap.optional_string
+    ~section
+    ~long:"octez-release"
+    ~placeholder:"<tag>"
+    ~description:"Use the octez release <tag> instead of local octez binaries."
+    ()

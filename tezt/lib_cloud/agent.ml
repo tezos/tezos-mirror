@@ -31,11 +31,11 @@ let docker_image_encoding =
         (function Env.Gcp {alias} -> Some alias | _ -> None)
         (fun alias -> Gcp {alias});
       case
-        ~title:"octez_latest_release"
+        ~title:"octez_release"
         Json_only
-        (constant "octez-latest-release")
-        (function Env.Octez_latest_release -> Some () | _ -> None)
-        (fun () -> Octez_latest_release);
+        string
+        (function Env.Octez_release {tag} -> Some tag | _ -> None)
+        (fun tag -> Octez_release {tag});
     ]
 
 let configuration_encoding =
@@ -246,12 +246,15 @@ let copy =
     match Hashtbl.find_opt already_copied (agent, destination) with
     | Some promise -> promise
     | None ->
-        (* Octez_latest_release image uses alpine, we can't copy binaries from our local setup. *)
+        (* Octez images use alpine, we can't copy binaries from our local setup. *)
         let* is_binary_file = is_binary source in
-        if
-          is_binary_file
-          && agent.configuration.docker_image = Octez_latest_release
-        then Lwt.return (path_of agent source)
+        let octez_release_image =
+          match agent.configuration.docker_image with
+          | Octez_release _ -> true
+          | Gcp _ -> false
+        in
+        if is_binary_file && octez_release_image then
+          Lwt.return (path_of agent source)
         else
           let p =
             let* () =

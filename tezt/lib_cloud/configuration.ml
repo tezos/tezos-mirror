@@ -20,7 +20,7 @@ let make ?os ?binaries_path ?max_run_duration ?machine_type ?docker_image () =
   let default_binaries_path =
     match docker_image with
     | Env.Gcp _ -> Path.default_binaries_path ()
-    | Octez_latest_release -> "/usr/local/bin"
+    | Octez_release _ -> "/usr/local/bin"
   in
   let binaries_path =
     Option.value ~default:default_binaries_path binaries_path

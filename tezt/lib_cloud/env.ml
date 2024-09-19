@@ -5,7 +5,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type docker_image = Gcp of {alias : string} | Octez_latest_release
+type docker_image = Gcp of {alias : string} | Octez_release of {tag : string}
 
 let tezt_cloud =
   match Cli.tezt_cloud with
@@ -134,10 +134,10 @@ let uri_of_docker_image docker_image =
       let* registry_uri = registry_uri () in
       Lwt.return (Format.asprintf "%s/%s" registry_uri alias)
   | Gcp {alias}, `Localhost -> Lwt.return alias
-  | Octez_latest_release, (`Cloud | `Host | `Orchestrator) ->
+  | Octez_release _, (`Cloud | `Host | `Orchestrator) ->
       let* registry_uri = registry_uri () in
       Lwt.return (Format.asprintf "%s/octez" registry_uri)
-  | Octez_latest_release, `Localhost -> Lwt.return "octez"
+  | Octez_release _, `Localhost -> Lwt.return "octez"
 
 let rec wait_process ?(sleep = 4) ~is_ready ~run () =
   let process = run () in

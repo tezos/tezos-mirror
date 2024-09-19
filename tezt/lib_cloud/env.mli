@@ -8,7 +8,7 @@
 (* This module aims to encapsulate static values from the CLI and several
    functions that are used by the library. *)
 
-type docker_image = Gcp of {alias : string} | Octez_latest_release
+type docker_image = Gcp of {alias : string} | Octez_release of {tag : string}
 
 val tezt_cloud : string
 
@@ -17,13 +17,13 @@ val tezt_cloud : string
   - [Localhost]: Agents and the orchestrator are run on the host machine
 
   - [Cloud]: The orchestrator is on the host machine. The agents are run onto
-    the cloud 
+    the cloud
 
     - [`Orchestrator]: The orchestrator is run on a VM. This is mode used by the
       proxy from the orchestrator point of view.
 
     - [`Host]: This mode is run by the host machine that initializes the
-      orchestrator running an a VM.    
+      orchestrator running an a VM.
 *)
 val mode : [`Localhost | `Cloud | `Orchestrator | `Host]
 
