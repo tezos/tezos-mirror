@@ -1098,6 +1098,7 @@ let test_largest_delayed_transfer_is_included =
     ~da_fee:arb_da_fee_for_delayed_inbox
     ~tags:["evm"; "sequencer"; "delayed_inbox"; "inclusion"]
     ~title:"Largest possible delayed transaction is included"
+    ~time_between_blocks:Nothing
   @@ fun {
            client;
            l1_contracts;
@@ -1296,6 +1297,7 @@ let test_delayed_fa_deposit_is_included =
     ~enable_fa_bridge:true
     ~kernels:[Kernel.Latest]
     ~additional_uses:[Constant.octez_codec]
+    ~time_between_blocks:Nothing
   @@ fun {
            client;
            l1_contracts;
@@ -1368,6 +1370,7 @@ let test_delayed_fa_deposit_is_ignored_if_feature_disabled =
     ~enable_fa_bridge:false
     ~kernels:[Kernel.Latest]
     ~additional_uses:[Constant.octez_codec]
+    ~time_between_blocks:Nothing
   @@ fun {
            client;
            l1_contracts;
@@ -1581,6 +1584,7 @@ let test_fa_withdrawal_is_included =
     ~commitment_period:5
     ~challenge_window:5
     ~kernels:[Kernel.Latest]
+    ~time_between_blocks:Nothing
     ~additional_uses:[Constant.octez_codec]
   @@ fun {
            client;
@@ -4604,6 +4608,7 @@ let test_replay_rpc =
   register_all
     ~tags:["evm"; "rpc"; "replay"]
     ~title:"Sequencer can replay a block"
+    ~time_between_blocks:Nothing
   @@ fun {sc_rollup_node; sequencer; client; proxy; _} _protocol ->
   (* Transfer funds to a random address. *)
   let address = "0xB7A97043983f24991398E5a82f63F4C58a417185" in
