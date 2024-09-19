@@ -1244,6 +1244,16 @@ let get_balance_for ?endpoint ~account client =
   in
   return @@ Tez.parse_floating output
 
+let spawn_get_full_balance_for ?endpoint ~account client =
+  spawn_command ?endpoint client ["get"; "full"; "balance"; "for"; account]
+
+let get_full_balance_for ?endpoint ~account client =
+  let* output =
+    spawn_get_full_balance_for ?endpoint ~account client
+    |> Process.check_and_read_stdout
+  in
+  return @@ Tez.parse_floating output
+
 let spawn_ticket_balance ?hooks ~contract ~ticketer ~content_type ~content
     client =
   spawn_command
