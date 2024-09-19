@@ -196,6 +196,40 @@ module Slot_index_queue = struct
 
   let name = "dal_injection_queue_slot_indices"
 
+  (** If [Tezos_dal_node_services.Types.slot_index] changes its
+      underlying definition, this code will fail to compile because of
+      the [encoding], preventing data corruption in the store. *)
+  module Store = Indexed_store.Make_singleton (struct
+    type t = Tezos_dal_node_services.Types.slot_index list
+
+    let name = name
+
+    let encoding = Data_encoding.(list uint8)
+  end)
+
+  let load_with_mode ~data_dir mode =
+    Store.load ~path:(Filename.concat data_dir name) mode
+
+  let load node_ctxt =
+    let open Lwt_result_syntax in
+    let data_dir = node_ctxt.Node_context.data_dir in
+    let* store = load_with_mode ~data_dir Read_only in
+    let* dal_slot_indices_opt = Store.read store in
+    match dal_slot_indices_opt with
+    | None -> return_none
+    | Some dal_slot_indices ->
+        let queue = Queue.create () in
+        List.iter
+          (fun slot_index -> Queue.push slot_index queue)
+          dal_slot_indices ;
+        return_some queue
+
+  let write node_ctxt slot_indices =
+    let open Lwt_result_syntax in
+    let data_dir = node_ctxt.Node_context.data_dir in
+    let* store = load_with_mode ~data_dir Read_write in
+    Store.write store slot_indices
+
   let replace node_ctxt t slot_indices =
     let open Lwt_result_syntax in
     let current_protocol =
@@ -214,6 +248,7 @@ module Slot_index_queue = struct
     in
     Queue.clear t ;
     SI.iter (fun slot_index -> Queue.push slot_index t) slot_indices ;
+    let* () = write node_ctxt (SI.elements slot_indices) in
     return_unit
 
   let next t =
@@ -402,6 +437,10 @@ let init_dal_worker_state node_ctxt =
     dal_constants.number_of_slots * dal_constants.attestation_lag
     * 5 (* Give more chance for DAL slots to be signaled. *)
   in
+  let* dal_slot_indices_opt = Slot_index_queue.load node_ctxt in
+  let dal_slot_indices =
+    Option.value_f dal_slot_indices_opt ~default:Slot_index_queue.create
+  in
   return
     {
       node_ctxt;
@@ -409,7 +448,7 @@ let init_dal_worker_state node_ctxt =
         Recent_dal_injections.create max_remembered_recent_injections;
       pending_messages =
         Pending_messages.create etherlink_max_pending_messages_size;
-      dal_slot_indices = Slot_index_queue.create ();
+      dal_slot_indices;
       count_messages = 0;
     }
 
