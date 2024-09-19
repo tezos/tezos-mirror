@@ -186,3 +186,128 @@ pub fn fetch_and_parse_sequencer_blueprint_from_dal<Host: Runtime>(
         None
     }
 }
+
+#[cfg(test)]
+pub mod tests {
+    use std::iter::repeat;
+
+    use primitive_types::{H160, U256};
+    use rlp::Encodable;
+    use tezos_ethereum::tx_common::EthereumTransactionCommon;
+    use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezos_smart_rollup_encoding::timestamp::Timestamp;
+    use tezos_smart_rollup_host::runtime::Runtime;
+
+    use crate::{
+        block::GENESIS_PARENT_HASH,
+        sequencer_blueprint::{BlueprintWithDelayedHashes, UnsignedSequencerBlueprint},
+    };
+
+    use super::{fetch_and_parse_sequencer_blueprint_from_dal, DAL_BLUEPRINT_INPUT_TAG};
+
+    fn dummy_transaction(i: u8) -> EthereumTransactionCommon {
+        let to = &hex::decode("423163e58aabec5daa3dd1130b759d24bef0f6ea").unwrap();
+        let to = Some(H160::from_slice(to));
+
+        let unsigned_transaction = EthereumTransactionCommon::new(
+            tezos_ethereum::transaction::TransactionType::Legacy,
+            Some(U256::one()),
+            i as u64,
+            U256::from(40000000u64),
+            U256::from(40000000u64),
+            21000u64,
+            to,
+            U256::from(500000000u64),
+            vec![],
+            vec![],
+            None,
+        );
+
+        unsigned_transaction
+            .sign_transaction(
+                "cb9db6b5878db2fa20586e23b7f7b51c22a7c6ed0530daafc2615b116f170cd3"
+                    .to_string(),
+            )
+            .expect("Transaction signature shouldn't fail")
+    }
+
+    // See the size of chunks in `sequencer_blueprint.ml` in the sequencer. Note
+    // that the kernel doesn't enforce a size for the chunks, this constant is
+    // purely for consistency.
+    const MAX_CHUNK_SIZE: usize = 3957;
+
+    pub fn dummy_big_blueprint(nb_transactions: usize) -> BlueprintWithDelayedHashes {
+        let transactions = repeat(())
+            .enumerate()
+            .map(|(i, ())| dummy_transaction(i as u8).to_bytes())
+            .take(nb_transactions)
+            .collect();
+        let timestamp = Timestamp::from(123456);
+        BlueprintWithDelayedHashes {
+            timestamp,
+            transactions,
+            parent_hash: GENESIS_PARENT_HASH,
+            delayed_hashes: vec![],
+        }
+    }
+
+    pub fn chunk_blueprint(
+        blueprint: BlueprintWithDelayedHashes,
+    ) -> Vec<UnsignedSequencerBlueprint> {
+        let bytes = blueprint.rlp_bytes();
+        let chunks = bytes.chunks(MAX_CHUNK_SIZE);
+        let nb_chunks = chunks.len();
+        let number = U256::zero();
+        chunks
+            .enumerate()
+            .map(|(chunk_index, chunk)| UnsignedSequencerBlueprint {
+                chunk: chunk.to_vec(),
+                nb_chunks: nb_chunks as u16,
+                number,
+                chunk_index: chunk_index as u16,
+            })
+            .collect()
+    }
+
+    pub fn prepare_dal_slot(
+        host: &mut MockKernelHost,
+        chunks: &[UnsignedSequencerBlueprint],
+        published_level: i32,
+        slot_index: u8,
+    ) {
+        let mut slot = Vec::with_capacity((MAX_CHUNK_SIZE + 1) * chunks.len());
+        for chunk in chunks {
+            let bytes = chunk.rlp_bytes();
+            slot.push(DAL_BLUEPRINT_INPUT_TAG);
+            slot.extend_from_slice(&bytes);
+        }
+
+        host.host.set_dal_slot(published_level, slot_index, &slot)
+    }
+
+    #[test]
+    fn test_parse_regular_slot() {
+        let mut host = MockKernelHost::default();
+
+        let blueprint = dummy_big_blueprint(100);
+        let chunks = chunk_blueprint(blueprint);
+        assert!(
+            chunks.len() >= 2,
+            "Blueprint is composed of {} chunks, but at least two are required for the test to make sense",
+            chunks.len()
+        );
+
+        let dal_parameters = host.reveal_dal_parameters();
+        let published_level = host.host.level() - (dal_parameters.attestation_lag as u32);
+        prepare_dal_slot(&mut host, &chunks, published_level as i32, 0);
+
+        let chunks_from_slot = fetch_and_parse_sequencer_blueprint_from_dal(
+            &mut host,
+            &dal_parameters,
+            0,
+            published_level,
+        );
+
+        assert_eq!(Some(chunks), chunks_from_slot)
+    }
+}
