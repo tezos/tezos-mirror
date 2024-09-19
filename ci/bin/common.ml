@@ -1493,8 +1493,13 @@ module Documentation = struct
       ["make -C docs -j sphinx"]
 
   (** Create a [documentation:linkcheck] job. *)
-  let job_linkcheck ~job_build_all ?dependencies ?rules () : tezos_job =
-    let dependencies = mk_artifact_dependencies ?dependencies [job_build_all] in
+  let job_linkcheck ~job_manuals ~job_docgen ~job_build_all ?dependencies ?rules
+      () : tezos_job =
+    let dependencies =
+      mk_artifact_dependencies
+        ?dependencies
+        [job_manuals; job_docgen; job_build_all]
+    in
     job
       ~__POS__
       ~name:"documentation:linkcheck"
