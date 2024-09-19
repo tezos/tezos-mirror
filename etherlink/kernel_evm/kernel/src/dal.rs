@@ -468,4 +468,40 @@ pub mod tests {
         let expected_chunks = vec![chunks[0].clone()];
         assert_eq!(Some(expected_chunks), parsed_chunks)
     }
+
+    #[test]
+    fn test_parse_invalid_slot() {
+        let mut host = MockKernelHost::default();
+
+        let blueprint = dummy_big_blueprint(1);
+        let chunks = chunk_blueprint(blueprint);
+
+        let dal_parameters = host.reveal_dal_parameters();
+        let published_level = host.host.level();
+
+        // Slot will be invalid as it hasn't been attested yet.
+        prepare_dal_slot(&mut host, &chunks, published_level as i32, 0);
+
+        let chunks_from_slot = fetch_and_parse_sequencer_blueprint_from_dal(
+            &mut host,
+            &dal_parameters,
+            0,
+            published_level,
+        );
+
+        assert_eq!(None, chunks_from_slot);
+
+        // Slot will be invalid as the level of its publication is negative
+        // (hence higher than i32::MAX when viewed as unsigned)
+        prepare_dal_slot(&mut host, &chunks, -1, 0);
+
+        let chunks_from_slot = fetch_and_parse_sequencer_blueprint_from_dal(
+            &mut host,
+            &dal_parameters,
+            0,
+            published_level,
+        );
+
+        assert_eq!(None, chunks_from_slot)
+    }
 }
