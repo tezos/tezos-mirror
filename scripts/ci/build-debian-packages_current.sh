@@ -22,6 +22,8 @@ eval "$(dpkg-architecture)"
 # Build octez debian packages
 make "dpkg-$1"
 
+echo "Version of Octez: $(dune exec src/lib_version/exe/octez_print_version.exe)"
+
 # Move the debian package to be packed as artifacts
 mkdir -p "$BUILDDIR/packages/$DISTRIBUTION/$RELEASE"
 cp -a -- *.deb "$BUILDDIR/packages/$DISTRIBUTION/$RELEASE"
