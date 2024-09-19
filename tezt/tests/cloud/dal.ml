@@ -764,6 +764,7 @@ type per_level_info = {
   published_commitments : (int, commitment) Hashtbl.t;
   attestations : (public_key_hash, Z.t option) Hashtbl.t;
   attested_commitments : Z.t;
+  etherlink_operator_balance : Tez.t;
 }
 
 type metrics = {
@@ -776,6 +777,7 @@ type metrics = {
   ratio_attested_commitments : float;
   ratio_published_commitments_last_level : float;
   ratio_attested_commitments_per_baker : (public_key_hash, float) Hashtbl.t;
+  etherlink_operator_balance : Tez.t;
 }
 
 let default_metrics =
@@ -789,6 +791,7 @@ let default_metrics =
     ratio_attested_commitments = 0.;
     ratio_published_commitments_last_level = 0.;
     ratio_attested_commitments_per_baker = Hashtbl.create 0;
+    etherlink_operator_balance = Tez.zero;
   }
 
 type t = {
@@ -823,6 +826,7 @@ let pp_metrics t
       ratio_attested_commitments;
       ratio_published_commitments_last_level;
       ratio_attested_commitments_per_baker;
+      etherlink_operator_balance;
     } =
   (match level_first_commitment_published with
   | None -> ()
@@ -857,7 +861,10 @@ let pp_metrics t
                "Ratio for %s (with stake %d): %f"
                account.Account.public_key_hash
                stake
-               ratio)
+               ratio) ;
+  Log.info
+    "Balance of the Etherlink operator: %s tez"
+    (Tez.to_string etherlink_operator_balance)
 
 let push_metrics t
     {
@@ -870,6 +877,7 @@ let push_metrics t
       ratio_attested_commitments;
       ratio_published_commitments_last_level;
       ratio_attested_commitments_per_baker;
+      etherlink_operator_balance;
     } =
   (* There are three metrics grouped by labels. *)
   t.bakers |> List.to_seq
@@ -923,7 +931,11 @@ let push_metrics t
     t.cloud
     ~name:"tezt_commitments"
     ~labels:[("kind", "attested")]
-    (float_of_int total_attested_commitments)
+    (float_of_int total_attested_commitments) ;
+  Cloud.push_metric
+    t.cloud
+    ~name:"etherlink_operator_balance"
+    (Tez.to_float etherlink_operator_balance)
 
 let published_level_of_attested_level t level =
   level - t.parameters.attestation_lag
@@ -1128,9 +1140,10 @@ let get_metrics t infos_per_level metrics =
     ratio_attested_commitments;
     ratio_published_commitments_last_level;
     ratio_attested_commitments_per_baker;
+    etherlink_operator_balance = infos_per_level.etherlink_operator_balance;
   }
 
-let get_infos_per_level endpoint ~level =
+let get_infos_per_level ~client ~endpoint ~level ~etherlink_operator =
   let block = string_of_int level in
   let* header =
     RPC_core.call endpoint @@ RPC.get_chain_block_header_shell ~block ()
@@ -1188,7 +1201,19 @@ let get_infos_per_level endpoint ~level =
            (public_key_hash, dal_attestation))
     |> Hashtbl.of_seq
   in
-  Lwt.return {level; published_commitments; attestations; attested_commitments}
+  let* etherlink_operator_balance =
+    match etherlink_operator with
+    | None -> return Tez.zero
+    | Some account -> Client.get_full_balance_for ~account client
+  in
+  Lwt.return
+    {
+      level;
+      published_commitments;
+      attestations;
+      attested_commitments;
+      etherlink_operator_balance;
+    }
 
 let add_source cloud agent ~job_name node dal_node =
   let agent_name = Agent.name agent in
@@ -2338,7 +2363,14 @@ let on_new_level t level =
   let* () = wait_for_level t level in
   toplog "Start process level %d" level ;
   let* infos_per_level =
-    get_infos_per_level t.bootstrap.node_rpc_endpoint ~level
+    get_infos_per_level
+      ~client:t.bootstrap.client
+      ~endpoint:t.bootstrap.node_rpc_endpoint
+      ~level
+      ~etherlink_operator:
+        (Option.map
+           (fun setup -> setup.operator.account.public_key_hash)
+           t.etherlink)
   in
   Hashtbl.replace t.infos level infos_per_level ;
   let metrics =
