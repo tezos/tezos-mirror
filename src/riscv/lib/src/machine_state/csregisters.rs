@@ -17,11 +17,7 @@ use self::{
     values::CSRValue,
     xstatus::{ExtensionValue, MNStatus, MStatus, SStatus},
 };
-use super::{
-    bus::Address,
-    hart_state::{interrupts_cache::InterruptsCache, HartState},
-    mode::TrapMode,
-};
+use super::{bus::Address, hart_state::HartState, mode::TrapMode};
 use crate::{
     bits::{ones, u64, Bits64},
     machine_state::mode::Mode,
@@ -1359,7 +1355,6 @@ pub fn access_checks(csr: CSRegister, hart_state: &HartState<impl ManagerRead>) 
 /// CSRs
 pub struct CSRegisters<M: backend::ManagerBase> {
     registers: CSRValues<M>,
-    pub(super) interrupt_cache: InterruptsCache,
 }
 
 impl<M: backend::ManagerBase> CSRegisters<M> {
@@ -1632,7 +1627,6 @@ impl<M: backend::ManagerBase> CSRegisters<M> {
     pub fn bind(space: backend::AllocatedOf<CSRegistersLayout, M>) -> Self {
         Self {
             registers: values::CSRValues::bind(space),
-            interrupt_cache: InterruptsCache::default(),
         }
     }
 
@@ -1981,10 +1975,10 @@ mod tests {
         let seip: u64 = 1 << Interrupt::SupervisorExternal.exception_code();
         let stip: u64 = 1 << Interrupt::SupervisorTimer.exception_code();
 
-        // check shadowing of MTIP
+        // Writing to MIP does nothing.
         csrs.write(CSRegister::mip, mtip | seip);
-        assert_eq!(csrs.read::<CSRRepr>(CSRegister::mip), mtip | seip);
-        assert_eq!(csrs.read::<CSRRepr>(CSRegister::sip), seip);
+        assert_eq!(csrs.read::<CSRRepr>(CSRegister::mip), 0);
+        assert_eq!(csrs.read::<CSRRepr>(CSRegister::sip), 0);
 
         // MSIP bit should not be written
         csrs.write(CSRegister::sie, stip | seip | msip);

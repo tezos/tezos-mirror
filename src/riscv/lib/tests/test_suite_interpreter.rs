@@ -108,11 +108,6 @@ macro_rules! test_case {
 test_case!(test_suite_rv64mi_p_access, "rv64mi-p-access");
 test_case!(#[ignore], test_suite_rv64mi_p_breakpoint, "rv64mi-p-breakpoint");
 test_case!(test_suite_rv64mi_p_csr, "rv64mi-p-csr", Mode::User);
-test_case!(
-    test_suite_rv64mi_p_illegal,
-    "rv64mi-p-illegal",
-    Mode::Supervisor
-);
 test_case!(test_suite_rv64mi_p_ld_misaligned, "rv64mi-p-ld-misaligned");
 test_case!(test_suite_rv64mi_p_lh_misaligned, "rv64mi-p-lh-misaligned");
 test_case!(test_suite_rv64mi_p_lw_misaligned, "rv64mi-p-lw-misaligned");

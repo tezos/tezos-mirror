@@ -9,8 +9,8 @@ use crate::state_backend::ManagerBase;
 /// Effects to be handled by function [`handle_csr_effect`].
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub enum CSREffect {
-    InvalidateTranslationCacheXIE,
-    InvalidateTranslationCacheXIP,
+    XIE,
+    XIP,
 }
 
 macro_rules! create_effect_getter {
@@ -26,15 +26,14 @@ macro_rules! create_effect_getter {
 }
 
 create_effect_getter!(NoEffect, None);
-create_effect_getter!(XieEffect, Some(CSREffect::InvalidateTranslationCacheXIE));
-create_effect_getter!(XipEffect, Some(CSREffect::InvalidateTranslationCacheXIP));
+create_effect_getter!(XieEffect, Some(CSREffect::XIE));
+create_effect_getter!(XipEffect, Some(CSREffect::XIP));
 
 #[inline(always)]
-pub fn handle_csr_effect(state: &mut CSRegisters<impl ManagerBase>, effect: Option<CSREffect>) {
+pub fn handle_csr_effect(_state: &mut CSRegisters<impl ManagerBase>, effect: Option<CSREffect>) {
     if let Some(effect) = effect {
         match effect {
-            CSREffect::InvalidateTranslationCacheXIE => state.interrupt_cache.invalidate(),
-            CSREffect::InvalidateTranslationCacheXIP => state.interrupt_cache.invalidate_by_mip(),
+            CSREffect::XIE | CSREffect::XIP => {}
         }
     }
 }
