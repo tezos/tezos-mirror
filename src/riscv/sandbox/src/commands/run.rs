@@ -66,14 +66,8 @@ fn run_test<R>(
     common: &CommonOptions,
     f_stepper: impl FnOnce(TestStepper) -> R,
 ) -> Result<R, Box<dyn Error>> {
-    let mut backend = TestStepper::<'_, M1G>::create_backend();
-    let stepper = TestStepper::new(
-        &mut backend,
-        program,
-        initrd,
-        posix_exit_mode(&common.posix_exit_mode),
-    )?;
-
+    let stepper =
+        TestStepper::<M1G>::new(program, initrd, posix_exit_mode(&common.posix_exit_mode))?;
     Ok(f_stepper(stepper))
 }
 

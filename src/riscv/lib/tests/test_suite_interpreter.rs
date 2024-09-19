@@ -46,9 +46,8 @@ fn interpret_test_with_check(path: &str, exit_mode: Mode, check_xregs: &[(XRegis
     let mut golden = mint.new_goldenfile(format!("{path}.out")).unwrap();
 
     let contents = fs::read(format!("{TESTS_DIR}/{path}")).expect("Failed to read binary");
-    let mut backend = TestStepper::<'_, M1M>::create_backend();
-    let mut interpreter =
-        TestStepper::new(&mut backend, &contents, None, exit_mode).expect("Boot failed");
+    let mut interpreter: TestStepper<M1M> =
+        TestStepper::new(&contents, None, exit_mode).expect("Boot failed");
 
     let res = interpreter.step_max(Bound::Included(MAX_STEPS));
     // Record the result to compare to the expected result
