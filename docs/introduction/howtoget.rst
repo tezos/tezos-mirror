@@ -199,7 +199,7 @@ automatically generated and published on `DockerHub
 <https://hub.docker.com/r/tezos/tezos/>`_. This provides a convenient
 way to run an always up-to-date ``octez-node``.
 
-From version 22.0 all Docker images for tezos are signed using Cosign.
+From version 22.0 all Octez Docker images are signed using Cosign.
 You can verify if the images are correctly signed using the Cosign utility, as explained below:
 
 .. toctree::
