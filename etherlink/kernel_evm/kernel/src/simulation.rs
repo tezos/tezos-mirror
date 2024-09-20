@@ -468,7 +468,7 @@ impl Evaluation {
                 Some(u64::min(gas, MAXIMUM_GAS_LIMIT))
             }),
             gas_price,
-            self.value,
+            Some(self.value.unwrap_or_default()),
             false,
             allocated_ticks,
             false,
