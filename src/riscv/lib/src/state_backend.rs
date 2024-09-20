@@ -59,6 +59,7 @@ mod alloc;
 mod effects;
 mod elems;
 mod enums;
+pub mod hash;
 mod layout;
 pub mod memory_backend;
 pub mod owned_backend;

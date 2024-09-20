@@ -163,9 +163,7 @@ impl NodePvm {
     }
 
     pub fn hash(&self) -> Hash {
-        tezos_crypto_rs::blake2b::digest_256(self.to_bytes())
-            .try_into()
-            .unwrap()
+        Hash::blake2b_hash_bytes(self.to_bytes()).unwrap()
     }
 
     pub fn set_input_message(&self, level: u32, message_counter: u64, input: Vec<u8>) -> Self {

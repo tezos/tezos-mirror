@@ -81,7 +81,7 @@ pub fn octez_riscv_id_unsafe_of_raw_bytes(s: &[u8]) -> Pointer<Id> {
 #[ocaml::func]
 #[ocaml::sig("id -> bytes")]
 pub fn octez_riscv_storage_id_to_raw_bytes(id: Pointer<Id>) -> [u8; 32] {
-    id.as_ref().0
+    id.as_ref().0.into()
 }
 
 #[ocaml::func]
@@ -272,7 +272,7 @@ pub fn octez_riscv_install_boot_sector(
 #[ocaml::func]
 #[ocaml::sig("state -> bytes")]
 pub fn octez_riscv_state_hash(state: Pointer<State>) -> [u8; 32] {
-    state.as_ref().0.hash()
+    state.as_ref().0.hash().into()
 }
 
 #[ocaml::func]

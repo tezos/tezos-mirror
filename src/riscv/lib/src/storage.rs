@@ -6,13 +6,13 @@
 pub(crate) mod binary;
 mod chunked_io;
 
+pub use crate::state_backend::hash::{Hash, HashError, DIGEST_SIZE};
 use std::{
     io::{self, Write},
     path::{Path, PathBuf},
 };
 use thiserror::Error;
 
-pub const DIGEST_SIZE: usize = 32;
 const CHUNK_SIZE: usize = 4096;
 
 #[derive(Error, Debug)]
@@ -26,8 +26,8 @@ pub enum StorageError {
     #[error("Invalid repo")]
     InvalidRepo,
 
-    #[error("BLAKE2b hashing error")]
-    HashError(#[from] tezos_crypto_rs::blake2b::Blake2bError),
+    #[error("Hashing error")]
+    HashError(#[from] HashError),
 
     #[error("Data for hash {0} not found")]
     NotFound(String),
@@ -35,8 +35,6 @@ pub enum StorageError {
     #[error("Commited chunk {0} not found")]
     ChunkNotFound(String),
 }
-
-pub type Hash = [u8; DIGEST_SIZE];
 
 #[derive(Debug, PartialEq)]
 pub struct Store {
@@ -83,11 +81,7 @@ impl Store {
     /// Store data and return its hash. The data is written to disk only if
     /// previously unseen.
     pub fn store(&self, data: &[u8]) -> Result<Hash, StorageError> {
-        // This is safe to unwrap because `digest_256` always returns
-        // a `DIGEST_SIZE`-long `Vec<u8>`.
-        let hash: Hash = tezos_crypto_rs::blake2b::digest_256(data)
-            .try_into()
-            .unwrap();
+        let hash = Hash::blake2b_hash_bytes(data)?;
         let file_name = self.path_of_hash(&hash);
         self.write_data_if_new(file_name, data)?;
         Ok(hash)
