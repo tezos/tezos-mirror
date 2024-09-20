@@ -515,6 +515,24 @@ let wait_for_level ?timeout sc_node level =
         ~where:("level >= " ^ string_of_int level)
         promise
 
+let wait_for ?where ?(timeout = 60.) daemon name filter =
+  let w =
+    let* res = wait_for ?where daemon name filter in
+    return (`Ok res)
+  in
+  let t =
+    let* () = Lwt_unix.sleep timeout in
+    return `Timeout
+  in
+  let* res = Lwt.pick [w; t] in
+  match res with
+  | `Ok res -> return res
+  | `Timeout ->
+      Test.fail
+        "Timeout wile waiting %fs for smart rollup node event %s"
+        timeout
+        name
+
 let unsafe_wait_sync ?timeout sc_node =
   let* node_level =
     match sc_node.persistent_state.endpoint with

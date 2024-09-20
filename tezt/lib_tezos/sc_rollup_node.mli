@@ -332,7 +332,13 @@ val wait_sync : t -> timeout:float -> int Lwt.t
     returns [Some _]) is produced, in which case the result of the filter is
     returned. [where], if present, should describe the constraint that [filter]
     applies. *)
-val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
+val wait_for :
+  ?where:string ->
+  ?timeout:float ->
+  t ->
+  string ->
+  (JSON.t -> 'a option) ->
+  'a Lwt.t
 
 (** Add a callback to be called whenever the daemon emits an event. *)
 val on_event : t -> (event -> unit) -> unit
