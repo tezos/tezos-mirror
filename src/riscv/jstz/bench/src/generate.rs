@@ -59,19 +59,19 @@ fn generate_inbox(rollup_addr: &str, transfers: usize) -> Result<InboxFile> {
 
     let mut accounts = gen_keys(accounts)?;
 
-    // Level 1 - setup
+    // Part 1 - setup
     let (fa2_address, deploy) = deploy_fa2(rollup_addr.clone(), accounts.first_mut().unwrap())?;
     let batch_mint = batch_mint(rollup_addr.clone(), &mut accounts, &fa2_address)?;
 
-    let level1 = vec![deploy, batch_mint];
+    let mut messages = vec![deploy, batch_mint];
 
-    // Level 2 - transfers
+    // Part 2 - transfers
     let len = accounts.len();
-    let mut transfers = Vec::with_capacity(transfers);
+    let expected_len = messages.len() + transfers;
 
     'outer: for token_id in 0..len {
         for (from, amount) in (token_id..(token_id + len)).zip(1..len) {
-            if transfers.capacity() == transfers.len() {
+            if expected_len == messages.len() {
                 break 'outer;
             }
 
@@ -85,19 +85,21 @@ fn generate_inbox(rollup_addr: &str, transfers: usize) -> Result<InboxFile> {
             let account = &mut accounts[from % len];
             let op = transfer_op(rollup_addr.clone(), account, &fa2_address, &transfer)?;
 
-            transfers.push(op);
+            messages.push(op);
         }
     }
 
-    // Level 3 - checking
+    // Part 3 - checking
     let tokens = 0..accounts.len();
-    let balances = accounts
+    for balance in accounts
         .iter_mut()
         .map(|a| balance(rollup_addr.clone(), a, &fa2_address, tokens.clone()))
-        .collect::<Result<Vec<_>>>()?;
+    {
+        messages.push(balance?);
+    }
 
     // Output inbox file
-    let inbox = InboxFile(vec![level1, transfers, balances]);
+    let inbox = InboxFile(vec![messages]);
     Ok(inbox)
 }
 
