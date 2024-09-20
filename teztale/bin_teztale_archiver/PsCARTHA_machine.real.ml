@@ -26,7 +26,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
   let wrap_full cctxt =
     new Tezos_client_006_PsCARTHA.Protocol_client_context.wrap_full cctxt
 
-  let endorsing_rights cctxt ~reference_level block =
+  let attesting_rights cctxt ~reference_level block =
     let*? level =
       Environment.wrap_error @@ Protocol.Alpha_context.Raw_level.of_int32 block
     in

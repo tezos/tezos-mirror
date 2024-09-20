@@ -99,7 +99,7 @@ module Delegate_operations = struct
   type t = {
     delegate : Tezos_crypto.Signature.public_key_hash;
     first_slot : int;
-    endorsing_power : int;
+    attesting_power : int;
     operations : operation list;
   }
 
@@ -110,7 +110,7 @@ module Delegate_operations = struct
       (fun (delegate, reception_time, errors, block_inclusion) ->
         match (reception_time, block_inclusion) with
         | None, [] ->
-            {delegate; first_slot = 0; endorsing_power = 0; operations = []}
+            {delegate; first_slot = 0; attesting_power = 0; operations = []}
         | _, _ ->
             let mempool_inclusion =
               match reception_time with
@@ -121,7 +121,7 @@ module Delegate_operations = struct
             {
               delegate;
               first_slot = 0;
-              endorsing_power = 0;
+              attesting_power = 0;
               operations =
                 [
                   {
@@ -142,10 +142,10 @@ module Delegate_operations = struct
   let encoding =
     let open Data_encoding in
     conv
-      (fun {delegate; first_slot; endorsing_power; operations} ->
-        (delegate, first_slot, endorsing_power, operations))
-      (fun (delegate, first_slot, endorsing_power, operations) ->
-        {delegate; first_slot; endorsing_power; operations})
+      (fun {delegate; first_slot; attesting_power; operations} ->
+        (delegate, first_slot, attesting_power, operations))
+      (fun (delegate, first_slot, attesting_power, operations) ->
+        {delegate; first_slot; attesting_power; operations})
       (obj4
          (req "delegate" Tezos_crypto.Signature.Public_key_hash.encoding)
          (dft "first_slot" int16 0)

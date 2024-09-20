@@ -26,7 +26,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
       Data_encoding.uint16
       (Data_encoding.Binary.to_bytes_exn Protocol.Alpha_context.Slot.encoding x)
 
-  let endorsing_rights cctxt ~reference_level level =
+  let attesting_rights cctxt ~reference_level level =
     let*? level =
       Environment.wrap_tzresult
       @@ Protocol.Alpha_context.Raw_level.of_int32 level

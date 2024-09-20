@@ -20,8 +20,8 @@ let to_received_ops ctx endpoint auth level data =
   let received_ops =
     List.map
       (fun Data.Delegate_operations.
-             {delegate; first_slot; endorsing_power; operations} ->
-        ( Consensus_ops.{address = delegate; first_slot; power = endorsing_power},
+             {delegate; first_slot; attesting_power; operations} ->
+        ( Consensus_ops.{address = delegate; first_slot; power = attesting_power},
           List.flatten
             (List.map
                (fun Data.Delegate_operations.
@@ -83,7 +83,7 @@ let included_ops_map level data =
   List.fold_left
     (fun acc
          Data.Delegate_operations.
-           {delegate; first_slot = _; endorsing_power; operations} ->
+           {delegate; first_slot = _; attesting_power; operations} ->
       List.fold_left
         (fun acc
              Data.Delegate_operations.
@@ -101,7 +101,7 @@ let included_ops_map level data =
                   {
                     op = {kind; round; hash = maybe_faked_hash};
                     delegate;
-                    power = endorsing_power;
+                    power = attesting_power;
                   }
                 acc)
             acc

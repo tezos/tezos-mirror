@@ -132,7 +132,7 @@ module Mutex = struct
 
   let operations_inclusion = Lwt_mutex.create ()
 
-  let endorsing_rights = Lwt_mutex.create ()
+  let attesting_rights = Lwt_mutex.create ()
 
   let cycles = Lwt_mutex.create ()
 
@@ -291,7 +291,7 @@ let maybe_insert_delegate =
   Caqti_request.Infix.(Caqti_type.(Type.public_key_hash ->. unit))
     "INSERT INTO delegates (address) VALUES (?) ON CONFLICT DO NOTHING"
 
-let maybe_insert_endorsing_right =
+let maybe_insert_attesting_right =
   Caqti_request.Infix.(
     Caqti_type.(t4 int32 int int Type.public_key_hash ->. unit))
     "INSERT INTO endorsing_rights (level, delegate, first_slot, \
