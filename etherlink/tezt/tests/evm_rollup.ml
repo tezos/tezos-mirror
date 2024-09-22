@@ -2422,6 +2422,7 @@ let withdraw ~commitment_period ~challenge_window ~amount_wei ~sender ~receiver
       ~sc_rollup_node
       ~sc_rollup_address
       ~client
+      ()
   in
   unit
 

@@ -1690,6 +1690,7 @@ let test_fa_withdrawal_is_included =
   (* Wait till the cementation and execute outbox message *)
   let* _ =
     find_and_execute_withdrawal
+      ~outbox_lookup_depth:100
       ~withdrawal_level
       ~commitment_period:5
       ~challenge_window:5
@@ -1697,6 +1698,7 @@ let test_fa_withdrawal_is_included =
       ~sc_rollup_node
       ~sc_rollup_address
       ~client
+      ()
   in
 
   let* _ = next_rollup_node_level ~sc_rollup_node ~client in
@@ -4116,6 +4118,7 @@ let test_outbox_size_limit_resilience ~slow =
         ~sc_rollup_node
         ~sc_rollup_address
         ~client
+        ()
     in
     let* balance =
       Client.get_balance_for
@@ -4134,6 +4137,7 @@ let test_outbox_size_limit_resilience ~slow =
         ~sc_rollup_node
         ~sc_rollup_address
         ~client
+        ()
     in
     let* balance =
       Client.get_balance_for
