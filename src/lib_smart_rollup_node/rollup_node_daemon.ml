@@ -207,9 +207,10 @@ let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
     Sc_rollup_block.{header; content = (); num_ticks; initial_tick}
   in
   let* () =
-    Node_context.mark_finalized_level
-      node_ctxt
-      Int32.(sub head.level (of_int node_ctxt.block_finality_time))
+    assert (node_ctxt.block_finality_time = 2) ;
+    let finalized_level = Int32.pred predecessor.header.level in
+    let finalized_hash = predecessor.header.predecessor in
+    Node_context.set_finalized node_ctxt finalized_hash finalized_level
   in
   let* () = Node_context.save_l2_block node_ctxt l2_block in
   let end_timestamp = Time.System.now () in

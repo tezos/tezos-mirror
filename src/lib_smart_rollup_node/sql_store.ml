@@ -961,7 +961,7 @@ module L2_blocks = struct
        b.inbox_hash, b.initial_tick, b.num_ticks
       FROM l2_blocks AS b
       INNER JOIN rollup_node_state as s
-      ON s.name = "finalized_level" AND s.level = b.level
+      ON s.name = "finalized_level" AND s.value = b.block_hash
       |sql}
 
     let select_level_and_predecessor =
@@ -1178,8 +1178,12 @@ module State = struct
       with_connection store conn @@ fun conn -> Sqlite.Db.exec conn Q.delete ()
   end
 
-  module Finalized_level = Make_level (struct
+  module Finalized_level = Make_both (struct
     let name = "finalized_level"
+
+    type value = Block_hash.t
+
+    let type_ = Types.block_hash
   end)
 
   module LCC = Make_both (struct

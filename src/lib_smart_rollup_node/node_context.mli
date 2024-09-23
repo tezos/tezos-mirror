@@ -267,10 +267,10 @@ val set_l2_head : rw -> Sc_rollup_block.t -> unit tzresult Lwt.t
     exists. *)
 val last_processed_head_opt : _ t -> Sc_rollup_block.t option tzresult Lwt.t
 
-(** [mark_finalized_head store head] remembers that the [head] is finalized. By
-    construction, every block whose level is smaller than [head]'s is also
-    finalized. *)
-val mark_finalized_level : rw -> int32 -> unit tzresult Lwt.t
+(** [mark_finalized_head store hash level] remembers that the block with [hash]
+    at [level] is finalized. By construction, every block whose level is smaller
+    than [level] is also finalized. *)
+val set_finalized : rw -> Block_hash.t -> int32 -> unit tzresult Lwt.t
 
 (** [get_finalized_level t] returns the last finalized level. *)
 val get_finalized_level : _ t -> int32 tzresult Lwt.t
