@@ -262,6 +262,8 @@ end
 
 let sqlite_file_name = "store.sqlite"
 
+let extra_sqlite_files = [sqlite_file_name ^ "-wal"; sqlite_file_name ^ "-shm"]
+
 type 'a t = Sqlite.t
 
 type rw = Store_sigs.rw t
@@ -1107,6 +1109,12 @@ module State = struct
       @@ Format.sprintf
            {sql|SELECT value, level from rollup_node_state WHERE name = %S|sql}
            N.name
+
+    let delete =
+      (unit ->. unit)
+      @@ Format.sprintf
+           {sql|DELETE from rollup_node_state WHERE name = %S|sql}
+           N.name
   end
 
   module type S = sig
@@ -1157,7 +1165,8 @@ module State = struct
     val name : string
 
     val type_ : value Caqti_type.t
-  end) : S with type value := N.value * int32 = struct
+  end) =
+  struct
     module Q = Q (N)
 
     let set = Q.set_both N.type_
@@ -1170,6 +1179,9 @@ module State = struct
 
     let get ?conn store =
       with_connection store conn @@ fun conn -> Sqlite.Db.find_opt conn get ()
+
+    let delete ?conn store =
+      with_connection store conn @@ fun conn -> Sqlite.Db.exec conn Q.delete ()
   end
 
   module Finalized_level = Make_level (struct
@@ -1246,4 +1258,18 @@ let gc store ~level =
     return_unit
   in
   let*! () = Events.(emit finish_gc) () in
+  return_unit
+
+let export_store ~data_dir ~output_db_file =
+  let open Lwt_result_syntax in
+  let* store = init Read_only ~data_dir in
+  Sqlite.use store @@ fun conn ->
+  let* () = Sqlite.vacuum ~conn ~output_db_file in
+  (* Remove operator specific information *)
+  let* store =
+    Sqlite.init ~path:output_db_file ~perm:`Read_write (fun _ -> return_unit)
+  in
+  let* () = State.LPC.delete store in
+  let* () = Sqlite.use store @@ fun conn -> Sqlite.vacuum_self ~conn in
+  let*! () = close store in
   return_unit
