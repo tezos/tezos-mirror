@@ -286,13 +286,13 @@ let is_processed {store; _} head =
 
 let last_processed_head_opt {store; _} = Store.L2_blocks.find_head store
 
-let mark_finalized_level {store; _} level =
-  Store.State.Finalized_level.set store level
+let set_finalized {store; _} hash level =
+  Store.State.Finalized_level.set store (hash, level)
 
 let get_finalized_level {store; _} =
   let open Lwt_result_syntax in
-  let+ level = Store.State.Finalized_level.get store in
-  Option.value level ~default:0l
+  let+ f = Store.State.Finalized_level.get store in
+  match f with None -> 0l | Some (_h, l) -> l
 
 let find_l2_block {store; _} block_hash = Store.L2_blocks.find store block_hash
 

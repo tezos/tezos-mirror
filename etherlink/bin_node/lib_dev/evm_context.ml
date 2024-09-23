@@ -1740,10 +1740,10 @@ let reconstruct ~data_dir ~rollup_node_data_dir ~boot_sector =
   let* rollup_node_store =
     Store.init Read_only ~data_dir:rollup_node_data_dir
   in
-  let* finalized_level = Store.State.Finalized_level.get rollup_node_store in
+  let* finalized = Store.State.Finalized_level.get rollup_node_store in
   let* finalized_level =
-    match finalized_level with
-    | Some l -> return l
+    match finalized with
+    | Some (_block, l) -> return l
     | None -> failwith "Rollup node has no finalized l2 block"
   in
   let* smart_rollup_address, genesis_level =
