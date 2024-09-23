@@ -24,11 +24,30 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Block_hash_cache : Aches.Vache.SET with type elt = Block_hash.t =
+  Aches.Vache.Set (Aches.Vache.LRU_Precise) (Aches.Vache.Strong) (Block_hash)
+
 let monitor_received_block
     ~(received_watcher : Block_hash.t Lwt_stream.t * Lwt_watcher.stopper) () =
   let block_stream, stopper = received_watcher in
   let shutdown () = Lwt_watcher.shutdown stopper in
-  let next () = Lwt_stream.get block_stream in
+  (* This table is created to avoid monitoring block already recieved such as a
+     scenario where we are receiving multiple blocks from multiple peers that
+     may re-advertise some already advertised blocks (such as processing
+     A;B;A;B;A;B). *)
+  let previous_block_hashes = Block_hash_cache.create 10 in
+  let next () =
+    Lwt_stream.get
+      (Lwt_stream.filter
+         (fun block_hash ->
+           if Block_hash_cache.mem previous_block_hashes block_hash then
+             (* We avoid outputting already recieved blocks *)
+             false
+           else (
+             Block_hash_cache.add previous_block_hashes block_hash ;
+             true))
+         block_stream)
+  in
   Tezos_rpc.Answer.return_stream {next; shutdown}
 
 let monitor_head
