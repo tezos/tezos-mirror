@@ -213,12 +213,6 @@ let micheline_encoding =
 
 let data_micheline_encoding = obj1 (req "data" micheline_encoding)
 
-let level_encoding =
-  conv
-    (fun _ -> failwith_unused_encoding ~__FUNCTION__)
-    (fun (level, ()) -> level)
-    (merge_objs (obj1 (req "level" int31)) unit)
-
 type header = {level : int}
 
 let header_encoding =
@@ -288,13 +282,13 @@ module Path = struct
 
   let head = main / "blocks" / "head"
 
-  let current_l1_level = head / "helpers" / "current_level"
-
   let micheline_view = head / "helpers" / "scripts" / "run_script_view"
 
   let storage ~contract = head / "context" / "contracts" / contract / "storage"
 
   let monitor_heads = root / "monitor" / "heads" / "main"
+
+  let block_by_level ~level = main / "blocks" / level
 end
 
 module Services = struct
@@ -304,13 +298,6 @@ module Services = struct
       ~query:Query.empty
       ~output:Data_encoding.string
       Path.chain_id
-
-  let current_l1_level =
-    Service.get_service
-      ~description:"Current L1 level"
-      ~query:Query.empty
-      ~output:level_encoding
-      Path.current_l1_level
 
   let micheline_view =
     Service.post_service
@@ -333,6 +320,15 @@ module Services = struct
       ~query:Tezos_rpc.Query.empty
       ~output:header_encoding
       Path.monitor_heads
+
+  let governance_operations ~contracts =
+    let output = operations_encoding ~contracts in
+    fun ~level ->
+      Service.get_service
+        ~description:"Potential operations from block by hash"
+        ~query:Query.empty
+        ~output
+        Path.(block_by_level ~level)
 end
 
 module RPC = struct
@@ -345,16 +341,8 @@ module RPC = struct
     | Ok chain_id -> return chain_id
     | Error trace -> fail trace
 
-  let current_l1_level base =
+  let micheline_view ~chain_id ~contract ~view ~level ~decode base =
     let open Lwt_result_syntax in
-    let*! answer = call_service ~base Services.current_l1_level () () () in
-    match answer with
-    | Ok current_l1_level -> return current_l1_level
-    | Error trace -> fail trace
-
-  let micheline_view ~chain_id ~contract ~view ~decode base =
-    let open Lwt_result_syntax in
-    let* level = current_l1_level base in
     let view_input = {chain_id; contract; view; level} in
     let*! answer =
       call_service ~base Services.micheline_view () () view_input
@@ -390,4 +378,11 @@ module RPC = struct
           read_stream stream
     in
     read_stream stream
+
+  let governance_operations ~config =
+    let base = config.Configuration.endpoint in
+    let service =
+      Services.(governance_operations ~contracts:config.contracts)
+    in
+    fun ~level -> call_service ~base (service ~level) () () ()
 end

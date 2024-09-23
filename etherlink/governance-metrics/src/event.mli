@@ -21,3 +21,7 @@ val contract_metrics : string -> unit Lwt.t
 (** Error event to give information when there is an issue related to processing
     the storage of a smart contract. *)
 val storage_state_error : string -> unit Lwt.t
+
+(** Error event to give information when there is an issue related to processing
+    the operations of a smart contract. *)
+val contract_operations_error : string -> unit Lwt.t
