@@ -14,5 +14,6 @@ brassaia
 rust-toolchain
 data-encoding
 cohttp
+opentelemetry
 prometheus
 resto

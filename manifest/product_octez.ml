@@ -136,6 +136,14 @@ let () =
     ~target:"!module-Resto"
     ~text:"Resto"
 
+(* Back-register the cohttp library which is currently maintained as its
+   own product but still attached to octez-libs. *)
+let () =
+  Sub_lib.add_doc_link
+    registered_octez_libs
+    ~target:"!module-OpenTelemetry_client_cohttp_lwt"
+    ~text:"Opentelemetry_client_cohttp_lwt"
+
 (* Container of the registered sublibraries of [octez-shell-libs] *)
 let registered_octez_shell_libs = Sub_lib.make_container ()
 
