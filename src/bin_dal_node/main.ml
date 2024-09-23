@@ -36,6 +36,7 @@ let merge
         profile;
         peers;
         history_mode;
+        service_name;
       } configuration =
   let profile =
     match profile with
@@ -61,6 +62,7 @@ let merge
     metrics_addr = Option.value ~default:configuration.metrics_addr metrics_addr;
     peers = peers @ configuration.peers;
     history_mode = Option.value ~default:configuration.history_mode history_mode;
+    service_name = Option.either service_name configuration.service_name;
   }
 
 let wrap_with_error main_promise =

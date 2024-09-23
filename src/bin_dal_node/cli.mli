@@ -49,6 +49,8 @@ type options = {
   metrics_addr : P2p_point.Id.t option;  (** Metrics server endpoint. *)
   peers : string list;  (** DAL nodes to connect to. *)
   history_mode : Configuration_file.history_mode option;
+  service_name : string option;
+      (** Name of the service provided by this node. *)
 }
 
 (** Subcommands that can be used by the DAL node. In the future this type

@@ -269,13 +269,25 @@ module Term = struct
       & opt (some history_mode_arg) None
       & info ~docs ~doc ["history-mode"])
 
+  let service_name =
+    let open Cmdliner in
+    let doc =
+      "A name that can be used to identify this node. This name can appear in \
+       observability data such as traces."
+    in
+    let service_name_arg = Arg.string in
+    Arg.(
+      value
+      & opt (some service_name_arg) None
+      & info ~docs ~doc ["service-name"])
+
   let term process =
     Cmdliner.Term.(
       ret
         (const process $ data_dir $ rpc_addr $ expected_pow $ net_addr
        $ public_addr $ endpoint $ metrics_addr $ attester_profile
        $ producer_profile $ observer_profile $ bootstrap_profile $ peers
-       $ history_mode))
+       $ history_mode $ service_name))
 end
 
 module Run = struct
@@ -346,6 +358,7 @@ type options = {
   metrics_addr : P2p_point.Id.t option;
   peers : string list;
   history_mode : Configuration_file.history_mode option;
+  service_name : string option;
 }
 
 type t = Run | Config_init
@@ -353,7 +366,7 @@ type t = Run | Config_init
 let make ~run =
   let run subcommand data_dir rpc_addr expected_pow listen_addr public_addr
       endpoint metrics_addr attesters producers observers bootstrap_flag peers
-      history_mode =
+      history_mode service_name =
     let run profile =
       run
         subcommand
@@ -368,6 +381,7 @@ let make ~run =
           metrics_addr;
           peers;
           history_mode;
+          service_name;
         }
     in
     let profile = Operator_profile.make ~attesters ~producers ?observers () in
