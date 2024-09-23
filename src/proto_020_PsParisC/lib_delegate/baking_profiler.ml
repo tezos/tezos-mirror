@@ -9,11 +9,14 @@ open Profiler
 
 let nonce_profiler = unplugged ()
 
+let operation_worker_profiler = unplugged ()
+
 let node_rpc_profiler = unplugged ()
 
 let init profiler_maker =
   plug nonce_profiler (profiler_maker ~name:"nonce") ;
-  plug node_rpc_profiler (profiler_maker ~name:"node_rpc")
+  plug node_rpc_profiler (profiler_maker ~name:"node_rpc") ;
+  plug operation_worker_profiler (profiler_maker ~name:"op_worker")
 
 let create_reset_block_section profiler =
   let last_block = ref None in
