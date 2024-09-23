@@ -784,4 +784,52 @@ mod tests {
 
         fetch_blueprints(host, DEFAULT_SR_ADDRESS, conf).expect("fetch failed");
     }
+
+    #[test]
+    fn test_dal_signal() {
+        let mut host = MockKernelHost::default();
+        let mut conf = dummy_sequencer_config(true, None);
+
+        setup_dal_signal(&mut host, &mut conf, None, None);
+
+        if read_next_blueprint(&mut host, &mut conf)
+            .expect("Blueprint reading shouldn't fail")
+            .0
+            .is_none()
+        {
+            panic!("There should be a blueprint in the DAL slot")
+        }
+    }
+
+    #[test]
+    fn test_dal_signal_empty_slot() {
+        let mut host = MockKernelHost::default();
+        let mut conf = dummy_sequencer_config(false, Some(vec![8]));
+
+        setup_dal_signal(&mut host, &mut conf, Some(vec![21]), Some(vec![]));
+
+        if read_next_blueprint(&mut host, &mut conf)
+            .expect("Blueprint reading shouldn't fail")
+            .0
+            .is_some()
+        {
+            panic!("There shouldn't be a blueprint fetched from DAL slots, as the slot is empty")
+        }
+    }
+
+    #[test]
+    fn test_dal_signal_with_multiple_slots_filled() {
+        let mut host = MockKernelHost::default();
+        let mut conf = dummy_sequencer_config(true, Some(vec![6, 8]));
+
+        setup_dal_signal(&mut host, &mut conf, None, None);
+
+        if read_next_blueprint(&mut host, &mut conf)
+            .expect("Blueprint reading shouldn't fail")
+            .0
+            .is_none()
+        {
+            panic!("There should be a blueprint in the DAL slot")
+        }
+    }
 }
