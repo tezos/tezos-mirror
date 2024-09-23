@@ -185,6 +185,8 @@ let ocplib_endian_bigstring =
 let ocplib_ocamlres =
   external_lib ~opam:"ocp-ocamlres" "ocplib-ocamlres" V.(at_least "0.4")
 
+let opentelemetry = external_lib "opentelemetry" V.True
+
 let optint = external_lib "optint" V.True
 
 let ppx_expect = inline_tests_backend (external_lib "ppx_expect" V.True)
