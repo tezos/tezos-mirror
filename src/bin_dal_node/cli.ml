@@ -269,6 +269,13 @@ module Term = struct
       & opt (some history_mode_arg) None
       & info ~docs ~doc ["history-mode"])
 
+  let service_name_env =
+    let open Cmdliner in
+    Cmd.Env.info
+      ~docs:"Opentelemetry"
+      ~doc:"Enable to provide an opentelemetry service name"
+      "OTEL_SERVICE_NAME"
+
   let service_name =
     let open Cmdliner in
     let doc =
@@ -279,7 +286,14 @@ module Term = struct
     Arg.(
       value
       & opt (some service_name_arg) None
-      & info ~docs ~doc ["service-name"])
+      & info ~docs ~doc ~env:service_name_env ["service-name"])
+
+  let service_namespace_env =
+    let open Cmdliner in
+    Cmd.Env.info
+      ~docs:"Opentelemetry"
+      ~doc:"Enable to provide an opentelemetry service namespace"
+      "OTEL_SERVICE_NAMESPACE"
 
   let service_namespace =
     let open Cmdliner in
@@ -291,7 +305,7 @@ module Term = struct
     Arg.(
       value
       & opt (some service_namespace_arg) None
-      & info ~docs ~doc ["service-namespace"])
+      & info ~docs ~doc ~env:service_namespace_env ["service-namespace"])
 
   let term process =
     Cmdliner.Term.(
