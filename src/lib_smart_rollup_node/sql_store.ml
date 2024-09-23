@@ -182,12 +182,6 @@ module Types = struct
     @@ proj level (fun i -> i.Inbox.level)
     @@ proj history_proof (fun i -> i.Inbox.old_levels_messages)
     @@ proj_end
-
-  let history_mode =
-    custom
-      ~encode:(fun h -> Ok (Configuration.string_of_history_mode h))
-      ~decode:(fun s -> Ok (Configuration.history_mode_of_string s))
-      string
 end
 
 let table_exists_req =
@@ -1224,12 +1218,23 @@ module State = struct
     let name = "last_context_split"
   end)
 
+  type history_mode = Archive | Full
+
+  let history_mode_type =
+    custom
+      ~encode:(function Archive -> Ok "archive" | Full -> Ok "full")
+      ~decode:(function
+        | "archive" -> Ok Archive
+        | "full" -> Ok Full
+        | s -> Error ("Invalid history mode: " ^ s))
+      string
+
   module History_mode = Make_value (struct
     let name = "history_mode"
 
-    type value = Configuration.history_mode
+    type value = history_mode
 
-    let type_ = Types.history_mode
+    let type_ = history_mode_type
   end)
 
   module L2_head = Make_both (struct

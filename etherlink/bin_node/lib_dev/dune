@@ -27,6 +27,7 @@
   octez-smart-rollup-wasm-debugger-lib
   octez-l2-libs.layer2_store
   octez-l2-libs.smart-rollup
+  octez-l2-libs.octez-smart-rollup-node-lib.store
   octez-evm-node-libs.evm_node_migrations
   octez-evm-node-libs.evm_node_kernels
   octez-libs.prometheus-app
