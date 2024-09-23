@@ -81,7 +81,7 @@ pub fn deploy_mock_wrapper(
         [code, calldata.abi_encode()].concat(),
         Some(300_000),
         U256::one(),
-        None,
+        U256::zero(),
         false,
         1_000_000_000,
         false,
