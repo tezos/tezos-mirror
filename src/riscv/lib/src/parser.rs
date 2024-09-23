@@ -486,6 +486,7 @@ const FM_8: u32 = 0b1000;
 #[inline]
 pub const fn parse_uncompressed_instruction(instr: u32) -> Instr {
     use InstrCacheable::*;
+    use InstrUncacheable::*;
     let i = match opcode(instr) {
         // R-type instructions
         OP_ARITH => match funct3(instr) {
@@ -615,8 +616,8 @@ pub const fn parse_uncompressed_instruction(instr: u32) -> Instr {
         },
         OP_SYNCH => match funct3(instr) {
             F3_0 => match fm(instr) {
-                FM_0 => fence_instr!(Fence, instr),
-                FM_8 => fence_instr!(FenceTso, instr),
+                FM_0 => return Instr::Uncacheable(fence_instr!(Fence, instr)),
+                FM_8 => return Instr::Uncacheable(fence_instr!(FenceTso, instr)),
                 _ => Unknown { instr },
             },
             F3_1 => return Instr::Uncacheable(InstrUncacheable::FenceI),
@@ -625,25 +626,27 @@ pub const fn parse_uncompressed_instruction(instr: u32) -> Instr {
         OP_SYS => match funct3(instr) {
             F3_0 => match funct7(instr) {
                 F7_0 => match (rs1_bits(instr), rs2_bits(instr)) {
-                    (RS1_0, RS2_0) => Ecall,
-                    (RS1_0, RS2_1) => Ebreak,
+                    (RS1_0, RS2_0) => return Instr::Uncacheable(Ecall),
+                    (RS1_0, RS2_1) => return Instr::Uncacheable(Ebreak),
                     _ => Unknown { instr },
                 },
-                F7_9 => SFenceVma {
-                    vaddr: rs1(instr),
-                    asid: rs2(instr),
-                },
+                F7_9 => {
+                    return Instr::Uncacheable(SFenceVma {
+                        vaddr: rs1(instr),
+                        asid: rs2(instr),
+                    })
+                }
                 F7_8 => match (rs1_bits(instr), rs2_bits(instr)) {
-                    (RS1_0, RS2_2) => Sret,
-                    (RS1_0, RS2_5) => Wfi,
+                    (RS1_0, RS2_2) => return Instr::Uncacheable(Sret),
+                    (RS1_0, RS2_5) => return Instr::Uncacheable(Wfi),
                     _ => Unknown { instr },
                 },
                 F7_24 => match (rs1_bits(instr), rs2_bits(instr)) {
-                    (RS1_0, RS2_2) => Mret,
+                    (RS1_0, RS2_2) => return Instr::Uncacheable(Mret),
                     _ => Unknown { instr },
                 },
                 F7_56 => match (rs1_bits(instr), rs2_bits(instr)) {
-                    (RS1_0, RS2_2) => Mnret,
+                    (RS1_0, RS2_2) => return Instr::Uncacheable(Mnret),
                     _ => Unknown { instr },
                 },
                 _ => Unknown { instr },
@@ -1216,7 +1219,7 @@ const fn parse_compressed_instruction_inner(instr: u16) -> Instr {
             },
 
             C_F3_4 => match (u16::bit(instr, 12), c_rd_rs1(instr), c_rs2(instr)) {
-                (true, x0, x0) => CEbreak,
+                (true, x0, x0) => return Instr::Uncacheable(InstrUncacheable::CEbreak),
                 (_, x0, _) => UnknownCompressed { instr },
                 (true, rs1, x0) => CJalr(CRJTypeArgs { rs1 }),
                 (true, rs1, rs2) => CAdd(CRTypeArgs { rd_rs1: rs1, rs2 }),
@@ -1302,8 +1305,8 @@ mod tests {
     use crate::{
         machine_state::{csregisters::CSRegister::mcause, registers::XRegister::*},
         parser::{
-            instruction::CIBTypeArgs, parse_compressed_instruction,
-            parse_compressed_instruction_inner,
+            instruction::{CIBTypeArgs, InstrUncacheable},
+            parse_compressed_instruction, parse_compressed_instruction_inner,
         },
     };
 
@@ -1436,7 +1439,7 @@ mod tests {
     #[test]
     fn test_6() {
         let bytes: [u8; 4] = [0x73, 0x00, 0x20, 0x70];
-        let expected = [Instr::Cacheable(Mnret)];
+        let expected = [Instr::Uncacheable(InstrUncacheable::Mnret)];
         let instructions = parse_block(&bytes);
         assert_eq!(instructions, expected)
     }
