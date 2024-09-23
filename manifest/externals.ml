@@ -262,6 +262,8 @@ let tezos_sapling_parameters =
 
 let tls_lwt = external_lib "tls-lwt" V.(at_least "0.16.0")
 
+let trace = external_lib "trace" V.True
+
 let unix = external_lib ~opam:"base-unix" "unix" V.True
 
 let uri = external_lib "uri" V.(at_least "3.1.0")
