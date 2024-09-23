@@ -187,6 +187,8 @@ let ocplib_ocamlres =
 
 let opentelemetry = external_lib "opentelemetry" V.True
 
+let opentelemetry_lwt = external_lib "opentelemetry-lwt" V.True
+
 let optint = external_lib "optint" V.True
 
 let ppx_expect = inline_tests_backend (external_lib "ppx_expect" V.True)
