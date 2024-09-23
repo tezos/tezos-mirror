@@ -832,4 +832,36 @@ mod tests {
             panic!("There should be a blueprint in the DAL slot")
         }
     }
+
+    #[test]
+    fn test_parsable_dal_signal_without_dal() {
+        let mut host = MockKernelHost::default();
+        let mut conf = dummy_sequencer_config(false, None);
+
+        setup_dal_signal(&mut host, &mut conf, Some(vec![6]), None);
+
+        if read_next_blueprint(&mut host, &mut conf)
+            .expect("Blueprint reading shouldn't fail")
+            .0
+            .is_some()
+        {
+            panic!("The DAL signal shouldn't have been applied by the kernel, and the blueprint shouldn't have been read")
+        }
+    }
+
+    #[test]
+    fn test_invalid_dal_signal() {
+        let mut host = MockKernelHost::default();
+        let mut conf = dummy_sequencer_config(true, Some(vec![8]));
+
+        setup_dal_signal(&mut host, &mut conf, Some(vec![21]), None);
+
+        if read_next_blueprint(&mut host, &mut conf)
+            .expect("Blueprint reading shouldn't fail")
+            .0
+            .is_some()
+        {
+            panic!("The DAL signal shouldn't have been applied by the kernel, and the blueprint shouldn't have been read")
+        }
+    }
 }
