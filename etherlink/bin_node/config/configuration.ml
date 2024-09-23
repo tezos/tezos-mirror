@@ -29,7 +29,13 @@ type kernel_execution_config = {
   preimages_endpoint : Uri.t option;
 }
 
-type garbage_collector = {split_frequency_in_seconds : int}
+type garbage_collector = {
+  split_frequency_in_seconds : int;
+  (* Split frequency in seconds is not really necessary, only history to keep
+     in seconds is. We keep the field for now to easily test different setups.
+     But the split frequency should be in close relationship to history. *)
+  history_to_keep_in_seconds : int;
+}
 
 type experimental_features = {
   drop_duplicate_on_injection : bool;
@@ -654,12 +660,20 @@ let observer_encoding =
 let garbage_collector_encoding =
   let open Data_encoding in
   conv
-    (fun {split_frequency_in_seconds} -> split_frequency_in_seconds)
-    (fun split_frequency_in_seconds -> {split_frequency_in_seconds})
-    (obj1
+    (fun {split_frequency_in_seconds; history_to_keep_in_seconds} ->
+      (split_frequency_in_seconds, history_to_keep_in_seconds))
+    (fun (split_frequency_in_seconds, history_to_keep_in_seconds) ->
+      {split_frequency_in_seconds; history_to_keep_in_seconds})
+    (obj2
        (req
           "split_frequency_in_seconds"
-          ~description:"Frequency of irmin context split in seconds"
+          ~description:"Frequency of irmin context split in days"
+          int31)
+       (req
+          "history_to_keep_in_seconds"
+          ~description:
+            "Number of seconds kept in the irmin context, the rest is garbage \
+             collected, e.g. 86_400 will keep 1 day of history."
           int31))
 
 let experimental_features_encoding =

@@ -49,7 +49,10 @@ type blueprints_publisher_config = {
           is not allowed to use the DAL. *)
 }
 
-type garbage_collector = {split_frequency_in_seconds : int}
+type garbage_collector = {
+  split_frequency_in_seconds : int;
+  history_to_keep_in_seconds : int;
+}
 
 (** Configuration settings for experimental features, with no backward
     compatibility guarantees. *)

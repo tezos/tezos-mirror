@@ -44,6 +44,48 @@ let gc_split =
     ("level", Ethereum_types.quantity_encoding)
     ("timestamp", Time.Protocol.encoding)
 
+let gc_started =
+  declare_2
+    ~section
+    ~name:"evm_context_gc_started"
+    ~msg:
+      "Garbage collection started for level {gc_level} at head level \
+       {head_level}"
+    ~level:Info
+    ~pp1:Ethereum_types.pp_quantity
+    ~pp2:Ethereum_types.pp_quantity
+    ("gc_level", Ethereum_types.quantity_encoding)
+    ("head_level", Ethereum_types.quantity_encoding)
+
+let gc_finished =
+  declare_3
+    ~section
+    ~name:"evm_context_gc_finished"
+    ~msg:
+      "Garbage collection finished for level {gc_level} at head level \
+       {head_level} (took {duration})"
+    ~level:Info
+    ~pp1:Ethereum_types.pp_quantity
+    ~pp2:Ethereum_types.pp_quantity
+    ~pp3:Ptime.Span.pp
+    ("gc_level", Ethereum_types.quantity_encoding)
+    ("head_level", Ethereum_types.quantity_encoding)
+    ( "duration",
+      Data_encoding.(
+        conv
+          Ptime.Span.to_float_s
+          (fun s ->
+            Ptime.Span.of_float_s s |> Option.value ~default:Ptime.Span.zero)
+          float) )
+
+let gc_waiter_failed =
+  declare_1
+    ~section
+    ~name:"evm_context_gc_waiter_failed"
+    ~level:Warning
+    ~msg:"[Warning] Garbage collector waiter failed with an exception:"
+    ("exn", Data_encoding.string)
+
 let ready () = emit ready ()
 
 let shutdown () = emit shutdown ()
@@ -52,3 +94,11 @@ let reconstruct_replace_mainnet_kernel () =
   emit reconstruct_replace_mainnet_kernel ()
 
 let gc_split level timestamp = emit gc_split (level, timestamp)
+
+let gc_started ~gc_level ~head_level = emit gc_started (gc_level, head_level)
+
+let gc_finished ~gc_level ~head_level duration =
+  emit gc_finished (gc_level, head_level, duration)
+
+let gc_waiter_failed exn =
+  emit__dont_wait__use_with_care gc_waiter_failed (Printexc.to_string exn)
