@@ -1595,6 +1595,8 @@ let jobs pipeline_type =
       in
       let job_documentation_linkcheck : tezos_job =
         Documentation.job_linkcheck
+          ~job_manuals
+          ~job_docgen
           ~job_build_all
           ~rules:
             (make_rules

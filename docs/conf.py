@@ -239,14 +239,19 @@ texinfo_documents = [
 linkcheck_anchors = False
 linkcheck_ignore = [
     # links which may fail for lack of access rights:
-    'https://gitlab.com/nomadic-labs/tezos/-/merge_requests/',
-    r'http(s)?://localhost:\d+/?',
+    r'^https://gitlab\.com/nomadic-labs/tezos/-/merge_requests/',
+    r'^http(s)?://localhost:\d+/?',
+    r'^https://grafana\.nomadic-labs\.cloud/',
     # local files, e.g. ../api/api-inline.html#*', \.\./CHANGES.html#version-*
     # (interpreted by linkcheck as external links, generating false positives)
     r'^\.\./',
     # flaky servers, to remove one day if they got more predictable
     r'^https://opentezos\.com/',
-    r'^https://crates.io/crates/tezos-smart-rollup',
+    r'^https://crates\.io/crates/tezos-smart-rollup',
+    r'^https://rpc\.ghostnet\.teztnets\.com/chains/main/blocks/',
+    r'^https://gitlab\.com/tezos/tezos/-/merge_requests/2771',
+    r'^https://gitlab\.com/tezos/tezos/-/merge_requests/3225',
+    r'^https://gitlab\.com/tezos/tezos/-/merge_requests/3267',
 ]
 linkcheck_allowed_redirects = dict(
     [
@@ -265,8 +270,8 @@ linkcheck_allowed_redirects = dict(
             r'https://github\.com/serokell/tezos-packaging/releases/tag/.*',
         ),
         (
-            r'https://www.reddit.com/r/tezos/',
-            r'https://www.reddit.com/r/tezos/[?]rdt=[0-9]+',
+            r'https://www\.reddit\.com/r/tezos/',
+            r'https://www\.reddit\.com/r/tezos/[?]rdt=[0-9]+',
         ),
         (
             r'https://ocaml\.org/api/.*',
