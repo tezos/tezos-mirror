@@ -10,24 +10,17 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
-  "octez-libs"
-  "octez-shell-libs"
-  "octez-l2-libs"
-  "caqti-lwt" { >= "2.0.1" }
-  "crunch" { >= "3.3.0" }
-  "re" { >= "1.10.0" }
-  "octez-smart-rollup-wasm-debugger-plugin"
-  "octez-version"
-  "lwt-watcher" { = "0.2" }
-  "lwt-exit"
-  "caqti"
-  "caqti-driver-sqlite3" { >= "2.0.1" }
-  "octez-smart-rollup-wasm-debugger-lib"
-  "tezos-dal-node-services"
+  "tezt" { with-test & >= "4.1.0" & < "5.0.0" }
+  "octez-libs" {with-test}
+  "qcheck-alcotest" { with-test & >= "0.20" }
+  "octez-alcotezt" {with-test}
+  "tezt-tezos" {with-test}
+  "octez-l2-libs" {with-test}
+  "octez-evm-node-libs" {with-test}
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Octez EVM node libraries"
+synopsis: "Tests for the WASM Runtime callbacks"
