@@ -3211,10 +3211,13 @@ let octez_brassaia_context =
       ]
 
 let octez_duo_context_lib =
+  let (PPX {preprocess; preprocessor_deps}) = ppx_profiler in
   octez_shell_lib
     "duo-context-lib"
     ~internal_name:"tezos_duo_context_lib"
     ~path:"src/lib_protocol_environment/duo_context_lib"
+    ~preprocess
+    ~preprocessor_deps
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
