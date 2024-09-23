@@ -331,7 +331,9 @@ let instantiate_prevalidator parameters set_prevalidator block chain_db =
     let instances =
       Tezos_base.Profiler.plugged Shell_profiling.mempool_profiler
     in
-    List.iter Tezos_protocol_environment.Environment_profiler.plug instances ;
+    List.iter
+      Tezos_protocol_environment.Environment_profiler.Environment_profiler.plug
+      instances ;
     Prevalidator.create parameters.prevalidator_limits proto chain_db
   in
   match r with
@@ -471,6 +473,7 @@ let reset_profilers block =
         requester_profiler;
         chain_validator_profiler;
         rpc_server_profiler;
+        Tezos_protocol_environment.Environment_profiler.context_ops_profiler;
       ]
   in
   List.iter

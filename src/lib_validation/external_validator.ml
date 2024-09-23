@@ -24,7 +24,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Profiler = Tezos_protocol_environment.Environment_profiler
+module Profiler =
+  Tezos_protocol_environment.Environment_profiler.Environment_profiler
 
 module Events = struct
   open Internal_event.Simple
@@ -113,7 +114,8 @@ module Processing = struct
         Profiler.Detailed
     in
     Tezos_base.Profiler.(plug main) headless ;
-    Tezos_protocol_environment.Environment_profiler.plug headless ;
+    Tezos_protocol_environment.Environment_profiler.Environment_profiler.plug
+      headless ;
     return {context_index; cache = None; cached_result = None; headless}
 
   let handle_request :
@@ -224,7 +226,9 @@ module Processing = struct
                     cache;
                   } )
         in
-        Tezos_protocol_environment.Environment_profiler.stop () ;
+        Tezos_protocol_environment.Environment_profiler.Environment_profiler
+        .stop
+          () ;
         let report = Tezos_base.Profiler.report headless in
         continue block_application_result cache None report
     | Preapply
@@ -340,7 +344,9 @@ module Processing = struct
                 header
                 operations)
         in
-        Tezos_protocol_environment.Environment_profiler.stop () ;
+        Tezos_protocol_environment.Environment_profiler.Environment_profiler
+        .stop
+          () ;
         let report = Tezos_base.Profiler.report headless in
         continue block_validate_result cache cached_result report
     | External_validation.Fork_test_chain

@@ -218,7 +218,8 @@ module Internal_validator_process = struct
         Profiler.Detailed
     in
     Tezos_base.Profiler.(plug main) headless ;
-    Tezos_protocol_environment.Environment_profiler.plug headless ;
+    Tezos_protocol_environment.Environment_profiler.Environment_profiler.plug
+      headless ;
     return_ok
       {
         chain_store;

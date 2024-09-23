@@ -189,7 +189,7 @@ struct
   module CamlinternalFormatBasics = CamlinternalFormatBasics
   include Stdlib
   module Pervasives = Stdlib
-  module Profiler = Environment_profiler
+  module Profiler = Environment_profiler.Environment_profiler
 
   module Logging = struct
     type level = Internal_event.level =
