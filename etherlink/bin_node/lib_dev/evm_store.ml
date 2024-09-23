@@ -207,7 +207,7 @@ module Q = struct
       You can review the result at
       [etherlink/tezt/tests/expected/evm_sequencer.ml/EVM Node- debug print store schemas.out].
     *)
-    let version = 11
+    let version = 12
 
     let all : Evm_node_migrations.migration list =
       Evm_node_migrations.migrations version
@@ -453,6 +453,24 @@ module Q = struct
   let context_hash_of_block_hash =
     (block_hash ->? context_hash)
     @@ {eos|SELECT c.context_hash from Context_hashes c JOIN Blocks b on c.id = b.level WHERE hash = ?|eos}
+
+  module GC = struct
+    let select_last_gc =
+      (unit ->? t2 level timestamp)
+      @@ {|SELECT last_gc_level, last_gc_timestamp FROM gc|}
+
+    let update_last_gc =
+      (t2 level timestamp ->. unit)
+      @@ {eos|INSERT INTO gc (id, last_gc_level, last_gc_timestamp) VALUES (1, ?, ?) ON CONFLICT(id) DO UPDATE SET last_gc_level = excluded.last_gc_level, last_gc_timestamp = excluded.last_gc_timestamp|eos}
+
+    let select_last_split =
+      (unit ->? t2 level timestamp)
+      @@ {|SELECT last_split_level, last_split_timestamp FROM gc|}
+
+    let update_last_split =
+      (t2 level timestamp ->. unit)
+      @@ {eos|INSERT INTO gc (id, last_split_level, last_split_timestamp) VALUES (1, ?, ?) ON CONFLICT(id) DO UPDATE SET last_split_level = excluded.last_split_level, last_split_timestamp = excluded.last_split_timestamp|eos}
+  end
 end
 
 module Schemas = struct
@@ -854,6 +872,23 @@ module Transactions = struct
   let clear_after store level =
     with_connection store @@ fun conn ->
     Db.exec conn Q.Transactions.clear_after level
+end
+
+module GC = struct
+  let last_gc store =
+    with_connection store @@ fun conn -> Db.find_opt conn Q.GC.select_last_gc ()
+
+  let update_last_gc store level timestamp =
+    with_connection store @@ fun conn ->
+    Db.exec conn Q.GC.update_last_gc (level, timestamp)
+
+  let last_split store =
+    with_connection store @@ fun conn ->
+    Db.find_opt conn Q.GC.select_last_split ()
+
+  let update_last_split store level timestamp =
+    with_connection store @@ fun conn ->
+    Db.exec conn Q.GC.update_last_split (level, timestamp)
 end
 
 module Blocks = struct
