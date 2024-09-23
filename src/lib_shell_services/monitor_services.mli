@@ -72,6 +72,18 @@ val applied_blocks :
   tzresult
   Lwt.t
 
+(** Call RPC GET /monitor/received_blocks
+
+  - Default [chains] is [Main].
+  - Default [protocols] is [[]].
+  - Default [next_protocols] is [[]]. *)
+val received_blocks :
+  #streamed ->
+  ?protocols:Protocol_hash.t list ->
+  ?next_protocols:Protocol_hash.t list ->
+  Chain_services.chain ->
+  (Block_hash.t Lwt_stream.t * stopper) tzresult Lwt.t
+
 val heads :
   #streamed ->
   ?protocols:Protocol_hash.t list ->
@@ -127,6 +139,21 @@ module S : sig
       ; protocols : Protocol_hash.t list >,
       unit,
       Chain_id.t * Block_hash.t * Block_header.t * Operation.t list list )
+    Tezos_rpc.Service.t
+
+  (** Define RPC GET /monitor/received_blocks
+
+  - Default [chains] is [Main].
+  - Default [protocols] is [[]].
+  - Default [next_protocols] is [[]]. *)
+  val received_blocks :
+    ( [`GET],
+      unit,
+      unit * Chain_services.chain,
+      < next_protocols : Protocol_hash.t list
+      ; protocols : Protocol_hash.t list >,
+      unit,
+      Block_hash.t )
     Tezos_rpc.Service.t
 
   val heads :
