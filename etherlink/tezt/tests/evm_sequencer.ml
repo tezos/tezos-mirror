@@ -6019,6 +6019,14 @@ let test_finalized_view =
     ~time_between_blocks:Nothing
     ~title:"--finalized-view returns the latest final block of the sequencer"
     ~da_fee:Wei.zero
+      (* This test depends on the number of blocks produced until the
+         rollup node synchronizes with the sequencer and proxy. When
+         DAL is activated, bake_until_sync would need to produce more
+         blocks than usual. Consequently, this would finalize the
+         blocks posted on-chain. The finalized proxy does have a head,
+         and the RPC does not fail, which is not the expected result
+         when running this test without DAL activation. *)
+    ~use_dal:Register_without_feature
   @@ fun {sc_rollup_node; client; sequencer; proxy; _} _protocol ->
   (* Start a proxy node with --finalized-view enabled *)
   let* finalized_proxy =
