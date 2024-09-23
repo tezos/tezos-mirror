@@ -49,6 +49,8 @@ type blueprints_publisher_config = {
           is not allowed to use the DAL. *)
 }
 
+type garbage_collector = {split_frequency_in_seconds : int}
+
 (** Configuration settings for experimental features, with no backward
     compatibility guarantees. *)
 type experimental_features = {
@@ -57,6 +59,7 @@ type experimental_features = {
   node_transaction_validation : bool;
   block_storage_sqlite3 : bool;
   overwrite_simulation_tick_limit : bool;
+  garbage_collector : garbage_collector option;
 }
 
 type sequencer = {
