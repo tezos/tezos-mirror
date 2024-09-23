@@ -60,6 +60,7 @@ type t = {
   version : int;  (** The version of the configuration. *)
   service_name : string option;
       (** Name of the service provided by this node. *)
+  service_namespace : string option;  (** Namespace for the service *)
 }
 
 (** [default] is the default configuration. *)
