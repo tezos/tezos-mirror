@@ -1446,8 +1446,8 @@ let merge_stores ?(cycle_size_limit = default_cycle_size_limit) block_store
   (* Do not allow multiple merges: force waiting for a potential
      previous merge. *)
   ()
-  [@profiler.record "merge store"]
-  [@profiler.reset_block_section Block_repr.hash new_head] ;
+  [@profiler.reset_block_section Block_repr.hash new_head]
+  [@profiler.record "merge store"] ;
   let*! () = Lwt_mutex.lock block_store.merge_mutex in
   protect
     ~on_error:(fun err ->

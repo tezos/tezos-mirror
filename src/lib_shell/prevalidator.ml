@@ -1427,8 +1427,8 @@ module Make
       match request with
       | Request.Flush (hash, event, live_blocks, live_operations) -> (
           ()
-          [@profiler.record Format.sprintf "%s" (Block_hash.to_b58check hash)]
-          [@profiler.stop] ;
+          [@profiler.stop]
+          [@profiler.record Format.sprintf "%s" (Block_hash.to_b58check hash)] ;
           Requests.on_advertise pv.shell ;
           (* TODO: https://gitlab.com/tezos/tezos/-/issues/1727
              Rebase the advertisement instead. *)
