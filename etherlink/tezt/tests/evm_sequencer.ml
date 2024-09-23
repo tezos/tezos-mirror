@@ -1801,11 +1801,17 @@ let test_delayed_deposit_from_init_rollup_node =
 let test_init_from_rollup_node_data_dir =
   register_all
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/7285
-     Replace by [Any] after the next upgrade *)
+     Replace by [Any] after the next upgrade
+
+     TODO: https://gitlab.com/tezos/tezos/-/issues/7505
+     'Reconstruct from a rollup node data directory that relied on signals'.
+     Enable DAL once this issue is closed.
+  *)
     ~kernels:[Latest]
     ~time_between_blocks:Nothing
     ~tags:["evm"; "rollup_node"; "init"; "reconstruct"]
     ~title:"Init evm node sequencer data dir from a rollup node data dir"
+    ~use_dal:Register_without_feature
     ~history_mode:Archive
   @@ fun {sc_rollup_node; sequencer; observer; proxy; client; boot_sector; _}
              _protocol ->
