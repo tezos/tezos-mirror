@@ -50,6 +50,7 @@ val start :
   fail_on_missing_blueprint:bool ->
   store_perm:[`Read_only | `Read_write] ->
   block_storage_sqlite3:bool ->
+  ?garbage_collector:Configuration.garbage_collector ->
   unit ->
   (init_status * Address.t) tzresult Lwt.t
 

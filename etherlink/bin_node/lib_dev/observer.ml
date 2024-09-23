@@ -75,6 +75,7 @@ let main ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync () =
       ~fail_on_missing_blueprint:false
       ~store_perm:`Read_write
       ~block_storage_sqlite3:config.experimental_features.block_storage_sqlite3
+      ?garbage_collector:config.experimental_features.garbage_collector
       ()
   in
   let* ro_ctxt = Evm_ro_context.load ~smart_rollup_address ~data_dir config in
