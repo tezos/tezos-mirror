@@ -14,6 +14,7 @@ open Product_data_encoding
 open Product_prometheus
 open Product_resto
 open Product_cohttp
+open Product_opentelemetry
 
 include Product (struct
   let name = "octez"
@@ -41,7 +42,8 @@ include Product (struct
       "rust-toolchain";
     ]
     @ Product_data_encoding.product_source @ Product_cohttp.product_source
-    @ Product_prometheus.product_source @ Product_resto.product_source
+    @ Product_opentelemetry.product_source @ Product_prometheus.product_source
+    @ Product_resto.product_source
 end)
 
 module String_set = Set.Make (String)
@@ -8068,6 +8070,8 @@ let _octez_dal_node =
          octez_crypto |> open_;
          octez_base_p2p_identity_file |> open_;
          octez_shell_services |> open_;
+         opentelemetry;
+         opentelemetry_client_cohttp_lwt;
          prometheus_app;
          prometheus;
          octez_crawler |> open_;

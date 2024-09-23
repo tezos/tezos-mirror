@@ -16,6 +16,7 @@ depends: [
   "tezos-dal-node-lib" { = version }
   "tezos-dal-node-services" { = version }
   "octez-l2-libs" { = version }
+  "opentelemetry"
   "octez-crawler" { = version }
   "memtrace"
   "octez-protocol-020-PsParisC-libs" { = version }
