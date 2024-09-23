@@ -199,7 +199,7 @@ let default_threshold_encryption_registration =
   Register_both {extra_tags_with = [Tag.ci_disabled]; extra_tags_without = []}
 
 let default_dal_registration =
-  Register_both {extra_tags_with = [Tag.ci_disabled]; extra_tags_without = []}
+  Register_both {extra_tags_with = [Tag.slow]; extra_tags_without = []}
 
 let ci_enabled_dal_registration =
   Register_both {extra_tags_with = []; extra_tags_without = []}
