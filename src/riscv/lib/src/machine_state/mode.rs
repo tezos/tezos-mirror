@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2023-2024 TriliTech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
 
@@ -107,7 +107,7 @@ mod tests {
             assert_eq!(inst.read(), first_value);
 
             let value_read = bincode::serialize(&inst.struct_ref()).unwrap()[0];
-            assert_eq!(Mode::try_from(value_read), Ok(first_value));
+            assert_eq!(Mode::from(value_read), first_value);
         });
 
         assert_eq!(Mode::from(42), Mode::default());

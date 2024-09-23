@@ -164,6 +164,11 @@ macro_rules! csr_new {
     };
 }
 
+/// Normalise the fields for a Control or State register using WARL/WPRI
+pub trait NormaliseFields {
+    fn normalise(self) -> Self;
+}
+
 #[cfg(test)]
 mod tests {
     use crate::bits::{Bits64, ConstantBits};
@@ -184,9 +189,4 @@ mod tests {
         let test = Test::new(true, ConstantBits, false);
         assert_eq!(test.to_bits(), 0b011);
     }
-}
-
-/// Normalise the fields for a Control or State register using WARL/WPRI
-pub trait NormaliseFields {
-    fn normalise(self) -> Self;
 }
