@@ -363,6 +363,13 @@ module State : sig
     val get : ?conn:Sqlite.conn -> _ t -> value option tzresult Lwt.t
   end
 
+  type history_mode =
+    | Archive
+        (** The whole history of the rollup (starting at its genesis) is kept *)
+    | Full
+        (** Only the history necessary to play refutation games is kept
+          (i.e. after the LCC only) *)
+
   module Finalized_level : S with type value := int32
 
   module LCC : S with type value := Commitment.Hash.t * int32
@@ -379,7 +386,7 @@ module State : sig
 
   module Last_context_split : S with type value := int32
 
-  module History_mode : S with type value := Configuration.history_mode
+  module History_mode : S with type value := history_mode
 
   module L2_head : S with type value := Block_hash.t * int32
 end

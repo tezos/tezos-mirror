@@ -232,6 +232,7 @@ let evm_node_lib_dev =
         octez_scoru_wasm_debugger_lib |> open_;
         octez_layer2_store |> open_;
         octez_smart_rollup_lib |> open_;
+        octez_smart_rollup_node_store_lib;
         evm_node_migrations;
         evm_node_kernels;
         prometheus_app;

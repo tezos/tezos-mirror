@@ -51,7 +51,7 @@ type gc_parameters = {
   context_splitting_period : int option;
 }
 
-type history_mode = Archive | Full
+type history_mode = Store.State.history_mode = Archive | Full
 
 type outbox_destination_filter =
   | Any_destination
