@@ -51,6 +51,7 @@ type options = {
   history_mode : Configuration_file.history_mode option;
   service_name : string option;
       (** Name of the service provided by this node. *)
+  service_namespace : string option;  (** Namespace for the service. *)
 }
 
 (** Subcommands that can be used by the DAL node. In the future this type

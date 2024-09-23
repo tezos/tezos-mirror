@@ -37,6 +37,7 @@ let merge
         peers;
         history_mode;
         service_name;
+        service_namespace;
       } configuration =
   let profile =
     match profile with
@@ -63,6 +64,8 @@ let merge
     peers = peers @ configuration.peers;
     history_mode = Option.value ~default:configuration.history_mode history_mode;
     service_name = Option.either service_name configuration.service_name;
+    service_namespace =
+      Option.either service_namespace configuration.service_namespace;
   }
 
 let wrap_with_error main_promise =

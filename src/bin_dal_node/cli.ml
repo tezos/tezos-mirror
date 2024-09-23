@@ -281,13 +281,25 @@ module Term = struct
       & opt (some service_name_arg) None
       & info ~docs ~doc ["service-name"])
 
+  let service_namespace =
+    let open Cmdliner in
+    let doc =
+      "A namespace associated with the node. This namespace can appear in \
+       observability data such as traces."
+    in
+    let service_namespace_arg = Arg.string in
+    Arg.(
+      value
+      & opt (some service_namespace_arg) None
+      & info ~docs ~doc ["service-namespace"])
+
   let term process =
     Cmdliner.Term.(
       ret
         (const process $ data_dir $ rpc_addr $ expected_pow $ net_addr
        $ public_addr $ endpoint $ metrics_addr $ attester_profile
        $ producer_profile $ observer_profile $ bootstrap_profile $ peers
-       $ history_mode $ service_name))
+       $ history_mode $ service_name $ service_namespace))
 end
 
 module Run = struct
@@ -359,6 +371,7 @@ type options = {
   peers : string list;
   history_mode : Configuration_file.history_mode option;
   service_name : string option;
+  service_namespace : string option;
 }
 
 type t = Run | Config_init
@@ -366,7 +379,7 @@ type t = Run | Config_init
 let make ~run =
   let run subcommand data_dir rpc_addr expected_pow listen_addr public_addr
       endpoint metrics_addr attesters producers observers bootstrap_flag peers
-      history_mode service_name =
+      history_mode service_name service_namespace =
     let run profile =
       run
         subcommand
@@ -382,6 +395,7 @@ let make ~run =
           peers;
           history_mode;
           service_name;
+          service_namespace;
         }
     in
     let profile = Operator_profile.make ~attesters ~producers ?observers () in
