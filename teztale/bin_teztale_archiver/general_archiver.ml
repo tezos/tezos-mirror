@@ -344,6 +344,7 @@ module Loops (Archiver : Archiver.S) = struct
         let*! _ =
           Lwt_stream.fold_s
             (fun (_chain_id, hash, header, _operations) acc ->
+              let now = Time.System.now () in
               let*! block_recorder, acc' =
                 match acc with
                 | Some (f, proto_level)
@@ -447,7 +448,7 @@ module Loops (Archiver : Archiver.S) = struct
               let reception =
                 {
                   Data.Block.source = "archiver";
-                  application_time = Some (Time.System.now ());
+                  application_time = Some now;
                   validation_time = None;
                 }
               in
@@ -474,6 +475,7 @@ module Loops (Archiver : Archiver.S) = struct
         let*! _ =
           Lwt_stream.fold_s
             (fun (_chain_id, hash, header, _operations) acc ->
+              let now = Time.System.now () in
               let*! block_recorder, acc' =
                 match acc with
                 | Some (f, proto_level)
@@ -532,7 +534,7 @@ module Loops (Archiver : Archiver.S) = struct
                 {
                   Data.Block.source = "archiver";
                   application_time = None;
-                  validation_time = Some (Time.System.now ());
+                  validation_time = Some now;
                 }
               in
               let block_level = header.Block_header.shell.Block_header.level in
