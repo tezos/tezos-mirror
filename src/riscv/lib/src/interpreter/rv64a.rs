@@ -8,19 +8,15 @@
 //! Chapter 8 - Unprivileged spec
 
 use crate::{
-    machine_state::{
-        bus::main_memory::MainMemoryLayout, instruction_cache::InstructionCacheLayout,
-        registers::XRegister, MachineState,
-    },
+    machine_state::{bus::main_memory::MainMemoryLayout, registers::XRegister, MachineCoreState},
     state_backend as backend,
     traps::Exception,
 };
 use std::ops::{BitAnd, BitOr, BitXor};
 
-impl<ML, ICL, M> MachineState<ML, ICL, M>
+impl<ML, M> MachineCoreState<ML, M>
 where
     ML: MainMemoryLayout,
-    ICL: InstructionCacheLayout,
     M: backend::ManagerReadWrite,
 {
     /// `LR.D` R-type instruction
@@ -228,7 +224,7 @@ mod test {
         machine_state::{
             bus::{devices::DEVICES_ADDRESS_SPACE_LENGTH, main_memory::tests::T1K},
             registers::{a0, a1, a2},
-            MachineState, MachineStateLayout,
+            MachineCoreState, MachineCoreStateLayout,
         },
         test_amo, test_lrsc,
     };

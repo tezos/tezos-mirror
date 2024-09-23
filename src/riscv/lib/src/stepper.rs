@@ -4,7 +4,8 @@
 
 use crate::{
     machine_state::{
-        bus::main_memory::MainMemoryLayout, instruction_cache::InstructionCacheLayout, MachineState,
+        bus::main_memory::MainMemoryLayout, instruction_cache::InstructionCacheLayout,
+        MachineCoreState,
     },
     state_backend::{ManagerBase, ManagerRead},
 };
@@ -83,9 +84,7 @@ pub trait Stepper {
     type Manager: ManagerBase + ManagerRead;
 
     /// Obtain a reference to the underlying machine state.
-    fn machine_state(
-        &self,
-    ) -> &MachineState<Self::MainMemoryLayout, Self::InstructionCacheLayout, Self::Manager>;
+    fn machine_state(&self) -> &MachineCoreState<Self::MainMemoryLayout, Self::Manager>;
 
     /// Result of one or more steps
     type StepResult: StepResult;

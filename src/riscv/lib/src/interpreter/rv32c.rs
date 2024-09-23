@@ -11,9 +11,8 @@ use crate::{
     machine_state::{
         bus::{main_memory::MainMemoryLayout, Address},
         hart_state::HartState,
-        instruction_cache::InstructionCacheLayout,
         registers::{sp, x0, x1, x2, XRegister, XRegisters},
-        MachineState,
+        MachineCoreState,
     },
     state_backend as backend,
     traps::Exception,
@@ -210,10 +209,9 @@ where
     }
 }
 
-impl<ML, ICL, M> MachineState<ML, ICL, M>
+impl<ML, M> MachineCoreState<ML, M>
 where
     ML: MainMemoryLayout,
-    ICL: InstructionCacheLayout,
     M: backend::ManagerReadWrite,
 {
     /// `C.LW` CL-type compressed instruction
@@ -275,8 +273,7 @@ mod tests {
     use crate::{
         backend_test, create_backend, create_state,
         machine_state::{
-            bus::main_memory::tests::T1K, instruction_cache::TestInstructionCacheLayout,
-            registers::a4, MachineState, MachineStateLayout,
+            bus::main_memory::tests::T1K, registers::a4, MachineCoreState, MachineCoreStateLayout,
         },
     };
     use proptest::{prelude::*, prop_assert_eq, proptest};
@@ -290,9 +287,14 @@ mod tests {
             (u64::MAX - 1, 100, 98_i64 as u64),
         ];
         for (init_pc, imm, res_pc) in test_case {
-            let mut backend =
-                create_backend!(MachineStateLayout<T1K, TestInstructionCacheLayout>, F);
-            let mut state = create_state!(MachineState, MachineStateLayout<T1K, TestInstructionCacheLayout>, F, backend, T1K, TestInstructionCacheLayout);
+            let mut backend = create_backend!(MachineCoreStateLayout<T1K>, F);
+            let mut state = create_state!(
+                MachineCoreState,
+                MachineCoreStateLayout<T1K>,
+                F,
+                backend,
+                T1K
+            );
 
             state.hart.pc.write(init_pc);
             let new_pc = state.hart.run_cj(imm);
@@ -303,8 +305,14 @@ mod tests {
     });
 
     backend_test!(run_caddi, F, {
-        let mut backend = create_backend!(MachineStateLayout<T1K, TestInstructionCacheLayout>, F);
-        let state = create_state!(MachineState, MachineStateLayout<T1K, TestInstructionCacheLayout>, F, backend, T1K, TestInstructionCacheLayout);
+        let mut backend = create_backend!(MachineCoreStateLayout<T1K>, F);
+        let state = create_state!(
+            MachineCoreState,
+            MachineCoreStateLayout<T1K>,
+            F,
+            backend,
+            T1K
+        );
         let state_cell = std::cell::RefCell::new(state);
 
         proptest!(|(

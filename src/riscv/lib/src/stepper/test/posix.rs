@@ -84,9 +84,9 @@ impl<M: ManagerBase> PosixState<M> {
         let exit_mode = self.exit_mode.read();
 
         if source_mode != exit_mode {
-            let return_pc = machine.hart.pc.read();
-            let new_pc = machine.hart.take_trap(source_exception, return_pc);
-            machine.hart.pc.write(new_pc);
+            let return_pc = machine.core.hart.pc.read();
+            let new_pc = machine.core.hart.take_trap(source_exception, return_pc);
+            machine.core.hart.pc.write(new_pc);
 
             return Ok(true);
         }
@@ -107,8 +107,8 @@ impl<M: ManagerBase> PosixState<M> {
         //   a7 = 93 & a0 = 1 | (TEST_FAILED << 1)
         // Failed virtual memory tests set
         //   a7 = 0 (a7 never gets set) & a0 = 1 | (TEST_FAILED << 1)
-        let a7_val = machine.hart.xregisters.read(a7);
-        let a0_val = machine.hart.xregisters.read(a0);
+        let a7_val = machine.core.hart.xregisters.read(a7);
+        let a0_val = machine.core.hart.xregisters.read(a0);
         match (a7_val, a0_val) {
             // Exit (test pass, physical | virtual)
             (93, 0) | (0, 1) => handle_exit(0),

@@ -14,7 +14,7 @@ use octez_riscv::{
         csregisters::satp::{Satp, SvLength, TranslationAlgorithm},
         instruction_cache::InstructionCacheLayout,
         mode::Mode,
-        AccessType, MachineState,
+        AccessType, MachineCoreState,
     },
     program::Program,
     pvm::PvmHooks,
@@ -309,7 +309,7 @@ where
             .step_max(Bound::Included(1))
             .to_stepper_status();
 
-        let should_continue = |machine: &MachineState<_, _, _>| {
+        let should_continue = |machine: &MachineCoreState<_, _>| {
             let raw_pc = machine.hart.pc.read();
             let pc = machine
                 .translate_without_cache(raw_pc, AccessType::Instruction)
@@ -337,7 +337,7 @@ where
             .step_max(Bound::Included(1))
             .to_stepper_status();
 
-        let should_continue = |machine: &MachineState<_, _, _>| {
+        let should_continue = |machine: &MachineCoreState<_, _>| {
             let raw_pc = machine.hart.pc.read();
             let pc = machine
                 .translate_without_cache(raw_pc, AccessType::Instruction)

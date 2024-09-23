@@ -11,10 +11,9 @@ use crate::{
             CSRegister,
         },
         hart_state::HartState,
-        instruction_cache::InstructionCacheLayout,
         mode::Mode,
         registers::XRegister,
-        AccessType, MachineState,
+        AccessType, MachineCoreState,
     },
     state_backend::{self as backend},
     traps::Exception,
@@ -102,10 +101,9 @@ where
     }
 }
 
-impl<ML, ICL, M> MachineState<ML, ICL, M>
+impl<ML, M> MachineCoreState<ML, M>
 where
     ML: MainMemoryLayout,
-    ICL: InstructionCacheLayout,
     M: backend::ManagerReadWrite,
 {
     /// `WFI` instruction
@@ -143,20 +141,19 @@ mod tests {
         machine_state::{
             bus::main_memory::tests::T1K,
             csregisters::{xstatus, CSRRepr, CSRegister},
-            instruction_cache::TestInstructionCacheLayout,
             mode::Mode,
             registers::{a0, t0},
-            MachineState, MachineStateLayout,
+            MachineCoreState, MachineCoreStateLayout,
         },
         traps::Exception,
     };
 
     backend_test!(test_sfence, F, {
-        type L = MachineStateLayout<T1K, TestInstructionCacheLayout>;
+        type L = MachineCoreStateLayout<T1K>;
         let mut backend = create_backend!(L, F);
-        let mut state = create_state!(MachineState, L, F, backend, T1K, TestInstructionCacheLayout);
+        let mut state = create_state!(MachineCoreState, L, F, backend, T1K);
 
-        let run_test = |state: &mut MachineState<_, _, _>,
+        let run_test = |state: &mut MachineCoreState<_, _>,
                         mode: Mode,
                         bit: bool,
                         result: Result<(), Exception>| {

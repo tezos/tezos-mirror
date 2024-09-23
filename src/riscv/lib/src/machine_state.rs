@@ -44,23 +44,33 @@ use csregisters::{values::CSRValue, CSRRepr};
 use mode::Mode;
 use std::ops::Bound;
 
-/// Layout for the machine state
-pub type MachineStateLayout<ML, ICL> = (
-    HartStateLayout,
-    bus::BusLayout<ML>,
-    TranslationCacheLayout,
-    ICL,
-);
+/// Layout for the machine 'run state' - which contains everything required for the running of
+/// instructions.
+pub type MachineCoreStateLayout<ML> = (HartStateLayout, bus::BusLayout<ML>, TranslationCacheLayout);
 
-/// Machine state
+/// The part of the machine state required to run (almost all) instructions.
+///
+/// Namely, things that are required to fetch instructions, but not run them, should be placed
+/// elsewhere in [`MachineState`].
+///
+/// Certain instructions (e.g. `FENCE.I` may invalidate other parts of the state, but this are
+/// small in number).
+pub struct MachineCoreState<ML: main_memory::MainMemoryLayout, M: backend::ManagerBase> {
+    pub hart: HartState<M>,
+    pub bus: Bus<ML, M>,
+    pub translation_cache: TranslationCache<M>,
+}
+
+/// Layout for the machine state - everything required to fetch & run instructions.
+pub type MachineStateLayout<ML, ICL> = (MachineCoreStateLayout<ML>, ICL);
+
+/// The machine state contains everything required to fetch & run instructions.
 pub struct MachineState<
     ML: main_memory::MainMemoryLayout,
     ICL: InstructionCacheLayout,
     M: backend::ManagerBase,
 > {
-    pub hart: HartState<M>,
-    pub bus: Bus<ML, M>,
-    pub translation_cache: TranslationCache<M>,
+    pub core: MachineCoreState<ML, M>,
     pub instruction_cache: InstructionCache<ICL, M>,
 }
 
@@ -255,28 +265,24 @@ macro_rules! run_cb_type_instr {
     }};
 }
 
-impl<ML: main_memory::MainMemoryLayout, ICL: InstructionCacheLayout, M: backend::ManagerBase>
-    MachineState<ML, ICL, M>
-{
+impl<ML: main_memory::MainMemoryLayout, M: backend::ManagerBase> MachineCoreState<ML, M> {
     /// Bind the machine state to the given allocated space.
-    pub fn bind(space: backend::AllocatedOf<MachineStateLayout<ML, ICL>, M>) -> Self {
+    pub fn bind(space: backend::AllocatedOf<MachineCoreStateLayout<ML>, M>) -> Self {
         Self {
             hart: HartState::bind(space.0),
             bus: Bus::bind(space.1),
             translation_cache: TranslationCache::bind(space.2),
-            instruction_cache: InstructionCache::bind(space.3),
         }
     }
 
     /// Obtain a structure with references to the bound regions of this type.
     pub fn struct_ref(
         &self,
-    ) -> backend::AllocatedOf<MachineStateLayout<ML, ICL>, backend::Ref<'_, M>> {
+    ) -> backend::AllocatedOf<MachineCoreStateLayout<ML>, backend::Ref<'_, M>> {
         (
             self.hart.struct_ref(),
             self.bus.struct_ref(),
             self.translation_cache.struct_ref(),
-            self.instruction_cache.struct_ref(),
         )
     }
 
@@ -288,104 +294,6 @@ impl<ML: main_memory::MainMemoryLayout, ICL: InstructionCacheLayout, M: backend:
         self.hart.reset(bus::start_of_main_memory::<ML>());
         self.bus.reset();
         self.translation_cache.reset();
-        self.instruction_cache.reset();
-    }
-
-    /// Translate an instruction address.
-    #[inline]
-    fn translate_instr_address(
-        &mut self,
-        mode: Mode,
-        satp: CSRRepr,
-        virt_addr: Address,
-    ) -> Result<Address, Exception>
-    where
-        M: backend::ManagerReadWrite,
-    {
-        // Chapter: P:S-ISA-1.9 & P:M-ISA-1.16
-        // If mtval is written with a nonzero value when a
-        // breakpoint, address-misaligned, access-fault, or page-fault exception
-        // occurs on an instruction fetch, load, or store, then mtval will contain the
-        // faulting virtual address.
-
-        let phys_addr = if let Some(phys_addr) =
-            self.translation_cache
-                .try_translate(mode, satp, AccessType::Instruction, virt_addr)
-        {
-            phys_addr
-        } else {
-            let phys_addr =
-                self.translate_with_prefetch(mode, satp, virt_addr, AccessType::Instruction)?;
-
-            self.translation_cache.cache_translation(
-                mode,
-                satp,
-                AccessType::Instruction,
-                virt_addr,
-                phys_addr,
-            );
-
-            phys_addr
-        };
-
-        Ok(phys_addr)
-    }
-
-    /// Fetch the 16 bits of an instruction at the given physical address.
-    #[inline(always)]
-    fn fetch_instr_halfword(&self, phys_addr: Address) -> Result<u16, Exception>
-    where
-        M: backend::ManagerRead,
-    {
-        self.bus
-            .read(phys_addr)
-            .map_err(|_: OutOfBounds| Exception::InstructionAccessFault(phys_addr))
-    }
-
-    /// Fetch instruction from the address given by program counter
-    /// The spec stipulates translation is performed for each byte respectively.
-    /// However, we assume the `raw_pc` is 2-byte aligned.
-    #[inline]
-    fn fetch_instr(
-        &mut self,
-        mode: Mode,
-        satp: CSRRepr,
-        virt_addr: Address,
-        phys_addr: Address,
-    ) -> Result<Instr, Exception>
-    where
-        M: backend::ManagerReadWrite,
-    {
-        let first_halfword = self.fetch_instr_halfword(phys_addr)?;
-
-        // The reasons to provide the second half in the lambda is
-        // because those bytes may be inaccessible or may trigger an exception when read.
-        // Hence we can't read all 4 bytes eagerly.
-        let instr = if is_compressed(first_halfword) {
-            self.instruction_cache
-                .cache_compressed(phys_addr, first_halfword)
-        } else {
-            let upper = {
-                let next_addr = phys_addr + 2;
-
-                // Optimization to skip an extra address translation lookup:
-                // If the last 2 bytes of the instruction are in the same page
-                // as the first 2 bytes, then we already know the translated address
-                let phys_addr = if next_addr % PAGE_SIZE == 0 {
-                    self.translate_instr_address(mode, satp, virt_addr + 2)?
-                } else {
-                    next_addr
-                };
-
-                self.fetch_instr_halfword(phys_addr)?
-            };
-
-            let combined = (upper as u32) << 16 | (first_halfword as u32);
-            self.instruction_cache
-                .cache_uncompressed(phys_addr, combined)
-        };
-
-        Ok(instr)
     }
 
     /// Advance [`MachineState`] by executing an [`InstrCacheable`].
@@ -663,6 +571,138 @@ impl<ML: main_memory::MainMemoryLayout, ICL: InstructionCacheLayout, M: backend:
             InstrCacheable::UnknownCompressed { instr: _ } => Err(Exception::IllegalInstruction),
         }
     }
+}
+
+impl<ML: main_memory::MainMemoryLayout, ICL: InstructionCacheLayout, M: backend::ManagerBase>
+    MachineState<ML, ICL, M>
+{
+    /// Bind the machine state to the given allocated space.
+    pub fn bind(space: backend::AllocatedOf<MachineStateLayout<ML, ICL>, M>) -> Self {
+        Self {
+            core: MachineCoreState::bind(space.0),
+            instruction_cache: InstructionCache::bind(space.1),
+        }
+    }
+
+    /// Obtain a structure with references to the bound regions of this type.
+    pub fn struct_ref(
+        &self,
+    ) -> backend::AllocatedOf<MachineStateLayout<ML, ICL>, backend::Ref<'_, M>> {
+        (self.core.struct_ref(), self.instruction_cache.struct_ref())
+    }
+
+    /// Reset the machine state.
+    pub fn reset(&mut self)
+    where
+        M: backend::ManagerWrite,
+    {
+        self.core.reset();
+        self.instruction_cache.reset();
+    }
+
+    /// Translate an instruction address.
+    #[inline]
+    fn translate_instr_address(
+        &mut self,
+        mode: Mode,
+        satp: CSRRepr,
+        virt_addr: Address,
+    ) -> Result<Address, Exception>
+    where
+        M: backend::ManagerReadWrite,
+    {
+        // Chapter: P:S-ISA-1.9 & P:M-ISA-1.16
+        // If mtval is written with a nonzero value when a
+        // breakpoint, address-misaligned, access-fault, or page-fault exception
+        // occurs on an instruction fetch, load, or store, then mtval will contain the
+        // faulting virtual address.
+
+        let phys_addr = if let Some(phys_addr) = self.core.translation_cache.try_translate(
+            mode,
+            satp,
+            AccessType::Instruction,
+            virt_addr,
+        ) {
+            phys_addr
+        } else {
+            let phys_addr = self.core.translate_with_prefetch(
+                mode,
+                satp,
+                virt_addr,
+                AccessType::Instruction,
+            )?;
+
+            self.core.translation_cache.cache_translation(
+                mode,
+                satp,
+                AccessType::Instruction,
+                virt_addr,
+                phys_addr,
+            );
+
+            phys_addr
+        };
+
+        Ok(phys_addr)
+    }
+
+    /// Fetch the 16 bits of an instruction at the given physical address.
+    #[inline(always)]
+    fn fetch_instr_halfword(&self, phys_addr: Address) -> Result<u16, Exception>
+    where
+        M: backend::ManagerRead,
+    {
+        self.core
+            .bus
+            .read(phys_addr)
+            .map_err(|_: OutOfBounds| Exception::InstructionAccessFault(phys_addr))
+    }
+
+    /// Fetch instruction from the address given by program counter
+    /// The spec stipulates translation is performed for each byte respectively.
+    /// However, we assume the `raw_pc` is 2-byte aligned.
+    #[inline]
+    fn fetch_instr(
+        &mut self,
+        mode: Mode,
+        satp: CSRRepr,
+        virt_addr: Address,
+        phys_addr: Address,
+    ) -> Result<Instr, Exception>
+    where
+        M: backend::ManagerReadWrite,
+    {
+        let first_halfword = self.fetch_instr_halfword(phys_addr)?;
+
+        // The reasons to provide the second half in the lambda is
+        // because those bytes may be inaccessible or may trigger an exception when read.
+        // Hence we can't read all 4 bytes eagerly.
+        let instr = if is_compressed(first_halfword) {
+            self.instruction_cache
+                .cache_compressed(phys_addr, first_halfword)
+        } else {
+            let upper = {
+                let next_addr = phys_addr + 2;
+
+                // Optimization to skip an extra address translation lookup:
+                // If the last 2 bytes of the instruction are in the same page
+                // as the first 2 bytes, then we already know the translated address
+                let phys_addr = if next_addr % PAGE_SIZE == 0 {
+                    self.translate_instr_address(mode, satp, virt_addr + 2)?
+                } else {
+                    next_addr
+                };
+
+                self.fetch_instr_halfword(phys_addr)?
+            };
+
+            let combined = (upper as u32) << 16 | (first_halfword as u32);
+            self.instruction_cache
+                .cache_uncompressed(phys_addr, combined)
+        };
+
+        Ok(instr)
+    }
 
     /// Advance [`MachineState`] by executing an [`InstrUncacheable`].
     fn run_instr_uncacheable(
@@ -686,7 +726,7 @@ impl<ML: main_memory::MainMemoryLayout, ICL: InstructionCacheLayout, M: backend:
         M: backend::ManagerReadWrite,
     {
         match instr {
-            Instr::Cacheable(i) => self.run_instr_cacheable(i),
+            Instr::Cacheable(i) => self.core.run_instr_cacheable(i),
             Instr::Uncacheable(i) => self.run_instr_uncacheable(i),
         }
     }
@@ -703,7 +743,7 @@ impl<ML: main_memory::MainMemoryLayout, ICL: InstructionCacheLayout, M: backend:
         M: backend::ManagerReadWrite,
     {
         match self.instruction_cache.fetch_instr(phys_addr).as_ref() {
-            Some(instr) => self.run_instr_cacheable(instr),
+            Some(instr) => self.core.run_instr_cacheable(instr),
             None => self
                 .fetch_instr(current_mode, satp, instr_pc, phys_addr)
                 .and_then(|instr| self.run_instr(&instr)),
@@ -719,18 +759,18 @@ impl<ML: main_memory::MainMemoryLayout, ICL: InstructionCacheLayout, M: backend:
     where
         M: backend::ManagerReadWrite,
     {
-        let current_pc = self.hart.pc.read();
-        let mip: CSRRepr = self.hart.csregisters.read(CSRegister::mip);
+        let current_pc = self.core.hart.pc.read();
+        let mip: CSRRepr = self.core.hart.csregisters.read(CSRegister::mip);
 
         // Clear the bit in the set of pending interrupt, marking it as handled
-        self.hart.csregisters.write(
+        self.core.hart.csregisters.write(
             CSRegister::mip,
             u64::set_bit(mip, interrupt.exception_code() as usize, false),
         );
 
-        let new_pc = self.hart.take_trap(interrupt, current_pc);
+        let new_pc = self.core.hart.take_trap(interrupt, current_pc);
         // Commit pc, it may be read by other instructions in this step
-        self.hart.pc.write(new_pc);
+        self.core.hart.pc.write(new_pc);
         Ok(new_pc)
     }
 
@@ -750,12 +790,12 @@ impl<ML: main_memory::MainMemoryLayout, ICL: InstructionCacheLayout, M: backend:
         if let Ok(exc) = EnvironException::try_from(&exception) {
             // We need to commit the PC before returning because the caller (e.g.
             // [step]) doesn't commit it eagerly.
-            self.hart.pc.write(current_pc);
+            self.core.hart.pc.write(current_pc);
 
             return Err(exc);
         }
 
-        Ok(self.hart.take_trap(exception, current_pc))
+        Ok(self.core.hart.take_trap(exception, current_pc))
     }
 
     /// Take an interrupt if available, and then
@@ -787,8 +827,8 @@ impl<ML: main_memory::MainMemoryLayout, ICL: InstructionCacheLayout, M: backend:
 
         // Update program couter
         match pc_update {
-            ProgramCounterUpdate::Set(address) => self.hart.pc.write(address),
-            ProgramCounterUpdate::Add(width) => self.hart.pc.write(instr_pc + width),
+            ProgramCounterUpdate::Set(address) => self.core.hart.pc.write(address),
+            ProgramCounterUpdate::Add(width) => self.core.hart.pc.write(instr_pc + width),
         };
 
         Ok(())
@@ -803,16 +843,16 @@ impl<ML: main_memory::MainMemoryLayout, ICL: InstructionCacheLayout, M: backend:
         M: backend::ManagerReadWrite,
     {
         while *steps < max_steps {
-            let current_mode = self.hart.mode.read();
+            let current_mode = self.core.hart.mode.read();
 
             // Try to take an interrupt if available, and then
             // obtain the pc for the next instruction to be executed
-            let instr_pc = match self.hart.get_pending_interrupt(current_mode) {
-                None => self.hart.pc.read(),
+            let instr_pc = match self.core.hart.get_pending_interrupt(current_mode) {
+                None => self.core.hart.pc.read(),
                 Some(interrupt) => self.address_on_interrupt(interrupt)?,
             };
 
-            let satp: CSRRepr = self.hart.csregisters.read(CSRegister::satp);
+            let satp: CSRRepr = self.core.hart.csregisters.read(CSRegister::satp);
             let instr_result = self
                 .translate_instr_address(current_mode, satp, instr_pc)
                 .and_then(|phys_addr| self.run_instr_at(current_mode, satp, instr_pc, phys_addr));
@@ -907,14 +947,14 @@ impl<ML: main_memory::MainMemoryLayout, ICL: InstructionCacheLayout, M: backend:
         M: backend::ManagerReadWrite,
     {
         // Reset hart state & set pc to entrypoint
-        self.hart.reset(program.entrypoint);
+        self.core.hart.reset(program.entrypoint);
         // Write program to main memory and point the PC at its start
         for (addr, data) in program.segments.iter() {
-            self.bus.write_all(*addr, data)?;
+            self.core.bus.write_all(*addr, data)?;
         }
 
         // Set booting Hart ID (a0) to 0
-        self.hart.xregisters.write(registers::a0, 0);
+        self.core.hart.xregisters.write(registers::a0, 0);
 
         // Load the initial program into memory
         let initrd_addr = program
@@ -926,7 +966,7 @@ impl<ML: main_memory::MainMemoryLayout, ICL: InstructionCacheLayout, M: backend:
 
         // Write initial ramdisk, if any
         let (dtb_addr, initrd) = if let Some(initrd) = initrd {
-            self.bus.write_all(initrd_addr, initrd)?;
+            self.core.bus.write_all(initrd_addr, initrd)?;
             let length = initrd.len() as u64;
             let dtb_options = devicetree::InitialRamDisk {
                 start: initrd_addr,
@@ -940,19 +980,21 @@ impl<ML: main_memory::MainMemoryLayout, ICL: InstructionCacheLayout, M: backend:
 
         // Write device tree to memory
         let fdt = devicetree::generate::<ML>(initrd)?;
-        self.bus.write_all(dtb_addr, fdt.as_slice())?;
+        self.core.bus.write_all(dtb_addr, fdt.as_slice())?;
 
         // Point DTB boot argument (a1) at the written device tree
-        self.hart.xregisters.write(registers::a1, dtb_addr);
+        self.core.hart.xregisters.write(registers::a1, dtb_addr);
 
         // Start in supervisor mode
-        self.hart.mode.write(mode);
+        self.core.hart.mode.write(mode);
 
         // Make sure to forward all exceptions and interrupts to supervisor mode
-        self.hart
+        self.core
+            .hart
             .csregisters
             .write(csregisters::CSRegister::medeleg, CSRValue::from(!0u64));
-        self.hart
+        self.core
+            .hart
             .csregisters
             .write(csregisters::CSRegister::mideleg, CSRValue::from(!0u64));
 
@@ -1026,13 +1068,13 @@ mod tests {
             // Instruction which performs a unit op (AUIPC with t0)
             const T2_ENC: u64 = 0b0_0111; // x7
 
-            state.hart.pc.write(init_pc_addr);
-            state.hart.xregisters.write(a1, T2_ENC << 7 | 0b0010111);
-            state.hart.xregisters.write(a2, init_pc_addr);
-            state.run_sw(0, a2, a1).expect("Storing instruction should succeed");
+            state.core.hart.pc.write(init_pc_addr);
+            state.core.hart.xregisters.write(a1, T2_ENC << 7 | 0b0010111);
+            state.core.hart.xregisters.write(a2, init_pc_addr);
+            state.core.run_sw(0, a2, a1).expect("Storing instruction should succeed");
             state.step().expect("should not raise trap to EE");
-            prop_assert_eq!(state.hart.xregisters.read(t2), init_pc_addr);
-            prop_assert_eq!(state.hart.pc.read(), init_pc_addr + 4);
+            prop_assert_eq!(state.core.hart.xregisters.read(t2), init_pc_addr);
+            prop_assert_eq!(state.core.hart.pc.read(), init_pc_addr + 4);
 
             // Instruction which updates pc by returning an address
             // t3 = jump_addr, (JALR imm=0, rs1=t3, rd=t0)
@@ -1040,19 +1082,19 @@ mod tests {
             const OP_JALR: u64 = 0b110_0111;
             const F3_0: u64 = 0b000;
 
-            state.hart.pc.write(init_pc_addr);
-            state.hart.xregisters.write(a1, T2_ENC << 15 | F3_0 << 12 | T0_ENC << 7 | OP_JALR);
-            state.hart.xregisters.write(a2, init_pc_addr);
-            state.run_sw(0, a2, a1).expect("Storing instruction should succeed");
-            state.hart.xregisters.write(t2, jump_addr);
+            state.core.hart.pc.write(init_pc_addr);
+            state.core.hart.xregisters.write(a1, T2_ENC << 15 | F3_0 << 12 | T0_ENC << 7 | OP_JALR);
+            state.core.hart.xregisters.write(a2, init_pc_addr);
+            state.core.run_sw(0, a2, a1).expect("Storing instruction should succeed");
+            state.core.hart.xregisters.write(t2, jump_addr);
 
             // Since we've written a new instruction to the init_pc_addr - we need to
             // invalidate the instruction cache.
             state.run_fencei();
 
             state.step().expect("should not raise trap to EE");
-            prop_assert_eq!(state.hart.xregisters.read(t0), init_pc_addr + 4);
-            prop_assert_eq!(state.hart.pc.read(), jump_addr);
+            prop_assert_eq!(state.core.hart.xregisters.read(t0), init_pc_addr + 4);
+            prop_assert_eq!(state.core.hart.pc.read(), jump_addr);
         });
     });
 
@@ -1076,20 +1118,20 @@ mod tests {
             const ECALL: u64 = 0b111_0011;
 
             // stvec is in DIRECT mode
-            state.hart.csregisters.write(CSRegister::stvec, stvec_addr);
+            state.core.hart.csregisters.write(CSRegister::stvec, stvec_addr);
             // mtvec is in VECTORED mode
-            state.hart.csregisters.write(CSRegister::mtvec, mtvec_addr | 1);
+            state.core.hart.csregisters.write(CSRegister::mtvec, mtvec_addr | 1);
 
             // TEST: Raise ECALL exception ==>> environment exception
-            state.hart.mode.write(Mode::Machine);
-            state.hart.pc.write(init_pc_addr);
-            state.hart.xregisters.write(a1, ECALL);
-            state.hart.xregisters.write(a2, init_pc_addr);
-            state.run_sw(0, a2, a1).expect("Storing instruction should succeed");
+            state.core.hart.mode.write(Mode::Machine);
+            state.core.hart.pc.write(init_pc_addr);
+            state.core.hart.xregisters.write(a1, ECALL);
+            state.core.hart.xregisters.write(a2, init_pc_addr);
+            state.core.run_sw(0, a2, a1).expect("Storing instruction should succeed");
             let e = state.step()
                 .expect_err("should raise Environment Exception");
             assert_eq!(e, EnvironException::EnvCallFromMMode);
-            prop_assert_eq!(state.hart.pc.read(), init_pc_addr);
+            prop_assert_eq!(state.core.hart.pc.read(), init_pc_addr);
         });
     });
 
@@ -1110,7 +1152,7 @@ mod tests {
             const EBREAK: u64 = 1 << 20 | 0b111_0011;
 
             // mtvec is in VECTORED mode
-            state.hart.csregisters.write(CSRegister::mtvec, mtvec_addr | 1);
+            state.core.hart.csregisters.write(CSRegister::mtvec, mtvec_addr | 1);
 
             // TEST: Raise exception, (and no interrupt before) take trap from M-mode to M-mode
             // (test no delegation takes place, even if delegation is on, traps never lower privilege)
@@ -1118,22 +1160,22 @@ mod tests {
                 1 << Exception::EnvCallFromSMode.exception_code() |
                 1 << Exception::EnvCallFromMMode.exception_code() |
                 1 << Exception::Breakpoint.exception_code();
-            state.hart.mode.write(Mode::Machine);
-            state.hart.pc.write(init_pc_addr);
-            state.hart.csregisters.write(CSRegister::medeleg, medeleg_val);
+            state.core.hart.mode.write(Mode::Machine);
+            state.core.hart.pc.write(init_pc_addr);
+            state.core.hart.csregisters.write(CSRegister::medeleg, medeleg_val);
 
-            state.hart.xregisters.write(a1, EBREAK);
-            state.hart.xregisters.write(a2, init_pc_addr);
-            state.run_sw(0, a2, a1).expect("Storing instruction should succeed");
+            state.core.hart.xregisters.write(a1, EBREAK);
+            state.core.hart.xregisters.write(a2, init_pc_addr);
+            state.core.run_sw(0, a2, a1).expect("Storing instruction should succeed");
             state.step().expect("should not raise environment exception");
             // pc should be mtvec_addr since exceptions aren't offset (by VECTORED mode)
             // even in VECTORED mode, only interrupts
-            let mstatus: MStatus = state.hart.csregisters.read(CSRegister::mstatus);
-            assert_eq!(state.hart.mode.read(), Mode::Machine);
-            assert_eq!(state.hart.pc.read(), mtvec_addr);
+            let mstatus: MStatus = state.core.hart.csregisters.read(CSRegister::mstatus);
+            assert_eq!(state.core.hart.mode.read(), Mode::Machine);
+            assert_eq!(state.core.hart.pc.read(), mtvec_addr);
             assert_eq!(mstatus.mpp(), xstatus::MPPValue::Machine);
-            assert_eq!(state.hart.csregisters.read::<CSRRepr>(CSRegister::mepc), init_pc_addr);
-            assert_eq!(state.hart.csregisters.read::<CSRRepr>(CSRegister::mcause), 3);
+            assert_eq!(state.core.hart.csregisters.read::<CSRRepr>(CSRegister::mepc), init_pc_addr);
+            assert_eq!(state.core.hart.csregisters.read::<CSRRepr>(CSRegister::mcause), 3);
         });
     });
 
@@ -1154,26 +1196,26 @@ mod tests {
             let stvec_addr = init_pc_addr + 4 * stvec_offset;
 
             // stvec is in VECTORED mode
-            state.hart.csregisters.write(CSRegister::stvec, stvec_addr | 1);
+            state.core.hart.csregisters.write(CSRegister::stvec, stvec_addr | 1);
 
             let bad_address = bus::start_of_main_memory::<T1K>() - (pc_addr_offset + 10) * 4;
             let medeleg_val = 1 << Exception::IllegalInstruction.exception_code() |
                 1 << Exception::EnvCallFromSMode.exception_code() |
                 1 << Exception::EnvCallFromMMode.exception_code() |
                 1 << Exception::InstructionAccessFault(bad_address).exception_code();
-            state.hart.mode.write(Mode::User);
-            state.hart.pc.write(bad_address);
-            state.hart.csregisters.write(CSRegister::medeleg, medeleg_val);
+            state.core.hart.mode.write(Mode::User);
+            state.core.hart.pc.write(bad_address);
+            state.core.hart.csregisters.write(CSRegister::medeleg, medeleg_val);
 
             state.step().expect("should not raise environment exception");
             // pc should be stvec_addr since exceptions aren't offsetted
             // even in VECTORED mode, only interrupts
-            let mstatus: MStatus = state.hart.csregisters.read(CSRegister::mstatus);
-            assert_eq!(state.hart.mode.read(), Mode::Supervisor);
-            assert_eq!(state.hart.pc.read(), stvec_addr);
+            let mstatus: MStatus = state.core.hart.csregisters.read(CSRegister::mstatus);
+            assert_eq!(state.core.hart.mode.read(), Mode::Supervisor);
+            assert_eq!(state.core.hart.pc.read(), stvec_addr);
             assert_eq!(mstatus.spp(), xstatus::SPPValue::User);
-            assert_eq!(state.hart.csregisters.read::<CSRRepr>(CSRegister::sepc), bad_address);
-            assert_eq!(state.hart.csregisters.read::<CSRRepr>(CSRegister::scause), 1);
+            assert_eq!(state.core.hart.csregisters.read::<CSRRepr>(CSRegister::sepc), bad_address);
+            assert_eq!(state.core.hart.csregisters.read::<CSRRepr>(CSRegister::scause), 1);
         });
     });
 
@@ -1237,20 +1279,24 @@ mod tests {
 
             // Write the instructions to the beginning of the main memory and point the program
             // counter at the first instruction.
-            state.hart.pc.write(start_ram);
+            state.core.hart.pc.write(start_ram);
             let instrs: [u8; 8] = [I_WRITE_T1_TO_ADDRESS_T0, I_LOAD_5_INTO_T2]
                 .into_iter()
                 .flat_map(u32::to_le_bytes)
                 .collect::<Vec<_>>()
                 .try_into()
                 .unwrap();
-            state.bus.write_all(start_ram, &instrs).unwrap();
+            state.core.bus.write_all(start_ram, &instrs).unwrap();
 
             // Configure the machine in such a way that the first instruction will override the
             // second instruction. The second instruction behaves differently.
             let address_to_write = start_ram + 4;
-            state.hart.xregisters.write(t0, address_to_write);
-            state.hart.xregisters.write(t1, I_LOAD_6_INTO_T2 as u64);
+            state.core.hart.xregisters.write(t0, address_to_write);
+            state
+                .core
+                .hart
+                .xregisters
+                .write(t1, I_LOAD_6_INTO_T2 as u64);
         }
 
         let mut alt_backend = backend.clone();
@@ -1260,7 +1306,7 @@ mod tests {
             let mut state = create_state!(MachineState, MachineStateLayout<M1K, TestInstructionCacheLayout>, F, backend, M1K, TestInstructionCacheLayout);
             state.step().unwrap();
             state.step().unwrap();
-            state.hart.xregisters.read(t2)
+            state.core.hart.xregisters.read(t2)
         };
 
         // Perform 2 steps separately in another backend by re-binding the state between steps.
@@ -1273,7 +1319,7 @@ mod tests {
             {
                 let mut state = create_state!(MachineState, MachineStateLayout<M1K, TestInstructionCacheLayout>, F, alt_backend, M1K, TestInstructionCacheLayout);
                 state.step().unwrap();
-                state.hart.xregisters.read(t2)
+                state.core.hart.xregisters.read(t2)
             }
         };
 
@@ -1448,29 +1494,34 @@ mod tests {
             state.reset();
 
             state
+                .core
                 .bus
                 .write_all(root_page_table_addr, &init_page_table)
                 .unwrap();
-            state.bus.write_all(code0_addr, &instrs0).unwrap();
-            state.bus.write_all(code1_addr, &instrs1).unwrap();
+            state.core.bus.write_all(code0_addr, &instrs0).unwrap();
+            state.core.bus.write_all(code1_addr, &instrs1).unwrap();
 
-            state.hart.pc.write(code_virt_addr);
+            state.core.hart.pc.write(code_virt_addr);
 
-            state.hart.mode.write(Mode::User);
-            state.hart.csregisters.write(CSRegister::satp, satp);
+            state.core.hart.mode.write(Mode::User);
+            state.core.hart.csregisters.write(CSRegister::satp, satp);
 
-            state.hart.xregisters.write(t0, new_pte.to_bits());
-            state.hart.xregisters.write(t1, root_page_table_virt_addr);
+            state.core.hart.xregisters.write(t0, new_pte.to_bits());
+            state
+                .core
+                .hart
+                .xregisters
+                .write(t1, root_page_table_virt_addr);
         }
 
         let mut alt_backend = backend.clone();
 
-        // Run 2 steps consecutively against one backend.
+        //  2 steps consecutively against one backend.
         let result = {
             let mut state = create_state!(MachineState, MachineStateLayout<M1M, TestInstructionCacheLayout>, F, backend, M1M, TestInstructionCacheLayout);
             state.step().unwrap();
             state.step().unwrap();
-            state.hart.xregisters.read(a0)
+            state.core.hart.xregisters.read(a0)
         };
 
         // Perform 2 steps separately in another backend by re-binding the state between steps.
@@ -1482,7 +1533,7 @@ mod tests {
             {
                 let mut state = create_state!(MachineState, MachineStateLayout<M1M, TestInstructionCacheLayout>, F, alt_backend, M1M, TestInstructionCacheLayout);
                 state.step().unwrap();
-                state.hart.xregisters.read(a0)
+                state.core.hart.xregisters.read(a0)
             }
         };
 

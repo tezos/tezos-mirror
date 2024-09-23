@@ -285,18 +285,29 @@ mod tests {
         const BUFFER_LEN: usize = 1024;
 
         // Configure machine for 'sbi_tezos_inbox_next'
-        pvm.machine_state.hart.xregisters.write(a0, buffer_addr);
         pvm.machine_state
+            .core
+            .hart
+            .xregisters
+            .write(a0, buffer_addr);
+        pvm.machine_state
+            .core
             .hart
             .xregisters
             .write(a1, BUFFER_LEN as u64);
-        pvm.machine_state.hart.xregisters.write(a2, level_addr);
-        pvm.machine_state.hart.xregisters.write(a3, counter_addr);
+        pvm.machine_state.core.hart.xregisters.write(a2, level_addr);
         pvm.machine_state
+            .core
+            .hart
+            .xregisters
+            .write(a3, counter_addr);
+        pvm.machine_state
+            .core
             .hart
             .xregisters
             .write(a7, SBI_FIRMWARE_TEZOS);
         pvm.machine_state
+            .core
             .hart
             .xregisters
             .write(a6, SBI_TEZOS_INBOX_NEXT);
@@ -324,16 +335,16 @@ mod tests {
 
         // Returned data is as expected
         assert_eq!(
-            pvm.machine_state.hart.xregisters.read(a0) as usize,
+            pvm.machine_state.core.hart.xregisters.read(a0) as usize,
             BUFFER_LEN
         );
-        assert_eq!(pvm.machine_state.bus.read(level_addr), Ok(level));
-        assert_eq!(pvm.machine_state.bus.read(counter_addr), Ok(counter));
+        assert_eq!(pvm.machine_state.core.bus.read(level_addr), Ok(level));
+        assert_eq!(pvm.machine_state.core.bus.read(counter_addr), Ok(counter));
 
         // Payload in memory should be as expected
         for (offset, &byte) in payload[..BUFFER_LEN].iter().enumerate() {
             let addr = buffer_addr + offset as u64;
-            let byte_written: u8 = pvm.machine_state.bus.read(addr).unwrap();
+            let byte_written: u8 = pvm.machine_state.core.bus.read(addr).unwrap();
             assert_eq!(
                 byte, byte_written,
                 "Byte at {addr:x} (offset {offset}) is not the same"
@@ -344,7 +355,7 @@ mod tests {
         assert!((BUFFER_LEN..4096)
             .map(|offset| {
                 let addr = buffer_addr + offset as u64;
-                pvm.machine_state.bus.read(addr).unwrap()
+                pvm.machine_state.core.bus.read(addr).unwrap()
             })
             .all(|b: u8| b == 0));
     }
@@ -365,6 +376,7 @@ mod tests {
 
         // Prepare subsequent ECALLs to use the SBI_CONSOLE_PUTCHAR extension
         pvm.machine_state
+            .core
             .hart
             .xregisters
             .write(a7, SBI_CONSOLE_PUTCHAR);
@@ -373,7 +385,11 @@ mod tests {
         let mut written = Vec::new();
         for _ in 0..10 {
             let char: u8 = rand::random();
-            pvm.machine_state.hart.xregisters.write(a0, char as u64);
+            pvm.machine_state
+                .core
+                .hart
+                .xregisters
+                .write(a0, char as u64);
             written.push(char);
 
             let outcome = pvm.handle_exception(&mut hooks, EnvironException::EnvCallFromUMode);

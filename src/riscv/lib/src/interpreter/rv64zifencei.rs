@@ -21,7 +21,9 @@ where
     /// Execute a `fence.i` instruction.
     #[inline(always)]
     pub fn run_fencei(&mut self) {
-        self.translation_cache.invalidate([AccessType::Instruction]);
+        self.core
+            .translation_cache
+            .invalidate([AccessType::Instruction]);
         self.instruction_cache.invalidate();
     }
 }

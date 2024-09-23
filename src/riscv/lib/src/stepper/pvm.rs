@@ -9,7 +9,7 @@ use crate::{
         bus::main_memory::{MainMemoryLayout, M1G},
         instruction_cache::{DefaultInstructionCacheLayout, InstructionCacheLayout},
         mode::Mode,
-        MachineError, MachineState,
+        MachineCoreState, MachineError,
     },
     program::Program,
     pvm::{Pvm, PvmHooks, PvmLayout, PvmStatus},
@@ -133,10 +133,8 @@ impl<'hooks, ML: MainMemoryLayout, ICL: InstructionCacheLayout> Stepper
 
     type Manager = Owned;
 
-    fn machine_state(
-        &self,
-    ) -> &MachineState<Self::MainMemoryLayout, Self::InstructionCacheLayout, Self::Manager> {
-        &self.pvm.machine_state
+    fn machine_state(&self) -> &MachineCoreState<Self::MainMemoryLayout, Self::Manager> {
+        &self.pvm.machine_state.core
     }
 
     type StepResult = StepperStatus;

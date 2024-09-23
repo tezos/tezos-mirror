@@ -11,9 +11,8 @@ use crate::{
     machine_state::{
         bus::main_memory::MainMemoryLayout,
         hart_state::HartState,
-        instruction_cache::InstructionCacheLayout,
         registers::{FRegister, FValue, XRegister},
-        MachineState,
+        MachineCoreState,
     },
     parser::instruction::InstrRoundingMode,
     state_backend as backend,
@@ -515,10 +514,9 @@ where
     }
 }
 
-impl<ML, ICL, M> MachineState<ML, ICL, M>
+impl<ML, M> MachineCoreState<ML, M>
 where
     ML: MainMemoryLayout,
-    ICL: InstructionCacheLayout,
     M: backend::ManagerReadWrite,
 {
     /// `FLD` I-type instruction.
@@ -559,9 +557,8 @@ mod tests {
                 CSRegister,
             },
             hart_state::{HartState, HartStateLayout},
-            instruction_cache::TestInstructionCacheLayout,
             registers::{fa2, fa3, parse_fregister, parse_xregister, t0},
-            MachineState, MachineStateLayout,
+            MachineCoreState, MachineCoreStateLayout,
         },
         traps::Exception,
     };
@@ -598,8 +595,14 @@ mod tests {
     });
 
     backend_test!(test_load_store, F, {
-        let mut backend = create_backend!(MachineStateLayout<T1K, TestInstructionCacheLayout>, F);
-        let state = create_state!(MachineState, MachineStateLayout<T1K, TestInstructionCacheLayout>, F, backend, T1K, TestInstructionCacheLayout);
+        let mut backend = create_backend!(MachineCoreStateLayout<T1K>, F);
+        let state = create_state!(
+            MachineCoreState,
+            MachineCoreStateLayout<T1K>,
+            F,
+            backend,
+            T1K
+        );
         let state_cell = std::cell::RefCell::new(state);
 
         proptest!(|(
