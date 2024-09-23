@@ -335,6 +335,20 @@ module Batcher = struct
     set_gauge "Last batch time" "batcher_last_batch_time" Ptime.to_float_s
 end
 
+module DAL_batcher = struct
+  let set_dal_batcher_queue_length =
+    set_gauge
+      "Number of messages waiting for publication on the DAL"
+      "dal_batcher_queue_length"
+      Int.to_float
+
+  let set_dal_injections_queue_length =
+    set_gauge
+      "Number of recently published DAL slots, who have not yet been forgotten"
+      "dal_injections_queue_length"
+      Int.to_float
+end
+
 module Performance = struct
   let virtual_ = v_gauge ~help:"Size Memory Stats" "performance_virtual"
 

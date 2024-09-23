@@ -161,6 +161,11 @@ module Worker = struct
             ~signals
             ~smart_rollup_address:state.smart_rollup_address
         in
+        let () =
+          Prometheus.Counter.inc
+            Metrics.signals_sent
+            (Int.to_float @@ List.length signals)
+        in
         Rollup_services.publish
           ~keep_alive:false
           ~rollup_node_endpoint:state.rollup_node_endpoint
