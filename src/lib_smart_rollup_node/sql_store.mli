@@ -17,6 +17,9 @@ type ro = Store_sigs.ro t
 (** Name of SQLite file in data directory. *)
 val sqlite_file_name : string
 
+(** Other files that make up the store. *)
+val extra_sqlite_files : string list
+
 (** [init mode ~data_dir] initializes the store and returns it. *)
 val init : 'a Store_sigs.mode -> data_dir:string -> 'a t tzresult Lwt.t
 
@@ -30,6 +33,13 @@ val readonly : _ t -> ro
 (** [gc store ~level] garbage collects data that relate to levels below [level]
     (by removing information from the database). *)
 val gc : rw -> level:int32 -> unit tzresult Lwt.t
+
+(** [export_store ~data_dir ~output_db_file] exports the store database with
+    data from the [data_dir] into the [output_db_file]. This function also
+    removes data that is specific to the operator. This function is meant to be
+    used to produce snapshots. *)
+val export_store :
+  data_dir:string -> output_db_file:string -> unit tzresult Lwt.t
 
 (** [with_transaction store f] executes [f] with a single connection to the
     database in a transaction. I.e., if [f] returns an error or raises an

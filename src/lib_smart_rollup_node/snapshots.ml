@@ -655,11 +655,9 @@ let post_export_checks ~snapshot_file =
     snapshot_header
     ~dest
 
-let operator_local_file_regexp = Re.Str.regexp "^storage/lpc$"
-
 let snapshotable_files_regexp =
   Re.Str.regexp
-    "^\\(storage/.*\\|context/.*\\|wasm_2_0_0/.*\\|arith/.*\\|riscv/.*\\|context/.*\\|metadata$\\)"
+    "^\\(storage/version\\|context/.*\\|wasm_2_0_0/.*\\|arith/.*\\|riscv/.*\\|context/.*\\|metadata$\\)"
 
 let maybe_cancel_gc ~rollup_node_endpoint =
   let open Lwt_syntax in
@@ -751,12 +749,10 @@ let export_dir (header : Header.t) ~unlock ~compression ~data_dir ~dest
       | Some dest -> Filename.concat dest dest_file_name
       | None -> dest_file_name
     in
-    let*! () =
-      let open Lwt_syntax in
-      let* () = Option.iter_s Lwt_utils_unix.create_dir dest in
+    let* () =
+      let*! () = Option.iter_s Lwt_utils_unix.create_dir dest in
       let include_file relative_path =
         Re.Str.string_match snapshotable_files_regexp relative_path 0
-        && not (Re.Str.string_match operator_local_file_regexp relative_path 0)
       in
       let files =
         Tezos_stdlib_unix.Utils.fold_files
@@ -768,6 +764,10 @@ let export_dir (header : Header.t) ~unlock ~compression ~data_dir ~dest
               (full_path, relative_path) :: acc)
           []
       in
+      Lwt_utils_unix.with_tempdir "rollup_node_sqlite_export_" @@ fun tmp_dir ->
+      let output_db_file = Filename.concat tmp_dir Store.sqlite_file_name in
+      let* () = Store.export_store ~data_dir ~output_db_file in
+      let files = (output_db_file, Store.sqlite_file_name) :: files in
       let writer =
         match compression with
         | On_the_fly -> gzip_writer
@@ -807,10 +807,7 @@ let export_compact cctxt ~no_checks ~compression ~data_dir ~dest ~filename =
   in
   Lwt_utils_unix.with_tempdir "snapshot_temp_" @@ fun tmp_dir ->
   let tmp_context_dir = Configuration.default_context_dir tmp_dir in
-  let tmp_store_dir = Configuration.default_storage_dir tmp_dir in
   let*! () = Lwt_utils_unix.create_dir tmp_context_dir in
-  let*! () = Lwt_utils_unix.create_dir tmp_store_dir in
-  let store_dir = Configuration.default_storage_dir data_dir in
   let context_dir = Configuration.default_context_dir data_dir in
   let* store = Store.init Read_only ~data_dir in
   let* metadata = Metadata.read_metadata_file ~dir:data_dir in
@@ -853,8 +850,10 @@ let export_compact cctxt ~no_checks ~compression ~data_dir ~dest ~filename =
     if Sys.file_exists path then
       Tezos_stdlib_unix.Utils.copy_file ~src:path ~dst:(tmp_dir // a)
   in
-  Tezos_stdlib_unix.Utils.copy_dir store_dir tmp_store_dir ;
+  let output_db_file = Filename.concat tmp_dir Store.sqlite_file_name in
+  let* () = Store.export_store ~data_dir ~output_db_file in
   copy_file "metadata" ;
+  copy_dir "storage" ;
   copy_dir "wasm_2_0_0" ;
   copy_dir "arith" ;
   copy_dir "riscv" ;
@@ -983,6 +982,10 @@ let import ~apply_unsafe_patches ~no_checks ~force cctxt ~data_dir
       ~snapshot_file
       ~dest:data_dir
   in
+  let rm f =
+    try Unix.unlink f with Unix.Unix_error (Unix.ENOENT, _, _) -> ()
+  in
+  List.iter rm Store.extra_sqlite_files ;
   let* () = maybe_reconstruct_context cctxt ~data_dir ~apply_unsafe_patches in
   let* () =
     correct_history_mode ~data_dir snapshot_header original_history_mode
