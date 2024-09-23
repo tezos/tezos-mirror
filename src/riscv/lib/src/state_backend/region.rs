@@ -119,6 +119,22 @@ impl<E: Elem, T, M: ManagerBase> LazyCell<E, T, M> {
     pub fn struct_ref(&self) -> AllocatedOf<Atom<E>, Ref<'_, M>> {
         self.inner.struct_ref()
     }
+
+    /// Read the in-memory value as a reference, rather than copying as
+    /// [`CellRead::read`] does.
+    pub fn read_ref(&mut self) -> &T
+    where
+        M: ManagerRead,
+        T: From<E>,
+    {
+        match self.value.get_mut() {
+            Some(v) => v,
+            n @ None => {
+                *n = Some(self.inner.read().into());
+                n.as_ref().unwrap()
+            }
+        }
+    }
 }
 
 /// A cell that support reading only.
