@@ -30,15 +30,15 @@ ReleaseCandidate | TestReleaseCandidate | Release | TestRelease)
   DEBCHANGELOG="New Release $VERSION / $CI_COMMIT_SHORT_SHA"
   ;;
 Master)
-  DEBVERSION=$(date +'%Y%m%d%H%M')+$CI_COMMIT_TAG
+  DEBVERSION=1:$(date +'%Y%m%d%H%M')+$CI_COMMIT_TAG
   DEBCHANGELOG="Packages for master $CI_COMMIT_TAG"
   ;;
 SoftRelease)
-  DEBVERSION=$(date +'%Y%m%d%H%M')+$CI_COMMIT_TAG
+  DEBVERSION=1:$(date +'%Y%m%d%H%M')+$CI_COMMIT_TAG
   DEBCHANGELOG="Packages for tag $CI_COMMIT_TAG"
   ;;
 TestBranch)
-  DEBVERSION=$(date +'%Y%m%d%H%M')+$CI_COMMIT_SHORT_SHA
+  DEBVERSION=1:$(date +'%Y%m%d%H%M')+$CI_COMMIT_SHORT_SHA
   DEBCHANGELOG="Test package commit $CI_COMMIT_REF_NAME"
   ;;
 *)

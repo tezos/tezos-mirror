@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# This script test the expected result for the script
-# scripts/ci/destination_debian_repo.sh
+# This script tests the value defined in scripts/ci/octez-packages-version.sh
+# and used in ex: scripts/ci/create_debian_repo.sh
 
 CI_COMMIT_SHORT_SHA="test"
 
@@ -26,7 +26,7 @@ for test in "${tests[@]}"; do
 
   . scripts/ci/octez-packages-version.sh
 
-  if [ "$RELEASETYPE" != "$expected_release" ] && [ "$VERSION" != "$expected_version" ]; then
+  if [ "$RELEASETYPE" != "$expected_release" ] || [ "$VERSION" != "$expected_version" ]; then
     echo -e "Test failed:\n   CI_COMMIT_REF_PROTECTED=$CI_COMMIT_REF_PROTECTED\n" \
       "  CI_PROJECT_NAMESPACE=$CI_PROJECT_NAMESPACE\n" \
       "  CI_COMMIT_TAG=$CI_COMMIT_TAG\n" \
