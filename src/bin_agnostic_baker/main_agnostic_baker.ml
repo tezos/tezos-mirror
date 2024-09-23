@@ -57,6 +57,24 @@ module Events = struct
       ~msg:"baker for protocol {proto} is now running"
       ("proto", Protocol_hash.encoding)
       ~pp1:Protocol_hash.pp_short
+
+  let starting_daemon =
+    declare_0
+      ~section
+      ~level:Notice
+      ~name:"starting_daemon"
+      ~msg:"starting agnostic daemon"
+      ()
+
+  let period_status =
+    declare_2
+      ~section
+      ~level:Notice
+      ~name:"period_status"
+      ~msg:
+        "new block on {period} period (remaining period duration {remaining})"
+      ("period", string)
+      ("remaining", int31)
 end
 
 module Parameters = struct
@@ -165,6 +183,114 @@ module RPC = struct
         raise Not_found
 end
 
+module Daemon = struct
+  let get_current_proposal ~node_addr =
+    let open Lwt_result_syntax in
+    let f json =
+      match json with
+      | `Null -> return_none
+      | `String s -> return_some @@ Protocol_hash.of_b58check_exn s
+      | _ -> tzfail (Cannot_decode_node_data "not an object")
+    in
+    let uri =
+      Format.sprintf
+        "%s/chains/main/blocks/head/votes/current_proposal"
+        node_addr
+    in
+    RPC.call_and_wrap_rpc ~node_addr ~uri ~f
+
+  let get_current_period ~node_addr =
+    let open Lwt_result_syntax in
+    let voting_period_field = "voting_period" in
+    let kind_field = "kind" in
+    let remaining_field = "remaining" in
+    let f json =
+      let* kind =
+        match json with
+        | `O fields -> (
+            match List.assoc_opt ~equal:( = ) voting_period_field fields with
+            | None ->
+                tzfail
+                  (Cannot_decode_node_data
+                     ("missing field " ^ voting_period_field))
+            | Some node -> (
+                match node with
+                | `O fields -> (
+                    match List.assoc_opt ~equal:( = ) kind_field fields with
+                    | None ->
+                        tzfail
+                          (Cannot_decode_node_data
+                             ("missing field " ^ voting_period_field))
+                    | Some node -> return @@ Ezjsonm.get_string node)
+                | _ -> tzfail (Cannot_decode_node_data "not an object")))
+        | _ -> tzfail (Cannot_decode_node_data "not an object")
+      in
+      let* remaining =
+        match json with
+        | `O fields -> (
+            match List.assoc_opt ~equal:( = ) remaining_field fields with
+            | None ->
+                tzfail
+                  (Cannot_decode_node_data ("missing field " ^ remaining_field))
+            | Some node -> return @@ Ezjsonm.get_int node)
+        | _ -> tzfail (Cannot_decode_node_data "not an object")
+      in
+      return (kind, remaining)
+    in
+    let uri =
+      Format.sprintf "%s/chains/main/blocks/head/votes/current_period" node_addr
+    in
+    RPC.call_and_wrap_rpc ~node_addr ~uri ~f
+
+  let monitor_heads ~node_addr =
+    let open Lwt_result_syntax in
+    let uri = Format.sprintf "%s/monitor/heads/main" node_addr in
+    let* _, body = RPC.request_uri ~node_addr ~uri in
+    let cohttp_stream = Cohttp_lwt.Body.to_stream body in
+    let buffer = Buffer.create 2048 in
+    let stream, push = Lwt_stream.create () in
+    let on_chunk v = push (Some v) and on_close () = push None in
+    let rec loop () =
+      let*! v = Lwt_stream.get cohttp_stream in
+      match v with
+      | None ->
+          on_close () ;
+          Lwt.return_unit
+      | Some chunk ->
+          Buffer.add_string buffer chunk ;
+          let data = Buffer.contents buffer in
+          Buffer.reset buffer ;
+          on_chunk data ;
+          loop ()
+    in
+    ignore (loop () : unit Lwt.t) ;
+    return stream
+
+  let monitor_voting_periods ~node_addr head_stream =
+    let open Lwt_result_syntax in
+    let rec loop () =
+      let*! v = Lwt_stream.get head_stream in
+      match v with
+      | Some _tick ->
+          let* period_kind, remaining = get_current_period ~node_addr in
+          let*! () = Events.(emit period_status) (period_kind, remaining) in
+          loop ()
+      | None -> return_unit
+    in
+    let* () = loop () in
+    return_unit
+
+  let run ~node_addr =
+    let open Lwt_result_syntax in
+    let*! () = Events.(emit starting_daemon) () in
+    let* _protocol_proposal = get_current_proposal ~node_addr in
+    let* head_stream = monitor_heads ~node_addr in
+    (* Monitoring voting periods through heads monitoring to avoid
+       missing UAUs. *)
+    let* () = monitor_voting_periods ~node_addr head_stream in
+    return_unit
+end
+
 let get_next_protocol_hash ~node_addr =
   let open Lwt_result_syntax in
   let f json =
@@ -174,7 +300,7 @@ let get_next_protocol_hash ~node_addr =
       match json with
       | `O fields -> (
           match List.assoc_opt ~equal:( = ) name fields with
-          | None -> tzfail (Cannot_decode_node_data ("missing field" ^ name))
+          | None -> tzfail (Cannot_decode_node_data ("missing field " ^ name))
           | Some node -> return node)
       | _ -> tzfail (Cannot_decode_node_data "not an object")
     in
@@ -260,6 +386,7 @@ let run () =
   let*! () = Tezos_base_unix.Internal_event_unix.init () in
   let endpoint, binaries_directory, baker_args = Args.parse_args Sys.argv in
   let* proto_hash = get_next_protocol_hash ~node_addr:endpoint in
+  let (_daemon : unit tzresult Lwt.t) = Daemon.run ~node_addr:endpoint in
   let* _baker = Baker.spawn_baker proto_hash ~binaries_directory ~baker_args in
   let*! () = Lwt_utils.never_ending () in
   return_unit
