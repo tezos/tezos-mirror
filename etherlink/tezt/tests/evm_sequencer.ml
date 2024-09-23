@@ -3865,6 +3865,17 @@ let test_sequencer_can_catch_up_on_event =
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "event"]
     ~title:"Evm node can catchup event from the rollup node"
+      (* This test relies on the rollup node receiving the blueprint before:
+         - the last_produced_block is applied, and
+         - the sequencer is shut down.
+         When DAL is activated and blueprints are sent using signals,
+         the sequencer notifies blueprints only when they can be
+         applied by the rollup node. In this test, we stop the
+         sequencer to trigger the catch-up mechanism before the
+         last_produced_block can be applied. Consequently, the signal
+         is not sent, and the rollup node does not apply the blueprint
+         corresponding to last_produced_block. *)
+    ~use_dal:Register_without_feature
   @@ fun {sc_rollup_node; client; sequencer; proxy; observer; _} _protocol ->
   let* () =
     repeat 2 (fun () ->
