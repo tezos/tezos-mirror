@@ -22,6 +22,8 @@
   octez-injector
   octez-version.value
   octez-l2-libs.layer2_store
+  octez-l2-libs.rollup_node_sqlite_migrations
+  octez-l2-libs.sqlite
   octez-crawler
   octez-libs.tezos-workers
   octez-l2-libs.smart-rollup)
@@ -39,6 +41,7 @@
   -open Octez_injector
   -open Tezos_version_value
   -open Tezos_layer2_store
+  -open Octez_sqlite
   -open Octez_crawler
   -open Tezos_workers
   -open Octez_smart_rollup))
