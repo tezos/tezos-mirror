@@ -1,0 +1,13 @@
+[package]
+name = "octez-evm-node-wasm-runtime"
+version = "0.0.0-dev"
+authors = [ "Etherlink Core Engineers <contact@tezos.com>" ]
+edition = "2021"
+
+[build-dependencies]
+ocaml-build = { version = "1.*", features = ["dune"] }
+
+[dependencies]
+ocaml = { version = "1.*" }
+wasmer = { path = "../../src/rust_deps/wasmer-3.3.0/lib/api", features = [] }
+wasmer-compiler-cranelift = { path = "../../src/rust_deps/wasmer-3.3.0/lib/compiler-cranelift" }
