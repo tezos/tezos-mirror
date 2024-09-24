@@ -124,7 +124,7 @@ let register_outbox_messages (module Plugin : Protocol_plugin_sig.S) node_ctxt
   | [] -> return_unit
   | _ ->
       let indexes = List.map fst outbox_messages in
-      Node_context.register_new_outbox_messages
+      Node_context.register_outbox_messages
         node_ctxt
         ~outbox_level:level
         ~indexes
@@ -782,7 +782,7 @@ let plugin_of_first_block cctxt (block : Layer1.header) =
   let*? plugin = Protocol_plugins.proto_plugin_for_protocol current_protocol in
   return (current_protocol, plugin)
 
-let run ~data_dir ~irmin_cache_size ~index_buffer_size ?log_kernel_debug_file
+let run ~data_dir ~irmin_cache_size ?log_kernel_debug_file
     (configuration : Configuration.t) (cctxt : Client_context.full) =
   let open Lwt_result_syntax in
   let* () =
@@ -869,7 +869,6 @@ let run ~data_dir ~irmin_cache_size ~index_buffer_size ?log_kernel_debug_file
       cctxt
       ~data_dir
       ~irmin_cache_size
-      ~index_buffer_size
       ?log_kernel_debug_file
       Read_write
       l1_ctxt

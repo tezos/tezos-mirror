@@ -385,7 +385,7 @@ let index_buffer_size_arg =
     ~placeholder:"<nb_entries>"
     ~doc:
       "The maximum cache size in memory before it is flushed to disk, used for \
-       indexes of the store."
+       indexes of the store. (Deprecated)"
     positive_int_parameter
 
 let irmin_cache_size_arg =

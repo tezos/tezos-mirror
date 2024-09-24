@@ -25,39 +25,33 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type lcc = Store.Lcc.lcc = {commitment : Commitment.Hash.t; level : int32}
+type lcc = {commitment : Commitment.Hash.t; level : int32}
 
 type genesis_info = Metadata.genesis_info = {
   level : int32;
   commitment_hash : Commitment.Hash.t;
 }
 
-type 'a store = 'a Store.t
+type 'a store = 'a Store.t constraint 'a = [< `Read | `Write > `Read]
 
 module Node_store = struct
   let close (s : 'a store) = Store.close s
 
-  let load :
-      'a Store_sigs.mode ->
-      index_buffer_size:int ->
-      l2_blocks_cache_size:int ->
-      string ->
-      'a store tzresult Lwt.t =
-    Store.load
+  let load : 'a Store_sigs.mode -> data_dir:string -> 'a store tzresult Lwt.t =
+    Store.init
 
   let check_and_set_history_mode (type a) (mode : a Store_sigs.mode)
-      (store : a Store.store) (history_mode : Configuration.history_mode option)
-      =
+      (store : a Store.t) (history_mode : Configuration.history_mode option) =
     let open Lwt_result_syntax in
     let* stored_history_mode =
       match mode with
-      | Read_only -> Store.History_mode.read store.history_mode
-      | Read_write -> Store.History_mode.read store.history_mode
+      | Read_only -> Store.State.History_mode.get store
+      | Read_write -> Store.State.History_mode.get store
     in
     let save_when_rw history_mode =
       match mode with
       | Read_only -> return_unit
-      | Read_write -> Store.History_mode.write store.history_mode history_mode
+      | Read_write -> Store.State.History_mode.set store history_mode
     in
     match (stored_history_mode, history_mode) with
     | None, None -> save_when_rw Configuration.default_history_mode
@@ -186,15 +180,13 @@ let make_kernel_logger event ?log_kernel_debug_file logs_dir =
 
 let checkout_context node_ctxt block_hash =
   let open Lwt_result_syntax in
-  let* l2_header =
-    Store.L2_blocks.header node_ctxt.store.l2_blocks block_hash
-  in
+  let* context_hash = Store.L2_blocks.find_context node_ctxt.store block_hash in
   let*? context_hash =
     let open Result_syntax in
-    match l2_header with
+    match context_hash with
     | None ->
         tzfail (Rollup_node_errors.Cannot_checkout_context (block_hash, None))
-    | Some {context; _} -> return context
+    | Some context -> return context
   in
   let*! ctxt = Context.checkout node_ctxt.context context_hash in
   match ctxt with
@@ -232,12 +224,12 @@ end
 
 let get_history_mode {store; _} =
   let open Lwt_result_syntax in
-  let+ mode = Store.History_mode.read store.history_mode in
+  let+ mode = Store.State.History_mode.get store in
   Option.value mode ~default:Configuration.default_history_mode
 
 let hash_of_level_opt {store; cctxt; _} level =
   let open Lwt_result_syntax in
-  let* hash = Store.Levels_to_hashes.find store.levels_to_hashes level in
+  let* hash = Store.L2_levels.find store level in
   match hash with
   | Some hash -> return_some hash
   | None ->
@@ -259,23 +251,18 @@ let hash_of_level node_ctxt level =
 
 let level_of_hash {l1_ctxt; store; _} hash =
   let open Lwt_result_syntax in
-  let* l2_header = Store.L2_blocks.header store.l2_blocks hash in
-  match l2_header with
-  | Some {level; _} -> return level
+  let* level = Store.L2_blocks.find_level store hash in
+  match level with
+  | Some level -> return level
   | None ->
       let+ {level; _} = Layer1.fetch_tezos_shell_header l1_ctxt hash in
       level
 
 let save_level {store; _} Layer1.{hash; level} =
-  Store.Levels_to_hashes.add store.levels_to_hashes level hash
+  Store.L2_levels.store store level hash
 
 let save_l2_block {store; _} (head : Sc_rollup_block.t) =
-  let head_info = {head with header = (); content = ()} in
-  Store.L2_blocks.append
-    store.l2_blocks
-    ~key:head.header.block_hash
-    ~header:head.header
-    ~value:head_info
+  Store.L2_blocks.store store head
 
 let notify_processed_tezos_level node_ctxt level =
   node_ctxt.sync.processed_level <- level ;
@@ -283,35 +270,39 @@ let notify_processed_tezos_level node_ctxt level =
 
 let set_l2_head node_ctxt (head : Sc_rollup_block.t) =
   let open Lwt_result_syntax in
-  let+ () = Store.L2_head.write node_ctxt.store.l2_head head in
+  let+ () =
+    Store.State.L2_head.set
+      node_ctxt.store
+      (head.header.block_hash, head.header.level)
+  in
   notify_processed_tezos_level node_ctxt head.header.level ;
   Metrics.wrap (fun () -> Metrics.Inbox.set_head_level head.header.level) ;
   Lwt_watcher.notify node_ctxt.global_block_watcher head
 
-let is_processed {store; _} head = Store.L2_blocks.mem store.l2_blocks head
+let is_processed {store; _} head =
+  let open Lwt_result_syntax in
+  let+ level = Store.L2_blocks.find_level store head in
+  Option.is_some level
 
-let last_processed_head_opt {store; _} = Store.L2_head.read store.l2_head
+let last_processed_head_opt {store; _} = Store.L2_blocks.find_head store
 
 let mark_finalized_level {store; _} level =
-  Store.Last_finalized_level.write store.last_finalized_level level
+  Store.State.Finalized_level.set store level
 
 let get_finalized_level {store; _} =
   let open Lwt_result_syntax in
-  let+ level = Store.Last_finalized_level.read store.last_finalized_level in
+  let+ level = Store.State.Finalized_level.get store in
   Option.value level ~default:0l
 
-let get_l2_block {store; _} block_hash =
+let find_l2_block {store; _} block_hash = Store.L2_blocks.find store block_hash
+
+let get_l2_block node_ctxt block_hash =
   let open Lwt_result_syntax in
-  let* block = Store.L2_blocks.read store.l2_blocks block_hash in
+  let* block = find_l2_block node_ctxt block_hash in
   match block with
   | None ->
       failwith "Could not retrieve L2 block for %a" Block_hash.pp block_hash
-  | Some (info, header) -> return {info with Sc_rollup_block.header}
-
-let find_l2_block {store; _} block_hash =
-  let open Lwt_result_syntax in
-  let+ block = Store.L2_blocks.read store.l2_blocks block_hash in
-  Option.map (fun (info, header) -> {info with Sc_rollup_block.header}) block
+  | Some block -> return block
 
 let get_l2_block_by_level node_ctxt level =
   let open Lwt_result_syntax in
@@ -326,26 +317,14 @@ let find_l2_block_by_level node_ctxt level =
   | None -> return_none
   | Some block_hash -> find_l2_block node_ctxt block_hash
 
-let get_finalized_head_opt node_ctxt =
-  let open Lwt_result_syntax in
-  let* level =
-    Store.Last_finalized_level.read node_ctxt.store.last_finalized_level
-  in
-  match level with
-  | None -> return_none
-  | Some level -> find_l2_block_by_level node_ctxt level
+let get_finalized_head_opt {store; _} = Store.L2_blocks.find_finalized store
 
 let head_of_block_level (hash, level) = {Layer1.hash; level}
 
 let block_level_of_head Layer1.{hash; level} = (hash, level)
 
-let get_l2_block_predecessor node_ctxt hash =
-  let open Lwt_result_syntax in
-  let+ header = Store.L2_blocks.header node_ctxt.store.l2_blocks hash in
-  Option.map
-    (fun {Sc_rollup_block.predecessor; level; _} ->
-      (predecessor, Int32.pred level))
-    header
+let get_l2_block_predecessor {store; _} hash =
+  Store.L2_blocks.find_predecessor store hash
 
 let get_predecessor_opt node_ctxt (hash, level) =
   let open Lwt_result_syntax in
@@ -424,11 +403,9 @@ let tick_search ~big_step_blocks node_ctxt ?min_level head tick =
       (* The starting block contains the tick we want, we are done. *)
       return_some head
   else
-    let* gc_levels = Store.Gc_levels.read node_ctxt.store.gc_levels in
+    let* last_gc_target = Store.State.Last_gc_target.get node_ctxt.store in
     let first_available_level =
-      match gc_levels with
-      | Some {first_available_level = l; _} -> l
-      | None -> node_ctxt.genesis_info.level
+      Option.value last_gc_target ~default:node_ctxt.genesis_info.level
     in
     let min_level =
       match min_level with
@@ -491,14 +468,14 @@ let tick_search ~big_step_blocks node_ctxt ?min_level head tick =
     (* Then do dichotomy on interval [start_block; end_block] *)
     dicho start_block end_block
 
-let block_with_tick ({store; _} as node_ctxt) ?min_level ~max_level tick =
+let block_with_tick node_ctxt ?min_level ~max_level tick =
   let open Lwt_result_syntax in
   let open Lwt_result_option_syntax in
   Error.trace_lwt_result_with
     "Could not retrieve block with tick %a"
     Z.pp_print
     tick
-  @@ let** head = Store.L2_head.read store.l2_head in
+  @@ let** head = last_processed_head_opt node_ctxt in
      (* We start by taking big steps of 4096 blocks for the first
         approximation. This means we need at most 20 big steps to start a
         dichotomy on a 4096 blocks interval (at most 12 steps). We could take
@@ -512,9 +489,7 @@ let block_with_tick ({store; _} as node_ctxt) ?min_level ~max_level tick =
      tick_search ~big_step_blocks:4096 node_ctxt ?min_level head tick
 
 let find_commitment {store; _} commitment_hash =
-  let open Lwt_result_syntax in
-  let+ commitment = Store.Commitments.read store.commitments commitment_hash in
-  Option.map fst commitment
+  Store.Commitments.find store commitment_hash
 
 let get_commitment node_ctxt commitment_hash =
   let open Lwt_result_syntax in
@@ -527,16 +502,13 @@ let get_commitment node_ctxt commitment_hash =
         commitment_hash
   | Some i -> return i
 
-let commitment_exists {store; _} hash =
-  Store.Commitments.mem store.commitments hash
+let commitment_exists node_ctxt hash =
+  let open Lwt_result_syntax in
+  let+ c = find_commitment node_ctxt hash in
+  Option.is_some c
 
 let save_commitment {store; _} commitment =
-  let open Lwt_result_syntax in
-  let hash = Commitment.hash commitment in
-  let+ () =
-    Store.Commitments.append store.commitments ~key:hash ~value:commitment
-  in
-  hash
+  Store.Commitments.store store commitment
 
 let tick_offset_of_commitment_period node_ctxt (commitment : Commitment.t) =
   let open Lwt_result_syntax in
@@ -552,30 +524,19 @@ let tick_offset_of_commitment_period node_ctxt (commitment : Commitment.t) =
   Z.sub commitment_final_tick (Z.of_int64 commitment.number_of_ticks)
 
 let commitment_published_at_level {store; _} commitment =
-  Store.Commitments_published_at_level.find
-    store.commitments_published_at_level
-    commitment
+  Store.Commitments_published_at_levels.get store commitment
 
-let set_commitment_published_at_level {store; _} hash =
-  Store.Commitments_published_at_level.add
-    store.commitments_published_at_level
-    hash
+let set_commitment_published_at_level {store; _} hash levels =
+  Store.Commitments_published_at_levels.register store hash levels
 
 type commitment_source = Anyone | Us
 
-let commitment_was_published {store; _} ~source commitment_hash =
+let commitment_was_published node_ctxt ~source commitment_hash =
   let open Lwt_result_syntax in
+  let+ info = commitment_published_at_level node_ctxt commitment_hash in
   match source with
-  | Anyone ->
-      Store.Commitments_published_at_level.mem
-        store.commitments_published_at_level
-        commitment_hash
+  | Anyone -> Option.is_some info
   | Us -> (
-      let+ info =
-        Store.Commitments_published_at_level.find
-          store.commitments_published_at_level
-          commitment_hash
-      in
       match info with
       | Some {published_at_level = Some _; _} -> true
       | _ -> false)
@@ -583,7 +544,7 @@ let commitment_was_published {store; _} ~source commitment_hash =
 let set_lcc node_ctxt lcc =
   let open Lwt_result_syntax in
   let lcc_l1 = Reference.get node_ctxt.lcc in
-  let* () = Store.Lcc.write node_ctxt.store.lcc lcc in
+  let* () = Store.State.LCC.set node_ctxt.store (lcc.commitment, lcc.level) in
   Metrics.Info.set_lcc_level_local lcc.level ;
   if lcc.level > lcc_l1.level then (
     Reference.set node_ctxt.lcc lcc ;
@@ -595,9 +556,9 @@ let set_lcc node_ctxt lcc =
 
 let last_seen_lcc {store; genesis_info; _} =
   let open Lwt_result_syntax in
-  let+ lcc = Store.Lcc.read store.lcc in
+  let+ lcc = Store.State.LCC.get store in
   match lcc with
-  | Some lcc -> lcc
+  | Some (commitment, level) -> {commitment; level}
   | None ->
       {commitment = genesis_info.commitment_hash; level = genesis_info.level}
 
@@ -606,13 +567,11 @@ let register_published_commitment node_ctxt commitment ~first_published_at_level
   let open Lwt_result_syntax in
   let commitment_hash = Commitment.hash commitment in
   let* prev_publication =
-    Store.Commitments_published_at_level.mem
-      node_ctxt.store.commitments_published_at_level
-      commitment_hash
+    Store.Commitments_published_at_levels.get node_ctxt.store commitment_hash
   in
   let published_at_level = if published_by_us then Some level else None in
   let* () =
-    if (not prev_publication) || published_by_us then
+    if Option.is_none prev_publication || published_by_us then
       set_commitment_published_at_level
         node_ctxt
         commitment_hash
@@ -622,7 +581,9 @@ let register_published_commitment node_ctxt commitment ~first_published_at_level
   if published_by_us then Metrics.Info.set_lpc_level_local level
   else Metrics.Info.set_lpc_level_l1 level ;
   when_ published_by_us @@ fun () ->
-  let* () = Store.Lpc.write node_ctxt.store.lpc commitment in
+  let* () =
+    Store.State.LPC.set node_ctxt.store (commitment_hash, commitment.inbox_level)
+  in
   let update_lpc_ref =
     match Reference.get node_ctxt.lpc with
     | None -> true
@@ -631,10 +592,7 @@ let register_published_commitment node_ctxt commitment ~first_published_at_level
   if update_lpc_ref then Reference.set node_ctxt.lpc (Some commitment) ;
   return_unit
 
-let find_inbox {store; _} inbox_hash =
-  let open Lwt_result_syntax in
-  let+ inbox = Store.Inboxes.read store.inboxes inbox_hash in
-  Option.map fst inbox
+let find_inbox {store; _} inbox_hash = Store.Inboxes.find store inbox_hash
 
 let get_inbox node_ctxt inbox_hash =
   let open Lwt_result_syntax in
@@ -647,18 +605,10 @@ let get_inbox node_ctxt inbox_hash =
         inbox_hash
   | Some i -> return i
 
-let save_inbox {store; _} inbox =
-  let open Lwt_result_syntax in
-  let hash = Octez_smart_rollup.Inbox.hash inbox in
-  let+ () = Store.Inboxes.append store.inboxes ~key:hash ~value:inbox in
-  hash
+let save_inbox {store; _} inbox = Store.Inboxes.store store inbox
 
-let find_inbox_by_block_hash ({store; _} as node_ctxt) block_hash =
-  let open Lwt_result_syntax in
-  let* header = Store.L2_blocks.header store.l2_blocks block_hash in
-  match header with
-  | None -> return_none
-  | Some {inbox_hash; _} -> find_inbox node_ctxt inbox_hash
+let find_inbox_by_block_hash {store; _} block_hash =
+  Store.Inboxes.find_by_block_hash store block_hash
 
 let inbox_of_head node_ctxt Layer1.{hash = block_hash; level = block_level} =
   let open Lwt_result_syntax in
@@ -691,55 +641,37 @@ let get_inbox_by_block_hash node_ctxt hash =
   let* level = level_of_hash node_ctxt hash in
   inbox_of_head node_ctxt {hash; level}
 
-let unsafe_find_stored_messages node_ctxt =
-  Store.Messages.read node_ctxt.store.messages
-
-let unsafe_get_stored_messages node_ctxt messages_hash =
+let find_messages {store; _} payload_hash =
   let open Lwt_result_syntax in
-  let* res = unsafe_find_stored_messages node_ctxt messages_hash in
+  let+ res = Store.Messages.find store payload_hash in
+  Option.map snd res
+
+let get_messages node_ctxt messages_hash =
+  let open Lwt_result_syntax in
+  let* res = find_messages node_ctxt messages_hash in
   match res with
   | None ->
       failwith
         "Could not retrieve messages with payloads merkelized hash %a"
         Merkelized_payload_hashes_hash.pp
         messages_hash
-  | Some (messages, _pred) -> return messages
+  | Some messages -> return messages
 
-let get_num_messages {store; _} hash =
+let get_num_messages node_ctxt hash =
   let open Lwt_result_syntax in
-  let* msg = Store.Messages.read store.messages hash in
-  match msg with
-  | None ->
-      failwith
-        "Could not retrieve number of messages for inbox witness %a"
-        Merkelized_payload_hashes_hash.pp
-        hash
-  | Some (messages, _pred_hash) -> return (List.length messages)
+  let+ messages = get_messages node_ctxt hash in
+  List.length messages
 
-let save_messages {store; _} key ~predecessor messages =
-  Store.Messages.append
-    store.messages
-    ~key
-    ~header:predecessor
-    ~value:(messages :> string list)
+let save_messages {store; _} key ~level messages =
+  Store.Messages.store store ~level key (messages :> string list)
 
 let set_outbox_message_executed {store; _} ~outbox_level ~index =
-  Store.Outbox_messages.set_outbox_message_executed
-    store.outbox_messages
-    ~outbox_level
-    ~index
+  Store.Outbox_messages.set_outbox_message_executed store ~outbox_level ~index
 
-let register_new_outbox_messages {store; _} ~outbox_level ~indexes =
-  Store.Outbox_messages.register_new_outbox_messages
-    store.outbox_messages
-    ~outbox_level
-    ~indexes
-
-let register_missing_outbox_messages {store; _} ~outbox_level ~indexes =
-  Store.Outbox_messages.register_missing_outbox_messages
-    store.outbox_messages
-    ~outbox_level
-    ~indexes
+let register_outbox_messages {store; _} ~outbox_level ~indexes =
+  let open Lwt_result_syntax in
+  let*? indexes = Bitset.from_list indexes in
+  Store.Outbox_messages.register_outbox_messages store ~outbox_level ~indexes
 
 let get_executable_pending_outbox_messages {store; lcc; current_protocol; _} =
   let max_level = (Reference.get lcc).level in
@@ -751,7 +683,7 @@ let get_executable_pending_outbox_messages {store; lcc; current_protocol; _} =
          (constants.max_number_of_stored_cemented_commitments
         * constants.commitment_period_in_blocks))
   in
-  Store.Outbox_messages.pending store.outbox_messages ~min_level ~max_level
+  Store.Outbox_messages.pending store ~min_level ~max_level
 
 let get_unexecutable_pending_outbox_messages ({store; lcc; _} as node_ctxt) =
   let open Lwt_result_syntax in
@@ -762,35 +694,33 @@ let get_unexecutable_pending_outbox_messages ({store; lcc; _} as node_ctxt) =
     | Some h -> Ok h.header.level
   in
   let min_level = Int32.succ (Reference.get lcc).level in
-  Store.Outbox_messages.pending store.outbox_messages ~min_level ~max_level
+  Store.Outbox_messages.pending store ~min_level ~max_level
 
 let get_full_l2_block ?get_outbox_messages node_ctxt block_hash =
   let open Lwt_result_syntax in
-  let* block = get_l2_block node_ctxt block_hash in
-  let* inbox = get_inbox node_ctxt block.header.inbox_hash
-  and* messages =
-    unsafe_get_stored_messages node_ctxt block.header.inbox_witness
-  and* commitment =
-    Option.map_es (get_commitment node_ctxt) block.header.commitment_hash
-  and* outbox =
-    match get_outbox_messages with
-    | None -> return_none
-    | Some get_outbox_messages -> (
-        let* ctxt = checkout_context node_ctxt block_hash in
-        let*! pvm_state = Context.PVMState.find ctxt in
-        match pvm_state with
+  let* block = Store.L2_blocks.find_full node_ctxt.store block_hash in
+  match block with
+  | None ->
+      failwith "Could not retrieve L2 block for %a" Block_hash.pp block_hash
+  | Some block ->
+      let* outbox =
+        match get_outbox_messages with
         | None -> return_none
-        | Some pvm_state ->
-            let*! outbox =
-              get_outbox_messages
-                node_ctxt
-                pvm_state
-                ~outbox_level:block.header.level
-            in
-            return_some outbox)
-  in
-  return
-    {block with content = {Sc_rollup_block.inbox; messages; commitment; outbox}}
+        | Some get_outbox_messages -> (
+            let* ctxt = checkout_context node_ctxt block_hash in
+            let*! pvm_state = Context.PVMState.find ctxt in
+            match pvm_state with
+            | None -> return_none
+            | Some pvm_state ->
+                let*! outbox =
+                  get_outbox_messages
+                    node_ctxt
+                    pvm_state
+                    ~outbox_level:block.header.level
+                in
+                return_some outbox)
+      in
+      return Sc_rollup_block.{block with content = {block.content with outbox}}
 
 type proto_info = {
   proto_level : int;
@@ -800,34 +730,19 @@ type proto_info = {
 
 let protocol_of_level_with_store (store : _ Store.t) level =
   let open Lwt_result_syntax in
-  let* protocols = Store.Protocols.read store.protocols in
-  let*? protocols =
-    match protocols with
-    | None | Some [] ->
-        error_with "Cannot infer protocol for level %ld: no protocol info" level
-    | Some protos -> Ok protos
-  in
-  let rec find = function
-    | [] ->
-        error_with "Cannot infer protocol for level %ld: no information" level
-    | {Store.Protocols.level = p_level; proto_level; protocol} :: protos -> (
-        (* Latest protocols appear first in the list *)
-        match p_level with
-        | First_known l when level >= l ->
-            Ok {protocol; proto_level; first_level_of_protocol = false}
-        | Activation_level l when level > l ->
-            (* The block at the activation level is of the previous protocol, so
-               we are in the protocol that was activated at [l] only when the
-               level we query is after [l]. *)
-            Ok
-              {
-                protocol;
-                proto_level;
-                first_level_of_protocol = level = Int32.succ l;
-              }
-        | _ -> (find [@tailcall]) protos)
-  in
-  Lwt.return (find protocols)
+  let* p = Store.Protocols.proto_of_level store level in
+  match p with
+  | None ->
+      failwith
+        "Cannot infer protocol for level %ld. This block is likely before the \
+         origination of the rollup. Make sure that the L1 octez node is \
+         properfly synchronized before starting the rollup node."
+        level
+  | Some {level = First_known _; proto_level; protocol} ->
+      return {protocol; proto_level; first_level_of_protocol = false}
+  | Some {level = Activation_level l; proto_level; protocol} ->
+      return
+        {protocol; proto_level; first_level_of_protocol = level = Int32.succ l}
 
 let protocol_of_level node_ctxt level =
   assert (level >= node_ctxt.genesis_info.level) ;
@@ -835,39 +750,32 @@ let protocol_of_level node_ctxt level =
 
 let last_seen_protocol node_ctxt =
   let open Lwt_result_syntax in
-  let+ protocols = Store.Protocols.read node_ctxt.store.protocols in
-  match protocols with
-  | None | Some [] -> None
-  | Some (p :: _) -> Some p.protocol
+  let+ p = Store.Protocols.last node_ctxt.store in
+  match p with None -> None | Some p -> Some p.protocol
 
 let protocol_activation_level node_ctxt protocol_hash =
   let open Lwt_result_syntax in
-  let* protocols = Store.Protocols.read node_ctxt.store.protocols in
-  match
-    Option.bind
-      protocols
-      (List.find_map (function Store.Protocols.{protocol; level; _} ->
-           if Protocol_hash.(protocol_hash = protocol) then Some level else None))
-  with
+  let* p = Store.Protocols.find node_ctxt.store protocol_hash in
+  match p with
+  | Some p -> return p.level
   | None ->
       failwith
         "Could not determine the activation level of a previously unseen \
          protocol %a"
         Protocol_hash.pp
         protocol_hash
-  | Some l -> return l
 
 let save_protocol_info node_ctxt (block : Layer1.header)
     ~(predecessor : Layer1.header) =
   let open Lwt_result_syntax in
-  let* protocols = Store.Protocols.read node_ctxt.store.protocols in
-  match protocols with
-  | Some ({proto_level; _} :: _)
+  let* last_protocol = Store.Protocols.last node_ctxt.store in
+  match last_protocol with
+  | Some {proto_level; _}
     when proto_level = block.header.proto_level
          && block.header.proto_level = predecessor.header.proto_level ->
       (* Nominal case, no protocol change. Nothing to do. *)
       return_unit
-  | None | Some [] ->
+  | None ->
       (* No protocols information saved in the rollup node yet, initialize with
          information by looking at the current head and its predecessor.
          We need to figure out if a protocol upgrade happened in one of these two blocks.
@@ -917,10 +825,8 @@ let save_protocol_info node_ctxt (block : Layer1.header)
           in
           [proto_info; pred_proto_info]
       in
-      Store.Protocols.write node_ctxt.store.protocols protocols
-  | Some
-      ({proto_level = last_proto_level; _} :: previous_protocols as protocols)
-    ->
+      List.iter_es (Store.Protocols.store node_ctxt.store) protocols
+  | Some _ ->
       (* block.header.proto_level <> last_proto_level or head is a migration
          block, i.e. there is a protocol change w.r.t. last registered one. *)
       let is_head_migration_block =
@@ -941,31 +847,7 @@ let save_protocol_info node_ctxt (block : Layer1.header)
         Store.Protocols.
           {level; proto_level = block.header.proto_level; protocol}
       in
-      let protocols =
-        if block.header.proto_level > last_proto_level then
-          (* Protocol upgrade, add new item to protocol list *)
-          proto_info :: protocols
-        else if block.header.proto_level < last_proto_level then (
-          (* Reorganization in which a protocol migration block was
-             backtracked. *)
-          match previous_protocols with
-          | [] ->
-              (* No info further back, store what we know. *)
-              [proto_info]
-          | previous_proto :: _ ->
-              (* make sure that we are in the case where we backtracked the
-                 migration block. *)
-              assert (
-                Protocol_hash.(proto_info.protocol = previous_proto.protocol)) ;
-              (* Remove last stored protocol *)
-              previous_protocols)
-        else
-          (* block.header.proto_level = last_proto_level && is_migration_block *)
-          (* Reorganization where we are doing a different protocol
-             upgrade. Replace last stored protocol. *)
-          proto_info :: previous_protocols
-      in
-      Store.Protocols.write node_ctxt.store.protocols protocols
+      Store.Protocols.store node_ctxt.store proto_info
 
 let get_slot_header {store; _} ~published_in_block_hash slot_index =
   Error.trace_lwt_result_with
@@ -973,54 +855,62 @@ let get_slot_header {store; _} ~published_in_block_hash slot_index =
     slot_index
     Block_hash.pp
     published_in_block_hash
-  @@ Store.Dal_slots_headers.get
-       store.irmin_store
-       ~primary_key:published_in_block_hash
-       ~secondary_key:slot_index
+  @@
+  let open Lwt_result_syntax in
+  let* sh =
+    Store.Dal_slots_headers.find_slot_header
+      store
+      published_in_block_hash
+      ~slot_index
+  in
+  match sh with
+  | None ->
+      failwith
+        "No slot header stored for %a"
+        Block_hash.pp
+        published_in_block_hash
+  | Some sh -> return sh
 
 let get_all_slot_headers {store; _} ~published_in_block_hash =
-  Store.Dal_slots_headers.list_values
-    store.irmin_store
-    ~primary_key:published_in_block_hash
+  Store.Dal_slots_headers.list_slot_headers store published_in_block_hash
 
 let get_slot_indexes {store; _} ~published_in_block_hash =
-  Store.Dal_slots_headers.list_secondary_keys
-    store.irmin_store
-    ~primary_key:published_in_block_hash
+  Store.Dal_slots_headers.list_slot_indexes store published_in_block_hash
 
 let save_slot_header {store; _} ~published_in_block_hash
     (slot_header : Dal.Slot_header.t) =
-  Store.Dal_slots_headers.add
-    store.irmin_store
-    ~primary_key:published_in_block_hash
-    ~secondary_key:slot_header.id.index
-    slot_header
+  Store.Dal_slots_headers.store store published_in_block_hash slot_header
 
 let find_slot_status {store; _} ~confirmed_in_block_hash slot_index =
-  Store.Dal_slots_statuses.find
-    store.irmin_store
-    ~primary_key:confirmed_in_block_hash
-    ~secondary_key:slot_index
+  Store.Dal_slots_statuses.find_slot_status
+    store
+    confirmed_in_block_hash
+    ~slot_index
 
 let list_slots_statuses {store; _} ~confirmed_in_block_hash =
-  Store.Dal_slots_statuses.list_secondary_keys_with_values
-    store.irmin_store
-    ~primary_key:confirmed_in_block_hash
+  Store.Dal_slots_statuses.list_slot_statuses store confirmed_in_block_hash
 
 let save_slot_status {store; _} current_block_hash slot_index status =
-  Store.Dal_slots_statuses.add
-    store.irmin_store
-    ~primary_key:current_block_hash
-    ~secondary_key:slot_index
-    status
+  Store.Dal_slots_statuses.store store current_block_hash slot_index status
 
-let get_gc_info_aux node_ctxt step =
-  let store =
+type gc_level = {gc_triggered_at : int32; gc_target : int32}
+
+let get_gc_info_aux {store; _} step =
+  let open Lwt_result_syntax in
+  let* gc_triggered_at =
     match step with
-    | `Started -> node_ctxt.store.gc_levels
-    | `Successful -> node_ctxt.store.successful_gc_levels
+    | `Started -> Store.State.Last_gc_triggered_at.get store
+    | `Successful -> Store.State.Last_successful_gc_triggered_at.get store
   in
-  Store.Gc_levels.read store
+  let* gc_target =
+    match step with
+    | `Started -> Store.State.Last_gc_target.get store
+    | `Successful -> Store.State.Last_successful_gc_target.get store
+  in
+  match (gc_triggered_at, gc_target) with
+  | None, _ | _, None -> return_none
+  | Some gc_triggered_at, Some gc_target ->
+      return_some {gc_triggered_at; gc_target}
 
 let get_gc_info node_ctxt step =
   let open Lwt_result_syntax in
@@ -1035,25 +925,23 @@ let get_gc_info node_ctxt step =
 
 let first_available_level node_ctxt =
   let open Lwt_result_syntax in
-  let+ gc_levels = get_gc_info node_ctxt `Started in
-  match gc_levels with
-  | Some {first_available_level; _} -> first_available_level
-  | None -> node_ctxt.genesis_info.level
+  let+ last_gc_target = Store.State.Last_gc_target.get node_ctxt.store in
+  Option.value last_gc_target ~default:node_ctxt.genesis_info.level
 
 let get_last_context_split_level node_ctxt =
-  Store.Last_context_split.read node_ctxt.store.last_context_split_level
+  Store.State.Last_context_split.get node_ctxt.store
 
-let save_gc_info node_ctxt step ~at_level ~gc_level =
+let save_gc_info {store; _} step ~at_level ~gc_level =
   let open Lwt_syntax in
-  let store =
-    match step with
-    | `Started -> node_ctxt.store.gc_levels
-    | `Successful -> node_ctxt.store.successful_gc_levels
-  in
   let* res =
-    Store.Gc_levels.write
-      store
-      {last_gc_level = at_level; first_available_level = gc_level}
+    let open Lwt_result_syntax in
+    match step with
+    | `Started ->
+        let* () = Store.State.Last_gc_target.set store gc_level in
+        Store.State.Last_gc_triggered_at.set store at_level
+    | `Successful ->
+        let* () = Store.State.Last_successful_gc_target.set store gc_level in
+        Store.State.Last_successful_gc_triggered_at.set store at_level
   in
   match res with
   | Error _ -> Event.gc_levels_storage_failure ()
@@ -1073,14 +961,11 @@ let splitting_period node_ctxt =
   Option.value node_ctxt.config.gc_parameters.context_splitting_period ~default
 
 let save_context_split_level node_ctxt level =
-  Store.Last_context_split.write node_ctxt.store.last_context_split_level level
+  Store.State.Last_context_split.set node_ctxt.store level
 
 let candidate_gc_level node_ctxt =
   let open Lwt_result_syntax in
-  let* history_mode = Store.History_mode.read node_ctxt.store.history_mode in
-  let history_mode =
-    Option.value history_mode ~default:Configuration.default_history_mode
-  in
+  let* history_mode = get_history_mode node_ctxt in
   match history_mode with
   | Archive ->
       (* Never call GC in archive mode *)
@@ -1095,11 +980,11 @@ let gc ?(wait_finished = false) ?(force = false) node_ctxt ~(level : int32) =
   (* [gc_level] is the level corresponding to the hash on which GC will be
      called. *)
   let* gc_level = candidate_gc_level node_ctxt in
-  let* gc_info = get_gc_info node_ctxt `Successful in
+  let* last_gc_target =
+    Store.State.Last_successful_gc_target.get node_ctxt.store
+  in
   let last_gc_target =
-    match gc_info with
-    | Some {first_available_level; _} -> first_available_level
-    | None -> node_ctxt.genesis_info.level
+    Option.value last_gc_target ~default:node_ctxt.genesis_info.level
   in
   let frequency =
     match node_ctxt.config.gc_parameters.frequency_in_blocks with
@@ -1110,17 +995,17 @@ let gc ?(wait_finished = false) ?(force = false) node_ctxt ~(level : int32) =
   | None -> return_unit
   | Some gc_level
     when (force || Int32.(sub gc_level last_gc_target >= frequency))
-         && Context.is_gc_finished node_ctxt.context
-         && Store.is_gc_finished node_ctxt.store -> (
+         && Context.is_gc_finished node_ctxt.context -> (
       let* hash = hash_of_level node_ctxt gc_level in
-      let* header = Store.L2_blocks.header node_ctxt.store.l2_blocks hash in
-      match header with
+      let* context = Store.L2_blocks.find_context node_ctxt.store hash in
+      match context with
       | None ->
           failwith
-            "Could not retrieve L2 block header for %a"
+            "GC: Could not retrieve context for L2 block %a at %ld"
             Block_hash.pp
             hash
-      | Some {context; _} ->
+            gc_level
+      | Some context ->
           let start_timestamp = Time.System.now () in
           let* gc_lockfile =
             Lwt_lock_file.lock
@@ -1135,13 +1020,13 @@ let gc ?(wait_finished = false) ?(force = false) node_ctxt ~(level : int32) =
               Metrics.GC.set_oldest_available_level gc_level) ;
           (* Start both node and context gc asynchronously *)
           let*! () = Context.gc node_ctxt.context context in
-          let* () = Store.gc node_ctxt.store ~level:gc_level in
+          let store_gc_promise = Store.gc node_ctxt.store ~level:gc_level in
           let gc_waiter () =
             let open Lwt_syntax in
             Lwt.finalize
               (fun () ->
                 let* () = Context.wait_gc_completion node_ctxt.context
-                and* () = Store.wait_gc_completion node_ctxt.store in
+                and* (_ : unit tzresult) = store_gc_promise in
                 Metrics.wrap (fun () ->
                     let stop_timestamp = Time.System.now () in
                     Metrics.GC.set_process_time
@@ -1163,8 +1048,7 @@ let gc ?(wait_finished = false) ?(force = false) node_ctxt ~(level : int32) =
 let cancel_gc node_ctxt =
   let open Lwt_syntax in
   let canceled_context_gc = Context.cancel_gc node_ctxt.context in
-  let+ canceled_store_gc = Store.cancel_gc node_ctxt.store in
-  canceled_context_gc || canceled_store_gc
+  return canceled_context_gc
 
 let check_level_available node_ctxt accessed_level =
   let open Lwt_result_syntax in
@@ -1191,8 +1075,8 @@ let wait_synchronized node_ctxt =
 (**/**)
 
 module Internal_for_tests = struct
-  let write_protocols_in_store (store : [> `Write] store) =
-    Store.Protocols.write store.Store.protocols
+  let write_protocols_in_store (store : [> `Write] store) protocols =
+    List.iter_es (Store.Protocols.store store) protocols
 
   let unsafe_get_store ctxt = ctxt.store
 end
