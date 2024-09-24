@@ -3784,7 +3784,8 @@ let test_sequencer_diverge =
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "diverge"]
     ~title:"Runs two sequencers, one diverge and stop"
-  @@ fun {sc_rollup_node; client; sequencer; observer; _} _protocol ->
+  @@ fun {sc_rollup_node; client; sequencer; observer; proxy; enable_dal; _}
+             _protocol ->
   let* () =
     repeat 4 (fun () ->
         let*@ _l2_level =
@@ -3792,9 +3793,10 @@ let test_sequencer_diverge =
         in
         unit)
   in
+  let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
   let* () =
-    (* 3 to make sure it is seen by the rollup node, 2 to finalize it *)
-    repeat 5 (fun () ->
+    (* 2 to make sure it has been finalized *)
+    repeat 2 (fun () ->
         let* _l1_level = next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
@@ -3854,7 +3856,8 @@ let test_sequencer_diverge =
     (* diff timestamp to differ *)
     let* _ = produce_block ~timestamp:"2020-01-01T00:13:00Z" sequencer
     and* _ = produce_block ~timestamp:"2020-01-01T00:12:00Z" sequencer_bis in
-    repeat 5 (fun () ->
+    let number_of_blocks = if enable_dal then 20 else 5 in
+    repeat number_of_blocks (fun () ->
         let* _ = next_rollup_node_level ~client ~sc_rollup_node in
         unit)
   in
