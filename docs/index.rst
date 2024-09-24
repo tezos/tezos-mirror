@@ -127,7 +127,8 @@ Platform developers can find a rich set of explanations, tutorials, and howtos, 
 - programming tutorials covering various libraries and frameworks specific to the Octez OCaml implementation, such as using :doc:`developer/gadt`, using :doc:`developer/error_monad`, using :doc:`developer/clic`, :doc:`developer/event_logging_framework`, etc.
 - howtos for specific maintenance tasks such as :doc:`developer/michelson_instructions`, :doc:`developer/protocol_environment_upgrade`, or :doc:`developer/howto-freeze-protocols`
 - a whole subsection on the :doc:`various testing frameworks <developer/testing_index>` for Octez, explaining how to use them and how to add different kinds of tests
-- presentations of various tools for platform developers, such as support for :doc:`developer/profiling` and :doc:`developer/snoop`.
+- presentations of various tools for platform developers, such as support for :doc:`developer/profiling` and :doc:`developer/snoop`
+- a subsection on :doc:`architecture details<developer/octez_architecture>` providing detailed explanations of the internal structure and design of key components in the Octez codebase.
 
 Platform developers are also provided reference materials for internal APIs of Octez, such as:
 
@@ -225,6 +226,7 @@ Platform developers are also provided reference materials for internal APIs of O
 
    developer/contributing_index
    developer/programming
+   developer/octez_architecture
    developer/testing_index
    developer/maintaining
    README
