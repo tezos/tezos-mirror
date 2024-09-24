@@ -27,6 +27,8 @@ open Protocol
 open Alpha_context
 open Baking_errors
 
+module Profiler = (val Profiler.wrap Baking_profiler.baker_profiler)
+
 (** A consensus key (aka, a validator) is identified by its alias name, its
     public key, its public key hash, and its secret key. *)
 type consensus_key = {
@@ -997,9 +999,17 @@ let compute_delegate_slots (cctxt : Protocol_client_context.full)
   let open Lwt_result_syntax in
   let*? level = Environment.wrap_tzresult (Raw_level.of_int32 level) in
   let* attesting_rights =
-    Plugin.RPC.Validators.get cctxt (chain, block) ~levels:[level]
+    (Plugin.RPC.Validators.get
+       cctxt
+       (chain, block)
+       ~levels:[level] [@profiler.record_s "RPC: get attesting rights"])
   in
-  delegate_slots attesting_rights delegates |> return
+  let delegate_slots =
+    (delegate_slots
+       attesting_rights
+       delegates [@profiler.record_f "delegate_slots"])
+  in
+  return delegate_slots
 
 let round_proposer state ~level round =
   let slots =
@@ -1390,3 +1400,18 @@ let pp_event fmt = function
       Format.fprintf fmt "new forge event: %a" pp_forge_event forge_event
   | Timeout kind ->
       Format.fprintf fmt "timeout reached: %a" pp_timeout_kind kind
+
+let pp_short_event fmt =
+  let open Format in
+  function
+  | New_valid_proposal _ -> fprintf fmt "new valid proposal"
+  | New_head_proposal _ -> fprintf fmt "new head proposal"
+  | Prequorum_reached (_, _) -> fprintf fmt "prequorum reached"
+  | Quorum_reached (_, _) -> fprintf fmt "quorum reached"
+  | Timeout (End_of_round _) -> fprintf fmt "end of round timeout"
+  | Timeout (Time_to_prepare_next_level_block _) ->
+      fprintf fmt "time to prepare next level block"
+  | New_forge_event (Block_ready _) -> fprintf fmt "block ready"
+  | New_forge_event (Preattestation_ready _) ->
+      fprintf fmt "preattestation ready"
+  | New_forge_event (Attestation_ready _) -> fprintf fmt "attestation ready"
