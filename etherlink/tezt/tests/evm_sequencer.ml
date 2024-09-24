@@ -3632,6 +3632,7 @@ let test_sequencer_upgrade =
            sequencer;
            proxy;
            observer;
+           enable_dal;
            _;
          }
              _protocol ->
@@ -3749,7 +3750,8 @@ let test_sequencer_upgrade =
           unit)
     in
     let* () =
-      repeat 5 (fun () ->
+      let number_of_blocks = if enable_dal then 20 else 5 in
+      repeat number_of_blocks (fun () ->
           let* _ = next_rollup_node_level ~client ~sc_rollup_node in
           unit)
     in
