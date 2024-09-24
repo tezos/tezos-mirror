@@ -81,6 +81,12 @@ module Parameters = struct
     in
     from_protocol_parameters json |> return
 
+  let from_endpoint endpoint =
+    let* json =
+      RPC_core.call endpoint @@ RPC.get_chain_block_context_constants ()
+    in
+    from_protocol_parameters json |> return
+
   let full_storage_period_with_refutation_in_cycles ~proto_parameters =
     let blocks_per_cycle =
       JSON.(proto_parameters |-> "blocks_per_cycle" |> as_int)
