@@ -24,10 +24,20 @@ for peers on port ``19731`` and listening for RPC on port ``18731``.
     ./src/bin_node/octez-sandboxed-node.sh 1 --connections 1
 
 This node will store its data in a temporary directory
-``/tmp/octez-node.xxxxxxxx`` which will be removed when the node is
-stopped.
-The option ``--connections`` is just to remove the spurious “Too few
-connections” warnings by lowering the number of expected connection.
+``/tmp/octez-node.xxxxxxxx`` which will be removed when the node is stopped.
+
+The option ``--connections`` specifies the ideal number of peers the node tries
+to connect to. Lowering the number of expected connections removes the spurious
+“Too few connections” warnings. Set it to ``1`` for our two-nodes network (and
+you would set it to ``0`` for a single-node network).
+
+More informations can be found in the :package-api:`api page of the octez node
+config <octez-node-config/Octez_node_config/Shared_arg/index.html#type-t>`: or
+by simply calling
+
+::
+
+   ./src/bin_node/octez-sandboxed-node.sh 1 --connections 1 --help
 
 To launch the second node, run the following command in another terminal, and
 it will listen on port ``19739`` and ``18739``:
