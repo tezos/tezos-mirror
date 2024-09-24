@@ -4,6 +4,13 @@
 
 ### Features
 
+#### RPCs
+
+- The experimental feature `node_transaction_validation` that enables validating
+  transactions in the node instead of invoking the kernel is now activated by
+  default. It does not change the notion of transaction validation but should
+  provide faster validation. (!15062)
+
 ### Bug fixes
 
 ### Internals
