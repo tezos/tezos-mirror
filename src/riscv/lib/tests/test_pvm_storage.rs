@@ -57,7 +57,7 @@ fn test_repo() {
 
     // Check that an unknown commit returns a `NotFound` error
     assert!(matches!(
-        repo.checkout(&[0; 32]),
+        repo.checkout(&[0; 32].into()),
         Err(StorageError::NotFound(_))
     ));
 
@@ -121,7 +121,7 @@ fn test_repo_serialised() {
 
     // Check that an unknown commit returns a `NotFound` error
     assert!(matches!(
-        repo.checkout_serialised::<Vec<u8>>(&[0; 32]),
+        repo.checkout_serialised::<Vec<u8>>(&[0; 32].into()),
         Err(StorageError::NotFound(_))
     ));
 
