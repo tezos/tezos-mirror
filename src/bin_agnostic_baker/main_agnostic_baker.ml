@@ -210,6 +210,12 @@ module Args = struct
       exit 0)
     else ()
 
+  let version_cmd args =
+    if List.mem ~equal:String.equal "--version" args then (
+      Format.printf "%s@." Tezos_version_value.Bin_version.octez_version_string ;
+      exit 0)
+    else ()
+
   let split_args ?(on = "--") =
     let rec loop acc = function
       | [] -> (List.rev acc, [])
@@ -233,6 +239,8 @@ module Args = struct
 
   let parse_args all_args =
     let all_args = Array.to_list all_args in
+    (* Specific vesrion case *)
+    let () = version_cmd all_args in
     (* Remove the binary path *)
     let all_args = Option.value ~default:[] (List.tl all_args) in
     (* Split agnostic baker and baker arguments, that aims to be delimited by -- *)
