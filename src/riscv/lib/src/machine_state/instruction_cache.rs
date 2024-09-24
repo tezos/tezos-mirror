@@ -33,16 +33,15 @@
 //! translation changes - as the upper address may no longer point
 //! to the same relative physical address.
 
-use crate::cache_utils::FenceCounter;
+use crate::cache_utils::{FenceCounter, Unparsed};
 use crate::machine_state::address_translation::PAGE_SIZE;
 use crate::machine_state::bus::Address;
 use crate::parser::instruction::{Instr, InstrCacheable};
-use crate::parser::{parse, parse_compressed_instruction, parse_uncompressed_instruction};
+use crate::parser::{parse_compressed_instruction, parse_uncompressed_instruction};
 use crate::state_backend::{
-    self, AllocatedOf, Atom, Cell, CellWrite, Choreographer, Elem, Layout, LazyCell, ManagerAlloc,
+    self, AllocatedOf, Atom, Cell, CellWrite, Choreographer, Layout, LazyCell, ManagerAlloc,
     ManagerBase, ManagerRead, ManagerReadWrite, ManagerWrite, Many, Placed, Ref,
 };
-use std::convert::Infallible;
 
 /// The layout of an entry in the instruction cache.
 pub type CachedLayout = (Atom<FenceCounter>, Atom<u64>, Atom<Unparsed>);
@@ -91,66 +90,6 @@ impl<M: ManagerBase> Cached<M> {
         M: ManagerWrite,
     {
         self.phys_addr.write(!0);
-    }
-}
-
-/// Unparsed instruction used for storing cached instructions in the state.
-///
-/// Compressed instructions are represented as the lower-16 bits of the u32, with upper-16 bits
-/// set to zero.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[repr(transparent)]
-pub struct Unparsed(u32);
-
-impl Elem for Unparsed {
-    #[inline(always)]
-    fn store(&mut self, source: &Self) {
-        self.0.store(&source.0)
-    }
-
-    #[inline(always)]
-    fn to_stored_in_place(&mut self) {
-        self.0.to_stored_in_place()
-    }
-
-    #[inline(always)]
-    fn from_stored_in_place(&mut self) {
-        self.0.from_stored_in_place()
-    }
-
-    #[inline(always)]
-    fn from_stored(source: &Self) -> Self {
-        Self(u32::from_stored(&source.0))
-    }
-}
-
-impl From<Unparsed> for (InstrCacheable, Unparsed) {
-    fn from(unparsed: Unparsed) -> Self {
-        let bytes = unparsed.0;
-        let upper = bytes as u16;
-
-        let instr = parse(upper, || {
-            Result::<u16, Infallible>::Ok((bytes >> 16) as u16)
-        })
-        .unwrap();
-
-        match instr {
-            Instr::Cacheable(i) => (i, unparsed),
-            // As written, this code path is unreachable.
-            // We can convert it into a static requirement by allowing
-            // errors on bind, instead
-            //
-            // TODO RV-221: on bind, we should error if an instruction's
-            //      bytes correspond to an Uncacheable instruction, rather
-            //      than returning an 'Unknown' instruction.
-            Instr::Uncacheable(_) => (InstrCacheable::Unknown { instr: bytes }, unparsed),
-        }
-    }
-}
-
-impl From<(InstrCacheable, Unparsed)> for Unparsed {
-    fn from((_, unparsed): (InstrCacheable, Unparsed)) -> Self {
-        unparsed
     }
 }
 
