@@ -3793,6 +3793,9 @@ let test_sequencer_diverge =
         let* _l1_level = next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
+  (* We duplicate the sequencer by creating a snapshot and importing it *)
+  let* _ = Evm_node.terminate sequencer in
+  let* snapshot_file = Runnable.run @@ Evm_node.export_snapshot sequencer in
   let* sequencer_bis =
     let* mode =
       match Evm_node.mode sequencer with
@@ -3816,15 +3819,16 @@ let test_sequencer_diverge =
     return @@ Evm_node.create ~mode (Sc_rollup_node.endpoint sc_rollup_node)
   in
   let* () = Process.check @@ Evm_node.spawn_init_config sequencer_bis in
-  let observer_bis =
-    Evm_node.create
-      ~mode:(Evm_node.mode observer)
-      (Evm_node.endpoint sequencer_bis)
-  in
-  let* () = Process.check @@ Evm_node.spawn_init_config observer_bis in
   let* () =
-    Evm_node.init_from_rollup_node_data_dir sequencer_bis sc_rollup_node
+    Runnable.run @@ Evm_node.import_snapshot sequencer_bis ~snapshot_file
   in
+  let* () = Evm_node.run sequencer in
+  let* () = Evm_node.run sequencer_bis in
+
+  (* We start a new observer for the new sequencer and wait for it to catch-up *)
+  let* observer_bis = run_new_observer_node ~sc_rollup_node sequencer_bis in
+  let* () = Evm_node.wait_for_blueprint_applied observer_bis 4 in
+
   (* When run in the CI the shutdown event are sometimes handled after the
      sequencer and/or the observer have already been terminated, leading to
      errors while they actually shutdown as expected. *)
@@ -3835,8 +3839,6 @@ let test_sequencer_diverge =
     and* _ = Evm_node.wait_for_shutdown_event ~can_terminate:true observer in
     unit
   in
-  let* () = Evm_node.run sequencer_bis in
-  let* () = Evm_node.run observer_bis in
   let* () =
     Lwt.pick
       [
