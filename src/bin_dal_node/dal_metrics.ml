@@ -37,6 +37,14 @@ module Node_metrics = struct
       ~subsystem
       name
 
+  let amplification_queue_length =
+    let name = "amplification_queue_length" in
+    Prometheus.Gauge.v
+      ~help:"Length of enqueued reconstruction tasks"
+      ~namespace
+      ~subsystem
+      name
+
   let number_of_stored_shards =
     let name = "number_of_stored_shards" in
     Prometheus.Counter.v
@@ -424,6 +432,9 @@ let reconstruction_started () =
 
 let reconstruction_done () =
   Prometheus.Counter.inc_one Node_metrics.number_of_reconstructions_done
+
+let update_amplification_queue_length n =
+  Int.to_float n |> Prometheus.Gauge.set Node_metrics.amplification_queue_length
 
 let reconstruction_aborted () =
   Prometheus.Counter.inc_one Node_metrics.number_of_reconstructions_aborted

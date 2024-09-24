@@ -275,6 +275,10 @@ let reply_receiver_job {process; query_store; _} node_context =
     in
     (* Messages queue is unbounded *)
     Query_store.remove query_store id ;
+    let () =
+      Dal_metrics.update_amplification_queue_length
+        (Query_store.length query_store)
+    in
     let* msg =
       let* r = Process_worker.read_message ic in
       match r with

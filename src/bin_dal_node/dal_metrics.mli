@@ -15,6 +15,9 @@ val reconstruction_started : unit -> unit
 (** Update the DAL metrics counter when a reconstruction is done. *)
 val reconstruction_done : unit -> unit
 
+(** Update the DAL metrics counter of enqueued reconstruction tasks *)
+val update_amplification_queue_length : int -> unit
+
 (** Update the DAL metrics counter when a reconstruction is aborted because
     enough shards have been received during the random delay. *)
 val reconstruction_aborted : unit -> unit
