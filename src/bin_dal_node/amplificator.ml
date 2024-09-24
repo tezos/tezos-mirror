@@ -14,6 +14,7 @@ type query =
       commitment : Cryptobox.commitment;
       proto_parameters : Dal_plugin.proto_parameters;
           (* Used, but not really necessary as long as parameters don't change. *)
+      reconstruction_start_time : float;
     }
 
 type query_msg = Query_msg of {query_id : int; shards : bytes}
@@ -236,7 +237,9 @@ end
 let query_sender_job {query_pipe; process; _} =
   let open Lwt_result_syntax in
   let rec loop () =
-    let*! (Query_msg {query_id; shards}) = Lwt_pipe.Unbounded.pop query_pipe in
+    let*! (Query_msg {query_id; shards; _}) =
+      Lwt_pipe.Unbounded.pop query_pipe
+    in
     let oc = Process_worker.output_channel process in
     let*! () = Event.(emit main_process_sending_query query_id) in
     (* Serialization: query_id, then shards *)
@@ -270,15 +273,14 @@ let reply_receiver_job {process; query_store; _} node_context =
   let node_store = Node_context.get_store node_context in
   let rec loop () =
     let*! id = Lwt_io.read_int ic in
-    let (Query {slot_id; commitment; proto_parameters}) =
+    let (Query
+          {slot_id; commitment; proto_parameters; reconstruction_start_time}) =
       Query_store.find query_store id
     in
     (* Messages queue is unbounded *)
     Query_store.remove query_store id ;
-    let () =
-      Dal_metrics.update_amplification_queue_length
-        (Query_store.length query_store)
-    in
+    let length = Query_store.length query_store in
+    let () = Dal_metrics.update_amplification_queue_length length in
     let* msg =
       let* r = Process_worker.read_message ic in
       match r with
@@ -312,6 +314,8 @@ let reply_receiver_job {process; query_store; _} node_context =
     let*! () =
       Event.(emit reconstruct_finished (slot_id.slot_level, slot_id.slot_index))
     in
+    let duration = Unix.gettimeofday () -. reconstruction_start_time in
+    Dal_metrics.update_amplification_complete_duration duration ;
     Dal_metrics.reconstruction_done () ;
     loop ()
   in
@@ -342,6 +346,8 @@ let start_amplificator node_ctxt =
   in
   let query_pipe = Lwt_pipe.Unbounded.create () in
   let query_store = Query_store.create 23 in
+  let queue_length = Query_store.length query_store in
+  let () = Dal_metrics.update_amplification_queue_length queue_length in
   let amplificator =
     {node_ctxt; process; query_pipe; query_store; query_id = 0}
   in
@@ -396,7 +402,7 @@ let make node_ctxt =
   return amplificator
 
 let enqueue_job_shards_proof amplificator commitment slot_id proto_parameters
-    shards =
+    shards reconstruction_start_time =
   let open Lwt_result_syntax in
   let*! shards = Seq_s.fold_left (fun res it -> it :: res) [] shards in
   let shards =
@@ -412,8 +418,10 @@ let enqueue_job_shards_proof amplificator commitment slot_id proto_parameters
     Query_store.add
       amplificator.query_store
       query_id
-      (Query {slot_id; commitment; proto_parameters})
+      (Query {slot_id; commitment; proto_parameters; reconstruction_start_time})
   in
+  let length = Query_store.length amplificator.query_store in
+  let () = Dal_metrics.update_amplification_queue_length length in
   let*! () = Event.(emit main_process_enqueue_query query_id) in
   let () =
     Lwt_pipe.Unbounded.push
@@ -426,6 +434,8 @@ let amplify node_store commitment (slot_id : Types.slot_id)
     ~number_of_already_stored_shards ~number_of_shards ~number_of_needed_shards
     proto_parameters amplificator =
   let open Lwt_result_syntax in
+  Dal_metrics.reconstruction_started () ;
+  let reconstruction_start_time = Unix.gettimeofday () in
   Dal_metrics.reconstruction_started () ;
   let*! () =
     Event.(
@@ -456,6 +466,7 @@ let amplify node_store commitment (slot_id : Types.slot_id)
       slot_id
       proto_parameters
       shards
+      reconstruction_start_time
   in
   return_unit
 

@@ -45,6 +45,16 @@ module Node_metrics = struct
       ~subsystem
       name
 
+  let amplification_complete_duration =
+    let name = "amplification_complete_duration_seconds" in
+    Prometheus.DefaultHistogram.v
+      ~help:
+        "Total duration between the reception of a shard and the publication \
+         after a reconstruction"
+      ~namespace
+      ~subsystem
+      name
+
   let number_of_stored_shards =
     let name = "number_of_stored_shards" in
     Prometheus.Counter.v
@@ -432,6 +442,11 @@ let reconstruction_started () =
 
 let reconstruction_done () =
   Prometheus.Counter.inc_one Node_metrics.number_of_reconstructions_done
+
+let update_amplification_complete_duration duration =
+  Prometheus.DefaultHistogram.observe
+    Node_metrics.amplification_complete_duration
+    duration
 
 let update_amplification_queue_length n =
   Int.to_float n |> Prometheus.Gauge.set Node_metrics.amplification_queue_length
