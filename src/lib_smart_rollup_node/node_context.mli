@@ -27,7 +27,7 @@
 
 (** This module describes the execution context of the node. *)
 
-type lcc = Store.Lcc.lcc = {commitment : Commitment.Hash.t; level : int32}
+type lcc = {commitment : Commitment.Hash.t; level : int32}
 
 type genesis_info = Metadata.genesis_info = {
   level : int32;
@@ -39,18 +39,12 @@ type 'a store constraint 'a = [< `Read | `Write > `Read]
 
 (** Exposed functions to manipulate Node_context store outside of this module *)
 module Node_store : sig
-  (** [load mode ~index_buffer_size ~l2_blocks_cache_size directory]
-    loads a store form the data persisted [directory] as described in
-    {!Store_sigs.load} *)
-  val load :
-    'a Store_sigs.mode ->
-    index_buffer_size:int ->
-    l2_blocks_cache_size:int ->
-    string ->
-    'a store tzresult Lwt.t
+  (** [load mode ~data_dir] loads a store form the data persisted in [data_dir]
+      as described in. *)
+  val load : 'a Store_sigs.mode -> data_dir:string -> 'a store tzresult Lwt.t
 
-  (** [close_store store] closes the store *)
-  val close : 'a store -> unit tzresult Lwt.t
+  (** [close store] closes the store *)
+  val close : 'a store -> unit Lwt.t
 
   (** [check_and_set_history_mode store history_mode] checks the
     compatibility between given history mode and that of the store.
@@ -363,14 +357,14 @@ val save_commitment : rw -> Commitment.t -> Commitment.Hash.t tzresult Lwt.t
 val commitment_published_at_level :
   _ t ->
   Commitment.Hash.t ->
-  Store.Commitments_published_at_level.element option tzresult Lwt.t
+  Store.Commitments_published_at_levels.publication_levels option tzresult Lwt.t
 
 (** [save_commitment_published_at_level t hash levels] saves the
     publication/inclusion information for a commitment with [hash]. *)
 val set_commitment_published_at_level :
   rw ->
   Commitment.Hash.t ->
-  Store.Commitments_published_at_level.element ->
+  Store.Commitments_published_at_levels.publication_levels ->
   unit tzresult Lwt.t
 
 type commitment_source = Anyone | Us
@@ -430,25 +424,26 @@ val inbox_of_head :
 val get_inbox_by_block_hash :
   _ t -> Block_hash.t -> Octez_smart_rollup.Inbox.t tzresult Lwt.t
 
-(** Returns messages as they are stored in the store, unsafe to use because all
-    messages may not be present. Use {!Messages.get} instead.  *)
-val unsafe_find_stored_messages :
-  _ t ->
-  Merkelized_payload_hashes_hash.t ->
-  (string list * Block_hash.t) option tzresult Lwt.t
+(** Returns messages for a payload hash, including protocol messages. *)
+val find_messages :
+  _ t -> Merkelized_payload_hashes_hash.t -> string list option tzresult Lwt.t
+
+(** Same as {!find_messages} but fails if not messages are stored. *)
+val get_messages :
+  _ t -> Merkelized_payload_hashes_hash.t -> string list tzresult Lwt.t
 
 (** [get_num_messages t witness_hash] retrieves the number of messages for the
     inbox witness [witness_hash] stored by the rollup node. *)
 val get_num_messages :
   _ t -> Merkelized_payload_hashes_hash.t -> int tzresult Lwt.t
 
-(** [save_messages t payloads_hash ~predecessor messages] associates the list of
+(** [save_messages t payloads_hash ~level messages] associates the list of
     [messages] to the [payloads_hash]. The payload hash must be computed by
     calling, e.g. {!Sc_rollup.Inbox.add_all_messages}. *)
 val save_messages :
   rw ->
   Merkelized_payload_hashes_hash.t ->
-  predecessor:Block_hash.t ->
+  level:int32 ->
   string list ->
   unit tzresult Lwt.t
 
@@ -470,18 +465,11 @@ type proto_info = {
 val set_outbox_message_executed :
   rw -> outbox_level:int32 -> index:int -> unit tzresult Lwt.t
 
-(** [register_new_outbox_messages node_ctxt ~outbox_level ~indexes] registers
-    the messages indexes for the [outbox_level]. If messages were already
-    registered for this level, they are overwritten. Messages added are first
-    marked unexecuted. *)
-val register_new_outbox_messages :
-  rw -> outbox_level:int32 -> indexes:int list -> unit tzresult Lwt.t
-
-(** [register_missing_outbox_messages node_ctxt ~outbox_level ~indexes]
-    registers the messages indexes for the [outbox_level]. If messages were
-    already registered for this level, they are not overwritten. This function
-    is meant to be used to recompute missing outbox messages information. *)
-val register_missing_outbox_messages :
+(** [register_outbox_messages node_ctxt ~outbox_level ~indexes] registers the
+    messages indexes for the [outbox_level]. If messages were already registered
+    for this level, they are overwritten. Messages marked as executed are
+    preserved. *)
+val register_outbox_messages :
   rw -> outbox_level:int32 -> indexes:int list -> unit tzresult Lwt.t
 
 (** Returns the pending messages (i.e. unexecuted) that can now be executed.
@@ -602,14 +590,14 @@ val gc :
     canceled. *)
 val cancel_gc : rw -> bool Lwt.t
 
+type gc_level = {gc_triggered_at : int32; gc_target : int32}
+
 (** [get_gc_info node_ctxt step] returns information about the garbage
     collected levels. If [step] is [`Started], it returns information for the
     last started GC and if it's [`Successful], it returns information for the
     last successful GC. *)
 val get_gc_info :
-  _ t ->
-  [`Started | `Successful] ->
-  Store.Gc_levels.levels option tzresult Lwt.t
+  _ t -> [`Started | `Successful] -> gc_level option tzresult Lwt.t
 
 (** The first non garbage collected level available in the node. *)
 val first_available_level : _ t -> int32 tzresult Lwt.t
@@ -651,7 +639,7 @@ val wait_synchronized : _ t -> unit Lwt.t
 
 module Internal_for_tests : sig
   val write_protocols_in_store :
-    [> `Write] store -> Store.Protocols.value -> unit tzresult Lwt.t
+    [> `Write] store -> Store.Protocols.proto_info list -> unit tzresult Lwt.t
 
   (** Extract the underlying store from the node context. This function is
            unsafe to use outside of tests as it breaks the abstraction barrier

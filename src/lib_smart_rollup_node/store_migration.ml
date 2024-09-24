@@ -455,7 +455,7 @@ module V3_migrations = struct
     storage_dir // "levels_to_hashes"
 
   let recompute_level (v3_store : _ Store_v3.t) (l2_block : Sc_rollup_block.t) =
-    Store.Levels_to_hashes.add
+    Store_v3.Levels_to_hashes.add
       ~flush:true
       v3_store.levels_to_hashes
       l2_block.header.level

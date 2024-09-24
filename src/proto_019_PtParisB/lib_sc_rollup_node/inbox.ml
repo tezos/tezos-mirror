@@ -168,7 +168,7 @@ let process_messages (node_ctxt : _ Node_context.t) ~is_first_block
     Node_context.save_messages
       node_ctxt
       witness_hash
-      ~predecessor:predecessor.hash
+      ~level:(Int32.succ predecessor.level)
       messages_with_protocol_internal_messages
   in
   let inbox = Sc_rollup_proto_types.Inbox.to_octez inbox in
@@ -207,11 +207,7 @@ let process_head (node_ctxt : _ Node_context.t) ~(predecessor : Layer1.header)
       Octez_smart_rollup.Inbox.Skip_list.content inbox.old_levels_messages
     in
     let* () =
-      Node_context.save_messages
-        node_ctxt
-        witness
-        ~predecessor:predecessor.hash
-        []
+      Node_context.save_messages node_ctxt witness ~level:head.level []
     in
     let* inbox_hash = Node_context.save_inbox node_ctxt inbox in
     return (inbox_hash, inbox, witness, [])

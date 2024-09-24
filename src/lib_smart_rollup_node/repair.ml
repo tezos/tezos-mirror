@@ -255,7 +255,7 @@ let recompute_outbox_messages node_ctxt first_level =
             level
             (List.length outbox_messages) ;
           let indexes = List.map fst outbox_messages in
-          Node_context.register_missing_outbox_messages
+          Node_context.register_outbox_messages
             node_ctxt
             ~outbox_level:level
             ~indexes)

@@ -186,7 +186,9 @@ let start_state_of_block plugin node_ctxt (block : Sc_rollup_block.t) =
   let module Plugin = (val plugin) in
   let*! tick = Plugin.Pvm.get_tick node_ctxt.kind state in
   let*! state_hash = Plugin.Pvm.state_hash node_ctxt.kind state in
-  let* messages = Messages.get node_ctxt block.header.inbox_witness in
+  let* messages =
+    Node_context.get_messages node_ctxt block.header.inbox_witness
+  in
   return
     Pvm_plugin_sig.
       {
