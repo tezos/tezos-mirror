@@ -1884,10 +1884,9 @@ let init ~(configuration : configuration) cloud next_agent =
         init_baker cloud configuration ~bootstrap teztale account i agent)
       (List.combine attesters_agents baker_accounts)
   in
-  let client =
-    Client.create ~endpoint:(Foreign_endpoint bootstrap.node_rpc_endpoint) ()
+  let* parameters =
+    Dal_common.Parameters.from_endpoint bootstrap.node_rpc_endpoint
   in
-  let* parameters = Dal_common.Parameters.from_client client in
   let () = toplog "Init: initializting producers and observers" in
   let* producers =
     Lwt_list.mapi_p
@@ -2027,7 +2026,7 @@ let ensure_enough_funds t i =
   | Sandbox -> (* Producer has enough money *) Lwt.return_unit
   | Testnet _ ->
       let* balance =
-        Client.RPC.call producer.client
+        Node.RPC.call producer.node
         @@ RPC.get_chain_block_context_contract_balance
              ~id:producer.account.public_key_hash
              ()
