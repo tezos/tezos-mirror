@@ -157,6 +157,20 @@ module Outbox_messages = struct
                    (req "executed_messages" Bitset.encoding)))
   end)
 
+  let iter (t : _ t) f =
+    let open Lwt_result_syntax in
+    let* res = read t in
+    match res with
+    | None -> return_unit
+    | Some h ->
+        H.iter_es
+          (fun outbox_level {messages; executed_messages} ->
+            f
+              ~outbox_level
+              ~messages:(Bitset.to_list messages)
+              ~executed_messages:(Bitset.to_list executed_messages))
+          h
+
   let by_outbox_level (t : _ t) ~outbox_level =
     let open Lwt_result_syntax in
     let* res = read t in
