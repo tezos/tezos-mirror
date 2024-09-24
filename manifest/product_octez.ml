@@ -1747,6 +1747,16 @@ let octez_print_version =
     ~path:"src/lib_version/print"
     ~deps:[octez_version |> open_; octez_version_value |> open_]
 
+let _octez_print_version_exe =
+  public_exe
+    "octez-version"
+    ~internal_name:"octez_print_version"
+    ~path:"src/lib_version/exe"
+    ~opam:"octez-version"
+    ~deps:[octez_version_value |> open_; octez_print_version |> open_]
+    ~modules:["octez_print_version"]
+    ~bisect_ppx:No
+
 let octez_base =
   octez_lib
     "base"
@@ -1800,22 +1810,6 @@ let octez_base_unix =
         lwt_exit;
       ]
     ~inline_tests:ppx_expect
-
-let _octez_print_version_exe =
-  public_exe
-    "octez-version"
-    ~internal_name:"octez_print_version"
-    ~path:"src/lib_version/exe"
-    ~opam:"octez-version"
-    ~deps:
-      [
-        octez_version_value |> open_;
-        octez_version |> open_;
-        octez_base_unix;
-        octez_print_version |> open_;
-      ]
-    ~modules:["octez_print_version"]
-    ~bisect_ppx:No
 
 let octez_base_p2p_identity_file =
   octez_lib
