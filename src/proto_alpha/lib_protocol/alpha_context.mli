@@ -834,6 +834,7 @@ module Constants : sig
       cryptobox_parameters : Dal.parameters;
       minimal_participation_ratio : Q.t;
       rewards_ratio : Q.t;
+      traps_fraction : Q.t;
     }
 
     type sc_rollup_reveal_hashing_schemes = {blake2B : Raw_level.t}

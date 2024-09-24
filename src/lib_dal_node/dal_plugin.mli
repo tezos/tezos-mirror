@@ -48,6 +48,7 @@ type proto_parameters = {
   number_of_slots : int;
   attestation_lag : int;
   attestation_threshold : int;
+  traps_fraction : Q.t;
   cryptobox_parameters : Cryptobox.Verifier.parameters;
   sc_rollup_challenge_window_in_blocks : int;
   commitment_period_in_blocks : int;

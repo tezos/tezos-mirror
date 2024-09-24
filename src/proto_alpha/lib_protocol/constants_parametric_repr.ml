@@ -54,6 +54,7 @@ type dal = {
   cryptobox_parameters : Dal.parameters;
   minimal_participation_ratio : Q.t;
   rewards_ratio : Q.t;
+  traps_fraction : Q.t;
 }
 
 let minimal_participation_ratio_encoding =
@@ -64,6 +65,10 @@ let rewards_ratio_encoding =
   between_zero_and_excluding_one_q_encoding
     "dal.rewards_ratio must be a value between zero (inclusive) and one \
      (exclusive)"
+
+let traps_fraction_encoding =
+  between_zero_and_one_q_encoding
+    "traps_fraction must be a value between zero and one"
 
 let dal_encoding =
   let open Data_encoding in
@@ -77,6 +82,7 @@ let dal_encoding =
            cryptobox_parameters;
            minimal_participation_ratio;
            rewards_ratio;
+           traps_fraction;
          } ->
       ( ( feature_enable,
           incentives_enable,
@@ -84,7 +90,8 @@ let dal_encoding =
           attestation_lag,
           attestation_threshold,
           minimal_participation_ratio,
-          rewards_ratio ),
+          rewards_ratio,
+          traps_fraction ),
         cryptobox_parameters ))
     (fun ( ( feature_enable,
              incentives_enable,
@@ -92,7 +99,8 @@ let dal_encoding =
              attestation_lag,
              attestation_threshold,
              minimal_participation_ratio,
-             rewards_ratio ),
+             rewards_ratio,
+             traps_fraction ),
            cryptobox_parameters ) ->
       {
         feature_enable;
@@ -103,9 +111,10 @@ let dal_encoding =
         cryptobox_parameters;
         minimal_participation_ratio;
         rewards_ratio;
+        traps_fraction;
       })
     (merge_objs
-       (obj7
+       (obj8
           (req "feature_enable" bool)
           (req "incentives_enable" bool)
           (req "number_of_slots" uint16)
@@ -114,7 +123,8 @@ let dal_encoding =
           (req
              "minimal_participation_ratio"
              minimal_participation_ratio_encoding)
-          (req "rewards_ratio" rewards_ratio_encoding))
+          (req "rewards_ratio" rewards_ratio_encoding)
+          (req "traps_fraction" traps_fraction_encoding))
        Dal.parameters_encoding)
 
 (* The encoded representation of this type is stored in the context as
