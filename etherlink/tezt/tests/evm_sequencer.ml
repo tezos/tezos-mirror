@@ -707,7 +707,6 @@ let test_resilient_to_rollup_node_disconnect =
            sc_rollup_address;
            client;
            observer;
-           dal_slots;
            _;
          }
              _protocol ->
@@ -769,17 +768,6 @@ let test_resilient_to_rollup_node_disconnect =
   and* () = Evm_node.wait_for_rollup_node_follower_connection_acquired sequencer
   and* () = Evm_node.wait_for_rollup_node_follower_connection_acquired observer
   and* () = Evm_node.wait_for_rollup_node_follower_connection_acquired proxy in
-
-  let* () =
-    match dal_slots with
-    | None -> Lwt.return_unit
-    | Some slot_indices ->
-        (* TODO: issue #7501. The DAL slot indices should be persisted in
-           order to eliminate the need to set them again when restarting
-           the rollup node. *)
-        Sc_rollup_node.RPC.call sc_rollup_node
-        @@ Sc_rollup_rpc.post_dal_slot_indices ~slot_indices
-  in
 
   (* Produce enough blocks in advance to ensure the sequencer node will catch
      up at the end. *)

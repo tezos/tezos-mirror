@@ -28,7 +28,6 @@ type sequencer_setup = {
   boot_sector : string;
   kernel : Uses.t;
   enable_dal : bool;
-  dal_slots : int list option;
 }
 
 (** [uses protocol] returns the list of dependencies for the tests. *)
