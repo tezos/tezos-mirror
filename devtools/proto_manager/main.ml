@@ -44,12 +44,7 @@ let cmd =
     "help to automatize most of the process involved in the new \
      stabilisation/release of protocol amendments"
   in
-  let info =
-    Cmd.info
-      "octez-proto-manager"
-      ~version:Tezos_version_value.Bin_version.octez_version_string
-      ~doc
-  in
+  let info = Cmd.info "proto-manager" ~version:"0.1" ~doc in
   Cmd.group info [stabilise; snapshot; hash]
 
 let () = exit (Cmd.eval cmd)
