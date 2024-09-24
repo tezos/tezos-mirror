@@ -75,6 +75,8 @@ type t = {
   profile : Profile_manager.t;
   history_mode : history_mode;
   version : int;
+  service_name : string option;
+  service_namespace : string option;
 }
 
 let default_data_dir = Filename.concat (Sys.getenv "HOME") ".tezos-dal-node"
@@ -123,6 +125,8 @@ let default =
     history_mode = default_history_mode;
     profile = Profile_manager.empty;
     version = current_version;
+    service_name = None;
+    service_namespace = None;
   }
 
 let neighbor_encoding : neighbor Data_encoding.t =
@@ -163,6 +167,8 @@ let encoding : t Data_encoding.t =
            history_mode;
            profile;
            version;
+           service_name;
+           service_namespace;
          } ->
       ( ( data_dir,
           rpc_addr,
@@ -174,7 +180,7 @@ let encoding : t Data_encoding.t =
           network_name,
           endpoint,
           metrics_addr ),
-        (history_mode, profile, version) ))
+        (history_mode, profile, version, service_name, service_namespace) ))
     (fun ( ( data_dir,
              rpc_addr,
              listen_addr,
@@ -185,7 +191,7 @@ let encoding : t Data_encoding.t =
              network_name,
              endpoint,
              metrics_addr ),
-           (history_mode, profile, version) ) ->
+           (history_mode, profile, version, service_name, service_namespace) ) ->
       {
         data_dir;
         rpc_addr;
@@ -200,6 +206,8 @@ let encoding : t Data_encoding.t =
         history_mode;
         profile;
         version;
+        service_name;
+        service_namespace;
       })
     (merge_objs
        (obj10
@@ -253,7 +261,7 @@ let encoding : t Data_encoding.t =
              ~description:"The point for the DAL node metrics server"
              P2p_point.Id.encoding
              default_metrics_addr))
-       (obj3
+       (obj5
           (dft
              "history_mode"
              ~description:"The history mode for the DAL node"
@@ -264,7 +272,17 @@ let encoding : t Data_encoding.t =
              ~description:"The Octez DAL node profiles"
              Profile_manager.encoding
              Profile_manager.empty)
-          (req "version" ~description:"The configuration file version" int31)))
+          (req "version" ~description:"The configuration file version" int31)
+          (dft
+             "service_name"
+             ~description:"Name of the service"
+             (Data_encoding.option Data_encoding.string)
+             None)
+          (dft
+             "service_namespace"
+             ~description:"Namespace for the service"
+             (Data_encoding.option Data_encoding.string)
+             None)))
 
 module V0 = struct
   type t = {
@@ -415,6 +433,8 @@ let from_v0 v0 =
     history_mode = v0.history_mode;
     profile = v0.profile;
     version = current_version;
+    service_name = None;
+    service_namespace = None;
   }
 
 type error += DAL_node_unable_to_write_configuration_file of string
