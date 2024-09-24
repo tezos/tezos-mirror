@@ -1,0 +1,19 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name rollup_node_sqlite_migrations)
+ (public_name octez-l2-libs.rollup_node_sqlite_migrations)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.base
+  caqti-lwt
+  re)
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives))
+
+(rule
+ (target migrations.ml)
+ (deps (glob_files *.sql))
+ (action (run ocaml-crunch -e sql -m plain -o %{target} -s .)))
