@@ -28,6 +28,8 @@ open Alpha_context
 open Baking_state
 module Events = Baking_events.Actions
 
+module Profiler = (val Profiler.wrap Baking_profiler.baker_profiler)
+
 module Operations_source = struct
   type error +=
     | Failed_operations_fetch of {
@@ -173,7 +175,10 @@ let generate_seed_nonce_hash config delegate level =
   let open Lwt_result_syntax in
   if level.Level.expected_commitment then
     let* seed_nonce =
-      Baking_nonces.generate_seed_nonce config delegate level.level
+      (Baking_nonces.generate_seed_nonce
+         config
+         delegate
+         level.level [@profiler.record_s "generate seed nonce"])
     in
     return_some seed_nonce
   else return_none
@@ -200,22 +205,22 @@ let sign_block_header global_state proposer unsigned_block_header =
           Baking_files.resolve_location ~chain_id `Highwatermarks
         in
         let* may_sign =
-          may_sign_block
-            cctxt
-            block_location
-            ~delegate:proposer.public_key_hash
-            ~level
-            ~round
+          (may_sign_block
+             cctxt
+             block_location
+             ~delegate:proposer.public_key_hash
+             ~level
+             ~round [@profiler.record_s "may sign"])
         in
         match may_sign with
         | true ->
             let* () =
-              record_block
-                cctxt
-                block_location
-                ~delegate:proposer.public_key_hash
-                ~level
-                ~round
+              (record_block
+                 cctxt
+                 block_location
+                 ~delegate:proposer.public_key_hash
+                 ~level
+                 ~round [@profiler.record_s "record block"])
             in
             return_true
         | false ->
@@ -226,11 +231,11 @@ let sign_block_header global_state proposer unsigned_block_header =
   | false -> tzfail (Block_previously_baked {level; round})
   | true ->
       let* signature =
-        Client_keys.sign
-          cctxt
-          proposer.secret_key_uri
-          ~watermark:Block_header.(to_watermark (Block_header chain_id))
-          unsigned_header
+        (Client_keys.sign
+           cctxt
+           proposer.secret_key_uri
+           ~watermark:Block_header.(to_watermark (Block_header chain_id))
+           unsigned_header [@profiler.record_s "sign : block header"])
       in
       return {Block_header.shell; protocol_data = {contents; signature}}
 
@@ -299,10 +304,10 @@ let prepare_block (global_state : global_state) (block_to_bake : block_to_bake)
       (`Hash global_state.chain_id, `Hash (predecessor.hash, 0))
   in
   let* seed_nonce_opt =
-    generate_seed_nonce_hash
-      global_state.config.Baking_configuration.nonce
-      consensus_key
-      injection_level
+    (generate_seed_nonce_hash
+       global_state.config.Baking_configuration.nonce
+       consensus_key
+       injection_level [@profiler.record_s "generate seed nonce hash"])
   in
   let seed_nonce_hash = Option.map fst seed_nonce_opt in
   let user_activated_upgrades = global_state.config.user_activated_upgrades in
@@ -324,7 +329,7 @@ let prepare_block (global_state : global_state) (block_to_bake : block_to_bake)
     | Some per_block_vote_file ->
         Per_block_vote_file.read_per_block_votes_no_fail
           ~default
-          ~per_block_vote_file
+          ~per_block_vote_file [@profiler.record_s "read per block votes file"]
     | None -> Lwt.return default
   in
   let*! () =
@@ -334,37 +339,44 @@ let prepare_block (global_state : global_state) (block_to_bake : block_to_bake)
   let chain = `Hash global_state.chain_id in
   let pred_block = `Hash (predecessor.hash, 0) in
   let* pred_resulting_context_hash =
-    Shell_services.Blocks.resulting_context_hash
-      cctxt
-      ~chain
-      ~block:pred_block
-      ()
+    (Shell_services.Blocks.resulting_context_hash
+       cctxt
+       ~chain
+       ~block:pred_block
+       () [@profiler.record_s "pred resulting context hash"])
   in
   let* pred_live_blocks =
-    Chain_services.Blocks.live_blocks cctxt ~chain ~block:pred_block ()
+    (Chain_services.Blocks.live_blocks
+       cctxt
+       ~chain
+       ~block:pred_block
+       () [@profiler.record_s "live blocks"])
   in
   let* {unsigned_block_header; operations} =
-    Block_forge.forge
-      cctxt
-      ~chain_id
-      ~pred_info:predecessor
-      ~pred_live_blocks
-      ~pred_resulting_context_hash
-      ~timestamp
-      ~round
-      ~seed_nonce_hash
-      ~payload_round
-      ~liquidity_baking_toggle_vote:liquidity_baking_vote
-      ~adaptive_issuance_vote
-      ~user_activated_upgrades
-      ~force_apply
-      global_state.config.fees
-      simulation_mode
-      simulation_kind
-      global_state.constants.parametric
+    (Block_forge.forge
+       cctxt
+       ~chain_id
+       ~pred_info:predecessor
+       ~pred_live_blocks
+       ~pred_resulting_context_hash
+       ~timestamp
+       ~round
+       ~seed_nonce_hash
+       ~payload_round
+       ~liquidity_baking_toggle_vote:liquidity_baking_vote
+       ~adaptive_issuance_vote
+       ~user_activated_upgrades
+       ~force_apply
+       global_state.config.fees
+       simulation_mode
+       simulation_kind
+       global_state.constants.parametric [@profiler.record_s "forge block"])
   in
   let* signed_block_header =
-    sign_block_header global_state consensus_key unsigned_block_header
+    (sign_block_header
+       global_state
+       consensus_key
+       unsigned_block_header [@profiler.record_s "sign block header"])
   in
   let* () =
     match seed_nonce_opt with
@@ -373,14 +385,14 @@ let prepare_block (global_state : global_state) (block_to_bake : block_to_bake)
         return_unit
     | Some (_, nonce) ->
         let block_hash = Block_header.hash signed_block_header in
-        Baking_nonces.register_nonce
-          cctxt
-          ~chain_id
-          block_hash
-          nonce
-          ~cycle:injection_level.cycle
-          ~level:injection_level.level
-          ~round
+        (Baking_nonces.register_nonce
+           cctxt
+           ~chain_id
+           block_hash
+           nonce
+           ~cycle:injection_level.cycle
+           ~level:injection_level.level
+           ~round [@profiler.record_s "register nonce"])
   in
   let baking_votes =
     {Per_block_votes.liquidity_baking_vote; adaptive_issuance_vote}
@@ -641,7 +653,10 @@ let sign_consensus_votes (global_state : global_state)
       unsigned_consensus_vote_batch) =
   let open Lwt_result_syntax in
   let* authorized_consensus_votes =
-    authorized_consensus_votes global_state unsigned_consensus_vote_batch
+    (authorized_consensus_votes
+       global_state
+       unsigned_consensus_vote_batch
+     [@profiler.record_s "authorized consensus votes"])
   in
   let* signed_consensus_votes =
     List.filter_map_es
@@ -649,10 +664,11 @@ let sign_consensus_votes (global_state : global_state)
             unsigned_consensus_vote) ->
         let*! () = Events.(emit signing_consensus_vote (vote_kind, delegate)) in
         let*! signed_consensus_vote_r =
-          forge_and_sign_consensus_vote
-            global_state
-            ~branch:batch_branch
-            unsigned_consensus_vote
+          (forge_and_sign_consensus_vote
+             global_state
+             ~branch:batch_branch
+             unsigned_consensus_vote
+           [@profiler.record_s "forge and sign consensus vote"])
         in
         match signed_consensus_vote_r with
         | Error err ->
@@ -702,10 +718,16 @@ let inject_consensus_vote state (signed_consensus_vote : signed_consensus_vote)
       return_unit)
     (fun () ->
       let* oph =
-        Node_rpc.inject_operation
-          cctxt
-          ~chain:(`Hash chain_id)
-          signed_consensus_vote.signed_operation
+        (Node_rpc.inject_operation
+           cctxt
+           ~chain:(`Hash chain_id)
+           signed_consensus_vote.signed_operation
+         [@profiler.record_s
+           Format.sprintf
+             "injecting consensus vote: %s"
+             (match unsigned_consensus_vote.vote_kind with
+             | Preattestation -> "preattestation"
+             | Attestation -> "attestation")])
       in
       let*! () =
         Events.(
@@ -752,12 +774,12 @@ let inject_block ?(force_injection = false) ?(asynchronous = true) state
         emit injecting_block (signed_block_header.shell.level, round, delegate))
     in
     let* bh =
-      Node_rpc.inject_block
-        state.global_state.cctxt
-        ~force:state.global_state.config.force
-        ~chain:(`Hash state.global_state.chain_id)
-        signed_block_header
-        operations
+      (Node_rpc.inject_block
+         state.global_state.cctxt
+         ~force:state.global_state.config.force
+         ~chain:(`Hash state.global_state.chain_id)
+         signed_block_header
+         operations [@profiler.record_s "injecting block"])
     in
     let*! () =
       Events.(
@@ -885,19 +907,26 @@ let update_to_level state level_update =
         cctxt
         delegates
         ~level:new_level
-        ~chain
+        ~chain [@profiler.record_s "compute predecessor delegate slots"]
   in
   let* next_level_delegate_slots =
-    Baking_state.compute_delegate_slots
-      cctxt
-      delegates
-      ~level:(Int32.succ new_level)
-      ~chain
+    (Baking_state.compute_delegate_slots
+       cctxt
+       delegates
+       ~level:(Int32.succ new_level)
+       ~chain [@profiler.record_s "compute current delegate slots"])
   in
   let round_durations = state.global_state.round_durations in
-  let*? current_round = compute_round new_level_proposal round_durations in
+  let*? current_round =
+    (compute_round
+       new_level_proposal
+       round_durations [@profiler.record_f "compute round"])
+  in
   let*! new_state =
-    compute_new_state ~current_round ~delegate_slots ~next_level_delegate_slots
+    (compute_new_state
+       ~current_round
+       ~delegate_slots
+       ~next_level_delegate_slots [@profiler.record_s "compute new state"])
   in
   return new_state
 
@@ -907,7 +936,11 @@ let synchronize_round state {new_round_proposal; handle_proposal} =
     Events.(emit synchronizing_round new_round_proposal.predecessor.hash)
   in
   let round_durations = state.global_state.round_durations in
-  let*? current_round = compute_round new_round_proposal round_durations in
+  let*? current_round =
+    (compute_round
+       new_round_proposal
+       round_durations [@profiler.record_f "compute round"])
+  in
   if Round.(current_round < new_round_proposal.block.round) then
     (* impossible *)
     failwith
@@ -966,48 +999,97 @@ let rec perform_action state (action : action) =
   let open Lwt_result_syntax in
   match action with
   | Do_nothing -> return state
-  | Prepare_block {block_to_bake} -> prepare_block_request state block_to_bake
+  | Prepare_block {block_to_bake} ->
+      prepare_block_request
+        state
+        block_to_bake [@profiler.record_s "action : prepare block"]
   | Prepare_preattestations {preattestations} ->
-      let* new_state = prepare_preattestations_request state preattestations in
+      let* new_state =
+        (prepare_preattestations_request
+           state
+           preattestations
+         [@profiler.record_s "action : prepare preattestations"])
+      in
       (* We wait for preattestations to trigger the [Prequorum_reached]
          event *)
       perform_action new_state Watch_prequorum
   | Prepare_attestations {attestations} ->
-      let* new_state = prepare_attestations_request state attestations in
+      let* new_state =
+        (prepare_attestations_request
+           state
+           attestations [@profiler.record_s "action : prepare attestations"])
+      in
       (* We wait for attestations to trigger the [Quorum_reached]
          event *)
       perform_action new_state Watch_quorum
   | Prepare_consensus_votes {preattestations; attestations} ->
-      let* state = prepare_preattestations_request state preattestations in
-      let* state = prepare_attestations_request state attestations in
+      let* state =
+        (prepare_preattestations_request
+           state
+           preattestations
+         [@profiler.record_s "action : prepare preattestations"])
+      in
+      let* state =
+        (prepare_attestations_request
+           state
+           attestations [@profiler.record_s "action : prepare attestations"])
+      in
       (* We wait for preattestations to trigger the [Prequorum_reached]
          event *)
       perform_action state Watch_prequorum
   | Inject_block {prepared_block; force_injection; asynchronous} ->
       let* new_state =
-        inject_block ~force_injection ~asynchronous state prepared_block
+        (inject_block
+           ~force_injection
+           ~asynchronous
+           state
+           prepared_block [@profiler.record_s "action : inject block"])
       in
       return new_state
   | Inject_preattestation {signed_preattestation} ->
-      let* () = inject_consensus_vote state signed_preattestation in
+      let* () =
+        (inject_consensus_vote
+           state
+           signed_preattestation
+         [@profiler.record_s "action : inject preattestation"])
+      in
       (* Here, we do not need to wait for the prequorum, it has
          already been triggered by the
          [Prepare_(preattestation|consensus_votes)] action *)
       return state
   | Inject_attestations {signed_attestations} ->
-      let* () = inject_consensus_votes state signed_attestations in
+      let* () =
+        (inject_consensus_votes
+           state
+           signed_attestations
+         [@profiler.record_s "action : inject attestations"])
+      in
       (* We wait for attestations to trigger the [Quorum_reached]
          event *)
       perform_action state Watch_quorum
   | Update_to_level level_update ->
-      let* new_state, new_action = update_to_level state level_update in
+      let* new_state, new_action =
+        (update_to_level
+           state
+           level_update [@profiler.record_s "action : update to level"])
+      in
       perform_action new_state new_action
   | Synchronize_round round_update ->
-      let* new_state, new_action = synchronize_round state round_update in
+      let* new_state, new_action =
+        (synchronize_round
+           state
+           round_update [@profiler.record_s "action : synchronize round"])
+      in
       perform_action new_state new_action
   | Watch_prequorum ->
-      let*! () = start_waiting_for_preattestation_quorum state in
+      let*! () =
+        (start_waiting_for_preattestation_quorum
+           state [@profiler.record_s "action : wait for preattestation quorum"])
+      in
       return state
   | Watch_quorum ->
-      let*! () = start_waiting_for_attestation_quorum state in
+      let*! () =
+        (start_waiting_for_attestation_quorum
+           state [@profiler.record_s "action : wait for attestation quorum"])
+      in
       return state
