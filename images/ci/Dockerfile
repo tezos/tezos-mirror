@@ -344,7 +344,10 @@ RUN apk update \
  && PATH="/root/.cargo/bin:${PATH}" \
  && curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | ash -s -- -y \
  && RUSTFLAGS="-C linker=clang -C link-arg=-fuse-ld=lld" cargo install \
- --git https://github.com/foundry-rs/foundry/ cast --profile release --force --locked \
+ --git https://github.com/foundry-rs/foundry/ foundry-cast --profile release --force --locked \
+ --tag nightly-07a1f67114565968b188d1abf42fe2c5c57bfca5 \
+ # Foundry releases nightly build. We pick the commit of the day (at the time
+ # of proposing the change)
  && cp /root/.cargo/bin/cast /bin \
  # Clean up
  && rm -rf /tmp/* && rm -rf /root/.cargo
