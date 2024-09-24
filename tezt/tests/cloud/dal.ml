@@ -933,14 +933,14 @@ let get_metrics t infos_per_level metrics =
     ratio_attested_commitments_per_baker;
   }
 
-let get_infos_per_level client ~level =
+let get_infos_per_level endpoint ~level =
   let block = string_of_int level in
   let* header =
-    Client.RPC.call client @@ RPC.get_chain_block_header_shell ~block ()
+    RPC_core.call endpoint @@ RPC.get_chain_block_header_shell ~block ()
   and* metadata =
-    Client.RPC.call client @@ RPC.get_chain_block_metadata_raw ~block ()
+    RPC_core.call endpoint @@ RPC.get_chain_block_metadata_raw ~block ()
   and* operations =
-    Client.RPC.call client @@ RPC.get_chain_block_operations ~block ()
+    RPC_core.call endpoint @@ RPC.get_chain_block_operations ~block ()
   in
   let level = JSON.(header |-> "level" |> as_int) in
   let attested_commitments =
@@ -1989,10 +1989,11 @@ let wait_for_level t level =
       Lwt.return_unit
 
 let on_new_level t level =
-  let client = t.bootstrap.client in
   let* () = wait_for_level t level in
   toplog "Start process level %d" level ;
-  let* infos_per_level = get_infos_per_level client ~level in
+  let* infos_per_level =
+    get_infos_per_level t.bootstrap.node_rpc_endpoint ~level
+  in
   Hashtbl.replace t.infos level infos_per_level ;
   let metrics =
     get_metrics t infos_per_level (Hashtbl.find t.metrics (level - 1))
