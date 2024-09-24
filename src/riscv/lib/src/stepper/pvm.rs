@@ -7,9 +7,8 @@ use crate::{
     kernel_loader,
     machine_state::{
         bus::main_memory::{MainMemoryLayout, M1G},
-        instruction_cache::{DefaultInstructionCacheLayout, InstructionCacheLayout},
         mode::Mode,
-        MachineCoreState, MachineError,
+        CacheLayouts, DefaultCacheLayouts, MachineCoreState, MachineError,
     },
     program::Program,
     pvm::{Pvm, PvmHooks, PvmLayout, PvmStatus},
@@ -30,19 +29,15 @@ pub enum PvmStepperError {
 }
 
 /// Wrapper over a PVM that lets you step through it
-pub struct PvmStepper<
-    'hooks,
-    ML: MainMemoryLayout = M1G,
-    ICL: InstructionCacheLayout = DefaultInstructionCacheLayout,
-> {
-    pvm: Pvm<ML, ICL, Owned>,
+pub struct PvmStepper<'hooks, ML: MainMemoryLayout = M1G, CL: CacheLayouts = DefaultCacheLayouts> {
+    pvm: Pvm<ML, CL, Owned>,
     hooks: PvmHooks<'hooks>,
     inbox: Inbox,
     rollup_address: [u8; 20],
     origination_level: u32,
 }
 
-impl<'hooks, ML: MainMemoryLayout, ICL: InstructionCacheLayout> PvmStepper<'hooks, ML, ICL> {
+impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts> PvmStepper<'hooks, ML, CL> {
     /// Create a new PVM stepper.
     pub fn new(
         program: &[u8],
@@ -52,7 +47,7 @@ impl<'hooks, ML: MainMemoryLayout, ICL: InstructionCacheLayout> PvmStepper<'hook
         rollup_address: [u8; 20],
         origination_level: u32,
     ) -> Result<Self, PvmStepperError> {
-        let space = Owned::allocate::<PvmLayout<ML, ICL>>();
+        let space = Owned::allocate::<PvmLayout<ML, CL>>();
         let mut pvm = Pvm::bind(space);
 
         let program = Program::<ML>::from_elf(program)?;
@@ -124,12 +119,10 @@ impl<'hooks, ML: MainMemoryLayout, ICL: InstructionCacheLayout> PvmStepper<'hook
     }
 }
 
-impl<'hooks, ML: MainMemoryLayout, ICL: InstructionCacheLayout> Stepper
-    for PvmStepper<'hooks, ML, ICL>
-{
+impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts> Stepper for PvmStepper<'hooks, ML, CL> {
     type MainMemoryLayout = ML;
 
-    type InstructionCacheLayout = ICL;
+    type CacheLayouts = CL;
 
     type Manager = Owned;
 

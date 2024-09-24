@@ -9,10 +9,8 @@ use crate::{
     kernel_loader,
     machine_state::{
         bus::main_memory::{MainMemoryLayout, M1G},
-        instruction_cache::{InstructionCacheLayout, TestInstructionCacheLayout},
-    },
-    machine_state::{
-        mode, MachineCoreState, MachineError, MachineState, MachineStateLayout, StepManyResult,
+        mode, CacheLayouts, MachineCoreState, MachineError, MachineState, MachineStateLayout,
+        StepManyResult, TestCacheLayouts,
     },
     program::Program,
     state_backend::owned_backend::Owned,
@@ -73,14 +71,11 @@ pub enum TestStepperError {
     MachineError(MachineError),
 }
 
-pub type TestStepperLayout<ML = M1G, ICL = TestInstructionCacheLayout> =
-    (PosixStateLayout, MachineStateLayout<ML, ICL>);
+pub type TestStepperLayout<ML = M1G, CL = TestCacheLayouts> =
+    (PosixStateLayout, MachineStateLayout<ML, CL>);
 
-pub struct TestStepper<
-    ML: MainMemoryLayout = M1G,
-    ICL: InstructionCacheLayout = TestInstructionCacheLayout,
-> {
-    machine_state: MachineState<ML, ICL, Owned>,
+pub struct TestStepper<ML: MainMemoryLayout = M1G, CL: CacheLayouts = TestCacheLayouts> {
+    machine_state: MachineState<ML, CL, Owned>,
     posix_state: PosixState<Owned>,
 }
 
@@ -155,10 +150,10 @@ impl<ML: MainMemoryLayout> TestStepper<ML> {
     }
 }
 
-impl<ML: MainMemoryLayout> Stepper for TestStepper<ML, TestInstructionCacheLayout> {
+impl<ML: MainMemoryLayout> Stepper for TestStepper<ML, TestCacheLayouts> {
     type MainMemoryLayout = ML;
 
-    type InstructionCacheLayout = TestInstructionCacheLayout;
+    type CacheLayouts = TestCacheLayouts;
 
     type Manager = Owned;
 

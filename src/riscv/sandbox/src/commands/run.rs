@@ -8,7 +8,7 @@ use crate::{
     posix_exit_mode,
 };
 use octez_riscv::{
-    machine_state::{bus::main_memory::M1G, instruction_cache::DefaultInstructionCacheLayout},
+    machine_state::{bus::main_memory::M1G, DefaultCacheLayouts},
     pvm::PvmHooks,
     stepper::{pvm::PvmStepper, test::TestStepper, StepResult, Stepper, StepperStatus},
 };
@@ -94,7 +94,7 @@ fn run_pvm<R>(
         let _written = console.write(&[c]).unwrap();
     });
 
-    let stepper = PvmStepper::<'_, M1G, DefaultInstructionCacheLayout>::new(
+    let stepper = PvmStepper::<'_, M1G, DefaultCacheLayouts>::new(
         program,
         initrd,
         inbox.build(),

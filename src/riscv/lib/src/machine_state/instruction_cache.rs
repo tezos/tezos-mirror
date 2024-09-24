@@ -33,14 +33,14 @@
 //! translation changes - as the upper address may no longer point
 //! to the same relative physical address.
 
-use crate::cache_utils::{FenceCounter, Unparsed};
+use crate::cache_utils::{FenceCounter, Sizes, Unparsed};
 use crate::machine_state::address_translation::PAGE_SIZE;
 use crate::machine_state::bus::Address;
 use crate::parser::instruction::{Instr, InstrCacheable};
 use crate::parser::{parse_compressed_instruction, parse_uncompressed_instruction};
 use crate::state_backend::{
-    self, AllocatedOf, Atom, Cell, CellWrite, Choreographer, Layout, LazyCell, ManagerAlloc,
-    ManagerBase, ManagerRead, ManagerReadWrite, ManagerWrite, Many, Placed, Ref,
+    self, AllocatedOf, Atom, Cell, CellWrite, LazyCell, ManagerBase, ManagerRead, ManagerReadWrite,
+    ManagerWrite, Ref,
 };
 
 /// The layout of an entry in the instruction cache.
@@ -93,63 +93,17 @@ impl<M: ManagerBase> Cached<M> {
     }
 }
 
-/// Configuration object for the size of the instruction cache.
-///
-/// *NB* you should ensure `SIZE == 1 << BITS`, otherwise a compilation error will occur:
-///
-/// The following fails to compile:
-/// ```compile_fail
-/// # use octez_riscv::machine_state::instruction_cache::Sizes;
-/// pub type SizesX = Sizes<15, { 1 << 16 }>;
-/// println!("{}", SizesX::CACHE_SIZE);
-/// ```
-///
-/// But the following would succeed:
-/// ```no_run
-/// # use octez_riscv::machine_state::instruction_cache::Sizes;
-/// pub type SizesY = Sizes<15, { 1 << 15 }>;
-/// println!("{}", SizesY::CACHE_SIZE);
-/// ```
-pub enum Sizes<const BITS: usize, const SIZE: usize> {}
+/// The default instruction cache index bits.
+pub const DEFAULT_CACHE_BITS: usize = 16;
 
-impl<const BITS: usize, const SIZE: usize> Sizes<BITS, SIZE> {
-    pub const CACHE_SIZE: usize = if 1 << BITS == SIZE {
-        SIZE
-    } else {
-        panic!("BITS parameter does not match SIZE parameter");
-    };
+/// The default instruction cache size.
+pub const DEFAULT_CACHE_SIZE: usize = 1 << DEFAULT_CACHE_BITS;
 
-    const CACHE_MASK: usize = {
-        Self::fence_counter_wrapping_protection();
-        Self::CACHE_SIZE - 1
-    };
+/// The default instruction cache index bits for tests.
+pub const TEST_CACHE_BITS: usize = 12;
 
-    // We know that phys_addr here is always u16-aligned.
-    // Therefore, we can safely halve the number of buckets we
-    // look at.
-    #[inline(always)]
-    const fn cache_index(phys_addr: Address) -> usize {
-        (phys_addr >> 1) as usize & Self::CACHE_MASK
-    }
-
-    /// Assert that the fence counter would not wrap before every cache entry has been invalidated
-    /// _at least_ once.
-    const fn fence_counter_wrapping_protection() {
-        let invalidation_count_until_wrapping = FenceCounter::MAX.0 as usize;
-        let cache_entries = Self::CACHE_SIZE;
-
-        assert!(
-            invalidation_count_until_wrapping > cache_entries,
-            "The fence counter does a full cycle before all cache entries could be invalidated!"
-        );
-    }
-}
-
-/// The default instruction cache layout used in the sandbox/rollup node when running kernels.
-pub type DefaultInstructionCacheLayout = Sizes<16, 65536>;
-
-/// The instruction cache layout recommended for use in tests.
-pub type TestInstructionCacheLayout = Sizes<12, 4096>;
+/// The default instruction cache for tests.
+pub const TEST_CACHE_SIZE: usize = 1 << TEST_CACHE_BITS;
 
 /// Trait for capturing the different possible layouts of the instruction cache (i.e.
 /// controlling the number of cache entries present).
@@ -176,29 +130,14 @@ pub trait InstructionCacheLayout: state_backend::Layout {
     ) -> AllocatedOf<Self, Ref<'_, M>>
     where
         Self: Sized;
+
+    fn cache_index(address: Address) -> usize;
 }
 
-type SizesLayout<const SIZE: usize> = (Atom<FenceCounter>, Many<CachedLayout, SIZE>);
+pub type Layout<const BITS: usize, const SIZE: usize> =
+    (Atom<FenceCounter>, Sizes<BITS, SIZE, CachedLayout>);
 
-impl<const BITS: usize, const SIZE: usize> Layout for Sizes<BITS, SIZE> {
-    type Placed = <SizesLayout<SIZE> as Layout>::Placed;
-
-    fn place_with(alloc: &mut Choreographer) -> Self::Placed {
-        SizesLayout::<SIZE>::place_with(alloc)
-    }
-
-    fn placed() -> Placed<Self::Placed> {
-        SizesLayout::<SIZE>::placed()
-    }
-
-    type Allocated<M: ManagerBase> = <SizesLayout<SIZE> as Layout>::Allocated<M>;
-
-    fn allocate<M: ManagerAlloc>(backend: &mut M, placed: Self::Placed) -> Self::Allocated<M> {
-        SizesLayout::<SIZE>::allocate(backend, placed)
-    }
-}
-
-impl<const BITS: usize, const SIZE: usize> InstructionCacheLayout for Sizes<BITS, SIZE> {
+impl<const BITS: usize, const SIZE: usize> InstructionCacheLayout for Layout<BITS, SIZE> {
     type Entries<M: ManagerBase> = Box<[Cached<M>; SIZE]>;
 
     fn refl<M: ManagerBase>(space: AllocatedOf<Self, M>) -> InstructionCache<Self, M> {
@@ -238,6 +177,10 @@ impl<const BITS: usize, const SIZE: usize> InstructionCacheLayout for Sizes<BITS
             cache.fence_counter.struct_ref(),
             cache.entries.iter().map(Cached::struct_ref).collect(),
         )
+    }
+
+    fn cache_index(address: Address) -> usize {
+        Sizes::<BITS, SIZE, CachedLayout>::cache_index(address)
     }
 }
 
@@ -369,6 +312,8 @@ mod tests {
         machine_state::registers::{a0, t0, t1},
         parser::instruction::{CIBTypeArgs, InstrCacheable, SBTypeArgs},
     };
+
+    pub type TestInstructionCacheLayout = Layout<TEST_CACHE_BITS, TEST_CACHE_SIZE>;
 
     // Ensure that the initialised values for the instruction cache (ie phys_addr = 0)
     // are not actually returned from the cache. This would result in an incorrect

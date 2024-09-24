@@ -3,10 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::{
-    machine_state::{
-        bus::main_memory::MainMemoryLayout, instruction_cache::InstructionCacheLayout,
-        MachineCoreState,
-    },
+    machine_state::{bus::main_memory::MainMemoryLayout, CacheLayouts, MachineCoreState},
     state_backend::{ManagerBase, ManagerRead},
 };
 use std::ops::{AddAssign, Bound};
@@ -78,7 +75,7 @@ pub trait Stepper {
     type MainMemoryLayout: MainMemoryLayout;
 
     /// Layout of the instruction cache
-    type InstructionCacheLayout: InstructionCacheLayout;
+    type CacheLayouts: CacheLayouts;
 
     /// State backend with which the stepper was instantiated
     type Manager: ManagerBase + ManagerRead;

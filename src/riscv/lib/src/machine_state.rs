@@ -7,6 +7,7 @@
 
 pub mod address_translation;
 pub mod bus;
+mod cache_layouts;
 pub mod csregisters;
 pub mod hart_state;
 pub mod instruction_cache;
@@ -17,7 +18,8 @@ pub mod reservation_set;
 #[cfg(test)]
 extern crate proptest;
 
-use self::instruction_cache::{InstructionCache, InstructionCacheLayout};
+pub use self::cache_layouts::{CacheLayouts, DefaultCacheLayouts, TestCacheLayouts};
+use self::instruction_cache::InstructionCache;
 use crate::{
     bits::u64,
     devicetree,
@@ -32,7 +34,7 @@ use crate::{
     },
     program::Program,
     range_utils::{bound_saturating_sub, less_than_bound, unwrap_bound},
-    state_backend::{self as backend},
+    state_backend as backend,
     traps::{EnvironException, Exception, Interrupt, TrapContext},
 };
 pub use address_translation::AccessType;
@@ -62,16 +64,19 @@ pub struct MachineCoreState<ML: main_memory::MainMemoryLayout, M: backend::Manag
 }
 
 /// Layout for the machine state - everything required to fetch & run instructions.
-pub type MachineStateLayout<ML, ICL> = (MachineCoreStateLayout<ML>, ICL);
+pub type MachineStateLayout<ML, CL> = (
+    MachineCoreStateLayout<ML>,
+    <CL as CacheLayouts>::InstructionCacheLayout,
+);
 
 /// The machine state contains everything required to fetch & run instructions.
 pub struct MachineState<
     ML: main_memory::MainMemoryLayout,
-    ICL: InstructionCacheLayout,
+    CL: CacheLayouts,
     M: backend::ManagerBase,
 > {
     pub core: MachineCoreState<ML, M>,
-    pub instruction_cache: InstructionCache<ICL, M>,
+    pub instruction_cache: InstructionCache<CL::InstructionCacheLayout, M>,
 }
 
 /// How to modify the program counter
@@ -551,11 +556,11 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::ManagerBase> MachineCoreStat
     }
 }
 
-impl<ML: main_memory::MainMemoryLayout, ICL: InstructionCacheLayout, M: backend::ManagerBase>
-    MachineState<ML, ICL, M>
+impl<ML: main_memory::MainMemoryLayout, CL: CacheLayouts, M: backend::ManagerBase>
+    MachineState<ML, CL, M>
 {
     /// Bind the machine state to the given allocated space.
-    pub fn bind(space: backend::AllocatedOf<MachineStateLayout<ML, ICL>, M>) -> Self {
+    pub fn bind(space: backend::AllocatedOf<MachineStateLayout<ML, CL>, M>) -> Self {
         Self {
             core: MachineCoreState::bind(space.0),
             instruction_cache: InstructionCache::bind(space.1),
@@ -565,7 +570,7 @@ impl<ML: main_memory::MainMemoryLayout, ICL: InstructionCacheLayout, M: backend:
     /// Obtain a structure with references to the bound regions of this type.
     pub fn struct_ref(
         &self,
-    ) -> backend::AllocatedOf<MachineStateLayout<ML, ICL>, backend::Ref<'_, M>> {
+    ) -> backend::AllocatedOf<MachineStateLayout<ML, CL>, backend::Ref<'_, M>> {
         (self.core.struct_ref(), self.instruction_cache.struct_ref())
     }
 
@@ -1033,9 +1038,9 @@ mod tests {
                 xstatus::{self, MStatus},
                 CSRRepr, CSRegister,
             },
-            instruction_cache::TestInstructionCacheLayout,
             mode::Mode,
             registers::{a0, a1, a2, t0, t1, t2, zero},
+            TestCacheLayouts,
         },
         parser::{
             instruction::{CIBTypeArgs, ITypeArgs, Instr, InstrCacheable, SBTypeArgs},
@@ -1048,16 +1053,15 @@ mod tests {
 
     #[test]
     fn test_machine_state_reset() {
-        test_determinism::<MachineStateLayout<T1K, TestInstructionCacheLayout>, _>(|space| {
-            let mut machine: MachineState<T1K, TestInstructionCacheLayout, _> =
-                MachineState::bind(space);
+        test_determinism::<MachineStateLayout<T1K, TestCacheLayouts>, _>(|space| {
+            let mut machine: MachineState<T1K, TestCacheLayouts, _> = MachineState::bind(space);
             machine.reset();
         });
     }
 
     backend_test!(test_step, F, {
-        let mut backend = create_backend!(MachineStateLayout<T1K, TestInstructionCacheLayout>, F);
-        let state = create_state!(MachineState, MachineStateLayout<T1K, TestInstructionCacheLayout>, F, backend, T1K, TestInstructionCacheLayout);
+        let mut backend = create_backend!(MachineStateLayout<T1K, TestCacheLayouts>, F);
+        let state = create_state!(MachineState, MachineStateLayout<T1K, TestCacheLayouts>, F, backend, T1K, TestCacheLayouts);
         let state_cell = std::cell::RefCell::new(state);
 
         proptest!(|(
@@ -1104,8 +1108,8 @@ mod tests {
     });
 
     backend_test!(test_step_env_exc, F, {
-        let mut backend = create_backend!(MachineStateLayout<T1K, TestInstructionCacheLayout>, F);
-        let state = create_state!(MachineState, MachineStateLayout<T1K, TestInstructionCacheLayout>, F, backend, T1K, TestInstructionCacheLayout);
+        let mut backend = create_backend!(MachineStateLayout<T1K, TestCacheLayouts>, F);
+        let state = create_state!(MachineState, MachineStateLayout<T1K, TestCacheLayouts>, F, backend, T1K, TestCacheLayouts);
         let state_cell = std::cell::RefCell::new(state);
 
         proptest!(|(
@@ -1141,8 +1145,8 @@ mod tests {
     });
 
     backend_test!(test_step_exc_mm, F, {
-        let mut backend = create_backend!(MachineStateLayout<T1K, TestInstructionCacheLayout>, F);
-        let state = create_state!(MachineState, MachineStateLayout<T1K, TestInstructionCacheLayout>, F, backend, T1K, TestInstructionCacheLayout);
+        let mut backend = create_backend!(MachineStateLayout<T1K, TestCacheLayouts>, F);
+        let state = create_state!(MachineState, MachineStateLayout<T1K, TestCacheLayouts>, F, backend, T1K, TestCacheLayouts);
         let state_cell = std::cell::RefCell::new(state);
 
         proptest!(|(
@@ -1185,8 +1189,8 @@ mod tests {
     });
 
     backend_test!(test_step_exc_us, F, {
-        let mut backend = create_backend!(MachineStateLayout<T1K, TestInstructionCacheLayout>, F);
-        let state = create_state!(MachineState, MachineStateLayout<T1K, TestInstructionCacheLayout>, F, backend, T1K, TestInstructionCacheLayout);
+        let mut backend = create_backend!(MachineStateLayout<T1K, TestCacheLayouts>, F);
+        let state = create_state!(MachineState, MachineStateLayout<T1K, TestCacheLayouts>, F, backend, T1K, TestCacheLayouts);
         let state_cell = std::cell::RefCell::new(state);
 
         proptest!(|(
@@ -1226,8 +1230,8 @@ mod tests {
 
     #[test]
     fn test_reset() {
-        test_determinism::<MachineStateLayout<M1K, TestInstructionCacheLayout>, _>(|space| {
-            let mut machine_state: MachineState<M1K, TestInstructionCacheLayout, _> =
+        test_determinism::<MachineStateLayout<M1K, TestCacheLayouts>, _>(|space| {
+            let mut machine_state: MachineState<M1K, TestCacheLayouts, _> =
                 MachineState::bind(space);
             machine_state.reset();
         });
@@ -1273,11 +1277,11 @@ mod tests {
             }))]
         );
 
-        let mut backend = create_backend!(MachineStateLayout<M1K, TestInstructionCacheLayout>, F);
+        let mut backend = create_backend!(MachineStateLayout<M1K, TestCacheLayouts>, F);
 
         // Configure the machine state.
         {
-            let mut state = create_state!(MachineState, MachineStateLayout<M1K, TestInstructionCacheLayout>, F, backend, M1K, TestInstructionCacheLayout);
+            let mut state = create_state!(MachineState, MachineStateLayout<M1K, TestCacheLayouts>, F, backend, M1K, TestCacheLayouts);
             state.reset();
 
             let start_ram = start_of_main_memory::<M1K>();
@@ -1308,7 +1312,7 @@ mod tests {
 
         // Perform 2 steps consecutively in one backend.
         let result = {
-            let mut state = create_state!(MachineState, MachineStateLayout<M1K, TestInstructionCacheLayout>, F, backend, M1K, TestInstructionCacheLayout);
+            let mut state = create_state!(MachineState, MachineStateLayout<M1K, TestCacheLayouts>, F, backend, M1K, TestCacheLayouts);
             state.step().unwrap();
             state.step().unwrap();
             state.core.hart.xregisters.read(t2)
@@ -1317,12 +1321,12 @@ mod tests {
         // Perform 2 steps separately in another backend by re-binding the state between steps.
         let alt_result = {
             {
-                let mut state = create_state!(MachineState, MachineStateLayout<M1K, TestInstructionCacheLayout>, F, alt_backend, M1K, TestInstructionCacheLayout);
+                let mut state = create_state!(MachineState, MachineStateLayout<M1K, TestCacheLayouts>, F, alt_backend, M1K, TestCacheLayouts);
                 state.step().unwrap();
             }
 
             {
-                let mut state = create_state!(MachineState, MachineStateLayout<M1K, TestInstructionCacheLayout>, F, alt_backend, M1K, TestInstructionCacheLayout);
+                let mut state = create_state!(MachineState, MachineStateLayout<M1K, TestCacheLayouts>, F, alt_backend, M1K, TestCacheLayouts);
                 state.step().unwrap();
                 state.core.hart.xregisters.read(t2)
             }
@@ -1340,7 +1344,7 @@ mod tests {
         // TODO: RV-210: Generalise for all testable backends.
         type F = crate::state_backend::memory_backend::test_helpers::InMemoryBackendFactory;
 
-        let mut backend = create_backend!(MachineStateLayout<M1M, TestInstructionCacheLayout>, F);
+        let mut backend = create_backend!(MachineStateLayout<M1M, TestCacheLayouts>, F);
 
         // Specify the physcal memory layout.
         let main_mem_addr = start_of_main_memory::<M1M>();
@@ -1495,7 +1499,7 @@ mod tests {
 
         // Configure the state backend.
         {
-            let mut state = create_state!(MachineState, MachineStateLayout<M1M, TestInstructionCacheLayout>, F, backend, M1M, TestInstructionCacheLayout);
+            let mut state = create_state!(MachineState, MachineStateLayout<M1M, TestCacheLayouts>, F, backend, M1M, TestCacheLayouts);
             state.reset();
 
             state
@@ -1523,7 +1527,7 @@ mod tests {
 
         //  2 steps consecutively against one backend.
         let result = {
-            let mut state = create_state!(MachineState, MachineStateLayout<M1M, TestInstructionCacheLayout>, F, backend, M1M, TestInstructionCacheLayout);
+            let mut state = create_state!(MachineState, MachineStateLayout<M1M, TestCacheLayouts>, F, backend, M1M, TestCacheLayouts);
             state.step().unwrap();
             state.step().unwrap();
             state.core.hart.xregisters.read(a0)
@@ -1532,11 +1536,11 @@ mod tests {
         // Perform 2 steps separately in another backend by re-binding the state between steps.
         let alt_result = {
             {
-                let mut state = create_state!(MachineState, MachineStateLayout<M1M, TestInstructionCacheLayout>, F, alt_backend, M1M, TestInstructionCacheLayout);
+                let mut state = create_state!(MachineState, MachineStateLayout<M1M, TestCacheLayouts>, F, alt_backend, M1M, TestCacheLayouts);
                 state.step().unwrap();
             }
             {
-                let mut state = create_state!(MachineState, MachineStateLayout<M1M, TestInstructionCacheLayout>, F, alt_backend, M1M, TestInstructionCacheLayout);
+                let mut state = create_state!(MachineState, MachineStateLayout<M1M, TestCacheLayouts>, F, alt_backend, M1M, TestCacheLayouts);
                 state.step().unwrap();
                 state.core.hart.xregisters.read(a0)
             }
