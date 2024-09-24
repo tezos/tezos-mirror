@@ -80,9 +80,12 @@ end
 module Parameters = struct
   let default_node_addr = "http://127.0.0.1:8732"
 
+  type status = Active | Frozen
+
   (* From Manifest/Product_octez/Protocol*)
-  let protocol_short_name = function
-    | ( "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P"
+  let protocol_status = function
+    | ( "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im"
+      | "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P"
       | "PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY"
       | "PsYLVpVvgbLhAhoqAkMFUo6gudkJ9weNXhUYCiLDzcUpFpkk8Wt"
       | "PsddFKi32cMJ2qPjf43Qv5GDWLDPZb3T3bF6fLKiF5HtvHNU7aP"
@@ -103,21 +106,19 @@ module Parameters = struct
       | "PtMumbai2TmsJHNGRkD8v8YDbtao7BLUC3wjASn1inAKLFCjaH1"
       | "PtNairobiyssHuh87hEhfVBGCVrK3WnS8Z2FT4ymB5tAa4r1nQf"
       | "ProxfordYmVfjWnRcgjWH36fW6PArwqykTFzotUxRs6gmTcZDuH"
-      | "PtParisBxoLz5gzMmn3d9WBQNoPSZakgnkMC2VNuQ3KXfUtUQeZ"
-      | "PsParisCZo7KAh1Z1smVd9ZMZ1HHn5gkzbM94V3PLCpknFWhUAi"
+      | "PtParisBxoLz5gzMmn3d9WBQNoPSZakgnkMC2VNuQ3KXfUtUQeZ" ) as full_hash ->
+        (String.sub full_hash 0 8, Frozen)
+    | ( "PsParisCZo7KAh1Z1smVd9ZMZ1HHn5gkzbM94V3PLCpknFWhUAi"
       | "PsquebeCaYyvBEESCaXL8B8Tn8BcEhps2Zke1xMVtyr7X4qMfxT" ) as full_hash ->
-        String.sub full_hash 0 8
-    | "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK" -> "alpha"
-    | "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im" ->
-        (* Temporary failure to be improved in followup MRs. *)
-        assert false
-    | _ -> (*We assume that unmatched protocols are beta ones*) "beta"
+        (String.sub full_hash 0 8, Active)
+    | "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK" -> ("alpha", Active)
+    | _ -> (*We assume that unmatched protocols are beta ones*) ("beta", Active)
 end
 
 module Baker = struct
   let baker_path ?(user_path = "./") proto_hash =
-    let short_name =
-      Parameters.protocol_short_name (Protocol_hash.to_b58check proto_hash)
+    let short_name, _status =
+      Parameters.protocol_status (Protocol_hash.to_b58check proto_hash)
     in
     Format.sprintf "%soctez-baker-%s" user_path short_name
 
