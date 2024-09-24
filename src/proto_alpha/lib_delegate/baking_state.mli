@@ -528,3 +528,5 @@ type event =
 val event_encoding : event Data_encoding.t
 
 val pp_event : Format.formatter -> event -> unit
+
+val pp_short_event : Format.formatter -> event -> unit
