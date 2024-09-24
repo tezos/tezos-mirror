@@ -1960,7 +1960,6 @@ let init ~(configuration : configuration) cloud next_agent =
         let bootstrap_agent = Option.get bootstrap_agent in
         init_sandbox_and_activate_protocol cloud configuration bootstrap_agent
     | Testnet testnet ->
-        let () = toplog "Init: initializting, testnet case" in
         init_testnet cloud configuration teztale bootstrap_agent testnet
   in
   let* bakers =
@@ -2329,7 +2328,6 @@ let benchmark () =
           let* () = set_name agent name in
           Lwt.return agent
       in
-      toplog "Init" ;
       let* t = init ~configuration cloud next_agent in
       toplog "Starting main loop" ;
       let main_loop = loop t (t.first_level + 1) in
