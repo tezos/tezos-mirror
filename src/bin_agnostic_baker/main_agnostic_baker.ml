@@ -83,7 +83,7 @@ module Parameters = struct
   type status = Active | Frozen
 
   (* From Manifest/Product_octez/Protocol*)
-  let protocol_status = function
+  let protocol_info = function
     | ( "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im"
       | "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P"
       | "PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY"
@@ -113,12 +113,16 @@ module Parameters = struct
         (String.sub full_hash 0 8, Active)
     | "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK" -> ("alpha", Active)
     | _ -> (*We assume that unmatched protocols are beta ones*) ("beta", Active)
+
+  let protocol_short_hash h = fst (protocol_info h)
+
+  let protocol_status h = snd (protocol_info h)
 end
 
 module Baker = struct
   let baker_path ?(user_path = "./") proto_hash =
-    let short_name, _status =
-      Parameters.protocol_status (Protocol_hash.to_b58check proto_hash)
+    let short_name =
+      Parameters.protocol_short_hash (Protocol_hash.to_b58check proto_hash)
     in
     Format.sprintf "%soctez-baker-%s" user_path short_name
 
@@ -185,6 +189,8 @@ module RPC = struct
 end
 
 module Daemon = struct
+  type state = {node_endpoint : string; baker_args : string list}
+
   let get_current_proposal ~node_addr =
     let open Lwt_result_syntax in
     let f json =
@@ -281,9 +287,10 @@ module Daemon = struct
     let* () = loop () in
     return_unit
 
-  let run ~node_addr =
+  let run ~state =
     let open Lwt_result_syntax in
     let*! () = Events.(emit starting_daemon) () in
+    let node_addr = state.node_endpoint in
     let* _protocol_proposal = get_current_proposal ~node_addr in
     let* head_stream = monitor_heads ~node_addr in
     (* Monitoring voting periods through heads monitoring to avoid
@@ -397,9 +404,13 @@ end
 let run () =
   let open Lwt_result_syntax in
   let*! () = Tezos_base_unix.Internal_event_unix.init () in
-  let endpoint, binaries_directory, baker_args = Args.parse_args Sys.argv in
-  let* proto_hash = get_next_protocol_hash ~node_addr:endpoint in
-  let (_daemon : unit tzresult Lwt.t) = Daemon.run ~node_addr:endpoint in
+  let node_endpoint, binaries_directory, baker_args =
+    Args.parse_args Sys.argv
+  in
+  let* proto_hash = get_next_protocol_hash ~node_addr:node_endpoint in
+  let (_daemon : unit tzresult Lwt.t) =
+    Daemon.run ~state:{node_endpoint; baker_args}
+  in
   let* _baker = Baker.spawn_baker proto_hash ~binaries_directory ~baker_args in
   let*! () = Lwt_utils.never_ending () in
   return_unit
