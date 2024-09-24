@@ -7,7 +7,7 @@
 
 open Cmdliner
 
-let wip () = Format.printf "This application is under development@."
+let wip () = Log.warning "This application is under development"
 
 let wip_t = Term.(const wip $ const ())
 
