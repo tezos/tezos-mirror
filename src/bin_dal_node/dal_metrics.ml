@@ -12,7 +12,7 @@ module Node_metrics = struct
   let subsystem = "node"
 
   let number_of_reconstructions_started =
-    let name = "number_of_reconstructions_started" in
+    let name = "amplification_reconstructions_started_count" in
     Prometheus.Counter.v
       ~help:"Number of reconstructions started for observer's amplification"
       ~namespace
@@ -20,7 +20,7 @@ module Node_metrics = struct
       name
 
   let number_of_reconstructions_done =
-    let name = "number_of_reconstructions_done" in
+    let name = "amplification_reconstructions_done_count" in
     Prometheus.Counter.v
       ~help:"Number of reconstructions finished for observer's amplification"
       ~namespace
@@ -28,7 +28,7 @@ module Node_metrics = struct
       name
 
   let number_of_reconstructions_aborted =
-    let name = "number_of_reconstructions_aborted" in
+    let name = "amplification_reconstructions_aborted_count" in
     Prometheus.Counter.v
       ~help:
         "Number of reconstructions aborted for observer's amplification, \
