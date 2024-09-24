@@ -53,10 +53,10 @@ export rust_version='1.78.0'
 export cargo_version='1.78.0'
 
 # Installed via apk opam
-export opam_version='2.2.0'
+export opam_version='2.2.1'
 
 # Installed via apk python3-dev
-export python_version='3.12.3'
+export python_version='3.12.6'
 
 # Installed via apk
 export poetry_version='1.8.3'
