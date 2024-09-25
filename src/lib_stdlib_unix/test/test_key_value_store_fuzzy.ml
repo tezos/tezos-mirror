@@ -96,6 +96,10 @@ module type S = sig
     ('file, 'key, 'value) Key_value_store.file_layout ->
     'file ->
     int tzresult Lwt.t
+
+  module View : sig
+    val opened_files : ('file, 'key, 'value) t -> int
+  end
 end
 
 let value_size = 1
@@ -142,6 +146,12 @@ module R : S = struct
          (fun (file', _) _ count -> if file = file' then count + 1 else count)
          t
          0
+
+  module View = struct
+    let opened_files table =
+      table |> Stdlib.Hashtbl.to_seq_keys |> Seq.map fst |> List.of_seq
+      |> List.sort_uniq compare |> List.length
+  end
 end
 
 module Helpers = struct
@@ -374,46 +384,26 @@ module Helpers = struct
 
   let pp_scenario fmt (action, next_actions) =
     let rec pp shift action fmt next_actions =
-      let shift_str = "|| " in
-      if shift then Format.fprintf fmt "%s " shift_str ;
       match next_actions with
       | [] ->
           Format.fprintf fmt "%a@." pp_action action ;
           if shift then Format.fprintf fmt "Wait"
       | (Parallel, next_action) :: actions ->
-          if shift then
-            Format.fprintf
-              fmt
-              "%a@.%a"
-              pp_action
-              action
-              (pp true next_action)
-              actions
-          else
-            Format.fprintf
-              fmt
-              "%a@.Wait@.%a"
-              pp_action
-              action
-              (pp true next_action)
-              actions
+          Format.fprintf
+            fmt
+            "P %a@.%a"
+            pp_action
+            action
+            (pp true next_action)
+            actions
       | (Sequential, next_action) :: actions ->
-          if shift then
-            Format.fprintf
-              fmt
-              "Wait@.%a@.%a@."
-              pp_action
-              action
-              (pp false next_action)
-              actions
-          else
-            Format.fprintf
-              fmt
-              "%a@.%a@."
-              pp_action
-              action
-              (pp false next_action)
-              actions
+          Format.fprintf
+            fmt
+            "S %a@.%a@."
+            pp_action
+            action
+            (pp false next_action)
+            actions
     in
     Format.fprintf fmt "%a" (pp false action) next_actions
 end
@@ -578,7 +568,14 @@ let run_scenario
             (function Ok () -> return_unit | Error err -> fail err)
             promises_running_seq
         in
-        run_actions action next_actions Seq_s.empty
+        if L.View.opened_files left = min lru_size (R.View.opened_files right)
+        then run_actions action next_actions Seq_s.empty
+        else
+          failwith
+            "Expected size of files table to be %d. Got %d (lru size is: %d)."
+            (R.View.opened_files right)
+            (L.View.opened_files left)
+            lru_size
     | (Parallel, action) :: next_actions ->
         (* We do not wait for promises to end and append them to the
            list of promises on-going. *)
