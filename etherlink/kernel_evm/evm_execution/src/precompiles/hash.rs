@@ -23,7 +23,7 @@ pub fn sha256_precompile<Host: Runtime>(
 ) -> Result<PrecompileOutcome, EthereumError> {
     log!(handler.borrow_host(), Debug, "Calling sha2-256 precompile");
     let estimated_ticks =
-        fail_if_too_much!(tick_model::ticks_of_sha256(input.len())?, handler);
+        fail_if_too_much!(tick_model::ticks_of_sha256(input.len()), handler);
 
     let size = input.len() as u64;
     let data_word_size = (31 + size) / 32;
@@ -62,7 +62,7 @@ pub fn ripemd160_precompile<Host: Runtime>(
         "Calling ripemd-160 precompile"
     );
     let estimated_ticks =
-        fail_if_too_much!(tick_model::ticks_of_ripemd160(input.len())?, handler);
+        fail_if_too_much!(tick_model::ticks_of_ripemd160(input.len()), handler);
 
     let size = input.len() as u64;
     let data_word_size = (31 + size) / 32;

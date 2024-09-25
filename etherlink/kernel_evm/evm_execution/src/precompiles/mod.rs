@@ -228,21 +228,17 @@ macro_rules! fail_if_too_much {
 }
 
 mod tick_model {
-    use crate::EthereumError;
-
-    pub fn ticks_of_sha256(data_size: usize) -> Result<u64, EthereumError> {
+    pub fn ticks_of_sha256(data_size: usize) -> u64 {
         let size = data_size as u64;
-        Ok(75_000 + 30_000 * (size.div_euclid(64)))
+        75_000 + 30_000 * (size.div_euclid(64))
     }
-    pub fn ticks_of_ripemd160(data_size: usize) -> Result<u64, EthereumError> {
+    pub fn ticks_of_ripemd160(data_size: usize) -> u64 {
         let size = data_size as u64;
-
-        Ok(70_000 + 20_000 * (size.div_euclid(64)))
+        70_000 + 20_000 * (size.div_euclid(64))
     }
-    pub fn ticks_of_identity(data_size: usize) -> Result<u64, EthereumError> {
+    pub fn ticks_of_identity(data_size: usize) -> u64 {
         let size = data_size as u64;
-
-        Ok(42_000 + 35 * size)
+        42_000 + 35 * size
     }
     pub fn ticks_of_withdraw() -> u64 {
         880_000

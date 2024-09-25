@@ -22,7 +22,7 @@ pub fn identity_precompile<Host: Runtime>(
 ) -> Result<PrecompileOutcome, EthereumError> {
     log!(handler.borrow_host(), Debug, "Calling identity precompile");
     let estimated_ticks =
-        fail_if_too_much!(tick_model::ticks_of_identity(input.len())?, handler);
+        fail_if_too_much!(tick_model::ticks_of_identity(input.len()), handler);
 
     let size = input.len() as u64;
     let data_word_size = (size + 31) / 32;
