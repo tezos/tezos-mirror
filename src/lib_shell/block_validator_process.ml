@@ -25,6 +25,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Context_ops_profiler = struct
+  include (val Profiler.wrap Environment_profiler.context_ops_profiler)
+end
+
 module Profiler = struct
   include (val Profiler.wrap Shell_profiling.block_validator_profiler)
 end
@@ -112,6 +116,16 @@ end
    This way, we avoid one pattern matching. *)
 type t =
   | E : {validator_process : (module S with type t = 'a); validator : 'a} -> t
+
+let[@warning "-32"] handle_reports = function
+  | Some (report, profiler_report) -> (
+      (match report with
+      | None -> ()
+      | Some report -> ( try Profiler.inc report with _ -> ())) ;
+      match profiler_report with
+      | None -> ()
+      | Some report -> ( try Context_ops_profiler.inc report with _ -> ()))
+  | _ -> ()
 
 (** The standard block validation method *)
 module Internal_validator_process = struct
@@ -201,7 +215,18 @@ module Internal_validator_process = struct
       (Block_validation.apply_result * Tezos_protocol_environment.Context.t)
       option;
     headless : Tezos_base.Profiler.instance;
+    profiler_headless : Tezos_base.Profiler.instance;
   }
+
+  let[@warning "-32"] headless_reports validator =
+    let report = Tezos_base.Profiler.report validator.headless in
+    (match report with
+    | None -> ()
+    | Some report -> ( try Profiler.inc report with _ -> ())) ;
+    let report = Tezos_base.Profiler.report validator.profiler_headless in
+    match report with
+    | None -> ()
+    | Some report -> ( try Context_ops_profiler.inc report with _ -> ())
 
   let init
       ({
@@ -217,9 +242,16 @@ module Internal_validator_process = struct
         Tezos_base_unix.Simple_profiler.headless
         Profiler.Detailed
     in
+    let profiler_headless =
+      Tezos_base.Profiler.instance
+        Tezos_base_unix.Simple_profiler.headless
+        Profiler.Detailed
+    in
     Tezos_base.Profiler.(plug main) headless ;
     Tezos_protocol_environment.Environment_profiler.Environment_profiler.plug
       headless ;
+    Tezos_protocol_environment.Environment_profiler.Context_ops_profiler.plug
+      profiler_headless ;
     return_ok
       {
         chain_store;
@@ -229,6 +261,7 @@ module Internal_validator_process = struct
         cache = None;
         preapply_result = None;
         headless;
+        profiler_headless;
       }
 
   let kind = Single_process
@@ -332,10 +365,6 @@ module Internal_validator_process = struct
         Events.(emit validation_success (block_hash, timespan))
       else Events.(emit application_success (block_hash, timespan))
     in
-    let report = Tezos_base.Profiler.report validator.headless in
-    (match report with
-    | None -> ()
-    | Some report -> ( try Profiler.inc report with _ -> ())) ;
     return result
 
   let preapply_block validator ~chain_id ~timestamp ~protocol_data ~live_blocks
@@ -392,10 +421,7 @@ module Internal_validator_process = struct
         operations
     in
     validator.preapply_result <- Some apply_result ;
-    let report = Tezos_base.Profiler.report validator.headless in
-    (match report with
-    | None -> ()
-    | Some report -> ( try Profiler.inc report with _ -> ())) ;
+    let () = (() [@profiler.custom headless_reports validator]) in
     return result
 
   let validate_block validator chain_store ~predecessor header _hash operations
@@ -438,10 +464,7 @@ module Internal_validator_process = struct
         header
         operations
     in
-    let report = Tezos_base.Profiler.report validator.headless in
-    (match report with
-    | None -> ()
-    | Some report -> ( try Profiler.inc report with _ -> ())) ;
+    let () = (() [@profiler.custom headless_reports validator]) in
     return res
 
   let context_garbage_collection _validator context_index context_hash
@@ -508,11 +531,9 @@ module External_validator_process = struct
           simulate;
         }
     in
-    let* res, report = send_request validator request in
-    (match report with
-    | None -> ()
-    | Some report -> ( try Profiler.inc report with _ -> ())) ;
-    return res
+    let* res = send_request validator request in
+    let () = (() [@profiler.custom handle_reports (snd res)]) in
+    return (fst res)
 
   let preapply_block validator ~chain_id ~timestamp ~protocol_data ~live_blocks
       ~live_operations ~predecessor_shell_header ~predecessor_hash
@@ -537,11 +558,9 @@ module External_validator_process = struct
           operations;
         }
     in
-    let* res, report = send_request validator request in
-    (match report with
-    | None -> ()
-    | Some report -> ( try Profiler.inc report with _ -> ())) ;
-    return res
+    let* res = send_request validator request in
+    let () = (() [@profiler.custom handle_reports (snd res)]) in
+    return (fst res)
 
   let validate_block validator chain_store ~predecessor header hash operations =
     let open Lwt_result_syntax in
@@ -563,11 +582,9 @@ module External_validator_process = struct
           hash;
         }
     in
-    let* res, report = send_request validator request in
-    (match report with
-    | None -> ()
-    | Some report -> ( try Profiler.inc report with _ -> ())) ;
-    return res
+    let* res = send_request validator request in
+    let () = (() [@profiler.custom handle_reports (snd res)]) in
+    return (fst res)
 
   let context_garbage_collection validator _index context_hash ~gc_lockfile_path
       =

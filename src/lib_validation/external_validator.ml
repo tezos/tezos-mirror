@@ -53,6 +53,7 @@ module Processing = struct
     cached_result :
       (Block_validation.apply_result * Context_ops.Environment_context.t) option;
     headless : Tezos_base.Profiler.instance;
+    profiler_headless : Tezos_base.Profiler.instance;
   }
 
   let load_protocol proto protocol_root =
@@ -113,17 +114,38 @@ module Processing = struct
         Tezos_base_unix.Simple_profiler.headless
         Profiler.Detailed
     in
+    let profiler_headless =
+      Tezos_base.Profiler.instance
+        Tezos_base_unix.Simple_profiler.headless
+        Profiler.Detailed
+    in
+
     Tezos_base.Profiler.(plug main) headless ;
     Tezos_protocol_environment.Environment_profiler.Environment_profiler.plug
       headless ;
-    return {context_index; cache = None; cached_result = None; headless}
+    Tezos_protocol_environment.Environment_profiler.Context_ops_profiler.plug
+      profiler_headless ;
+    return
+      {
+        context_index;
+        cache = None;
+        cached_result = None;
+        headless;
+        profiler_headless;
+      }
 
   let handle_request :
       type a.
       External_validation.parameters ->
       state ->
       a External_validation.request ->
-      [ `Continue of (a * Tezos_base.Profiler.report option) tzresult * state
+      [ `Continue of
+        (a
+        * (Tezos_base.Profiler.report option
+          * Tezos_base.Profiler.report option)
+          option)
+        tzresult
+        * state
       | `Stop ]
       Lwt.t =
    fun {
@@ -134,14 +156,17 @@ module Processing = struct
          operation_metadata_size_limit;
          _;
        }
-       {context_index; cache; cached_result; headless} ->
+       {context_index; cache; cached_result; headless; profiler_headless} ->
     let open Lwt_result_syntax in
     let continue res cache cached_result report =
       let res =
         match res with Error errs -> Error errs | Ok res -> Ok (res, report)
       in
       Lwt.return
-        (`Continue (res, {context_index; cache; cached_result; headless}))
+        (`Continue
+          ( res,
+            {context_index; cache; cached_result; headless; profiler_headless}
+          ))
     in
     function
     | Commit_genesis {chain_id} ->
@@ -226,11 +251,14 @@ module Processing = struct
                     cache;
                   } )
         in
-        Tezos_protocol_environment.Environment_profiler.Environment_profiler
-        .stop
-          () ;
+        let () = (() [@profiler.stop]) in
         let report = Tezos_base.Profiler.report headless in
-        continue block_application_result cache None report
+        let profiler_report = Tezos_base.Profiler.report profiler_headless in
+        continue
+          block_application_result
+          cache
+          None
+          (Some (report, profiler_report))
     | Preapply
         {
           chain_id;
@@ -296,9 +324,10 @@ module Processing = struct
               Lwt.return (Ok res, Some last_preapplied_context)
           | Error _ as err -> Lwt.return (err, None)
         in
-        Tezos_protocol_environment.Environment_profiler.stop () ;
+        let () = (() [@profiler.stop]) in
         let report = Tezos_base.Profiler.report headless in
-        continue res cache cachable_result report
+        let profiler_report = Tezos_base.Profiler.report profiler_headless in
+        continue res cache cachable_result (Some (report, profiler_report))
     | External_validation.Validate
         {
           chain_id;
@@ -344,11 +373,14 @@ module Processing = struct
                 header
                 operations)
         in
-        Tezos_protocol_environment.Environment_profiler.Environment_profiler
-        .stop
-          () ;
+        let () = (() [@profiler.stop]) in
         let report = Tezos_base.Profiler.report headless in
-        continue block_validate_result cache cached_result report
+        let profiler_report = Tezos_base.Profiler.report profiler_headless in
+        continue
+          block_validate_result
+          cache
+          cached_result
+          (Some (report, profiler_report))
     | External_validation.Fork_test_chain
         {chain_id; context_hash; forked_header} ->
         let*! context_opt = Context_ops.checkout context_index context_hash in
