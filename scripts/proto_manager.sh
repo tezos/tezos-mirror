@@ -765,7 +765,7 @@ function update_source() {
     #replace all code between '(* Start of alpha predecessor stitching. Used for automatic protocol snapshot *)' and '(* End of alpha predecessor stitching. Used for automatic protocol snapshot *)' with the content of prepare_first_block_patched in src/proto_alpha/lib_protocol/raw_context.ml
     perl -0777 -pe "s/${start_predecessor}.*${end_predecessor}/${escaped_prepare_first_block}/s" -i "src/proto_alpha/lib_protocol/init_storage.ml"
     ocamlformat -i "src/proto_alpha/lib_protocol/init_storage.ml"
-    commit "alpha: add ${capitalized_label} as Alpha previous protocol"
+    commit "Alpha: add ${capitalized_label} as Alpha previous protocol"
   fi
 
 }
@@ -1409,6 +1409,25 @@ function delete_protocol() {
   echo "Deletion done"
 }
 
+function update_files() {
+  for file in "$@"; do
+    log_blue "Update ${file}"
+    sed -i.old \
+      -e "s/${source_hash}/${long_hash}/g" \
+      -e "s/${source_short_hash}/${short_hash}/g" \
+      -e "s/proto_${protocol_source}/proto_${new_protocol_name}/g" \
+      -e "s/${capitalized_source}/${capitalized_label}/g" \
+      -e "s/${protocol_source}/${label}/g" \
+      -e "s/${capitalized_previous_tag}/${capitalized_new_tag}/g" \
+      -e "s/${previous_tag}/${new_tag}/g" \
+      -e "s/${previous_variant}/${new_variant}/g" \
+      "${file}"
+    if [[ "${file}" == *.ml || "${file}" == *.mli ]]; then
+      ocamlformat -i "${file}"
+    fi
+  done
+}
+
 function hash() {
 
   log_cyan "Computing hash"
@@ -1442,6 +1461,23 @@ function hash() {
   else
     is_snapshot=true
   fi
+
+  # set current version
+  # Starting from 018 the version value moved to `constants_repr`. To be
+  # able to snapshot older protocol the `raw_context` file is kept even
+  # if it is not strictly needed anymore.
+  echo "Setting current version in raw_context and proxy"
+
+  if [[ ${is_snapshot} == true ]]; then
+    sed -i.old.old -e "s/${previous_variant}/${new_variant}/g" \
+      -e "s/${previous_tag}/${new_tag}/g" \
+      "src/proto_${protocol_source}/lib_protocol/constants_repr.ml" \
+      "src/proto_${protocol_source}/lib_protocol/raw_context.ml" \
+      "src/proto_${protocol_source}/lib_protocol/raw_context.mli" \
+      "src/proto_${protocol_source}/lib_client/proxy.ml" \
+      "src/proto_${protocol_source}/lib_protocol/init_storage.ml"
+  fi
+  commit_no_hooks_if_changes "src: set current version"
 
   long_hash=$(./octez-protocol-compiler -hash-only "src/proto_${protocol_source}/lib_protocol")
   short_hash=$(echo "${long_hash}" | head -c 8)
@@ -1495,6 +1531,7 @@ function hash() {
       echo "Press y to continue or n to stop"
       read -r continue
       if [[ ${continue} != "y" ]]; then
+        rm -rf proto_to_hash.txt
         print_and_exit 1 "${LINENO}"
       else
         echo "Continuing with the current hash"
@@ -1535,7 +1572,6 @@ function hash() {
     new_tezos_protocol="${version}"
     new_versioned_name="${label}"
     cd "src/proto_${new_protocol_name}"
-
   fi
 
   cd lib_protocol
@@ -1621,13 +1657,9 @@ function hash() {
     "src/proto_alpha/lib_protocol/raw_context.ml" \
     "src/proto_alpha/lib_protocol/raw_context.mli" \
     "src/proto_alpha/lib_protocol/init_storage.ml"; do
-    log_blue "Update ${file}"
-    sed -i.old \
-      -e "s/${capitalized_source}/${capitalized_label}/g" \
-      -e "s/${protocol_source}/${label}/g" -i.old "${file}"
-    ocamlformat -i "${file}"
+    update_files "${file}"
   done
-  commit_if_changes "alpha: add ${capitalized_label} as Alpha previous protocol"
+  commit_if_changes "Alpha: add ${capitalized_label} as Alpha previous protocol"
 
   sed -i.old -e "s/${protocol_source}/${new_protocol_name}/g" \
     -e "s/${previous_tag}/${new_tag}/g" \
@@ -1635,15 +1667,7 @@ function hash() {
   commit_if_changes "tezt: update protocol tag in alcotezt"
 
   sed -e "s/${capitalized_source} -> \"P[ts].*\"/${capitalized_label} -> \"${long_hash}\"/g" -i.old tezt/lib_tezos/protocol.ml
-  sed -i.old \
-    -e "s/${source_hash}/${long_hash}/g" \
-    -e "s/proto_${protocol_source}/proto_${new_protocol_name}/g" \
-    -e "s/${capitalized_source}/${capitalized_label}/g" \
-    -e "s/${protocol_source}/${label}/g" tezt/lib_tezos/protocol.ml \
-    -e "s/${capitalized_previous_tag}/${capitalized_new_tag}/g" \
-    -e "s/${previous_tag}/${new_tag}/g" \
-    -e "s/${previous_variant}/${new_variant}/g" \
-    "tezt/lib_tezos/protocol.ml" "tezt/lib_tezos/protocol.mli"
+  update_files "tezt/lib_tezos/protocol.ml" "tezt/lib_tezos/protocol.mli"
   ocamlformat -i tezt/lib_tezos/protocol.ml
   ocamlformat -i tezt/lib_tezos/protocol.mli
   commit_if_changes "tezt: adapt lib_tezos/protocol.ml"
@@ -1685,7 +1709,7 @@ function hash() {
 
   # shellcheck disable=SC2001
   find . -type f -name "*${regression_source_name}*.out" | while read -r FILE; do
-    NEW_FILENAME=$(echo "${FILE}" | sed "s/${regression_source_name}/${regression_protocol_name}/g")
+    NEW_FILENAME=$(echo "${FILE}" | sed "s/${capitalized_previous_tag}/${capitalized_new_tag}/g")
 
     # Create the directory structure for the new file if it doesn't exist
     mkdir -p "$(dirname "${NEW_FILENAME}")"
@@ -1700,12 +1724,8 @@ function hash() {
       git mv "${FILE}" "${NEW_FILENAME}"
     fi
 
-    if [[ "${is_snapshot}" == true ]]; then
-      sed -i.old -e "s/proto_${protocol_source}/proto_${version}-${short_hash}/g" "${NEW_FILENAME}"
-      sed -i.old -e "s/${tezos_protocol_source}/${version}-${short_hash}/g" "${NEW_FILENAME}"
-    fi
-    #replace all occurences of old hash with new hash
-    sed -i.old -e "s/${source_hash}/${long_hash}/g" "${NEW_FILENAME}"
+    update_files "${NEW_FILENAME}"
+
   done
   commit_if_changes "tezt: move ${protocol_source} regression files"
 
@@ -1733,20 +1753,10 @@ function hash() {
     commit_if_changes "kaitai: update structs"
   fi
 
-  sed -i.old \
-    -e "s/${source_hash}/${long_hash}/g" \
-    -e "s/${source_short_hash}/${short_hash}/g" \
-    src/bin_client/octez-init-sandboxed-client.sh
+  update_files src/bin_client/octez-init-sandboxed-client.sh
   commit_no_hooks_if_changes "sandbox: update octez-activate-${label} command to client sandbox"
 
-  sed -i.old \
-    -e "s/${source_hash}/${long_hash}/g" \
-    -e "s/${source_short_hash}/${short_hash}/g" \
-    -e "s/proto_${protocol_source}/proto_${new_protocol_name}/g" \
-    -e "s/${capitalized_source}/${capitalized_label}/g" \
-    -e "s/${protocol_source}/${label}/g" \
-    -e "s/${previous_variant}/${new_variant}/g" \
-    devtools/testnet_experiment_tools/testnet_experiment_tools.ml
+  update_files devtools/testnet_experiment_tools/testnet_experiment_tools.ml
   ocamlformat -i devtools/testnet_experiment_tools/testnet_experiment_tools.ml
   commit_if_changes "devtools: update testnet_experiment_tools"
 
@@ -1814,7 +1824,7 @@ function hash() {
   make -C docs "${label}"/rpc.rst
   commit_if_changes "docs: generate ${label}/rpc.rst"
 
-  make -C docs openapi
+  make -C docs openapi || log_blue "OpenAPI files updated"
   rm -rf openapi-tmp
   commit_if_changes "docs: generate openapi"
 
