@@ -765,7 +765,7 @@ function update_source() {
     #replace all code between '(* Start of alpha predecessor stitching. Used for automatic protocol snapshot *)' and '(* End of alpha predecessor stitching. Used for automatic protocol snapshot *)' with the content of prepare_first_block_patched in src/proto_alpha/lib_protocol/raw_context.ml
     perl -0777 -pe "s/${start_predecessor}.*${end_predecessor}/${escaped_prepare_first_block}/s" -i "src/proto_alpha/lib_protocol/init_storage.ml"
     ocamlformat -i "src/proto_alpha/lib_protocol/init_storage.ml"
-    commit "alpha: add ${capitalized_label} as Alpha previous protocol"
+    commit "Alpha: add ${capitalized_label} as Alpha previous protocol"
   fi
 
 }
@@ -1478,6 +1478,7 @@ function hash() {
       "src/proto_${protocol_source}/lib_protocol/init_storage.ml"
   fi
   commit_no_hooks_if_changes "src: set current version"
+
   long_hash=$(./octez-protocol-compiler -hash-only "src/proto_${protocol_source}/lib_protocol")
   short_hash=$(echo "${long_hash}" | head -c 8)
   log_magenta "Known hash is: ${source_hash}"
@@ -1530,6 +1531,7 @@ function hash() {
       echo "Press y to continue or n to stop"
       read -r continue
       if [[ ${continue} != "y" ]]; then
+        rm -rf proto_to_hash.txt
         print_and_exit 1 "${LINENO}"
       else
         echo "Continuing with the current hash"
@@ -1570,7 +1572,6 @@ function hash() {
     new_tezos_protocol="${version}"
     new_versioned_name="${label}"
     cd "src/proto_${new_protocol_name}"
-
   fi
 
   cd lib_protocol
@@ -1658,7 +1659,7 @@ function hash() {
     "src/proto_alpha/lib_protocol/init_storage.ml"; do
     update_files "${file}"
   done
-  commit_if_changes "alpha: add ${capitalized_label} as Alpha previous protocol"
+  commit_if_changes "Alpha: add ${capitalized_label} as Alpha previous protocol"
 
   sed -i.old -e "s/${protocol_source}/${new_protocol_name}/g" \
     -e "s/${previous_tag}/${new_tag}/g" \
@@ -1708,7 +1709,7 @@ function hash() {
 
   # shellcheck disable=SC2001
   find . -type f -name "*${regression_source_name}*.out" | while read -r FILE; do
-    NEW_FILENAME=$(echo "${FILE}" | sed "s/${regression_source_name}/${regression_protocol_name}/g")
+    NEW_FILENAME=$(echo "${FILE}" | sed "s/${capitalized_previous_tag}/${capitalized_new_tag}/g")
 
     # Create the directory structure for the new file if it doesn't exist
     mkdir -p "$(dirname "${NEW_FILENAME}")"
@@ -1823,7 +1824,7 @@ function hash() {
   make -C docs "${label}"/rpc.rst
   commit_if_changes "docs: generate ${label}/rpc.rst"
 
-  make -C docs openapi
+  make -C docs openapi || log_blue "OpenAPI files updated"
   rm -rf openapi-tmp
   commit_if_changes "docs: generate openapi"
 
