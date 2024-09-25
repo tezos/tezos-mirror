@@ -104,6 +104,7 @@ let init_constants ?(default = Test) ?(reward_per_block = 0L)
           attesting_reward_weight = 0;
           seed_nonce_revelation_tip_weight = 0;
           vdf_revelation_tip_weight = 0;
+          dal_rewards_weight = 0;
         }
   --> set S.liquidity_baking_subsidy Tez.zero
   --> set S.minimal_block_delay Protocol.Alpha_context.Period.one_minute

@@ -1162,6 +1162,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
                  attesting_reward_weight;
                  seed_nonce_revelation_tip_weight;
                  vdf_revelation_tip_weight;
+                 dal_rewards_weight;
                }
                 : Previous.issuance_weights) =
             c.issuance_weights
@@ -1173,6 +1174,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             attesting_reward_weight;
             seed_nonce_revelation_tip_weight;
             vdf_revelation_tip_weight;
+            dal_rewards_weight;
           }
         in
         let constants =
@@ -1465,6 +1467,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             attesting_reward_weight;
             seed_nonce_revelation_tip_weight;
             vdf_revelation_tip_weight;
+            dal_rewards_weight = 0;
           }
         in
         let constants =

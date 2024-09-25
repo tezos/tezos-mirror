@@ -312,6 +312,7 @@ let test_unrevealed () =
           baking_reward_fixed_portion_weight = 0;
           seed_nonce_revelation_tip_weight = 0;
           vdf_revelation_tip_weight = 0;
+          dal_rewards_weight = 0;
         };
       consensus_threshold = 0;
       minimal_participation_ratio = Ratio.{numerator = 0; denominator = 1};

@@ -125,7 +125,7 @@ module Generated : sig
 
   (* This function is meant to be used just in lib_parameters and in the
      migration code to be sure that the parameters are consistent. *)
-  val generate : consensus_committee_size:int -> t
+  val generate : consensus_committee_size:int -> dal_rewards_ratio:Q.t -> t
 end
 
 (** For each subcache, a size limit needs to be declared once. However,

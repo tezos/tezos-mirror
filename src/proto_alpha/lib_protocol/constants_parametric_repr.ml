@@ -243,6 +243,7 @@ type issuance_weights = {
   attesting_reward_weight : int;
   seed_nonce_revelation_tip_weight : int;
   vdf_revelation_tip_weight : int;
+  dal_rewards_weight : int;
 }
 
 type t = {
@@ -526,6 +527,7 @@ let issuance_weights_encoding =
             attesting_reward_weight;
             seed_nonce_revelation_tip_weight;
             vdf_revelation_tip_weight;
+            dal_rewards_weight;
           } :
            issuance_weights) ->
       ( base_total_issued_per_minute,
@@ -533,13 +535,15 @@ let issuance_weights_encoding =
         baking_reward_bonus_weight,
         attesting_reward_weight,
         seed_nonce_revelation_tip_weight,
-        vdf_revelation_tip_weight ))
+        vdf_revelation_tip_weight,
+        dal_rewards_weight ))
     (fun ( base_total_issued_per_minute,
            baking_reward_fixed_portion_weight,
            baking_reward_bonus_weight,
            attesting_reward_weight,
            seed_nonce_revelation_tip_weight,
-           vdf_revelation_tip_weight ) ->
+           vdf_revelation_tip_weight,
+           dal_rewards_weight ) ->
       {
         base_total_issued_per_minute;
         baking_reward_fixed_portion_weight;
@@ -547,14 +551,16 @@ let issuance_weights_encoding =
         attesting_reward_weight;
         seed_nonce_revelation_tip_weight;
         vdf_revelation_tip_weight;
+        dal_rewards_weight;
       })
-    (obj6
+    (obj7
        (req "base_total_issued_per_minute" Tez_repr.encoding)
        (req "baking_reward_fixed_portion_weight" int31)
        (req "baking_reward_bonus_weight" int31)
        (req "attesting_reward_weight" int31)
        (req "seed_nonce_revelation_tip_weight" int31)
-       (req "vdf_revelation_tip_weight" int31))
+       (req "vdf_revelation_tip_weight" int31)
+       (req "dal_rewards_weight" int31))
 
 let encoding =
   let open Data_encoding in

@@ -174,10 +174,13 @@ let constants_mainnet : Constants.Parametric.t =
               attesting_reward_weight;
               seed_nonce_revelation_tip_weight;
               vdf_revelation_tip_weight;
+              dal_rewards_weight;
             };
           max_slashing_threshold;
         } =
-    Constants.Generated.generate ~consensus_committee_size
+    Constants.Generated.generate
+      ~consensus_committee_size
+      ~dal_rewards_ratio:default_dal.rewards_ratio
   in
   let dal_activation_level =
     if default_dal.feature_enable then Raw_level.succ Raw_level.root
@@ -243,6 +246,8 @@ let constants_mainnet : Constants.Parametric.t =
         (* 1/20480 of block rewards *)
         vdf_revelation_tip_weight;
         (* 1/20480 of block rewards *)
+        dal_rewards_weight;
+        (* 0 for now *)
       };
     hard_storage_limit_per_operation = Z.of_int 60_000;
     cost_per_byte = Tez.of_mutez_exn 250L;
@@ -339,7 +344,9 @@ let constants_sandbox =
   let block_time = 1 in
   let Constants.Generated.
         {max_slashing_threshold; consensus_threshold = _; issuance_weights} =
-    Constants.Generated.generate ~consensus_committee_size
+    Constants.Generated.generate
+      ~consensus_committee_size
+      ~dal_rewards_ratio:default_dal.rewards_ratio
   in
   {
     constants_mainnet with
@@ -375,7 +382,9 @@ let constants_test =
   let consensus_committee_size = 67 in
   let Constants.Generated.
         {max_slashing_threshold = _; consensus_threshold; issuance_weights} =
-    Constants.Generated.generate ~consensus_committee_size
+    Constants.Generated.generate
+      ~consensus_committee_size
+      ~dal_rewards_ratio:default_dal.rewards_ratio
   in
   {
     constants_mainnet with
