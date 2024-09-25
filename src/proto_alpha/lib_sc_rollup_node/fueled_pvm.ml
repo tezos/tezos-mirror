@@ -175,11 +175,14 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
                Sc_rollup.Dal_parameters.encoding
                dal_parameters)
     in
-    let eval_tick fuel failing_ticks state =
+    let eval_tick_consume_fuel fuel failing_ticks state =
       let max_steps = F.max_ticks fuel in
-      let normal_eval ?(max_steps = max_steps) state =
+      let normal_eval ?(max_steps = max_steps) state fuel =
         Lwt.catch
           (fun () ->
+            (* This call to the PVM implementation of [eval_many] should never return running more
+               ticks than the given [max_steps] ticks. If it were to happen, this is a security issue,
+               and should be reported as such. *)
             let*! state, executed_ticks =
               PVM.eval_many
                 ~reveal_builtins
@@ -188,12 +191,27 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
                 ~is_reveal_enabled
                 state
             in
-            return (state, executed_ticks, failing_ticks))
+            let* remaining_fuel =
+              match F.consume (F.of_ticks executed_ticks) fuel with
+              | None ->
+                  tzfail
+                  @@ Rollup_node_errors.PVM_eval_too_many_ticks
+                       {max_given = max_steps; executed = executed_ticks}
+              | Some remaining_fuel -> Lwt_result.return remaining_fuel
+            in
+            return (state, executed_ticks, failing_ticks, remaining_fuel))
           (function
             | Error_wrapper error -> Lwt.return (Error error)
             | exn -> Lwt.reraise exn)
       in
-      let failure_insertion_eval state tick failing_ticks' =
+      let normal_eval_wrapper ?(max_steps = max_steps) state fuel one_step_eval
+          =
+        let>* state, xticks, fticks, remaining_fuel =
+          normal_eval ~max_steps state fuel
+        in
+        return (state, xticks, fticks, remaining_fuel, one_step_eval)
+      in
+      let failure_insertion_eval state tick =
         let*! () =
           Interpreter_event.intended_failure
             ~level
@@ -202,29 +220,21 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
             ~internal:true
         in
         let*! state = PVM.Internal_for_tests.insert_failure state in
-        return (state, 1L, failing_ticks')
+        return state
       in
       match failing_ticks with
       | xtick :: failing_ticks' ->
+          let one_step_eval state = failure_insertion_eval state xtick in
           let jump = Int64.(max 0L (pred xtick)) in
           if Compare.Int64.(jump = 0L) then
             (* Insert the failure in the first tick. *)
-            failure_insertion_eval state xtick failing_ticks'
+            return (state, xtick, failing_ticks', fuel, Some one_step_eval)
           else
             (* Jump just before the tick where we'll insert a failure.
                Nevertheless, we don't execute more than [max_steps]. *)
             let max_steps = Int64.max 0L max_steps |> Int64.min max_steps in
-            let open Delayed_write_monad.Lwt_result_syntax in
-            let>* state, executed_ticks, _failing_ticks =
-              normal_eval ~max_steps state
-            in
-            (* Insert the failure. *)
-            let>* state, executed_ticks', failing_ticks' =
-              failure_insertion_eval state xtick failing_ticks'
-            in
-            let executed_ticks = Int64.add executed_ticks executed_ticks' in
-            return (state, executed_ticks, failing_ticks')
-      | _ -> normal_eval state
+            normal_eval_wrapper ~max_steps state fuel (Some one_step_eval)
+      | _ -> normal_eval_wrapper state fuel None
     in
     let abort (state : PVM.tree) fuel current_tick =
       let state = PVM.Ctxt_wrapper.to_node_pvmstate state in
@@ -239,65 +249,72 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
       match input_request with
       | No_input_required when F.is_empty fuel -> abort state fuel current_tick
       | No_input_required -> (
-          let>* next_state, executed_ticks, failing_ticks =
-            eval_tick fuel failing_ticks state
+          let>* state, executed_ticks, failing_ticks, fuel, one_step_advancement
+              =
+            eval_tick_consume_fuel fuel failing_ticks state
           in
-          let fuel_executed = F.of_ticks executed_ticks in
-          match F.consume fuel_executed fuel with
-          | None -> abort state fuel current_tick
-          | Some fuel ->
-              go
-                fuel
-                (Int64.add current_tick executed_ticks)
-                failing_ticks
-                next_state)
+          let tick_after_eval_consume = Int64.add current_tick executed_ticks in
+          match one_step_advancement with
+          | None -> go fuel tick_after_eval_consume failing_ticks state
+          | Some one_step_eval -> (
+              let>* state = one_step_eval state in
+              match F.consume F.one_tick_consumption fuel with
+              | None -> abort state fuel tick_after_eval_consume
+              | Some fuel ->
+                  go
+                    fuel
+                    (Int64.succ tick_after_eval_consume)
+                    failing_ticks
+                    state))
       | Needs_reveal (Reveal_raw_data hash) -> (
-          let* data =
-            get_reveal
-              ~dac_client:node_ctxt.dac_client
-              ~pre_images_endpoint:node_ctxt.config.pre_images_endpoint
-              ~data_dir:node_ctxt.data_dir
-              ~pvm_kind:node_ctxt.kind
-              reveal_map
-              hash
-          in
-          let*! next_state = PVM.set_input (Reveal (Raw_data data)) state in
           match F.consume F.one_tick_consumption fuel with
           | None -> abort state fuel current_tick
           | Some fuel ->
+              let* data =
+                get_reveal
+                  ~dac_client:node_ctxt.dac_client
+                  ~pre_images_endpoint:node_ctxt.config.pre_images_endpoint
+                  ~data_dir:node_ctxt.data_dir
+                  ~pvm_kind:node_ctxt.kind
+                  reveal_map
+                  hash
+              in
+              let*! next_state = PVM.set_input (Reveal (Raw_data data)) state in
               go fuel (Int64.succ current_tick) failing_ticks next_state)
       | Needs_reveal Reveal_metadata -> (
-          let*! next_state = PVM.set_input (Reveal (Metadata metadata)) state in
           match F.consume F.one_tick_consumption fuel with
           | None -> abort state fuel current_tick
           | Some fuel ->
+              let*! next_state =
+                PVM.set_input (Reveal (Metadata metadata)) state
+              in
               go fuel (Int64.succ current_tick) failing_ticks next_state)
       | Needs_reveal (Request_dal_page page_id) -> (
-          let* content_opt =
-            Dal_pages_request.page_content
-              constants.dal
-              ~inbox_level:(Int32.of_int level)
-              ~dal_activation_level
-              ~dal_attested_slots_validity_lag
-              node_ctxt
-              page_id
-          in
-          let*! next_state =
-            PVM.set_input (Reveal (Dal_page content_opt)) state
-          in
           match F.consume F.one_tick_consumption fuel with
           | None -> abort state fuel current_tick
           | Some fuel ->
+              let* content_opt =
+                Dal_pages_request.page_content
+                  constants.dal
+                  ~inbox_level:(Int32.of_int level)
+                  ~dal_activation_level
+                  ~dal_attested_slots_validity_lag
+                  node_ctxt
+                  page_id
+              in
+              let*! next_state =
+                PVM.set_input (Reveal (Dal_page content_opt)) state
+              in
               go fuel (Int64.succ current_tick) failing_ticks next_state)
       | Needs_reveal Reveal_dal_parameters -> (
           (* TODO: https://gitlab.com/tezos/tezos/-/issues/6562
              Consider supporting revealing of historical DAL parameters. *)
-          let*! next_state =
-            PVM.set_input (Reveal (Dal_parameters dal_parameters)) state
-          in
           match F.consume F.one_tick_consumption fuel with
           | None -> abort state fuel current_tick
           | Some fuel ->
+              let*! next_state =
+                PVM.set_input (Reveal (Dal_parameters dal_parameters)) state
+              in
               go fuel (Int64.succ current_tick) failing_ticks next_state)
       | Initial | First_after _ ->
           complete state fuel current_tick failing_ticks
@@ -342,7 +359,6 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
     | Aborted {state; fuel; _} ->
         return (Feed_input_aborted {state; fuel; fed_input = false})
     | Completed {state; fuel; current_tick = tick; failing_ticks} -> (
-        let open Delayed_write_monad.Lwt_result_syntax in
         match F.consume F.one_tick_consumption fuel with
         | None -> return (Feed_input_aborted {state; fuel; fed_input = false})
         | Some fuel -> (

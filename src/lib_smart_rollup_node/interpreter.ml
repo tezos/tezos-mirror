@@ -129,6 +129,7 @@ let transition_pvm (module Plugin : Protocol_plugin_sig.PARTIAL) node_ctxt ctxt
   let* predecessor_state =
     state_of_head (module Plugin) node_ctxt ctxt predecessor
   in
+  let*! initial_tick = Plugin.Pvm.get_tick node_ctxt.kind predecessor_state in
   let* eval_result =
     Plugin.Pvm.Fueled.Free.eval_block_inbox
       ~fuel:(Fuel.Free.of_ticks 0L)
@@ -144,7 +145,6 @@ let transition_pvm (module Plugin : Protocol_plugin_sig.PARTIAL) node_ctxt ctxt
     Delayed_write_monad.apply node_ctxt eval_result
   in
   let*! ctxt = Context.PVMState.set ctxt state in
-  let*! initial_tick = Plugin.Pvm.get_tick node_ctxt.kind predecessor_state in
   (* Produce events. *)
   let*! () =
     Interpreter_event.transitioned_pvm inbox_level state_hash tick num_messages
