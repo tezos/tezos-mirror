@@ -474,6 +474,30 @@ let send_messages_batcher ?rpc_hooks ?batch_size n client sc_node =
   let* () = Client.bake_for_and_wait client in
   return (List.rev rids)
 
+(** Regression test to ensure rollup node store schema does not change without a
+    migration. *)
+let test_store_schema_regression =
+  test_full_scenario
+    ~regression:true
+    {
+      variant = None;
+      tags = ["store"; "schema"];
+      description = "Rollup node: regression on store schema";
+    }
+    ~kind:"wasm_2_0_0"
+  @@ fun _protocol sc_rollup_node sc_rollup _node _client ->
+  let* () = Sc_rollup_node.run sc_rollup_node sc_rollup [] in
+  let sqlite, out =
+    Process.spawn_with_stdin
+      "sqlite3"
+      [Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) "store.sqlite"]
+  in
+  let* () = Lwt_io.write out ".schema\n" in
+  let* () = Lwt_io.write out ".exit\n" in
+  let* schema = Process.check_and_read_stdout sqlite in
+  Regression.capture ~eol:false schema ;
+  unit
+
 (* Synchronizing the inbox in the rollup node
    ------------------------------------------
 
@@ -6395,6 +6419,7 @@ let register ~protocols =
 
 let register_protocol_independent () =
   let protocols = Protocol.[Alpha] in
+  test_store_schema_regression protocols ;
   let with_kind kind =
     test_rollup_node_running ~kind protocols ;
     test_rollup_node_boots_into_initial_state protocols ~kind ;
