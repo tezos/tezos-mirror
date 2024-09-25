@@ -69,6 +69,30 @@ let with_transaction store k =
 module Types = struct
   let level = int32
 
+  let feed input =
+    let length = String.length input in
+    fun pos buf ->
+      let size = min (Bytes.length buf) (length - !pos) in
+      Bytes.blit_string input !pos buf 0 size ;
+      pos := !pos + size ;
+      size
+
+  let output res buf n = Buffer.add_subbytes res buf 0 n
+
+  let compress ?level s =
+    let compressed = Buffer.create 1024 in
+    Zlib.compress ?level ~header:false (feed s (ref 0)) (output compressed) ;
+    Buffer.contents compressed
+
+  let decompress input =
+    let uncompressed = Buffer.create 1_024 in
+    try
+      Zlib.uncompress ~header:false (feed input (ref 0)) (output uncompressed) ;
+      Ok (Buffer.contents uncompressed)
+    with Zlib.Error (func, msg) ->
+      let message = Format.asprintf "in %s: %s" func msg in
+      Error message
+
   let from_encoding ~name encoding =
     custom
       ~encode:(fun v ->
@@ -79,6 +103,29 @@ module Types = struct
                 name
                 Data_encoding.Binary.pp_write_error))
       ~decode:(fun s ->
+        Data_encoding.Binary.of_string encoding s
+        |> Result.map_error
+             (Format.asprintf
+                "Fail to decode %s in database: %a"
+                name
+                Data_encoding.Binary.pp_read_error))
+      octets
+
+  let from_encoding_compressed ~name encoding =
+    custom
+      ~encode:(fun v ->
+        match Data_encoding.Binary.to_string encoding v with
+        | Error e ->
+            Error
+              (Format.asprintf
+                 "Fail to encode %s for database: %a"
+                 name
+                 Data_encoding.Binary.pp_write_error
+                 e)
+        | Ok s -> Ok (compress s))
+      ~decode:(fun s ->
+        let open Result_syntax in
+        let* s = decompress s in
         Data_encoding.Binary.of_string encoding s
         |> Result.map_error
              (Format.asprintf
@@ -164,7 +211,7 @@ module Types = struct
     from_encoding ~name:"Inbox.history_proof" Inbox.history_proof_encoding
 
   let messages_list =
-    from_encoding
+    from_encoding_compressed
       ~name:"message list"
       Data_encoding.(list @@ dynamic_size (Variable.string' Hex))
 
