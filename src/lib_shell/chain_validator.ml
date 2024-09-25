@@ -91,7 +91,6 @@ module Types = struct
        with a known head. Because the chain validator does not handle
        directly these messages, this is done through callbacks. *)
     synchronisation_state : Synchronisation_heuristic.Bootstrapping.t;
-    valid_block_input : Store.Block.t Lwt_watcher.input;
     new_head_input : (Block_hash.t * Block_header.t) Lwt_watcher.input;
     mutable child : (state * (unit -> unit Lwt.t (* shutdown *))) option;
     prevalidator : Prevalidator.t option ref;
@@ -160,14 +159,6 @@ let check_and_update_synchronisation_state w (hash, block) peer_id : unit Lwt.t
 (* Called for every validated block. *)
 let notify_new_block w peer {Block_validator.block; _} =
   let nv = Worker.state w in
-  Option.iter
-    (fun id ->
-      List.assoc ~equal:Chain_id.equal id (Worker.list table)
-      |> Option.iter (fun w ->
-             let nv = Worker.state w in
-             Lwt_watcher.notify nv.valid_block_input block))
-    nv.parameters.parent ;
-  Lwt_watcher.notify nv.valid_block_input block ;
   Lwt_watcher.notify nv.parameters.global_valid_block_input block ;
   Worker.Queue.push_request_now w (Validated {peer; block})
 
@@ -270,7 +261,6 @@ let may_switch_test_chain w active_chains spawn_child chain_store block =
                     Lwt_watcher.notify
                       nv.parameters.global_valid_block_input
                       new_genesis_block ;
-                    Lwt_watcher.notify nv.valid_block_input new_genesis_block ;
                     return testchain_store
                 | Error
                     (Block_validator_errors.Missing_test_protocol
@@ -806,7 +796,6 @@ type launch_error = error trace
 let on_launch w _ parameters =
   let open Lwt_result_syntax in
   let* () = may_load_protocols parameters in
-  let valid_block_input = Lwt_watcher.create_input () in
   let new_head_input = Lwt_watcher.create_input () in
   let notify_branch peer_id locator =
     Worker.Queue.push_request_now w (Notify_branch (peer_id, locator))
@@ -858,7 +847,6 @@ let on_launch w _ parameters =
     {
       parameters;
       chain_db;
-      valid_block_input;
       new_head_input;
       synchronisation_state;
       active_peers = P2p_peer.Error_table.create 50;
@@ -1049,10 +1037,6 @@ let force_bootstrapped w b =
   Synchronisation_heuristic.Bootstrapping.force_bootstrapped
     state.synchronisation_state
     b
-
-let valid_block_watcher w =
-  let {valid_block_input; _} = Worker.state w in
-  Lwt_watcher.create_stream valid_block_input
 
 let new_head_watcher w =
   let {new_head_input; _} = Worker.state w in
