@@ -122,7 +122,9 @@ module Network = struct
     match network with
     | Sandbox -> Lwt.return 1
     | Testnet _ ->
-        let* json = RPC_core.call endpoint (RPC.get_chain_block_header ()) in
+        let* json =
+          RPC_core.call endpoint (RPC.get_chain_block_header_shell ())
+        in
         JSON.(json |-> "level" |> as_int) |> Lwt.return
 
   let expected_pow = function Testnet _ -> 26. | Sandbox -> 0.
@@ -493,7 +495,7 @@ end
 type configuration = {
   stake : int list;
   stake_machine_type : string list option;
-  dal_node_producer : int;
+  dal_node_producers : int;
   observer_slot_indices : int list;
   protocol : Protocol.t;
   producer_machine_type : string option;
@@ -601,6 +603,11 @@ type t = {
   configuration : configuration;
   cloud : Cloud.t;
   bootstrap : bootstrap;
+  some_node_rpc_endpoint : Endpoint.t;
+  (* endpoint to be used for get various information about L1; for testnets, it
+     is a public endpoint only if no L1 node is run by the scenario, in contrast
+     to [bootstrap.node_rpp_endpoint] which is a public endpoint when the
+     '--bootstrap' argument is not provided *)
   bakers : baker list;
   producers : producer list;
   observers : observer list;
@@ -756,7 +763,7 @@ let update_expected_published_commitments t metrics =
       (* -1 since we are looking at level n operation submitted at the previous
          level. *)
       let producers =
-        min t.configuration.dal_node_producer t.parameters.number_of_slots
+        min t.configuration.dal_node_producers t.parameters.number_of_slots
       in
       metrics.expected_published_commitments + producers
 
@@ -776,7 +783,7 @@ let update_ratio_published_commitments_last_level t per_level_info metrics =
   | None -> 0.
   | Some _ ->
       let producers =
-        min t.configuration.dal_node_producer t.parameters.number_of_slots
+        min t.configuration.dal_node_producers t.parameters.number_of_slots
       in
       if producers = 0 then 100.
       else
@@ -931,13 +938,14 @@ let get_metrics t infos_per_level metrics =
     ratio_attested_commitments_per_baker;
   }
 
-let get_infos_per_level client ~level =
+let get_infos_per_level endpoint ~level =
   let block = string_of_int level in
-  let* header = Client.RPC.call client @@ RPC.get_chain_block_header ~block ()
+  let* header =
+    RPC_core.call endpoint @@ RPC.get_chain_block_header_shell ~block ()
   and* metadata =
-    Client.RPC.call client @@ RPC.get_chain_block_metadata_raw ~block ()
+    RPC_core.call endpoint @@ RPC.get_chain_block_metadata_raw ~block ()
   and* operations =
-    Client.RPC.call client @@ RPC.get_chain_block_operations ~block ()
+    RPC_core.call endpoint @@ RPC.get_chain_block_operations ~block ()
   in
   let level = JSON.(header |-> "level" |> as_int) in
   let attested_commitments =
@@ -1166,7 +1174,7 @@ let init_testnet cloud (configuration : configuration) teztale agent
   let* producer_accounts =
     Client.stresstest_gen_keys
       ~alias_prefix:"dal_producer"
-      configuration.dal_node_producer
+      configuration.dal_node_producers
       bootstrap.client
   in
   let () = toplog "Funding the producer accounts" in
@@ -1233,7 +1241,7 @@ let init_testnet cloud (configuration : configuration) teztale agent
   Lwt.return
     (bootstrap, baker_accounts, producer_accounts, etherlink_rollup_operator_key)
 
-let init_bootstrap_and_activate_protocol cloud (configuration : configuration)
+let init_sandbox_and_activate_protocol cloud (configuration : configuration)
     agent =
   let dal_bootstrap_node_net_port = Agent.next_available_port agent in
   let dal_config : Cryptobox.Config.t =
@@ -1276,7 +1284,7 @@ let init_bootstrap_and_activate_protocol cloud (configuration : configuration)
   let* producer_accounts =
     Client.stresstest_gen_keys
       ~alias_prefix:"dal_producer"
-      configuration.dal_node_producer
+      configuration.dal_node_producers
       client
   in
   let* etherlink_rollup_operator_key =
@@ -1830,6 +1838,20 @@ let init_etherlink cloud configuration ~bootstrap etherlink_rollup_operator_key
   in
   return {operator; accounts; producers}
 
+let obtain_some_node_rpc_endpoint agent network (bootstrap : bootstrap)
+    (bakers : baker list) (producers : producer list)
+    (observers : observer list) etherlink =
+  match (agent, network) with
+  | None, Network.Testnet _ -> (
+      match (bakers, producers, observers, etherlink) with
+      | baker :: _, _, _, _ -> Node.as_rpc_endpoint baker.node
+      | [], producer :: _, _, _ -> Node.as_rpc_endpoint producer.node
+      | [], [], observer :: _, _ -> Node.as_rpc_endpoint observer.node
+      | [], [], [], Some etherlink ->
+          Node.as_rpc_endpoint etherlink.operator.node
+      | [], [], [], None -> bootstrap.node_rpc_endpoint)
+  | _ -> bootstrap.node_rpc_endpoint
+
 let init ~(configuration : configuration) cloud next_agent =
   let () = toplog "Init" in
   let* bootstrap_agent =
@@ -1845,7 +1867,7 @@ let init ~(configuration : configuration) cloud next_agent =
     |> Lwt.all
   in
   let* producers_agents =
-    List.init configuration.dal_node_producer (fun i ->
+    List.init configuration.dal_node_producers (fun i ->
         let name = Format.asprintf "producer-%d" i in
         next_agent ~name)
     |> Lwt.all
@@ -1870,7 +1892,7 @@ let init ~(configuration : configuration) cloud next_agent =
     match configuration.network with
     | Network.Sandbox ->
         let bootstrap_agent = Option.get bootstrap_agent in
-        init_bootstrap_and_activate_protocol cloud configuration bootstrap_agent
+        init_sandbox_and_activate_protocol cloud configuration bootstrap_agent
     | Testnet testnet ->
         let () = toplog "Init: initializting, testnet case" in
         init_testnet cloud configuration teztale bootstrap_agent testnet
@@ -1881,10 +1903,9 @@ let init ~(configuration : configuration) cloud next_agent =
         init_baker cloud configuration ~bootstrap teztale account i agent)
       (List.combine attesters_agents baker_accounts)
   in
-  let client =
-    Client.create ~endpoint:(Foreign_endpoint bootstrap.node_rpc_endpoint) ()
+  let* parameters =
+    Dal_common.Parameters.from_endpoint bootstrap.node_rpc_endpoint
   in
-  let* parameters = Dal_common.Parameters.from_client client in
   let () = toplog "Init: initializting producers and observers" in
   let* producers =
     Lwt_list.mapi_p
@@ -1950,11 +1971,22 @@ let init ~(configuration : configuration) cloud next_agent =
   let disconnection_state =
     Option.map Disconnect.init configuration.disconnect
   in
+  let some_node_rpc_endpoint =
+    obtain_some_node_rpc_endpoint
+      bootstrap_agent
+      configuration.network
+      bootstrap
+      bakers
+      producers
+      observers
+      etherlink
+  in
   Lwt.return
     {
       cloud;
       configuration;
       bootstrap;
+      some_node_rpc_endpoint;
       bakers;
       producers;
       observers;
@@ -1987,10 +2019,11 @@ let wait_for_level t level =
       Lwt.return_unit
 
 let on_new_level t level =
-  let client = t.bootstrap.client in
   let* () = wait_for_level t level in
   toplog "Start process level %d" level ;
-  let* infos_per_level = get_infos_per_level client ~level in
+  let* infos_per_level =
+    get_infos_per_level t.bootstrap.node_rpc_endpoint ~level
+  in
   Hashtbl.replace t.infos level infos_per_level ;
   let metrics =
     get_metrics t infos_per_level (Hashtbl.find t.metrics (level - 1))
@@ -2024,7 +2057,7 @@ let ensure_enough_funds t i =
   | Sandbox -> (* Producer has enough money *) Lwt.return_unit
   | Testnet _ ->
       let* balance =
-        Client.RPC.call producer.client
+        Node.RPC.call producer.node
         @@ RPC.get_chain_block_context_contract_balance
              ~id:producer.account.public_key_hash
              ()
@@ -2089,7 +2122,7 @@ let rec loop t level =
     if producers_not_ready t then Lwt.return_unit
     else
       Seq.ints 0
-      |> Seq.take t.configuration.dal_node_producer
+      |> Seq.take t.configuration.dal_node_producers
       |> Seq.map (fun i -> produce_slot t level i)
       |> List.of_seq |> Lwt.join
   in
@@ -2132,7 +2165,7 @@ let etherlink_loop (etherlink : etherlink) =
 let configuration =
   let stake = Cli.stake in
   let stake_machine_type = Cli.stake_machine_type in
-  let dal_node_producer = Cli.producers in
+  let dal_node_producers = Cli.producers in
   let observer_slot_indices = Cli.observer_slot_indices in
   let protocol = Cli.protocol in
   let producer_machine_type = Cli.producer_machine_type in
@@ -2146,7 +2179,7 @@ let configuration =
   {
     stake;
     stake_machine_type;
-    dal_node_producer;
+    dal_node_producers;
     observer_slot_indices;
     protocol;
     producer_machine_type;
@@ -2165,7 +2198,7 @@ let benchmark () =
     [
       (if configuration.bootstrap then [`Bootstrap] else []);
       List.map (fun i -> `Baker i) configuration.stake;
-      List.init configuration.dal_node_producer (fun _ -> `Producer);
+      List.init configuration.dal_node_producers (fun _ -> `Producer);
       List.map (fun _ -> `Observer) configuration.observer_slot_indices;
       (if configuration.etherlink then [`Etherlink_operator] else []);
       List.init configuration.etherlink_producers (fun i ->

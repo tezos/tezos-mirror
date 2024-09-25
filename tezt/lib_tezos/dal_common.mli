@@ -43,6 +43,8 @@ module Parameters : sig
 
   val from_client : Client.t -> t Lwt.t
 
+  val from_endpoint : Endpoint.t -> t Lwt.t
+
   (* This function computes the period (in cycles) during which the node stores
      data about attested slots assuming the node supports refutations and it has
      been start sufficiently far in the past. See the functions
