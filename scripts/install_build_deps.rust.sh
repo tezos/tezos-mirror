@@ -28,11 +28,31 @@ if [ ! -x "$(command -v rustup)" ] &&
   exit 1
 fi
 
-if ! [[ "$(rustc --version | cut -d' ' -f2)" == *"$rust_version"* ]]; then
+current_rust_version="$(rustc --version | cut -d' ' -f2)"
+
+if ! [[ "$current_rust_version" == *"$rust_version"* ]]; then
+  # Note: since the addition of the rust-toolchain file,
+  # we do not recommend to use 'rustup override set $recommended_rust_version'.
   echo "\
-Wrong Rust version. This is probably because you have used 'rustup
-override' in the past. Run the following command from your
-favorite shell, and retry to install the dependencies:
-$ rustup override unset"
+Wrong Rust version ($current_rust_version instead of $rust_version).
+
+If you are using rustup, you can install the recommended version with:
+
+    rustup install $recommended_rust_version
+
+'rustup show' should show that the active toolchain is overridden by the
+'rust-toolchain' file from this repository.
+If you have used 'rustup override' in the past you may need to run:
+
+    rustup override unset
+
+See more information here:
+http://tezos.gitlab.io/introduction/howtoget.html#install-rust
+
+Alternatively, you can try to continue anyway by setting
+the RUST_VERSION environment variable:
+
+    RUST_VERSION=$current_rust_version make build-deps
+"
   exit 1
 fi
