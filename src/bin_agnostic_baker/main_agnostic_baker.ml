@@ -115,6 +115,23 @@ end
 module Parameters = struct
   let default_node_addr = "http://127.0.0.1:8732"
 
+  let default_daily_logs_path = Some "octez-agnostic-baker"
+
+  let log_config ~base_dir =
+    let base_dir : string =
+      match base_dir with
+      | Some p -> p
+      | None -> Tezos_client_base_unix.Client_config.Cfg_file.default.base_dir
+    in
+    let daily_logs_path =
+      default_daily_logs_path
+      |> Option.map Filename.Infix.(fun logdir -> base_dir // "logs" // logdir)
+    in
+    Tezos_base_unix.Internal_event_unix.make_with_defaults
+      ?enable_default_daily_logs_at:daily_logs_path
+      ~log_cfg:Tezos_base_unix.Logs_simple_config.default_cfg
+      ()
+
   type status = Active | Frozen
 
   let pp_status fmt status =
@@ -432,6 +449,10 @@ module Args = struct
 
   let endpoint_short_arg = "-E"
 
+  let base_dir_arg = "--base-dir"
+
+  let base_dir_short_arg = "--b"
+
   let help_arg = "--help"
 
   let print_help () =
@@ -489,6 +510,9 @@ module Args = struct
       print_help () ;
       exit 1)
 
+  let get_base_dir =
+    get_arg_value ~arg:base_dir_arg ~short_arg:base_dir_short_arg
+
   let parse_args all_args =
     let all_args = Array.to_list all_args in
     (* Specific vesrion case *)
@@ -505,14 +529,19 @@ module Args = struct
         (get_endpoint baker_args)
     in
     let binaries_directory = get_binaries_directory agnostic_baker_args in
-    (endpoint, binaries_directory, baker_args)
+    let base_dir = get_base_dir baker_args in
+    (endpoint, base_dir, binaries_directory, baker_args)
 end
 
 let run () =
   let open Lwt_result_syntax in
-  let*! () = Tezos_base_unix.Internal_event_unix.init () in
-  let node_endpoint, binaries_directory, baker_args =
+  let node_endpoint, base_dir, binaries_directory, baker_args =
     Args.parse_args Sys.argv
+  in
+  let*! () =
+    Tezos_base_unix.Internal_event_unix.init
+      ~config:(Parameters.log_config ~base_dir)
+      ()
   in
   let* _daemon =
     Daemon.run
