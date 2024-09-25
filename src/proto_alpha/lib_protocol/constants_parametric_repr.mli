@@ -33,6 +33,9 @@ type dal = {
   attestation_lag : int;
   attestation_threshold : int;
   cryptobox_parameters : Dal.parameters;
+  minimal_participation_ratio : Q.t;
+      (* the ratio of the protocol-attested slots that need to be attested by an
+         attester in order to receive rewards *)
 }
 
 val dal_encoding : dal Data_encoding.t

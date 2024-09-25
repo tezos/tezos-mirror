@@ -49,7 +49,12 @@ type dal = {
   attestation_lag : int;
   attestation_threshold : int;
   cryptobox_parameters : Dal.parameters;
+  minimal_participation_ratio : Q.t;
 }
+
+let minimal_participation_ratio_encoding =
+  between_zero_and_one_q_encoding
+    "dal.minimal_participation_ratio must be a value between zero and one"
 
 let dal_encoding =
   let open Data_encoding in
@@ -61,18 +66,21 @@ let dal_encoding =
            attestation_lag;
            attestation_threshold;
            cryptobox_parameters;
+           minimal_participation_ratio;
          } ->
       ( ( feature_enable,
           incentives_enable,
           number_of_slots,
           attestation_lag,
-          attestation_threshold ),
+          attestation_threshold,
+          minimal_participation_ratio ),
         cryptobox_parameters ))
     (fun ( ( feature_enable,
              incentives_enable,
              number_of_slots,
              attestation_lag,
-             attestation_threshold ),
+             attestation_threshold,
+             minimal_participation_ratio ),
            cryptobox_parameters ) ->
       {
         feature_enable;
@@ -81,14 +89,18 @@ let dal_encoding =
         attestation_lag;
         attestation_threshold;
         cryptobox_parameters;
+        minimal_participation_ratio;
       })
     (merge_objs
-       (obj5
+       (obj6
           (req "feature_enable" bool)
           (req "incentives_enable" bool)
           (req "number_of_slots" uint16)
           (req "attestation_lag" uint8)
-          (req "attestation_threshold" uint8))
+          (req "attestation_threshold" uint8)
+          (req
+             "minimal_participation_ratio"
+             minimal_participation_ratio_encoding))
        Dal.parameters_encoding)
 
 (* The encoded representation of this type is stored in the context as

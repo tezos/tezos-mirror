@@ -145,6 +145,18 @@ let default_dal =
       attestation_lag = 8;
       attestation_threshold = 66;
       cryptobox_parameters = default_cryptobox_parameters;
+      minimal_participation_ratio = Q.(64 // 100);
+      (* Note that other values may make tests in tezt/tests/mockup.ml
+         fail. Indeed, some tests modify the constants' values a bit and then
+         perform some checks on the modified values. In case of [Q.t] values,
+         the numerator and the denominator are increased by 1. For instance,
+         when minimal_attestation_ratio is 60%, we have that the new value is
+         2/3 = 4/6 = (3+1)/(5+1). However, the test fails because it does not
+         realize that 2/3 = 4/6...
+         That is why a value x of [minimal_participation_ratio] was chosen such
+         that we have x = a/b with a and b smallest such that they are relatively
+         prime, and (a+1, b+1) are relatively prime as well. The value x = 63%
+         works as well. *)
     }
 
 let constants_mainnet : Constants.Parametric.t =
