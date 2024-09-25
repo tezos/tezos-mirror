@@ -36,6 +36,7 @@
   octez-libs.prometheus-app
   octez-libs.prometheus
   octez-crawler
+  memtrace
   octez-protocol-020-PsParisC-libs.dal
   octez-protocol-021-PsquebeC-libs.dal
   (select void_for_linking-octez-protocol-alpha-libs-dal from

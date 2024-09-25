@@ -1,6 +1,6 @@
 opam-version: "2.0"
 name: "octez-deps"
-version: "~dev"
+version: "dev"
 synopsis:
   "Virtual package depending on Octez dependencies (profile: octez-deps)"
 description:
