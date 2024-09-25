@@ -160,6 +160,8 @@ let lwt_watcher = external_lib "lwt-watcher" V.(exactly "0.2")
 
 let magic_mime = external_lib "magic-mime" V.(at_least "1.3.1")
 
+let memtrace = external_lib "memtrace" V.True
+
 let mtime = external_lib "mtime" V.(at_least "2.0.0")
 
 let mtime_clock_os = external_sublib mtime "mtime.clock.os"

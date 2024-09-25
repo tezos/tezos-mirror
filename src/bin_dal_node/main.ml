@@ -96,5 +96,9 @@ let run subcommand cli_options =
       @@ Configuration_file.save (merge cli_options Configuration_file.default)
 
 let _ =
+  (* Memtrace can be activated via the environment variable MEMTRACE
+     whose value is the file collecting the trace. The trace can then
+     be observed with [memtrace-viewer]. *)
+  Memtrace.trace_if_requested () ;
   let commands = Cli.make ~run in
   exit @@ Cmdliner.Cmd.eval commands

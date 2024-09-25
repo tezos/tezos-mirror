@@ -7916,6 +7916,7 @@ let _octez_dal_node =
          prometheus_app;
          prometheus;
          octez_crawler |> open_;
+         memtrace;
        ]
       @ protocol_deps)
     ~conflicts:[Conflicts.checkseum]
