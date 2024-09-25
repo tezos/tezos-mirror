@@ -158,7 +158,7 @@ let docker_run_command agent cmd args =
       *)
       Process.spawn cmd (["-o"; "StrictHostKeyChecking=no"] @ args)
 
-let copy agent ~source ~destination =
+let copy agent ~is_directory ~source ~destination =
   let* exists =
     let process = docker_run_command agent "ls" [destination] in
     let* status = process |> Process.wait in
@@ -220,7 +220,8 @@ let copy agent ~source ~destination =
           (* FIXME: I forgot why we enforce [-0]. *)
           Process.run
             "scp"
-            (["-O"]
+            ((if is_directory then ["-r"] else [])
+            @ ["-O"]
             @ ["-o"; "StrictHostKeyChecking=no"]
             @ identity @ port @ [source] @ [destination])
         in
@@ -238,15 +239,15 @@ let copy =
      scenario. This optimisation ease the writing of scenario so that copy can
      always be called before using the file copied. *)
   let already_copied = Hashtbl.create 11 in
-  fun ?destination agent ~source ->
+  fun ?(refresh = false) ?(is_directory = false) ?destination agent ~source ->
     Log.info "COPY %s" source ;
     let destination =
       Option.value ~default:(path_of agent source) destination
     in
     match Hashtbl.find_opt already_copied (agent, destination) with
-    | Some promise -> promise
-    | None ->
-        (* Octez images use alpine, we can't copy binaries from our local setup. *)
+    | Some promise when not refresh -> promise
+    | Some _ | None ->
+        (* Octez images uses alpine, so we can't copy binaries from our local setup. *)
         let* is_binary_file = is_binary source in
         let octez_release_image =
           match agent.configuration.docker_image with
@@ -264,7 +265,7 @@ let copy =
                 ["-p"; Filename.dirname destination]
               |> Process.check
             in
-            let* () = copy agent ~source ~destination in
+            let* () = copy agent ~is_directory ~source ~destination in
             Lwt.return destination
           in
           Hashtbl.replace already_copied (agent, destination) p ;

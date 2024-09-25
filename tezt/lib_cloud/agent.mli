@@ -51,8 +51,16 @@ val set_name : t -> string -> unit
     If [configuration.docker_image] is [Octezt_latest_release], binary
     files won't be copied and the destination will be the same as if
     [destination] was not provided.
- *)
-val copy : ?destination:string -> t -> source:string -> string Lwt.t
+
+    If [is_directory] is set, then the whole source is copied, including
+    subdirectories. *)
+val copy :
+  ?refresh:bool ->
+  ?is_directory:bool ->
+  ?destination:string ->
+  t ->
+  source:string ->
+  string Lwt.t
 
 (** [next_available_port agent] returns the next available port for
     this agent. Raises [Not_found] if no port is available. *)

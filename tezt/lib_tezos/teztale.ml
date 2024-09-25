@@ -23,14 +23,15 @@ module Server = struct
     interface : interface;
     users : user list;
     admin : user;
+    public_directory : string option;
   }
 
   type filenames = {conf_filename : string; db_filename : string}
 
   type t = {process : Process.t; filenames : filenames; conf : conf}
 
-  let make_conf ~name ~address ~port ~users ~admin =
-    {name; interface = {address; port}; users; admin}
+  let make_conf ~name ~address ~port ~users ~admin ?public_directory () =
+    {name; interface = {address; port}; users; admin; public_directory}
 
   (* We could use the libs from teztale in order to build the conf file using ocaml types
      and printing it as json into a file, but using a string also tests that nothing
@@ -51,6 +52,12 @@ module Server = struct
     let pp_interface fmt {address; port} =
       Format.fprintf fmt {|{"address": "%s", "port": %d}|} address port
     in
+    let pp_public_directory fmt public_directory =
+      match public_directory with
+      | None -> Format.fprintf fmt ""
+      | Some str -> Format.fprintf fmt {|,
+  "public_directory": "%s"|} str
+    in
     let contents =
       (* Verbosity needs to be set to a minimum level of INFO
          because wait_for_readiness can't be used with a lower verbosity *)
@@ -61,7 +68,7 @@ module Server = struct
   "users": [%a],
   "admins": [%a],
   "with_transaction": "FULL",
-  "verbosity": "INFO"
+  "verbosity": "INFO"%a
 }|}
         db_filename
         pp_interface
@@ -70,6 +77,8 @@ module Server = struct
         conf.users
         pp_login
         conf.admin
+        pp_public_directory
+        conf.public_directory
     in
     let* () =
       match runner with
@@ -85,14 +94,14 @@ module Server = struct
     Lwt.return {conf_filename; db_filename}
 
   let make ?name ?(address = "0.0.0.0") ?port ?(users = [])
-      ?(admin = {login = "admin"; password = "password"}) () =
+      ?(admin = {login = "admin"; password = "password"}) ?public_directory () =
     let port = match port with Some port -> port | None -> Port.fresh () in
     let name = match name with Some name -> name | None -> fresh_name () in
-    make_conf ~name ~address ~port ~users ~admin
+    make_conf ~name ~address ~port ~users ~admin ?public_directory ()
 
   let run ?runner ?(path = Uses.path Constant.teztale_server) ?name ?address
-      ?port ?users ?admin () =
-    let conf = make ?name ?address ?port ?users ?admin () in
+      ?port ?users ?admin ?public_directory () =
+    let conf = make ?name ?address ?port ?users ?admin ?public_directory () in
     let* filenames = dump_conf ?runner conf in
     let process =
       Process.spawn ~name:conf.name ?runner path [filenames.conf_filename]

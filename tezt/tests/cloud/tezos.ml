@@ -218,7 +218,7 @@ module Teztale = struct
     include Teztale.Server
 
     let run agent ?(path = Uses.path Constant.teztale_server) ?address ?name
-        ?port ?users ?admin () =
+        ?port ?users ?admin ?public_directory () =
       let runner = Agent.runner agent in
       let port =
         match port with
@@ -226,7 +226,16 @@ module Teztale = struct
         | None -> Agent.next_available_port agent
       in
       let* path = Agent.copy agent ~source:path in
-      Teztale.Server.run ?runner ~path ?address ~port ?name ?users ?admin ()
+      Teztale.Server.run
+        ?runner
+        ~path
+        ?address
+        ~port
+        ?name
+        ?users
+        ?admin
+        ?public_directory
+        ()
   end
 
   module Archiver = struct
@@ -239,3 +248,8 @@ module Teztale = struct
       Teztale.Archiver.run ?runner ~path ?name ~node_port user feed
   end
 end
+
+let create_dir ?runner dir =
+  let* () = Process.spawn ?runner "rm" ["-rf"; dir] |> Process.check in
+  let* () = Process.spawn ?runner "mkdir" ["-p"; dir] |> Process.check in
+  Lwt.return_unit
