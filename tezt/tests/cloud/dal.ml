@@ -111,7 +111,7 @@ module Network = struct
 
   let default_bootstrap = function
     | Ghostnet -> "ghostnet.tzinit.org" (* Taken from ghostnet configuration *)
-    | Weeklynet date -> sf "weeklynet-%s.tzinit.org" date
+    | Weeklynet date -> sf "weeklynet-%s.teztnets.com" date
 
   let default_dal_bootstrap = function
     | Ghostnet ->
