@@ -208,6 +208,14 @@ val count_values :
   'file ->
   int tzresult Lwt.t
 
+module View : sig
+  (** Returns the number of files current opened by the key value
+      store. Do note this number is an upper bound on the number of
+      file descriptors opened.      
+  *)
+  val opened_files : ('file, 'key, 'value) t -> int
+end
+
 module Internal_for_tests : sig
   (** Same as {!init} above, except that the user can specify a prefix for the
       lock file (default is lockfile_prefix = "internal_for_tests") to avoid issues

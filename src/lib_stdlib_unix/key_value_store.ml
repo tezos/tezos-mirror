@@ -227,6 +227,10 @@ module Files : sig
   val count_values : 'value t -> ('key, 'value) layout -> int tzresult Lwt.t
 
   val remove : 'value t -> ('key, 'value) layout -> unit tzresult Lwt.t
+
+  module View : sig
+    val opened_files : 'value t -> int
+  end
 end = struct
   module LRU = Ringo.LRU_Collection
 
@@ -345,6 +349,10 @@ end = struct
 
      The store ensures that actions performed on a given file are done
      sequentially. *)
+
+  module View = struct
+    let opened_files {files; _} = Table.length files
+  end
 
   let init ~lru_size =
     (* FIXME https://gitlab.com/tezos/tezos/-/issues/6774
@@ -1065,6 +1073,10 @@ let values_exist t file_layout seq =
 let remove_file {files; root_dir; _} file_layout file =
   let layout = file_layout ~root_dir file in
   Files.remove files layout
+
+module View = struct
+  let opened_files {files; _} = Files.View.opened_files files
+end
 
 module Internal_for_tests = struct
   let init ?(lockfile_prefix = "internal_for_tests") ~lru_size ~root_dir () =
