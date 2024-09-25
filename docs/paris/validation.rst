@@ -187,15 +187,14 @@ protocol environment:
 Partial Application
 ~~~~~~~~~~~~~~~~~~~
 
-The ``Partial application`` mode is used for :ref:`multi-pass
-validation<multi_pass_validation>`. Its aim is to provide Tezos shell
+The ``Partial application`` mode is no longer used, but it subsists in the code. Its aim is to provide Tezos shell
 implementations with a light-weight (read "fast") block application
 mechanism, which can determine whether a block has a *chance* of being
 valid or not, in a situation when the provided context is *not a
 recent one*. That is, when the block candidate succeeds neither the
 head of the chain, nor a close ancestor.
 
-This validation mode is typically used when the node receives a
+This validation mode could be used when the node receives a
 significantly large branch -- for instance, while bootstrapping. To
 check whether this branch is plausibly valid or potentially malicious
 spam, the shell retrieves the context from the most recent common
