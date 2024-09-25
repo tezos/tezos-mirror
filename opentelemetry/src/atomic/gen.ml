@@ -51,13 +51,13 @@ let () =
   let version = Scanf.sscanf Sys.ocaml_version "%d.%d.%s" (fun x y _ -> x, y) in
   write_file "atomic.ml"
     (if version >= (4, 12) then
-      atomic_after_412
-    else
-      atomic_before_412);
+       atomic_after_412
+     else
+       atomic_before_412);
   copy_file
     (if version >= (4, 12) then
-      "atomic.post412.mli"
-    else
-      "atomic.pre412.mli")
+       "atomic.post412.mli"
+     else
+       "atomic.pre412.mli")
     "atomic.mli";
   ()
