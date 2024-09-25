@@ -7575,6 +7575,36 @@ let _octez_node =
             ~section:"bin";
         ]
 
+let _octez_agnostic_baker =
+  public_exe
+    "octez-agnostic-baker"
+    ~path:"src/bin_agnostic_baker"
+    ~internal_name:"main_agnostic_baker"
+    ~synopsis:"Tezos: `octez-agnostic-baker` binary for baking"
+    ~release_status:Unreleased
+    ~with_macos_security_framework:true
+    ~deps:
+      [
+        data_encoding |> open_;
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_base_unix;
+        octez_validation |> open_;
+        octez_client_base_unix |> open_;
+        octez_client_base |> open_;
+        octez_rpc |> open_;
+        octez_rpc_http_client |> open_;
+        octez_rpc_http_client_unix |> open_;
+        octez_rpc_http |> open_;
+        cohttp_lwt_unix;
+        octez_node_config;
+        octez_clic;
+        octez_stdlib_unix |> open_;
+        octez_event_logging |> open_;
+        octez_signer_services;
+        octez_version_value;
+      ]
+    ~linkall:true
+
 let _octez_client =
   let protocol_deps =
     let deps_for_protocol protocol =
