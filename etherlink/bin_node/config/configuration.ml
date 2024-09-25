@@ -184,13 +184,47 @@ let default_tx_pool_addr_limit = Int64.of_int 4000
 
 let default_tx_pool_tx_per_addr_limit = Int64.of_int 16
 
-let default_blueprints_publisher_config =
+let default_blueprints_publisher_config_without_dal =
   {
     max_blueprints_lag = 50;
+    (* When the sequencer is more than max_blueprints_lag L2
+       levels ahead of the rollup, a cath-up mechanism is
+       triggered. It consists in resending some blueprints on the
+       inbox. *)
     max_blueprints_ahead = 100;
+    (* When the sequencer is more than max_blueprints_ahead L2 levels
+       ahead of the rollup, it locks its tx_pool for some time. This
+       has the effect of considerably slowing down the creation of L2
+       blocks. *)
     max_blueprints_catchup = 50;
+    (* This is the maximum number of blueprints that the sequencer
+       resends at each L1 level during catch up. *)
     catchup_cooldown = 1;
+    (* When the catch-up mechanism is triggered, it deactivates itself
+       for [catchup_cooldown] L1 levels. *)
     dal_slots = None;
+    (* If this is None, the DAL will not be used by the
+       sequencer. Otherwise, this is the list of DAL slot indices on
+       which the rollup node will try to publish DAL slots. It should
+       be included in the dal_slots list of the kernel configuration
+       otherwise the kernel will ignore any DAL slots published on
+       forbidden indices. *)
+  }
+
+let default_blueprints_publisher_config_with_dal =
+  {
+    default_blueprints_publisher_config_without_dal with
+    max_blueprints_lag = 400;
+    (* This lag should be large enough to avoid triggerring the
+       catch-up mechanism before the rollup had the opportunity to
+       import the blueprints from the DAL. This typically takes about
+       10 L1 levels (so 200 L2 levels assuming a 10s block time on the
+       L1 and 500ms block time on the L2) when there is no congestion
+       on the DAL. We double this typical value to support some DAL
+       congestion. *)
+    max_blueprints_ahead = 500;
+    (* For this parameter to make sense, it should be
+       significantly larger than max_blueprints_lag. *)
   }
 
 let default_fee_history = {max_count = None; max_past = None}
@@ -266,6 +300,11 @@ let kernel_execution_config_dft ~data_dir ?preimages ?preimages_endpoint () =
 let sequencer_config_dft ?time_between_blocks ?max_number_of_chunks ~sequencer
     ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
     ?catchup_cooldown ?dal_slots () =
+  let default_blueprints_publisher_config =
+    if Option.is_some dal_slots then
+      default_blueprints_publisher_config_with_dal
+    else default_blueprints_publisher_config_without_dal
+  in
   let blueprints_publisher_config =
     {
       max_blueprints_lag =
@@ -300,6 +339,11 @@ let threshold_encryption_sequencer_config_dft ?time_between_blocks
     ?max_number_of_chunks ~sequencer ?sidecar_endpoint ?max_blueprints_lag
     ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown ?dal_slots
     () =
+  let default_blueprints_publisher_config =
+    if Option.is_some dal_slots then
+      default_blueprints_publisher_config_with_dal
+    else default_blueprints_publisher_config_without_dal
+  in
   let blueprints_publisher_config =
     {
       max_blueprints_lag =
@@ -389,6 +433,9 @@ let time_between_blocks_encoding : time_between_blocks Data_encoding.t =
 
 let blueprints_publisher_config_encoding =
   let open Data_encoding in
+  let default_blueprints_publisher_config =
+    default_blueprints_publisher_config_without_dal
+  in
   conv
     (fun {
            max_blueprints_lag;
@@ -478,6 +525,9 @@ let sequencer_field =
 
 let sequencer_encoding =
   let open Data_encoding in
+  let default_blueprints_publisher_config =
+    default_blueprints_publisher_config_without_dal
+  in
   conv
     (fun {
            time_between_blocks;
@@ -510,6 +560,9 @@ let sequencer_encoding =
 
 let threshold_encryption_sequencer_encoding =
   let open Data_encoding in
+  let default_blueprints_publisher_config =
+    default_blueprints_publisher_config_without_dal
+  in
   conv
     (function
       | Threshold_encryption_sequencer
