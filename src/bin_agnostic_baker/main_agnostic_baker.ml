@@ -48,10 +48,13 @@ module Events = struct
 
   let section = ["agnostic-baker"]
 
+  let alternative_color = Internal_event.Green
+
   (* Notice *)
   let starting_baker =
     declare_2
       ~section
+      ~alternative_color
       ~level:Notice
       ~name:"starting_baker"
       ~msg:"starting baker for protocol {proto} with arguments: {args}"
@@ -62,6 +65,7 @@ module Events = struct
   let baker_running =
     declare_1
       ~section
+      ~alternative_color
       ~level:Notice
       ~name:"baker_running"
       ~msg:"baker for protocol {proto} is now running"
@@ -71,6 +75,7 @@ module Events = struct
   let starting_daemon =
     declare_0
       ~section
+      ~alternative_color
       ~level:Notice
       ~name:"starting_daemon"
       ~msg:"starting agnostic daemon"
@@ -89,6 +94,7 @@ module Events = struct
   let waiting_for_active_protocol =
     declare_0
       ~section
+      ~alternative_color
       ~level:Notice
       ~name:"waiting_for_active_protocol"
       ~msg:"waiting for active protocol"
@@ -97,6 +103,7 @@ module Events = struct
   let period_status =
     declare_2
       ~section
+      ~alternative_color
       ~level:Notice
       ~name:"period_status"
       ~msg:
