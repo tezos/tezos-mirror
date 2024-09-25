@@ -209,7 +209,7 @@ val count_values :
   int tzresult Lwt.t
 
 module View : sig
-  (** Returns the number of files current opened by the key value
+  (** Returns the number of files currently opened by the key value
       store. Do note this number is an upper bound on the number of
       file descriptors opened.      
   *)
