@@ -1409,6 +1409,25 @@ function delete_protocol() {
   echo "Deletion done"
 }
 
+function update_files() {
+  for file in "$@"; do
+    log_blue "Update ${file}"
+    sed -i.old \
+      -e "s/${source_hash}/${long_hash}/g" \
+      -e "s/${source_short_hash}/${short_hash}/g" \
+      -e "s/proto_${protocol_source}/proto_${new_protocol_name}/g" \
+      -e "s/${capitalized_source}/${capitalized_label}/g" \
+      -e "s/${protocol_source}/${label}/g" \
+      -e "s/${capitalized_previous_tag}/${capitalized_new_tag}/g" \
+      -e "s/${previous_tag}/${new_tag}/g" \
+      -e "s/${previous_variant}/${new_variant}/g" \
+      "${file}"
+    if [[ "${file}" == *.ml || "${file}" == *.mli ]]; then
+      ocamlformat -i "${file}"
+    fi
+  done
+}
+
 function hash() {
 
   log_cyan "Computing hash"
@@ -1637,11 +1656,7 @@ function hash() {
     "src/proto_alpha/lib_protocol/raw_context.ml" \
     "src/proto_alpha/lib_protocol/raw_context.mli" \
     "src/proto_alpha/lib_protocol/init_storage.ml"; do
-    log_blue "Update ${file}"
-    sed -i.old \
-      -e "s/${capitalized_source}/${capitalized_label}/g" \
-      -e "s/${protocol_source}/${label}/g" -i.old "${file}"
-    ocamlformat -i "${file}"
+    update_files "${file}"
   done
   commit_if_changes "alpha: add ${capitalized_label} as Alpha previous protocol"
 
@@ -1651,15 +1666,7 @@ function hash() {
   commit_if_changes "tezt: update protocol tag in alcotezt"
 
   sed -e "s/${capitalized_source} -> \"P[ts].*\"/${capitalized_label} -> \"${long_hash}\"/g" -i.old tezt/lib_tezos/protocol.ml
-  sed -i.old \
-    -e "s/${source_hash}/${long_hash}/g" \
-    -e "s/proto_${protocol_source}/proto_${new_protocol_name}/g" \
-    -e "s/${capitalized_source}/${capitalized_label}/g" \
-    -e "s/${protocol_source}/${label}/g" tezt/lib_tezos/protocol.ml \
-    -e "s/${capitalized_previous_tag}/${capitalized_new_tag}/g" \
-    -e "s/${previous_tag}/${new_tag}/g" \
-    -e "s/${previous_variant}/${new_variant}/g" \
-    "tezt/lib_tezos/protocol.ml" "tezt/lib_tezos/protocol.mli"
+  update_files "tezt/lib_tezos/protocol.ml" "tezt/lib_tezos/protocol.mli"
   ocamlformat -i tezt/lib_tezos/protocol.ml
   ocamlformat -i tezt/lib_tezos/protocol.mli
   commit_if_changes "tezt: adapt lib_tezos/protocol.ml"
@@ -1716,12 +1723,8 @@ function hash() {
       git mv "${FILE}" "${NEW_FILENAME}"
     fi
 
-    if [[ "${is_snapshot}" == true ]]; then
-      sed -i.old -e "s/proto_${protocol_source}/proto_${version}-${short_hash}/g" "${NEW_FILENAME}"
-      sed -i.old -e "s/${tezos_protocol_source}/${version}-${short_hash}/g" "${NEW_FILENAME}"
-    fi
-    #replace all occurences of old hash with new hash
-    sed -i.old -e "s/${source_hash}/${long_hash}/g" "${NEW_FILENAME}"
+    update_files "${NEW_FILENAME}"
+
   done
   commit_if_changes "tezt: move ${protocol_source} regression files"
 
@@ -1749,20 +1752,10 @@ function hash() {
     commit_if_changes "kaitai: update structs"
   fi
 
-  sed -i.old \
-    -e "s/${source_hash}/${long_hash}/g" \
-    -e "s/${source_short_hash}/${short_hash}/g" \
-    src/bin_client/octez-init-sandboxed-client.sh
+  update_files src/bin_client/octez-init-sandboxed-client.sh
   commit_no_hooks_if_changes "sandbox: update octez-activate-${label} command to client sandbox"
 
-  sed -i.old \
-    -e "s/${source_hash}/${long_hash}/g" \
-    -e "s/${source_short_hash}/${short_hash}/g" \
-    -e "s/proto_${protocol_source}/proto_${new_protocol_name}/g" \
-    -e "s/${capitalized_source}/${capitalized_label}/g" \
-    -e "s/${protocol_source}/${label}/g" \
-    -e "s/${previous_variant}/${new_variant}/g" \
-    devtools/testnet_experiment_tools/testnet_experiment_tools.ml
+  update_files devtools/testnet_experiment_tools/testnet_experiment_tools.ml
   ocamlformat -i devtools/testnet_experiment_tools/testnet_experiment_tools.ml
   commit_if_changes "devtools: update testnet_experiment_tools"
 
