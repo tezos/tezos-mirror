@@ -89,7 +89,7 @@ module type VERIFIER = sig
   type commitment_proof
 
   module Commitment_proof :
-    Kzg.Interfaces.DegreeCheck_proof with type t := commitment_proof
+    Kzg.Interfaces.Degree_check_proof with type t := commitment_proof
 
   (** [verify_commitment t commitment proof] returns [true] if and only if the
       size of the data committed via [commitment] does not exceed the

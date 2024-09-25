@@ -1076,6 +1076,20 @@ let _octez_srs_extraction_tests =
                  ["check"; "srs_filecoin_g1_6"; "srs_filecoin_g2_6"]);
         ])
 
+let octez_kzg =
+  octez_lib
+    "kzg"
+    ~path:"src/lib_kzg"
+    ~synopsis:"Toolbox for KZG polynomial commitment"
+    ~deps:
+      [
+        repr;
+        data_encoding |> open_;
+        octez_bls12_381_polynomial |> open_;
+        octez_crypto;
+      ]
+    ~preprocess:(pps ppx_repr)
+
 let octez_plompiler =
   octez_lib
     "plompiler"
@@ -1083,12 +1097,12 @@ let octez_plompiler =
     ~path:"src/lib_plompiler"
     ~deps:
       [
-        repr;
         stdint;
         hacl_star;
         octez_bls12_381_hash;
         octez_polynomial;
         octez_mec;
+        octez_kzg;
       ]
     ~preprocess:(staged_pps [ppx_repr; ppx_deriving_show])
 
@@ -1139,20 +1153,6 @@ let make_plonk_runtest_invocation ~package =
                     ]);
              ]);
     ]
-
-let octez_kzg =
-  octez_lib
-    "kzg"
-    ~path:"src/lib_kzg"
-    ~synopsis:"Toolbox for KZG polynomial commitment"
-    ~deps:
-      [
-        repr;
-        data_encoding |> open_;
-        octez_bls12_381_polynomial |> open_;
-        octez_crypto;
-      ]
-    ~preprocess:(pps ppx_repr)
 
 let octez_plonk =
   octez_lib

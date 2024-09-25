@@ -71,7 +71,7 @@ module type Evaluations_sig = sig
   val linear :
     ?res:t ->
     evaluations:t SMap.t ->
-    poly_names:SMap.key list ->
+    poly_names:string list ->
     ?linear_coeffs:scalar list ->
     ?composition_gx:int list * int ->
     ?add_constant:scalar ->

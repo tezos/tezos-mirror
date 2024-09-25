@@ -1,3 +1,8 @@
+(* The tests are located in lib_plonk/test. If you want to specifically run
+   Polynomial’s commitment test, run
+   `dune exec ./src/lib_plonk/test/main.exe -- test "Polynomial Commitment" --verbose`
+   (note that this will also run the test for Kzg_Pack) *)
+
 open Bls
 open Utils
 module Commit = Commitment.Commit
