@@ -351,7 +351,7 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
         call_data,
         Some(gas_limit),
         effective_gas_price,
-        Some(value),
+        value,
         true,
         allocated_ticks,
         retriable,

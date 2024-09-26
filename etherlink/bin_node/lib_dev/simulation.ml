@@ -98,6 +98,39 @@ let rlp_v2 ({call; with_da_fees; timestamp} : estimate_gas_input_v2) =
 (** Encoding used to forward the call to the kernel, to be used in simulation
     mode only. *)
 let rlp_encode input =
+  let input =
+    (* If the value is not provided, the kernel will put `None` for the transfer
+       object. It is not wanted, we want the kernel to put `Some(0)` instead. *)
+    match input with
+    | V0 call ->
+        V0
+          {
+            call with
+            value = Some (Option.value ~default:(Qty Z.zero) call.value);
+          }
+    | V1 {call; with_da_fees} ->
+        V1
+          {
+            call =
+              {
+                call with
+                value = Some (Option.value ~default:(Qty Z.zero) call.value);
+              };
+            with_da_fees;
+          }
+    | V2 {call; with_da_fees; timestamp} ->
+        V2
+          {
+            call =
+              {
+                call with
+                value = Some (Option.value ~default:(Qty Z.zero) call.value);
+              };
+            with_da_fees;
+            timestamp;
+          }
+  in
+
   let prefix, rlp =
     match input with
     | V0 call -> (None, rlp_v0 call)

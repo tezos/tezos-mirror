@@ -468,7 +468,7 @@ impl Evaluation {
                 Some(u64::min(gas, MAXIMUM_GAS_LIMIT))
             }),
             gas_price,
-            self.value,
+            self.value.unwrap_or_default(),
             false,
             allocated_ticks,
             false,
@@ -574,7 +574,7 @@ impl TxValidation {
             transaction.data.clone(),
             Some(gas_limit), // gas could be omitted
             block_fees.base_fee_per_gas(),
-            Some(transaction.value),
+            transaction.value,
             true,
             allocated_ticks,
             false,
@@ -934,7 +934,7 @@ mod tests {
             call_data,
             Some(gas_limit),
             gas_price,
-            Some(transaction_value),
+            transaction_value,
             false,
             DUMMY_ALLOCATED_TICKS,
             false,
