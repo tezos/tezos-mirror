@@ -27,6 +27,16 @@ val close : _ t -> unit Lwt.t
 (** Returns a read-only version of the store. *)
 val readonly : _ t -> ro
 
+(** [gc store ~level] garbage collects data that relate to levels below [level]
+    (by removing information from the database). *)
+val gc : rw -> level:int32 -> unit tzresult Lwt.t
+
+(** [with_transaction store f] executes [f] with a single connection to the
+    database in a transaction. I.e., if [f] returns an error or raises an
+    exception, the store will not be modified.  *)
+val with_transaction :
+  _ t -> (Sqlite.conn -> 'a tzresult Lwt.t) -> 'a tzresult Lwt.t
+
 (** {2 Modules for storing data in the store}
 
     Each module maps to a table in the database. Every read and write function
