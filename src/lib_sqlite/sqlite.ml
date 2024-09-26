@@ -158,6 +158,8 @@ module Q = struct
       ~decode:(function "wal" -> Ok Wal | _ -> Ok Other)
       string
 
+  let vacuum_self = (unit ->. unit) @@ {|VACUUM main|}
+
   let vacuum_request = (string ->. unit) @@ {|VACUUM main INTO ?|}
 
   module Journal_mode = struct
@@ -198,6 +200,9 @@ let vacuum ~conn ~output_db_file =
   in
   let* () = use (Pool {db_pool}) set_wal_journal_mode in
   return_unit
+
+let vacuum_self ~conn =
+  with_connection conn @@ fun conn -> Db.exec conn Q.vacuum_self ()
 
 let init ~path ~perm migration_code =
   let open Lwt_result_syntax in

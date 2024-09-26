@@ -36,6 +36,10 @@ val close : t -> unit Lwt.t
     function is useful to backup the database. *)
 val vacuum : conn:conn -> output_db_file:string -> unit tzresult Lwt.t
 
+(** Vacuums the database itself after removing lot of data
+    {{:https://www.sqlite.org/lang_vacuum.html}[VACUUM] sqlite command}. *)
+val vacuum_self : conn:conn -> unit tzresult Lwt.t
+
 (** {2 Database connections} *)
 
 (** [use db k] executes [k] with a fresh connection to [db]. *)

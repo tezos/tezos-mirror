@@ -39,6 +39,22 @@ module Events = struct
       ~level:Error
       ("applied", Data_encoding.int31)
       ("known", Data_encoding.int31)
+
+  let start_gc =
+    declare_0
+      ~section
+      ~name:"smart_rollup_node_store_gc_start"
+      ~msg:"Garbage collection started for store"
+      ~level:Info
+      ()
+
+  let finish_gc =
+    declare_0
+      ~section
+      ~name:"smart_rollup_node_store_gc_finish"
+      ~msg:"Garbage collection finished for store"
+      ~level:Info
+      ()
 end
 
 let with_connection store conn =
@@ -1212,3 +1228,22 @@ module State = struct
     let type_ = Types.block_hash
   end)
 end
+
+let gc store ~level =
+  let open Lwt_result_syntax in
+  Sqlite.use store @@ fun conn ->
+  let*! () = Events.(emit start_gc) () in
+  let* () =
+    Sqlite.with_transaction conn @@ fun conn ->
+    let* () = L2_blocks.delete_before ~conn store ~level in
+    let* () = Commitments.delete_before ~conn store ~level in
+    let* () = Inboxes.delete_before ~conn store ~level in
+    let* () = Messages.delete_before ~conn store ~level in
+    let* () =
+      Commitments_published_at_levels.delete_before ~conn store ~level
+    in
+    let* () = L2_levels.delete_before ~conn store ~level in
+    return_unit
+  in
+  let*! () = Events.(emit finish_gc) () in
+  return_unit
