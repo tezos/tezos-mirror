@@ -85,6 +85,12 @@ module Types = struct
       ~decode:Inbox_hash.of_b58check
       string
 
+  let payload_hashes_hash =
+    tzcustom
+      ~encode:Merkelized_payload_hashes_hash.to_b58check
+      ~decode:Merkelized_payload_hashes_hash.of_b58check
+      string
+
   let commitment_hash =
     tzcustom
       ~encode:Commitment.Hash.to_b58check
@@ -99,6 +105,11 @@ module Types = struct
 
   let history_proof =
     from_encoding ~name:"Inbox.history_proof" Inbox.history_proof_encoding
+
+  let messages_list =
+    from_encoding
+      ~name:"message list"
+      Data_encoding.(list @@ dynamic_size (Variable.string' Hex))
 
   let commitment =
     product (fun compressed_state inbox_level predecessor number_of_ticks ->
@@ -426,6 +437,46 @@ module Inboxes = struct
   let find_by_block_hash ?conn store inbox_hash =
     with_connection store conn @@ fun conn ->
     Sqlite.Db.find_opt conn Q.select_by_block_hash inbox_hash
+
+  let delete_before ?conn store ~level =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.exec conn Q.delete_before level
+end
+
+module Messages = struct
+  module Q = struct
+    open Types
+
+    let insert =
+      (t3 payload_hashes_hash level messages_list ->. unit)
+      @@ {sql|
+      REPLACE INTO messages
+      (payload_hashes_hash, inbox_level, message_list)
+      VALUES (?, ?, ?)
+      |sql}
+
+    let select =
+      (payload_hashes_hash ->? t2 level messages_list)
+      @@ {sql|
+      SELECT inbox_level, message_list
+      FROM messages
+      WHERE payload_hashes_hash = ?
+      |sql}
+
+    let delete_before =
+      (level ->. unit)
+      @@ {sql|
+      DELETE FROM messages WHERE inbox_level < ?
+      |sql}
+  end
+
+  let store ?conn store ~level payload_hashes_hash messages =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.exec conn Q.insert (payload_hashes_hash, level, messages)
+
+  let find ?conn store hash =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.find_opt conn Q.select hash
 
   let delete_before ?conn store ~level =
     with_connection store conn @@ fun conn ->
