@@ -38,6 +38,7 @@ let variables : variables =
        the variable tezos/tezos but tezos. *)
     ( "rust_toolchain_image_name",
       "${GCP_REGISTRY}/${CI_PROJECT_PATH}/rust-toolchain" );
+    ("jsonnet_image_name", "${GCP_REGISTRY}/${CI_PROJECT_PATH}/jsonnet");
     ( "client_libs_dependencies_image_name",
       "${GCP_REGISTRY}/${CI_PROJECT_PATH}/client-libs-dependencies" );
     ("GIT_STRATEGY", "fetch");

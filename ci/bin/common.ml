@@ -702,6 +702,27 @@ module Images = struct
       ~image_path
       ()
 
+  (** The jsonnet image *)
+  let jsonnet =
+    let image_builder arch =
+      job_docker_authenticated
+        ~__POS__
+        ~arch
+        ~skip_docker_initialization:true
+        ~stage
+        ~name:("oc.docker:jsonnet:" ^ arch_to_string_alt arch)
+        ~ci_docker_hub:false
+        ~artifacts:
+          (artifacts ~reports:(reports ~dotenv:"jsonnet_image_tag.env" ()) [])
+        ["./scripts/ci/docker_jsonnet_build.sh"]
+    in
+    let image_path = "${jsonnet_image_name}:${jsonnet_image_tag}" in
+    Image.mk_internal
+      ~image_builder_amd64:(image_builder Amd64)
+      ~image_builder_arm64:(image_builder Arm64)
+      ~image_path
+      ()
+
   module CI = struct
     (* The job that builds the CI images.
        This job is automatically included in any pipeline that uses any of these images. *)
