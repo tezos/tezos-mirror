@@ -19,6 +19,7 @@ type query_msg = Query_msg of {query_id : int; shards : bytes}
 module Query_store = Stdlib.Hashtbl
 
 type t = {
+  node_ctxt : Node_context.t;
   process : Process_worker.t;
   query_pipe : query_msg Lwt_pipe.Unbounded.t;
   mutable query_id : int;
@@ -354,7 +355,7 @@ let reply_receiver_job {process; query_store; _} node_context =
           let err = [error_of_exn exn] in
           Lwt.return (Error err))
 
-let make () =
+let make node_ctxt =
   let open Lwt_result_syntax in
   (* Fork a process to offload cryptographic calculations *)
   let* process =
@@ -364,8 +365,9 @@ let make () =
   in
   let query_pipe = Lwt_pipe.Unbounded.create () in
   let query_store = Query_store.create 23 in
-  let amplificator = {process; query_pipe; query_store; query_id = 0} in
-
+  let amplificator =
+    {node_ctxt; process; query_pipe; query_store; query_id = 0}
+  in
   let (_ : Lwt_exit.clean_up_callback_id) =
     Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _exit_code ->
         let pid = Process_worker.pid process in
@@ -378,7 +380,6 @@ let make () =
 let init amplificator node_context =
   let open Lwt_result_syntax in
   let proto_parameters = Node_context.get_proto_parameters node_context in
-
   (* Run a job enqueueing all shards calculation tasks *)
   let amplificator_query_sender_job =
     let*! r = query_sender_job amplificator in
@@ -432,12 +433,10 @@ let enqueue_job_shards_proof amplificator commitment slot_id proto_parameters
   let shards =
     Data_encoding.(Binary.to_bytes_exn (list Cryptobox.shard_encoding)) shards
   in
-
   (* Should be atomic incr in the context of a lwt concurrency
    * Could overflow some day on 32 bits machines, more difficult on 64 *)
   let query_id = amplificator.query_id in
   amplificator.query_id <- amplificator.query_id + 1 ;
-
   (* Store some arguments in a query table, because they are necessary to publish, but not to calculate,
      so avoid the cost of serializing them *)
   let () =
@@ -458,51 +457,45 @@ let amplify node_store commitment (slot_id : Types.slot_id)
     ~number_of_already_stored_shards ~number_of_shards ~number_of_needed_shards
     proto_parameters amplificator =
   let open Lwt_result_syntax in
-  match amplificator with
-  | None ->
-      let*! () = Event.(emit amplificator_uninitialized ()) in
-      return_unit
-  | Some amplificator ->
-      Dal_metrics.reconstruction_started () ;
-      let*! () =
-        Event.(
-          emit
-            reconstruct_started
-            ( slot_id.slot_level,
-              slot_id.slot_index,
-              number_of_already_stored_shards,
-              number_of_shards ))
-      in
-      let shards =
-        Store.(Shards.read_all node_store.shards slot_id ~number_of_shards)
-        |> Seq_s.filter_map (function
-               | _, index, Ok share -> Some Cryptobox.{index; share}
-               | _ -> None)
-      in
-      let*? shards =
-        Seq_s.take
-          ~when_negative_length:[error_of_exn (Invalid_argument "Seq_s.take")]
-          number_of_needed_shards
-          shards
-      in
-      (* Enqueue this reconstruction in a query_pipe to be sent to a reconstruction process *)
-      let* () =
-        enqueue_job_shards_proof
-          amplificator
-          commitment
-          slot_id
-          proto_parameters
-          shards
-      in
-      return_unit
+  Dal_metrics.reconstruction_started () ;
+  let*! () =
+    Event.(
+      emit
+        reconstruct_started
+        ( slot_id.slot_level,
+          slot_id.slot_index,
+          number_of_already_stored_shards,
+          number_of_shards ))
+  in
+  let shards =
+    Store.(Shards.read_all node_store.shards slot_id ~number_of_shards)
+    |> Seq_s.filter_map (function
+           | _, index, Ok share -> Some Cryptobox.{index; share}
+           | _ -> None)
+  in
+  let*? shards =
+    Seq_s.take
+      ~when_negative_length:[error_of_exn (Invalid_argument "Seq_s.take")]
+      number_of_needed_shards
+      shards
+  in
+  (* Enqueue this reconstruction in a query_pipe to be sent to a reconstruction process *)
+  let* () =
+    enqueue_job_shards_proof
+      amplificator
+      commitment
+      slot_id
+      proto_parameters
+      shards
+  in
+  return_unit
 
-let try_amplification node_ctxt commitment (slot_id : Types.slot_id)
-    amplificator =
+let try_amplification commitment (slot_id : Types.slot_id) amplificator =
   let open Lwt_result_syntax in
+  let node_ctxt = amplificator.node_ctxt in
   match Node_context.get_shards_proofs_precomputation node_ctxt with
   | None ->
-      (* The prover SRS is not loaded so we cannot reconstruct slots
-         yet. *)
+      (* The prover SRS is not loaded so we cannot reconstruct slots yet. *)
       let*! () =
         Event.(
           emit
