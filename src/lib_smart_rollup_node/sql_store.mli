@@ -61,3 +61,36 @@ module Commitments : sig
       (as known from the handled L1 blocks). *)
   val find_lpc : ?conn:Sqlite.conn -> _ t -> Commitment.t option tzresult Lwt.t
 end
+
+(** Storage mapping commitment hashes to the level when they were published by
+    the rollup node. *)
+module Commitments_published_at_levels : sig
+  type publication_levels = {
+    first_published_at_level : int32;
+        (** The level at which this commitment was first published. *)
+    published_at_level : int32 option;
+        (** The level at which we published this commitment. If
+            [first_published_at_level <> published_at_level] it means that the
+            commitment is republished. *)
+  }
+
+  (** [register ?conn s hash levels] stores the publication levels for
+      commitment whose hash is [hash].  *)
+  val register :
+    ?conn:Sqlite.conn ->
+    rw ->
+    Commitment.Hash.t ->
+    publication_levels ->
+    unit tzresult Lwt.t
+
+  (** Retrieve the publication levels for a commitment by its hash. *)
+  val get :
+    ?conn:Sqlite.conn ->
+    _ t ->
+    Commitment.Hash.t ->
+    publication_levels option tzresult Lwt.t
+
+  (** Retrieve the level at which a commitment was first published. *)
+  val get_first_published_level :
+    ?conn:Sqlite.conn -> _ t -> Commitment.Hash.t -> int32 option tzresult Lwt.t
+end

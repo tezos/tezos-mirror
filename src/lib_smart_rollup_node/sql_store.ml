@@ -276,3 +276,69 @@ module Commitments = struct
     with_connection store conn @@ fun conn ->
     Sqlite.Db.exec conn Q.delete_before level
 end
+
+module Commitments_published_at_levels = struct
+  type publication_levels = {
+    first_published_at_level : int32;
+    published_at_level : int32 option;
+  }
+
+  module Q = struct
+    open Types
+
+    let publication_levels =
+      product (fun first_published_at_level published_at_level ->
+          {first_published_at_level; published_at_level})
+      @@ proj level (fun p -> p.first_published_at_level)
+      @@ proj (option level) (fun p -> p.published_at_level)
+      @@ proj_end
+
+    let register =
+      (t2 commitment_hash publication_levels ->. unit)
+      @@ {sql|
+      REPLACE INTO commitments_published_at_levels
+      (commitment_hash, first_published_at_level, published_at_level)
+      VALUES (?, ?, ?)
+      |sql}
+
+    let select =
+      (commitment_hash ->? publication_levels)
+      @@ {sql|
+      SELECT first_published_at_level, published_at_level
+      FROM commitments_published_at_levels
+      WHERE commitment_hash = ?
+      |sql}
+
+    let first_published =
+      (commitment_hash ->? level)
+      @@ {sql|
+      SELECT first_published_at_level
+      FROM commitments_published_at_levels
+      WHERE commitment_hash = ?
+        AND first_published_at_level IS NOT NULL
+      |sql}
+
+    let delete_before =
+      (level ->. unit)
+      @@ {sql|
+      DELETE FROM commitments_published_at_levels
+      WHERE first_published_at_level < ?
+      |sql}
+  end
+
+  let register ?conn store commitment levels =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.exec conn Q.register (commitment, levels)
+
+  let get ?conn store commitment =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.find_opt conn Q.select commitment
+
+  let get_first_published_level ?conn store commitment =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.find_opt conn Q.first_published commitment
+
+  let delete_before ?conn store ~level =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.exec conn Q.delete_before level
+end
