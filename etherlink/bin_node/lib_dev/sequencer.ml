@@ -136,6 +136,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
       ~data_dir
       ~preimages:configuration.kernel_execution.preimages
       ?preimages_endpoint:configuration.kernel_execution.preimages_endpoint
+      ~finalized_view:configuration.finalized_view
       ()
   in
 

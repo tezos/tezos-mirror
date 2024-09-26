@@ -39,6 +39,7 @@ let main ~data_dir ~evm_node_endpoint ~(config : Configuration.t) =
       ~data_dir
       ~preimages:config.kernel_execution.preimages
       ?preimages_endpoint:config.kernel_execution.preimages_endpoint
+      ~finalized_view:config.finalized_view
       ()
   in
   let* () = Evm_ro_context.preload_known_kernels ctxt in

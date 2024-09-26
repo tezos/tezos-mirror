@@ -83,6 +83,7 @@ let main ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync () =
       ~data_dir
       ~preimages:config.kernel_execution.preimages
       ?preimages_endpoint:config.kernel_execution.preimages_endpoint
+      ~finalized_view:config.finalized_view
       ()
   in
 

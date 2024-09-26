@@ -118,10 +118,7 @@ type mode =
               proposals are forwarded, and from where preblocks are fetched. *)
       dal_slots : int list option;
     }
-  | Proxy of {
-      finalized_view : bool;
-          (** Expose the latest final block of the rollup instead of its current head *)
-    }
+  | Proxy
   | Rpc of mode
 
 (** Returns the mode of the EVM node. *)
@@ -180,6 +177,8 @@ val wait_for_ready : ?timeout:float -> t -> unit Lwt.t
 (** [wait_for_blueprint_applied ~timeout evm_node level] waits until
     [evm_node] has applied a blueprint locally for level [level]. *)
 val wait_for_blueprint_applied : ?timeout:float -> t -> int -> unit Lwt.t
+
+val wait_for_blueprint_finalized : ?timeout:float -> t -> int -> unit Lwt.t
 
 (** [wait_for_predownload_kernel ?timeout evm_node ~root_hash] waits until
     [evm_node] has download a kernel with [root_hash]. *)

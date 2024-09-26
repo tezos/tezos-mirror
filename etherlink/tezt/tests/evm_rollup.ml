@@ -442,7 +442,7 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
   let* produce_block, evm_node =
     match setup_mode with
     | Setup_proxy ->
-        let mode = Evm_node.(Proxy {finalized_view = false}) in
+        let mode = Evm_node.Proxy in
         let* evm_node =
           Evm_node.init
             ~patch_config
@@ -3151,9 +3151,7 @@ let gen_kernel_migration_test ~from ~to_ ?bootstrap_accounts ?chain_id
   in
   (* Load the EVM rollup's storage and sanity check results. *)
   let* evm_node =
-    Evm_node.init
-      ~mode:(Proxy {finalized_view = false})
-      (Sc_rollup_node.endpoint evm_setup.sc_rollup_node)
+    Evm_node.init ~mode:Proxy (Sc_rollup_node.endpoint evm_setup.sc_rollup_node)
   in
   let endpoint = Evm_node.endpoint evm_node in
   let* sanity_check =
@@ -3172,9 +3170,7 @@ let gen_kernel_migration_test ~from ~to_ ?bootstrap_accounts ?chain_id
       ~client:evm_setup.client
   in
   let* evm_node =
-    Evm_node.init
-      ~mode:(Proxy {finalized_view = false})
-      (Sc_rollup_node.endpoint evm_setup.sc_rollup_node)
+    Evm_node.init ~mode:Proxy (Sc_rollup_node.endpoint evm_setup.sc_rollup_node)
   in
   let evm_setup = {evm_setup with evm_node} in
   (* Check the values after the upgrade with [sanity_check] results. *)

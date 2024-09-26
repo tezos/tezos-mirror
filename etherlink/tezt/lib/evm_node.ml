@@ -90,7 +90,7 @@ type mode =
       sequencer_sidecar_endpoint : string;
       dal_slots : int list option;
     }
-  | Proxy of {finalized_view : bool}
+  | Proxy
   | Rpc of mode
 
 module Per_level_map = Map.Make (Int)
@@ -103,6 +103,9 @@ module Parameters = struct
     mutable pending_blueprint_injected : unit option Lwt.u list Per_level_map.t;
     mutable last_applied_level : int;
     mutable pending_blueprint_applied : unit option Lwt.u list Per_level_map.t;
+    mutable last_finalized_level : int;
+    mutable pending_blueprint_finalized :
+      unit option Lwt.u list Per_level_map.t;
     mode : mode;
     data_dir : string;
     rpc_addr : string;
@@ -127,7 +130,14 @@ let mode t = t.persistent_state.mode
 let is_sequencer t =
   match t.persistent_state.mode with
   | Sequencer _ | Sandbox _ | Threshold_encryption_sequencer _ -> true
-  | Observer _ | Threshold_encryption_observer _ | Proxy _ | Rpc _ -> false
+  | Observer _ | Threshold_encryption_observer _ | Proxy | Rpc _ -> false
+
+let is_observer t =
+  match t.persistent_state.mode with
+  | Sequencer _ | Sandbox _ | Threshold_encryption_sequencer _ | Proxy | Rpc _
+    ->
+      false
+  | Observer _ | Threshold_encryption_observer _ -> true
 
 let initial_kernel t =
   let rec from_mode = function
@@ -138,7 +148,7 @@ let initial_kernel t =
     | Threshold_encryption_observer {initial_kernel; _} ->
         initial_kernel
     | Rpc mode -> from_mode mode
-    | Proxy _ -> Test.fail "cannot start a RPC node from a proxy node"
+    | Proxy -> Test.fail "cannot start a RPC node from a proxy node"
   in
   from_mode t.persistent_state.mode
 
@@ -147,7 +157,7 @@ let can_apply_blueprint t =
   | Sequencer _ | Sandbox _ | Threshold_encryption_sequencer _ | Observer _
   | Threshold_encryption_observer _ ->
       true
-  | Proxy _ | Rpc _ -> false
+  | Proxy | Rpc _ -> false
 
 let connection_arguments ?rpc_addr ?rpc_port ?runner () =
   let rpc_port =
@@ -178,6 +188,15 @@ let trigger_blueprint_injected evm_node level =
   List.iter (fun pending -> Lwt.wakeup_later pending (Some ()))
   @@ Option.value ~default:[] pending_for_level
 
+let trigger_blueprint_finalized evm_node level =
+  let pending = evm_node.persistent_state.pending_blueprint_finalized in
+  let pending_for_level = Per_level_map.find_opt level pending in
+  evm_node.persistent_state.last_finalized_level <- level ;
+  evm_node.persistent_state.pending_blueprint_finalized <-
+    Per_level_map.remove level pending ;
+  List.iter (fun pending -> Lwt.wakeup_later pending (Some ()))
+  @@ Option.value ~default:[] pending_for_level
+
 let trigger_blueprint_applied evm_node level =
   let pending = evm_node.persistent_state.pending_blueprint_applied in
   let pending_for_level = Per_level_map.find_opt level pending in
@@ -197,6 +216,9 @@ let event_ready_name = "is_ready.v0"
 
 let event_blueprint_injected_name = "blueprint_injection.v0"
 
+let event_blueprint_finalized_name =
+  "evm_events_follower_upstream_blueprint_applied.v0"
+
 let event_blueprint_applied_name = "blueprint_application.v0"
 
 let handle_is_ready_event (evm_node : t) {name; value = _; timestamp = _} =
@@ -206,6 +228,12 @@ let handle_blueprint_injected_event (evm_node : t) {name; value; timestamp = _}
     =
   if name = event_blueprint_injected_name then
     trigger_blueprint_injected evm_node JSON.(value |> as_int)
+  else ()
+
+let handle_blueprint_finalized_event (evm_node : t) {name; value; timestamp = _}
+    =
+  if name = event_blueprint_finalized_name then
+    trigger_blueprint_finalized evm_node JSON.(value |-> "level" |> as_int)
   else ()
 
 let handle_blueprint_applied_event (evm_node : t) {name; value; timestamp = _} =
@@ -251,6 +279,29 @@ let wait_for_ready ?timeout evm_node =
       evm_node.persistent_state.pending_ready <-
         resolver :: evm_node.persistent_state.pending_ready ;
       wait_for_event_listener ?timeout evm_node ~event:event_ready_name promise
+
+let wait_for_blueprint_finalized ?timeout evm_node level =
+  match evm_node.status with
+  | Running {session_state = {ready = true; _}; _}
+    when is_sequencer evm_node || is_observer evm_node ->
+      let current_level = evm_node.persistent_state.last_finalized_level in
+      if level <= current_level then unit
+      else
+        let promise, resolver = Lwt.task () in
+        evm_node.persistent_state.pending_blueprint_finalized <-
+          Per_level_map.update
+            level
+            (fun pending -> Some (resolver :: Option.value ~default:[] pending))
+            evm_node.persistent_state.pending_blueprint_finalized ;
+        wait_for_event_listener
+          ?timeout
+          evm_node
+          ~event:event_blueprint_finalized_name
+          promise
+  | Running {session_state = {ready = true; _}; _} ->
+      failwith "EVM node is not a stateful node"
+  | Not_running | Running {session_state = {ready = false; _}; _} ->
+      failwith "EVM node is not ready"
 
 let wait_for_blueprint_injected ?timeout evm_node level =
   match evm_node.status with
@@ -487,14 +538,13 @@ let wait_for_tx_pool_add_transaction ?timeout evm_node =
   @@ JSON.as_string_opt
 
 let create ?(path = Uses.path Constant.octez_evm_node) ?name ?runner
-    ?(mode = Proxy {finalized_view = false}) ?data_dir ?rpc_addr ?rpc_port
-    ?restricted_rpcs endpoint =
+    ?(mode = Proxy) ?data_dir ?rpc_addr ?rpc_port ?restricted_rpcs endpoint =
   let arguments, rpc_addr, rpc_port =
     connection_arguments ?rpc_addr ?rpc_port ?runner ()
   in
   let new_name () =
     match mode with
-    | Proxy _ -> "proxy_" ^ fresh_name ()
+    | Proxy -> "proxy_" ^ fresh_name ()
     | Sequencer _ -> "sequencer_" ^ fresh_name ()
     | Sandbox _ -> "sandbox_" ^ fresh_name ()
     | Threshold_encryption_sequencer _ -> "te_sequencer_" ^ fresh_name ()
@@ -518,6 +568,8 @@ let create ?(path = Uses.path Constant.octez_evm_node) ?name ?runner
         pending_blueprint_injected = Per_level_map.empty;
         last_applied_level = 0;
         pending_blueprint_applied = Per_level_map.empty;
+        last_finalized_level = 0;
+        pending_blueprint_finalized = Per_level_map.empty;
         mode;
         data_dir;
         rpc_addr;
@@ -530,6 +582,7 @@ let create ?(path = Uses.path Constant.octez_evm_node) ?name ?runner
   on_event evm_node (handle_is_ready_event evm_node) ;
   on_event evm_node (handle_blueprint_injected_event evm_node) ;
   on_event evm_node (handle_blueprint_applied_event evm_node) ;
+  on_event evm_node (handle_blueprint_finalized_event evm_node) ;
   evm_node
 
 let name evm_node = evm_node.name
@@ -548,9 +601,7 @@ let run_args evm_node =
   in
   let mode_args =
     match evm_node.persistent_state.mode with
-    | Proxy {finalized_view} ->
-        ["run"; "proxy"]
-        @ Cli_arg.optional_switch "finalized-view" finalized_view
+    | Proxy -> ["run"; "proxy"]
     | Sequencer {initial_kernel; genesis_timestamp; wallet_dir; _} ->
         ["run"; "sequencer"; "--initial-kernel"; initial_kernel]
         @ Cli_arg.optional_arg
@@ -690,7 +741,7 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
   in
   let mode_args =
     match evm_node.persistent_state.mode with
-    | Proxy _ -> ["--rollup-node-endpoint"; evm_node.persistent_state.endpoint]
+    | Proxy -> ["--rollup-node-endpoint"; evm_node.persistent_state.endpoint]
     | Rpc _ -> []
     | Sequencer
         {
@@ -933,7 +984,7 @@ let rpc_endpoint ?(local = false) ?(private_ = false) (evm_node : t) =
       | Threshold_encryption_sequencer {private_rpc_port = None; _} ->
           Test.fail
             "Threshold encryption sequencer doesn't have a private RPC server"
-      | Proxy _ -> Test.fail "Proxy doesn't have a private RPC server"
+      | Proxy -> Test.fail "Proxy doesn't have a private RPC server"
       | Observer _ -> Test.fail "Observer doesn't have a private RPC server"
       | Rpc _ -> Test.fail "Rpc node doesn't have a private RPC server"
       | Threshold_encryption_observer _ ->
@@ -1327,7 +1378,7 @@ let preimages_dir evm_node =
     | Observer {preimages_dir; _}
     | Threshold_encryption_observer {preimages_dir; _} ->
         preimages_dir
-    | Proxy _ -> Test.fail "cannot start a RPC node from a proxy node"
+    | Proxy -> Test.fail "cannot start a RPC node from a proxy node"
   in
   from_node ~data_dir:(data_dir evm_node) evm_node.persistent_state.mode
 
@@ -1336,6 +1387,6 @@ let supports_threshold_encryption evm_node =
     | Sandbox _ | Sequencer _ | Observer _ -> false
     | Threshold_encryption_observer _ | Threshold_encryption_sequencer _ -> true
     | Rpc mode -> from_node mode
-    | Proxy _ -> Test.fail "cannot start a RPC node from a proxy node"
+    | Proxy -> Test.fail "cannot start a RPC node from a proxy node"
   in
   from_node evm_node.persistent_state.mode

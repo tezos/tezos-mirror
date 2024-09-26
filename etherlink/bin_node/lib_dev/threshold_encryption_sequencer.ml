@@ -105,6 +105,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
       ~data_dir
       ~preimages:configuration.kernel_execution.preimages
       ?preimages_endpoint:configuration.kernel_execution.preimages_endpoint
+      ~finalized_view:configuration.finalized_view
       ()
   in
   let ro_backend = Evm_ro_context.ro_backend ro_ctxt configuration in

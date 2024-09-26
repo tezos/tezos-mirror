@@ -61,7 +61,7 @@ type observer = {
 }
 
 type proxy = {
-  finalized_view : bool;
+  finalized_view : bool option;
   evm_node_endpoint : Uri.t option;
   ignore_block_param : bool;
 }
@@ -106,6 +106,7 @@ type t = {
   verbose : Internal_event.level;
   experimental_features : experimental_features;
   fee_history : fee_history;
+  finalized_view : bool;
 }
 
 let default_filter_config ?max_nb_blocks ?max_nb_logs ?chunk_size () =
@@ -721,13 +722,19 @@ let proxy_encoding =
         ignore_block_param;
       })
   @@ obj3
-       (dft "finalized_view" bool false)
+       (opt
+          ~description:
+            "When enabled, the node only expose blocks that are finalized, \
+             i.e., the `latest` block parameter becomes a synonym for \
+             `finalized`. DEPRECATED: use the top level `finalized_view` \
+             option instead."
+          "finalized_view"
+          bool)
        (opt "evm_node_endpoint" string)
        (dft "ignore_block_param" bool false)
 
-let default_proxy ?(finalized_view = false) ?evm_node_endpoint
-    ?(ignore_block_param = false) () =
-  {finalized_view; evm_node_endpoint; ignore_block_param}
+let default_proxy ?evm_node_endpoint ?(ignore_block_param = false) () =
+  {finalized_view = None; evm_node_endpoint; ignore_block_param}
 
 let fee_history_encoding =
   let open Data_encoding in
@@ -857,6 +864,7 @@ let encoding data_dir : t Data_encoding.t =
            experimental_features;
            fee_history;
            kernel_execution;
+           finalized_view;
          } ->
       ( (log_filter, sequencer, threshold_encryption_sequencer, observer),
         ( ( tx_pool_timeout_limit,
@@ -868,7 +876,7 @@ let encoding data_dir : t Data_encoding.t =
             experimental_features,
             proxy,
             fee_history ),
-          (kernel_execution, public_rpc, private_rpc) ) ))
+          (kernel_execution, public_rpc, private_rpc, finalized_view) ) ))
     (fun ( (log_filter, sequencer, threshold_encryption_sequencer, observer),
            ( ( tx_pool_timeout_limit,
                tx_pool_addr_limit,
@@ -879,7 +887,7 @@ let encoding data_dir : t Data_encoding.t =
                experimental_features,
                proxy,
                fee_history ),
-             (kernel_execution, public_rpc, private_rpc) ) ) ->
+             (kernel_execution, public_rpc, private_rpc, finalized_view) ) ) ->
       {
         public_rpc;
         private_rpc;
@@ -897,6 +905,7 @@ let encoding data_dir : t Data_encoding.t =
         experimental_features;
         fee_history;
         kernel_execution;
+        finalized_view;
       })
     (merge_objs
        (obj4
@@ -954,13 +963,21 @@ let encoding data_dir : t Data_encoding.t =
                 default_experimental_features)
              (dft "proxy" proxy_encoding (default_proxy ()))
              (dft "fee_history" fee_history_encoding default_fee_history))
-          (obj3
+          (obj4
              (dft
                 "kernel_execution"
                 (kernel_execution_encoding data_dir)
                 (kernel_execution_config_dft ~data_dir ()))
              (dft "public_rpc" rpc_encoding (default_rpc ()))
-             (opt "private_rpc" rpc_encoding))))
+             (opt "private_rpc" rpc_encoding)
+             (dft
+                ~description:
+                  "When enabled, the node only expose blocks that are \
+                   finalized, i.e., the `latest` block parameter becomes a \
+                   synonym for `finalized`."
+                "finalized_view"
+                bool
+                false))))
 
 let pp_print_json ~data_dir fmt config =
   let json =
@@ -984,11 +1001,51 @@ let save ~force ~data_dir config =
     let*! () = Lwt_utils_unix.create_dir data_dir in
     Lwt_utils_unix.Json.write_file config_file json
 
+module Json_syntax = struct
+  let ( |-?> ) json field =
+    match json with
+    | `O assoc -> List.assoc ~equal:String.equal field assoc
+    | _ -> None
+
+  let ( |?-?> ) json field =
+    match json with
+    | Some (`O assoc) -> List.assoc ~equal:String.equal field assoc
+    | _ -> None
+
+  let ( |?> ) x f = match x with Some x -> f x | None -> None
+
+  let as_bool_opt = function `Bool b -> Some b | _ -> None
+end
+
+(* Syntactic checks related to deprecations *)
+let precheck json =
+  let open Lwt_result_syntax in
+  Lwt.catch
+    (fun () ->
+      let open Json_syntax in
+      (* Conflicts between [.proxy.finalized_view] and [.finalized_view] *)
+      let proxy_conf =
+        json |-?> "proxy" |?-?> "finalized_view" |?> as_bool_opt
+      in
+      let toplevel_conf = json |-?> "finalized_view" |?> as_bool_opt in
+      let* () =
+        match (proxy_conf, toplevel_conf) with
+        | Some b, Some b' ->
+            when_ (b <> b') @@ fun () ->
+            failwith
+              "`proxy.finalized_view` and `finalized_view` are inconsistent."
+        | _ -> return_unit
+      in
+
+      return_unit)
+    (fun _exn -> failwith "Syntax error in the configuration file")
+
 let load_file ~data_dir path =
   let open Lwt_result_syntax in
-  let+ json = Lwt_utils_unix.Json.read_file path in
+  let* json = Lwt_utils_unix.Json.read_file path in
+  let* () = precheck json in
   let config = Data_encoding.Json.destruct (encoding data_dir) json in
-  config
+  return config
 
 let load ~data_dir = load_file ~data_dir (config_filename ~data_dir)
 
@@ -1016,7 +1073,7 @@ module Cli = struct
       ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
       ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
       ?catchup_cooldown ?sequencer_sidecar_endpoint ?restricted_rpcs
-      ?proxy_finalized_view ?proxy_ignore_block_param ?dal_slots () =
+      ~finalized_view ?proxy_ignore_block_param ?dal_slots () =
     let public_rpc =
       default_rpc
         ?rpc_port
@@ -1074,7 +1131,6 @@ module Cli = struct
     in
     let proxy =
       default_proxy
-        ?finalized_view:proxy_finalized_view
         ?evm_node_endpoint
         ?ignore_block_param:proxy_ignore_block_param
         ()
@@ -1116,6 +1172,7 @@ module Cli = struct
       verbose = (if verbose then Debug else Internal_event.Notice);
       experimental_features = default_experimental_features;
       fee_history = default_fee_history;
+      finalized_view;
     }
 
   let patch_kernel_execution_config kernel_execution ?preimages
@@ -1151,7 +1208,7 @@ module Cli = struct
       ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
       ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
       ?catchup_cooldown ?sequencer_sidecar_endpoint ?restricted_rpcs
-      ?proxy_finalized_view ?proxy_ignore_block_param ~dal_slots configuration =
+      ~finalized_view ?proxy_ignore_block_param ~dal_slots configuration =
     let public_rpc =
       patch_rpc
         ?rpc_addr
@@ -1329,11 +1386,17 @@ module Cli = struct
             evm_node_endpoint
     in
     let proxy =
-      default_proxy
-        ?finalized_view:proxy_finalized_view
-        ?evm_node_endpoint
-        ?ignore_block_param:proxy_ignore_block_param
-        ()
+      {
+        evm_node_endpoint =
+          Option.either evm_node_endpoint configuration.proxy.evm_node_endpoint;
+        ignore_block_param =
+          Option.value
+            ~default:configuration.proxy.ignore_block_param
+            proxy_ignore_block_param;
+        finalized_view =
+          (if finalized_view then Some true
+           else configuration.proxy.finalized_view);
+      }
     in
     let log_filter =
       {
@@ -1390,6 +1453,7 @@ module Cli = struct
       verbose = (if verbose then Debug else configuration.verbose);
       experimental_features = configuration.experimental_features;
       fee_history = configuration.fee_history;
+      finalized_view = finalized_view || configuration.finalized_view;
     }
 
   let create_or_read_config ~data_dir ?rpc_addr ?rpc_port ?rpc_batch_limit
@@ -1401,7 +1465,7 @@ module Cli = struct
       ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
       ?catchup_cooldown ?log_filter_max_nb_blocks ?log_filter_max_nb_logs
       ?log_filter_chunk_size ?sequencer_sidecar_endpoint ?restricted_rpcs
-      ?proxy_finalized_view ?proxy_ignore_block_param ?dal_slots () =
+      ~finalized_view ?proxy_ignore_block_param ?dal_slots () =
     let open Lwt_result_syntax in
     let open Filename.Infix in
     (* Check if the data directory of the evm node is not the one of Octez
@@ -1453,7 +1517,7 @@ module Cli = struct
           ?log_filter_chunk_size
           ?sequencer_sidecar_endpoint
           ?restricted_rpcs
-          ?proxy_finalized_view
+          ~finalized_view
           ?proxy_ignore_block_param
           ~dal_slots
           configuration
@@ -1492,7 +1556,7 @@ module Cli = struct
           ?log_filter_chunk_size
           ?sequencer_sidecar_endpoint
           ?restricted_rpcs
-          ?proxy_finalized_view
+          ~finalized_view
           ?proxy_ignore_block_param
           ?dal_slots
           ()

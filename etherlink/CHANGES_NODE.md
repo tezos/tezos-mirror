@@ -6,6 +6,12 @@
 
 #### RPCs
 
+- Generalized the support for the `--finalized-view` CLI argument. When
+  enabled, the `latest` block parameter becomes a synonym for `finalized`.
+  As a consequence, the `proxy.finalized_view` configuration parameter is
+  **deprecated**, in favor of the newly introduced `finalized_view` toplevel
+  configuration parameter. `proxy.finalized_view` will be removed in a future
+  version. (!15080)
 - **Experimental:** Introduce the experimental feature
   `ovewrite_simulation_tick_limit`. When enabled, the `eth_call` RPC is no
   longer subject to the kernel tick limit. This can be useful to execute calls

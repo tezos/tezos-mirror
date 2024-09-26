@@ -119,6 +119,14 @@ let event_retrying_connect =
     ("endpoint", Data_encoding.string)
     ("delay", Data_encoding.float)
 
+let event_deprecation_note =
+  Internal_event.Simple.declare_1
+    ~section
+    ~name:"deprecation_note"
+    ~msg:"{msg}"
+    ~level:Warning
+    ("msg", Data_encoding.string)
+
 type kernel_log_kind = Application | Simulation
 
 type kernel_log_level = Debug | Info | Error | Fatal
@@ -264,3 +272,5 @@ let cannot_fetch_time_between_blocks fallback trace =
 
 let invalid_node_da_fees ~node_da_fees ~kernel_da_fees =
   emit invalid_node_da_fees (node_da_fees, kernel_da_fees)
+
+let deprecation_note msg = emit event_deprecation_note msg

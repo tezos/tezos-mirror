@@ -88,7 +88,7 @@ type observer = {
 }
 
 type proxy = {
-  finalized_view : bool;
+  finalized_view : bool option;
       (** Provide a view on the latest final state of the rollup, not its
           current HEAD. *)
   evm_node_endpoint : Uri.t option;
@@ -135,6 +135,7 @@ type t = {
   verbose : Internal_event.level;
   experimental_features : experimental_features;
   fee_history : fee_history;
+  finalized_view : bool;
 }
 
 (** [encoding data_dir] is the encoding of {!t} based on data dir [data_dir]. *)
@@ -242,7 +243,7 @@ module Cli : sig
     ?catchup_cooldown:int ->
     ?sequencer_sidecar_endpoint:Uri.t ->
     ?restricted_rpcs:restricted_rpcs ->
-    ?proxy_finalized_view:bool ->
+    finalized_view:bool ->
     ?proxy_ignore_block_param:bool ->
     ?dal_slots:int list ->
     unit ->
@@ -278,7 +279,7 @@ module Cli : sig
     ?catchup_cooldown:int ->
     ?sequencer_sidecar_endpoint:Uri.t ->
     ?restricted_rpcs:restricted_rpcs ->
-    ?proxy_finalized_view:bool ->
+    finalized_view:bool ->
     ?proxy_ignore_block_param:bool ->
     dal_slots:int trace option ->
     t ->
@@ -315,7 +316,7 @@ module Cli : sig
     ?log_filter_chunk_size:int ->
     ?sequencer_sidecar_endpoint:Uri.t ->
     ?restricted_rpcs:restricted_rpcs ->
-    ?proxy_finalized_view:bool ->
+    finalized_view:bool ->
     ?proxy_ignore_block_param:bool ->
     ?dal_slots:int list ->
     unit ->

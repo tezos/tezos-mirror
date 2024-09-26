@@ -12,6 +12,7 @@ type t = {
   store : Evm_store.t;
   smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
   index : Irmin_context.ro_index;
+  finalized_view : bool;
 }
 
 (** [load ~data_dir ~preimages ()] creates a new read-only handler on the
@@ -25,6 +26,7 @@ val load :
   data_dir:string ->
   preimages:string ->
   ?preimages_endpoint:Uri.t ->
+  finalized_view:bool ->
   unit ->
   t tzresult Lwt.t
 

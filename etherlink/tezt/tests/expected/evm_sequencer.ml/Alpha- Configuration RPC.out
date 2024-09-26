@@ -18,7 +18,6 @@
     "overwrite_simulation_tick_limit": false
   },
   "proxy": {
-    "finalized_view": false,
     "ignore_block_param": false
   },
   "fee_history": {},
@@ -33,7 +32,8 @@
     "batch_limit": "unlimited",
     "restricted_rpcs": "unrestricted",
     "max_active_connections": "unlimited"
-  }
+  },
+  "finalized_view": false
 }
 {
   "log_filter": {
@@ -66,7 +66,6 @@
     "overwrite_simulation_tick_limit": false
   },
   "proxy": {
-    "finalized_view": false,
     "ignore_block_param": false
   },
   "fee_history": {},
@@ -81,7 +80,8 @@
     "batch_limit": "unlimited",
     "restricted_rpcs": "unrestricted",
     "max_active_connections": "unlimited"
-  }
+  },
+  "finalized_view": false
 }
 {
   "log_filter": {
@@ -107,7 +107,7 @@
     "overwrite_simulation_tick_limit": false
   },
   "proxy": {
-    "finalized_view": false,
+    "evm_node_endpoint": "hidden",
     "ignore_block_param": false
   },
   "fee_history": {},
@@ -122,5 +122,6 @@
     "batch_limit": "unlimited",
     "restricted_rpcs": "unrestricted",
     "max_active_connections": "unlimited"
-  }
+  },
+  "finalized_view": false
 }

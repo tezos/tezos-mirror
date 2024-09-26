@@ -81,7 +81,7 @@ let produce_block ?(wait_on_blueprint_applied = true) ?timestamp evm_node =
 
 let next_evm_level ~evm_node ~sc_rollup_node ~client =
   match Evm_node.mode evm_node with
-  | Proxy _ ->
+  | Proxy ->
       let* _l1_level = next_rollup_node_level ~sc_rollup_node ~client in
       unit
   | Sequencer _ | Sandbox _ | Threshold_encryption_sequencer _ ->
