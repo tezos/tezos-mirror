@@ -135,9 +135,6 @@ module WASM = struct
     Uses.make ~tag:"tx_kernel_dal" ~path:"tx_kernel_dal.wasm" ()
 end
 
-let _octez_proto_manager =
-  Uses.make ~tag:"proto_manager" ~path:"./octez-proto-manager"
-
 (* TODO: tezos/tezos#4803
    Can we do better than to depend on script-inputs?
 *)

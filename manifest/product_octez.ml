@@ -4306,14 +4306,6 @@ let _octogram_bin =
         yaml;
       ]
 
-let _octez_proto_manager =
-  public_exe
-    "octez-proto-manager"
-    ~path:"src/bin_proto_manager"
-    ~internal_name:"main"
-    ~synopsis:"Tezos protocol manager"
-    ~deps:[unix; cmdliner; octez_version_value]
-
 let octez_openapi =
   public_lib
     "tezos-openapi"

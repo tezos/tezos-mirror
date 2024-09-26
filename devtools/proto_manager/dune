@@ -3,13 +3,12 @@
 
 (executable
  (name main)
- (public_name octez-proto-manager)
- (package octez-proto-manager)
+ (public_name proto-manager)
+ (package proto-manager)
  (instrumentation (backend bisect_ppx))
  (libraries
   unix
-  cmdliner
-  octez-version.value)
+  cmdliner)
  (link_flags
   (:standard)
   (:include %{workspace_root}/static-link-flags.sexp)))

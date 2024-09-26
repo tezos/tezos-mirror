@@ -73,3 +73,11 @@ let _benchmark_tools_occupy_memory =
     ~deps:[]
     ~static:false
     ~bisect_ppx:No
+
+let _octez_proto_manager =
+  public_exe
+    "proto-manager"
+    ~path:"devtools/proto_manager"
+    ~internal_name:"main"
+    ~synopsis:"Tezos protocol manager"
+    ~deps:[unix; cmdliner]
