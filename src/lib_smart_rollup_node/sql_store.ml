@@ -79,6 +79,12 @@ module Types = struct
         |> Result.map_error (fun err -> Format.asprintf "%a" pp_print_trace err))
       t
 
+  let block_hash =
+    tzcustom
+      ~encode:Block_hash.to_b58check
+      ~decode:Block_hash.of_b58check
+      string
+
   let inbox_hash =
     tzcustom
       ~encode:Inbox_hash.to_b58check
@@ -773,4 +779,44 @@ module Dal_slots_statuses = struct
   let list_slot_statuses ?conn store block =
     with_connection store conn @@ fun conn ->
     Sqlite.Db.rev_collect_list conn Q.select_slot_statuses block
+end
+
+module L2_levels = struct
+  module Q = struct
+    open Types
+
+    let insert =
+      (t2 level block_hash ->. unit)
+      @@ {sql|
+      REPLACE INTO l2_levels
+      (level, block_hash)
+      VALUES (?, ?)
+      |sql}
+
+    let select =
+      (level ->? block_hash)
+      @@ {sql|
+      SELECT block_hash
+      FROM l2_levels
+      WHERE level = ?
+      |sql}
+
+    let delete_before =
+      (level ->. unit)
+      @@ {sql|
+      DELETE FROM l2_levels WHERE level < ?
+      |sql}
+  end
+
+  let store ?conn store level block =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.exec conn Q.insert (level, block)
+
+  let find ?conn store level =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.find_opt conn Q.select level
+
+  let delete_before ?conn store ~level =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.exec conn Q.delete_before level
 end

@@ -268,3 +268,15 @@ module Dal_slots_statuses : sig
     Block_hash.t ->
     (Dal.Slot_index.t * [`Confirmed | `Unconfirmed]) list tzresult Lwt.t
 end
+
+(** Storage for associating levels to block hashes  *)
+module L2_levels : sig
+  (** [store ?conn s level block] associates the block hash [block] to
+      [level]. *)
+  val store :
+    ?conn:Sqlite.conn -> rw -> int32 -> Block_hash.t -> unit tzresult Lwt.t
+
+  (** Retrieve the block hash associated to a given level. *)
+  val find :
+    ?conn:Sqlite.conn -> _ t -> int32 -> Block_hash.t option tzresult Lwt.t
+end
