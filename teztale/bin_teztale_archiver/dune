@@ -15,6 +15,8 @@
   octez-libs.rpc-http-client-unix
   octez-libs.rpc-http
   octez-version.value
+  tls-lwt
+  conduit-lwt-unix
   lib_teztale_base
   x509
   (select PtCJ7pwo_machine.ml from
