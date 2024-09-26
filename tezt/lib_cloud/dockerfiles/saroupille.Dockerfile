@@ -1,7 +1,9 @@
 # When copying this image, feel free to change to debian:stable if you
 # encounter any dependency issue
-FROM debian:sid as raw
+FROM debian:sid AS raw
 
+# ignore "Pin versions in apt get install" hadolint warning
+# hadolint ignore=DL3008
 RUN apt-get update && apt-get install -y \
     # netbase is needed to handle transport services
     netbase \
@@ -15,14 +17,16 @@ RUN apt-get update && apt-get install -y \
     libpq-dev \
     # Dependencies needed for tezt-cloud
     docker.io docker-cli screen file \
-    # iproute2 installs traffic control tooling 
+    # iproute2 installs traffic control tooling
     iproute2 \
-    # emacs can be useful for debugging 
+    # emacs can be useful for debugging
     emacs \
-    # wget can be used to import snapshots 
+    # wget can be used to import snapshots
     wget \
     # Necessary certificates for mirages dependencies
     ca-certificates \
+    # jq is useful for pretty-printing json
+    jq \
     # DL3015: Use --no-install-recommends
     --no-install-recommends && \
     # DL3009: Delete the apt-get lists after Installing
@@ -48,7 +52,7 @@ COPY $DAL_TRUSTED_SETUP_PATH /usr/local/share/dal-trusted-setup
 CMD ["-D", "-p", "30000", "-e"]
 ENTRYPOINT ["/usr/sbin/sshd"]
 
-FROM raw as full
+FROM raw AS full
 # Path where binaries should be stored on the docker container
 ARG BINARIES_DESTINATION_PATH
 COPY ./octez-node $BINARIES_DESTINATION_PATH/octez-node
