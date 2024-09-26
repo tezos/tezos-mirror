@@ -94,3 +94,18 @@ module Commitments_published_at_levels : sig
   val get_first_published_level :
     ?conn:Sqlite.conn -> _ t -> Commitment.Hash.t -> int32 option tzresult Lwt.t
 end
+
+(** Aggregated collection of messages from the L1 inbox *)
+module Inboxes : sig
+  (** [store ?conn s inbox] stores the [inbox], associated to its hash and
+      returns it. *)
+  val store : ?conn:Sqlite.conn -> rw -> Inbox.t -> Inbox_hash.t tzresult Lwt.t
+
+  (** Retrieve an inbox by its hash. *)
+  val find :
+    ?conn:Sqlite.conn -> _ t -> Inbox_hash.t -> Inbox.t option tzresult Lwt.t
+
+  (** Retrieve an inbox by its the block hash in which it appeared. *)
+  val find_by_block_hash :
+    ?conn:Sqlite.conn -> _ t -> Block_hash.t -> Inbox.t option tzresult Lwt.t
+end

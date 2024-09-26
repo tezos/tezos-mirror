@@ -53,6 +53,24 @@ let with_transaction store k =
 module Types = struct
   let level = int32
 
+  let from_encoding ~name encoding =
+    custom
+      ~encode:(fun v ->
+        Data_encoding.Binary.to_string encoding v
+        |> Result.map_error
+             (Format.asprintf
+                "Fail to encode %s for database: %a"
+                name
+                Data_encoding.Binary.pp_write_error))
+      ~decode:(fun s ->
+        Data_encoding.Binary.of_string encoding s
+        |> Result.map_error
+             (Format.asprintf
+                "Fail to decode %s in database: %a"
+                name
+                Data_encoding.Binary.pp_read_error))
+      octets
+
   let tzcustom ~encode ~decode t =
     custom
       ~encode:(fun v -> Ok (encode v))
@@ -60,6 +78,12 @@ module Types = struct
         decode s
         |> Result.map_error (fun err -> Format.asprintf "%a" pp_print_trace err))
       t
+
+  let inbox_hash =
+    tzcustom
+      ~encode:Inbox_hash.to_b58check
+      ~decode:Inbox_hash.of_b58check
+      string
 
   let commitment_hash =
     tzcustom
@@ -73,6 +97,9 @@ module Types = struct
       ~decode:State_hash.of_b58check
       string
 
+  let history_proof =
+    from_encoding ~name:"Inbox.history_proof" Inbox.history_proof_encoding
+
   let commitment =
     product (fun compressed_state inbox_level predecessor number_of_ticks ->
         Commitment.{compressed_state; inbox_level; predecessor; number_of_ticks})
@@ -80,6 +107,12 @@ module Types = struct
     @@ proj level (fun c -> c.Commitment.inbox_level)
     @@ proj commitment_hash (fun c -> c.Commitment.predecessor)
     @@ proj int64 (fun c -> c.Commitment.number_of_ticks)
+    @@ proj_end
+
+  let inbox =
+    product (fun level m -> Inbox.{level; old_levels_messages = m})
+    @@ proj level (fun i -> i.Inbox.level)
+    @@ proj history_proof (fun i -> i.Inbox.old_levels_messages)
     @@ proj_end
 end
 
@@ -337,6 +370,62 @@ module Commitments_published_at_levels = struct
   let get_first_published_level ?conn store commitment =
     with_connection store conn @@ fun conn ->
     Sqlite.Db.find_opt conn Q.first_published commitment
+
+  let delete_before ?conn store ~level =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.exec conn Q.delete_before level
+end
+
+module Inboxes = struct
+  module Q = struct
+    open Types
+
+    let insert =
+      (t2 inbox_hash inbox ->. unit)
+      @@ {sql|
+      REPLACE INTO inboxes
+      (hash, inbox_level, history_proof)
+      VALUES (?, ?, ?)
+      |sql}
+
+    let select =
+      (inbox_hash ->? inbox)
+      @@ {sql|
+      SELECT inbox_level, history_proof
+      FROM inboxes
+      WHERE hash = ?
+      |sql}
+
+    let select_by_block_hash =
+      (block_hash ->? inbox)
+      @@ {sql|
+      SELECT i.inbox_level, i.history_proof
+      FROM inboxes as i
+      INNER JOIN l2_blocks as b
+      ON b.inbox_hash = i.hash AND b.block_hash = ?
+      |sql}
+
+    let delete_before =
+      (level ->. unit)
+      @@ {sql|
+      DELETE FROM inboxes WHERE inbox_level < ?
+      |sql}
+  end
+
+  let store ?conn store inbox =
+    let open Lwt_result_syntax in
+    with_connection store conn @@ fun conn ->
+    let hash = Inbox.hash inbox in
+    let+ () = Sqlite.Db.exec conn Q.insert (hash, inbox) in
+    hash
+
+  let find ?conn store inbox_hash =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.find_opt conn Q.select inbox_hash
+
+  let find_by_block_hash ?conn store inbox_hash =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.find_opt conn Q.select_by_block_hash inbox_hash
 
   let delete_before ?conn store ~level =
     with_connection store conn @@ fun conn ->
