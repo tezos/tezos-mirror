@@ -4,6 +4,15 @@
 
 ### Features
 
+#### RPCs
+
+- **Experimental:** Introduce the experimental feature
+  `ovewrite_simulation_tick_limit`. When enabled, the `eth_call` RPC is no
+  longer subject to the kernel tick limit. This can be useful to execute calls
+  that will not be injected in transactions (similarly to what the Uniswap V3
+  frontend does to prepare swaps). However, it can lead to confusing UX for
+  users, where eth_estimateGas fails when eth_call succeeded. (!15078)
+
 ### Bug fixes
 
 ### Internals

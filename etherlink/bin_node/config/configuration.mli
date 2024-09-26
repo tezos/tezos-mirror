@@ -56,6 +56,7 @@ type experimental_features = {
   enable_send_raw_transaction : bool;
   node_transaction_validation : bool;
   block_storage_sqlite3 : bool;
+  overwrite_simulation_tick_limit : bool;
 }
 
 type sequencer = {
