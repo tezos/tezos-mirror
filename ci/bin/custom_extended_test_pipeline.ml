@@ -125,7 +125,7 @@ let jobs =
       ~tezt_variant:"-slow"
       ~retry:2
       ~tezt_parallel:3
-      ~parallel:(Vector 10)
+      ~parallel:(Vector 20)
       ~dependencies
       ()
   in

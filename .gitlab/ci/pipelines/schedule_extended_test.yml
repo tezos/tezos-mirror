@@ -2485,7 +2485,7 @@ tezt-slow:
       junit: $JUNIT
     when: always
   retry: 2
-  parallel: 10
+  parallel: 20
 
 tezt-flaky:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
