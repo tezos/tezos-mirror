@@ -332,3 +332,34 @@ module L2_blocks : sig
     Block_hash.t ->
     Sc_rollup_block.full option tzresult Lwt.t
 end
+
+(** Storage of single values. *)
+module State : sig
+  module type S = sig
+    type value
+
+    val set : ?conn:Sqlite.conn -> rw -> value -> unit tzresult Lwt.t
+
+    val get : ?conn:Sqlite.conn -> _ t -> value option tzresult Lwt.t
+  end
+
+  module Finalized_level : S with type value := int32
+
+  module LCC : S with type value := Commitment.Hash.t * int32
+
+  module LPC : S with type value := Commitment.Hash.t * int32
+
+  module Last_gc_target : S with type value := int32
+
+  module Last_gc_triggered_at : S with type value := int32
+
+  module Last_successful_gc_target : S with type value := int32
+
+  module Last_successful_gc_triggered_at : S with type value := int32
+
+  module Last_context_split : S with type value := int32
+
+  module History_mode : S with type value := Configuration.history_mode
+
+  module L2_head : S with type value := Block_hash.t * int32
+end
