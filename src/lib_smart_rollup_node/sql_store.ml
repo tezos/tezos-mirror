@@ -103,6 +103,15 @@ module Types = struct
       ~decode:State_hash.of_b58check
       string
 
+  let z =
+    custom
+      ~encode:(fun i -> Ok (Z.to_string i))
+      ~decode:(fun s ->
+        try Ok (Z.of_string s) with _ -> Error "Invalid Z.t value in database")
+      string
+
+  let bitset = tzcustom ~encode:Bitset.to_z ~decode:Bitset.from_z z
+
   let history_proof =
     from_encoding ~name:"Inbox.history_proof" Inbox.history_proof_encoding
 
@@ -481,4 +490,82 @@ module Messages = struct
   let delete_before ?conn store ~level =
     with_connection store conn @@ fun conn ->
     Sqlite.Db.exec conn Q.delete_before level
+end
+
+module Outbox_messages = struct
+  type messages_per_level = {messages : Bitset.t; executed_messages : Bitset.t}
+
+  module Q = struct
+    open Types
+
+    let messages_per_level =
+      product (fun messages executed_messages -> {messages; executed_messages})
+      @@ proj bitset (fun m -> m.messages)
+      @@ proj bitset (fun m -> m.executed_messages)
+      @@ proj_end
+
+    let register =
+      (t2 level bitset ->. unit)
+      @@ {sql|
+      INSERT INTO outbox_messages
+      (outbox_level, messages, executed_messages)
+      VALUES ($1, $2, 0)
+      ON CONFLICT DO UPDATE SET messages = $2
+      |sql}
+
+    let range =
+      (t2 level level ->* t2 level messages_per_level)
+      @@ {sql|
+      SELECT outbox_level, messages, executed_messages
+      FROM outbox_messages
+      WHERE outbox_level BETWEEN ? AND ?
+      ORDER BY outbox_level DESC
+      |sql}
+
+    let select_executed =
+      (level ->? bitset)
+      @@ {sql|
+      SELECT executed_messages
+      FROM outbox_messages
+      WHERE outbox_level = ?
+      |sql}
+
+    let update_executed =
+      (t2 level bitset ->. unit)
+      @@ {sql|
+      UPDATE outbox_messages
+      SET executed_messages = $2
+      WHERE outbox_level = $1
+      |sql}
+  end
+
+  let pending ?conn store ~min_level ~max_level =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.fold
+      conn
+      Q.range
+      (fun (outbox_level, {messages; executed_messages}) acc ->
+        let pending_at_level = Bitset.diff messages executed_messages in
+        let l = Bitset.to_list pending_at_level in
+        if List.is_empty l then acc else (outbox_level, l) :: acc)
+      (min_level, max_level)
+      []
+
+  let register_outbox_messages ?conn store ~outbox_level ~indexes =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.exec conn Q.register (outbox_level, indexes)
+
+  let set_outbox_message_executed ?conn store ~outbox_level ~index =
+    let open Lwt_result_syntax in
+    with_connection store conn @@ fun conn ->
+    let* executed_messages =
+      Sqlite.Db.find_opt conn Q.select_executed outbox_level
+    in
+    match executed_messages with
+    | None ->
+        (* Not tracking *)
+        return_unit
+    | Some executed_messages ->
+        let*? executed_messages = Bitset.add executed_messages index in
+        Sqlite.Db.exec conn Q.update_executed (outbox_level, executed_messages)
 end

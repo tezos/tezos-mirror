@@ -129,3 +129,34 @@ module Messages : sig
     Merkelized_payload_hashes_hash.t ->
     (int32 * string list) option tzresult Lwt.t
 end
+
+(** Storage for persisting outbox messages. *)
+module Outbox_messages : sig
+  (** [pending ?conn s ~min_level ~max_level] returns all pending (i.e. non
+      executed) outbox messages between outbox levels [min_level] and
+      [max_level]. The result is given as a list of pairs whose first component
+      is the outbox level and the second is the message indexes list. *)
+  val pending :
+    ?conn:Sqlite.conn ->
+    _ t ->
+    min_level:int32 ->
+    max_level:int32 ->
+    (int32 * int list) list tzresult Lwt.t
+
+  (** Register outbox messages for a given outbox level by its indexes. *)
+  val register_outbox_messages :
+    ?conn:Sqlite.conn ->
+    rw ->
+    outbox_level:int32 ->
+    indexes:Bitset.t ->
+    unit tzresult Lwt.t
+
+  (** Register an outbox message as executed by its outbox level and its index
+      in the outbox. *)
+  val set_outbox_message_executed :
+    ?conn:Sqlite.conn ->
+    rw ->
+    outbox_level:int32 ->
+    index:int ->
+    unit tzresult Lwt.t
+end
