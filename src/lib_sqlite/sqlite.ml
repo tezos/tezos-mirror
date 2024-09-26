@@ -209,3 +209,5 @@ let init ~path ~perm migration_code =
   let* () = set_wal_journal_mode conn in
   let* () = with_transaction conn migration_code in
   return store
+
+let close (Pool {db_pool}) = Caqti_lwt_unix.Pool.drain db_pool

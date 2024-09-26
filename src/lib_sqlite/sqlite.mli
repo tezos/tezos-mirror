@@ -29,6 +29,8 @@ val init :
   (conn -> unit tzresult Lwt.t) ->
   t tzresult Lwt.t
 
+val close : t -> unit Lwt.t
+
 (** Rebuild the database in [output_db_file] using the
     {{:https://www.sqlite.org/lang_vacuum.html}[VACUUM] sqlite command}. This
     function is useful to backup the database. *)
