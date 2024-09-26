@@ -166,6 +166,12 @@ module Types = struct
     @@ proj level (fun i -> i.Inbox.level)
     @@ proj history_proof (fun i -> i.Inbox.old_levels_messages)
     @@ proj_end
+
+  let history_mode =
+    custom
+      ~encode:(fun h -> Ok (Configuration.string_of_history_mode h))
+      ~decode:(fun s -> Ok (Configuration.history_mode_of_string s))
+      string
 end
 
 let table_exists_req =
@@ -1038,4 +1044,171 @@ module L2_blocks = struct
   let delete_before ?conn store ~level =
     with_connection store conn @@ fun conn ->
     Sqlite.Db.exec conn Q.delete_before level
+end
+
+module State = struct
+  module Q (N : sig
+    val name : string
+  end) =
+  struct
+    open Types
+
+    let set_level =
+      (level ->. unit)
+      @@ Format.sprintf
+           {sql|REPLACE INTO rollup_node_state (name, level) VALUES (%S, ?)|sql}
+           N.name
+
+    let get_level =
+      (unit ->? level)
+      @@ Format.sprintf
+           {sql|SELECT level from rollup_node_state WHERE name = %S|sql}
+           N.name
+
+    let set_value type_ =
+      (type_ ->. unit)
+      @@ Format.sprintf
+           {sql|REPLACE INTO rollup_node_state (name, value) VALUES (%S, ?)|sql}
+           N.name
+
+    let get_value type_ =
+      (unit ->? type_)
+      @@ Format.sprintf
+           {sql|SELECT value from rollup_node_state WHERE name = %S|sql}
+           N.name
+
+    let set_both type_ =
+      (t2 type_ level ->. unit)
+      @@ Format.sprintf
+           {sql|
+         REPLACE INTO rollup_node_state (name, value, level)
+         VALUES (%S, ?, ?)
+         |sql}
+           N.name
+
+    let get_both type_ =
+      (unit ->? t2 type_ level)
+      @@ Format.sprintf
+           {sql|SELECT value, level from rollup_node_state WHERE name = %S|sql}
+           N.name
+  end
+
+  module type S = sig
+    type value
+
+    val set : ?conn:Sqlite.conn -> rw -> value -> unit tzresult Lwt.t
+
+    val get : ?conn:Sqlite.conn -> _ t -> value option tzresult Lwt.t
+  end
+
+  module Make_level (N : sig
+    val name : string
+  end) : S with type value := int32 = struct
+    module Q = Q (N)
+
+    let set ?conn store level =
+      with_connection store conn @@ fun conn ->
+      Sqlite.Db.exec conn Q.set_level level
+
+    let get ?conn store =
+      with_connection store conn @@ fun conn ->
+      Sqlite.Db.find_opt conn Q.get_level ()
+  end
+
+  module Make_value (N : sig
+    type value
+
+    val name : string
+
+    val type_ : value Caqti_type.t
+  end) : S with type value := N.value = struct
+    module Q = Q (N)
+
+    let set = Q.set_value N.type_
+
+    let set ?conn store value =
+      with_connection store conn @@ fun conn -> Sqlite.Db.exec conn set value
+
+    let get = Q.get_value N.type_
+
+    let get ?conn store =
+      with_connection store conn @@ fun conn -> Sqlite.Db.find_opt conn get ()
+  end
+
+  module Make_both (N : sig
+    type value
+
+    val name : string
+
+    val type_ : value Caqti_type.t
+  end) : S with type value := N.value * int32 = struct
+    module Q = Q (N)
+
+    let set = Q.set_both N.type_
+
+    let set ?conn store (value, level) =
+      with_connection store conn @@ fun conn ->
+      Sqlite.Db.exec conn set (value, level)
+
+    let get = Q.get_both N.type_
+
+    let get ?conn store =
+      with_connection store conn @@ fun conn -> Sqlite.Db.find_opt conn get ()
+  end
+
+  module Finalized_level = Make_level (struct
+    let name = "finalized_level"
+  end)
+
+  module LCC = Make_both (struct
+    let name = "lcc"
+
+    type value = Commitment.Hash.t
+
+    let type_ = Types.commitment_hash
+  end)
+
+  module LPC = Make_both (struct
+    let name = "lpc"
+
+    type value = Commitment.Hash.t
+
+    let type_ = Types.commitment_hash
+  end)
+
+  module Last_gc_target = Make_level (struct
+    let name = "last_gc_target"
+  end)
+
+  module Last_gc_triggered_at = Make_level (struct
+    let name = "last_gc_triggered_at"
+  end)
+
+  module Last_successful_gc_target = Make_level (struct
+    let name = "last_gc_target"
+  end)
+
+  module Last_successful_gc_triggered_at = Make_level (struct
+    let name = "last_gc_triggered_at"
+  end)
+
+  module Last_context_split = Make_level (struct
+    let name = "last_context_split"
+  end)
+
+  module History_mode = Make_value (struct
+    let name = "history_mode"
+
+    type value = Configuration.history_mode
+
+    let type_ = Types.history_mode
+  end)
+
+  module L2_head = Make_both (struct
+    let name = "l2_head"
+
+    type value = Block_hash.t
+
+    let type_ = Types.block_hash
+  end)
 end
