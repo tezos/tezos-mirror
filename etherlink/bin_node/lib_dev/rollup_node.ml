@@ -131,6 +131,9 @@ end) : Services_backend_sig.Backend = struct
   module SimulatorBackend = struct
     include Reader
 
+    let modify ~key:_ ~value:_ _state =
+      failwith "Unsupported primitive for the proxy mode"
+
     let simulate_and_read ?state_override:_ _state ~input =
       let open Lwt_result_syntax in
       let* json =

@@ -4736,6 +4736,90 @@ let test_trace_transaction =
   check_trace_result ~sequencer:trace_result ~rpc:trace_result_rpc ;
   unit
 
+let test_overwrite_simulation_tick_limit =
+  register_all
+    ~kernels:Kernel.all
+    ~tags:["evm"; "rpc"; "overwrite_tick_limit"; "eth_call"]
+    ~title:"Can overwrite tick limit in eth_call with the experimental feature"
+    ~time_between_blocks:Nothing
+    ~maximum_allowed_ticks:
+      (* We set a smaller tick limit to make it easier to trigger the
+         OutOfTick error *)
+      500_000_000L
+  @@ fun {sequencer; sc_rollup_node; _} _protocol ->
+  let* observer =
+    run_new_observer_node
+      ~sc_rollup_node
+      ~patch_config:
+        JSON.(
+          update
+            "experimental_features"
+            (put
+               ( "overwrite_simulation_tick_limit",
+                 annotate ~origin:"" (`Bool true) )))
+      sequencer
+  in
+
+  let* recursive = Solidity_contracts.recursive () in
+  let* () = Eth_cli.add_abi ~label:recursive.label ~abi:recursive.abi () in
+  (* Deploy the contract. *)
+  let* recursive_address, _tx_hash =
+    send_transaction_to_sequencer
+      (fun () ->
+        Eth_cli.deploy
+          ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+          ~endpoint:(Evm_node.endpoint sequencer)
+          ~abi:recursive.abi
+          ~bin:recursive.bin)
+      sequencer
+  in
+
+  let* has_failed =
+    Lwt.catch
+      (fun () ->
+        let* _ =
+          Eth_cli.contract_call
+            ~endpoint:Evm_node.(endpoint sequencer)
+            ~abi_label:recursive.label
+            ~address:recursive_address
+            ~method_call:"call(200)"
+            ()
+        in
+        return false)
+      (fun _ -> return true)
+  in
+
+  if not has_failed then
+    Test.fail "The sequencer should have refused the `eth_call`" ;
+
+  let* has_failed =
+    Lwt.catch
+      (fun () ->
+        let* _ =
+          Eth_cli.contract_call
+            ~endpoint:Evm_node.(endpoint observer)
+            ~abi_label:recursive.label
+            ~address:recursive_address
+            ~method_call:"call(200)"
+            ()
+        in
+        return false)
+      (fun _ -> return true)
+  in
+
+  if has_failed then
+    Test.fail "The observer shouldn’t have refused the `eth_call`" ;
+
+  (* `eth_call` is supposed to work, but not gas estimation. *)
+  let* data = Cast.calldata ~args:["200"] "call(uint256)" in
+  let*@? (_ : Rpc.error) =
+    Rpc.estimate_gas
+      [("to", `String recursive_address); ("data", `String data)]
+      observer
+  in
+
+  unit
+
 let test_trace_transaction_on_invalid_transaction =
   register_all
     ~kernels:Kernel.all
@@ -6552,4 +6636,5 @@ let () =
   test_tx_pool_replacing_transactions protocols ;
   test_da_fees_after_execution protocols ;
   test_trace_transaction_calltracer_failed_create protocols ;
-  test_configuration_service [Protocol.Alpha]
+  test_configuration_service [Protocol.Alpha] ;
+  test_overwrite_simulation_tick_limit protocols

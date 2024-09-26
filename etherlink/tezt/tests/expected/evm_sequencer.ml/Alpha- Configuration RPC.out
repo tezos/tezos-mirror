@@ -14,7 +14,8 @@
     "drop_duplicate_on_injection": true,
     "enable_send_raw_transaction": true,
     "node_transaction_validation": true,
-    "block_storage_sqlite3": true
+    "block_storage_sqlite3": true,
+    "overwrite_simulation_tick_limit": false
   },
   "proxy": {
     "finalized_view": false,
@@ -61,7 +62,8 @@
     "drop_duplicate_on_injection": true,
     "enable_send_raw_transaction": true,
     "node_transaction_validation": true,
-    "block_storage_sqlite3": true
+    "block_storage_sqlite3": true,
+    "overwrite_simulation_tick_limit": false
   },
   "proxy": {
     "finalized_view": false,
@@ -101,7 +103,8 @@
     "drop_duplicate_on_injection": true,
     "enable_send_raw_transaction": true,
     "node_transaction_validation": true,
-    "block_storage_sqlite3": true
+    "block_storage_sqlite3": true,
+    "overwrite_simulation_tick_limit": false
   },
   "proxy": {
     "finalized_view": false,

@@ -103,6 +103,7 @@ module type S = sig
       context [block_param] (optionally updated with [state_override]) and
       returns the result. *)
   val simulate_call :
+    overwrite_tick_limit:bool ->
     Ethereum_types.call ->
     Ethereum_types.Block_parameter.extended ->
     Ethereum_types.state_override ->

@@ -195,6 +195,11 @@ struct
   module SimulatorBackend = struct
     include Reader
 
+    let modify ~key ~value state =
+      let open Lwt_result_syntax in
+      let*! state = Evm_state.modify ~key ~value state in
+      return state
+
     let simulate_and_read ?state_override simulate_state ~input =
       let open Lwt_result_syntax in
       let config =

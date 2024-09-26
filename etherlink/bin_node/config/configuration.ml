@@ -34,6 +34,7 @@ type experimental_features = {
   enable_send_raw_transaction : bool;
   node_transaction_validation : bool;
   block_storage_sqlite3 : bool;
+  overwrite_simulation_tick_limit : bool;
 }
 
 type sequencer = {
@@ -122,6 +123,7 @@ let default_experimental_features =
     drop_duplicate_on_injection = false;
     node_transaction_validation = false;
     block_storage_sqlite3 = false;
+    overwrite_simulation_tick_limit = false;
   }
 
 let default_data_dir = Filename.concat (Sys.getenv "HOME") ".octez-evm-node"
@@ -650,22 +652,26 @@ let experimental_features_encoding =
            enable_send_raw_transaction;
            node_transaction_validation;
            block_storage_sqlite3;
+           overwrite_simulation_tick_limit;
          } ->
       ( drop_duplicate_on_injection,
         enable_send_raw_transaction,
         node_transaction_validation,
-        block_storage_sqlite3 ))
+        block_storage_sqlite3,
+        overwrite_simulation_tick_limit ))
     (fun ( drop_duplicate_on_injection,
            enable_send_raw_transaction,
            node_transaction_validation,
-           block_storage_sqlite3 ) ->
+           block_storage_sqlite3,
+           overwrite_simulation_tick_limit ) ->
       {
         drop_duplicate_on_injection;
         enable_send_raw_transaction;
         node_transaction_validation;
         block_storage_sqlite3;
+        overwrite_simulation_tick_limit;
       })
-    (obj4
+    (obj5
        (dft
           ~description:
             "Request the rollup node to filter messages it has already \
@@ -687,6 +693,17 @@ let experimental_features_encoding =
           ~description:
             "Store the blocks and transactions in a sqlite3 database and \
              removes them from the durable storage"
+          bool
+          false)
+       (dft
+          "overwrite_simulation_tick_limit"
+          ~description:
+            "When enabled, the eth_call method is not subject to the tick \
+             limit. This can be useful to execute calls that will not be \
+             injected in transactions (similarly to what the Uniswap V3 \
+             frontend does to prepare swaps). However, it can lead to \
+             confusing UX for users, where eth_estimateGas fails when eth_call \
+             succeeded."
           bool
           false))
 

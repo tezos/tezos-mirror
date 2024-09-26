@@ -9,6 +9,8 @@
 module type SimulationBackend = sig
   include Durable_storage.READER
 
+  val modify : key:string -> value:string -> state -> state tzresult Lwt.t
+
   val simulate_and_read :
     ?state_override:Ethereum_types.state_override ->
     state ->
@@ -70,10 +72,20 @@ module Make (SimulationBackend : SimulationBackend) = struct
         return `V0
       else return `V1
 
-  let simulate_call call block_param state_override =
+  let simulate_call ~overwrite_tick_limit call block_param state_override =
     let open Lwt_result_syntax in
     let* simulation_state = SimulationBackend.get_state ~block:block_param () in
     let* simulation_version = simulation_version simulation_state in
+    let* simulation_state =
+      if overwrite_tick_limit then
+        SimulationBackend.modify
+          simulation_state
+          ~key:"/evm/maximum_allowed_ticks"
+          ~value:
+            Data_encoding.(
+              Binary.to_string_exn Little_endian.int64 1_000_000_000_000L)
+      else return simulation_state
+    in
     let* bytes =
       call_simulation
         ~state_override
