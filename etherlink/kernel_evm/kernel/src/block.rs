@@ -15,6 +15,7 @@ use crate::configuration::Limits;
 use crate::delayed_inbox::DelayedInbox;
 use crate::error::Error;
 use crate::event::Event;
+use crate::inbox::Transaction;
 use crate::storage;
 use crate::upgrade;
 use crate::upgrade::KernelUpgrade;
@@ -70,6 +71,26 @@ pub enum BlockComputationResult {
 pub enum ComputationResult {
     RebootNeeded,
     Finished,
+}
+
+fn on_invalid_transaction<Host: Runtime>(
+    host: &mut Host,
+    transaction: &Transaction,
+    block_in_progress: &BlockInProgress,
+    data_size: u64,
+) -> Result<(), anyhow::Error> {
+    if transaction.is_delayed() {
+        block_in_progress.register_delayed_transaction(transaction.tx_hash);
+    }
+
+    block_in_progress.account_for_invalid_transaction(data_size);
+    log!(
+        host,
+        Benchmarking,
+        "Estimated ticks after tx: {}",
+        block_in_progress.estimated_ticks_in_run
+    );
+    Ok(())
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -180,17 +201,7 @@ fn compute<Host: Runtime>(
                 return Ok(BlockComputationResult::RebootNeeded);
             }
             ExecutionResult::Invalid => {
-                if transaction.is_delayed() {
-                    block_in_progress.register_delayed_transaction(transaction.tx_hash);
-                }
-
-                block_in_progress.account_for_invalid_transaction(data_size);
-                log!(
-                    host,
-                    Benchmarking,
-                    "Estimated ticks after tx: {}",
-                    block_in_progress.estimated_ticks_in_run
-                );
+                on_invalid_transaction(host, &transaction, block_in_progress, data_size)?
             }
         };
         is_first_transaction = false;
