@@ -109,3 +109,23 @@ module Inboxes : sig
   val find_by_block_hash :
     ?conn:Sqlite.conn -> _ t -> Block_hash.t -> Inbox.t option tzresult Lwt.t
 end
+
+(** Storage for persisting messages downloaded from the L1 node. *)
+module Messages : sig
+  (** [store ?conn s ~level hash messages] stores the [messages] who's payload
+      hash is [hash] that appeared in inbox level [~level]. *)
+  val store :
+    ?conn:Sqlite.conn ->
+    rw ->
+    level:int32 ->
+    Merkelized_payload_hashes_hash.t ->
+    string list ->
+    unit tzresult Lwt.t
+
+  (** Retrieve messages by their payload hash. *)
+  val find :
+    ?conn:Sqlite.conn ->
+    _ t ->
+    Merkelized_payload_hashes_hash.t ->
+    (int32 * string list) option tzresult Lwt.t
+end
