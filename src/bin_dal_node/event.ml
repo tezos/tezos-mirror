@@ -399,14 +399,6 @@ let saving_profiles_failed =
     ~level:Error
     ("error", Error_monad.trace_encoding)
 
-let reconstruct_missing_prover_srs =
-  declare_0
-    ~section
-    ~name:"reconstruct_missing_prover_srs"
-    ~msg:"Missing prover SRS, reconstruction failed"
-    ~level:Warning
-    ()
-
 let reconstruct_starting_in =
   declare_3
     ~section

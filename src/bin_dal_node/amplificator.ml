@@ -330,9 +330,7 @@ let start_amplificator node_ctxt =
   in
   let* shards_proofs_precomputation =
     match shards_proofs_precomputation with
-    | None ->
-        let*! () = Event.(emit reconstruct_missing_prover_srs ()) in
-        fail [Errors.Amplificator_initialization_failed]
+    | None -> fail [Errors.Amplificator_initialization_failed]
     | Some v -> return v
   in
   (* Fork a process to offload cryptographic calculations *)
