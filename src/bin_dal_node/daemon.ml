@@ -1084,7 +1084,6 @@ let run ~data_dir ~configuration_override =
       head_level
       first_seen_level
   in
-  (* Initialize the crypto process *)
   (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5743
      Instead of recomputing these parameters, they could be stored
      (for a given cryptobox). *)
@@ -1104,8 +1103,10 @@ let run ~data_dir ~configuration_override =
       transport_layer
       cctxt
   in
-  let profile_manager = Node_context.get_profile_ctxt ctxt in
-  let is_prover_profile = Profile_manager.is_prover_profile profile_manager in
+  let is_prover_profile = Profile_manager.is_prover_profile profile_ctxt in
+  (* Initialize amplificator if in prover profile.
+     This forks a process and should be kept early to avoid copying opened file
+     descriptors. *)
   let* amplificator =
     if not is_prover_profile then return_none
     else
@@ -1166,11 +1167,6 @@ let run ~data_dir ~configuration_override =
         cctxt
     in
     return crawler
-  in
-  let* () =
-    match amplificator with
-    | None -> return_unit
-    | Some amplificator -> Amplificator.init amplificator ctxt
   in
   (* Activate the p2p instance. *)
   connect_gossipsub_with_p2p gs_worker transport_layer store ctxt amplificator ;

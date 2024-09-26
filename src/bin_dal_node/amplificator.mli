@@ -41,7 +41,3 @@ val try_amplification :
 
 (** Creates a new amplificator process *)
 val make : Node_context.t -> t tzresult Lwt.t
-
-(** [init amplificator node_ctxt params] Initializes the amplificator [t] with
-    the current context. *)
-val init : t -> Node_context.t -> unit tzresult Lwt.t

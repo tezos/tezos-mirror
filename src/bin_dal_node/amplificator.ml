@@ -322,7 +322,7 @@ let reply_receiver_job {process; query_store; _} node_context =
           let err = [error_of_exn exn] in
           Lwt.return (Error err))
 
-let make node_ctxt =
+let start_amplificator node_ctxt =
   let open Lwt_result_syntax in
   let cryptobox = Node_context.get_cryptobox node_ctxt in
   let shards_proofs_precomputation =
@@ -346,7 +346,6 @@ let make node_ctxt =
   let amplificator =
     {node_ctxt; process; query_pipe; query_store; query_id = 0}
   in
-
   let (_ : Lwt_exit.clean_up_callback_id) =
     Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _exit_code ->
         let pid = Process_worker.pid process in
@@ -356,9 +355,10 @@ let make node_ctxt =
   in
   return amplificator
 
-let init amplificator node_context =
+let make node_ctxt =
   let open Lwt_result_syntax in
-  let proto_parameters = Node_context.get_proto_parameters node_context in
+  let* amplificator = start_amplificator node_ctxt in
+  let proto_parameters = Node_context.get_proto_parameters node_ctxt in
   (* Run a job enqueueing all shards calculation tasks *)
   let amplificator_query_sender_job =
     let*! r = query_sender_job amplificator in
@@ -368,24 +368,21 @@ let init amplificator node_context =
         Lwt_result_syntax.fail
           (Amplification_query_sender_job "Error running query sender job" :: e)
   in
-
   (* Run a job retrieving all shards and their proof and publish them *)
   let amplificator_reply_receiver_job =
-    let*! r = reply_receiver_job amplificator node_context in
+    let*! r = reply_receiver_job amplificator node_ctxt in
     match r with
     | Ok () -> return_unit
     | Error e ->
         Lwt_result_syntax.fail
           (Amplification_reply_receiver_job "Error in reply receiver job" :: e)
   in
-
   let (_ : Lwt_exit.clean_up_callback_id) =
     Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _exit_code ->
         let () = Lwt.cancel amplificator_query_sender_job in
         let () = Lwt.cancel amplificator_reply_receiver_job in
         Lwt.return_unit)
   in
-
   let bytes_proto_parameters =
     Data_encoding.Binary.to_bytes_exn
       Dal_plugin.proto_parameters_encoding
@@ -403,7 +400,7 @@ let init amplificator node_context =
           ]
     | `Write_ok -> return_unit
   in
-  return_unit
+  return amplificator
 
 let enqueue_job_shards_proof amplificator commitment slot_id proto_parameters
     shards =
