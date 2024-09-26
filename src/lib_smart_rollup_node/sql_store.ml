@@ -103,6 +103,12 @@ module Types = struct
       ~decode:State_hash.of_b58check
       string
 
+  let protocol_hash =
+    tzcustom
+      ~encode:Protocol_hash.to_b58check
+      ~decode:Protocol_hash.of_b58check
+      string
+
   let z =
     custom
       ~encode:(fun i -> Ok (Z.to_string i))
@@ -568,4 +574,81 @@ module Outbox_messages = struct
     | Some executed_messages ->
         let*? executed_messages = Bitset.add executed_messages index in
         Sqlite.Db.exec conn Q.update_executed (outbox_level, executed_messages)
+end
+
+module Protocols = struct
+  type level = First_known of int32 | Activation_level of int32
+
+  type proto_info = {
+    level : level;
+    proto_level : int;
+    protocol : Protocol_hash.t;
+  }
+
+  module Q = struct
+    open Types
+
+    let proto_info =
+      product (fun protocol proto_level first_level first_is_activation ->
+          let level =
+            if first_is_activation then Activation_level first_level
+            else First_known first_level
+          in
+          {level; proto_level; protocol})
+      @@ proj protocol_hash (fun p -> p.protocol)
+      @@ proj int (fun p -> p.proto_level)
+      @@ proj level (fun {level = First_known l | Activation_level l; _} -> l)
+      @@ proj bool (function
+             | {level = First_known _; _} -> false
+             | {level = Activation_level _; _} -> true)
+      @@ proj_end
+
+    let insert =
+      (proto_info ->. unit)
+      @@ {sql|
+      REPLACE INTO protocols
+      (hash, proto_level, first_level, first_is_activation)
+      VALUES (?, ?, ?, ?)
+      |sql}
+
+    let select =
+      (protocol_hash ->? proto_info)
+      @@ {sql|
+      SELECT hash, proto_level, first_level, first_is_activation
+      FROM protocols
+      WHERE hash = ?
+      |sql}
+
+    let proto_of_level =
+      (level ->? proto_info)
+      @@ {sql|
+      SELECT hash, proto_level, first_level, first_is_activation
+      FROM protocols
+      WHERE ($1 >= first_level AND first_is_activation = false)
+         OR ($1 > first_level AND first_is_activation = true)
+      ORDER BY first_level DESC LIMIT 1
+      |sql}
+
+    let last =
+      (unit ->? proto_info)
+      @@ {sql|
+      SELECT hash, proto_level, first_level, first_is_activation
+      FROM protocols
+      ORDER BY first_level DESC LIMIT 1
+      |sql}
+  end
+
+  let store ?conn store proto =
+    with_connection store conn @@ fun conn -> Sqlite.Db.exec conn Q.insert proto
+
+  let find ?conn store inbox_hash =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.find_opt conn Q.select inbox_hash
+
+  let proto_of_level ?conn store level =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.find_opt conn Q.proto_of_level level
+
+  let last ?conn store =
+    with_connection store conn @@ fun conn -> Sqlite.Db.find_opt conn Q.last ()
 end
