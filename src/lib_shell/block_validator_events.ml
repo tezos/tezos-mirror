@@ -150,10 +150,10 @@ let could_not_find_context =
     ~pp1:Block_hash.pp
     ("hash", Block_hash.encoding)
 
-let stopping_node_missing_irmin_key =
+let stopping_node_missing_context_key =
   declare_0
     ~section
-    ~name:"stopping_node_missing_irmin_key"
+    ~name:"stopping_node_missing_context_key"
     ~level:Error
-    ~msg:"critical irmin error: stopping the node gracefully."
+    ~msg:"critical context error: stopping the node gracefully."
     ()
