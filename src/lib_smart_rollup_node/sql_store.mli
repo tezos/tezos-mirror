@@ -160,3 +160,41 @@ module Outbox_messages : sig
     index:int ->
     unit tzresult Lwt.t
 end
+
+(** Storage for protocol activation levels. *)
+module Protocols : sig
+  type level = First_known of int32 | Activation_level of int32
+
+  (** Each element of this type represents information we have about a Tezos
+      protocol regarding its activation. *)
+  type proto_info = {
+    level : level;
+        (** The level at which we have seen the protocol for the first time,
+            either because we saw its activation or because the first block we
+            saw (at the origination of the rollup) was from this protocol. *)
+    proto_level : int;
+        (** The protocol level, i.e. its number in the sequence of protocol
+            activations on the chain. *)
+    protocol : Protocol_hash.t;  (** The protocol this information concerns. *)
+  }
+
+  (** Store a new protocol with its activation level. NOTE: if the protocol hash
+      is already registered, it will be overwritten.  *)
+  val store : ?conn:Sqlite.conn -> rw -> proto_info -> unit tzresult Lwt.t
+
+  (** Retrieve protocol information by protocol hash. *)
+  val find :
+    ?conn:Sqlite.conn ->
+    _ t ->
+    Protocol_hash.t ->
+    proto_info option tzresult Lwt.t
+
+  (** [proto_of_level ?conn s level] returns the protocol in which [level]
+      appears. It returns [None] if [level] is before the activation of the
+      first known protocol. *)
+  val proto_of_level :
+    ?conn:Sqlite.conn -> _ t -> int32 -> proto_info option tzresult Lwt.t
+
+  (** Returns the last protocol by activation level. *)
+  val last : ?conn:Sqlite.conn -> _ t -> proto_info option tzresult Lwt.t
+end
