@@ -97,6 +97,12 @@ module Types = struct
       ~decode:Merkelized_payload_hashes_hash.of_b58check
       string
 
+  let context_hash =
+    tzcustom
+      ~encode:Smart_rollup_context_hash.to_b58check
+      ~decode:Smart_rollup_context_hash.of_b58check
+      string
+
   let commitment_hash =
     tzcustom
       ~encode:Commitment.Hash.to_b58check
@@ -815,6 +821,219 @@ module L2_levels = struct
   let find ?conn store level =
     with_connection store conn @@ fun conn ->
     Sqlite.Db.find_opt conn Q.select level
+
+  let delete_before ?conn store ~level =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.exec conn Q.delete_before level
+end
+
+module L2_blocks = struct
+  module Q = struct
+    open Types
+
+    let l2_block =
+      let open Sc_rollup_block in
+      product
+        (fun
+          block_hash
+          level
+          predecessor
+          commitment_hash
+          previous_commitment_hash
+          context
+          inbox_witness
+          inbox_hash
+          initial_tick
+          num_ticks
+        ->
+          {
+            header =
+              {
+                block_hash;
+                level;
+                predecessor;
+                commitment_hash;
+                previous_commitment_hash;
+                context;
+                inbox_witness;
+                inbox_hash;
+              };
+            content = ();
+            initial_tick;
+            num_ticks;
+          })
+      @@ proj block_hash (fun b -> b.header.block_hash)
+      @@ proj level (fun b -> b.header.level)
+      @@ proj block_hash (fun b -> b.header.predecessor)
+      @@ proj (option commitment_hash) (fun b -> b.header.commitment_hash)
+      @@ proj commitment_hash (fun b -> b.header.previous_commitment_hash)
+      @@ proj context_hash (fun b -> b.header.context)
+      @@ proj payload_hashes_hash (fun b -> b.header.inbox_witness)
+      @@ proj inbox_hash (fun b -> b.header.inbox_hash)
+      @@ proj z (fun b -> b.initial_tick)
+      @@ proj int64 (fun b -> b.num_ticks)
+      @@ proj_end
+
+    let insert =
+      (l2_block ->. unit)
+      @@ {sql|
+      REPLACE INTO l2_blocks
+      (block_hash, level, predecessor, commitment_hash,
+       previous_commitment_hash, context, inbox_witness,
+       inbox_hash, initial_tick, num_ticks)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      |sql}
+
+    let select =
+      (block_hash ->? l2_block)
+      @@ {sql|
+      SELECT
+       block_hash, level, predecessor, commitment_hash,
+       previous_commitment_hash, context, inbox_witness,
+       inbox_hash, initial_tick, num_ticks
+      FROM l2_blocks
+      WHERE block_hash = ?
+      |sql}
+
+    let select_by_level =
+      (level ->? l2_block)
+      @@ {sql|
+      SELECT
+       block_hash, level, predecessor, commitment_hash,
+       previous_commitment_hash, context, inbox_witness,
+       inbox_hash, initial_tick, num_ticks
+      FROM l2_blocks
+      WHERE level = ?
+      |sql}
+
+    let select_level =
+      (block_hash ->? level)
+      @@ {sql|
+      SELECT level
+      FROM l2_blocks
+      WHERE block_hash = ?
+      |sql}
+
+    let select_context =
+      (block_hash ->? context_hash)
+      @@ {sql|
+      SELECT context
+      FROM l2_blocks
+      WHERE block_hash = ?
+      |sql}
+
+    let select_head =
+      (unit ->? l2_block)
+      @@ {sql|
+      SELECT
+       b.block_hash, b.level, b.predecessor, b.commitment_hash,
+       b.previous_commitment_hash, b.context, b.inbox_witness,
+       b.inbox_hash, b.initial_tick, b.num_ticks
+      FROM l2_blocks as b
+      INNER JOIN rollup_node_state as s
+      ON s.name = "l2_head" AND s.value = b.block_hash
+      |sql}
+
+    let select_finalized =
+      (unit ->? l2_block)
+      @@ {sql|
+      SELECT
+       b.block_hash, b.level, b.predecessor, b.commitment_hash,
+       b.previous_commitment_hash, b.context, b.inbox_witness,
+       b.inbox_hash, b.initial_tick, b.num_ticks
+      FROM l2_blocks AS b
+      INNER JOIN rollup_node_state as s
+      ON s.name = "finalized_level" AND s.level = b.level
+      |sql}
+
+    let select_level_and_predecessor =
+      (block_hash ->? t2 level block_hash)
+      @@ {sql|
+      SELECT level, predecessor
+      FROM l2_blocks
+      WHERE block_hash = ?
+      |sql}
+
+    let select_full =
+      (block_hash ->? t4 l2_block (option commitment) inbox messages_list)
+      @@ {sql|
+      SELECT
+       b.block_hash, b.level, b.predecessor, b.commitment_hash,
+       b.previous_commitment_hash, b.context, b.inbox_witness,
+       b.inbox_hash, b.initial_tick, b.num_ticks,
+       c.compressed_state, c.inbox_level, c.predecessor, c.number_of_ticks,
+       i.inbox_level, i.history_proof,
+       m.message_list
+      FROM l2_blocks AS b
+      LEFT JOIN commitments as c
+      ON c.hash = b.commitment_hash
+      INNER JOIN inboxes as i
+      ON i.hash = b.inbox_hash
+      INNER JOIN messages as m
+      ON m.payload_hashes_hash = b.inbox_witness
+      WHERE block_hash = ?
+      |sql}
+
+    let delete_before =
+      (level ->. unit)
+      @@ {sql|
+      DELETE FROM l2_blocks WHERE level < ?
+      |sql}
+  end
+
+  let store ?conn store l2_block =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.exec conn Q.insert l2_block
+
+  let find ?conn store block_hash =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.find_opt conn Q.select block_hash
+
+  let find_by_level ?conn store level =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.find_opt conn Q.select_by_level level
+
+  let find_level ?conn store block_hash =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.find_opt conn Q.select_level block_hash
+
+  let find_context ?conn store block_hash =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.find_opt conn Q.select_context block_hash
+
+  let find_head ?conn store =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.find_opt conn Q.select_head ()
+
+  let find_finalized ?conn store =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.find_opt conn Q.select_finalized ()
+
+  let find_predecessor ?conn store block_hash =
+    let open Lwt_result_syntax in
+    let+ level_pred =
+      with_connection store conn @@ fun conn ->
+      Sqlite.Db.find_opt conn Q.select_level_and_predecessor block_hash
+    in
+    Option.map
+      (fun (level, predecessor) -> (predecessor, Int32.pred level))
+      level_pred
+
+  let find_full ?conn store block_hash =
+    let open Lwt_result_syntax in
+    let+ res =
+      with_connection store conn @@ fun conn ->
+      Sqlite.Db.find_opt conn Q.select_full block_hash
+    in
+    match res with
+    | None -> None
+    | Some (l2_block, commitment, inbox, messages) ->
+        Some
+          Sc_rollup_block.
+            {
+              l2_block with
+              content = {inbox; messages; commitment; outbox = None};
+            }
 
   let delete_before ?conn store ~level =
     with_connection store conn @@ fun conn ->

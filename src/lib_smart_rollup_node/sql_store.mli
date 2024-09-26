@@ -280,3 +280,55 @@ module L2_levels : sig
   val find :
     ?conn:Sqlite.conn -> _ t -> int32 -> Block_hash.t option tzresult Lwt.t
 end
+
+(** Storage for L2 blocks contracted by the rollup node. *)
+module L2_blocks : sig
+  (** Store an L2 block. *)
+  val store :
+    ?conn:Sqlite.conn -> rw -> Sc_rollup_block.t -> unit tzresult Lwt.t
+
+  (** Retrieve an L2 block by the L1 block hash. *)
+  val find :
+    ?conn:Sqlite.conn ->
+    _ t ->
+    Block_hash.t ->
+    Sc_rollup_block.t option tzresult Lwt.t
+
+  (** Retrieve an L2 block by its level. *)
+  val find_by_level :
+    ?conn:Sqlite.conn -> _ t -> int32 -> Sc_rollup_block.t option tzresult Lwt.t
+
+  (** Retrieve the level of an L2 block with its hash. *)
+  val find_level :
+    ?conn:Sqlite.conn -> _ t -> Block_hash.t -> int32 option tzresult Lwt.t
+
+  (** Retrieve the context hash for an L2 block with its hash. *)
+  val find_context :
+    ?conn:Sqlite.conn ->
+    _ t ->
+    Block_hash.t ->
+    Smart_rollup_context_hash.t option tzresult Lwt.t
+
+  (** Retrieve the current head of the L2 chain. *)
+  val find_head :
+    ?conn:Sqlite.conn -> _ t -> Sc_rollup_block.t option tzresult Lwt.t
+
+  (** Retrieve the currently last finalized block of the L2 chain. *)
+  val find_finalized :
+    ?conn:Sqlite.conn -> _ t -> Sc_rollup_block.t option tzresult Lwt.t
+
+  (** Returns the predecessor, and its level, of an L2 block. *)
+  val find_predecessor :
+    ?conn:Sqlite.conn ->
+    _ t ->
+    Block_hash.t ->
+    (Block_hash.t * int32) option tzresult Lwt.t
+
+  (** Returns a full L2 block (i.e. with all information) with a single database
+      query. NOTE: The result does not contain the outbox. *)
+  val find_full :
+    ?conn:Sqlite.conn ->
+    _ t ->
+    Block_hash.t ->
+    Sc_rollup_block.full option tzresult Lwt.t
+end
