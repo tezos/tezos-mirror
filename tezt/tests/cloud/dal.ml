@@ -530,6 +530,13 @@ module Cli = struct
       ~unset_long:"no-teztale"
       ~description:"Runs teztale"
       false
+
+  let memtrace =
+    Clap.flag
+      ~section
+      ~set_long:"memtrace"
+      ~description:"Use memtrace on all the services"
+      false
 end
 
 type configuration = {
@@ -1179,7 +1186,12 @@ let init_testnet cloud (configuration : configuration) teztale agent
         in
         let* () = Node.wait_for_ready node in
         let* () = add_source cloud agent ~job_name:"bootstrap" node dal_node in
-        let* () = Dal_node.run ~event_level:`Notice dal_node in
+        let* () =
+          Dal_node.Agent.run
+            ~memtrace:Cli.memtrace
+            ~event_level:`Notice
+            dal_node
+        in
         let client = Client.create ~endpoint:(Node node) () in
         let node_rpc_endpoint =
           Endpoint.
@@ -1380,7 +1392,12 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
       ~bootstrap_profile:true
       dal_bootstrap_node
   in
-  let* () = Dal_node.run ~event_level:`Notice dal_bootstrap_node in
+  let* () =
+    Dal_node.Agent.run
+      ~memtrace:Cli.memtrace
+      ~event_level:`Notice
+      dal_bootstrap_node
+  in
   let* () =
     add_source
       cloud
@@ -1442,7 +1459,9 @@ let init_baker cloud (configuration : configuration) ~bootstrap teztale account
         ~peers:[bootstrap.dal_node_p2p_endpoint] (* no need for peer *)
         dal_node
     in
-    let* () = Dal_node.run ~event_level:`Notice dal_node in
+    let* () =
+      Dal_node.Agent.run ~memtrace:Cli.memtrace ~event_level:`Notice dal_node
+    in
     Lwt.return dal_node
   in
   let* () =
@@ -1554,7 +1573,9 @@ let init_producer cloud configuration ~bootstrap teztale ~number_of_slots
   (* We do not wait on the promise because loading the SRS takes some time.
      Instead we will publish commitments only once this promise is fulfilled. *)
   let () = toplog "Init producer: wait for DAL node to be ready" in
-  let is_ready = Dal_node.run ~event_level:`Notice dal_node in
+  let is_ready =
+    Dal_node.Agent.run ~memtrace:Cli.memtrace ~event_level:`Notice dal_node
+  in
   let () = toplog "Init producer: DAL node is ready" in
   let* () =
     match teztale with
@@ -1602,7 +1623,9 @@ let init_observer cloud configuration ~bootstrap teztale ~slot_index i agent =
       node
       dal_node
   in
-  let* () = Dal_node.run ~event_level:`Notice dal_node in
+  let* () =
+    Dal_node.Agent.run ~memtrace:Cli.memtrace ~event_level:`Notice dal_node
+  in
   let* () =
     match teztale with
     | None -> Lwt.return_unit
@@ -1683,7 +1706,7 @@ let init_etherlink_operator_setup cloud configuration name ~bootstrap ~dal_slots
             ~peers:[bootstrap.dal_node_p2p_endpoint]
             dal_node
         in
-        let* () = Dal_node.run dal_node in
+        let* () = Dal_node.Agent.run ~memtrace:Cli.memtrace dal_node in
         some dal_node
   in
   let* sc_rollup_node =
@@ -2109,7 +2132,7 @@ let on_new_level t level =
             let baker_to_reconnect =
               (List.nth t.bakers (b mod nb_bakers)).dal_node
             in
-            Dal_node.run baker_to_reconnect)
+            Dal_node.Agent.run ~memtrace:Cli.memtrace baker_to_reconnect)
       in
       Lwt.return {t with disconnection_state = Some disconnection_state}
 
