@@ -269,11 +269,9 @@ impl BlockInProgress {
                 hex::encode(transaction.tx_hash)
             );
         };
-        // This is wrong, as for now `gas_used` contains the execution gas + gas
-        // for DA fees. This will be resolved in the next commit.
         host.add_execution_gas(gas_used);
 
-        self.add_gas(gas_used.into())?;
+        self.add_gas(receipt_info.overall_gas_used)?;
 
         // account for transaction ticks
         self.add_ticks(tick_model::ticks_of_valid_transaction(
@@ -460,7 +458,7 @@ impl BlockInProgress {
                     to,
                     cumulative_gas_used: cumulative_gas,
                     effective_gas_price,
-                    gas_used: U256::from(outcome.gas_used),
+                    gas_used: receipt_info.overall_gas_used,
                     contract_address,
                     logs_bloom: TransactionReceipt::logs_to_bloom(&logs),
                     logs,
