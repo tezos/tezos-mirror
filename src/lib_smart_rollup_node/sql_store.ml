@@ -109,6 +109,14 @@ module Types = struct
       ~decode:Protocol_hash.of_b58check
       string
 
+  let dal_commitment =
+    tzcustom
+      ~encode:Dal.Commitment.to_b58check
+      ~decode:Dal.Commitment.of_b58check
+      string
+
+  let dal_slot_index : Dal.Slot_index.t Caqti_type.t = int16
+
   let z =
     custom
       ~encode:(fun i -> Ok (Z.to_string i))
@@ -651,4 +659,69 @@ module Protocols = struct
 
   let last ?conn store =
     with_connection store conn @@ fun conn -> Sqlite.Db.find_opt conn Q.last ()
+end
+
+module Dal_slots_headers = struct
+  module Q = struct
+    open Types
+
+    let slot_header =
+      let open Dal.Slot_header in
+      product (fun index published_level commitment ->
+          {id = {published_level; index}; commitment})
+      @@ proj dal_slot_index (fun h -> h.id.index)
+      @@ proj level (fun h -> h.id.published_level)
+      @@ proj dal_commitment (fun h -> h.commitment)
+      @@ proj_end
+
+    let insert =
+      (t2 block_hash slot_header ->. unit)
+      @@ {sql|
+      REPLACE INTO dal_slots_headers
+      (block_hash, slot_index, published_level, slot_commitment)
+      VALUES (?, ?, ?, ?)
+      |sql}
+
+    let find_slot_header =
+      (t2 block_hash dal_slot_index ->? slot_header)
+      @@ {sql|
+      SELECT slot_index, published_level, slot_commitment
+      FROM dal_slots_headers
+      WHERE block_hash = ? AND slot_index = ?
+      |sql}
+
+    let select_slot_headers =
+      (block_hash ->* slot_header)
+      @@ {sql|
+      SELECT slot_index, published_level, slot_commitment
+      FROM dal_slots_headers
+      WHERE block_hash = ?
+      ORDER BY slot_index DESC
+      |sql}
+
+    let select_slot_indexes =
+      (block_hash ->* dal_slot_index)
+      @@ {sql|
+      SELECT slot_index
+      FROM dal_slots_headers
+      WHERE block_hash = ?
+      ORDER BY slot_index DESC
+      |sql}
+  end
+
+  let store ?conn store block slot_header =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.exec conn Q.insert (block, slot_header)
+
+  let find_slot_header ?conn store block ~slot_index =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.find_opt conn Q.find_slot_header (block, slot_index)
+
+  let list_slot_headers ?conn store block =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.rev_collect_list conn Q.select_slot_headers block
+
+  let list_slot_indexes ?conn store block =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.rev_collect_list conn Q.select_slot_indexes block
 end

@@ -198,3 +198,40 @@ module Protocols : sig
   (** Returns the last protocol by activation level. *)
   val last : ?conn:Sqlite.conn -> _ t -> proto_info option tzresult Lwt.t
 end
+
+(** Published slot headers per block hash, stored as a list of bindings from
+    [Dal_slot_index.t] to [Dal.Slot.t]. The encoding function converts this list
+    into a [Dal.Slot_index.t]-indexed map. *)
+module Dal_slots_headers : sig
+  (** [store ?conn s block slot_header] stores the slot header [slot_header] as
+      being published in the L1 block whose hash is [block]. *)
+  val store :
+    ?conn:Sqlite.conn ->
+    rw ->
+    Block_hash.t ->
+    Dal.Slot_header.t ->
+    unit tzresult Lwt.t
+
+  (** Retrieve a published slot header by its publication block and slot
+      index. *)
+  val find_slot_header :
+    ?conn:Sqlite.conn ->
+    _ t ->
+    Block_hash.t ->
+    slot_index:Dal.Slot_index.t ->
+    Dal.Slot_header.t option tzresult Lwt.t
+
+  (** List all slot headers published in a block. *)
+  val list_slot_headers :
+    ?conn:Sqlite.conn ->
+    _ t ->
+    Block_hash.t ->
+    Dal.Slot_header.t list tzresult Lwt.t
+
+  (** List all indexes of slot headers published in a block. *)
+  val list_slot_indexes :
+    ?conn:Sqlite.conn ->
+    _ t ->
+    Block_hash.t ->
+    Dal.Slot_index.t list tzresult Lwt.t
+end
