@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Extention of the open type [error] with the errors that could be raised by
+(** Extension of the open type [error] with the errors that could be raised by
     the DAL node. *)
 type error +=
   | Decoding_failed of Types.Store.kind
@@ -32,6 +32,7 @@ type error +=
   | Cryptobox_initialisation_failed of string
   | Not_enough_history of {stored_levels : int; minimal_levels : int}
   | Not_enough_l1_history of {stored_cycles : int; minimal_cycles : int}
+  | Amplificator_initialization_failed
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4622
 
@@ -136,7 +137,15 @@ let () =
           Some (stored_cycles, minimal_cycles)
       | _ -> None)
     (fun (stored_cycles, minimal_cycles) ->
-      Not_enough_l1_history {stored_cycles; minimal_cycles})
+      Not_enough_l1_history {stored_cycles; minimal_cycles}) ;
+  register_error_kind
+    `Permanent
+    ~id:"dal.node.amplificator_initialization_failed"
+    ~title:"Amplificator initialization failed"
+    ~description:"Amplificator initialization failed"
+    Data_encoding.empty
+    (function Amplificator_initialization_failed -> Some () | _ -> None)
+    (fun () -> Amplificator_initialization_failed)
 
 (** This part defines and handles more elaborate errors for the DAL node. *)
 

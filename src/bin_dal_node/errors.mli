@@ -32,6 +32,7 @@ type error +=
   | Cryptobox_initialisation_failed of string
   | Not_enough_history of {stored_levels : int; minimal_levels : int}
   | Not_enough_l1_history of {stored_cycles : int; minimal_cycles : int}
+  | Amplificator_initialization_failed
 
 (** The errors below are used to extend tzresult/tztrace monad/errors with Some
     specific errors on which we'd like to match in the DAL node's code. *)

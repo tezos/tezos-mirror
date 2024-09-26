@@ -1104,9 +1104,6 @@ let run ~data_dir ~configuration_override =
       transport_layer
       cctxt
   in
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/7452
-     The amplificator also initializes the crypto. This could be avoided. Also,
-     is this the right moment to start the amplificator? *)
   let profile_manager = Node_context.get_profile_ctxt ctxt in
   let is_prover_profile = Profile_manager.is_prover_profile profile_manager in
   let* amplificator =

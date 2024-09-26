@@ -135,38 +135,6 @@ let proved_shards_encoding =
 (* This module contains the logic for a shard proving process worker running in
    background. It communicates with the main dal process via pipe ipc. *)
 module Reconstruction_process_worker = struct
-  let reconstruct_process_init_cryptobox
-      (proto_parameters : Dal_plugin.proto_parameters) =
-    let open Lwt_result_syntax in
-    let* () =
-      let find_srs_files () = Tezos_base.Dal_srs.find_trusted_setup_files () in
-      Cryptobox.init_prover_dal ~find_srs_files ()
-    in
-    match Cryptobox.make proto_parameters.cryptobox_parameters with
-    | Ok cryptobox -> (
-        match Cryptobox.precompute_shards_proofs cryptobox with
-        | Ok precomputation -> return (cryptobox, precomputation)
-        | Error (`Invalid_degree_strictly_less_than_expected {given; expected})
-          ->
-            fail
-              [
-                Errors.Cryptobox_initialisation_failed
-                  (Printf.sprintf
-                     "Cryptobox.precompute_shards_proofs: SRS size (= %d) \
-                      smaller than expected (= %d)"
-                     given
-                     expected);
-              ])
-    | Error (`Fail msg) ->
-        fail
-          [
-            Errors.Cryptobox_initialisation_failed
-              (Format.asprintf
-                 "Error initializing cryptobox in crypto process \
-                  (Cryptobox.make): %s"
-                 msg);
-          ]
-
   let read_init_message_from_parent ic =
     let open Lwt_result_syntax in
     let* bytes_proto_parameters =
@@ -213,14 +181,13 @@ module Reconstruction_process_worker = struct
          - receive shards
          - calculate all shards and their proofs
          - sent shards and proofs *)
-  let reconstruct_process_worker ic oc () =
+  let reconstruct_process_worker ic oc (cryptobox, shards_proofs_precomputation)
+      =
     let open Lwt_result_syntax in
     (* Read init message from parent with parameters required to initialize
        cryptobox *)
-    let* proto_parameters = read_init_message_from_parent ic in
-    let* cryptobox, shards_proofs_precomputation =
-      reconstruct_process_init_cryptobox proto_parameters
-    in
+    (* FIXME: it is not necessary anymore to initialize the cryptobox *)
+    let* _proto_parameters = read_init_message_from_parent ic in
     let*! () = Event.(emit crypto_process_started (Unix.getpid ())) in
     let rec loop () =
       let*! query_id = Lwt_io.read_int ic in
@@ -357,17 +324,29 @@ let reply_receiver_job {process; query_store; _} node_context =
 
 let make node_ctxt =
   let open Lwt_result_syntax in
+  let cryptobox = Node_context.get_cryptobox node_ctxt in
+  let shards_proofs_precomputation =
+    Node_context.get_shards_proofs_precomputation node_ctxt
+  in
+  let* shards_proofs_precomputation =
+    match shards_proofs_precomputation with
+    | None ->
+        let*! () = Event.(emit reconstruct_missing_prover_srs ()) in
+        fail [Errors.Amplificator_initialization_failed]
+    | Some v -> return v
+  in
   (* Fork a process to offload cryptographic calculations *)
   let* process =
     Process_worker.run
       Reconstruction_process_worker.reconstruct_process_worker
-      ()
+      (cryptobox, shards_proofs_precomputation)
   in
   let query_pipe = Lwt_pipe.Unbounded.create () in
   let query_store = Query_store.create 23 in
   let amplificator =
     {node_ctxt; process; query_pipe; query_store; query_id = 0}
   in
+
   let (_ : Lwt_exit.clean_up_callback_id) =
     Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _exit_code ->
         let pid = Process_worker.pid process in
@@ -493,89 +472,75 @@ let amplify node_store commitment (slot_id : Types.slot_id)
 let try_amplification commitment (slot_id : Types.slot_id) amplificator =
   let open Lwt_result_syntax in
   let node_ctxt = amplificator.node_ctxt in
-  match Node_context.get_shards_proofs_precomputation node_ctxt with
-  | None ->
-      (* The prover SRS is not loaded so we cannot reconstruct slots yet. *)
+  let node_store = Node_context.get_store node_ctxt in
+  let proto_parameters = Node_context.get_proto_parameters node_ctxt in
+  let number_of_shards =
+    proto_parameters.cryptobox_parameters.number_of_shards
+  in
+  let redundancy_factor =
+    proto_parameters.cryptobox_parameters.redundancy_factor
+  in
+  let number_of_needed_shards = number_of_shards / redundancy_factor in
+  let* number_of_already_stored_shards =
+    Store.Shards.count_values node_store.shards slot_id
+  in
+  (* There are two situations where we don't want to reconstruct:
+     if we don't have enough shards or if we already have all the
+     shards. *)
+  if
+    number_of_already_stored_shards < number_of_needed_shards
+    || number_of_already_stored_shards = number_of_shards
+  then return_unit
+  else
+    (* We have enough shards to reconstruct the whole slot. *)
+    with_amplification_lock
+      node_ctxt
+      slot_id
+      ~on_error:
+        Event.(
+          fun err ->
+            emit reconstruct_error (slot_id.slot_level, slot_id.slot_index, err))
+    @@ fun () ->
+    (* Wait a random delay between 1 and 2 seconds before starting
+       the reconstruction; this is to give some slack to receive
+       all the shards so that the reconstruction is not needed, and
+       also avoids having multiple nodes reconstruct at once. *)
+    let random_delay =
+      Constants.(
+        amplification_random_delay_min
+        +. Random.float
+             (amplification_random_delay_max -. amplification_random_delay_min))
+    in
+    let*! () =
+      Event.(
+        emit
+          reconstruct_starting_in
+          (slot_id.slot_level, slot_id.slot_index, random_delay))
+    in
+    let*! () = Lwt_unix.sleep random_delay in
+    (* Count again the stored shards because we may have received
+       more shards during the random delay. *)
+    let* number_of_already_stored_shards =
+      Store.Shards.count_values node_store.shards slot_id
+    in
+    (* If we have received all the shards while waiting the random
+       delay, there is no point in reconstructing anymore *)
+    if number_of_already_stored_shards = number_of_shards then (
       let*! () =
         Event.(
           emit
-            reconstruct_missing_prover_srs
+            reconstruct_no_missing_shard
             (slot_id.slot_level, slot_id.slot_index))
       in
-      return_unit
-  | Some _ ->
-      let node_store = Node_context.get_store node_ctxt in
-      let proto_parameters = Node_context.get_proto_parameters node_ctxt in
-      let number_of_shards =
-        proto_parameters.cryptobox_parameters.number_of_shards
-      in
-      let redundancy_factor =
-        proto_parameters.cryptobox_parameters.redundancy_factor
-      in
-      let number_of_needed_shards = number_of_shards / redundancy_factor in
-      let* number_of_already_stored_shards =
-        Store.Shards.count_values node_store.shards slot_id
-      in
-      (* There are two situations where we don't want to reconstruct:
-         if we don't have enough shards or if we already have all the
-         shards. *)
-      if
-        number_of_already_stored_shards < number_of_needed_shards
-        || number_of_already_stored_shards = number_of_shards
-      then return_unit
-      else
-        (* We have enough shards to reconstruct the whole slot. *)
-        with_amplification_lock
-          node_ctxt
-          slot_id
-          ~on_error:
-            Event.(
-              fun err ->
-                emit
-                  reconstruct_error
-                  (slot_id.slot_level, slot_id.slot_index, err))
-        @@ fun () ->
-        (* Wait a random delay between 1 and 2 seconds before starting
-           the reconstruction; this is to give some slack to receive
-           all the shards so that the reconstruction is not needed, and
-           also avoids having multiple nodes reconstruct at once. *)
-        let random_delay =
-          Constants.(
-            amplification_random_delay_min
-            +. Random.float
-                 (amplification_random_delay_max
-                -. amplification_random_delay_min))
-        in
-        let*! () =
-          Event.(
-            emit
-              reconstruct_starting_in
-              (slot_id.slot_level, slot_id.slot_index, random_delay))
-        in
-        let*! () = Lwt_unix.sleep random_delay in
-        (* Count again the stored shards because we may have received
-           more shards during the random delay. *)
-        let* number_of_already_stored_shards =
-          Store.Shards.count_values node_store.shards slot_id
-        in
-        (* If we have received all the shards while waiting the random
-           delay, there is no point in reconstructing anymore *)
-        if number_of_already_stored_shards = number_of_shards then (
-          let*! () =
-            Event.(
-              emit
-                reconstruct_no_missing_shard
-                (slot_id.slot_level, slot_id.slot_index))
-          in
-          Dal_metrics.reconstruction_aborted () ;
-          return_unit)
-        else
-          amplify
-            node_store
-            commitment
-            slot_id
-            ~number_of_already_stored_shards
-            ~number_of_shards
-            ~number_of_needed_shards
-            proto_parameters
-            amplificator
+      Dal_metrics.reconstruction_aborted () ;
+      return_unit)
+    else
+      amplify
+        node_store
+        commitment
+        slot_id
+        ~number_of_already_stored_shards
+        ~number_of_shards
+        ~number_of_needed_shards
+        proto_parameters
+        amplificator
