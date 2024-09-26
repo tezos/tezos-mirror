@@ -1188,7 +1188,7 @@ module Tezt = struct
       ~(tezt_tests : Tezt_core.TSL_AST.t) ?(retry = 2) ?(tezt_retry = 1)
       ?(tezt_parallel = 1) ?(tezt_variant = "")
       ?(before_script = before_script ~source_version:true ~eval_opam:true [])
-      ?timeout ?job_select_tezts ~dependencies () : tezos_job =
+      ?timeout ?job_select_tezts ~dependencies ?allow_failure () : tezos_job =
     let variables =
       [
         ("JUNIT", "tezt-junit.xml");
@@ -1261,6 +1261,7 @@ module Tezt = struct
       ~dependencies
       ?retry
       ~before_script
+      ?allow_failure
       [
         (* Print [print_variables] in a shell-friendly manner for easier debugging *)
         "echo \""

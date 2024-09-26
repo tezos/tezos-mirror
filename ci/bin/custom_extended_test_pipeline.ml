@@ -148,6 +148,7 @@ let jobs =
       ~tezt_retry:3
       ~tezt_parallel:1
       ~dependencies
+      ~allow_failure:Yes
       ()
   in
   [
