@@ -12,6 +12,7 @@ use std::marker::PhantomData;
 
 use crate::{delayed_inbox::DelayedInbox, inbox::Transaction};
 use tezos_ethereum::rlp_helpers::FromRlpBytes;
+use tezos_evm_logging::Level;
 use tezos_evm_runtime::{internal_runtime::InternalHost, runtime::KernelHost};
 use tezos_smart_rollup_core::rollup_host::RollupHost;
 use tezos_smart_rollup_host::{path::RefPath, runtime::Runtime};
@@ -27,6 +28,7 @@ pub extern "C" fn populate_delayed_inbox() {
         host: sdk_host,
         internal,
         _pd: PhantomData,
+        logs_verbosity: Level::default(),
     };
     let payload = host.store_read_all(&DELAYED_INPUT_PATH).unwrap();
     let transaction = Transaction::from_rlp_bytes(&payload).unwrap();

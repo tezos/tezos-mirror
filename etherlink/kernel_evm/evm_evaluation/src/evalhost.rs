@@ -4,6 +4,7 @@
 
 use std::{cell::RefCell, io::Write};
 
+use tezos_evm_logging::Verbosity;
 use tezos_evm_runtime::{
     internal_runtime::{ExtendedRuntime, InternalRuntime},
     runtime::MockKernelHost,
@@ -215,5 +216,11 @@ impl ExtendedRuntime for EvalHost {
         path: &T,
     ) -> Result<Vec<u8>, tezos_smart_rollup_host::runtime::RuntimeError> {
         self.host.store_get_hash(path)
+    }
+}
+
+impl Verbosity for EvalHost {
+    fn verbosity(&self) -> tezos_evm_logging::Level {
+        self.host.verbosity()
     }
 }

@@ -7,6 +7,7 @@
 
 use crate::internal_runtime::{ExtendedRuntime, InternalRuntime};
 use crate::runtime::Runtime;
+use tezos_evm_logging::Verbosity;
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
 use tezos_smart_rollup_host::dal_parameters::RollupDalParameters;
 use tezos_smart_rollup_host::{
@@ -223,6 +224,12 @@ impl<Host: Runtime> SdkRuntime for SafeStorage<&mut Host> {
     #[inline(always)]
     fn runtime_version(&self) -> Result<String, RuntimeError> {
         self.host.runtime_version()
+    }
+}
+
+impl<Host: Runtime> Verbosity for SafeStorage<&mut Host> {
+    fn verbosity(&self) -> tezos_evm_logging::Level {
+        self.host.verbosity()
     }
 }
 

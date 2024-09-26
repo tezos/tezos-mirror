@@ -30,7 +30,11 @@ use storage::{
 };
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_ethereum::block::BlockFees;
-use tezos_evm_logging::{log, Level::*};
+use tezos_evm_logging::{
+    log,
+    Level::{self, *},
+    Verbosity,
+};
 use tezos_evm_runtime::runtime::{KernelHost, Runtime};
 use tezos_evm_runtime::safe_storage::WORLD_STATE_PATH;
 use tezos_smart_rollup::entrypoint;
@@ -320,6 +324,7 @@ pub fn kernel_loop<Host: tezos_smart_rollup_host::runtime::Runtime>(host: &mut H
     let mut host = KernelHost {
         host,
         internal: internal_storage,
+        logs_verbosity: Level::default(),
         _pd: PhantomData::<Host>,
     };
 

@@ -29,7 +29,7 @@ use evm_execution::trace::TracerInput;
 use primitive_types::{H160, H256, U256};
 use tezos_ethereum::block::BlockFees;
 use tezos_ethereum::transaction::TransactionHash;
-use tezos_evm_logging::{log, Level::*};
+use tezos_evm_logging::{log, Level::*, Verbosity};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_evm_runtime::safe_storage::SafeStorage;
 use tezos_smart_rollup::outbox::OutboxQueue;

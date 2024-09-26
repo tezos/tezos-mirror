@@ -9,6 +9,8 @@ edition = "2021"
 license = "MIT"
 
 [dependencies]
+num-traits.workspace = true
+num-derive.workspace = true
 tezos-smart-rollup-debug.workspace = true
 
 [features]
