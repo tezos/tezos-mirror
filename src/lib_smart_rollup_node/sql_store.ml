@@ -50,6 +50,39 @@ let with_connection store conn =
 let with_transaction store k =
   Sqlite.use store @@ fun conn -> Sqlite.with_transaction conn k
 
+module Types = struct
+  let level = int32
+
+  let tzcustom ~encode ~decode t =
+    custom
+      ~encode:(fun v -> Ok (encode v))
+      ~decode:(fun s ->
+        decode s
+        |> Result.map_error (fun err -> Format.asprintf "%a" pp_print_trace err))
+      t
+
+  let commitment_hash =
+    tzcustom
+      ~encode:Commitment.Hash.to_b58check
+      ~decode:Commitment.Hash.of_b58check
+      string
+
+  let state_hash =
+    tzcustom
+      ~encode:State_hash.to_b58check
+      ~decode:State_hash.of_b58check
+      string
+
+  let commitment =
+    product (fun compressed_state inbox_level predecessor number_of_ticks ->
+        Commitment.{compressed_state; inbox_level; predecessor; number_of_ticks})
+    @@ proj state_hash (fun c -> c.Commitment.compressed_state)
+    @@ proj level (fun c -> c.Commitment.inbox_level)
+    @@ proj commitment_hash (fun c -> c.Commitment.predecessor)
+    @@ proj int64 (fun c -> c.Commitment.number_of_ticks)
+    @@ proj_end
+end
+
 let table_exists_req =
   (string ->! bool)
   @@ {sql|
@@ -175,3 +208,71 @@ let init (type m) (mode : m Store_sigs.mode) ~data_dir : m t tzresult Lwt.t =
 let close store = Sqlite.close store
 
 let readonly (store : Store_sigs.rw t) : Store_sigs.ro t = store
+
+module Commitments = struct
+  module Q = struct
+    open Types
+
+    let insert =
+      (t2 commitment_hash commitment ->. unit)
+      @@ {sql|
+      REPLACE INTO commitments
+      (hash, compressed_state, inbox_level, predecessor, number_of_ticks)
+      VALUES (?, ?, ?, ?, ?)
+      |sql}
+
+    let select =
+      (commitment_hash ->? commitment)
+      @@ {sql|
+      SELECT compressed_state, inbox_level, predecessor, number_of_ticks
+      FROM commitments
+      WHERE hash = ?
+      |sql}
+
+    let delete_before =
+      (level ->. unit)
+      @@ {sql|
+      DELETE FROM commitments WHERE inbox_level < ?
+      |sql}
+
+    let lcc =
+      (unit ->? commitment)
+      @@ {sql|
+      SELECT compressed_state, inbox_level, predecessor, number_of_ticks
+      FROM commitments
+      INNER JOIN rollup_node_state
+      ON name = "lcc" AND value = hash
+      |sql}
+
+    let lpc =
+      (unit ->? commitment)
+      @@ {sql|
+      SELECT compressed_state, inbox_level, predecessor, number_of_ticks
+      FROM commitments
+      INNER JOIN rollup_node_state
+      ON name = "lpc" AND value = hash
+      |sql}
+  end
+
+  let store ?conn store commitment =
+    let open Lwt_result_syntax in
+    with_connection store conn @@ fun conn ->
+    let hash = Commitment.hash commitment in
+    let+ () = Sqlite.Db.exec conn Q.insert (hash, commitment) in
+    hash
+
+  let find ?conn store commitment_hash =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.find_opt conn Q.select commitment_hash
+
+  let find_lcc ?conn store commitment_hash =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.find_opt conn Q.lcc commitment_hash
+
+  let find_lpc ?conn store =
+    with_connection store conn @@ fun conn -> Sqlite.Db.find_opt conn Q.lpc ()
+
+  let delete_before ?conn store ~level =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.exec conn Q.delete_before level
+end
