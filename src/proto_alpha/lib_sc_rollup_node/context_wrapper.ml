@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2023-2024 Nomadic Labs <contact@nomadic-labs.com>           *)
+(* Copyright (c) 2024 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -16,6 +17,8 @@ module type S = sig
 
   type tree
 
+  type mut_state
+
   val of_node_context : 'a Context.t -> ('a, repo, tree) Context_sigs.t
 
   val to_node_context : ('a, repo, tree) Context_sigs.t -> 'a Context.t
@@ -23,6 +26,10 @@ module type S = sig
   val of_node_pvmstate : Context.pvmstate -> tree
 
   val to_node_pvmstate : tree -> Context.pvmstate
+
+  val from_imm : tree -> mut_state
+
+  val to_imm : mut_state -> tree
 end
 
 (* Context *)
@@ -79,6 +86,8 @@ module Irmin = struct
 
   type tree = I.tree
 
+  type mut_state = I.mut_state
+
   let of_node_context : 'a Context.t -> ('a, repo, tree) Context_sigs.t =
    fun ctxt -> of_node_context I.equality_witness ctxt
 
@@ -89,6 +98,10 @@ module Irmin = struct
    fun c -> of_node_pvmstate I.equality_witness c
 
   let to_node_pvmstate : tree -> Context.pvmstate = to_node_pvmstate (module I)
+
+  let from_imm : tree -> mut_state = I.from_imm
+
+  let to_imm : mut_state -> tree = I.to_imm
 end
 
 module Riscv = struct
@@ -97,6 +110,8 @@ module Riscv = struct
   type repo = R.repo
 
   type tree = R.tree
+
+  type mut_state = R.mut_state
 
   let of_node_context : 'a Context.t -> ('a, repo, tree) Context_sigs.t =
    fun ctxt -> of_node_context R.equality_witness ctxt
@@ -108,4 +123,8 @@ module Riscv = struct
    fun c -> of_node_pvmstate R.equality_witness c
 
   let to_node_pvmstate : tree -> Context.pvmstate = to_node_pvmstate (module R)
+
+  let from_imm : tree -> mut_state = R.from_imm
+
+  let to_imm : mut_state -> tree = R.to_imm
 end

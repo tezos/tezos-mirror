@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2024 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2024 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -13,6 +14,8 @@ type repo = Storage.Repo.t
 
 type tree = Storage.State.t
 
+type mut_state = tree ref
+
 type 'a raw_index = ('a, repo) Context_sigs.raw_index
 
 type 'a index = ('a, repo) Context_sigs.index
@@ -20,6 +23,10 @@ type 'a index = ('a, repo) Context_sigs.index
 type rw_index = [`Read | `Write] index
 
 let impl_name = "RISC-V"
+
+let from_imm imm_state = ref imm_state
+
+let to_imm mut_state = !mut_state
 
 let equality_witness : (repo, tree) Context_sigs.equality_witness =
   (Context_sigs.Equality_witness.make (), Context_sigs.Equality_witness.make ())

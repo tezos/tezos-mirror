@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
+(* Copyright (c) 2024 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -30,6 +31,8 @@ type repo
 
 (** The type of trees stored in the context, i.e. the actual data. *)
 type tree
+
+type mut_state = tree ref
 
 type 'a raw_index = ('a, repo) Context_sigs.raw_index
 
@@ -69,6 +72,10 @@ type commit
 val impl_name : string
 
 val equality_witness : (repo, tree) Context_sigs.equality_witness
+
+val from_imm : tree -> mut_state
+
+val to_imm : mut_state -> tree
 
 (** [load cache_size path] initializes from disk a context from [path].
     [cache_size] allows to change the LRU cache size of Irmin
