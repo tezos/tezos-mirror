@@ -342,29 +342,6 @@ module Q = struct
       @@ {|SELECT smart_rollup_address from metadata|}
   end
 
-  module Blocks = struct
-    let insert =
-      (t3 level block_hash block ->. unit)
-      @@ {eos|INSERT INTO blocks (level, hash, block) VALUES (?, ?, ?)|eos}
-
-    let select_with_level =
-      (level ->? block) @@ {eos|SELECT block FROM blocks WHERE level = ?|eos}
-
-    let select_with_hash =
-      (block_hash ->? block)
-      @@ {eos|SELECT block FROM blocks WHERE hash = ?|eos}
-
-    let select_hash_of_number =
-      (level ->? block_hash)
-      @@ {eos|SELECT hash FROM blocks WHERE level = ?|eos}
-
-    let select_number_of_hash =
-      (block_hash ->? level)
-      @@ {eos|SELECT level FROM blocks WHERE hash = ?|eos}
-
-    let clear_after = (level ->. unit) @@ {|DELETE FROM blocks WHERE level > ?|}
-  end
-
   module Transactions = struct
     let receipt_fields =
       custom
@@ -433,6 +410,29 @@ module Q = struct
 
     let clear_after =
       (level ->. unit) @@ {|DELETE FROM transactions WHERE block_number > ?|}
+  end
+
+  module Blocks = struct
+    let insert =
+      (t3 level block_hash block ->. unit)
+      @@ {eos|INSERT INTO blocks (level, hash, block) VALUES (?, ?, ?)|eos}
+
+    let select_with_level =
+      (level ->? block) @@ {eos|SELECT block FROM blocks WHERE level = ?|eos}
+
+    let select_with_hash =
+      (block_hash ->? block)
+      @@ {eos|SELECT block FROM blocks WHERE hash = ?|eos}
+
+    let select_hash_of_number =
+      (level ->? block_hash)
+      @@ {eos|SELECT hash FROM blocks WHERE level = ?|eos}
+
+    let select_number_of_hash =
+      (block_hash ->? level)
+      @@ {eos|SELECT level FROM blocks WHERE hash = ?|eos}
+
+    let clear_after = (level ->. unit) @@ {|DELETE FROM blocks WHERE level > ?|}
   end
 end
 
@@ -689,31 +689,6 @@ module Metadata = struct
     with_connection store @@ fun conn -> Db.find_opt conn Q.Metadata.get ()
 end
 
-module Blocks = struct
-  let store store (block : Ethereum_types.block) =
-    with_connection store @@ fun conn ->
-    Db.exec conn Q.Blocks.insert (block.number, block.hash, block)
-
-  let find_with_level store level =
-    with_connection store @@ fun conn ->
-    Db.find_opt conn Q.Blocks.select_with_level level
-
-  let find_with_hash store hash =
-    with_connection store @@ fun conn ->
-    Db.find_opt conn Q.Blocks.select_with_hash hash
-
-  let find_hash_of_number store level =
-    with_connection store @@ fun conn ->
-    Db.find_opt conn Q.Blocks.select_hash_of_number level
-
-  let find_number_of_hash store hash =
-    with_connection store @@ fun conn ->
-    Db.find_opt conn Q.Blocks.select_number_of_hash hash
-
-  let clear_after store level =
-    with_connection store @@ fun conn -> Db.exec conn Q.Blocks.clear_after level
-end
-
 module Transactions = struct
   let store store
       ({
@@ -815,6 +790,31 @@ module Transactions = struct
   let clear_after store level =
     with_connection store @@ fun conn ->
     Db.exec conn Q.Transactions.clear_after level
+end
+
+module Blocks = struct
+  let store store (block : Ethereum_types.block) =
+    with_connection store @@ fun conn ->
+    Db.exec conn Q.Blocks.insert (block.number, block.hash, block)
+
+  let find_with_level store level =
+    with_connection store @@ fun conn ->
+    Db.find_opt conn Q.Blocks.select_with_level level
+
+  let find_with_hash store hash =
+    with_connection store @@ fun conn ->
+    Db.find_opt conn Q.Blocks.select_with_hash hash
+
+  let find_hash_of_number store level =
+    with_connection store @@ fun conn ->
+    Db.find_opt conn Q.Blocks.select_hash_of_number level
+
+  let find_number_of_hash store hash =
+    with_connection store @@ fun conn ->
+    Db.find_opt conn Q.Blocks.select_number_of_hash hash
+
+  let clear_after store level =
+    with_connection store @@ fun conn -> Db.exec conn Q.Blocks.clear_after level
 end
 
 let reset store ~l2_level =
