@@ -40,12 +40,10 @@ type t = {
   gs_worker : Gossipsub.Worker.t;
   transport_layer : Gossipsub.Transport_layer.t;
   mutable profile_ctxt : Profile_manager.t;
-  metrics_server : Metrics.t;
 }
 
 let init config profile_ctxt cryptobox shards_proofs_precomputation
-    proto_parameters proto_plugins store gs_worker transport_layer cctxt
-    metrics_server =
+    proto_parameters proto_plugins store gs_worker transport_layer cctxt =
   let neighbors_cctxts =
     List.map
       (fun Configuration_file.{addr; port} ->
@@ -71,7 +69,6 @@ let init config profile_ctxt cryptobox shards_proofs_precomputation
     gs_worker;
     transport_layer;
     profile_ctxt;
-    metrics_server;
   }
 
 let may_reconstruct ~reconstruct slot_id t =

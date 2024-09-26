@@ -1099,8 +1099,9 @@ let run ~data_dir ~configuration_override =
       return_some amplificator
     else return_none
   in
-  (* This must be done after the amplificator starts. *)
-  let*! metrics_server = Metrics.launch config.metrics_addr in
+  (* Starts the metrics *after* the amplificator fork, to avoid forked opened
+     sockets *)
+  let*! _metrics_server = Metrics.launch config.metrics_addr in
   (* Set value size hooks. *)
   Value_size_hooks.set_share_size
     (Cryptobox.Internal_for_tests.encoded_share_size cryptobox) ;
@@ -1117,7 +1118,6 @@ let run ~data_dir ~configuration_override =
       gs_worker
       transport_layer
       cctxt
-      metrics_server
   in
   (* Start RPC server. We do that before the waiting for the L1 node to be
      bootstrapped so that queries can already be issued. Note that that the node
