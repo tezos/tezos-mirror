@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Features
+
+### Bug fixes
+
+### Internals
+
 ## Version 0.5 (2024-09-27)
 
 This release brings two features of interest for users operating EVM nodes as
