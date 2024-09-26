@@ -235,3 +235,36 @@ module Dal_slots_headers : sig
     Block_hash.t ->
     Dal.Slot_index.t list tzresult Lwt.t
 end
+
+(** [Dal_slots_statuses] is used to store the attestation status of DAL
+    slots. The values of this storage module have type `[`Confirmed |
+    `Unconfirmed]`, depending on whether the content of the slot has been
+    attested on L1 or not. If an entry is not present for a [(block_hash,
+    slot_index)], this means that the corresponding block is not processed yet.
+*)
+module Dal_slots_statuses : sig
+  (** [store ?conn s block slot_index status] store the attestation status of
+      slot published in [block] and index [slot_index]. *)
+  val store :
+    ?conn:Sqlite.conn ->
+    rw ->
+    Block_hash.t ->
+    Dal.Slot_index.t ->
+    [`Confirmed | `Unconfirmed] ->
+    unit tzresult Lwt.t
+
+  (** Retrieve the attestation status of a DAL slot. *)
+  val find_slot_status :
+    ?conn:Sqlite.conn ->
+    _ t ->
+    Block_hash.t ->
+    slot_index:Dal.Slot_index.t ->
+    [`Confirmed | `Unconfirmed] option tzresult Lwt.t
+
+  (** List attestation statuses of all slots published in a given L1 block. *)
+  val list_slot_statuses :
+    ?conn:Sqlite.conn ->
+    _ t ->
+    Block_hash.t ->
+    (Dal.Slot_index.t * [`Confirmed | `Unconfirmed]) list tzresult Lwt.t
+end

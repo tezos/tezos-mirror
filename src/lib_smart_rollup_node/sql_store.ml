@@ -117,6 +117,12 @@ module Types = struct
 
   let dal_slot_index : Dal.Slot_index.t Caqti_type.t = int16
 
+  let dal_slot_status =
+    custom
+      ~encode:(function `Confirmed -> Ok true | `Unconfirmed -> Ok false)
+      ~decode:(function true -> Ok `Confirmed | false -> Ok `Unconfirmed)
+      bool
+
   let z =
     custom
       ~encode:(fun i -> Ok (Z.to_string i))
@@ -724,4 +730,47 @@ module Dal_slots_headers = struct
   let list_slot_indexes ?conn store block =
     with_connection store conn @@ fun conn ->
     Sqlite.Db.rev_collect_list conn Q.select_slot_indexes block
+end
+
+module Dal_slots_statuses = struct
+  module Q = struct
+    open Types
+
+    let insert =
+      (t3 block_hash dal_slot_index dal_slot_status ->. unit)
+      @@ {sql|
+      REPLACE INTO dal_slots_statuses
+      (block_hash, slot_index, attested)
+      VALUES (?, ?, ?)
+      |sql}
+
+    let find_slot_status =
+      (t2 block_hash dal_slot_index ->? dal_slot_status)
+      @@ {sql|
+      SELECT attested
+      FROM dal_slots_statuses
+      WHERE block_hash = ? AND slot_index = ?
+      |sql}
+
+    let select_slot_statuses =
+      (block_hash ->* t2 dal_slot_index dal_slot_status)
+      @@ {sql|
+      SELECT slot_index, attested
+      FROM dal_slots_statuses
+      WHERE block_hash = ?
+      ORDER BY slot_index DESC
+      |sql}
+  end
+
+  let store ?conn store block slot_index slot_status =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.exec conn Q.insert (block, slot_index, slot_status)
+
+  let find_slot_status ?conn store block ~slot_index =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.find_opt conn Q.find_slot_status (block, slot_index)
+
+  let list_slot_statuses ?conn store block =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.rev_collect_list conn Q.select_slot_statuses block
 end
