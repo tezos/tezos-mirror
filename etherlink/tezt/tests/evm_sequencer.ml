@@ -3186,9 +3186,7 @@ let test_force_kernel_upgrade_too_early =
   (* Wait for the sequencer to publish its genesis block. *)
   let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
   let* proxy =
-    Evm_node.init
-      ~mode:(Proxy {finalized_view = false})
-      (Sc_rollup_node.endpoint sc_rollup_node)
+    Evm_node.init ~mode:Proxy (Sc_rollup_node.endpoint sc_rollup_node)
   in
 
   (* Assert the kernel version is the same at start up. *)
@@ -3250,9 +3248,7 @@ let test_force_kernel_upgrade =
   (* Wait for the sequencer to publish its genesis block. *)
   let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
   let* proxy =
-    Evm_node.init
-      ~mode:(Proxy {finalized_view = false})
-      (Sc_rollup_node.endpoint sc_rollup_node)
+    Evm_node.init ~mode:Proxy (Sc_rollup_node.endpoint sc_rollup_node)
   in
 
   (* Assert the kernel version is the same at start up. *)
@@ -6003,7 +5999,7 @@ let test_patch_kernel =
   in
   unit
 
-let test_proxy_finalized_view =
+let test_finalized_view =
   register_all
     ~kernels:
       [
@@ -6012,16 +6008,27 @@ let test_proxy_finalized_view =
       ]
     ~tags:["evm"; "finalized_view"]
     ~time_between_blocks:Nothing
-    ~title:
-      "--finalized-view of the proxy node returns the latest final block of \
-       the sequencer"
+    ~title:"--finalized-view returns the latest final block of the sequencer"
     ~da_fee:Wei.zero
   @@ fun {sc_rollup_node; client; sequencer; proxy; _} _protocol ->
   (* Start a proxy node with --finalized-view enabled *)
   let* finalized_proxy =
     Evm_node.init
-      ~mode:(Proxy {finalized_view = true})
+      ~patch_config:
+        JSON.(
+          fun json ->
+            put ("finalized_view", annotate ~origin:"" (`Bool true)) json)
+      ~mode:Proxy
       (Sc_rollup_node.endpoint sc_rollup_node)
+  in
+  let* finalized_observer =
+    run_new_observer_node
+      ~patch_config:
+        JSON.(
+          fun json ->
+            put ("finalized_view", annotate ~origin:"" (`Bool true)) json)
+      ~sc_rollup_node
+      sequencer
   in
   (* Produce a few EVM blocks *)
   let* _ =
@@ -6047,18 +6054,34 @@ let test_proxy_finalized_view =
      consensus algorithm, so the finalized proxy does not have a head yet. *)
   let*@? _ = Rpc.block_number finalized_proxy in
 
-  (* We produce two more L1 blocks to finalize the L2 blocks.
-     2 here is hardcoded because it’s Tenderbake magic number. *)
+  (* By default the stateful node assume the block 0 is finalized *)
+  let*@ finalized_block = Rpc.block_number finalized_observer in
+  Check.((finalized_block = 0l) int32)
+    ~error_msg:
+      "The stateful node should assume the block 0 is finalized, but %L is \
+       returned" ;
+
+  (* We produce more L1 blocks to finalize the L2 blocks and to give some time
+     to the EVM nodes to catch-up. *)
   let* _ =
-    repeat 2 @@ fun () ->
+    Evm_node.wait_for_blueprint_finalized
+      finalized_observer
+      (Int32.to_int sequencer_head)
+  and* _ =
+    repeat 3 @@ fun () ->
     let* _ = next_rollup_node_level ~sc_rollup_node ~client in
     unit
   in
-  let*@ _ = Rpc.block_number finalized_proxy in
-  Check.((proxy_head = sequencer_head) int32)
+  let*@ finalized_proxy_block = Rpc.block_number finalized_proxy in
+  let*@ finalized_observer_block = Rpc.block_number finalized_observer in
+  Check.((finalized_proxy_block = sequencer_head) int32)
     ~error_msg:
       "Finalized proxy head should be equal to sequencer head (%R), but is %L \
        instead" ;
+  Check.((finalized_observer_block = sequencer_head) int32)
+    ~error_msg:
+      "Finalized observer head should be equal to sequencer head (%R), but is \
+       %L instead" ;
   unit
 
 let test_finalized_block_param =
@@ -6611,7 +6634,7 @@ let () =
   test_fa_bridge_feature_flag protocols ;
   test_trace_call protocols ;
   test_patch_kernel protocols ;
-  test_proxy_finalized_view protocols ;
+  test_finalized_view protocols ;
   test_finalized_block_param protocols ;
   test_regression_block_hash_gen protocols ;
   test_sequencer_sandbox () ;

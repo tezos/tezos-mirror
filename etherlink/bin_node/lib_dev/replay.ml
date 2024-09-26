@@ -19,7 +19,15 @@ let patch_kernel ~kernel_path evm_state =
 let main ?profile ?kernel_path ~data_dir ~preimages ~preimages_endpoint number =
   let open Lwt_result_syntax in
   let* ro_ctxt =
-    Evm_ro_context.load ~data_dir ~preimages ?preimages_endpoint ()
+    Evm_ro_context.load
+      ~data_dir
+      ~preimages
+      ?preimages_endpoint
+      ~finalized_view:
+        (* The block parameter won’t be used so this parameter is effectively
+           ignored during a replay *)
+        false
+      ()
   in
   let alter_evm_state =
     match kernel_path with

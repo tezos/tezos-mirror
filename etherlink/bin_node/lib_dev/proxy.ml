@@ -45,6 +45,20 @@ let main
       ~keep_alive:config.keep_alive
       rollup_node_endpoint
   in
+  let* () =
+    when_ Option.(is_some config.proxy.finalized_view) @@ fun () ->
+    let*! () =
+      Events.deprecation_note
+        "proxy.finalized_view has been deprecated and will be removed in a \
+         future version"
+    in
+    return_unit
+  in
+  let* finalized_view =
+    match (config.proxy.finalized_view, config.finalized_view) with
+    | Some fv, false -> return fv
+    | _, fv -> return fv
+  in
   let module Rollup_node_rpc = Rollup_node.Make (struct
     let base = rollup_node_endpoint
 
@@ -54,7 +68,7 @@ let main
 
     let smart_rollup_address = smart_rollup_address
 
-    let finalized = config.proxy.finalized_view
+    let finalized = finalized_view
 
     let ignore_block_param = config.proxy.ignore_block_param
   end) in

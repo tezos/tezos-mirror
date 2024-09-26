@@ -45,7 +45,7 @@ Miscellaneous commands:
       [--tx-pool-addr-limit <4_000>] [--tx-pool-tx-per-addr-limit <16>]
       [-v --verbose] [--restricted-rpcs <regexp>]
       [--blacklisted-rpcs <blacklist>] [--whitelisted-rpcs <whitelist>]
-      [--preimages-dir <_evm_installer_preimages>]
+      [--finalized-view] [--preimages-dir <_evm_installer_preimages>]
       [--preimages-endpoint <url>] [--time-between-blocks <10.>]
       [--max-number-of-chunks <10.>] [--private-rpc-port <PORT>]
       [--genesis-timestamp <[TIMESTAMP]>]
@@ -70,6 +70,7 @@ Miscellaneous commands:
     --restricted-rpcs <regexp>: Disable methods that matches the given Perl-like regular expression. Cannot be used with --whitelisted-rpcs or --blacklisted-rpcs.
     --blacklisted-rpcs <blacklist>: Disable the RPC methods which are part of the provided list. Cannot be used with --restricted-rpcs or --blacklisted-rpcs.
     --whitelisted-rpcs <whitelist>: Disable the RPC methods which are not part of the provided list. Cannot be used with --restricted-rpcs or --blacklisted-rpcs.
+    --finalized-view: If the flag is set, the node will use the latest final state of the rollup, not its current HEAD, for any read-only operation.
     --preimages-dir <_evm_installer_preimages>: Path to the preimages directory
     --preimages-endpoint <url>: The address of a service which provides pre-images for the rollup. Missing pre-images will be downloaded remotely if they are not already present on disk.
     --time-between-blocks <10.>: Interval (in seconds) at which the sequencer creates an empty block by default. If set to `none`, blocks are produced on demand only (see private method produceBlock).
@@ -88,7 +89,7 @@ Miscellaneous commands:
       [--tx-pool-addr-limit <4_000>] [--tx-pool-tx-per-addr-limit <16>]
       [-v --verbose] [--restricted-rpcs <regexp>]
       [--blacklisted-rpcs <blacklist>] [--whitelisted-rpcs <whitelist>]
-      [--read-only] [--finalized-view] [--ignore-block-param]
+      [--finalized-view] [--read-only] [--ignore-block-param]
       [--evm-node-endpoint <url>]
     Start the EVM node in proxy mode.
     --data-dir <data-dir>: The path to the EVM node data directory
@@ -109,8 +110,8 @@ Miscellaneous commands:
     --restricted-rpcs <regexp>: Disable methods that matches the given Perl-like regular expression. Cannot be used with --whitelisted-rpcs or --blacklisted-rpcs.
     --blacklisted-rpcs <blacklist>: Disable the RPC methods which are part of the provided list. Cannot be used with --restricted-rpcs or --blacklisted-rpcs.
     --whitelisted-rpcs <whitelist>: Disable the RPC methods which are not part of the provided list. Cannot be used with --restricted-rpcs or --blacklisted-rpcs.
+    --finalized-view: If the flag is set, the node will use the latest final state of the rollup, not its current HEAD, for any read-only operation.
     --read-only: If the flag is set, the node refuses transactions
-    --finalized-view: If the flag is set, the node exposes a view of the latest final state of the rollup, not its current HEAD.
     --ignore-block-param: If the flag is set, the node in proxy mode ignores the block parameter submitted by the client and defaults to the latest block for unsupported blocks.
     --evm-node-endpoint <url>: The address of an EVM node to connect to.
   
@@ -122,7 +123,7 @@ Miscellaneous commands:
       [--tx-pool-timeout-limit <3_600>] [--tx-pool-addr-limit <4_000>]
       [--tx-pool-tx-per-addr-limit <16>] [-v --verbose]
       [--restricted-rpcs <regexp>] [--blacklisted-rpcs <blacklist>]
-      [--whitelisted-rpcs <whitelist>]
+      [--whitelisted-rpcs <whitelist>] [--finalized-view]
       [--preimages-dir <_evm_installer_preimages>]
       [--preimages-endpoint <url>] [--time-between-blocks <10.>]
       [--max-number-of-chunks <10.>] [--private-rpc-port <PORT>]
@@ -152,6 +153,7 @@ Miscellaneous commands:
     --restricted-rpcs <regexp>: Disable methods that matches the given Perl-like regular expression. Cannot be used with --whitelisted-rpcs or --blacklisted-rpcs.
     --blacklisted-rpcs <blacklist>: Disable the RPC methods which are part of the provided list. Cannot be used with --restricted-rpcs or --blacklisted-rpcs.
     --whitelisted-rpcs <whitelist>: Disable the RPC methods which are not part of the provided list. Cannot be used with --restricted-rpcs or --blacklisted-rpcs.
+    --finalized-view: If the flag is set, the node will use the latest final state of the rollup, not its current HEAD, for any read-only operation.
     --preimages-dir <_evm_installer_preimages>: Path to the preimages directory
     --preimages-endpoint <url>: The address of a service which provides pre-images for the rollup. Missing pre-images will be downloaded remotely if they are not already present on disk.
     --time-between-blocks <10.>: Interval (in seconds) at which the sequencer creates an empty block by default. If set to `none`, blocks are produced on demand only (see private method produceBlock).
@@ -176,7 +178,7 @@ Miscellaneous commands:
       [--tx-pool-timeout-limit <3_600>] [--tx-pool-addr-limit <4_000>]
       [--tx-pool-tx-per-addr-limit <16>] [-v --verbose]
       [--restricted-rpcs <regexp>] [--blacklisted-rpcs <blacklist>]
-      [--whitelisted-rpcs <whitelist>]
+      [--whitelisted-rpcs <whitelist>] [--finalized-view]
       [--preimages-dir <_evm_installer_preimages>]
       [--preimages-endpoint <url>] [--time-between-blocks <10.>]
       [--max-number-of-chunks <10.>] [--private-rpc-port <PORT>]
@@ -207,6 +209,7 @@ Miscellaneous commands:
     --restricted-rpcs <regexp>: Disable methods that matches the given Perl-like regular expression. Cannot be used with --whitelisted-rpcs or --blacklisted-rpcs.
     --blacklisted-rpcs <blacklist>: Disable the RPC methods which are part of the provided list. Cannot be used with --restricted-rpcs or --blacklisted-rpcs.
     --whitelisted-rpcs <whitelist>: Disable the RPC methods which are not part of the provided list. Cannot be used with --restricted-rpcs or --blacklisted-rpcs.
+    --finalized-view: If the flag is set, the node will use the latest final state of the rollup, not its current HEAD, for any read-only operation.
     --preimages-dir <_evm_installer_preimages>: Path to the preimages directory
     --preimages-endpoint <url>: The address of a service which provides pre-images for the rollup. Missing pre-images will be downloaded remotely if they are not already present on disk.
     --time-between-blocks <10.>: Interval (in seconds) at which the sequencer creates an empty block by default. If set to `none`, blocks are produced on demand only (see private method produceBlock).
@@ -232,8 +235,8 @@ Miscellaneous commands:
       [--tx-pool-timeout-limit <3_600>] [--tx-pool-addr-limit <4_000>]
       [--tx-pool-tx-per-addr-limit <16>] [-v --verbose]
       [--restricted-rpcs <regexp>] [--blacklisted-rpcs <blacklist>]
-      [--whitelisted-rpcs <whitelist>] [--evm-node-endpoint <url>]
-      [--bundler-node-endpoint <url>]
+      [--whitelisted-rpcs <whitelist>] [--finalized-view]
+      [--evm-node-endpoint <url>] [--bundler-node-endpoint <url>]
       [--preimages-dir <_evm_installer_preimages>]
       [--preimages-endpoint <url>] [--initial-kernel <evm_installer.wasm>]
       [--dont-track-rollup-node] [--no-sync]
@@ -256,6 +259,7 @@ Miscellaneous commands:
     --restricted-rpcs <regexp>: Disable methods that matches the given Perl-like regular expression. Cannot be used with --whitelisted-rpcs or --blacklisted-rpcs.
     --blacklisted-rpcs <blacklist>: Disable the RPC methods which are part of the provided list. Cannot be used with --restricted-rpcs or --blacklisted-rpcs.
     --whitelisted-rpcs <whitelist>: Disable the RPC methods which are not part of the provided list. Cannot be used with --restricted-rpcs or --blacklisted-rpcs.
+    --finalized-view: If the flag is set, the node will use the latest final state of the rollup, not its current HEAD, for any read-only operation.
     --evm-node-endpoint <url>: The address of an EVM node to connect to.
     --bundler-node-endpoint <url>: The address of a service which encrypts incoming transactions for the rollup.
     --preimages-dir <_evm_installer_preimages>: Path to the preimages directory
@@ -272,7 +276,8 @@ Miscellaneous commands:
       [--tx-pool-timeout-limit <3_600>] [--tx-pool-addr-limit <4_000>]
       [--tx-pool-tx-per-addr-limit <16>] [-v --verbose]
       [--restricted-rpcs <regexp>] [--blacklisted-rpcs <blacklist>]
-      [--whitelisted-rpcs <whitelist>] [--evm-node-endpoint <url>]
+      [--whitelisted-rpcs <whitelist>] [--finalized-view]
+      [--evm-node-endpoint <url>]
       [--preimages-dir <_evm_installer_preimages>]
       [--preimages-endpoint <url>]
     Start the EVM node in sequencer mode
@@ -294,6 +299,7 @@ Miscellaneous commands:
     --restricted-rpcs <regexp>: Disable methods that matches the given Perl-like regular expression. Cannot be used with --whitelisted-rpcs or --blacklisted-rpcs.
     --blacklisted-rpcs <blacklist>: Disable the RPC methods which are part of the provided list. Cannot be used with --restricted-rpcs or --blacklisted-rpcs.
     --whitelisted-rpcs <whitelist>: Disable the RPC methods which are not part of the provided list. Cannot be used with --restricted-rpcs or --blacklisted-rpcs.
+    --finalized-view: If the flag is set, the node will use the latest final state of the rollup, not its current HEAD, for any read-only operation.
     --evm-node-endpoint <url>: The address of an EVM node to connect to.
     --preimages-dir <_evm_installer_preimages>: Path to the preimages directory
     --preimages-endpoint <url>: The address of a service which provides pre-images for the rollup. Missing pre-images will be downloaded remotely if they are not already present on disk.
@@ -379,7 +385,7 @@ Miscellaneous commands:
       [--tx-pool-addr-limit <4_000>] [--tx-pool-tx-per-addr-limit <16>]
       [-v --verbose] [--restricted-rpcs <regexp>]
       [--blacklisted-rpcs <blacklist>] [--whitelisted-rpcs <whitelist>]
-      [--preimages-dir <_evm_installer_preimages>]
+      [--finalized-view] [--preimages-dir <_evm_installer_preimages>]
       [--preimages-endpoint <url>] [--time-between-blocks <10.>]
       [--max-number-of-chunks <10.>] [--private-rpc-port <PORT>]
       [--sequencer-key <edsk...>] [--maximum-blueprints-lag <LAG>]
@@ -408,6 +414,7 @@ Miscellaneous commands:
     --restricted-rpcs <regexp>: Disable methods that matches the given Perl-like regular expression. Cannot be used with --whitelisted-rpcs or --blacklisted-rpcs.
     --blacklisted-rpcs <blacklist>: Disable the RPC methods which are part of the provided list. Cannot be used with --restricted-rpcs or --blacklisted-rpcs.
     --whitelisted-rpcs <whitelist>: Disable the RPC methods which are not part of the provided list. Cannot be used with --restricted-rpcs or --blacklisted-rpcs.
+    --finalized-view: If the flag is set, the node will use the latest final state of the rollup, not its current HEAD, for any read-only operation.
     --preimages-dir <_evm_installer_preimages>: Path to the preimages directory
     --preimages-endpoint <url>: The address of a service which provides pre-images for the rollup. Missing pre-images will be downloaded remotely if they are not already present on disk.
     --time-between-blocks <10.>: Interval (in seconds) at which the sequencer creates an empty block by default. If set to `none`, blocks are produced on demand only (see private method produceBlock).

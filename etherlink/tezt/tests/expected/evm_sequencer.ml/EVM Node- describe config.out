@@ -135,7 +135,12 @@
            frontend does to prepare swaps). However, it can lead to confusing
            UX for users, where eth_estimateGas fails when eth_call succeeded. */ },
   "proxy"?:
-    { "finalized_view"?: boolean,
+    { "finalized_view"?:
+        boolean
+        /* When enabled, the node only expose blocks that are finalized,
+           i.e., the `latest` block parameter becomes a synonym for
+           `finalized`. DEPRECATED: use the top level `finalized_view` option
+           instead. */,
       "evm_node_endpoint"?: $unistring,
       "ignore_block_param"?: boolean },
   "fee_history"?:
@@ -224,7 +229,11 @@
         || { /* blacklist
                 The list of JSON RPC API methods disallowed for this server. */
              "blacklist": [ $unistring ... ] },
-      "max_active_connections"?: $max_active_rpc_connections } }
+      "max_active_connections"?: $max_active_rpc_connections },
+  "finalized_view"?:
+    boolean
+    /* When enabled, the node only expose blocks that are finalized, i.e.,
+       the `latest` block parameter becomes a synonym for `finalized`. */ }
 $int64:
   /* 64 bit integers
      Decimal representation of 64 bit integers */

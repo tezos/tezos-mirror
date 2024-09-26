@@ -320,7 +320,7 @@ let setup_sequencer ?block_storage_sqlite3 ?sequencer_rpc_port
   let* proxy =
     Evm_node.init
       ~patch_config
-      ~mode:(Proxy {finalized_view = false})
+      ~mode:Proxy
       (Sc_rollup_node.endpoint sc_rollup_node)
   in
   return

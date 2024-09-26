@@ -538,8 +538,8 @@ let read_only_arg =
 let finalized_view_arg =
   Tezos_clic.switch
     ~doc:
-      "If the flag is set, the node exposes a view of the latest final state \
-       of the rollup, not its current HEAD."
+      "If the flag is set, the node will use the latest final state of the \
+       rollup, not its current HEAD, for any read-only operation."
     ~long:"finalized-view"
     ()
 
@@ -617,7 +617,7 @@ let num_download_retries =
     Params.int
 
 let common_config_args =
-  Tezos_clic.args18
+  Tezos_clic.args19
     data_dir_arg
     rpc_addr_arg
     rpc_port_arg
@@ -636,6 +636,7 @@ let common_config_args =
     restricted_rpcs_arg
     blacklisted_rpcs_arg
     whitelisted_rpcs_arg
+    finalized_view_arg
 
 let compress_on_the_fly_arg : (bool, unit) Tezos_clic.arg =
   Tezos_clic.switch
@@ -692,7 +693,7 @@ let start_proxy ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?rpc_batch_limit
       ?tx_pool_addr_limit
       ?tx_pool_tx_per_addr_limit
       ?restricted_rpcs
-      ~proxy_finalized_view:finalized_view
+      ~finalized_view
       ~proxy_ignore_block_param:ignore_block_param
       ~verbose
       ()
@@ -741,7 +742,7 @@ let start_sequencer ?password_filename ~wallet_dir ~data_dir ?rpc_addr ?rpc_port
     ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
     ?catchup_cooldown ?log_filter_max_nb_blocks ?log_filter_max_nb_logs
     ?log_filter_chunk_size ?genesis_timestamp ?restricted_rpcs ?kernel
-    ?dal_slots ?sandbox_key () =
+    ?dal_slots ?sandbox_key ~finalized_view () =
   let open Lwt_result_syntax in
   let wallet_ctxt = register_wallet ?password_filename ~wallet_dir () in
   let* sequencer_key =
@@ -783,6 +784,7 @@ let start_sequencer ?password_filename ~wallet_dir ~data_dir ?rpc_addr ?rpc_port
       ?log_filter_chunk_size
       ?restricted_rpcs
       ?dal_slots
+      ~finalized_view
       ()
   in
   let*! () =
@@ -825,7 +827,7 @@ let start_threshold_encryption_sequencer ?password_filename ~wallet_dir
     ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
     ?catchup_cooldown ?log_filter_max_nb_blocks ?log_filter_max_nb_logs
     ?log_filter_chunk_size ?genesis_timestamp ?restricted_rpcs ?kernel
-    ?sequencer_sidecar_endpoint ?dal_slots () =
+    ?sequencer_sidecar_endpoint ?dal_slots ~finalized_view () =
   let open Lwt_result_syntax in
   let wallet_ctxt = register_wallet ?password_filename ~wallet_dir () in
   let* sequencer_key =
@@ -863,6 +865,7 @@ let start_threshold_encryption_sequencer ?password_filename ~wallet_dir
       ?sequencer_sidecar_endpoint
       ?restricted_rpcs
       ?dal_slots
+      ~finalized_view
       ()
   in
   let*! () =
@@ -922,7 +925,8 @@ let rpc_command =
              verbose,
              restricted_rpcs,
              blacklisted_rpcs,
-             whitelisted_rpcs ),
+             whitelisted_rpcs,
+             finalized_view ),
            (evm_node_endpoint, preimages, preimages_endpoint) )
          () ->
       let* restricted_rpcs =
@@ -945,7 +949,12 @@ let rpc_command =
 
            This config will be used to infer what is the endpoint to use to
            connect to the read-write node. *)
-        Cli.create_or_read_config ~data_dir ~keep_alive ~verbose ()
+        Cli.create_or_read_config
+          ~data_dir
+          ~keep_alive
+          ~verbose
+          ~finalized_view
+          ()
       in
       let evm_node_endpoint =
         match evm_node_endpoint with
@@ -987,6 +996,7 @@ let rpc_command =
           ?rpc_addr
           ~dal_slots:None
           read_write_config
+          ~finalized_view
       in
       let*! () =
         let open Tezos_base_unix.Internal_event_unix in
@@ -1019,7 +1029,7 @@ let start_observer ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?rpc_batch_limit
     ?evm_node_endpoint ?threshold_encryption_bundler_endpoint
     ?tx_pool_timeout_limit ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit
     ?log_filter_chunk_size ?log_filter_max_nb_logs ?log_filter_max_nb_blocks
-    ?restricted_rpcs ?kernel ~no_sync () =
+    ?restricted_rpcs ?kernel ~no_sync ~finalized_view () =
   let open Lwt_result_syntax in
   let* config =
     Cli.create_or_read_config
@@ -1050,6 +1060,7 @@ let start_observer ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?rpc_batch_limit
       ?log_filter_max_nb_blocks
       ?restricted_rpcs
       ?dal_slots:None
+      ~finalized_view
       ()
   in
   let*! () =
@@ -1522,7 +1533,8 @@ mode.|}
              verbose,
              restricted_rpcs,
              blacklisted_rpcs,
-             whitelisted_rpcs ),
+             whitelisted_rpcs,
+             finalized_view ),
            ( preimages,
              preimages_endpoint,
              time_between_blocks,
@@ -1588,6 +1600,7 @@ mode.|}
           ?restricted_rpcs
           ~verbose
           ?dal_slots
+          ~finalized_view
           ()
       in
       Configuration.save ~force ~data_dir config)
@@ -1756,11 +1769,7 @@ let proxy_command =
     ~desc:"Start the EVM node in proxy mode."
     (merge_options
        common_config_args
-       (args4
-          read_only_arg
-          finalized_view_arg
-          ignore_block_param_arg
-          evm_node_endpoint_arg))
+       (args3 read_only_arg ignore_block_param_arg evm_node_endpoint_arg))
     (prefixes ["run"; "proxy"] @@ stop)
     (fun ( ( data_dir,
              rpc_addr,
@@ -1779,8 +1788,9 @@ let proxy_command =
              verbose,
              restricted_rpcs,
              blacklisted_rpcs,
-             whitelisted_rpcs ),
-           (read_only, finalized_view, ignore_block_param, evm_node_endpoint) )
+             whitelisted_rpcs,
+             finalized_view ),
+           (read_only, ignore_block_param, evm_node_endpoint) )
          () ->
       let open Lwt_result_syntax in
       let* restricted_rpcs =
@@ -1862,7 +1872,8 @@ let sequencer_command =
              verbose,
              restricted_rpcs,
              blacklisted_rpcs,
-             whitelisted_rpcs ),
+             whitelisted_rpcs,
+             finalized_view ),
            ( preimages,
              preimages_endpoint,
              time_between_blocks,
@@ -1915,6 +1926,7 @@ let sequencer_command =
         ?restricted_rpcs
         ?kernel
         ?dal_slots
+        ~finalized_view
         ())
 
 let sandbox_command =
@@ -1943,7 +1955,8 @@ let sandbox_command =
              verbose,
              restricted_rpcs,
              blacklisted_rpcs,
-             whitelisted_rpcs ),
+             whitelisted_rpcs,
+             finalized_view ),
            ( preimages,
              preimages_endpoint,
              time_between_blocks,
@@ -1995,6 +2008,7 @@ let sandbox_command =
         ?restricted_rpcs
         ?kernel
         ~sandbox_key:(pk, sk)
+        ~finalized_view
         ())
 
 let threshold_encryption_sequencer_config_args =
@@ -2041,7 +2055,8 @@ let threshold_encryption_sequencer_command =
              verbose,
              restricted_rpcs,
              blacklisted_rpcs,
-             whitelisted_rpcs ),
+             whitelisted_rpcs,
+             finalized_view ),
            ( preimages,
              preimages_endpoint,
              time_between_blocks,
@@ -2096,6 +2111,7 @@ let threshold_encryption_sequencer_command =
         ?restricted_rpcs
         ?kernel
         ?dal_slots
+        ~finalized_view
         ())
 
 let observer_run_args =
@@ -2131,7 +2147,8 @@ let observer_command =
              verbose,
              restricted_rpcs,
              blacklisted_rpcs,
-             whitelisted_rpcs ),
+             whitelisted_rpcs,
+             finalized_view ),
            ( evm_node_endpoint,
              threshold_encryption_bundler_endpoint,
              preimages,
@@ -2168,6 +2185,7 @@ let observer_command =
         ?restricted_rpcs
         ?kernel
         ~no_sync
+        ~finalized_view
         ())
 
 let export_snapshot (data_dir, snapshot_file, compress_on_the_fly, uncompressed)
@@ -2314,6 +2332,7 @@ let preemptive_kernel_download_command =
           ~verbose:false
           ?preimages
           ?preimages_endpoint
+          ~finalized_view:false
           ()
       in
       let kernel_execution_config = configuration.kernel_execution in

@@ -12,9 +12,11 @@ type t = {
   store : Evm_store.t;
   smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
   index : Irmin_context.ro_index;
+  finalized_view : bool;
 }
 
-let load ?smart_rollup_address ~data_dir ~preimages ?preimages_endpoint () =
+let load ?smart_rollup_address ~data_dir ~preimages ?preimages_endpoint
+    ~finalized_view () =
   let open Lwt_result_syntax in
   let* store = Evm_store.init ~data_dir ~perm:`Read_only () in
   let* index =
@@ -26,7 +28,15 @@ let load ?smart_rollup_address ~data_dir ~preimages ?preimages_endpoint () =
     | None -> Evm_store.(use store Metadata.get)
     | Some smart_rollup_address -> return smart_rollup_address
   in
-  {store; index; data_dir; preimages; preimages_endpoint; smart_rollup_address}
+  {
+    store;
+    index;
+    data_dir;
+    preimages;
+    preimages_endpoint;
+    smart_rollup_address;
+    finalized_view;
+  }
 
 let get_evm_state ctxt hash =
   let open Lwt_result_syntax in
@@ -38,6 +48,13 @@ let get_evm_state ctxt hash =
 let find_latest_hash ctxt =
   let open Lwt_result_syntax in
   let* res = Evm_store.(use ctxt.store Context_hashes.find_latest) in
+  match res with
+  | Some (_, hash) -> return hash
+  | None -> failwith "No state available"
+
+let find_finalized_hash ctxt =
+  let open Lwt_result_syntax in
+  let* res = Evm_store.(use ctxt.store Context_hashes.find_finalized) in
   match res with
   | Some (_, hash) -> return hash
   | None -> failwith "No state available"
@@ -58,17 +75,15 @@ let find_irmin_hash_from_number ctxt number =
 let find_irmin_hash ctxt (block : Ethereum_types.Block_parameter.extended) =
   let open Lwt_result_syntax in
   match block with
+  | Block_parameter (Latest | Pending) when ctxt.finalized_view ->
+      find_finalized_hash ctxt
   | Block_parameter (Latest | Pending) -> find_latest_hash ctxt
   | Block_parameter Earliest -> (
       let* res = Evm_store.(use ctxt.store Context_hashes.find_earliest) in
       match res with
       | Some (_, hash) -> return hash
       | None -> failwith "No state available")
-  | Block_parameter Finalized -> (
-      let* res = Evm_store.(use ctxt.store Context_hashes.find_finalized) in
-      match res with
-      | Some (_, hash) -> return hash
-      | None -> failwith "No state available")
+  | Block_parameter Finalized -> find_finalized_hash ctxt
   | Block_parameter (Number number) -> (
       let* res =
         Evm_store.(
@@ -236,6 +251,13 @@ struct
     let open Lwt_result_syntax in
     match block_param with
     | Block_parameter (Number n) -> return n
+    | Block_parameter (Latest | Pending) when Ctxt.ctxt.finalized_view -> (
+        let* res =
+          Evm_store.(use Ctxt.ctxt.store Context_hashes.find_finalized)
+        in
+        match res with
+        | Some (latest, _) -> return latest
+        | None -> failwith "The EVM node does not have any state available")
     | Block_parameter (Latest | Pending) -> (
         let* res = Evm_store.(use Ctxt.ctxt.store Context_hashes.find_latest) in
         match res with
