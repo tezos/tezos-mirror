@@ -5,6 +5,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let welcome = Bytes.of_string "0 Ready"
+
 (* A Lwt worker maintening a queue of calculation jobs to send to the crypto process *)
 type query =
   | Query of {
@@ -137,7 +139,7 @@ let proved_shards_encoding =
 module Reconstruction_process_worker = struct
   let read_init_message_from_parent ic =
     let open Lwt_result_syntax in
-    let* bytes_proto_parameters =
+    let* () =
       let* r = Process_worker.read_message ic in
       match r with
       | `End_of_file ->
@@ -146,14 +148,10 @@ module Reconstruction_process_worker = struct
               Reconstruction_process_worker_error
                 "Invalid initialization message";
             ]
-      | `Message msg -> return msg
+      | `Message b when Bytes.equal b welcome -> return_unit
+      | `Message b -> fail_with_exn (Invalid_argument (String.of_bytes b))
     in
-    let proto_parameters =
-      Data_encoding.Binary.of_bytes_exn
-        Dal_plugin.proto_parameters_encoding
-        bytes_proto_parameters
-    in
-    return proto_parameters
+    return_unit
 
   let reconstruct cryptobox precomputation shards =
     let open Lwt_result_syntax in
@@ -186,8 +184,7 @@ module Reconstruction_process_worker = struct
     let open Lwt_result_syntax in
     (* Read init message from parent with parameters required to initialize
        cryptobox *)
-    (* FIXME: it is not necessary anymore to initialize the cryptobox *)
-    let* _proto_parameters = read_init_message_from_parent ic in
+    let* () = read_init_message_from_parent ic in
     let*! () = Event.(emit crypto_process_started (Unix.getpid ())) in
     let rec loop () =
       let*! query_id = Lwt_io.read_int ic in
@@ -356,7 +353,6 @@ let start_amplificator node_ctxt =
 let make node_ctxt =
   let open Lwt_result_syntax in
   let* amplificator = start_amplificator node_ctxt in
-  let proto_parameters = Node_context.get_proto_parameters node_ctxt in
   (* Run a job enqueueing all shards calculation tasks *)
   let amplificator_query_sender_job =
     let*! r = query_sender_job amplificator in
@@ -381,14 +377,9 @@ let make node_ctxt =
         let () = Lwt.cancel amplificator_reply_receiver_job in
         Lwt.return_unit)
   in
-  let bytes_proto_parameters =
-    Data_encoding.Binary.to_bytes_exn
-      Dal_plugin.proto_parameters_encoding
-      proto_parameters
-  in
   let* () =
     let oc = Process_worker.output_channel amplificator.process in
-    let* r = Process_worker.write_message oc bytes_proto_parameters in
+    let* r = Process_worker.write_message oc (Bytes.of_string "0 Ready") in
     match r with
     | `End_of_file ->
         fail
