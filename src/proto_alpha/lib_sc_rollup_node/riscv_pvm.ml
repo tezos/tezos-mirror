@@ -47,6 +47,25 @@ module State = Riscv_context.PVMState
 module Backend = Octez_riscv_pvm.Backend
 module Ctxt_wrapper = Context_wrapper.Riscv
 
+let to_pvm_input (input : Sc_rollup.input) : Backend.input =
+  match input with
+  | Sc_rollup.Inbox_message {inbox_level; message_counter; payload} ->
+      InboxMessage
+        ( Raw_level.to_int32 inbox_level,
+          Z.to_int64 message_counter,
+          Sc_rollup.Inbox_message.unsafe_to_string payload )
+  | Sc_rollup.(Reveal (Metadata {address; origination_level})) ->
+      Reveal
+        (Metadata
+           ( Sc_rollup.Address.to_bytes address,
+             Raw_level.to_int32 origination_level ))
+  | Sc_rollup.(Reveal (Raw_data data)) -> Reveal (RawData data)
+  | _ -> assert false
+
+let of_pvm_input_request (_input_request : Backend.input_request) :
+    Sc_rollup.input_request =
+  raise (Invalid_argument "input_request not implemented")
+
 module PVM :
   Sc_rollup.PVM.S
     with type state = tree
@@ -110,25 +129,6 @@ module PVM :
               (Sc_rollup.First_after
                  (Raw_level.of_int32_exn level, Z.of_int64 message_counter)))
     | WaitingForMetadata -> return Sc_rollup.(Needs_reveal Reveal_metadata)
-
-  let to_pvm_input (input : Sc_rollup.input) : Backend.input =
-    match input with
-    | Sc_rollup.Inbox_message {inbox_level; message_counter; payload} ->
-        InboxMessage
-          ( Raw_level.to_int32 inbox_level,
-            Z.to_int64 message_counter,
-            Sc_rollup.Inbox_message.unsafe_to_string payload )
-    | Sc_rollup.(Reveal (Metadata {address; origination_level})) ->
-        Reveal
-          (Metadata
-             ( Sc_rollup.Address.to_bytes address,
-               Raw_level.to_int32 origination_level ))
-    | Sc_rollup.(Reveal (Raw_data data)) -> Reveal (RawData data)
-    | _ -> assert false
-
-  let of_pvm_input_request (_input_request : Backend.input_request) :
-      Sc_rollup.input_request =
-    raise (Invalid_argument "input_request not implemented")
 
   let set_input input state = Backend.set_input state (to_pvm_input input)
 
