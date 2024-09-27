@@ -548,7 +548,7 @@ let shutdown_worker state =
    to add them. But these attestations become 'Outdated' in the mempool once
    (L+1, 0) is received. Hence the cache for previous level.
 *)
-let update_operations_pool state (head_level, head_round) =
+let flush_operation_pool state (head_level, head_round) =
   let attestations =
     let head_round_i32 = Round.to_int32 head_round in
     let head_level_i32 = head_level in
@@ -578,7 +578,7 @@ let update_operations_pool state (head_level, head_round) =
   let operation_pool = {Operation_pool.empty with consensus = attestations} in
   state.operation_pool <- operation_pool
 
-let create ?(monitor_node_operations = true)
+let run ?(monitor_node_operations = true)
     (cctxt : #Protocol_client_context.full) =
   let open Lwt_syntax in
   let state =
@@ -608,7 +608,7 @@ let create ?(monitor_node_operations = true)
             cancel_monitoring
               state [@profiler.record_f "cancel monitoring state"] ;
             return_unit) ;
-        update_operations_pool
+        flush_operation_pool
           state
           head [@profiler.record_f "update operations pool"] ;
         let rec loop () =

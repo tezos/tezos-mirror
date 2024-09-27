@@ -54,7 +54,7 @@ let create_state cctxt ?synchronize ?monitor_node_mempool ~config
   let chain = cctxt#chain in
   let monitor_node_operations = monitor_node_mempool in
   let*! operation_worker =
-    Operation_worker.create ?monitor_node_operations cctxt
+    Operation_worker.run ?monitor_node_operations cctxt
   in
   Baking_scheduling.create_initial_state
     cctxt

@@ -47,13 +47,12 @@ type event =
 
 (** {1 Constructors}*)
 
-(** [create ?monitor_node_operations cctxt] creates a monitoring process to
-   fetch operations for the baker to process.
+(** [run ?monitor_node_operations cctxt] spawns an operation worker.
 
     @param monitor_node_operations monitor operations on the node (defaults:
    [true]).  Set [monitor_node_operations] to [false] to only consider
    externally provided (non-node) operations.  *)
-val create :
+val run :
   ?monitor_node_operations:bool -> #Protocol_client_context.full -> t Lwt.t
 
 (** {1 Utilities} *)
