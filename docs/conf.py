@@ -236,7 +236,11 @@ texinfo_documents = [
 
 # -- Ignore fragments in linkcheck
 
+# Check the existence of given anchors (suffixes of the form "#label") in URLs
 linkcheck_anchors = False
+# linkcheck_report_timeouts_as_broken = False  # (default)
+# linkcheck_timeout = 30  # (default)
+linkcheck_retries = 2
 linkcheck_ignore = [
     # links which may fail for lack of access rights:
     r'^https://gitlab\.com/nomadic-labs/tezos/-/merge_requests/',
@@ -249,9 +253,6 @@ linkcheck_ignore = [
     r'^https://opentezos\.com/',
     r'^https://crates\.io/crates/tezos-smart-rollup',
     r'^https://rpc\.ghostnet\.teztnets\.com/chains/main/blocks/',
-    r'^https://gitlab\.com/tezos/tezos/-/merge_requests/2771',
-    r'^https://gitlab\.com/tezos/tezos/-/merge_requests/3225',
-    r'^https://gitlab\.com/tezos/tezos/-/merge_requests/3267',
 ]
 linkcheck_allowed_redirects = dict(
     [
