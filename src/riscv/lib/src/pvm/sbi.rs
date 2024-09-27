@@ -10,7 +10,7 @@ use crate::{
         registers::{a0, a1, a2, a3, a6, a7, XValue},
         AccessType, MachineState,
     },
-    parser::instruction::InstrCacheable,
+    parser::instruction::InstrUncacheable,
     state_backend::{CellRead, CellReadWrite, CellWrite, ManagerReadWrite},
     traps::EnvironException,
 };
@@ -417,7 +417,7 @@ where
     // No matter the outcome, we need to bump the
     // program counter because ECALL's don't update it
     // to the following instructions.
-    let pc = machine.core.hart.pc.read() + InstrCacheable::Ecall.width();
+    let pc = machine.core.hart.pc.read() + InstrUncacheable::Ecall.width();
     machine.core.hart.pc.write(pc);
 
     // SBI extension is contained in a7.

@@ -345,13 +345,6 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::ManagerBase> MachineCoreStat
             InstrCacheable::Lhu(args) => run_load_instr!(self, instr, args, run_lhu),
             InstrCacheable::Lwu(args) => run_load_instr!(self, instr, args, run_lwu),
             InstrCacheable::Ld(args) => run_load_instr!(self, instr, args, run_ld),
-            InstrCacheable::Fence(args) => {
-                self.run_fence(args.pred, args.succ);
-                Ok(Add(instr.width()))
-            }
-            InstrCacheable::FenceTso(_args) => Err(Exception::IllegalInstruction),
-            InstrCacheable::Ecall => run_syscall_instr!(self, run_ecall),
-            InstrCacheable::Ebreak => run_syscall_instr!(self, run_ebreak),
 
             // RV64I S-type instructions
             InstrCacheable::Sb(args) => run_store_instr!(self, instr, args, run_sb),
@@ -504,20 +497,6 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::ManagerBase> MachineCoreStat
             InstrCacheable::Csrrsi(args) => run_csr_imm_instr!(self, instr, args, run_csrrsi),
             InstrCacheable::Csrrci(args) => run_csr_imm_instr!(self, instr, args, run_csrrci),
 
-            // Privileged instructions
-            // Trap-Return
-            InstrCacheable::Mret => run_xret_instr!(self, run_mret),
-            InstrCacheable::Sret => run_xret_instr!(self, run_sret),
-            // Currently not implemented instruction (part of Smrnmi extension)
-            InstrCacheable::Mnret => Err(Exception::IllegalInstruction),
-            // Interrupt-Management
-            InstrCacheable::Wfi => run_no_args_instr!(self, instr, run_wfi),
-            // Supervisor Memory-Management
-            InstrCacheable::SFenceVma { asid, vaddr } => {
-                self.run_sfence_vma(*asid, *vaddr)?;
-                Ok(ProgramCounterUpdate::Add(instr.width()))
-            }
-
             // RV32C compressed instructions
             InstrCacheable::CLw(args) => run_load_instr!(self, instr, args, run_clw),
             InstrCacheable::CLwsp(args) => run_ci_load_sp_instr!(self, instr, args, run_clwsp),
@@ -546,7 +525,6 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::ManagerBase> MachineCoreStat
             InstrCacheable::CXor(args) => run_cr_type_instr!(self, instr, args, run_cxor),
             InstrCacheable::COr(args) => run_cr_type_instr!(self, instr, args, run_cor),
             InstrCacheable::CSub(args) => run_cr_type_instr!(self, instr, args, run_csub),
-            InstrCacheable::CEbreak => run_syscall_instr!(self, run_cebreak),
             InstrCacheable::CNop => {
                 self.run_cnop();
                 Ok(ProgramCounterUpdate::Add(instr.width()))
@@ -712,9 +690,36 @@ impl<ML: main_memory::MainMemoryLayout, ICL: InstructionCacheLayout, M: backend:
     where
         M: backend::ManagerReadWrite,
     {
-        use ProgramCounterUpdate::Add;
+        use ProgramCounterUpdate::{Add, Set};
+
+        let core = &mut self.core;
 
         match instr {
+            InstrUncacheable::Fence(args) => {
+                self.core.run_fence(args.pred, args.succ);
+                Ok(Add(instr.width()))
+            }
+            InstrUncacheable::FenceTso(_args) => Err(Exception::IllegalInstruction),
+            InstrUncacheable::Ecall => run_syscall_instr!(core, run_ecall),
+            InstrUncacheable::Ebreak => run_syscall_instr!(core, run_ebreak),
+
+            // Privileged instructions
+            // Trap-Return
+            InstrUncacheable::Mret => run_xret_instr!(core, run_mret),
+            InstrUncacheable::Sret => run_xret_instr!(core, run_sret),
+            // Currently not implemented instruction (part of Smrnmi extension)
+            InstrUncacheable::Mnret => Err(Exception::IllegalInstruction),
+            // Interrupt-Management
+            InstrUncacheable::Wfi => run_no_args_instr!(core, instr, run_wfi),
+            // Supervisor Memory-Management
+            InstrUncacheable::SFenceVma { asid, vaddr } => {
+                self.core.run_sfence_vma(*asid, *vaddr)?;
+                Ok(ProgramCounterUpdate::Add(instr.width()))
+            }
+
+            // RV32C compressed instructions
+            InstrUncacheable::CEbreak => run_syscall_instr!(core, run_cebreak),
+
             // Zifencei instructions
             InstrUncacheable::FenceI => run_no_args_instr!(self, instr, run_fencei),
         }

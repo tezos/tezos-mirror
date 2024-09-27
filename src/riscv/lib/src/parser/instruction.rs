@@ -269,10 +269,6 @@ pub enum InstrCacheable {
     Lhu(ITypeArgs),
     Lwu(ITypeArgs),
     Ld(ITypeArgs),
-    Fence(FenceArgs),
-    FenceTso(FenceArgs),
-    Ecall,
-    Ebreak,
 
     // RV64I S-type instructions
     Sb(SBTypeArgs),
@@ -409,16 +405,6 @@ pub enum InstrCacheable {
     Csrrsi(CsriArgs),
     Csrrci(CsriArgs),
 
-    // Privileged instructions
-    // Trap-Return
-    Mret,
-    Sret,
-    Mnret,
-    // Interrupt-Management
-    Wfi,
-    // Supervisor Memory-Management
-    SFenceVma { asid: XRegister, vaddr: XRegister },
-
     // RV32C compressed instructions
     CLw(ITypeArgs),
     CLwsp(CIBTypeArgs),
@@ -446,7 +432,6 @@ pub enum InstrCacheable {
     CSub(CRTypeArgs),
     CAddw(CRTypeArgs),
     CSubw(CRTypeArgs),
-    CEbreak,
     CNop,
 
     // RV64C compressed instructions
@@ -466,12 +451,39 @@ pub enum InstrCacheable {
     UnknownCompressed { instr: u16 },
 }
 
-/// Instructions that may invalidate the Instruction Cache cannot be
-/// stored in that cache, and are split out to statically ensure this.
+/// Uncacheable instructions are those that may result in a
+/// breaking of the normal flow of execution.
+///
+/// Namely, that may happen due:
+/// - interrupt control flow
+/// - cache invalidation
+/// - altering the mapping of virtual to physical memory
+///
+/// Any of these can result in breaking the 'default flow of execution',
+/// invalidating the assumptions that are required for the [`BlockCache`] to
+/// function.
 #[derive(Debug, PartialEq, Eq, Clone, Copy, EnumTag, Hash)]
 pub enum InstrUncacheable {
+    Fence(FenceArgs),
+    FenceTso(FenceArgs),
+    Ecall,
+    Ebreak,
+
+    // RV32C compressed instructions
+    CEbreak,
+
     // Zifencei instructions
     FenceI,
+
+    // Privileged instructions
+    // Trap-Return
+    Mret,
+    Sret,
+    Mnret,
+    // Interrupt-Management
+    Wfi,
+    // Supervisor Memory-Management
+    SFenceVma { asid: XRegister, vaddr: XRegister },
 }
 
 /// RISC-V parsed instructions.
@@ -529,10 +541,6 @@ impl InstrCacheable {
             | Lhu(_)
             | Lwu(_)
             | Ld(_)
-            | Fence(_)
-            | FenceTso(_)
-            | Ecall
-            | Ebreak
             | Sb(_)
             | Sh(_)
             | Sw(_)
@@ -650,11 +658,6 @@ impl InstrCacheable {
             | Csrrwi(_)
             | Csrrsi(_)
             | Csrrci(_)
-            | Mret
-            | Sret
-            | Mnret
-            | Wfi
-            | SFenceVma { .. }
             | Unknown { instr: _ } => 4,
 
             // 2 bytes instructions (compressed instructions)
@@ -684,7 +687,6 @@ impl InstrCacheable {
             | CSub(_)
             | CAddw(_)
             | CSubw(_)
-            | CEbreak
             | CNop
             | CLd(_)
             | CLdsp(_)
@@ -705,7 +707,18 @@ impl InstrUncacheable {
     pub const fn width(&self) -> u64 {
         use InstrUncacheable::*;
         match self {
-            FenceI => 4,
+            FenceI
+            | Fence(_)
+            | FenceTso(_)
+            | Ecall
+            | Ebreak
+            | Mret
+            | Sret
+            | Mnret
+            | Wfi
+            | SFenceVma { .. } => 4,
+
+            CEbreak => 2,
         }
     }
 }
@@ -956,12 +969,6 @@ impl fmt::Display for InstrCacheable {
             Lwu(args) => i_instr_load!(f, "lwu", args),
             Ld(args) => i_instr_load!(f, "ld", args),
 
-            Fence(args) => fence_instr!(f, "fence", args),
-            FenceTso(args) => fence_instr!(f, "fence.tso", args),
-
-            Ecall => write!(f, "ecall"),
-            Ebreak => write!(f, "ebreak"),
-
             // RV64I S-type instructions
             Sb(args) => s_instr!(f, "sb", args),
             Sh(args) => s_instr!(f, "sh", args),
@@ -1112,16 +1119,6 @@ impl fmt::Display for InstrCacheable {
             Csrrsi(args) => csri_instr!(f, "csrrsi", args),
             Csrrci(args) => csri_instr!(f, "csrrci", args),
 
-            // Privileged instructions
-            // Trap-Return
-            Mret => write!(f, "mret"),
-            Sret => write!(f, "sret"),
-            Mnret => write!(f, "mnret"),
-            // Interrupt-management
-            Wfi => write!(f, "wfi"),
-            // Supervisor Memory-Management
-            SFenceVma { asid, vaddr } => write!(f, "sfence.vma {vaddr},{asid}"),
-
             // RV32C compressed instructions
             CLw(args) => i_instr_load!(f, "c.lw", args),
             CLwsp(args) => c_instr_sp!(f, "c.lwsp", args),
@@ -1153,7 +1150,6 @@ impl fmt::Display for InstrCacheable {
             COr(args) => cr_instr!(f, "c.or", args),
             CXor(args) => cr_instr!(f, "c.xor", args),
             CSub(args) => cr_instr!(f, "c.sub", args),
-            CEbreak => write!(f, "c.ebreak"),
             CNop => write!(f, "c.nop"),
 
             // RV64C compressed instructions
@@ -1181,8 +1177,27 @@ impl fmt::Display for InstrUncacheable {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use InstrUncacheable::*;
         match self {
+            Fence(args) => fence_instr!(f, "fence", args),
+            FenceTso(args) => fence_instr!(f, "fence.tso", args),
+
+            Ecall => write!(f, "ecall"),
+            Ebreak => write!(f, "ebreak"),
+
+            // Privileged instructions
+            // Trap-Return
+            Mret => write!(f, "mret"),
+            Sret => write!(f, "sret"),
+            Mnret => write!(f, "mnret"),
+            // Interrupt-management
+            Wfi => write!(f, "wfi"),
+            // Supervisor Memory-Management
+            SFenceVma { asid, vaddr } => write!(f, "sfence.vma {vaddr},{asid}"),
+
             // Zifencei instructions
             FenceI => write!(f, "fence.i"),
+
+            // Compressed
+            CEbreak => write!(f, "c.ebreak"),
         }
     }
 }
