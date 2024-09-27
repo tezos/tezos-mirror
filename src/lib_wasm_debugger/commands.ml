@@ -435,9 +435,18 @@ let reveals config request =
       request_dal_page config num_retries published_level index page_index
 
 let write_debug_default config =
-  if config.Config.kernel_debug then
-    Tezos_scoru_wasm.Builtins.Printer (fun msg -> Lwt_fmt.printf "%s%!" msg)
-  else Tezos_scoru_wasm.Builtins.Noop
+  match config.Config.timings_file with
+  | None when config.Config.kernel_debug ->
+      Tezos_scoru_wasm.Builtins.Printer (Lwt_io.printf "%s%!")
+  | None -> Tezos_scoru_wasm.Builtins.Noop
+  | Some timings_file ->
+      let console = Timing_buffer.create () in
+      let out = open_out timings_file in
+      Gc.finalise (Timing_buffer.flush_buffer console) out ;
+      Tezos_scoru_wasm.Builtins.Printer
+        (fun msg ->
+          Timing_buffer.add_message console out msg ;
+          Lwt.return_unit)
 
 module Make (Wasm_utils : Wasm_utils_intf.S) = struct
   module Prof = Profiling.Make (Wasm_utils)
@@ -445,13 +454,13 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
 
   (* [compute_step tree] is a wrapper around [Wasm_pvm.compute_step] that also
      returns the number of ticks elapsed (whi is always 1). *)
-  let compute_step config tree =
+  let compute_step ~write_debug tree =
     let open Lwt_syntax in
     trap_exn (fun () ->
         let+ tree =
           Wasm.compute_step_with_debug
             ~wasm_entrypoint:Constants.wasm_entrypoint
-            ~write_debug:(write_debug_default config)
+            ~write_debug
             tree
         in
         (tree, 1L))
@@ -459,16 +468,13 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
   (** [eval_to_result tree] tries to evaluates the PVM until the next `SK_Result`
     or `SK_Trap`, and stops in case of reveal tick or input tick. It has the
     property that the memory hasn't been flushed yet and can be inspected. *)
-  let eval_to_result config tree =
+  let eval_to_result ?write_debug config tree =
     trap_exn (fun () ->
-        eval_to_result
-          ~write_debug:(write_debug_default config)
-          ~reveal_builtins:(reveals config)
-          tree)
+        eval_to_result ?write_debug ~reveal_builtins:(reveals config) tree)
 
   (* [eval_kernel_run tree] evals up to the end of the current `kernel_run` (or
      starts a new one if already at snapshot point). *)
-  let eval_kernel_run ?hooks ~wasm_entrypoint config tree =
+  let eval_kernel_run ?hooks ?write_debug ~wasm_entrypoint config tree =
     let open Lwt_syntax in
     trap_exn (fun () ->
         let* info_before = Wasm.get_info tree in
@@ -477,7 +483,7 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
             ?hooks
             ~wasm_entrypoint
             ~reveal_builtins:(reveals config)
-            ~write_debug:(write_debug_default config)
+            ?write_debug
             ~stop_at_snapshot:true
             ~max_steps:Int64.max_int
             tree
@@ -491,9 +497,6 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
   let eval_until_input_requested ?hooks ?write_debug ~wasm_entrypoint config
       tree =
     let open Lwt_syntax in
-    let write_debug =
-      Option.value ~default:(write_debug_default config) write_debug
-    in
     trap_exn (fun () ->
         let* info_before = Wasm.get_info tree in
         let* tree =
@@ -502,7 +505,7 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
             ~wasm_entrypoint
             ~fast_exec:true
             ~reveal_builtins:(Some (reveals config))
-            ~write_debug
+            ?write_debug
             ~max_steps:Int64.max_int
             tree
         in
@@ -635,7 +638,7 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
         return (tree, inboxes, level)
 
   (* Eval dispatcher. *)
-  let eval ?hooks ?migrate_to ?write_debug ~wasm_entrypoint level inboxes config
+  let eval ?hooks ?migrate_to ~write_debug ~wasm_entrypoint level inboxes config
       step tree =
     let open Lwt_result_syntax in
     let return' ?(inboxes = inboxes) f =
@@ -643,10 +646,11 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
       return (tree, count, inboxes, level)
     in
     match step with
-    | Tick -> return' (compute_step config tree)
-    | Result -> return' (eval_to_result config tree)
+    | Tick -> return' (compute_step ~write_debug tree)
+    | Result -> return' (eval_to_result ~write_debug config tree)
     | Kernel_run ->
-        return' (eval_kernel_run ?hooks ~wasm_entrypoint config tree)
+        return'
+          (eval_kernel_run ?hooks ~write_debug ~wasm_entrypoint config tree)
     | Inbox -> (
         let*! status = check_input_request tree in
         match status with
@@ -657,7 +661,7 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
             let* tree, ticks =
               eval_until_input_requested
                 ?hooks
-                ?write_debug
+                ~write_debug
                 ~wasm_entrypoint
                 config
                 tree
@@ -665,7 +669,12 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
             return (tree, ticks, inboxes, level)
         | Error _ ->
             return'
-              (eval_until_input_requested ?hooks ~wasm_entrypoint config tree))
+              (eval_until_input_requested
+                 ?hooks
+                 ~write_debug
+                 ~wasm_entrypoint
+                 config
+                 tree))
 
   let profile ?migrate_to ~collapse ~with_time ~no_reboot level inboxes config
       function_symbols tree =
@@ -743,10 +752,10 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
 
   (* [step level inboxes config kind tree] evals according to the step kind and
      prints the number of ticks elapsed and the new status. *)
-  let step ~wasm_entrypoint level inboxes config kind tree =
+  let step ~write_debug ~wasm_entrypoint level inboxes config kind tree =
     let open Lwt_result_syntax in
     let* tree, ticks, inboxes, level =
-      eval ~wasm_entrypoint level inboxes config kind tree
+      eval ~write_debug ~wasm_entrypoint level inboxes config kind tree
     in
     let*! () = Lwt_fmt.printf "Evaluation took %Ld ticks so far\n" ticks in
     let*! () = show_status tree in
@@ -1052,7 +1061,7 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
 
   (* [handle_command command tree inboxes level] dispatches the commands to their
      actual implementation. *)
-  let handle_command c config tree inboxes level =
+  let handle_command ~write_debug c config tree inboxes level =
     let open Lwt_result_syntax in
     let command = parse_commands c in
     let return ?(tree = tree) ?(inboxes = inboxes) () =
@@ -1077,6 +1086,7 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
           return ()
       | Step kind ->
           step
+            ~write_debug
             ~wasm_entrypoint:Constants.wasm_entrypoint
             level
             inboxes
