@@ -541,7 +541,7 @@ oc.upgrade_bin_ubuntu_jammy:
   - gcp
   needs:
   - apt_repo_ubuntu_current
-  - apt_repo_debian
+  - apt_repo_ubuntu
   dependencies: []
   timeout: 60 minutes
   script:

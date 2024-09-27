@@ -356,7 +356,7 @@ let jobs pipeline_type =
         ~__POS__
         ~name:"oc.upgrade_bin_ubuntu_jammy"
         ~dependencies:
-          (Dependent [Job job_apt_repo_ubuntu_current; Job job_apt_repo_debian])
+          (Dependent [Job job_apt_repo_ubuntu_current; Job job_apt_repo_ubuntu])
         ~image:Images.ubuntu_jammy
         ["./docs/introduction/upgrade-bin-deb.sh ubuntu jammy"];
     ]
