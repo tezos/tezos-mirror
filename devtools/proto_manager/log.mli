@@ -39,14 +39,14 @@ val error : ?name:string -> ('a, Format.formatter, unit) format -> 'a
    in the standard error. *)
 val warning : ('a, Format.formatter, unit) format -> 'a
 
-(* Same as [eprintln] but prints in blue. *)
+(* Same as [printfln] but prints in blue. *)
 val blue : ('a, Format.formatter, unit) format -> 'a
 
-(* Same as [eprintln] but prints in green. *)
+(* Same as [printfln] but prints in green. *)
 val green : ('a, Format.formatter, unit) format -> 'a
 
-(* Same as [eprintln] but prints in cyan. *)
+(* Same as [printfln] but prints in cyan. *)
 val cyan : ('a, Format.formatter, unit) format -> 'a
 
-(* Same as [eprintln] but prints in magenta. *)
+(* Same as [printfln] but prints in magenta. *)
 val magenta : ('a, Format.formatter, unit) format -> 'a
