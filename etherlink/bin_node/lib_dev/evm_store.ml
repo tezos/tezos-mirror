@@ -501,6 +501,15 @@ let init ~data_dir ~perm () =
         return_unit
     in
     let* migrations = Migrations.missing_migrations conn in
+    let*? () =
+      match (perm, migrations) with
+      | `Read_only, _ :: _ ->
+          error_with
+            "The store has %d missing migrations but was opened in read-only \
+             mode."
+            (List.length migrations)
+      | _, _ -> Ok ()
+    in
     let* () =
       List.iter_es
         (fun (i, ((module M : Evm_node_migrations.S) as mig)) ->
