@@ -13,8 +13,19 @@ type error =
   | Invalid_record of Key.t
   | Invalid_span of Key.t
   | Invalid_stop of Key.t
+  | Improper_field of (Longident.t Location.loc * Ppxlib.expression)
   | Improper_let_binding of Ppxlib.expression
+  | Improper_record of (Ppxlib.Ast.longident_loc * Parsetree.expression) list
   | Malformed_attribute of Ppxlib.expression
+
+let pp_field ppf (lident, expr) =
+  Format.fprintf
+    ppf
+    "%a = %a"
+    Pprintast.longident
+    lident.Ppxlib.txt
+    Pprintast.expression
+    expr
 
 let error loc err =
   let msg, hint =
@@ -74,6 +85,29 @@ let error loc err =
              Found %a@."
             Key.pp
             key )
+    | Improper_record record ->
+        ( "Improper record.",
+          Format.asprintf
+            "@[<v 2>It looks like you tried to provide some additional options \
+             through the mandatory record but no option could be parsed out of \
+             it. Possible options are:@,\
+             - the level_of_detail@,\
+             - the profiler_module@,\
+             Found %a@."
+            Format.(
+              pp_print_list
+                ~pp_sep:(fun ppf () -> Format.fprintf ppf ";@,")
+                pp_field)
+            record )
+    | Improper_field field ->
+        ( "Improper field.",
+          Format.asprintf
+            "@[<v 2>Expecting a field specifying either:@,\
+             - the level_of_detail@,\
+             - the profiler_module@,\
+             Found %a@."
+            pp_field
+            field )
     | Improper_let_binding expr ->
         ( "Improper let binding expression.",
           Format.asprintf

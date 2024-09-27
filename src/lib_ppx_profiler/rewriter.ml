@@ -358,6 +358,27 @@ end = struct
         | Some labels -> Key.List labels
         | None -> Error.error loc Error.(Malformed_attribute structure))
 
+  let exists_field field string =
+    let Ppxlib.{txt; _}, _ = field in
+    txt = Ppxlib.Lident string
+
+  let extract_field_from_record loc record string =
+    match List.find (fun field -> exists_field field string) record with
+    | _, Ppxlib.{pexp_desc = Pexp_construct ({txt = Lident ident; _}, None); _}
+      ->
+        Some ident
+    | field -> Error.error loc Error.(Improper_field field)
+    | exception Not_found -> None
+
+  let extract_from_record loc record =
+    let level_of_detail =
+      extract_field_from_record loc record "level_of_detail"
+    in
+    let profiler_module =
+      extract_field_from_record loc record "profiler_module"
+    in
+    (level_of_detail, profiler_module)
+
   let extract_key_from_payload loc payload =
     match payload with
     | Ppxlib.PStr
@@ -366,21 +387,21 @@ end = struct
             [%e?
               {
                 pexp_desc =
-                  Pexp_construct ({txt = Lident label; _}, Some structure);
+                  Pexp_apply
+                    ( {pexp_desc = Pexp_record (record, _); _},
+                      [(Nolabel, structure)] );
                 _;
               }]];
-        ]
-      when not (String.equal label "::") ->
-        (* If the construct is "::" the payload attribute is a list but there's a trick:
-           - [ [@profiler.mark Terse ["label"]] ] is a [Construct("Terse", Some expression)]
-           - [ [@profiler.mark ["label"]] ] is a [Construct("::", Some expression)]
-           The AST handles [Terse ...] and [ ["label"] ] in the same way so we
-           need to make sure that we don't include the list case in this branch *)
-        (* [@ppx Terse|Detailed|Verbose ...] *)
+        ] ->
+        (* [@ppx {<other infos>} ...] *)
+        let level_of_detail, profiler_module = extract_from_record loc record in
+        (match (level_of_detail, profiler_module) with
+        | None, None -> Error.error loc Error.(Improper_record record)
+        | _ -> ()) ;
         Key.
           {
-            level_of_detail = Some label;
-            profiler_module = None;
+            level_of_detail;
+            profiler_module;
             content = extract_content_from_structure loc structure;
           }
     | Ppxlib.PStr [[%stri [%e? structure]]] ->
