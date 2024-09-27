@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2023-2024 TriliTech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
 
@@ -318,7 +318,7 @@ mod tests {
         // Handle the ECALL successfully
         let outcome =
             pvm.handle_exception(&mut Default::default(), EnvironException::EnvCallFromUMode);
-        assert!(matches!(outcome, false));
+        assert!(!outcome);
 
         // After the ECALL we should be waiting for input
         assert_eq!(pvm.status(), PvmStatus::WaitingForInput);

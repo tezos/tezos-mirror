@@ -206,10 +206,10 @@ impl LogLine {
 
 #[derive(Debug)]
 enum LogType {
-    StartOfLevel(LogLine),
+    StartOfLevel(#[allow(unused)] LogLine),
     Deploy(LogLine),
     Success(LogLine),
-    EndOfLevel(LogLine),
+    EndOfLevel(#[allow(unused)] LogLine),
     SmartFunctionLog(LogLine),
 }
 

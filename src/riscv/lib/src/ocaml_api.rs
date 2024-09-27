@@ -66,7 +66,7 @@ impl From<PvmStatus> for Status {
 
 impl From<Status> for PvmStatus {
     fn from(item: Status) -> Self {
-        PvmStatus::try_from(item as u8).expect("Invalid conversion")
+        PvmStatus::from(item as u8)
     }
 }
 

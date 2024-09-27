@@ -71,4 +71,6 @@ pub use host::RollupHostWithInMemoryStorage as RollupHost;
 mod kernel_entrypoint;
 mod panic_protection;
 
+#[doc(hidden)]
+#[allow(unused_imports)]
 pub use kernel_entrypoint::*;

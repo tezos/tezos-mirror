@@ -149,7 +149,7 @@ fn transfer_op(
 ) -> Result<Message> {
     let transfer = [TransferToken {
         from: &account.address,
-        transfers: &[&transfer],
+        transfers: &[transfer],
     }];
 
     let body = serde_json::ser::to_vec(&transfer)?;
