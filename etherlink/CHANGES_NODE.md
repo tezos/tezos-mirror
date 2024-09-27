@@ -4,6 +4,21 @@
 
 ### Features
 
+### Bug fixes
+
+### Internals
+
+## Version 0.5 (2024-09-27)
+
+This release brings two features of interest for users operating EVM nodes as
+part of a dApp deployments. These features are not for general-purpose
+deployments.
+
+This release will not apply any migration to the node’s store (version 11),
+meaning it is possible to downgrade to the previous version.
+
+### Features
+
 #### RPCs
 
 - Generalized the support for the `--finalized-view` CLI argument. When
@@ -19,10 +34,6 @@
   frontend does to prepare swaps). However, it can lead to confusing UX for
   users, where eth_estimateGas fails when eth_call succeeded. (!15078)
 
-### Bug fixes
-
-### Internals
-
 ## Version 0.4 (2024-09-18)
 
 The main addition of this release is an initial support for the
@@ -30,6 +41,12 @@ The main addition of this release is an initial support for the
 overriding the balance, nonce, state (both with `state` and `stateDiff` keys)
 and code of arbitrary address. It also contains a number of bug fixes and
 miscellaneous improvements.
+
+This version is compatible with every kernel deployed on Etherlink Mainnet
+Beta.
+
+The node will apply two migrations to its internal store (version 11), meaning
+it is not possible to downgrade to the previous version.
 
 ### Features
 
@@ -84,8 +101,11 @@ This release primilarly addresses two bugs uncovered in production: the broken
 `octez_evm_node_head` metrics for the RPC mode, and the node hanging when
 catching-up to the head of its upstream EVM node (in observer mode).
 
-This version is compatible with every kernel deployed on Etherlink Mainnet
+This release is compatible with every kernel deployed on Etherlink Mainnet
 Beta.
+
+The node will not apply any migration to its internal store (version 9),
+meaning it is possible to downgrade to the previous release.
 
 ### Features
 
@@ -124,6 +144,9 @@ requires to stop the node for now.
 
 This version is compatible with every kernel deployed on Etherlink Mainnet
 Beta.
+
+The node will not apply any migration to its internal store (version 9),
+meaning it is possible to downgrade to the previous version.
 
 ### Features
 
