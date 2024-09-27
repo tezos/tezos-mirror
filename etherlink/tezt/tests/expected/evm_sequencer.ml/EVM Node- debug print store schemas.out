@@ -61,4 +61,6 @@ CREATE TABLE gc (
   last_gc_timestamp TIMESTAMP,
   last_split_level INTEGER,
   last_split_timestamp TIMESTAMP
-)
+);
+
+CREATE UNIQUE INDEX block_hash_index ON blocks (hash)
