@@ -1063,6 +1063,7 @@ module External_validator_process = struct
               | err -> Lwt.reraise err)
         in
         let* () = Error_monad.cancel_with_exceptions canceler in
+        vp.validator_process <- Uninitialized ;
         Lwt.return_unit
     | Uninitialized | Exiting -> Lwt.return_unit
 end
