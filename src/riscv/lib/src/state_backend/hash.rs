@@ -77,3 +77,61 @@ impl AsRef<[u8]> for Hash {
         &self.digest
     }
 }
+
+pub trait RootHashable {
+    /// Build the root hash corresponding to the Merkle tree described by the
+    /// layout of the data.
+    fn hash(&self) -> Result<Hash, HashError>;
+}
+
+impl RootHashable for Hash {
+    fn hash(&self) -> Result<Hash, HashError> {
+        Ok(*self)
+    }
+}
+
+impl<T: RootHashable> RootHashable for &[T] {
+    fn hash(&self) -> Result<Hash, HashError> {
+        let mut hashes: Vec<u8> = Vec::new();
+
+        self.iter().try_for_each(|e| {
+            let hash: [u8; DIGEST_SIZE] = e.hash()?.into();
+            hashes.extend_from_slice(&hash);
+            Ok::<(), HashError>(())
+        })?;
+
+        Hash::blake2b_hash_bytes(&hashes)
+    }
+}
+
+impl<T: RootHashable> RootHashable for Vec<T> {
+    fn hash(&self) -> Result<Hash, HashError> {
+        let values: &[T] = self.as_ref();
+        values.hash()
+    }
+}
+
+impl<T: RootHashable, const N: usize> RootHashable for [T; N] {
+    fn hash(&self) -> Result<Hash, HashError> {
+        self.as_ref().hash()
+    }
+}
+
+macro_rules! impl_roothash_for_tuple {
+    ($($name:ident),*) => {
+        impl<$($name: RootHashable),*> RootHashable for ($($name,)*) {
+            fn hash(&self) -> Result<Hash, HashError> {
+                #[allow(non_snake_case)]
+                let ($($name,)*) = self;
+                let hashes: Result<Vec<Hash>, HashError> = [$($name.hash(),)*].into_iter().collect();
+                hashes?.hash()
+            }
+        }
+    }
+}
+
+impl_roothash_for_tuple!(A, B);
+impl_roothash_for_tuple!(A, B, C);
+impl_roothash_for_tuple!(A, B, C, D);
+impl_roothash_for_tuple!(A, B, C, D, E);
+impl_roothash_for_tuple!(A, B, C, D, E, F);

@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 use super::{
+    hash::{Hash, HashError, RootHashable},
     AllocatedOf, Array, Atom, Elem, ManagerBase, ManagerDeserialise, ManagerRead, ManagerReadWrite,
     ManagerSerialise, ManagerWrite, Ref,
 };
@@ -74,6 +75,12 @@ impl<'de, E: serde::Deserialize<'de> + Elem, M: ManagerDeserialise> serde::Deser
     {
         let region = Cells::deserialize(deserializer)?;
         Ok(Self { region })
+    }
+}
+
+impl<E: serde::Serialize + Elem, M: ManagerSerialise> RootHashable for Cell<E, M> {
+    fn hash(&self) -> Result<Hash, HashError> {
+        Hash::blake2b_hash(self)
     }
 }
 
@@ -366,6 +373,14 @@ impl<'de, E: serde::Deserialize<'de> + Elem, const LEN: usize, M: ManagerDeseria
     }
 }
 
+impl<E: serde::Serialize + Elem, const LEN: usize, M: ManagerSerialise> RootHashable
+    for Cells<E, LEN, M>
+{
+    fn hash(&self) -> Result<Hash, HashError> {
+        Hash::blake2b_hash(self)
+    }
+}
+
 /// Multiple elements of an unspecified type
 pub struct DynCells<const LEN: usize, M: ManagerBase + ?Sized> {
     region: M::DynRegion<LEN>,
@@ -435,6 +450,12 @@ impl<'de, const LEN: usize, M: ManagerDeserialise> serde::Deserialize<'de> for D
     {
         let region = M::deserialise_dyn_region(deserializer)?;
         Ok(DynCells { region })
+    }
+}
+
+impl<const LEN: usize, M: ManagerSerialise> RootHashable for DynCells<LEN, M> {
+    fn hash(&self) -> Result<Hash, HashError> {
+        Hash::blake2b_hash(self)
     }
 }
 

@@ -3,7 +3,11 @@
 // SPDX-License-Identifier: MIT
 
 use super::{Address, AddressableRead, AddressableWrite};
-use crate::state_backend::{self as backend, ManagerDeserialise, ManagerSerialise};
+use crate::state_backend::{
+    self as backend,
+    hash::{Hash, HashError, RootHashable},
+    ManagerDeserialise, ManagerSerialise,
+};
 use serde::{Deserialize, Serialize};
 use std::mem;
 
@@ -270,6 +274,13 @@ where
     {
         let data = L::deserialise_data(deserializer)?;
         Ok(Self { data })
+    }
+}
+
+impl<L: MainMemoryLayout, M: ManagerSerialise> RootHashable for MainMemory<L, M> {
+    // TODO RV-230: Finer-grained hashing for memory
+    fn hash(&self) -> Result<Hash, HashError> {
+        Hash::blake2b_hash(self)
     }
 }
 

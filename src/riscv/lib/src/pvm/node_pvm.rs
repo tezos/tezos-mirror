@@ -11,6 +11,7 @@ use crate::{
     pvm::common::{Pvm, PvmHooks, PvmLayout, PvmStatus},
     state_backend::{
         self,
+        hash::RootHashable,
         memory_backend::{InMemoryBackend, SliceManager, SliceManagerRO},
         Backend, Layout,
     },
@@ -163,7 +164,7 @@ impl NodePvm {
     }
 
     pub fn hash(&self) -> Hash {
-        Hash::blake2b_hash_bytes(self.to_bytes()).unwrap()
+        self.with_backend(|state| state.struct_ref().hash().unwrap())
     }
 
     pub fn set_input_message(&self, level: u32, message_counter: u64, input: Vec<u8>) -> Self {
