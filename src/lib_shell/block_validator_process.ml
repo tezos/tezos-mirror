@@ -648,7 +648,11 @@ let apply_block ?(simulate = false) ?(should_validate = true)
           is_validated
           (Block_validator_errors.Applying_non_validated_block block_hash))
   in
-  let* metadata = Store.Block.get_block_metadata chain_store predecessor in
+  let* metadata =
+    (Store.Block.get_block_metadata
+       chain_store
+       predecessor [@profiler.record_s "get_predecessor_metadata"])
+  in
   let max_operations_ttl = Store.Block.max_operations_ttl metadata in
   VP.apply_block
     ~simulate
@@ -664,14 +668,16 @@ let validate_block (E {validator_process = (module VP); validator}) chain_store
     ~predecessor header block_hash operations =
   let open Lwt_result_syntax in
   let* live_blocks, live_operations =
-    Store.Chain.compute_live_blocks chain_store ~block:predecessor
+    (Store.Chain.compute_live_blocks
+       chain_store
+       ~block:predecessor [@profiler.record_s "compute_live_blocks"])
   in
   let*? () =
-    Block_validation.check_liveness
-      ~live_operations
-      ~live_blocks
-      block_hash
-      operations
+    (Block_validation.check_liveness
+       ~live_operations
+       ~live_blocks
+       block_hash
+       operations [@profiler.record_f "check_liveness"])
   in
   VP.validate_block
     validator
@@ -683,11 +689,11 @@ let validate_block (E {validator_process = (module VP); validator}) chain_store
 
 let context_garbage_collection (E {validator_process = (module VP); validator})
     context_index context_hash ~gc_lockfile_path =
-  VP.context_garbage_collection
-    validator
-    context_index
-    context_hash
-    ~gc_lockfile_path
+  (VP.context_garbage_collection
+     validator
+     context_index
+     context_hash
+     ~gc_lockfile_path [@profiler.record_s "context_garbage_collection"])
 
 let context_split (E {validator_process = (module VP); validator}) context_index
     =
