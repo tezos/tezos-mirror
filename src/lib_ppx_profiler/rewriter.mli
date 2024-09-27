@@ -43,27 +43,25 @@ and Rewriter : sig
 
   (** A rewriter essentially contains:
       - a key: see {!page-key.key}
+      - an action
       - a location: a compilerlib location allowing finer error tracking
   *)
-  type content
+  type action =
+    | Aggregate
+    | Aggregate_f
+    | Aggregate_s
+    | Mark
+    | Record
+    | Record_f
+    | Record_s
+    | Reset_block_section
+    | Span
+    | Span_f
+    | Span_s
+    | Stamp
+    | Stop
 
-  val get_key : content -> Key.t
-
-  (** Possible rewriters *)
-  type t =
-    | Aggregate of content
-    | Aggregate_f of content
-    | Aggregate_s of content
-    | Mark of content
-    | Record of content
-    | Record_f of content
-    | Record_s of content
-    | Reset_block_section of content
-    | Span of content
-    | Span_f of content
-    | Span_s of content
-    | Stamp of content
-    | Stop of content
+  type t = {key : Key.t; action : action; location : Ppxlib.location}
 
   val to_constant : t -> Constants.t
 
