@@ -80,4 +80,4 @@ let _octez_proto_manager =
     ~path:"devtools/proto_manager"
     ~internal_name:"main"
     ~synopsis:"Tezos protocol manager"
-    ~deps:[unix; cmdliner]
+    ~deps:[unix; cmdliner; re]
