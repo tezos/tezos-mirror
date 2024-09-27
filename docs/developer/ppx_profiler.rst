@@ -62,6 +62,22 @@ have the signature of :package-api:`the Profiler.GLOBAL_PROFILER module
 <octez-libs/Tezos_base/Profiler/module-type-GLOBAL_PROFILER/index.html>` that
 can be obtained with ``module Profiler = (val Profiler.wrap my_profiler)``.
 
+Of course you can create any module with this signature but in case you didn't
+name it ``Profiler`` (let's say you name it ``My_profiler``) you'll have to
+declare your PPX attribute with a ``profiler_module`` field:
+
+.. code-block:: OCaml
+
+   () [@profiler.record {profiler_module = My_profiler} "merge store"] ;
+
+This will be preprocessed into
+
+.. code-block:: OCaml
+
+   My_profiler.record "merge store" ;
+   () ;
+
+
 How to use this PPX?
 --------------------
 
@@ -174,22 +190,32 @@ The payload is made of two parts, the first one being optional:
 
 .. code-block:: OCaml
 
-   payload ::= (Terse | Detailed | Verbose)? args
+   payload ::= record? args
 
-   args ::= <string> | <string list> | <function application> | <ident> | Empty
+   record ::= { fields }
+
+   fields ::= field ; fields | empty
+
+   field ::=
+     | level_of_detail = (Terse | Detailed | Verbose)
+     | profiler_module = module_ident
+
+   args ::= <string> | <string list> | <function application> | ident | empty
 
 As an example:
 
 .. code-block:: OCaml
 
-   f x [@profiler.aggregate_s Detailed g y z]
+   f x [@profiler.aggregate_s {level_of_detail = Detailed} g y z] ;
+   g x [@profiler.span_f {level_of_detail = Verbose; profiler_module = Prof} "label"]
    ...
 
 will be preprocessed as
 
 .. code-block:: OCaml
 
-   Profiler.aggregate_s ~lod:Detailed (g y z) @@ f x
+   Profiler.aggregate_s ~lod:Detailed (g y z) @@ f x ;
+   Prof.span_f ~lod:Verbose "label" @@ g x
    ...
 
 Adding functionalities
