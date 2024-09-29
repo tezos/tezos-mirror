@@ -199,7 +199,7 @@ let default_threshold_encryption_registration =
   Register_both {extra_tags_with = [Tag.ci_disabled]; extra_tags_without = []}
 
 let default_dal_registration =
-  Register_both {extra_tags_with = [Tag.ci_disabled]; extra_tags_without = []}
+  Register_both {extra_tags_with = [Tag.slow]; extra_tags_without = []}
 
 let ci_enabled_dal_registration =
   Register_both {extra_tags_with = []; extra_tags_without = []}
@@ -1098,6 +1098,7 @@ let test_largest_delayed_transfer_is_included =
     ~da_fee:arb_da_fee_for_delayed_inbox
     ~tags:["evm"; "sequencer"; "delayed_inbox"; "inclusion"]
     ~title:"Largest possible delayed transaction is included"
+    ~time_between_blocks:Nothing
   @@ fun {
            client;
            l1_contracts;
@@ -1296,6 +1297,7 @@ let test_delayed_fa_deposit_is_included =
     ~enable_fa_bridge:true
     ~kernels:[Kernel.Latest]
     ~additional_uses:[Constant.octez_codec]
+    ~time_between_blocks:Nothing
   @@ fun {
            client;
            l1_contracts;
@@ -1368,6 +1370,7 @@ let test_delayed_fa_deposit_is_ignored_if_feature_disabled =
     ~enable_fa_bridge:false
     ~kernels:[Kernel.Latest]
     ~additional_uses:[Constant.octez_codec]
+    ~time_between_blocks:Nothing
   @@ fun {
            client;
            l1_contracts;
@@ -1581,6 +1584,7 @@ let test_fa_withdrawal_is_included =
     ~commitment_period:5
     ~challenge_window:5
     ~kernels:[Kernel.Latest]
+    ~time_between_blocks:Nothing
     ~additional_uses:[Constant.octez_codec]
   @@ fun {
            client;
@@ -1686,6 +1690,7 @@ let test_fa_withdrawal_is_included =
   (* Wait till the cementation and execute outbox message *)
   let* _ =
     find_and_execute_withdrawal
+      ~outbox_lookup_depth:100
       ~withdrawal_level
       ~commitment_period:5
       ~challenge_window:5
@@ -1693,6 +1698,7 @@ let test_fa_withdrawal_is_included =
       ~sc_rollup_node
       ~sc_rollup_address
       ~client
+      ()
   in
 
   let* _ = next_rollup_node_level ~sc_rollup_node ~client in
@@ -1790,15 +1796,16 @@ let test_init_from_rollup_node_data_dir =
   register_all
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/7285
      Replace by [Any] after the next upgrade
-
-     TODO: https://gitlab.com/tezos/tezos/-/issues/7505
-     'Reconstruct from a rollup node data directory that relied on signals'.
-     Enable DAL once this issue is closed.
   *)
     ~kernels:[Latest]
     ~time_between_blocks:Nothing
     ~tags:["evm"; "rollup_node"; "init"; "reconstruct"]
     ~title:"Init evm node sequencer data dir from a rollup node data dir"
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/7505
+         'Reconstruct from a rollup node data directory that relied on
+         signals'. We cannot rely on
+         Evm_node.init_from_rollup_node_data_dir until this issue is
+         fixed. Enable DAL once it is done. *)
     ~use_dal:Register_without_feature
     ~history_mode:Archive
   @@ fun {sc_rollup_node; sequencer; observer; proxy; client; boot_sector; _}
@@ -3625,6 +3632,7 @@ let test_sequencer_upgrade =
            sequencer;
            proxy;
            observer;
+           enable_dal;
            _;
          }
              _protocol ->
@@ -3742,7 +3750,8 @@ let test_sequencer_upgrade =
           unit)
     in
     let* () =
-      repeat 5 (fun () ->
+      let number_of_blocks = if enable_dal then 20 else 5 in
+      repeat number_of_blocks (fun () ->
           let* _ = next_rollup_node_level ~client ~sc_rollup_node in
           unit)
     in
@@ -3775,7 +3784,8 @@ let test_sequencer_diverge =
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "diverge"]
     ~title:"Runs two sequencers, one diverge and stop"
-  @@ fun {sc_rollup_node; client; sequencer; observer; _} _protocol ->
+  @@ fun {sc_rollup_node; client; sequencer; observer; proxy; enable_dal; _}
+             _protocol ->
   let* () =
     repeat 4 (fun () ->
         let*@ _l2_level =
@@ -3783,9 +3793,10 @@ let test_sequencer_diverge =
         in
         unit)
   in
+  let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
   let* () =
-    (* 3 to make sure it is seen by the rollup node, 2 to finalize it *)
-    repeat 5 (fun () ->
+    (* 2 to make sure it has been finalized *)
+    repeat 2 (fun () ->
         let* _l1_level = next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
@@ -3845,7 +3856,8 @@ let test_sequencer_diverge =
     (* diff timestamp to differ *)
     let* _ = produce_block ~timestamp:"2020-01-01T00:13:00Z" sequencer
     and* _ = produce_block ~timestamp:"2020-01-01T00:12:00Z" sequencer_bis in
-    repeat 5 (fun () ->
+    let number_of_blocks = if enable_dal then 20 else 5 in
+    repeat number_of_blocks (fun () ->
         let* _ = next_rollup_node_level ~client ~sc_rollup_node in
         unit)
   in
@@ -3859,6 +3871,17 @@ let test_sequencer_can_catch_up_on_event =
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "event"]
     ~title:"Evm node can catchup event from the rollup node"
+      (* This test relies on the rollup node receiving the blueprint before:
+         - the last_produced_block is applied, and
+         - the sequencer is shut down.
+         When DAL is activated and blueprints are sent using signals,
+         the sequencer notifies blueprints only when they can be
+         applied by the rollup node. In this test, we stop the
+         sequencer to trigger the catch-up mechanism before the
+         last_produced_block can be applied. Consequently, the signal
+         is not sent, and the rollup node does not apply the blueprint
+         corresponding to last_produced_block. *)
+    ~use_dal:Register_without_feature
   @@ fun {sc_rollup_node; client; sequencer; proxy; observer; _} _protocol ->
   let* () =
     repeat 2 (fun () ->
@@ -4112,6 +4135,7 @@ let test_outbox_size_limit_resilience ~slow =
         ~sc_rollup_node
         ~sc_rollup_address
         ~client
+        ()
     in
     let* balance =
       Client.get_balance_for
@@ -4130,6 +4154,7 @@ let test_outbox_size_limit_resilience ~slow =
         ~sc_rollup_node
         ~sc_rollup_address
         ~client
+        ()
     in
     let* balance =
       Client.get_balance_for
@@ -4604,6 +4629,7 @@ let test_replay_rpc =
   register_all
     ~tags:["evm"; "rpc"; "replay"]
     ~title:"Sequencer can replay a block"
+    ~time_between_blocks:Nothing
   @@ fun {sc_rollup_node; sequencer; client; proxy; _} _protocol ->
   (* Transfer funds to a random address. *)
   let address = "0xB7A97043983f24991398E5a82f63F4C58a417185" in
@@ -6010,6 +6036,14 @@ let test_finalized_view =
     ~time_between_blocks:Nothing
     ~title:"--finalized-view returns the latest final block of the sequencer"
     ~da_fee:Wei.zero
+      (* This test depends on the number of blocks produced until the
+         rollup node synchronizes with the sequencer and proxy. When
+         DAL is activated, bake_until_sync would need to produce more
+         blocks than usual. Consequently, this would finalize the
+         blocks posted on-chain. The finalized proxy does have a head,
+         and the RPC does not fail, which is not the expected result
+         when running this test without DAL activation. *)
+    ~use_dal:Register_without_feature
   @@ fun {sc_rollup_node; client; sequencer; proxy; _} _protocol ->
   (* Start a proxy node with --finalized-view enabled *)
   let* finalized_proxy =

@@ -206,6 +206,7 @@ val l1_timestamp : Client.t -> Tezos_base.Time.Protocol.t Lwt.t
     a commitment and cement it, then constructs outbox proof
     and executes the outbox message *)
 val find_and_execute_withdrawal :
+  ?outbox_lookup_depth:int ->
   withdrawal_level:int ->
   commitment_period:int ->
   challenge_window:int ->
@@ -213,6 +214,7 @@ val find_and_execute_withdrawal :
   sc_rollup_node:Sc_rollup_node.t ->
   sc_rollup_address:string ->
   client:Client.t ->
+  unit ->
   int Lwt.t
 
 (** Runs a sequencer in mode sandbox, with no connection needed to a

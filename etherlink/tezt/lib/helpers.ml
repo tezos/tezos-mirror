@@ -326,8 +326,9 @@ let l1_timestamp client =
       l1_header |-> "timestamp" |> as_string
       |> Tezos_base.Time.Protocol.of_notation_exn)
 
-let find_and_execute_withdrawal ~withdrawal_level ~commitment_period
-    ~challenge_window ~evm_node ~sc_rollup_node ~sc_rollup_address ~client =
+let find_and_execute_withdrawal ?(outbox_lookup_depth = 10) ~withdrawal_level
+    ~commitment_period ~challenge_window ~evm_node ~sc_rollup_node
+    ~sc_rollup_address ~client () =
   (* Bake enough levels to have a commitment and cement it. *)
   let* _ =
     repeat
@@ -340,8 +341,10 @@ let find_and_execute_withdrawal ~withdrawal_level ~commitment_period
   (* Construct and execute the outbox proof. *)
   let find_outbox level =
     let rec aux level' =
-      if level' > level + 10 then
-        Test.fail "Looked for an outbox for 10 levels, stopping the loop"
+      if level' > level + outbox_lookup_depth then
+        Test.fail
+          "Looked for an outbox for %d levels, stopping the loop"
+          outbox_lookup_depth
       else
         let* outbox =
           Sc_rollup_node.RPC.call sc_rollup_node
