@@ -334,6 +334,40 @@ Miscellaneous
   the next release. Please check our documentation for more details. (MR
   :gl:`!13273`)
 
+Version 20.3
+============
+
+Node
+----
+
+- Introduced ``--storage-maintenance-delay`` to allow delaying the
+  storage maintenance. It is set to ``auto`` by default, to
+  automatically trigger the maintenance whenever it is the most
+  suitable. (MR :gl:`!14503`)
+
+- **Breaking change** Bumped the node’s storage version to
+  ``3.2``. This new version changes the store’s representation,
+  allowing the storage to scale to the increasing number of blocks per
+  cycles, thus paving the way to reducing even more the block
+  time. Upgrading to this new version must be done manually (using the
+  ``octez-node upgrade storage`` command) and is irreversible. (MR
+  :gl:`!14211`)
+
+- **Breaking change** Bumped the snapshot version from ``7`` to ``8``,
+  in order to support the changes introduced by the ``3.2`` storage
+  version. Snapshots of version ``7`` exported with previous versions
+  of Octez can still be imported. Snapshots of version ``8``
+  are not retro-compatible with previous octez versions (MR
+  :gl:`!14398`).
+
+DAL node
+--------
+
+- Fixed a memory leak in the DAL node.
+
+- Fix ``--public-addr`` when the specified port was different
+  from the default one. (MR :gl:`!11732`)
+
 Version 20.2
 ============
 
