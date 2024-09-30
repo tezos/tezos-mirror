@@ -189,6 +189,8 @@ module type METRIC = sig
     ?subsystem:string ->
     string ->
     t
+
+  val clear : family -> unit
 end
 
 module type CHILD = sig
@@ -259,6 +261,8 @@ end = struct
       v_labels ~help ?registry ?namespace ?subsystem name ~label_names:[]
     in
     labels family []
+
+  let clear t = t.children <- LabelSetMap.empty
 end
 
 module Counter = struct
