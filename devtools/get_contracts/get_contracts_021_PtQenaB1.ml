@@ -22,8 +22,8 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
-open Tezos_protocol_021_PsquebeC
-open Tezos_client_021_PsquebeC
+open Tezos_protocol_021_PtQenaB1
+open Tezos_client_021_PtQenaB1
 open Protocol
 
 module Proto = struct

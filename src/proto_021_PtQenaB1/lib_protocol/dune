@@ -2,20 +2,20 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_protocol_environment_021_PsquebeC)
+ (name tezos_protocol_environment_021_PtQenaB1)
  (public_name tezos-protocol-021-PtQenaB1.protocol.environment)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.protocol-environment)
  (library_flags (:standard -linkall))
- (modules Tezos_protocol_environment_021_PsquebeC))
+ (modules Tezos_protocol_environment_021_PtQenaB1))
 
 (rule
- (targets tezos_protocol_environment_021_PsquebeC.ml)
+ (targets tezos_protocol_environment_021_PtQenaB1.ml)
  (action
   (write-file
    %{targets}
-   "module Name = struct let name = \"021-PsquebeC\" end\ninclude Tezos_protocol_environment.V13.Make(Name)()\n")))
+   "module Name = struct let name = \"021-PtQenaB1\" end\ninclude Tezos_protocol_environment.V13.Make(Name)()\n")))
 
 (library
  (name tezos_raw_protocol_021_PtQenaB1)
@@ -28,9 +28,9 @@
   (:standard)
   -nostdlib
   -nopervasives
-  -open Tezos_protocol_environment_021_PsquebeC
-  -open Tezos_protocol_environment_021_PsquebeC.Pervasives
-  -open Tezos_protocol_environment_021_PsquebeC.Error_monad)
+  -open Tezos_protocol_environment_021_PtQenaB1
+  -open Tezos_protocol_environment_021_PtQenaB1.Pervasives
+  -open Tezos_protocol_environment_021_PtQenaB1.Error_monad)
  (modules
   Misc
   Non_empty_string
@@ -314,14 +314,14 @@
  (action
   (write-file
    %{targets}
-   "\nlet hash = Tezos_crypto.Hashed.Protocol_hash.of_b58check_exn \"PsquebeCaYyvBEESCaXL8B8Tn8BcEhps2Zke1xMVtyr7X4qMfxT\"\nlet name = Tezos_protocol_environment_021_PsquebeC.Name.name\ninclude Tezos_raw_protocol_021_PtQenaB1\ninclude Tezos_raw_protocol_021_PsquebeC.Main\n")))
+   "\nlet hash = Tezos_crypto.Hashed.Protocol_hash.of_b58check_exn \"PtQenaB1PqFEfTe2og7bZTaPvMw2CxRyDFEwWNj3GiWp9ba4bJd\"\nlet name = Tezos_protocol_environment_021_PtQenaB1.Name.name\ninclude Tezos_raw_protocol_021_PtQenaB1\ninclude Tezos_raw_protocol_021_PtQenaB1.Main\n")))
 
 (rule
  (targets tezos_protocol_021_PtQenaB1.ml)
  (action
   (write-file
    %{targets}
-   "\nmodule Environment = Tezos_protocol_environment_021_PsquebeC\nmodule Protocol = Protocol\n")))
+   "\nmodule Environment = Tezos_protocol_environment_021_PtQenaB1\nmodule Protocol = Protocol\n")))
 
 (rule
  (alias runtest_compile_protocol)
@@ -1175,4 +1175,4 @@
    %{targets}
    (chdir
     %{workspace_root}
-    (run %{bin:octez-embedded-protocol-packer} %{src_dir} 021_PsquebeC)))))
+    (run %{bin:octez-embedded-protocol-packer} %{src_dir} 021_PtQenaB1)))))

@@ -2,26 +2,26 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_protocol_021_PsquebeC_parameters)
- (public_name tezos-protocol-021-PsquebeC.parameters)
+ (name tezos_protocol_021_PtQenaB1_parameters)
+ (public_name tezos-protocol-021-PtQenaB1.parameters)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.base
   octez-proto-libs.protocol-environment
-  tezos-protocol-021-PsquebeC.protocol)
+  tezos-protocol-021-PtQenaB1.protocol)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_protocol_021_PsquebeC)
+  -open Tezos_protocol_021_PtQenaB1)
  (modules (:standard \ gen)))
 
 (executable
  (name gen)
  (libraries
   octez-libs.base
-  tezos-protocol-021-PsquebeC.parameters
-  tezos-protocol-021-PsquebeC.protocol)
+  tezos-protocol-021-PtQenaB1.parameters
+  tezos-protocol-021-PtQenaB1.protocol)
  (link_flags
   (:standard)
   (:include %{workspace_root}/macos-link-flags.sexp)
@@ -29,8 +29,8 @@
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_protocol_021_PsquebeC_parameters
-  -open Tezos_protocol_021_PsquebeC)
+  -open Tezos_protocol_021_PtQenaB1_parameters
+  -open Tezos_protocol_021_PtQenaB1)
  (modules gen))
 
 (rule
@@ -54,7 +54,7 @@
  (action (run %{deps} --mainnet-with-chain-id)))
 
 (install
- (package tezos-protocol-021-PsquebeC)
+ (package tezos-protocol-021-PtQenaB1)
  (section lib)
  (files
   sandbox-parameters.json test-parameters.json mainnet-parameters.json

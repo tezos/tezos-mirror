@@ -10,18 +10,13 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
-  "octez-libs" { = version }
-  "tezos-protocol-021-PsquebeC" { = version }
-  "tezos-benchmark" { = version }
-  "tezos-benchmark-021-PsquebeC" { = version }
-  "tezos-benchmark-type-inference-021-PsquebeC" { = version }
-  "octez-shell-libs" { = version }
-  "octez-protocol-021-PsquebeC-libs" { = version }
   "octez-proto-libs" { = version }
+  "octez-shell-libs" { = version }
+  "octez-libs" { = version }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tezos/Protocol: protocol benchmarks"
+synopsis: "Tezos protocol 021-PtQenaB1 package"

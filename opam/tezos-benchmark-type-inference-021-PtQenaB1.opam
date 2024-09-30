@@ -11,13 +11,14 @@ depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
   "octez-libs" { = version }
-  "tezos-protocol-021-PsquebeC" { = version }
-  "octez-protocol-021-PsquebeC-libs" { = version }
-  "octez-shell-libs" { = version }
+  "tezos-micheline-rewriting" { = version }
+  "tezos-protocol-021-PtQenaB1" { = version }
+  "hashcons"
+  "octez-protocol-021-PtQenaB1-libs" { with-test & = version }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tezos/Protocol: accuser binary"
+synopsis: "Tezos: type inference for partial Michelson expressions"

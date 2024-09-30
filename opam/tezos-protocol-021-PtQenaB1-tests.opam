@@ -12,12 +12,12 @@ depends: [
   "ocaml" { >= "4.14" }
   "tezt" { with-test & >= "4.1.0" & < "5.0.0" }
   "octez-libs" {with-test}
-  "octez-protocol-021-PsquebeC-libs" {with-test}
-  "tezos-protocol-021-PsquebeC" {with-test}
+  "octez-protocol-021-PtQenaB1-libs" {with-test}
+  "tezos-protocol-021-PtQenaB1" {with-test}
   "octez-alcotezt" {with-test}
   "tezos-benchmark" {with-test}
-  "tezos-benchmark-021-PsquebeC" {with-test}
-  "tezos-benchmark-type-inference-021-PsquebeC" {with-test}
+  "tezos-benchmark-021-PtQenaB1" {with-test}
+  "tezos-benchmark-type-inference-021-PtQenaB1" {with-test}
   "qcheck-alcotest" { with-test & >= "0.20" }
   "tezt-tezos" {with-test}
   "octez-shell-libs" {with-test}

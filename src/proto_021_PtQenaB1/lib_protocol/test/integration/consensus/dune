@@ -3,7 +3,7 @@
 
 (library
  (name
-  src_proto_021_PsquebeC_lib_protocol_test_integration_consensus_tezt_lib)
+  src_proto_021_PtQenaB1_lib_protocol_test_integration_consensus_tezt_lib)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
@@ -22,10 +22,10 @@
   -open Octez_alcotezt
   -open Tezos_base.TzPervasives
   -open Tezos_protocol_021_PtQenaB1
-  -open Tezos_021_PsquebeC_test_helpers
+  -open Tezos_021_PtQenaB1_test_helpers
   -open Tezos_base_test_helpers
   -open Tezos_protocol_021_PtQenaB1_parameters
-  -open Tezos_protocol_plugin_021_PsquebeC)
+  -open Tezos_protocol_plugin_021_PtQenaB1)
  (modules
   test_baking
   test_consensus_key
@@ -46,7 +46,7 @@
  (name main)
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
-  src_proto_021_PsquebeC_lib_protocol_test_integration_consensus_tezt_lib
+  src_proto_021_PtQenaB1_lib_protocol_test_integration_consensus_tezt_lib
   tezt)
  (link_flags
   (:standard)

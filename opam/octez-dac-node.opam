@@ -17,7 +17,7 @@ depends: [
   "octez-l2-libs" { = version }
   "octez-internal-libs" { = version }
   "octez-protocol-020-PsParisC-libs" { = version }
-  "octez-protocol-021-PsquebeC-libs" { = version }
+  "octez-protocol-021-PtQenaB1-libs" { = version }
 ]
 depopts: [
   "octez-protocol-alpha-libs"

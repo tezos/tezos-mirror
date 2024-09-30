@@ -25,7 +25,7 @@
    (octez_smart_rollup_node_PtParisB -> void_for_linking-octez_smart_rollup_node_PtParisB.empty)
    (-> void_for_linking-octez_smart_rollup_node_PtParisB.empty))
   octez_smart_rollup_node_PsParisC
-  octez_smart_rollup_node_PsquebeC
+  octez_smart_rollup_node_PtQenaB1
   (select void_for_linking-octez_smart_rollup_node_alpha from
    (octez_smart_rollup_node_alpha -> void_for_linking-octez_smart_rollup_node_alpha.empty)
    (-> void_for_linking-octez_smart_rollup_node_alpha.empty)))

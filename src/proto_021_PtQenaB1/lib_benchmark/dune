@@ -2,8 +2,8 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_benchmark_021_PsquebeC)
- (public_name tezos-benchmark-021-PsquebeC)
+ (name tezos_benchmark_021_PtQenaB1)
+ (public_name tezos-benchmark-021-PtQenaB1)
  (libraries
   octez-libs.stdlib
   octez-libs.base
@@ -11,12 +11,12 @@
   octez-libs.micheline
   tezos-micheline-rewriting
   tezos-benchmark
-  tezos-benchmark-type-inference-021-PsquebeC
-  tezos-protocol-021-PsquebeC.protocol
+  tezos-benchmark-type-inference-021-PtQenaB1
+  tezos-protocol-021-PtQenaB1.protocol
   octez-libs.crypto
-  tezos-protocol-021-PsquebeC.parameters
+  tezos-protocol-021-PtQenaB1.parameters
   hashcons
-  octez-protocol-021-PsquebeC-libs.test-helpers
+  octez-protocol-021-PtQenaB1-libs.test-helpers
   prbnmcn-stats)
  (library_flags (:standard -linkall))
  (flags
@@ -27,7 +27,7 @@
   -open Tezos_micheline
   -open Tezos_micheline_rewriting
   -open Tezos_benchmark
-  -open Tezos_benchmark_type_inference_021_PsquebeC
-  -open Tezos_protocol_021_PsquebeC
-  -open Tezos_021_PsquebeC_test_helpers)
+  -open Tezos_benchmark_type_inference_021_PtQenaB1
+  -open Tezos_protocol_021_PtQenaB1
+  -open Tezos_021_PtQenaB1_test_helpers)
  (private_modules kernel rules state_space))

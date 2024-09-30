@@ -12,7 +12,7 @@ depends: [
   "ocaml" { >= "4.14" }
   "ppx_expect"
   "octez-libs" { = version }
-  "tezos-protocol-021-PsquebeC" { = version }
+  "tezos-protocol-021-PtQenaB1" { = version }
   "octez-shell-libs" { = version }
   "uri" { >= "3.1.0" }
   "tezt" { >= "4.1.0" & < "5.0.0" }
@@ -36,4 +36,4 @@ build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Octez protocol 021-PsquebeC libraries"
+synopsis: "Octez protocol 021-PtQenaB1 libraries"

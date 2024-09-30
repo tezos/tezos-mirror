@@ -2,19 +2,19 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_dal_021_PsquebeC)
- (public_name octez-protocol-021-PsquebeC-libs.dal)
+ (name tezos_dal_021_PtQenaB1)
+ (public_name octez-protocol-021-PtQenaB1-libs.dal)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.base
   octez-protocol-compiler.registerer
   octez-libs.stdlib-unix
   tezos-dal-node-lib
-  octez-protocol-021-PsquebeC-libs.client
-  octez-protocol-021-PsquebeC-libs.plugin
-  tezos-protocol-021-PsquebeC.embedded-protocol
-  octez-protocol-021-PsquebeC-libs.layer2-utils
-  tezos-protocol-021-PsquebeC.protocol)
+  octez-protocol-021-PtQenaB1-libs.client
+  octez-protocol-021-PtQenaB1-libs.plugin
+  tezos-protocol-021-PtQenaB1.embedded-protocol
+  octez-protocol-021-PtQenaB1-libs.layer2-utils
+  tezos-protocol-021-PtQenaB1.protocol)
  (inline_tests (flags -verbose) (modes native))
  (preprocess (pps ppx_expect))
  (library_flags (:standard -linkall))
@@ -24,8 +24,8 @@
   -open Tezos_protocol_registerer
   -open Tezos_stdlib_unix
   -open Tezos_dal_node_lib
-  -open Tezos_client_021_PsquebeC
-  -open Tezos_protocol_plugin_021_PsquebeC
-  -open Tezos_embedded_protocol_021_PsquebeC
-  -open Tezos_layer2_utils_021_PsquebeC
-  -open Tezos_protocol_021_PsquebeC))
+  -open Tezos_client_021_PtQenaB1
+  -open Tezos_protocol_plugin_021_PtQenaB1
+  -open Tezos_embedded_protocol_021_PtQenaB1
+  -open Tezos_layer2_utils_021_PtQenaB1
+  -open Tezos_protocol_021_PtQenaB1))

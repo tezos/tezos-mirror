@@ -11,14 +11,14 @@ depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
   "octez-libs" { = version }
-  "tezos-micheline-rewriting" { = version }
-  "tezos-protocol-021-PsquebeC" { = version }
-  "hashcons"
-  "octez-protocol-021-PsquebeC-libs" { with-test & = version }
+  "tezos-protocol-021-PtQenaB1" { = version }
+  "octez-injector" { = version }
+  "octez-protocol-021-PtQenaB1-libs" { = version }
+  "octez-shell-libs" { = version }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tezos: type inference for partial Michelson expressions"
+synopsis: "Tezos/Protocol: protocol-specific library for the injector binary"
