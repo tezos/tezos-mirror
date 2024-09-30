@@ -521,6 +521,9 @@ let changeset_semgrep_files =
     changeset_base
     @ make ["src/**/*"; "tezt/**/*"; "devtools/**/*"; "scripts/semgrep/**/*"])
 
+(** Set of Jsonnet files for formatting ([jsonnetfmt --test]). *)
+let changeset_jsonnet_fmt_files = Changeset.(make ["**/*.jsonnet"])
+
 (* We only need to run the [oc.script:snapshot_alpha_and_link] job if
    protocol Alpha or if the scripts changed. *)
 let changeset_script_snapshot_alpha_and_link =
@@ -701,6 +704,22 @@ module Images = struct
       ~image_builder_arm64:(image_builder Arm64)
       ~image_path
       ()
+
+  (** The jsonnet image *)
+  let jsonnet =
+    let image_builder arch =
+      job_docker_authenticated
+        ~__POS__
+        ~arch
+        ~stage
+        ~name:("oc.docker:jsonnet:" ^ arch_to_string_alt arch)
+        ~ci_docker_hub:false
+        ~artifacts:
+          (artifacts ~reports:(reports ~dotenv:"jsonnet_image_tag.env" ()) [])
+        ["./scripts/ci/docker_jsonnet_build.sh"]
+    in
+    let image_path = "${jsonnet_image_name}:${jsonnet_image_tag}" in
+    Image.mk_internal ~image_builder_amd64:(image_builder Amd64) ~image_path ()
 
   module CI = struct
     (* The job that builds the CI images.

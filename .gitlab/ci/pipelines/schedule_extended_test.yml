@@ -48,6 +48,26 @@ oc.docker:client-libs-dependencies:
     reports:
       dotenv: client_libs_dependencies_image_tag.env
 
+oc.docker:jsonnet:amd64:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  stage: images
+  tags:
+  - gcp
+  dependencies: []
+  timeout: 60 minutes
+  before_script:
+  - ./scripts/ci/docker_initialize.sh
+  script:
+  - ./scripts/ci/docker_jsonnet_build.sh
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    CI_DOCKER_HUB: "false"
+  artifacts:
+    reports:
+      dotenv: jsonnet_image_tag.env
+
 oc.docker:rust-toolchain:amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
   stage: images
@@ -181,6 +201,19 @@ oc.misc_checks:
   - ./scripts/ci/lint_misc_check.sh
   - scripts/check_wasm_pvm_regressions.sh check
   - etherlink/scripts/check_evm_store_migrations.sh check
+
+check_jsonnet_fmt:
+  image: ${jsonnet_image_name}:${jsonnet_image_tag}
+  stage: sanity
+  tags:
+  - gcp
+  rules:
+  - when: on_success
+  dependencies:
+  - oc.docker:jsonnet:amd64
+  timeout: 60 minutes
+  script:
+  - scripts/lint.sh --check-jsonnet-format
 
 check_rust_fmt:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}

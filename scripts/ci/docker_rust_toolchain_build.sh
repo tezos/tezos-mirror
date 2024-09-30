@@ -68,7 +68,8 @@ fi
 
 echo "Build ${image_name}"
 
-./images/create_rust_toolchain_image.sh \
+./images/create_image.sh \
+  "rust-toolchain" \
   "${image_base}" \
   "${image_tag}" \
   --build-arg=BUILDKIT_INLINE_CACHE=1 \

@@ -8,6 +8,7 @@ The images, their content and indented usage, are:
 | Image                      | Contents                                | Usage                          |
 |----------------------------|-----------------------------------------|--------------------------------|
 | `rust-toolchain`           | cargo                                   | CI: kernel build, test and SDK |
+| `jsonnet`                  | jsonnet                                 | CI: Grafazos jobs              |
 | `client-libs-dependencies` | kaitai-struct-compiler, xxd, java, node | CI: Kaitai e2e tests           |
 | `ci`                       | ocaml, cargo, npm, python ...           | CI: the majority of jobs       |
 
@@ -63,14 +64,19 @@ field and thus reuse the image directly.
 The `rust-toolchain` image is used in the CI to build and test
 kernels, and to build the kernel SDK. It is also used to build the
 `evm_kernel` included in the Octez Docker distribution. To build this
-image for local use, run `create_rust_toolchain_image.sh`.
+image for local use, run `create_image.sh "rust-toolchain"`.
+
+# `jsonnet` image
+
+The `jsonnet` image is used in the CI to build and test Grafazos.
+It contains the `jsonnet` tools to compile and format jsonnet files.
+To build this image for local use, run `create_image.sh "grafazos"`
 
 # `client-libs-dependencies` image
 
 The `client-libs-depencies` image is used in the CI to run end-to-end
 tests of client-libs. To build this image for local use, run
 `create_client_libs_dependencies_image.sh`.
-
 
 # `ci` images
 

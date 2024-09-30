@@ -16,6 +16,7 @@ Where <action> can be:
 * --check-coq-attributes: check the presence of coq attributes.
 * --check-rust-toolchain: check the contents of rust-toolchain files
 * --check-licenses-git-new: check license headers of added OCaml .ml(i) files.
+* --check-jsonnet-format: checks that the jsonnet files are formatted.
 * --help: display this and return 0.
 EOF
 }
@@ -264,6 +265,22 @@ check_licenses_git_new() {
   return $res
 }
 
+check_jsonnet_format() {
+
+  function jsonnetfmt_script() {
+    jsonnetfmt --test grafazos/src/*.jsonnet
+  }
+
+  if jsonnetfmt_script; then
+    echo "Jsonnet files correctly formatted ✅"
+  else
+    echo "Jsonnet files are not correctly formatted (or formatting failed). ❌"
+    echo "Consider running: make -C grafazos/ fmt"
+    exit 1
+  fi
+
+}
+
 if [ $# -eq 0 ] || [[ "$1" != --* ]]; then
   say "provide one action (see --help)"
   exit 1
@@ -302,6 +319,9 @@ case "$action" in
   ;;
 "--check-licenses-git-new")
   action=check_licenses_git_new
+  ;;
+"--check-jsonnet-format")
+  action=check_jsonnet_format
   ;;
 "help" | "-help" | "--help" | "-h")
   usage

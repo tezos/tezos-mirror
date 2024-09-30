@@ -51,6 +51,26 @@ oc.docker:client-libs-dependencies:
     reports:
       dotenv: client_libs_dependencies_image_tag.env
 
+oc.docker:jsonnet:amd64:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  stage: images
+  tags:
+  - gcp
+  dependencies: []
+  timeout: 60 minutes
+  before_script:
+  - ./scripts/ci/docker_initialize.sh
+  script:
+  - ./scripts/ci/docker_jsonnet_build.sh
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    CI_DOCKER_HUB: "false"
+  artifacts:
+    reports:
+      dotenv: jsonnet_image_tag.env
+
 oc.docker:rust-toolchain:amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
   stage: images
@@ -243,6 +263,24 @@ oc.misc_checks:
   - scripts/check_wasm_pvm_regressions.sh check
   - etherlink/scripts/check_evm_store_migrations.sh check
   - ./scripts/ci/lint_check_licenses.sh
+
+check_jsonnet_fmt:
+  image: ${jsonnet_image_name}:${jsonnet_image_tag}
+  stage: sanity
+  tags:
+  - gcp
+  rules:
+  - changes:
+    - '**/*.jsonnet'
+    when: on_success
+  needs:
+  - oc.docker:jsonnet:amd64
+  - trigger
+  dependencies:
+  - oc.docker:jsonnet:amd64
+  timeout: 60 minutes
+  script:
+  - scripts/lint.sh --check-jsonnet-format
 
 check_rust_fmt:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
@@ -471,6 +509,8 @@ oc.build:static-x86_64-linux-binaries:
     optional: true
   - job: oc.misc_checks
     optional: true
+  - job: check_jsonnet_fmt
+    optional: true
   - job: check_rust_fmt
     optional: true
   - job: documentation:rst-check
@@ -551,6 +591,8 @@ oc.build_x86_64-released:
   - job: oc.semgrep
     optional: true
   - job: oc.misc_checks
+    optional: true
+  - job: check_jsonnet_fmt
     optional: true
   - job: check_rust_fmt
     optional: true
@@ -643,6 +685,8 @@ oc.build_x86_64-exp-dev-extra:
     optional: true
   - job: oc.misc_checks
     optional: true
+  - job: check_jsonnet_fmt
+    optional: true
   - job: check_rust_fmt
     optional: true
   - job: documentation:rst-check
@@ -726,6 +770,8 @@ ocaml-check:
   - job: oc.semgrep
     optional: true
   - job: oc.misc_checks
+    optional: true
+  - job: check_jsonnet_fmt
     optional: true
   - job: check_rust_fmt
     optional: true
@@ -1082,6 +1128,8 @@ opam:prepare:
   - job: oc.semgrep
     optional: true
   - job: oc.misc_checks
+    optional: true
+  - job: check_jsonnet_fmt
     optional: true
   - job: check_rust_fmt
     optional: true
@@ -1912,6 +1960,8 @@ trigger:debian_repository_partial_auto:
     optional: true
   - job: oc.misc_checks
     optional: true
+  - job: check_jsonnet_fmt
+    optional: true
   - job: check_rust_fmt
     optional: true
   - job: documentation:rst-check
@@ -1949,6 +1999,8 @@ kaitai_checks:
   - job: oc.semgrep
     optional: true
   - job: oc.misc_checks
+    optional: true
+  - job: check_jsonnet_fmt
     optional: true
   - job: check_rust_fmt
     optional: true
@@ -2042,6 +2094,8 @@ oc.check_lift_limits_patch:
     optional: true
   - job: oc.misc_checks
     optional: true
+  - job: check_jsonnet_fmt
+    optional: true
   - job: check_rust_fmt
     optional: true
   - job: documentation:rst-check
@@ -2102,6 +2156,8 @@ oc.python_check:
   - job: oc.semgrep
     optional: true
   - job: oc.misc_checks
+    optional: true
+  - job: check_jsonnet_fmt
     optional: true
   - job: check_rust_fmt
     optional: true
@@ -2223,6 +2279,8 @@ oc.script:test-gen-genesis:
   - job: oc.semgrep
     optional: true
   - job: oc.misc_checks
+    optional: true
+  - job: check_jsonnet_fmt
     optional: true
   - job: check_rust_fmt
     optional: true
@@ -2363,6 +2421,8 @@ oc.script:b58_prefix:
   - job: oc.semgrep
     optional: true
   - job: oc.misc_checks
+    optional: true
+  - job: check_jsonnet_fmt
     optional: true
   - job: check_rust_fmt
     optional: true
@@ -3186,6 +3246,8 @@ oc.install_opam_jammy:
     optional: true
   - job: oc.misc_checks
     optional: true
+  - job: check_jsonnet_fmt
+    optional: true
   - job: check_rust_fmt
     optional: true
   - job: documentation:rst-check
@@ -3224,6 +3286,8 @@ oc.compile_sources_doc_bookworm:
   - job: oc.semgrep
     optional: true
   - job: oc.misc_checks
+    optional: true
+  - job: check_jsonnet_fmt
     optional: true
   - job: check_rust_fmt
     optional: true
@@ -3922,6 +3986,8 @@ oc.install_python_bookworm:
     optional: true
   - job: oc.misc_checks
     optional: true
+  - job: check_jsonnet_fmt
+    optional: true
   - job: check_rust_fmt
     optional: true
   - job: documentation:rst-check
@@ -3974,6 +4040,8 @@ documentation:odoc:
   - job: oc.semgrep
     optional: true
   - job: oc.misc_checks
+    optional: true
+  - job: check_jsonnet_fmt
     optional: true
   - job: check_rust_fmt
     optional: true
@@ -4051,6 +4119,8 @@ documentation:manuals:
     optional: true
   - job: oc.misc_checks
     optional: true
+  - job: check_jsonnet_fmt
+    optional: true
   - job: check_rust_fmt
     optional: true
   - job: documentation:rst-check
@@ -4127,6 +4197,8 @@ documentation:docgen:
   - job: oc.semgrep
     optional: true
   - job: oc.misc_checks
+    optional: true
+  - job: check_jsonnet_fmt
     optional: true
   - job: check_rust_fmt
     optional: true

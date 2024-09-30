@@ -428,6 +428,17 @@ let jobs pipeline_type =
             ["./scripts/ci/lint_check_licenses.sh"]
         | Schedule_extended_test -> [])
     in
+    let job_jsonnet_fmt =
+      job
+        ~__POS__
+        ~name:"check_jsonnet_fmt"
+        ~image:Images.jsonnet
+        ~stage
+        ~dependencies
+        ~rules:
+          (make_rules ~dependent:true ~changes:changeset_jsonnet_fmt_files ())
+        ["scripts/lint.sh --check-jsonnet-format"]
+    in
     let job_check_rust_fmt : tezos_job =
       job
         ~__POS__
@@ -480,6 +491,7 @@ let jobs pipeline_type =
       job_oc_ocaml_fmt;
       job_semgrep;
       job_oc_misc_checks;
+      job_jsonnet_fmt;
       job_check_rust_fmt;
       job_check_rst;
     ]
