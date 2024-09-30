@@ -84,7 +84,7 @@ tezt:
   variables:
     JUNIT: tezt-junit.xml
     TEZT_VARIANT: ""
-    TESTS: /ci_disabled && /time_sensitive && /slow && /cloud && /flaky
+    TESTS: /ci_disabled && /time_sensitive && /slow && /extra && /cloud && /flaky
     TEZT_RETRY: "1"
     TEZT_PARALLEL: "6"
     TEZT_NO_NPX: "true"
@@ -138,7 +138,7 @@ tezt-time-sensitive:
   variables:
     JUNIT: tezt-junit.xml
     TEZT_VARIANT: -time_sensitive
-    TESTS: time_sensitive && /ci_disabled && /slow && /cloud
+    TESTS: time_sensitive && /ci_disabled && /slow && /extra && /cloud
     TEZT_RETRY: "1"
     TEZT_PARALLEL: "1"
     TEZT_NO_NPX: "true"
@@ -191,7 +191,8 @@ tezt-slow:
   variables:
     JUNIT: tezt-junit.xml
     TEZT_VARIANT: -slow
-    TESTS: slow && /ci_disabled && /time_sensitive && /cloud && not (file = src/proto_019_PtParisA/lib_protocol/test/integration/test_adaptive_issuance_launch.ml)
+    TESTS: slow && /ci_disabled && /time_sensitive && /extra && /cloud && not (file
+      = src/proto_019_PtParisA/lib_protocol/test/integration/test_adaptive_issuance_launch.ml)
     TEZT_RETRY: "1"
     TEZT_PARALLEL: "3"
     TEZT_NO_NPX: "true"
@@ -208,6 +209,60 @@ tezt-slow:
     when: always
   retry: 2
   parallel: 20
+
+tezt-extra:
+  image: ${ci_image_name}/e2etest:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp_tezt
+  needs:
+  - oc.docker:ci:amd64
+  - oc.build_x86_64-released
+  - oc.build_x86_64-exp-dev-extra
+  - oc.build_kernels
+  - oc.tezt:fetch-records
+  dependencies:
+  - oc.docker:ci:amd64
+  - oc.build_x86_64-released
+  - oc.build_x86_64-exp-dev-extra
+  - oc.build_kernels
+  - oc.tezt:fetch-records
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/version.sh
+  script:
+  - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
+    CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
+  - ./scripts/ci/tezt.sh --without-select-tezts "${TESTS}" --from-record tezt/records
+    --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --list-tsv > selected_tezts.tsv
+  - ./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh --send-junit
+    --without-select-tezts "${TESTS}" --color --log-buffer-size 5000 --log-file tezt.log
+    --global-timeout 1800 --on-unknown-regression-files fail --junit ${JUNIT} --junit-mem-peak
+    'dd_tags[memory.peak]' --from-record tezt/records --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
+    --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json --job-count ${TEZT_PARALLEL}
+    --retry ${TEZT_RETRY} --record-mem-peak --mem-warn 5_000_000_000
+  variables:
+    JUNIT: tezt-junit.xml
+    TEZT_VARIANT: -extra
+    TESTS: extra && /ci_disabled && /time_sensitive && /slow && /cloud && /flaky
+    TEZT_RETRY: "1"
+    TEZT_PARALLEL: "6"
+    TEZT_NO_NPX: "true"
+  artifacts:
+    expire_in: 7 days
+    paths:
+    - selected_tezts.tsv
+    - tezt.log
+    - tezt-*.log
+    - tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
+    - $JUNIT
+    reports:
+      junit: $JUNIT
+    when: always
+  retry: 2
+  parallel: 10
 
 tezt-flaky:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
@@ -246,7 +301,7 @@ tezt-flaky:
   variables:
     JUNIT: tezt-junit.xml
     TEZT_VARIANT: -flaky
-    TESTS: /ci_disabled && /time_sensitive && /slow && /cloud && flaky
+    TESTS: /ci_disabled && /time_sensitive && /slow && /extra && /cloud && flaky
     TEZT_RETRY: "3"
     TEZT_PARALLEL: "1"
     TEZT_NO_NPX: "true"
