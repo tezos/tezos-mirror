@@ -30,6 +30,7 @@
 (package (name octez-evm-node))
 (package (name octez-evm-node-libs))
 (package (name octez-evm-node-tests)(allow_empty))
+(package (name octez-evm-wasm-runtime-tests)(allow_empty))
 (package (name octez-injector))
 (package (name octez-injector-server))
 (package (name octez-internal-libs))

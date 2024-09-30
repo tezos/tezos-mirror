@@ -11,6 +11,8 @@ val alcotezt : Manifest.target
 
 val bls12_381 : Manifest.target
 
+val lazy_containers : Manifest.target
+
 val octez_base : Manifest.target
 
 val octez_base_test_helpers : Manifest.target

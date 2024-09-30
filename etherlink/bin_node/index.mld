@@ -8,3 +8,4 @@ It contains the following libraries:
 - {{!module-Evm_node_lib_dev}Evm_node_lib_dev}: An implementation of a subset of Ethereum JSON-RPC API for the EVM rollup [dev version]
 - {{!module-Evm_node_lib_dev_encoding}Evm_node_lib_dev_encoding}: EVM encodings for the EVM node and plugin for the WASM Debugger [dev version]
 - {{!module-Evm_node_migrations}Evm_node_migrations}: SQL migrations for the EVM node store
+- {{!module-Wasm_runtime_callbacks}Wasm_runtime_callbacks}: Callbacks implementing the I/O functions required to implement the host functions of the WASM runtime

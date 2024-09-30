@@ -79,6 +79,41 @@ let evm_node_config =
         octez_stdlib_unix |> open_;
       ]
 
+let wasm_runtime_callbacks =
+  octez_evm_node_lib
+    "wasm_runtime_callbacks"
+    ~path:"etherlink/lib_wasm_runtime_callbacks"
+    ~synopsis:
+      "Callbacks implementing the I/O functions required to implement the host \
+       functions of the WASM runtime"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_base_unix;
+        octez_layer2_store |> open_;
+      ]
+
+let wasm_runtime_callbacks_tests =
+  tezt
+    ["test_vector"; "test_store"]
+    ~path:"etherlink/lib_wasm_runtime_callbacks/test"
+    ~opam:"octez-evm-wasm-runtime-tests"
+    ~synopsis:"Tests for the WASM Runtime callbacks"
+    ~with_macos_security_framework:true
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_base_unix;
+        octez_base_test_helpers |> open_;
+        octez_test_helpers |> open_;
+        qcheck_alcotest;
+        alcotezt;
+        tezt_wrapper |> open_ |> open_ ~m:"Base";
+        tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
+        octez_layer2_store |> open_;
+        wasm_runtime_callbacks;
+      ]
+
 let evm_node_migrations =
   octez_evm_node_lib
     "evm_node_migrations"
