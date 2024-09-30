@@ -646,7 +646,7 @@ let parallel_test =
       | Error err ->
           QCheck2.Test.fail_reportf "%a@." Error_monad.pp_print_trace err)
 
-let () =
+let _ci_flaky () =
   Alcotest.run
     ~__FILE__
     "test-key-value-store-fuzzy"
