@@ -166,9 +166,17 @@ pub fn fetch_blueprints<Host: Runtime>(
 
 #[cfg(test)]
 mod tests {
-    use crate::configuration::Limits;
+    use crate::{
+        configuration::Limits,
+        dal_slot_import_signal::{
+            DalSlotImportSignals, DalSlotIndicesList, DalSlotIndicesOfLevel,
+            UnsignedDalSlotSignals,
+        },
+        parsing::DAL_SLOT_IMPORT_SIGNAL_TAG,
+    };
     use primitive_types::U256;
-    use tezos_crypto_rs::hash::HashTrait;
+    use rlp::Encodable;
+    use tezos_crypto_rs::hash::{HashTrait, SecretKeyEd25519, UnknownSignature};
     use tezos_data_encoding::types::Bytes;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup::{
@@ -179,16 +187,27 @@ mod tests {
         types::PublicKeyHash,
     };
     use tezos_smart_rollup_encoding::contract::Contract;
+    use tezos_smart_rollup_host::runtime::Runtime as SdkRuntime;
     use tezos_smart_rollup_mock::TransferMetadata;
+    // SdkRuntime is not used directly but necessary to add the Runtime trait in
+    // context for typechecking. Feel free to remove it and look at rustc
+    // errors.
 
     use crate::{
         block_storage::internal_for_tests::store_current_number,
-        blueprint_storage::read_next_blueprint, parsing::RollupType,
+        blueprint_storage::read_next_blueprint, dal::tests::*, parsing::RollupType,
     };
 
     use super::*;
 
-    fn dummy_sequencer_config(enable_dal: bool) -> Configuration {
+    // This is the secret key of the dummy sequencer configuration
+    const DUMMY_SEQUENCER_SECRET_KEY: &str =
+        "edsk3gUfUPyBSfrS9CCgmCiQsTCHGkviBDusMxDJstFtojtc1zcpsh";
+
+    fn dummy_sequencer_config(
+        enable_dal: bool,
+        kernel_slots: Option<Vec<u8>>,
+    ) -> Configuration {
         let mut host = MockKernelHost::default();
         let delayed_inbox =
             DelayedInbox::new(&mut host).expect("Delayed inbox should be created");
@@ -202,7 +221,7 @@ mod tests {
         .unwrap();
         let dal = if enable_dal {
             Some(DalConfiguration {
-                slot_indices: vec![6],
+                slot_indices: kernel_slots.unwrap_or(vec![6]),
             })
         } else {
             None
@@ -238,6 +257,44 @@ mod tests {
             limits: Limits::default(),
             enable_fa_bridge: false,
         }
+    }
+
+    fn get_dal_slots(conf: &Configuration) -> Option<Vec<u8>> {
+        match &conf.mode {
+            ConfigurationMode::Sequencer {
+                dal: Some(DalConfiguration { slot_indices }),
+                ..
+            } => Some(slot_indices.clone()),
+            _ => None,
+        }
+    }
+
+    fn make_dal_signal(
+        host: &mut MockKernelHost,
+        dal_slots: &[u8],
+    ) -> DalSlotImportSignals {
+        let dal_parameters = host.reveal_dal_parameters();
+        let unsigned_signals = UnsignedDalSlotSignals(vec![DalSlotIndicesOfLevel {
+            published_level: host.host.level() - (dal_parameters.attestation_lag as u32),
+            slot_indices: DalSlotIndicesList(dal_slots.to_vec()),
+        }]);
+        let to_sign = unsigned_signals.rlp_bytes();
+        let sk = SecretKeyEd25519::from_b58check(DUMMY_SEQUENCER_SECRET_KEY).unwrap();
+        let signature: UnknownSignature =
+            sk.sign(&to_sign).expect("Signature shouldn't fail").into();
+        DalSlotImportSignals {
+            signals: unsigned_signals,
+            signature,
+        }
+    }
+
+    fn frame_message(bytes: &[u8], message_kind: u8) -> Vec<u8> {
+        let mut buffer = Vec::with_capacity(1 + RAW_ROLLUP_ADDRESS_SIZE + bytes.len());
+        buffer.push(0_u8);
+        buffer.extend_from_slice(&DEFAULT_SR_ADDRESS);
+        buffer.push(message_kind);
+        buffer.extend_from_slice(bytes);
+        buffer
     }
 
     // Those blueprints are produced with `chunk data --as-blueprint --sequencer-key unencrypted:edsk3gUfUPyBSfrS9CCgmCiQsTCHGkviBDusMxDJstFtojtc1zcpsh --number 10`
@@ -340,7 +397,7 @@ mod tests {
         let mut host = MockKernelHost::default();
         host.host
             .add_external(Bytes::from(hex::decode(DUMMY_TRANSACTION).unwrap()));
-        let mut conf = dummy_sequencer_config(enable_dal);
+        let mut conf = dummy_sequencer_config(enable_dal, None);
         fetch_blueprints(&mut host, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
 
         if read_next_blueprint(&mut host, &mut conf)
@@ -370,7 +427,7 @@ mod tests {
             .add_external(Bytes::from(hex::decode(DUMMY_CHUNK1).unwrap()));
         host.host
             .add_external(Bytes::from(hex::decode(DUMMY_CHUNK2).unwrap()));
-        let mut conf = dummy_sequencer_config(enable_dal);
+        let mut conf = dummy_sequencer_config(enable_dal, None);
         fetch_blueprints(&mut host, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
 
         if read_next_blueprint(&mut host, &mut conf)
@@ -397,7 +454,7 @@ mod tests {
         host.host.add_external(Bytes::from(
             hex::decode(DUMMY_BLUEPRINT_CHUNK_NUMBER_10).unwrap(),
         ));
-        let mut conf = dummy_sequencer_config(enable_dal);
+        let mut conf = dummy_sequencer_config(enable_dal, None);
         fetch_blueprints(&mut host, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
 
         // The dummy chunk in the inbox is registered at block 10
@@ -426,7 +483,7 @@ mod tests {
         host.host.add_external(Bytes::from(
             hex::decode(DUMMY_BLUEPRINT_CHUNK_UNPARSABLE).unwrap(),
         ));
-        let mut conf = dummy_sequencer_config(enable_dal);
+        let mut conf = dummy_sequencer_config(enable_dal, None);
         fetch_blueprints(&mut host, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
 
         if read_next_blueprint(&mut host, &mut conf)
@@ -453,7 +510,7 @@ mod tests {
         host.host.add_external(Bytes::from(
             hex::decode(DUMMY_BLUEPRINT_CHUNK_NUMBER_10).unwrap(),
         ));
-        let mut conf = dummy_sequencer_config(enable_dal);
+        let mut conf = dummy_sequencer_config(enable_dal, None);
 
         match read_proxy_inbox(
             &mut host,
@@ -494,7 +551,7 @@ mod tests {
 
     fn test_parsing_delayed_inbox(enable_dal: bool) {
         let mut host = MockKernelHost::default();
-        let mut conf = dummy_sequencer_config(enable_dal);
+        let mut conf = dummy_sequencer_config(enable_dal, None);
         let metadata = TransferMetadata::new(
             delayed_bridge(&conf),
             PublicKeyHash::from_b58check("tz1NiaviJwtMbpEcNqSP6neeoBYj8Brb3QPv").unwrap(),
@@ -528,7 +585,7 @@ mod tests {
 
     fn test_parsing_l1_contract_inbox(enable_dal: bool) {
         let mut host = MockKernelHost::default();
-        let mut conf = dummy_sequencer_config(enable_dal);
+        let mut conf = dummy_sequencer_config(enable_dal, None);
         let metadata = TransferMetadata::new(
             ContractKt1Hash::from_b58check(DUMMY_INVALID_TICKETER).unwrap(),
             PublicKeyHash::from_b58check("tz1NiaviJwtMbpEcNqSP6neeoBYj8Brb3QPv").unwrap(),
@@ -640,7 +697,7 @@ mod tests {
 
     fn test_deposit_in_sequencer_mode(enable_dal: bool) {
         let mut host = MockKernelHost::default();
-        let mut conf = dummy_sequencer_config(enable_dal);
+        let mut conf = dummy_sequencer_config(enable_dal, None);
         let metadata = TransferMetadata::new(
             conf.tezos_contracts.ticketer.clone().unwrap(),
             PublicKeyHash::from_b58check("tz1NiaviJwtMbpEcNqSP6neeoBYj8Brb3QPv").unwrap(),
@@ -672,5 +729,139 @@ mod tests {
     #[test]
     fn test_deposit_in_sequencer_mode_with_dal() {
         test_deposit_in_sequencer_mode(true)
+    }
+
+    fn fill_slots(host: &mut MockKernelHost, slots: Vec<u8>) {
+        let blueprint = dummy_big_blueprint(100);
+        let chunks = chunk_blueprint(blueprint);
+
+        let dal_parameters = host.reveal_dal_parameters();
+        let published_level = host.host.level() - (dal_parameters.attestation_lag as u32);
+
+        let mut remaining_chunks = chunks;
+        // If slots is empty, the chunks are not put in any slot.
+        for (i, slot) in slots.iter().enumerate() {
+            // The last slot contains all the remaining chunks
+            if i == slots.len() - 1 {
+                prepare_dal_slot(host, &remaining_chunks, published_level as i32, *slot);
+            } else {
+                // Take the first chunk, put it in the slot, and leave the
+                // rest for the next slots.
+                if let Some((first_chunk, rem_chunks)) = remaining_chunks.split_first() {
+                    prepare_dal_slot(
+                        host,
+                        &[first_chunk.clone()],
+                        published_level as i32,
+                        *slot,
+                    );
+                    remaining_chunks = rem_chunks.to_vec();
+                } else {
+                    break;
+                }
+            }
+        }
+    }
+
+    fn setup_dal_signal(
+        host: &mut MockKernelHost,
+        conf: &mut Configuration,
+        signal_slots: Option<Vec<u8>>,
+        filled_slots: Option<Vec<u8>>,
+    ) {
+        let dal_slots = if let Some(slots) = signal_slots {
+            slots
+        } else {
+            get_dal_slots(conf).unwrap()
+        };
+
+        let signal = make_dal_signal(host, &dal_slots).rlp_bytes();
+        let input = frame_message(signal.as_ref(), DAL_SLOT_IMPORT_SIGNAL_TAG);
+
+        host.host.add_external(Bytes::from(input));
+
+        let filled_slots = filled_slots.unwrap_or(dal_slots);
+        fill_slots(host, filled_slots);
+
+        fetch_blueprints(host, DEFAULT_SR_ADDRESS, conf).expect("fetch failed");
+    }
+
+    #[test]
+    fn test_dal_signal() {
+        let mut host = MockKernelHost::default();
+        let mut conf = dummy_sequencer_config(true, None);
+
+        setup_dal_signal(&mut host, &mut conf, None, None);
+
+        if read_next_blueprint(&mut host, &mut conf)
+            .expect("Blueprint reading shouldn't fail")
+            .0
+            .is_none()
+        {
+            panic!("There should be a blueprint in the DAL slot")
+        }
+    }
+
+    #[test]
+    fn test_dal_signal_empty_slot() {
+        let mut host = MockKernelHost::default();
+        let mut conf = dummy_sequencer_config(false, Some(vec![8]));
+
+        setup_dal_signal(&mut host, &mut conf, Some(vec![21]), Some(vec![]));
+
+        if read_next_blueprint(&mut host, &mut conf)
+            .expect("Blueprint reading shouldn't fail")
+            .0
+            .is_some()
+        {
+            panic!("There shouldn't be a blueprint fetched from DAL slots, as the slot is empty")
+        }
+    }
+
+    #[test]
+    fn test_dal_signal_with_multiple_slots_filled() {
+        let mut host = MockKernelHost::default();
+        let mut conf = dummy_sequencer_config(true, Some(vec![6, 8]));
+
+        setup_dal_signal(&mut host, &mut conf, None, None);
+
+        if read_next_blueprint(&mut host, &mut conf)
+            .expect("Blueprint reading shouldn't fail")
+            .0
+            .is_none()
+        {
+            panic!("There should be a blueprint in the DAL slot")
+        }
+    }
+
+    #[test]
+    fn test_parsable_dal_signal_without_dal() {
+        let mut host = MockKernelHost::default();
+        let mut conf = dummy_sequencer_config(false, None);
+
+        setup_dal_signal(&mut host, &mut conf, Some(vec![6]), None);
+
+        if read_next_blueprint(&mut host, &mut conf)
+            .expect("Blueprint reading shouldn't fail")
+            .0
+            .is_some()
+        {
+            panic!("The DAL signal shouldn't have been applied by the kernel, and the blueprint shouldn't have been read")
+        }
+    }
+
+    #[test]
+    fn test_invalid_dal_signal() {
+        let mut host = MockKernelHost::default();
+        let mut conf = dummy_sequencer_config(true, Some(vec![8]));
+
+        setup_dal_signal(&mut host, &mut conf, Some(vec![21]), None);
+
+        if read_next_blueprint(&mut host, &mut conf)
+            .expect("Blueprint reading shouldn't fail")
+            .0
+            .is_some()
+        {
+            panic!("The DAL signal shouldn't have been applied by the kernel, and the blueprint shouldn't have been read")
+        }
     }
 }
