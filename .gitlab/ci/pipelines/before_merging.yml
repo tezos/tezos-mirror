@@ -3814,6 +3814,7 @@ tezt-flaky:
   - oc.build_kernels
   - oc.build_dsn_node
   - oc.tezt:fetch-records
+  allow_failure: true
   timeout: 60 minutes
   before_script:
   - . ./scripts/version.sh

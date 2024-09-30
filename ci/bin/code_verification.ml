@@ -1368,6 +1368,7 @@ let jobs pipeline_type =
           ~dependencies
           ?job_select_tezts
           ~rules:rules_manual
+          ~allow_failure:Yes
           ()
         |> enable_coverage_output_artifact
       in
