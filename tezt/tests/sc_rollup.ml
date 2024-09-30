@@ -4327,8 +4327,6 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
       source_contract_address
       target_contract_address
   in
-  let* () = Client.bake_for_and_wait client in
-  let* _level = Sc_rollup_node.wait_sync ~timeout:30. rollup_node in
   let consumed_outputs () =
     Node.RPC.call node
     @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_consumed_outputs
