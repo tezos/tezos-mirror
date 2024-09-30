@@ -37,15 +37,7 @@ type t
     main process of the DAL node but by the process provided in the
     [amplificator] argument. *)
 val try_amplification :
-  Node_context.t ->
-  Cryptobox.Commitment.t ->
-  Types.slot_id ->
-  t option ->
-  unit tzresult Lwt.t
+  Cryptobox.Commitment.t -> Types.slot_id -> t -> unit tzresult Lwt.t
 
 (** Creates a new amplificator process *)
-val make : unit -> t tzresult Lwt.t
-
-(** [init amplificator node_ctxt params] Initializes the amplificator [t] with
-    the current context. *)
-val init : t -> Node_context.t -> unit tzresult Lwt.t
+val make : Node_context.t -> t tzresult Lwt.t

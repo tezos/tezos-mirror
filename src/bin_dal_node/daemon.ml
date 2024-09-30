@@ -636,12 +636,13 @@ let connect_gossipsub_with_p2p gs_worker transport_layer node_store node_ctxt
         Profile_manager.get_profiles @@ Node_context.get_profile_ctxt node_ctxt
       with
       | Operator profile
-        when Operator_profile.is_observed_slot slot_index profile ->
-          Amplificator.try_amplification
-            node_ctxt
-            commitment
-            slot_id
-            amplificator
+        when Operator_profile.is_observed_slot slot_index profile -> (
+          match amplificator with
+          | None ->
+              let*! () = Event.(emit amplificator_uninitialized ()) in
+              return_unit
+          | Some amplificator ->
+              Amplificator.try_amplification commitment slot_id amplificator)
       | _ -> return_unit
   in
   Lwt.dont_wait
@@ -1083,28 +1084,12 @@ let run ~data_dir ~configuration_override =
       head_level
       first_seen_level
   in
-  (* Initialize the crypto process *)
   (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5743
      Instead of recomputing these parameters, they could be stored
      (for a given cryptobox). *)
   let* cryptobox, shards_proofs_precomputation =
     init_cryptobox config proto_parameters
   in
-  let* amplificator =
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/7452
-       The amplificator also initializes the crypto. This could be avoided.
-       Also, is this the right moment to start the amplificator? *)
-    if Profile_manager.is_prover_profile profile_ctxt then
-      let* amplificator = Amplificator.make () in
-      return_some amplificator
-    else return_none
-  in
-  (* This must be done after the amplificator starts. *)
-  let*! metrics_server = Metrics.launch config.metrics_addr in
-  (* Set value size hooks. *)
-  Value_size_hooks.set_share_size
-    (Cryptobox.Internal_for_tests.encoded_share_size cryptobox) ;
-  Value_size_hooks.set_number_of_slots proto_parameters.number_of_slots ;
   let ctxt =
     Node_context.init
       config
@@ -1117,8 +1102,24 @@ let run ~data_dir ~configuration_override =
       gs_worker
       transport_layer
       cctxt
-      metrics_server
   in
+  let is_prover_profile = Profile_manager.is_prover_profile profile_ctxt in
+  (* Initialize amplificator if in prover profile.
+     This forks a process and should be kept early to avoid copying opened file
+     descriptors. *)
+  let* amplificator =
+    if not is_prover_profile then return_none
+    else
+      let* amplificator = Amplificator.make ctxt in
+      return_some amplificator
+  in
+  (* Starts the metrics *after* the amplificator fork, to avoid forked opened
+     sockets *)
+  let*! _metrics_server = Metrics.launch config.metrics_addr in
+  (* Set value size hooks. *)
+  Value_size_hooks.set_share_size
+    (Cryptobox.Internal_for_tests.encoded_share_size cryptobox) ;
+  Value_size_hooks.set_number_of_slots proto_parameters.number_of_slots ;
   (* Start RPC server. We do that before the waiting for the L1 node to be
      bootstrapped so that queries can already be issued. Note that that the node
      will thus already respond to the baker about shards status if queried. *)
@@ -1166,11 +1167,6 @@ let run ~data_dir ~configuration_override =
         cctxt
     in
     return crawler
-  in
-  let* () =
-    match amplificator with
-    | None -> return_unit
-    | Some amplificator -> Amplificator.init amplificator ctxt
   in
   (* Activate the p2p instance. *)
   connect_gossipsub_with_p2p gs_worker transport_layer store ctxt amplificator ;

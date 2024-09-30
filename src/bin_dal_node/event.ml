@@ -399,19 +399,6 @@ let saving_profiles_failed =
     ~level:Error
     ("error", Error_monad.trace_encoding)
 
-let reconstruct_missing_prover_srs =
-  declare_2
-    ~section
-    ~name:"reconstruct_missing_prover_srs"
-    ~msg:
-      "Missing prover SRS, reconstruction for the level {level} and slot index \
-       {slot_index} was skipped."
-    ~level:Warning
-    ~pp1:(fun fmt -> Format.fprintf fmt "%ld")
-    ("level", Data_encoding.int32)
-    ~pp2:Format.pp_print_int
-    ("slot_index", Data_encoding.int31)
-
 let reconstruct_starting_in =
   declare_3
     ~section

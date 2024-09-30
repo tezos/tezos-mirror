@@ -40,7 +40,6 @@ val init :
   Gossipsub.Worker.t ->
   Gossipsub.Transport_layer.t ->
   Tezos_rpc.Context.generic ->
-  Metrics.t ->
   t
 
 (** Returns all the registered plugins *)
