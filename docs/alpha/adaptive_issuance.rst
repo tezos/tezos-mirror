@@ -210,7 +210,7 @@ Where:
 Adaptive Maximum
 ................
 
-In addition to the issuance bounds described above, the Quebec protocol introduces
+In addition to the issuance bounds described above, the Qena protocol introduces
 another upper bound on the total issuance rate. This new bound, called
 **adaptive maximum**, prevents the issuance rate from taking
 undesirably high values when the staked ratio of the chain is already

@@ -27,7 +27,7 @@ is computed in a similar but simpler way.
   ``/chain/<chain_id>/blocks/<block_id>/context/``
 
   Besides, many RPCs presented here used to be known under different
-  names. They have been renamed in the Quebec protocol in order to
+  names. They have been renamed in the Qena protocol in order to
   disambiguate and normalize the baking power lexicon; the old names
   have been deprecated. See the
   :ref:`changelog<delegates_RPCs_normalization>` for more information.
@@ -257,7 +257,7 @@ operations, the context for this minimum is not directly accessible
 via RPC. In that case, in order to retrieve this exact context, one
 needs to replay the block's balance updates on their own.
 
-In the Quebec protocol, to solve these problems, only the total
+In the Qena protocol, to solve these problems, only the total
 delegated amounts **at the end of blocks** count when determining this
 minimum. This is known as the **per-block min-delegated
 feature**. This solution no longer penalizes baking rights when 
@@ -317,14 +317,14 @@ first level of the current cycle is ``129``, and let's say that
      - 900
      - 1050
      - 980
-   * - Quebec RPC
+   * - Qena RPC
      - Returned min (tez)
      - 1000
      - 1000
      -
      - 1000
      - 980
-   * - Quebec RPC
+   * - Qena RPC
      - Returned level
      - 129
      - 129
@@ -351,7 +351,7 @@ the middle of the block application. Also, the
 ``min_delegated_in_current_cycle`` RPC returns the value in mutez, but
 here we use tez for simplicity.
 
-* In Quebec:
+* In Qena:
 
   - At levels ``129`` and ``150``, the earliest level at the end of
     which the ``total_delegated`` is equal to the minimum ``1000`` is

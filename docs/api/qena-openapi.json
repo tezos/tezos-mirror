@@ -1,8 +1,8 @@
 {
   "openapi": "3.0.0",
   "info": {
-    "title": "Octez Protocol quebec RPC",
-    "description": "The RPC API for protocol quebec served by the Octez node.",
+    "title": "Octez Protocol qena RPC",
+    "description": "The RPC API for protocol qena served by the Octez node.",
     "version": "Octez 21.0~beta11+dev (216ad76c)"
   },
   "paths": {

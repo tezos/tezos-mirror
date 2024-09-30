@@ -71,18 +71,18 @@ and specific to the Paris protocol can be found at:
 
 - :src:`docs/api/paris-mempool-openapi.json` (version 20.3)
 
-Quebec RPCs
+Qena RPCs
 -----------
 
-The OpenAPI specifications for RPCs which are specific to the Quebec (``PsquebeC``)
+The OpenAPI specifications for RPCs which are specific to the Qena (``PtQenaB1``)
 protocol proposal can be found at:
 
-- :src:`docs/api/quebec-openapi.json` (version 21.0~rc1)
+- :src:`docs/api/qena-openapi.json` (version 21.0~rc1)
 
 The OpenAPI specifications for RPCs which are related to the mempool
-and specific to the Quebec protocol proposal can be found at:
+and specific to the Qena protocol proposal can be found at:
 
-- :src:`docs/api/quebec-mempool-openapi.json` (version 21.0~rc1)
+- :src:`docs/api/qena-mempool-openapi.json` (version 21.0~rc1)
 
 Alpha RPCs
 ----------
@@ -115,13 +115,13 @@ The OpenAPI specifications for the RPCs of the smart rollup node for the Paris
 
 - :src:`docs/api/paris-smart-rollup-node-openapi.json` (version 20.3)
 
-Quebec RPCs
+Qena RPCs
 -----------
 
-The OpenAPI specifications for the RPCs of the smart rollup node for the Quebec
-(``PsquebeC``) protocol proposal can be found at:
+The OpenAPI specifications for the RPCs of the smart rollup node for the Qena
+(``PtQenaB1``) protocol proposal can be found at:
 
-- :src:`docs/api/quebec-smart-rollup-node-openapi.json` (version 21.0~rc1)
+- :src:`docs/api/qena-smart-rollup-node-openapi.json` (version 21.0~rc1)
 
 Alpha RPCs
 ----------

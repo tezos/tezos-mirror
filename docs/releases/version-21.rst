@@ -1,7 +1,7 @@
 Version 21.0~rc1 and 21.0~rc2
 =============================
 
-Version 21 contains a new version (V13) of the protocol environment. This new version is used by both :doc:`Quebec A and Quebec B <../protocols/021_quebeca>` protocol proposals.
+Version 21 contains a new version (V13) of the protocol environment. This new version is used by both Quebec A and Quebec protocol proposals.
 As a result, Octez version 21 is the first version compatible with these proposals.
 
 The two candidates differ only in their version of the Quebec protocol proposal:
@@ -50,7 +50,7 @@ the new safety net.
 
 Not applying round 1 -- 2 block proposals by default while creating
 them will allow for faster propagation and earlier consensus
-agreement. See :ref:`here <baker_manual_quebeca>`
+agreement. See :ref:`here <baker_manual_qena>`
 for further details on how bakers can fine-tune this parameter.
 
 DAL node
