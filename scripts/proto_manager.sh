@@ -1029,6 +1029,10 @@ function update_tezt_tests() {
     commit "tezt: copy ${protocol_source} encoding samples to ${label}"
   fi
 
+  regression_protocol_name="${capitalized_label}-"
+  regression_source_name="${capitalized_source}-"
+  alpha_regression="Alpha-"
+
   # for regression files, protocol_name should be at least 5 character long, if not add enough trailing '-' at the end
   regression_protocol_name=${capitalized_label}
   while [[ ${#regression_protocol_name} -lt 5 ]]; do
@@ -1043,7 +1047,8 @@ function update_tezt_tests() {
   # shellcheck disable=SC2312
   # shellcheck disable=SC2001
   find . -type f -name "*${regression_source_name}*.out" | while read -r FILE; do
-    NEW_FILENAME=$(echo "${FILE}" | sed "s/${regression_source_name}/${regression_protocol_name}/g")
+    ORIG_FILENAME=$(echo "${FILE}" | sed "s/${alpha_regression}/${regression_source_name}/g")
+    NEW_FILENAME=$(echo "${FILE}" | sed "s/${alpha_regression}/${regression_protocol_name}/g")
 
     # Create the directory structure for the new file if it doesn't exist
     mkdir -p "$(dirname "${NEW_FILENAME}")"
@@ -1052,6 +1057,10 @@ function update_tezt_tests() {
     filename=$(basename "${NEW_FILENAME}" .out)
     # NEW_FILENAME should be less than 80 characters
     filename="${filename:0:80}"
+
+    orig_filename=$(basename "${ORIG_FILENAME}" .out)
+    orig_filename="${orig_filename:0:80}"
+    orig_filename=$(dirname "${ORIG_FILENAME}")/"${orig_filename}".out
     NEW_FILENAME=$(dirname "${NEW_FILENAME}")/"${filename}".out
 
     if [[ ${is_snapshot} == true ]]; then
@@ -1634,12 +1643,14 @@ function hash() {
   tezos_protocol_source=$(echo "${protocol_source}" | tr '_' '-')
 
   short_hash=$(echo "${protocol_source}" | cut -d'_' -f2)
-  if [[ ${source_short_hash} != "${short_hash}" ]]; then
-    is_snapshot=false
-  else
-    is_snapshot=true
+  if [[ "${is_snapshot}" == false ]]; then
+    if [[ ${source_short_hash} != "${short_hash}" ]]; then
+      is_snapshot=false
+    else
+      is_snapshot=true
+    fi
   fi
-
+  echo "Is_snapshot = $is_snapshot"
   # set current version
   # Starting from 018 the version value moved to `constants_repr`. To be
   # able to snapshot older protocol the `raw_context` file is kept even
@@ -1862,32 +1873,21 @@ function hash() {
     commit "tezt: move ${previous_tag} encoding samples to ${new_tag}"
   fi
 
-  if [[ ${is_snapshot} == true ]]; then
-    # regression_protocol_name = $short hash  minus the first 2 characters
-    regression_protocol_name=${short_hash:2}
-    # with all characters in lowercase
-    regression_protocol_name=$(tr '[:upper:]' '[:lower:]' <<< "${regression_protocol_name}")
-    # and capitalized
-    regression_protocol_name=$(tr '[:lower:]' '[:upper:]' <<< "${regression_protocol_name:0:1}")${regression_protocol_name:1}
+  regression_protocol_name="${capitalized_label}-"
+  regression_source_name="${capitalized_source}-"
+  alpha_regression="Alpha-"
 
-    regression_source_name=${source_short_hash:2}
-    regression_source_name=$(tr '[:upper:]' '[:lower:]' <<< "${regression_source_name}")
-    regression_source_name=$(tr '[:lower:]' '[:upper:]' <<< "${regression_source_name:0:1}")${regression_source_name:1}
-  else
-    regression_protocol_name=${capitalized_label}
-    regression_source_name=${capitalized_source}
-  fi
-
-  while [[ ${#regression_protocol_name} -lt 5 ]]; do
+  while [[ ${#regression_protocol_name} -le 5 ]]; do
     regression_protocol_name="${regression_protocol_name}-"
   done
-  while [[ ${#regression_source_name} -lt 5 ]]; do
+  while [[ ${#regression_source_name} -le 5 ]]; do
     regression_source_name="${regression_source_name}-"
   done
 
   # shellcheck disable=SC2001
-  find . -type f -name "*${regression_source_name}*.out" | while read -r FILE; do
-    NEW_FILENAME=$(echo "${FILE}" | sed "s/${capitalized_previous_tag}/${capitalized_new_tag}/g")
+  find . -type f -name "*${alpha_regression}*.out" | while read -r FILE; do
+    ORIG_FILENAME=$(echo "${FILE}" | sed "s/${alpha_regression}/${regression_source_name}/g")
+    NEW_FILENAME=$(echo "${FILE}" | sed "s/${alpha_regression}/${regression_protocol_name}/g")
 
     # Create the directory structure for the new file if it doesn't exist
     mkdir -p "$(dirname "${NEW_FILENAME}")"
@@ -1896,13 +1896,21 @@ function hash() {
     filename=$(basename "${NEW_FILENAME}" .out)
     # NEW_FILENAME should be less than 80 characters
     filename="${filename:0:80}"
+
+    orig_filename=$(basename "${ORIG_FILENAME}" .out)
+    orig_filename="${orig_filename:0:80}"
+    orig_filename=$(dirname "${ORIG_FILENAME}")/"${orig_filename}".out
     NEW_FILENAME=$(dirname "${NEW_FILENAME}")/"${filename}".out
 
-    if [[ "${FILE}" != "${NEW_FILENAME}" ]]; then
-      git mv "${FILE}" "${NEW_FILENAME}"
+    if [[ "${orig_filename}" != "${NEW_FILENAME}" ]]; then
+      ## if $FILE exists
+      if [[ -f "${orig_filename}" ]]; then
+        git mv "${orig_filename}" "${NEW_FILENAME}"
+        update_files "${NEW_FILENAME}"
+      else
+        echo "File ${orig_filename} does not exist"
+      fi
     fi
-
-    update_files "${NEW_FILENAME}"
 
   done
   commit_if_changes "tezt: move ${protocol_source} regression files"
@@ -1962,10 +1970,10 @@ function hash() {
     -e "s,src/proto_${protocol_source},src/proto_${new_protocol_name},g" \
     -e "s,tezos-protocol-${tezos_protocol_source}/,tezos-protocol-${new_tezos_protocol}/,g" \
     -e "s,raw_protocol_${protocol_source}/,raw_protocol_${new_protocol_name}/,g" \
-    -e "s/_${protocol_source}:/_${label}:/g" \
-    -e "s/_${protocol_source}>/_${label}>/g" \
-    -e "s/_${protocol_source}\`/_${label}\`/g" \
-    -e "s/-${protocol_source}.html/-${label}.html/g" \
+    -e "s/_${previous_tag}:/_${label}:/g" \
+    -e "s/_${previous_tag}>/_${label}>/g" \
+    -e "s/_${previous_tag}\`/_${label}\`/g" \
+    -e "s/-${previous_tag}.html/-${label}.html/g" \
     \{\} \;
   commit_if_changes "docs: fix versioned links"
 
