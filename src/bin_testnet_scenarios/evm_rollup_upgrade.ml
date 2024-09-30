@@ -163,7 +163,7 @@ let upgrade_kernel ~configuration_path ~testnet () =
     get_upgrade_config (JSON.parse_file configuration_path)
   in
   let testnet = testnet () in
-  let* client, node = Helpers.setup_octez_node ~testnet () in
+  let* client, node = Scenario_helpers.setup_octez_node ~testnet () in
   let* operator = Client.gen_and_show_keys client in
   let* () =
     Evm_rollup.check_operator_balance
