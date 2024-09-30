@@ -24,6 +24,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let monitor_received_block
+    ~(received_watcher : Block_hash.t Lwt_stream.t * Lwt_watcher.stopper) () =
+  let block_stream, stopper = received_watcher in
+  let shutdown () = Lwt_watcher.shutdown stopper in
+  let next () = Lwt_stream.get block_stream in
+  Tezos_rpc.Answer.return_stream {next; shutdown}
+
 let monitor_head
     ~(head_watcher :
        (Block_hash.t * Block_header.t) Lwt_stream.t * Lwt_watcher.stopper)
@@ -265,6 +272,16 @@ let build_rpc_directory validator mainchain_validator =
       in
       let next () = Lwt_stream.get stream in
       Tezos_rpc.Answer.return_stream {next; shutdown}) ;
+  gen_register1 Monitor_services.S.received_blocks (fun chain () () ->
+      let open Lwt_syntax in
+      let* chain_store = Chain_directory.get_chain_store_exn store chain in
+      match Validator.get validator (Store.Chain.chain_id chain_store) with
+      | Error _ -> Lwt.fail Not_found
+      | Ok chain_validator ->
+          let received_watcher =
+            Chain_validator.received_block_watcher chain_validator
+          in
+          monitor_received_block ~received_watcher ()) ;
   gen_register1 Monitor_services.S.heads (fun chain q () ->
       let open Lwt_syntax in
       let* chain_store = Chain_directory.get_chain_store_exn store chain in

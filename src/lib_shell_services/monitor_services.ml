@@ -158,7 +158,7 @@ module S = struct
     Tezos_rpc.Service.get_service
       ~description:
         "Monitor all newly received blocks that are not yet known by the store."
-      ~query:heads_query
+      ~query:Tezos_rpc.Query.empty
       ~output:(obj1 (req "hash" Block_hash.encoding))
       Tezos_rpc.Path.(path / "received_blocks" /: Chain_services.chain_arg)
 
@@ -215,17 +215,8 @@ let applied_blocks ctxt ?(chains = [`Main]) ?(protocols = [])
     end)
     ()
 
-let received_blocks ctxt ?(protocols = []) ?(next_protocols = []) chain =
-  make_streamed_call
-    S.received_blocks
-    ctxt
-    ((), chain)
-    (object
-       method protocols = protocols
-
-       method next_protocols = next_protocols
-    end)
-    ()
+let received_blocks ctxt chain =
+  make_streamed_call S.received_blocks ctxt ((), chain) () ()
 
 let heads ctxt ?(protocols = []) ?(next_protocols = []) chain =
   make_streamed_call
