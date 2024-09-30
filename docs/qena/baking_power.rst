@@ -260,7 +260,7 @@ needs to replay the block's balance updates on their own.
 In the Quebec protocol, to solve these problems, only the total
 delegated amounts **at the end of blocks** count when determining this
 minimum. This is known as the **per-block min-delegated
-feature**. This solution no longer penalizes baking rights when 
+feature**. This solution no longer penalizes baking rights when
 funds are transferred between two accounts delegated to the same
 baker. Moreover, it lets users easily retrieve via RPC the exact
 context that the minimum comes from, since it is guaranteed to

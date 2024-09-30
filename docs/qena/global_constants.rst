@@ -105,7 +105,7 @@ value 999 with their respective hashes:
 .. code-block:: michelson
 
      parameter (constant "exprtYirrFwYKm6yKLzJNtYRbq49zedYq16BonRvMzHiwSbUekB9YL");
-     storage (big_map int (constant "exprtYirrFwYKm6yKLzJNtYRbq49zedYq16BonRvMzHiwSbUekB9YL")); 
+     storage (big_map int (constant "exprtYirrFwYKm6yKLzJNtYRbq49zedYq16BonRvMzHiwSbUekB9YL"));
      code {
        PUSH int (constant "expruQN5r2umbZVHy6WynYM8f71F8zS4AERz9bugF8UkPBEqrHLuU8");
        # <rest of code>
@@ -116,7 +116,7 @@ The full expansion of this contract would be:
 .. code-block:: michelson
 
      parameter (lambda unit unit);
-     storage (big_map int (lambda unit unit)); 
+     storage (big_map int (lambda unit unit));
      code {
        PUSH int 999;
        # <rest of code>
@@ -133,9 +133,9 @@ Global Constants at Runtime
 Contracts that use global constants are semantically equivalent to the
 contract with all constants expanded.
 
-Note that using the `UNPACK <https://tezos.gitlab.io/michelson-reference/#instr-UNPACK>`__ 
+Note that using the `UNPACK <https://tezos.gitlab.io/michelson-reference/#instr-UNPACK>`__
 operation to deserialize a lambda which contains a reference to a global
 constant is not supported. Similarly, originating a contract which contains
 a reference to a global constant using the
-`CREATE_CONTRACT <https://tezos.gitlab.io/michelson-reference/#instr-CREATE_CONTRACT>`__ 
+`CREATE_CONTRACT <https://tezos.gitlab.io/michelson-reference/#instr-CREATE_CONTRACT>`__
 instruction will also fail.
