@@ -150,24 +150,6 @@ let compute_min
     ~initial:issuance_ratio_initial_min
     ~final:issuance_ratio_final_min
 
-(* let dyn_max ~stake_ratio =
-  let r =
-    if Compare.Q.(stake_ratio <= Q.(5 // 100)) then Q.(10 // 100)
-    else if Compare.Q.(stake_ratio >= Q.(50 // 100)) then Q.(1 // 100)
-    else
-      (* (1 + 9 * ((50 - 100 * x) / 42 ) ^ 2 ) / 100 *)
-      let q9 = Q.of_int 9 in
-      let q50 = Q.of_int 50 in
-      let q100 = Q.of_int 100 in
-      let q42 = Q.of_int 42 in
-      let x = stake_ratio in
-      let to_square = Q.((q50 - (q100 * x)) / q42) in
-      Q.((one + (q9 * to_square * to_square)) / q100)
-  in
-  if Compare.Q.(r <= Q.(1 // 100)) then Q.(1 // 100)
-  else if Compare.Q.(r >= Q.(10 // 100)) then Q.(10 // 100)
-  else r *)
-
 let compute_max ~issuance_ratio_min
     ~(reward_params : Constants_parametric_repr.adaptive_rewards_params)
     ~launch_cycle ~new_cycle =
@@ -309,7 +291,6 @@ let compute_and_store_reward_coeff_at_cycle_end ctxt ~new_cycle =
     let issuance_ratio_max =
       compute_max
         ~issuance_ratio_min
-        (* ~stake_ratio *)
         ~launch_cycle
         ~new_cycle
         ~reward_params
@@ -437,8 +418,6 @@ module Internal_for_tests = struct
   let compute_coeff = compute_coeff
 
   let compute_min = compute_min
-  
-  (* let dyn_max = dyn_max *)
 
   let compute_max = compute_max
 end

@@ -131,6 +131,5 @@ module Internal_for_tests : sig
     reward_params:Constants_parametric_repr.adaptive_rewards_params ->
     launch_cycle:Cycle_repr.t option ->
     new_cycle:Cycle_repr.t ->
-    (* stake_ratio:Q.t -> *)
     Q.t
 end
