@@ -63,6 +63,7 @@ tezt:
   - oc.build_kernels
   - oc.tezt:fetch-records
   timeout: 40 minutes
+  interruptible: false
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -115,6 +116,7 @@ tezt-memory-3k:
   - oc.build_kernels
   - oc.tezt:fetch-records
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -167,6 +169,7 @@ tezt-memory-4k:
   - oc.build_kernels
   - oc.tezt:fetch-records
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -219,6 +222,7 @@ tezt-time-sensitive:
   - oc.build_kernels
   - oc.tezt:fetch-records
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -270,6 +274,7 @@ tezt-slow:
   - oc.build_kernels
   - oc.tezt:fetch-records
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -322,6 +327,7 @@ tezt-flaky:
   - oc.build_kernels
   - oc.tezt:fetch-records
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -372,6 +378,7 @@ oc.build_x86_64-released:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
+  interruptible: false
   before_script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -416,6 +423,7 @@ oc.build_x86_64-exp-dev-extra:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
+  interruptible: false
   before_script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -462,6 +470,7 @@ oc.build_kernels:
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
+  interruptible: false
   before_script:
   - . ./scripts/ci/sccache-start.sh
   script:
@@ -500,6 +509,7 @@ oc.tezt:fetch-records:
   - oc.docker:ci:amd64
   allow_failure: true
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh

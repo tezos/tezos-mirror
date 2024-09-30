@@ -119,6 +119,7 @@ sanity_ci:
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - ./scripts/ci/take_ownership.sh
   - eval $(opam env)
@@ -137,6 +138,7 @@ docker:hadolint:
   - when: always
   dependencies: []
   timeout: 60 minutes
+  interruptible: false
   script:
   - hadolint build.Dockerfile
   - hadolint Dockerfile
@@ -156,6 +158,7 @@ oc.ocaml_fmt:
     paths:
     - $CI_PROJECT_DIR/_dune_cache
     policy: pull-push
+  interruptible: false
   before_script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -177,6 +180,7 @@ oc.semgrep:
   - when: always
   dependencies: []
   timeout: 60 minutes
+  interruptible: false
   script:
   - echo "OCaml code linting. For information on how to reproduce locally, check out
     scripts/semgrep/README.md"
@@ -192,6 +196,7 @@ oc.misc_checks:
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -212,6 +217,7 @@ check_jsonnet_fmt:
   dependencies:
   - oc.docker:jsonnet:amd64
   timeout: 60 minutes
+  interruptible: false
   script:
   - scripts/lint.sh --check-jsonnet-format
 
@@ -225,6 +231,7 @@ check_rust_fmt:
   dependencies:
   - oc.docker:rust-toolchain:amd64
   timeout: 60 minutes
+  interruptible: false
   script:
   - scripts/check-format-rust.sh
 
@@ -238,6 +245,7 @@ documentation:rst-check:
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - . $HOME/.venv/bin/activate
   script:
@@ -262,6 +270,7 @@ oc.build_arm64-released:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
+  interruptible: false
   before_script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -307,6 +316,7 @@ oc.build_arm64-exp-dev-extra:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
+  interruptible: false
   before_script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -354,6 +364,7 @@ oc.build:static-x86_64-linux-binaries:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
+  interruptible: false
   before_script:
   - ./scripts/ci/take_ownership.sh
   - eval $(opam env)
@@ -390,6 +401,7 @@ oc.build_x86_64-released:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
+  interruptible: false
   before_script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -440,6 +452,7 @@ oc.build_x86_64-exp-dev-extra:
     paths:
     - $CI_PROJECT_DIR/_dune_cache
     policy: push
+  interruptible: false
   before_script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -495,6 +508,7 @@ ocaml-check:
     paths:
     - $CI_PROJECT_DIR/_dune_cache
     policy: pull-push
+  interruptible: false
   before_script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -530,6 +544,7 @@ oc.build_kernels:
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
+  interruptible: false
   before_script:
   - . ./scripts/ci/sccache-start.sh
   script:
@@ -578,6 +593,7 @@ oc.build_dsn_node:
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
+  interruptible: false
   before_script:
   - . ./scripts/ci/sccache-start.sh
   script:
@@ -607,6 +623,7 @@ oc.tezt:fetch-records:
   - oc.docker:ci:amd64
   allow_failure: true
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -643,6 +660,7 @@ build_octez_source:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
+  interruptible: false
   before_script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -671,6 +689,7 @@ oc.build:rpm:amd64:
   needs: []
   dependencies: []
   timeout: 75 minutes
+  interruptible: false
   before_script:
   - . ./scripts/version.sh
   - ./scripts/ci/bin_packages_rpm_dependencies.sh
@@ -724,6 +743,7 @@ opam:prepare:
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - eval $(opam env)
   script:
@@ -759,6 +779,7 @@ opam:all_6:
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
+  interruptible: false
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -824,6 +845,7 @@ opam:exec_6:
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
+  interruptible: false
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -878,6 +900,7 @@ opam:all_2:
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
+  interruptible: false
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -945,6 +968,7 @@ opam:all_1:
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
+  interruptible: false
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -1000,6 +1024,7 @@ opam:all_3:
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
+  interruptible: false
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -1067,6 +1092,7 @@ opam:exec_4:
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
+  interruptible: false
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -1120,6 +1146,7 @@ opam:all_4:
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
+  interruptible: false
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -1186,6 +1213,7 @@ opam:exec_1:
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
+  interruptible: false
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -1250,6 +1278,7 @@ opam:all_5:
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
+  interruptible: false
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -1317,6 +1346,7 @@ opam:all_7:
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
+  interruptible: false
   before_script:
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
@@ -1381,6 +1411,7 @@ kaitai_checks:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
+  interruptible: false
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -1414,6 +1445,7 @@ kaitai_e2e_checks:
   - oc.docker:client-libs-dependencies
   - kaitai_checks
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - . ./scripts/version.sh
   - . ./scripts/install_build_deps.js.sh
@@ -1440,6 +1472,7 @@ oc.check_lift_limits_patch:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
+  interruptible: false
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -1465,6 +1498,7 @@ oc.python_check:
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -1495,6 +1529,7 @@ oc.integration:compiler-rejections:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
+  interruptible: false
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -1517,6 +1552,7 @@ oc.script:test-gen-genesis:
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - eval $(opam env)
   - cd scripts/gen-genesis
@@ -1546,6 +1582,7 @@ oc.script:snapshot_alpha_and_link:
     paths:
     - $CI_PROJECT_DIR/_dune_cache
     policy: pull
+  interruptible: false
   before_script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -1576,6 +1613,7 @@ oc.script:test_octez_release_versions:
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -1593,6 +1631,7 @@ oc.script:b58_prefix:
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - . ./scripts/version.sh
   - . $HOME/.venv/bin/activate
@@ -1617,6 +1656,7 @@ oc.test-liquidity-baking-scripts:
   - oc.build_x86_64-released
   - oc.build_x86_64-exp-dev-extra
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -1645,6 +1685,7 @@ test_kernels:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
+  interruptible: false
   before_script:
   - . ./scripts/ci/sccache-start.sh
   script:
@@ -1680,6 +1721,7 @@ test_etherlink_kernel:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
+  interruptible: false
   before_script:
   - . ./scripts/ci/sccache-start.sh
   script:
@@ -1715,6 +1757,7 @@ test_etherlink_firehose:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
+  interruptible: false
   before_script:
   - . ./scripts/ci/sccache-start.sh
   script:
@@ -1746,6 +1789,7 @@ check_riscv_kernels:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
+  interruptible: false
   before_script:
   - . ./scripts/ci/sccache-start.sh
   script:
@@ -1780,6 +1824,7 @@ test_riscv_kernels:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
+  interruptible: false
   before_script:
   - . ./scripts/ci/sccache-start.sh
   script:
@@ -1815,6 +1860,7 @@ test_evm_compatibility:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
+  interruptible: false
   before_script:
   - . ./scripts/ci/sccache-start.sh
   script:
@@ -1857,6 +1903,7 @@ oc.unit:non-proto-x86_64:
     paths:
     - $CI_PROJECT_DIR/_dune_cache
     policy: pull
+  interruptible: false
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -1914,6 +1961,7 @@ oc.unit:other-x86_64:
     paths:
     - $CI_PROJECT_DIR/_dune_cache
     policy: pull
+  interruptible: false
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -1971,6 +2019,7 @@ oc.unit:proto-x86_64:
     paths:
     - $CI_PROJECT_DIR/_dune_cache
     policy: pull
+  interruptible: false
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -2024,6 +2073,7 @@ oc.unit:non-proto-arm64:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
+  interruptible: false
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -2063,6 +2113,7 @@ oc.unit:webassembly-x86_64:
   dependencies:
   - oc.docker:ci:amd64
   timeout: 20 minutes
+  interruptible: false
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -2092,6 +2143,7 @@ oc.unit:protocol_compiles:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
+  interruptible: false
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -2118,6 +2170,7 @@ de.unit:x86_64:
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - eval $(opam env)
   script:
@@ -2137,6 +2190,7 @@ de.unit:arm64:
   dependencies:
   - oc.docker:ci:arm64
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - eval $(opam env)
   script:
@@ -2156,6 +2210,7 @@ resto.unit:x86_64:
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - eval $(opam env)
   script:
@@ -2175,6 +2230,7 @@ resto.unit:arm64:
   dependencies:
   - oc.docker:ci:arm64
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - eval $(opam env)
   script:
@@ -2190,6 +2246,7 @@ oc.install_opam_jammy:
   dependencies: []
   allow_failure: true
   timeout: 2 hours
+  interruptible: false
   script:
   - ./docs/introduction/install-opam.sh
   variables:
@@ -2204,6 +2261,7 @@ oc.compile_sources_doc_bookworm:
   - when: always
   dependencies: []
   timeout: 60 minutes
+  interruptible: false
   script:
   - ./docs/introduction/compile-sources.sh tezos/tezos latest-release
   variables:
@@ -2219,6 +2277,7 @@ oc.compile_sources_doc_mantic:
   - when: always
   dependencies: []
   timeout: 60 minutes
+  interruptible: false
   script:
   - ./docs/introduction/compile-sources.sh tezos/tezos latest-release
   variables:
@@ -2247,6 +2306,7 @@ tezt:
   - oc.build_dsn_node
   - oc.tezt:fetch-records
   timeout: 40 minutes
+  interruptible: false
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -2307,6 +2367,7 @@ tezt-memory-3k:
   - oc.build_dsn_node
   - oc.tezt:fetch-records
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -2367,6 +2428,7 @@ tezt-memory-4k:
   - oc.build_dsn_node
   - oc.tezt:fetch-records
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -2427,6 +2489,7 @@ tezt-time-sensitive:
   - oc.build_dsn_node
   - oc.tezt:fetch-records
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -2486,6 +2549,7 @@ tezt-slow:
   - oc.build_dsn_node
   - oc.tezt:fetch-records
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -2542,6 +2606,7 @@ tezt-flaky:
   - oc.build_dsn_node
   - oc.tezt:fetch-records
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -2597,6 +2662,7 @@ tezt:static-binaries:
   - oc.build:static-x86_64-linux-binaries
   - oc.tezt:fetch-records
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - mv octez-binaries/x86_64/octez-* .
   script:
@@ -2637,6 +2703,7 @@ oc.install_python_noble:
   - when: always
   dependencies: []
   timeout: 60 minutes
+  interruptible: false
   script:
   - ./docs/developer/install-python-debian-ubuntu.sh tezos/tezos master
 
@@ -2649,6 +2716,7 @@ oc.install_python_jammy:
   - when: always
   dependencies: []
   timeout: 60 minutes
+  interruptible: false
   script:
   - ./docs/developer/install-python-debian-ubuntu.sh tezos/tezos master
 
@@ -2661,6 +2729,7 @@ oc.install_python_bookworm:
   - when: always
   dependencies: []
   timeout: 60 minutes
+  interruptible: false
   script:
   - ./docs/developer/install-python-debian-ubuntu.sh tezos/tezos master
 
@@ -2683,6 +2752,7 @@ documentation:odoc:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
+  interruptible: false
   before_script:
   - eval $(opam env)
   - . ./scripts/ci/sccache-start.sh
@@ -2719,6 +2789,7 @@ documentation:manuals:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
+  interruptible: false
   before_script:
   - eval $(opam env)
   - . ./scripts/ci/sccache-start.sh
@@ -2756,6 +2827,7 @@ documentation:docgen:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
+  interruptible: false
   before_script:
   - eval $(opam env)
   - . ./scripts/ci/sccache-start.sh
@@ -2793,6 +2865,7 @@ documentation:build_all:
   - documentation:manuals
   - documentation:docgen
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - eval $(opam env)
   - . $HOME/.venv/bin/activate
@@ -2823,6 +2896,7 @@ documentation:linkcheck:
   - documentation:build_all
   allow_failure: true
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - . ./scripts/version.sh
   - eval $(opam env)
