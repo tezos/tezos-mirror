@@ -77,6 +77,6 @@ let parisb_name = "paris_019"
 
 let parisc_name = "paris_020"
 
-let proto_quebeca_name = "quebeca_021"
+let proto_qena_name = "qena_021"
 
 let proto_alpha_name = "alpha_current"
