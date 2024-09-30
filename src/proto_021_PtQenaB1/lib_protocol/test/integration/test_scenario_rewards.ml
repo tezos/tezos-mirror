@@ -8,7 +8,7 @@
 (** Testing
     -------
     Component:    Adaptive Issuance, Rewards
-    Invocation:   dune exec src/proto_021_PsquebeC/lib_protocol/test/integration/main.exe \
+    Invocation:   dune exec src/proto_021_PtQenaB1/lib_protocol/test/integration/main.exe \
                    -- --file test_scenario_rewards.ml
     Subject:      Test rewards issuance in the protocol.
 *)

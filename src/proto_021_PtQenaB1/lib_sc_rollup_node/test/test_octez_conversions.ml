@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:  Smart rollup node library, type conversions
-    Invocation: dune exec src/proto_021_PsquebeC/lib_sc_rollup_node/test/main.exe \
+    Invocation: dune exec src/proto_021_PtQenaB1/lib_sc_rollup_node/test/main.exe \
                 -- -f test_octez_conversions.ml
     Subject:    Ensure conversions between octez smart rollup structures and
                 protocol ones are bijective.

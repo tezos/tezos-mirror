@@ -27,7 +27,7 @@
 (** Testing
     -------
     Component:  Protocol Sc_rollup_storage
-    Invocation: dune exec src/proto_021_PsquebeC/lib_protocol/test/unit/main.exe \
+    Invocation: dune exec src/proto_021_PtQenaB1/lib_protocol/test/unit/main.exe \
                   -- --file test_sc_rollup_storage.ml
     Subject:    Tests for the SCORU storage module
 *)

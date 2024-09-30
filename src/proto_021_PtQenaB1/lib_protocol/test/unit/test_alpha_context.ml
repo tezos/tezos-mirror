@@ -29,7 +29,7 @@ open Alpha_context
 (** Testing
     -------
     Component:    Alpha_context
-    Invocation:   dune exec src/proto_021_PsquebeC/lib_protocol/test/unit/main.exe \
+    Invocation:   dune exec src/proto_021_PtQenaB1/lib_protocol/test/unit/main.exe \
                   -- --file test_alpha_context.ml
     Dependencies: helpers/block.ml
     Subject:      To test the modules (including the top-level)

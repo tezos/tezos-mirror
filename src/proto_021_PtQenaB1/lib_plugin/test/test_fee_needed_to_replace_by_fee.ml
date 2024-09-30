@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Plugin.Mempool
-    Invocation:   dune exec src/proto_021_PsquebeC/lib_plugin/test/main.exe \
+    Invocation:   dune exec src/proto_021_PtQenaB1/lib_plugin/test/main.exe \
                   -- --file test_fee_needed_to_replace_by_fee.ml
     Subject:      Unit tests the fee_needed_to_replace_by_fee function
                   of the mempool plugin

@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Protocol (interpretation)
-    Invocation:   dune exec src/proto_021_PsquebeC/lib_protocol/test/integration/michelson/main.exe \
+    Invocation:   dune exec src/proto_021_PtQenaB1/lib_protocol/test/integration/michelson/main.exe \
                   -- --file test_interpretation.ml
     Subject:      Interpretation of Michelson scripts
 *)
