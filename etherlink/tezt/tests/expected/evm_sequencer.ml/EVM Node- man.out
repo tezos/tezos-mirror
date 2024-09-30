@@ -358,15 +358,15 @@ Miscellaneous commands:
   
   replay blueprint <level> [--data-dir <data-dir>]
       [--preimages-dir <_evm_installer_preimages>]
-      [--preimages-endpoint <url>] [-v --verbose]
-      [--kernel <evm_kernel.wasm>] [--profile]
+      [--preimages-endpoint <url>] [--kernel <evm_kernel.wasm>]
+      [--kernel-verbosity <info>] [--profile]
     Replay a specific block level.
     <level>: level to replay
     --data-dir <data-dir>: The path to the EVM node data directory
     --preimages-dir <_evm_installer_preimages>: Path to the preimages directory
     --preimages-endpoint <url>: The address of a service which provides pre-images for the rollup. Missing pre-images will be downloaded remotely if they are not already present on disk.
-    -v --verbose: Sets logging level to debug. Beware, it is highly verbose.
     --kernel <evm_kernel.wasm>: Path to the EVM kernel used to launch the PVM, it will be loaded from storage afterward
+    --kernel-verbosity <info>: Sets kernel's logging verbosity, either `fatal`, `error`, `info`, `debug`
     --profile: Profile the execution of the WASM PVM
   
   patch kernel with <kernel_path> [--data-dir <data-dir>]

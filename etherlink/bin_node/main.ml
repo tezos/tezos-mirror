@@ -276,6 +276,23 @@ let verbose_arg =
     ~doc:"Sets logging level to debug. Beware, it is highly verbose."
     ()
 
+let kernel_verbosity_arg =
+  Tezos_clic.arg
+    ~long:"kernel-verbosity"
+    ~doc:
+      "Sets kernel's logging verbosity, either `fatal`, `error`, `info`, \
+       `debug`"
+    ~placeholder:"info"
+    ( Tezos_clic.parameter @@ fun _ctxt value ->
+      let open Lwt_result_syntax in
+      let open Evm_node_lib_dev.Events in
+      match value with
+      | "debug" -> return Debug
+      | "info" -> return Info
+      | "error" -> return Error
+      | "fatal" -> return Fatal
+      | _ -> failwith "%s is an invalid verbosity level" value )
+
 let data_dir_arg =
   let default = Configuration.default_data_dir in
   Tezos_clic.default_arg
@@ -1381,8 +1398,8 @@ let replay_command =
        data_dir_arg
        preimages_arg
        preimages_endpoint_arg
-       verbose_arg
        kernel_arg
+       kernel_verbosity_arg
        profile_arg)
     (prefixes ["replay"; "blueprint"]
     @@ Tezos_clic.param
@@ -1392,14 +1409,20 @@ let replay_command =
               Lwt.return_ok
               @@ Evm_node_lib_dev_encoding.Ethereum_types.Qty (Z.of_string s)))
     @@ stop)
-    (fun (data_dir, preimages, preimages_endpoint, verbose, kernel_path, profile)
+    (fun ( data_dir,
+           preimages,
+           preimages_endpoint,
+           kernel_path,
+           kernel_verbosity,
+           profile )
          l2_level
          () ->
       let open Lwt_result_syntax in
       let*! () =
         let open Tezos_base_unix.Internal_event_unix in
         let config =
-          if verbose then Some (make_with_defaults ~verbosity:Debug ())
+          if kernel_verbosity = Some Evm_node_lib_dev.Events.Debug then
+            Some (make_with_defaults ~verbosity:Debug ())
           else None
         in
         init ?config ()
@@ -1412,6 +1435,7 @@ let replay_command =
       Evm_node_lib_dev.Replay.main
         ~profile
         ?kernel_path
+        ?kernel_verbosity
         ~data_dir
         ~preimages
         ~preimages_endpoint

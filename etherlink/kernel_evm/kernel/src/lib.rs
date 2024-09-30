@@ -24,17 +24,13 @@ use reveal_storage::{is_revealed_storage, reveal_storage};
 use storage::{
     read_base_fee_per_gas, read_chain_id, read_da_fee, read_kernel_version,
     read_last_info_per_level_timestamp, read_last_info_per_level_timestamp_stats,
-    read_minimum_base_fee_per_gas, read_tracer_input, store_base_fee_per_gas,
-    store_chain_id, store_da_fee, store_kernel_version, store_storage_version,
-    STORAGE_VERSION, STORAGE_VERSION_PATH,
+    read_logs_verbosity, read_minimum_base_fee_per_gas, read_tracer_input,
+    store_base_fee_per_gas, store_chain_id, store_da_fee, store_kernel_version,
+    store_storage_version, STORAGE_VERSION, STORAGE_VERSION_PATH,
 };
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_ethereum::block::BlockFees;
-use tezos_evm_logging::{
-    log,
-    Level::{self, *},
-    Verbosity,
-};
+use tezos_evm_logging::{log, Level::*, Verbosity};
 use tezos_evm_runtime::runtime::{KernelHost, Runtime};
 use tezos_evm_runtime::safe_storage::WORLD_STATE_PATH;
 use tezos_smart_rollup::entrypoint;
@@ -321,10 +317,11 @@ pub fn kernel_loop<Host: tezos_smart_rollup_host::runtime::Runtime>(host: &mut H
     // shouldn't be called in tests as it won't use `MockInternal` for the
     // internal runtime.
     let internal_storage = tezos_evm_runtime::internal_runtime::InternalHost();
+    let logs_verbosity = read_logs_verbosity(host);
     let mut host = KernelHost {
         host,
         internal: internal_storage,
-        logs_verbosity: Level::default(),
+        logs_verbosity,
         _pd: PhantomData::<Host>,
     };
 
