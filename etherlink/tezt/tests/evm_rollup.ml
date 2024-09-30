@@ -36,12 +36,12 @@ module Protocol = struct
   let register_test =
     Protocol.register_test ~additional_tags:(function
         | Alpha -> []
-        | _ -> [Tag.slow])
+        | _ -> [Tag.extra])
 
   let register_regression_test =
     Protocol.register_regression_test ~additional_tags:(function
         | Alpha -> []
-        | _ -> [Tag.slow])
+        | _ -> [Tag.extra])
 end
 
 let pvm_kind = "wasm_2_0_0"
