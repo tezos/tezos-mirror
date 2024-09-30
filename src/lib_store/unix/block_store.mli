@@ -212,7 +212,7 @@ val resulting_context_hash :
 
 (** [read_block block_store ~read_metadata key] reads the block [key]
     in [block_store] if present. Return [None] if the block is
-    unknown. If [read_metadata] is set to [true] it tries to retreive
+    unknown. If [read_metadata] is set to [true] it tries to retrieve
     the metadata but do not fail if it is not available. *)
 val read_block :
   block_store -> read_metadata:bool -> key -> Block_repr.t option tzresult Lwt.t
@@ -264,21 +264,19 @@ val move_floating_store :
     in [block_store] to finish if any. *)
 val await_merging : block_store -> unit Lwt.t
 
-(**
-   (* TODO UPDATE MERGE DOC *)
-   [merge_stores block_store ?finalizer ~nb_blocks_to_preserve
-    ~history_mode ~from_block ~to_block] triggers a merge as described
-    in the above description. This will result, {b asynchronously},
-    in:
+(** [merge_stores block_store ~on_error ~finalizer ~history_mode
+    ~new_head ~new_head_metadata ~cementing_highwatermark
+    ~disable_context_pruning] triggers a merge as described in the
+    above description. This will result, {b asynchronously}, in:
 
-    - the cementing (if needs be) of a cycle from [from_block] to
-      [to_block] (included)
+    - the cementing (if needs be) of a cycle from [new_head] to
+    [cementing_highwatermark] (included)
 
-    - trimming the floating stores and preserves [to_block] -
-      [nb_blocks_to_preserve] blocks (iff these blocks are present or
-      the longest suffix otherwise) along with their metadata in the
-      floating store. It may potentially have duplicates in the
-      cemented block store.
+    - trimming the floating stores and preserves blocks (iff these
+    blocks are present or the longest suffix otherwise) along with
+    their metadata in the floating store, depending on the
+    [last_preserved_block_level] from the [new_head_metadata]. It may
+    potentially have duplicates in the cemented block store.
 
     After the cementing, {!Cemented_block_store.trigger_gc} will be
     called with the given [history_mode]. When the merging thread
@@ -288,6 +286,10 @@ val await_merging : block_store -> unit Lwt.t
 
     If a merge thread is already occurring, this function will first
     wait for the previous merge to be done.
+
+    [on_error] is called as soon as an error occurs during the
+    [merge_stores]. It is typically used to unlock resources that are
+    locked during the [finalizer] call to avoid deadlocks.
 
     {b Warning} For a given [block_store], the caller must wait for
     this function termination before calling it again or it may result
@@ -349,8 +351,8 @@ val unlock_block_store : t -> unit Lwt.t
 
 (** [sync ?last_status block_store] updates the [block_store] internal
     file descriptors so that the return block store points to the
-    latest fds. This is useful to keep track of a block store opened
-    in readonly mode that is updated by another read/write
+    latest values. This is useful to keep track of a block store
+    opened in readonly mode that is updated by another read/write
     instance.
     If [last_status] is provided, it gives a hint about the previous
     sync call and may avoid unnecessary synchronizations. As a result,
@@ -394,5 +396,5 @@ val may_recover_merge : block_store -> unit tzresult Lwt.t
 val stat_metadata_cycles :
   t -> (string * metadata_stat list) list tzresult Lwt.t
 
-(** Upgrade the block_store_status *)
+(** Upgrade the block_store_status. *)
 val v_3_1_upgrade : [`Chain_dir] Naming.directory -> unit tzresult Lwt.t
