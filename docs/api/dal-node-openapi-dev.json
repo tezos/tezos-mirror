@@ -3,7 +3,7 @@
   "info": {
     "title": "Octez DAL Node RPC",
     "description": "The RPC API for the Octez DAL node.",
-    "version": "Octez 21.0~beta11+dev (2209c392)"
+    "version": "Octez 21.0~beta11+dev (39e8de63)"
   },
   "paths": {
     "/health": {
@@ -126,7 +126,7 @@
     },
     "/levels/{int32}/slots/{int}/content": {
       "get": {
-        "description": "Retrieve the content of the slot associated with the given commitment.",
+        "description": "Retrieve the content of the slot whose id is given.",
         "parameters": [
           {
             "name": "int32",
