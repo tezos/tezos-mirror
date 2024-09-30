@@ -101,7 +101,7 @@ might be introduced, a different selection mechanism may be used, the quorum
 requirement might differ, etc.
 
 
-.. _voting_power_quebeca:
+.. _voting_power_qena:
 
 Voting Power
 ------------
@@ -112,8 +112,8 @@ all its delegators (including the delegate itself of course), no
 matter whether they are :doc:`staked<staking>` or not.
 
 More precisely, the voting power of a delegate during a voting period
-is the sum of its :ref:`total_staked<total_staked_quebeca>` and
-:ref:`total_delegated<total_delegated_quebeca>` amounts, measured in
+is the sum of its :ref:`total_staked<total_staked_qena>` and
+:ref:`total_delegated<total_delegated_qena>` amounts, measured in
 *mutez*, and snapshotted at the beginning of the voting period. (Note
 the differences from the validator selection for consensus, which is
 based on the more complex :doc:`baking power<baking_power>` instead,
@@ -157,7 +157,7 @@ Note that Pass ballots do not count towards or against the super-majority;
 they still counts towards participation and quorum.
 
 More details can be found in the file
-:src:`src/proto_021_PsquebeC/lib_protocol/amendment.ml`.
+:src:`src/proto_021_PtQenaB1/lib_protocol/amendment.ml`.
 
 
 The Hash and the Protocol
@@ -255,7 +255,7 @@ above, the quorum is adaptive and that low participation would lower the
 quorum of the next vote.
 
 More details on the operations can be found in
-:src:`src/proto_021_PsquebeC/lib_protocol/operation_repr.ml`.
+:src:`src/proto_021_PtQenaB1/lib_protocol/operation_repr.ml`.
 The binary format is described by
 ``octez-client describe unsigned operation``.
 
@@ -345,7 +345,7 @@ Further details and explanations on the voting procedure can be found at:
 - `Tezos Governance <https://www.tezosagora.org/learn#an-introduction-to-tezos-governance>`_ on Tezos Agora.
 
 For more details on the client commands refer to the manual at
-:ref:`client_manual_quebeca`.
+:ref:`client_manual_qena`.
 
 For vote related RPCs check the :doc:`rpc` under the prefix
 ``votes/``.

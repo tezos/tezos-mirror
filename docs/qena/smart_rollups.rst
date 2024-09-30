@@ -143,7 +143,7 @@ the Layer 1 pushes one final internal message “End of
 level”. Similarly to “Start of level“, this internal message does not
 come with any payload.
 
-.. _reveal_data_channel_smart_rollups_quebeca:
+.. _reveal_data_channel_smart_rollups_qena:
 
 Reveal data channel
 """""""""""""""""""
@@ -179,7 +179,7 @@ A smart rollup is characterized by:
 - the Michelson type of the entrypoint used by Layer 1 smart contracts
 to send internal messages to it, and
 - an optional list of addresses used as a white-list of allowed
-committers (see :ref:`private_rollups_quebeca`).
+committers (see :ref:`private_rollups_qena`).
 
 All these characteristics are provided when originating a new smart
 rollup.
@@ -207,7 +207,7 @@ implements the exact same semantics as the PVM. The PVM is only ever
 used by the rollup node when it needs to produce a proof during the
 last step of the refutation mechanism.
 
-.. _commitments_quebeca:
+.. _commitments_qena:
 
 Commitments
 ^^^^^^^^^^^
@@ -276,7 +276,7 @@ to avoid type confusion: namely, a kernel transferring a tuple that
 the Layer 1 interprets as a ticket. Lastly, the outbox message can
 contain a white-list update. This message can only be executed for a
 rollup that is private since its origination (see
-:ref:`private_rollups_quebeca`).
+:ref:`private_rollups_qena`).
 
 Refutation
 ^^^^^^^^^^
@@ -326,7 +326,7 @@ published a concurrent commitment. However, assuming the existence of
 an honest participant *H*, then *H* will start the refutation game with all
 concurrent committers to avoid the rollup getting stuck.
 
-.. _private_rollups_quebeca:
+.. _private_rollups_qena:
 
 Private rollups
 ^^^^^^^^^^^^^^^

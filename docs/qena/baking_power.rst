@@ -3,23 +3,23 @@ Baking Power
 
 The :doc:`proof-of-stake<proof_of_stake>` mechanism used for the
 :doc:`consensus algorithm<consensus>` assigns baking and attesting
-:ref:`slots<slots_quebeca>`, called **baking rights**, to each
-:ref:`delegate a.k.a. baker<def_delegate_quebeca>`. For this selection
+:ref:`slots<slots_qena>`, called **baking rights**, to each
+:ref:`delegate a.k.a. baker<def_delegate_qena>`. For this selection
 process, each baker is weighted according to its **baking power** --
-provided that it is :ref:`active<active_delegate_quebeca>` and meets the
+provided that it is :ref:`active<active_delegate_qena>` and meets the
 :ref:`minimal power and own staked
-requirements<minimal_baking_power_quebeca>`.
+requirements<minimal_baking_power_qena>`.
 
 This page details how this baking power is determined from the
 :doc:`staked<staking>` and non-staked funds owned by the baker itself
 and all its delegators.
 
 Note that the :doc:`amendment and voting process<voting>` is based on
-each delegate's :ref:`voting power<voting_power_quebeca>` instead, which
+each delegate's :ref:`voting power<voting_power_qena>` instead, which
 is computed in a similar but simpler way.
 
 
-.. _RPC_path_shortcut_quebeca:
+.. _RPC_path_shortcut_qena:
 
 .. note::
 
@@ -33,18 +33,18 @@ is computed in a similar but simpler way.
   :ref:`changelog<delegates_RPCs_normalization>` for more information.
 
 
-.. _baking_power_overview_quebeca:
+.. _baking_power_overview_qena:
 
 Overview
 --------
 
-At the end of :ref:`cycle<def_cycle_quebeca>` ``n`` (that is, the
+At the end of :ref:`cycle<def_cycle_qena>` ``n`` (that is, the
 beginning of cycle ``n + 1``), the protocol :doc:`randomly
 generates<randomness_generation>` the baking rights for cycle ``n +
 1 + CONSENSUS_RIGHTS_DELAY = n + 3``, using the **current baking
 power** as the weight for each delegate that meets the
-:ref:`requirements<minimal_baking_power_quebeca>`. (``CONSENSUS_RIGHTS_DELAY
-= 2`` is a :ref:`protocol constant<cs_constants_quebeca>`.)
+:ref:`requirements<minimal_baking_power_qena>`. (``CONSENSUS_RIGHTS_DELAY
+= 2`` is a :ref:`protocol constant<cs_constants_qena>`.)
 
 The ``.../delegates/<delegate_pkh>/baking_power`` RPC can be used to
 retrieve the current baking power of a delegate, that is, its baking
@@ -68,9 +68,9 @@ Delegate, delegators, stakers
 -----------------------------
 
 A **delegate**, a.k.a. **baker**, is a :ref:`user
-account<user_accounts_quebeca>` that has registered as a delegate by
+account<user_accounts_qena>` that has registered as a delegate by
 emitting a self-``delegation`` :ref:`manager
-operation<manager_operations_quebeca>`. The list of all registered
+operation<manager_operations_qena>`. The list of all registered
 delegates is queried with the ``.../delegates`` RPC.
 
 A **delegator** for a given baker is an :doc:`account<accounts>` that
@@ -81,7 +81,7 @@ delegate is queried with the
 ``.../delegates/<delegate_pkh>/delegators`` RPC.
 
 A **staker** is a delegator that has :doc:`staked<staking>` tez by
-emitting a :ref:`stake operation<staked_funds_management_quebeca>`. This
+emitting a :ref:`stake operation<staked_funds_management_qena>`. This
 includes the delegate itself if it has staked funds. Note that stakers
 are always user accounts, because smart contracts cannot emit
 ``stake`` operations. The list of a delegate's stakers and their
@@ -92,7 +92,7 @@ An **external delegator** (resp. **external staker**) is a delegator
 (resp. staker) that is not the delegate itself.
 
 
-.. _total_staked_quebeca:
+.. _total_staked_qena:
 
 Staked tez
 ----------
@@ -100,7 +100,7 @@ Staked tez
 Delegates and delegators have the option to :doc:`stake<staking>`
 their tez. **Staked tez** contribute to the baking power, but they
 also function as a security deposit for baking, meaning that they may
-be :ref:`slashed<slashing_quebeca>` if the delegate misbehaves. That's
+be :ref:`slashed<slashing_qena>` if the delegate misbehaves. That's
 why they are also known as **frozen deposits**.
 
 The **staked balance** of an account is its amount of staked tez. It
@@ -153,13 +153,13 @@ tez. It is the sum of the following balances:
   requests**. These tez have been removed from the staked balance via
   an ``unstake`` operation, but have not been added back to the
   spendable balance yet; see
-  :ref:`staked_funds_management_quebeca`. Unstake requests can be
+  :ref:`staked_funds_management_qena`. Unstake requests can be
   queried with RPC ``.../contracts/<contract_id>/unstake_requests``
   (returns a detailed view with unfinalizable/finalizable status,
   delegate-at-creation-time, cycle, and amount in mutez).
 
 - The **frozen bonds** are a deposit for :ref:`rollup
-  commitments<commitments_quebeca>`. They can be queried with RPC
+  commitments<commitments_qena>`. They can be queried with RPC
   ``.../contracts/<contract_id>/frozen_bonds`` (in mutez).
 
 Together, the staked and delegated tez represent all the tez owned by
@@ -172,7 +172,7 @@ an account, called the **full balance**.
   full_balance = staked + delegated
 
 
-.. _total_delegated_quebeca:
+.. _total_delegated_qena:
 
 Delegated tez to a baker
 ^^^^^^^^^^^^^^^^^^^^^^^^
@@ -224,7 +224,7 @@ For a given delegate, we define the following:
 
   total_delegated = own_delegated + external_delegated
 
-.. _min_delegated_quebeca:
+.. _min_delegated_qena:
 
 Min-delegated-in-current-cycle
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -236,7 +236,7 @@ cycle** ``n``, called ``min_delegated_in_current_cycle``. The purpose
 of this mechanism is to prevent any manipulation of baking rights
 through short-duration transfers. (Note that such a mechanism is not
 needed for staked tez because they are inherently :ref:`frozen for at
-least four cycles<staked_funds_management_quebeca>`, so short-duration
+least four cycles<staked_funds_management_qena>`, so short-duration
 staking is already not possible.)
 
 In the Paris protocol, the considered minimum is the minimum at any
@@ -390,13 +390,13 @@ here we use tez for simplicity.
     (min: ``900``, level: ``200``).
 
 
-.. _overstaking_quebeca:
+.. _overstaking_qena:
 
 Overstaking
 -----------
 
 The **limit_of_staking_over_baking** is a :ref:`configurable delegate
-parameter<staking_policy_configuration_quebeca>` that limits how much
+parameter<staking_policy_configuration_qena>` that limits how much
 staked tez the external stakers can contribute to the baking power,
 relative to the baker's own staked tez. It defaults to ``0``, meaning
 no staked contribution from external stakers at all. It can be set to
@@ -458,8 +458,8 @@ contributes to ensuring that all baking rights are covered by
 appropriate security deposits.
 
 Recall that the delegated amount used for baking rights is
-:ref:`min_delegated_in_current_cycle<min_delegated_quebeca>`, and any
-:ref:`overstaked<overstaking_quebeca>` tez count as delegated
+:ref:`min_delegated_in_current_cycle<min_delegated_qena>`, and any
+:ref:`overstaked<overstaking_qena>` tez count as delegated
 too. Therefore:
 
 .. code-block:: python
@@ -467,14 +467,14 @@ too. Therefore:
   total_delegated_after_limits = min(min_delegated_in_current_cycle + overstaked, own_staked * 9)
 
 We finally have everything we need to compute the baking power
-:ref:`as defined above<baking_power_overview_quebeca>`:
+:ref:`as defined above<baking_power_overview_qena>`:
 
 .. code-block:: python
 
   baking_power = total_staked_after_limits + 0.5 * total_delegated_after_limits
 
 
-.. _minimal_baking_power_quebeca:
+.. _minimal_baking_power_qena:
 
 Minimal power and own staked requirements
 -----------------------------------------
@@ -484,10 +484,10 @@ requirements:
 
 - ``baking_power >= MINIMAL_STAKE``
 - ``own_staked >= MINIMAL_FROZEN_STAKE``
-- The delegate must be :ref:`active<active_delegate_quebeca>`
+- The delegate must be :ref:`active<active_delegate_qena>`
 
 where ``MINIMAL_STAKE = 6,000ꜩ`` and ``MINIMAL_FROZEN_STAKE = 600ꜩ``
-are :ref:`protocol constants<cs_constants_quebeca>`.
+are :ref:`protocol constants<cs_constants_qena>`.
 
 If any of these conditions is not met at the end of cycle ``n``, the delegate
 still has a *baking power* as computed above, but receives no *baking
