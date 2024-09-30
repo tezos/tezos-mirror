@@ -249,13 +249,19 @@ let () =
 
 (** {3 Scheduled pipelines} *)
 
+(* All jobs in scheduled pipelines have "interruptible: false"
+   to prevent them from being canceled after a push to master.
+   Instead of modifying the definition of each job, we override the value
+   with [with_interruptible]. *)
 let () =
   let open Pipeline in
   let open Rules in
   register
     "schedule_extended_test"
     schedule_extended_tests
-    ~jobs:(Code_verification.jobs Schedule_extended_test)
+    ~jobs:
+      (Code_verification.jobs Schedule_extended_test
+      |> List.map (with_interruptible false))
     ~description:
       "Scheduled, full version of 'before_merging', daily on 'master'.\n\n\
        This pipeline unconditionally executes all jobs in 'before_merging' \
@@ -266,7 +272,8 @@ let () =
   register
     "schedule_extended_rpc_test"
     schedule_extended_rpc_tests
-    ~jobs:Custom_extended_test_pipeline.jobs
+    ~jobs:
+      (Custom_extended_test_pipeline.jobs |> List.map (with_interruptible false))
     ~description:
       "Scheduled run of all tezt tests with external RPC servers, weekly on \
        'master'.\n\n\
@@ -275,7 +282,8 @@ let () =
   register
     "schedule_extended_validation_test"
     schedule_extended_validation_tests
-    ~jobs:Custom_extended_test_pipeline.jobs
+    ~jobs:
+      (Custom_extended_test_pipeline.jobs |> List.map (with_interruptible false))
     ~description:
       "Scheduled run of all tezt tests with single-process validation, weekly \
        on 'master'.\n\n\

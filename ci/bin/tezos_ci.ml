@@ -795,11 +795,14 @@ let trigger_job ?(dependencies = Staged []) ?rules ~__POS__ ~stage
     image_builders = [];
   }
 
-let map_non_trigger_job ~error_on_trigger (tezos_job : tezos_job)
+let map_non_trigger_job ?error_on_trigger (tezos_job : tezos_job)
     (f : Gitlab_ci.Types.job -> Gitlab_ci.Types.job) : tezos_job =
   match tezos_job.job with
   | Job job -> {tezos_job with job = Job (f job)}
-  | _ -> failwith "%s" error_on_trigger
+  | _ -> (
+      match error_on_trigger with
+      | None -> tezos_job
+      | Some error_on_trigger -> failwith "%s" error_on_trigger)
 
 let add_artifacts ?name ?expose_as ?reports ?expire_in ?when_ paths
     (tezos_job : tezos_job) =
@@ -1016,3 +1019,10 @@ let append_after_script script tezos_job =
   @@ fun job ->
   let after_script = Option.value ~default:[] job.after_script in
   {job with after_script = Some (after_script @ script)}
+
+(* The reason we don't use [error_on_trigger] here is that this is intended to be
+   used with [List.map] on a whole pipeline, and it's just more convenient to
+   not have to filter out the trigger job to then put it back. *)
+let with_interruptible value tezos_job =
+  map_non_trigger_job tezos_job @@ fun job ->
+  {job with interruptible = Some value}
