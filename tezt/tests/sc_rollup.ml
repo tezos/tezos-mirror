@@ -44,7 +44,7 @@ open Sc_rollup_helpers
 
 let default_wasm_pvm_revision = function
   | Protocol.Alpha -> "2.0.0-r5"
-  | Protocol.Quebeca -> "2.0.0-r5"
+  | Protocol.Qena -> "2.0.0-r5"
   | ParisC -> "2.0.0-r4"
 
 let max_nb_ticks = 50_000_000_000_000

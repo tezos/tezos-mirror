@@ -186,7 +186,7 @@ let run ?event_level ?event_sections_levels (baker : t) =
       baker.persistent_state.liquidity_baking_toggle_vote
   in
   let force_apply_from_round =
-    (* From Quebec, the flag --force-apply has been replaced by
+    (* From Qena, the flag --force-apply has been replaced by
        --force-apply-from-round, the following maintains back-compatibility with
        ParisC tests. *)
     if
