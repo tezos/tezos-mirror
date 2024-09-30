@@ -25,13 +25,13 @@
 (*****************************************************************************)
 
 (* Declaration order must respect the version order. *)
-type t = Quebeca | ParisC | Alpha
+type t = Qena | ParisC | Alpha
 
-let all = [Quebeca; ParisC; Alpha]
+let all = [Qena; ParisC; Alpha]
 
 let encoding =
   Data_encoding.string_enum
-    [("parisc", ParisC); ("alpha", Alpha); ("quebeca", Quebeca)]
+    [("parisc", ParisC); ("alpha", Alpha); ("qena", Qena)]
 
 type constants =
   | Constants_sandbox
@@ -45,15 +45,12 @@ let constants_to_string = function
   | Constants_mainnet_with_chain_id -> "mainnet-with-chain-id"
   | Constants_test -> "test"
 
-let name = function
-  | Alpha -> "Alpha"
-  | Quebeca -> "Quebeca"
-  | ParisC -> "Parisc"
+let name = function Alpha -> "Alpha" | Qena -> "Qena" | ParisC -> "Parisc"
 
-let number = function ParisC -> 020 | Quebeca -> 021 | Alpha -> 022
+let number = function ParisC -> 020 | Qena -> 021 | Alpha -> 022
 
 let directory = function
-  | Quebeca -> "proto_021_PsquebeC"
+  | Qena -> "proto_021_PtQenaB1"
   | Alpha -> "proto_alpha"
   | ParisC -> "proto_020_PsParisC"
 
@@ -63,7 +60,7 @@ let tag protocol = String.lowercase_ascii (name protocol)
 let hash = function
   | Alpha -> "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
   | ParisC -> "PsParisCZo7KAh1Z1smVd9ZMZ1HHn5gkzbM94V3PLCpknFWhUAi"
-  | Quebeca -> "PsquebeCaYyvBEESCaXL8B8Tn8BcEhps2Zke1xMVtyr7X4qMfxT"
+  | Qena -> "PtQenaB1PqFEfTe2og7bZTaPvMw2CxRyDFEwWNj3GiWp9ba4bJd"
 (* DO NOT REMOVE, AUTOMATICALLY ADD STABILISED PROTOCOL HASH HERE *)
 
 let genesis_hash = "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im"
@@ -275,8 +272,8 @@ let write_parameter_file :
   Lwt.return output_file
 
 let previous_protocol = function
-  | Alpha -> Some Quebeca
-  | Quebeca -> Some ParisC
+  | Alpha -> Some Qena
+  | Qena -> Some ParisC
   | ParisC -> None
 
 let has_predecessor p = previous_protocol p <> None
