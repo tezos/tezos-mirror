@@ -194,23 +194,24 @@ type feature_test_registration =
       extra_tags_with : string list;
       extra_tags_without : string list;
     }
-    (* We want at most one variant of the test in the CI, the
-       [extra_tags_with] and [extra_tags_without] fields allow to select
-       which one by passing [Tag.ci_disabled] or [Tag.slow] to the case
-       which should not run in CI. *)
+    (* We want at most one variant of the test in MR CI, the
+       [extra_tags_with] and [extra_tags_without] fields allow to
+       select which one by passing [Tag.ci_disabled] or
+       [Tag.extra] to the case which should not run in
+       MR CI. *)
 [@@warning "-unused-constructor"]
 
 let default_threshold_encryption_registration =
   Register_both {extra_tags_with = [Tag.ci_disabled]; extra_tags_without = []}
 
 let default_dal_registration =
-  Register_both {extra_tags_with = [Tag.slow]; extra_tags_without = []}
+  Register_both {extra_tags_with = [Tag.extra]; extra_tags_without = []}
 
 let ci_enabled_dal_registration =
   Register_both {extra_tags_with = []; extra_tags_without = []}
 
 let default_multichain_registration =
-  Register_both {extra_tags_with = [Tag.slow]; extra_tags_without = []}
+  Register_both {extra_tags_with = [Tag.extra]; extra_tags_without = []}
 
 let register_sandbox ?tx_pool_tx_per_addr_limit ~title ?set_account_code
     ?da_fee_per_byte ?minimum_base_fee_per_gas ~tags ?patch_config ?websockets
