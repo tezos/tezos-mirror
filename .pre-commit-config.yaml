@@ -13,6 +13,11 @@ repos:
     hooks:
       - id: shellcheck
         args: [ "--external-sources" ]
+  - repo: https://github.com/google/go-jsonnet
+    rev: v0.20.0
+    hooks:
+      - id: jsonnet-format
+      - id: jsonnet-lint
   - repo: https://github.com/cisagov/pre-commit-shfmt
     rev: v0.0.2
     hooks:
