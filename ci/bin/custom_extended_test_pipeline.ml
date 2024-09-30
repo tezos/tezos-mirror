@@ -109,6 +109,18 @@ let jobs =
       ~dependencies
       ()
   in
+  let tezt_extra : tezos_job =
+    Tezt.job
+      ~__POS__
+      ~name:"tezt-extra"
+      ~tezt_tests:(Tezt.tests_tag_selector ~extra:true [Not (Has_tag "flaky")])
+      ~tezt_variant:"-extra"
+      ~retry:2
+      ~tezt_parallel:6
+      ~parallel:(Vector 10)
+      ~dependencies
+      ()
+  in
   let tezt_flaky : tezos_job =
     (* Runs tests tagged "flaky" [Tag.flaky].
 
@@ -135,6 +147,7 @@ let jobs =
     tezt;
     tezt_time_sensitive;
     tezt_slow;
+    tezt_extra;
     tezt_flaky;
     job_build_x86_64_release;
     job_build_x86_64_exp_dev_extra;

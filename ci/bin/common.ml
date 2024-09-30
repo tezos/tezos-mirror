@@ -1050,7 +1050,7 @@ module Tezt = struct
     It returns a TSL expression that:
     - always deselects tags with [ci_disabled];
     - selects, respectively deselects, the tests with the tags
-      [time_sensitive], [slow] or [cloud],
+      [time_sensitive], [slow], [extra] or [cloud],
       depending on the value of the corresponding function argument.
       These arguments all default to false.
 
@@ -1059,12 +1059,14 @@ module Tezt = struct
     The list of TSL expressions [and_] are appended to the final
     selector, allowing to modify the selection further. *)
   let tests_tag_selector ?(time_sensitive = false) ?(slow = false)
-      ?(cloud = false) (and_ : Tezt_core.TSL_AST.t list) : Tezt_core.TSL_AST.t =
+      ?(extra = false) ?(cloud = false) (and_ : Tezt_core.TSL_AST.t list) :
+      Tezt_core.TSL_AST.t =
     let tags =
       [
         (false, "ci_disabled");
         (time_sensitive, "time_sensitive");
         (slow, "slow");
+        (extra, "extra");
         (cloud, "cloud");
       ]
     in

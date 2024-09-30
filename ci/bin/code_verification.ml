@@ -1000,7 +1000,7 @@ let jobs pipeline_type =
              ~source_version:true
                (* TODO: https://gitlab.com/tezos/tezos/-/issues/5026
                   As observed for the `unit:js_components` running `npm i`
-                  everytime we run a job is inefficient.
+                  every time we run a job is inefficient.
 
                   The benefit of this approach is that we specify node version
                   and npm dependencies (package.json) in one place, and that the local
@@ -1471,30 +1471,32 @@ let jobs pipeline_type =
     in
     (* Tezt jobs.
 
-       The Tezt jobs are split into a set of special-purpose jobs running the
-       tests of the corresponding tag:
-       - [tezt-time_sensitive]: runs the jobs with tag [time_sensitive];
-       - [tezt-slow]: runs the jobs with tag [slow];
-       - [tezt-flaky]: runs the jobs with tag [flaky] and
-          none of the tags above;
+              The Tezt jobs are split into a set of special-purpose jobs running the
+              tests of the corresponding tag:
+              - [tezt-time_sensitive]: runs the jobs with tag [time_sensitive];
+              - [tezt-slow]: runs the jobs with tag [slow];
+              - [tezt-extra]: runs the jobs with tag [extra] not tagged
+                 as [flaky].
+              - [tezt-flaky]: runs the jobs with tag [flaky] and
+                 none of the tags above;
 
-       and a job [tezt] that runs all remaining tests (excepting those
-       that are tagged [ci_disabled], that are disabled in the CI.)
+              and a job [tezt] that runs all remaining tests (excepting those
+              that are tagged [ci_disabled], that are disabled in the CI.)
 
-       There is an implicit rule that the Tezt tags [time_sensitive],
-       [slow] and [cloud] are mutually exclusive.
-       The [flaky] tag is not exclusive to these tags.
-       If e.g. a test has both tags [slow] and [flaky], it will run in
-       [tezt-slow], to prevent flaky tests to run in the [tezt-flaky]
-       job if they also have another special tag. Tests tagged [cloud] are
-       meant to be used with Tezt cloud (see [tezt/lib_cloud/README.md]) and
-       do not run in the CI.
+              There is an implicit rule that the Tezt tags [time_sensitive],
+              [slow], [extra] and [cloud] are mutually exclusive.
+              The [flaky] tag is not exclusive to these tags.
+              If e.g. a test has both tags [slow] and [flaky], it will run in
+              [tezt-slow], to prevent flaky tests to run in the [tezt-flaky]
+              job if they also have another special tag. Tests tagged [cloud] are
+              meant to be used with Tezt cloud (see [tezt/lib_cloud/README.md]) and
+              do not run in the CI.
 
-       For more information on tags, see [src/lib_test/tag.mli].
+              For more information on tags, see [src/lib_test/tag.mli].
 
-       Important: the [Custom_test_extended_pipeline.jobs] function
-       declares a set of jobs that must match the ones defined
-       below. Please update the jobs accordingly.
+              Important: the [Custom_test_extended_pipeline.jobs] function
+              declares a set of jobs that must match the ones defined
+              below. Please update the jobs accordingly.
     *)
     let jobs_tezt =
       let dependencies =
@@ -1582,6 +1584,21 @@ let jobs pipeline_type =
           ?job_select_tezts
           ()
       in
+      let tezt_extra : tezos_job =
+        Tezt.job
+          ~__POS__
+          ~name:"tezt-extra"
+          ~rules:rules_manual
+          ~tezt_tests:
+            (Tezt.tests_tag_selector ~extra:true [Not (Has_tag "flaky")])
+          ~tezt_variant:"-extra"
+          ~retry:2
+          ~tezt_parallel:6
+          ~parallel:(Vector 10)
+          ~dependencies
+          ?job_select_tezts
+          ()
+      in
       let tezt_flaky : tezos_job =
         (* Runs tests tagged "flaky" [Tag.flaky].
 
@@ -1628,7 +1645,14 @@ let jobs pipeline_type =
           ~before_script:(before_script ["mv octez-binaries/x86_64/octez-* ."])
           ()
       in
-      [tezt; tezt_time_sensitive; tezt_slow; tezt_flaky; tezt_static_binaries]
+      [
+        tezt;
+        tezt_time_sensitive;
+        tezt_slow;
+        tezt_extra;
+        tezt_flaky;
+        tezt_static_binaries;
+      ]
     in
     let jobs_sdk_rust : tezos_job list =
       let job_test_sdk_rust =
