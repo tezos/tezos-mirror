@@ -89,6 +89,7 @@ module Types = struct
        directly these messages, this is done through callbacks. *)
     synchronisation_state : Synchronisation_heuristic.Bootstrapping.t;
     valid_block_input : Store.Block.t Lwt_watcher.input;
+    received_block_input : Block_hash.t Lwt_watcher.input;
     new_head_input : (Block_hash.t * Block_header.t) Lwt_watcher.input;
     mutable child : (state * (unit -> unit Lwt.t (* shutdown *))) option;
     prevalidator : Prevalidator.t option ref;
@@ -572,10 +573,11 @@ let on_notify_head w peer_id (block_hash, header) mempool =
         Block_hash.(
           Store.Block.hash current_head = block_hash
           || Store.Block.predecessor current_head = block_hash)
-    then
+    then (
+      Lwt_watcher.notify nv.received_block_input block_hash ;
       with_activated_peer_validator w peer_id (fun pv ->
           Peer_validator.notify_head pv block_hash header ;
-          return_ok_unit)
+          return_ok_unit))
     else return_ok_unit
   in
   match r with
@@ -806,6 +808,7 @@ let on_launch w _ parameters =
   let open Lwt_result_syntax in
   let* () = may_load_protocols parameters in
   let valid_block_input = Lwt_watcher.create_input () in
+  let received_block_input = Lwt_watcher.create_input () in
   let new_head_input = Lwt_watcher.create_input () in
   let notify_branch peer_id locator =
     Worker.Queue.push_request_now w (Notify_branch (peer_id, locator))
@@ -858,6 +861,7 @@ let on_launch w _ parameters =
       parameters;
       chain_db;
       valid_block_input;
+      received_block_input;
       new_head_input;
       synchronisation_state;
       active_peers = P2p_peer.Error_table.create 50;
@@ -1052,6 +1056,10 @@ let force_bootstrapped w b =
 let valid_block_watcher w =
   let {valid_block_input; _} = Worker.state w in
   Lwt_watcher.create_stream valid_block_input
+
+let received_block_watcher w =
+  let {received_block_input; _} = Worker.state w in
+  Lwt_watcher.create_stream received_block_input
 
 let new_head_watcher w =
   let {new_head_input; _} = Worker.state w in
