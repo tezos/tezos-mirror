@@ -50,7 +50,7 @@ the new safety net.
 
 Not applying round 1 -- 2 block proposals by default while creating
 them will allow for faster propagation and earlier consensus
-agreement. See `here <../../quebeca/cli-commands.html#baker-manual>`__
+agreement. See :ref:`here <baker_manual_quebeca>`
 for further details on how bakers can fine-tune this parameter.
 
 DAL node
