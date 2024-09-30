@@ -1663,6 +1663,18 @@ oc.test-liquidity-baking-scripts:
   script:
   - ./scripts/ci/test_liquidity_baking_scripts.sh
 
+oc:scripts:release_script_values:
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  interruptible: false
+  script:
+  - scripts/ci/test_release_values.sh
+
 test_kernels:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
   stage: test

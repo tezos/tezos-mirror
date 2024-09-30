@@ -19,11 +19,11 @@ set -eu
 
 if [ $# -lt 2 ]; then
   cat << EOF
-Usage: $0 <DISTRIBUTION> <RELEASE..>
+Usage: $0 <DISTRIBUTION> <RELEASES..>
 
 <DISTRIBUTION>: The linux distribution, eg. debian or ubuntu
 
-<RELEASE>: The release of the Linux distribution, e.g. 'jammy', 'noble', 'bookworm'.
+<RELEASES>: The release of the Linux distribution, e.g. 'jammy', 'noble', 'bookworm'.
 This argument can be repeated to build for multiple releases.
 
 Set the ARCHITECTURES env variable of packages built for
@@ -52,50 +52,29 @@ BUCKET="$GCP_LINUX_PACKAGES_BUCKET"
 
 oldPWD=$PWD
 
-# check if it's a real or a test release or we are testing
-# the packages in a branch
-if [ -n "${CI_COMMIT_TAG:-}" ]; then
-  # shellcheck source=./scripts/ci/octez-release.sh
-  . ./scripts/ci/octez-release.sh
-fi
+. scripts/ci/octez-packages-version.sh
 
-#This logic must be kept in sync with the installation tests scripts in
-# docs/introduction/install-bin-deb.sh
-
-# if it's a release tag, then it can be a RC release or a final release
-if [ -n "${gitlab_release_no_v:-}" ]; then
-  # It a release tag, this can be either a real or test release
-  if [ -n "${gitlab_release_rc_version}" ]; then
-    # Release candidate
-    TARGETDIR="public/$PREFIX/RC/$DISTRIBUTION"
-  else
-    # Release
-    TARGETDIR="public/$PREFIX/$DISTRIBUTION"
-  fi
-else
-  if [ "$CI_COMMIT_REF_PROTECTED" = "false" ]; then
-    if [ "$CI_COMMIT_REF_NAME" = "RC" ]; then
-      echo "Cannot create a repository for a branch named 'RC'"
-      exit 1
-    else
-      # Branch is not protected, this is for testing ordinary MRs
-      TARGETDIR="public/$PREFIX/$CI_COMMIT_REF_NAME/$DISTRIBUTION"
-    fi
-  else
-    # For protected branches that are not release, we allow
-    # a repository only for master.
-    if [ "$CI_COMMIT_REF_NAME" = "master" ]; then
-      TARGETDIR="public/$PREFIX/master/$DISTRIBUTION"
-    else
-      if [ -n "${CI_COMMIT_TAG}" ]; then
-        TARGETDIR="public/$PREFIX/${CI_COMMIT_TAG}/$DISTRIBUTION"
-      else
-        echo "Cannot create a repository for a protected branch that is not associated to a tag or master"
-        exit 1
-      fi
-    fi
-  fi
-fi
+case "$RELEASETYPE" in
+ReleaseCandidate | TestReleaseCandidate)
+  TARGETDIR="public/$PREFIX/RC/$DISTRIBUTION"
+  ;;
+Release | TestRelease)
+  TARGETDIR="public/$PREFIX/$DISTRIBUTION"
+  ;;
+Master)
+  TARGETDIR="public/$PREFIX/master/$DISTRIBUTION"
+  ;;
+SoftRelease)
+  TARGETDIR="public/$PREFIX/${CI_COMMIT_TAG}/$DISTRIBUTION"
+  ;;
+TestBranch)
+  TARGETDIR="public/$PREFIX/$CI_COMMIT_REF_NAME/$DISTRIBUTION"
+  ;;
+*)
+  echo "Cannot create a repository for this branch"
+  exit 1
+  ;;
+esac
 
 if [ "$CI_PROJECT_NAMESPACE" = "tezos" ] && [ "$CI_COMMIT_REF_PROTECTED" = "true" ]; then
   # the keys used for official releases only
