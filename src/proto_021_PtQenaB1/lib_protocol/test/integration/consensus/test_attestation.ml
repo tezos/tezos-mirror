@@ -692,7 +692,7 @@ let test_attester_not_in_dal_committee () =
   let n = 10 in
   let bootstrap_balances = bal_low :: Stdlib.List.init n (fun _ -> bal_high) in
   let dal =
-    Tezos_protocol_021_PsquebeC_parameters.Default_parameters.constants_sandbox
+    Tezos_protocol_021_PtQenaB1_parameters.Default_parameters.constants_sandbox
       .dal
   in
   let dal =

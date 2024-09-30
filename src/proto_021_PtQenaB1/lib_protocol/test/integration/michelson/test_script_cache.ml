@@ -351,7 +351,7 @@ let test_size_adds_entries_sizes () =
 
 *)
 let defined_size_limit =
-  Tezos_protocol_021_PsquebeC_parameters.Default_parameters.constants_mainnet
+  Tezos_protocol_021_PtQenaB1_parameters.Default_parameters.constants_mainnet
     .cache_script_size
 
 let test_size_limit_is_in_constants_repr () =

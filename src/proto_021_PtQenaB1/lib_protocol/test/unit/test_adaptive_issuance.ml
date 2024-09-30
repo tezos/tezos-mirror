@@ -455,9 +455,7 @@ let test_compute_min_max () =
     f ~reward_params ~launch_cycle ~new_cycle
   in
   let compute_min = compute_aux ~f:compute_min in
-  let compute_max =
-    compute_aux ~f:(compute_max ~issuance_ratio_min:Q.zero)
-  in
+  let compute_max = compute_aux ~f:(compute_max ~issuance_ratio_min:Q.zero) in
   let assert_eq_on_interval ~loc ~f ~from ~to_ expected =
     assert (List.length expected = to_ - from + 1) ;
     let actual = Stdlib.List.init (to_ - from + 1) (fun i -> f (i + from)) in
