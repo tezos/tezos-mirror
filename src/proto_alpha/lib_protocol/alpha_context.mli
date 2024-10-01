@@ -2321,6 +2321,12 @@ module Delegate : sig
     attesting_power:int ->
     context tzresult Lwt.t
 
+  val record_dal_participation :
+    context ->
+    delegate:Signature.Public_key_hash.t ->
+    number_of_attested_slots:int ->
+    context tzresult Lwt.t
+
   val current_frozen_deposits :
     context -> public_key_hash -> Tez.t tzresult Lwt.t
 

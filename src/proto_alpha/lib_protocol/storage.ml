@@ -286,6 +286,14 @@ module Contract = struct
       end)
       (Missed_attestations_info)
 
+  module Attested_dal_slots =
+    Indexed_context.Make_map
+      (Registered)
+      (struct
+        let name = ["attested_dal_slots"]
+      end)
+      (Encoding.Int32)
+
   module Manager =
     Indexed_context.Make_map
       (Registered)

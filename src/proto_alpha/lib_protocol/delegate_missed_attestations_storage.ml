@@ -108,6 +108,24 @@ let record_attesting_participation ctxt ~delegate ~participation
                 contract
                 {remaining_slots; missed_levels = 1}))
 
+let record_dal_participation ctxt ~delegate ~number_of_attested_slots =
+  let open Lwt_result_syntax in
+  if Compare.Int.(number_of_attested_slots = 0) then return ctxt
+  else
+    let contract = Contract_repr.Implicit delegate in
+    let* result = Storage.Contract.Attested_dal_slots.find ctxt contract in
+    match result with
+    | Some already_attested_slots ->
+        Storage.Contract.Attested_dal_slots.update
+          ctxt
+          contract
+          Int32.(add already_attested_slots (of_int number_of_attested_slots))
+    | None ->
+        Storage.Contract.Attested_dal_slots.init
+          ctxt
+          contract
+          (Int32.of_int number_of_attested_slots)
+
 let record_baking_activity_and_pay_rewards_and_fees ctxt ~payload_producer
     ~block_producer ~baking_reward ~reward_bonus =
   let open Lwt_result_syntax in
@@ -155,6 +173,16 @@ let check_and_reset_delegate_participation ctxt delegate =
   | Some missed_attestations ->
       let*! ctxt = Storage.Contract.Missed_attestations.remove ctxt contract in
       return (ctxt, Compare.Int.(missed_attestations.remaining_slots >= 0))
+
+let get_and_reset_delegate_dal_participation ctxt delegate =
+  let open Lwt_result_syntax in
+  let contract = Contract_repr.Implicit delegate in
+  let* result = Storage.Contract.Attested_dal_slots.find ctxt contract in
+  match result with
+  | None -> return (ctxt, 0l)
+  | Some num_slots ->
+      let*! ctxt = Storage.Contract.Attested_dal_slots.remove ctxt contract in
+      return (ctxt, num_slots)
 
 module For_RPC = struct
   type participation_info = {

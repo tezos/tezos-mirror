@@ -2764,7 +2764,9 @@ let are_attestations_required ctxt ~level =
   let level_position_in_protocol = Raw_level.diff level first_level in
   Compare.Int32.(level_position_in_protocol > 1l)
 
-let record_attesting_participation ctxt =
+(* It also records participation in the DAL. *)
+let record_attesting_participation ctxt dal_attestation =
+  let open Lwt_result_syntax in
   match Consensus.allowed_attestations ctxt with
   | None -> tzfail (Consensus.Slot_map_not_found {loc = __LOC__})
   | Some validators ->
@@ -2777,11 +2779,18 @@ let record_attesting_participation ctxt =
               Delegate.Participated
             else Delegate.Didn't_participate
           in
-          Delegate.record_attesting_participation
+          let* ctxt =
+            Delegate.record_attesting_participation
+              ctxt
+              ~delegate:consensus_pk.delegate
+              ~participation
+              ~attesting_power:power
+          in
+          Dal_apply.record_dal_participation
             ctxt
-            ~delegate:consensus_pk.delegate
-            ~participation
-            ~attesting_power:power)
+            consensus_pk.delegate
+            initial_slot
+            dal_attestation)
         validators
         ctxt
 
@@ -3000,9 +3009,10 @@ let finalize_application ctxt block_data_contents ~round ~predecessor_hash
     | Some nonce_hash ->
         Nonce.record_hash ctxt {nonce_hash; delegate = block_producer.delegate}
   in
+  let* ctxt, dal_attestation = Dal_apply.finalisation ctxt in
   let* ctxt, reward_bonus =
     if required_attestations then
-      let* ctxt = record_attesting_participation ctxt in
+      let* ctxt = record_attesting_participation ctxt dal_attestation in
       let*? rewards_bonus =
         Baking.bonus_baking_reward ctxt ~attestation_power
       in
@@ -3027,7 +3037,6 @@ let finalize_application ctxt block_data_contents ~round ~predecessor_hash
     may_start_new_cycle ctxt
   in
   let* ctxt = Amendment.may_start_new_voting_period ctxt in
-  let* ctxt, dal_attestation = Dal_apply.finalisation ctxt in
   let* ctxt = Sc_rollup.Inbox.finalize_inbox_level ctxt in
   let balance_updates =
     migration_balance_updates @ baking_receipts @ cycle_end_balance_updates

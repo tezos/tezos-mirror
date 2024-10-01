@@ -99,6 +99,23 @@ let apply_publish_commitment ctxt operation ~source =
   let* ctxt = Dal.Slot.register_slot_header ctxt slot_header ~source in
   return (ctxt, slot_header)
 
+let record_dal_participation ctxt delegate tb_slot dal_attestation =
+  let open Lwt_result_syntax in
+  let*? () = Dal.assert_feature_enabled ctxt in
+  Dal.only_if_incentives_enabled
+    ctxt
+    ~default:(fun ctxt -> return ctxt)
+    (fun ctxt ->
+      let number_of_attested_slots =
+        match Slot.Map.find_opt tb_slot (Dal.Attestation.attestations ctxt) with
+        | None -> 0
+        | Some delegate_attestation ->
+            Dal.Attestation.(
+              intersection dal_attestation delegate_attestation
+              |> number_of_attested_slots)
+      in
+      Delegate.record_dal_participation ctxt ~delegate ~number_of_attested_slots)
+
 let finalisation ctxt =
   let open Lwt_result_syntax in
   Dal.only_if_feature_enabled

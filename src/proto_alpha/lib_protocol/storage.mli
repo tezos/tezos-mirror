@@ -140,6 +140,14 @@ module Contract : sig
        and type value = missed_attestations_info
        and type t := Raw_context.t
 
+  (** The number of protocol-attested DAL slots attested by a delegate during a
+      cycle. *)
+  module Attested_dal_slots :
+    Indexed_data_storage
+      with type key = Contract_repr.t
+       and type value = Int32.t
+       and type t := Raw_context.t
+
   (** The manager of a contract *)
   module Manager :
     Indexed_data_storage_with_local_context
