@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2023 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -94,6 +95,8 @@ pub trait MainMemoryLayout: backend::Layout {
 
     /// Clone the dynamic region.
     fn clone_data<M: backend::ManagerClone>(data: &Self::Data<M>) -> Self::Data<M>;
+
+    fn hash_data<M: ManagerSerialise>(data: &Self::Data<M>) -> Result<Hash, HashError>;
 }
 
 impl<const BYTES: usize> MainMemoryLayout for Sizes<BYTES> {
@@ -159,6 +162,10 @@ impl<const BYTES: usize> MainMemoryLayout for Sizes<BYTES> {
 
     fn clone_data<M: backend::ManagerClone>(data: &Self::Data<M>) -> Self::Data<M> {
         data.clone()
+    }
+
+    fn hash_data<M: ManagerSerialise>(data: &Self::Data<M>) -> Result<Hash, HashError> {
+        data.hash()
     }
 }
 
@@ -286,9 +293,8 @@ where
 }
 
 impl<L: MainMemoryLayout, M: ManagerSerialise> RootHashable for MainMemory<L, M> {
-    // TODO RV-230: Finer-grained hashing for memory
     fn hash(&self) -> Result<Hash, HashError> {
-        Hash::blake2b_hash(self)
+        L::hash_data(&self.data)
     }
 }
 

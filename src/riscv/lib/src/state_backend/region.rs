@@ -1,12 +1,16 @@
 // SPDX-FileCopyrightText: 2023 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
 
+use crate::storage::binary;
+
 use super::{
-    hash::{Hash, HashError, RootHashable},
+    hash::{self, Hash, HashError, HashWriter, RootHashable},
     AllocatedOf, Array, Atom, Elem, ManagerBase, ManagerClone, ManagerDeserialise, ManagerRead,
     ManagerReadWrite, ManagerSerialise, ManagerWrite, Ref,
 };
+use std::num::NonZeroUsize;
 
 /// Single element of type `E`
 #[repr(transparent)]
@@ -492,9 +496,18 @@ impl<'de, const LEN: usize, M: ManagerDeserialise> serde::Deserialize<'de> for D
     }
 }
 
+// SAFETY: This constant is non-zero.
+const MERKLE_LEAF_SIZE: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(4096) };
+const MERKLE_ARITY: usize = 3;
+
 impl<const LEN: usize, M: ManagerSerialise> RootHashable for DynCells<LEN, M> {
     fn hash(&self) -> Result<Hash, HashError> {
-        Hash::blake2b_hash(self)
+        let hashes = {
+            let mut writer = HashWriter::new(MERKLE_LEAF_SIZE);
+            binary::serialise_into(&self, &mut writer)?;
+            writer.finalise()?
+        };
+        hash::build_custom_merkle_hash(MERKLE_ARITY, hashes)
     }
 }
 
