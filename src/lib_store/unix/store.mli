@@ -1017,15 +1017,8 @@ module Chain_traversal : sig
     (Block.t * Block.t list) Lwt.t
 end
 
-(** Upgrade a v_2 to v_3 store by rewriting the block store and the
-    protocol level's table.
-
-    {b Warning} Not backward-compatible. *)
-val v_3_0_upgrade : store_dir:string -> Genesis.t -> unit tzresult Lwt.t
-
 (** Potentially upgrade to v_3 and then upgrade the block_store_status in v_3_1. *)
-val v_3_1_upgrade :
-  store_dir:string -> Genesis.t -> upgrade_to_v3:bool -> unit tzresult Lwt.t
+val v_3_1_upgrade : store_dir:string -> Genesis.t -> unit tzresult Lwt.t
 
 (**/**)
 

@@ -374,16 +374,5 @@ val close : block_store -> unit Lwt.t
    [block_store] where the merge procedure was interrupted. *)
 val may_recover_merge : block_store -> unit tzresult Lwt.t
 
-(** Upgrade a v_2 to v_3 block store by retrieving
-    [resulting_context_hash] of all blocks present in the floating
-    stores and updating their index.
-
-    {b Warning} Not backward-compatible. *)
-val v_3_0_upgrade :
-  [`Chain_dir] Naming.directory ->
-  cleanups:(unit -> unit Lwt.t) list ref ->
-  finalizers:(unit -> unit Lwt.t) list ref ->
-  unit tzresult Lwt.t
-
 (** Upgrade the block_store_status *)
 val v_3_1_upgrade : [`Chain_dir] Naming.directory -> unit tzresult Lwt.t
