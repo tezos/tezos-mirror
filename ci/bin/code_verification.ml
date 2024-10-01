@@ -169,10 +169,8 @@ module Opam = struct
            ~batch_index
            ())
       ~variables:
-        [
-          (* See [.gitlab-ci.yml] for details on [RUNTEZTALIAS] *)
-          ("RUNTEZTALIAS", "true");
-        ]
+        (* See [variables] in [main.ml] for details on [RUNTEZTALIAS] *)
+        [("RUNTEZTALIAS", "true")]
       ~parallel:(Matrix [[("package", packages)]])
       ~before_script:
         (before_script ~eval_opam:true ["mkdir -p $CI_PROJECT_DIR/opam_logs"])
