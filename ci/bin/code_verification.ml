@@ -325,11 +325,11 @@ let jobs pipeline_type =
         in
         ([], make_dependencies)
     | Before_merging | Merge_train ->
-        (* Define the [start] job
+        (* Define the [start] job.
 
-           §1: The purpose of this job is to launch the CI manually in certain cases.
-           The objective is not to run computing when it is not
-           necessary and the decision to do so belongs to the developer
+           The purpose of this job is to implement a manual trigger
+           for [Before_merging] pipelines, instead of running it on
+           each update to the merge request.
 
            §2: We also perform some fast sanity checks. *)
         let job_start =
