@@ -557,6 +557,7 @@ val empty_mempool_file : ?filename:string -> unit -> string
     If you want to wait until the node switches its head to the baked block,
     consider using {!bake_for_and_wait} below. *)
 val bake_for :
+  ?env:string String_map.t ->
   ?endpoint:endpoint ->
   ?protocol:Protocol.t ->
   ?keys:string list ->
@@ -588,6 +589,7 @@ val bake_for :
     @param level_before If provided, check that the node is at this
     level before baking. *)
 val bake_for_and_wait :
+  ?env:string String_map.t ->
   ?endpoint:endpoint ->
   ?protocol:Protocol.t ->
   ?keys:string list ->
@@ -609,6 +611,7 @@ val bake_for_and_wait :
 
 (** Same as {!bake_for_and_wait}, but return the new level. *)
 val bake_for_and_wait_level :
+  ?env:string String_map.t ->
   ?endpoint:endpoint ->
   ?protocol:Protocol.t ->
   ?keys:string list ->
@@ -631,6 +634,7 @@ val bake_for_and_wait_level :
 
 (** Same as [bake_for], but do not wait for the process to exit. *)
 val spawn_bake_for :
+  ?env:string String_map.t ->
   ?endpoint:endpoint ->
   ?protocol:Protocol.t ->
   ?keys:string list ->
@@ -803,6 +807,7 @@ val spawn_activate_account :
 
 (** Run [octez-client transfer amount from giver to receiver]. *)
 val transfer :
+  ?env:string String_map.t ->
   ?hooks:Process.hooks ->
   ?log_output:bool ->
   ?endpoint:endpoint ->
@@ -1143,6 +1148,7 @@ val drain_delegate :
 
     Avoid this function when using [originate_contract_at] is possible. *)
 val originate_contract :
+  ?env:string String_map.t ->
   ?hooks:Process.hooks ->
   ?log_output:bool ->
   ?endpoint:endpoint ->
@@ -1161,6 +1167,7 @@ val originate_contract :
 
 (** Same as [originate_contract], but do not wait for the process to exit. *)
 val spawn_originate_contract :
+  ?env:string String_map.t ->
   ?hooks:Process.hooks ->
   ?log_output:bool ->
   ?endpoint:endpoint ->
