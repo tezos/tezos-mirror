@@ -57,6 +57,29 @@ module Term = struct
     & pos 0 (some (parser, printer)) None
     & info [] ~docv:"UPGRADE" ~doc
 
+  let upgrade_status ~data_dir = Data_version.upgrade_status data_dir
+
+  let run_upgrade ~data_dir ~sandbox_file (config : Config_file.t) =
+    let open Lwt_result_syntax in
+    let* sandbox_parameters =
+      match (config.blockchain_network.genesis_parameters, sandbox_file) with
+      | None, None -> return_none
+      | Some parameters, None ->
+          return_some (parameters.context_key, parameters.values)
+      | _, Some filename -> (
+          let*! r = Lwt_utils_unix.Json.read_file filename in
+          match r with
+          | Error _err ->
+              tzfail (Node_run_command.Invalid_sandbox_file filename)
+          | Ok json -> return_some ("sandbox_parameter", json))
+    in
+    let genesis = config.blockchain_network.genesis in
+    Data_version.upgrade_data_dir
+      ~data_dir
+      genesis
+      ~chain_name:config.blockchain_network.chain_name
+      ~sandbox_parameters
+
   let process subcommand data_dir config_file status sandbox_file =
     let run =
       let open Lwt_result_syntax in
@@ -81,30 +104,8 @@ module Term = struct
                            data_dir))))
               ~filename:(Data_version.lock_file data_dir)
               (fun () ->
-                let genesis = config.blockchain_network.genesis in
-                if status then Data_version.upgrade_status data_dir
-                else
-                  let* sandbox_parameters =
-                    match
-                      ( config.blockchain_network.genesis_parameters,
-                        sandbox_file )
-                    with
-                    | None, None -> return_none
-                    | Some parameters, None ->
-                        return_some (parameters.context_key, parameters.values)
-                    | _, Some filename -> (
-                        let*! r = Lwt_utils_unix.Json.read_file filename in
-                        match r with
-                        | Error _err ->
-                            tzfail
-                              (Node_run_command.Invalid_sandbox_file filename)
-                        | Ok json -> return_some ("sandbox_parameter", json))
-                  in
-                  Data_version.upgrade_data_dir
-                    ~data_dir
-                    genesis
-                    ~chain_name:config.blockchain_network.chain_name
-                    ~sandbox_parameters)
+                if status then upgrade_status ~data_dir
+                else run_upgrade ~data_dir ~sandbox_file config)
           in
           match r with
           | Error (Exn (Unix.Unix_error (Unix.ENOENT, _, _)) :: _) ->
