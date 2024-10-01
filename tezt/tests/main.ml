@@ -201,6 +201,7 @@ let register_protocol_tests_that_use_supports_correctly () =
   Sc_rollup.register ~protocols ;
   Self_address_transfer.register ~protocols ;
   Signer_test.register ~protocols ;
+  Storage_maintenance.register ~protocols ;
   Storage_reconstruction.register ~protocols ;
   Storage_snapshots.register ~protocols ;
   Stresstest_command.register ~protocols ;

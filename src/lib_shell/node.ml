@@ -216,7 +216,8 @@ let check_context_consistency store =
       let*! () = Node_event.(emit storage_corrupted_context_detected ()) in
       tzfail Non_recoverable_context
 
-let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess ~version
+let create ?(sandboxed = false) ?sandbox_parameters
+    ?(context_pruning = Storage_maintenance.Enabled) ~singleprocess ~version
     ~commit_info
     {
       genesis;
@@ -269,6 +270,7 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess ~version
           ~context_dir:context_root
           ~allow_testchains:start_testchain
           ~readonly:false
+          ~context_pruning
           genesis
       in
       let main_chain_store = Store.main_chain_store store in
@@ -310,6 +312,7 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess ~version
           ~context_dir:context_root
           ~allow_testchains:start_testchain
           ~readonly:false
+          ~context_pruning
           genesis
       in
       return (validator_process, store)

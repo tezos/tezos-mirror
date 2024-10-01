@@ -205,6 +205,10 @@ type chain_store
     @param block_cache_limit allows to override the size of the block
     cache to use. The minimal value is 1.
 
+    @param context_pruning specifies whether or not the context
+    pruning is expected to be run (if set to Enabled) or not (if set
+    to Disabled) during a storage maintenance.
+
     @param readonly a flag that, if set to true, prevent writing
     throughout the store {b and} context.
       Default: false
@@ -217,6 +221,7 @@ val init :
   ?history_mode:History_mode.t ->
   ?readonly:bool ->
   ?block_cache_limit:int ->
+  ?context_pruning:Storage_maintenance.context_pruning ->
   store_dir:string ->
   context_dir:string ->
   allow_testchains:bool ->
