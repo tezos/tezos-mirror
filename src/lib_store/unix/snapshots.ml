@@ -597,16 +597,17 @@ module Version = struct
        context (storage 2.0)
    * - 6: new context representation introduced by irmin 3.7.2
    * - 7: fix tar snapshots corrupted generation
+   * - 8: change cemented files offset format to 64 bits
    *)
 
   (* Used for old snapshot format versions *)
-  (* Keeping this for future use. *)
-  let _legacy_version = 4
+  let legacy_version = 7
 
-  let current_version = 7
+  let current_version = 8
 
   (* List of versions that are supported *)
-  let supported_versions = [(current_version, `Current)]
+  let supported_versions =
+    [(legacy_version, `Legacy_format); (current_version, `Current)]
 
   let is_supported version =
     match List.assq_opt version supported_versions with
@@ -614,8 +615,7 @@ module Version = struct
     | None -> false
 
   (* Returns true if the given version uses a legacy data format. *)
-  (* Keeping this for future use. *)
-  let _is_legacy_format version =
+  let is_legacy_format version =
     let open Lwt_result_syntax in
     match List.assq_opt version supported_versions with
     | None ->
@@ -975,6 +975,14 @@ module Onthefly : sig
   (* [copy_to_file tar file ~dst] copies the [file] from the [tar]
      into new file designated by [dst]. *)
   val copy_to_file : i -> file -> dst:string -> unit Lwt.t
+
+  (* [copy_and_upgrade_legacy_file tar filename ~dst ~nb_blocks] loads
+     the file [filename] from the given [tar], upgrades the [~nb_blocks] offset
+     bytes from a 32 to a 64-bit format (in case the snapshot uses a legacy
+     format) and then it copies the rest of the file in the [~dst] file.
+     TODO: this function should be removed when the upgrade is finished. *)
+  val copy_and_upgrade_legacy_file :
+    i -> file -> dst:string -> nb_blocks:int -> unit Lwt.t
 end = struct
   include Tar
 
@@ -1404,6 +1412,31 @@ end = struct
     Lwt.finalize
       (fun () -> copy_n tar.fd fd header.Tar.Header.file_size)
       (fun () -> Lwt_unix.close fd)
+
+  let copy_and_upgrade_legacy_file tar {header; data_ofs} ~dst ~nb_blocks =
+    let open Lwt_syntax in
+    let* _ = Lwt_unix.LargeFile.lseek tar.fd data_ofs SEEK_SET in
+    let* upgraded_fd =
+      Lwt_unix.openfile
+        dst
+        Unix.[O_WRONLY; O_CREAT; O_TRUNC]
+        snapshot_rw_file_perm
+    in
+    Lwt.finalize
+      (fun () ->
+        (* Should use the Cemented_block_store function - need to expose after merging MR (?) *)
+        let* bytes =
+          Cemented_block_store.get_and_upgrade_offsets tar.fd nb_blocks
+        in
+        (* Write the 64-bit offsets list into the new file *)
+        let block = Cstruct.of_bytes bytes in
+        let* () = Writer.really_write upgraded_fd block in
+        (* Copy the rest of the block file containing INITIAL_SIZE - 4 * NB_BLOCKS bytes. *)
+        let remaining_size =
+          Int64.(sub header.Tar.Header.file_size (of_int (4 * nb_blocks)))
+        in
+        copy_n tar.fd upgraded_fd remaining_size)
+      (fun () -> Lwt_unix.close upgraded_fd)
 end
 
 module type EXPORTER = sig
@@ -3213,18 +3246,75 @@ module Raw_importer : IMPORTER = struct
             else return_true)
       files
 
+  let copy_and_upgrade_legacy_file ~src ~dst ~file =
+    let open Lwt_result_syntax in
+    let*! fd = Lwt_unix.openfile src [Unix.O_RDONLY; O_CLOEXEC] 0o444 in
+    (* Destination *)
+    let*! upgraded_fd =
+      Lwt_unix.openfile dst [Unix.O_WRONLY; Unix.O_CREAT; Unix.O_TRUNC] 0o644
+    in
+    (* Total number of blocks stored in the cemented blocks file *)
+    let* nb_blocks =
+      match String.split_on_char '_' file with
+      | [x_str; y_str] ->
+          let x = int_of_string x_str in
+          let y = int_of_string y_str in
+          return (y - x + 1)
+      | _ -> tzfail (Invalid_cemented_file file)
+    in
+    Lwt.finalize
+      (fun () ->
+        let*! bytes =
+          Cemented_block_store.get_and_upgrade_offsets fd nb_blocks
+        in
+        (* Write the 64-bit offsets list into the new file *)
+        let*! () =
+          Lwt_utils_unix.write_bytes
+            ~pos:0
+            ~len:(8 * nb_blocks)
+            upgraded_fd
+            bytes
+        in
+        (* Copy the rest of the block file *)
+        let buffer = Bytes.create cemented_buffer_size in
+        let copy_bytes fd_in fd_out =
+          let rec loop () =
+            let*! bytes_read =
+              Lwt_unix.read fd_in buffer 0 cemented_buffer_size
+            in
+            if bytes_read = 0 then Lwt.return_unit
+            else
+              let*! _bytes_written =
+                Lwt_unix.write fd_out buffer 0 bytes_read
+              in
+              loop ()
+          in
+          loop ()
+        in
+        let*! () = copy_bytes fd upgraded_fd in
+        return_unit)
+      (fun () ->
+        let*! () = Lwt_unix.close fd in
+        let*! () = Lwt_unix.close upgraded_fd in
+        Lwt.return_unit)
+
   let restore_cemented_cycle t ~file =
-    let open Lwt_syntax in
+    let open Lwt_result_syntax in
     let src = Filename.concat (Naming.dir_path t.snapshot_cemented_dir) file in
     let dst = Filename.concat (Naming.dir_path t.dst_cemented_dir) file in
-    let* () =
-      Lwt_utils_unix.copy_file_raw
-        ~buffer_size:cemented_buffer_size
-        ~src
-        ~dst
-        ()
-    in
-    return_ok_unit
+    let* is_legacy_format = Version.is_legacy_format t.version in
+    if is_legacy_format then
+      (* Need to upgrade the offset format of cemented files from 32 to 64 bits. *)
+      copy_and_upgrade_legacy_file ~src ~dst ~file
+    else
+      let*! () =
+        Lwt_utils_unix.copy_file_raw
+          ~buffer_size:cemented_buffer_size
+          ~src
+          ~dst
+          ()
+      in
+      return_unit
 
   let restore_floating_blocks t genesis_hash =
     let open Lwt_result_syntax in
@@ -3540,16 +3630,39 @@ module Tar_importer : IMPORTER = struct
       | Some file -> return file
       | None -> tzfail (Cannot_read {kind = `Cemented_cycle; path = filename})
     in
-    let*! () =
-      Onthefly.copy_to_file
-        t.tar
-        tar_file
-        ~dst:
-          (Filename.concat
-             (Naming.dir_path t.dst_cemented_dir)
-             (Filename.basename file))
-    in
-    return_unit
+    let* is_legacy_format = Version.is_legacy_format t.version in
+    if is_legacy_format then
+      (* Need to upgrade the offset format of cemented files from 32 to 64 bits. *)
+      let* nb_blocks =
+        match String.split_on_char '_' file with
+        | [x_str; y_str] ->
+            let x = int_of_string x_str in
+            let y = int_of_string y_str in
+            return (y - x + 1)
+        | _ -> tzfail (Invalid_cemented_file file)
+      in
+      let*! () =
+        Onthefly.copy_and_upgrade_legacy_file
+          t.tar
+          tar_file
+          ~dst:
+            (Filename.concat
+               (Naming.dir_path t.dst_cemented_dir)
+               (Filename.basename file))
+          ~nb_blocks
+      in
+      return_unit
+    else
+      let*! () =
+        Onthefly.copy_to_file
+          t.tar
+          tar_file
+          ~dst:
+            (Filename.concat
+               (Naming.dir_path t.dst_cemented_dir)
+               (Filename.basename file))
+      in
+      return_unit
 
   let restore_floating_blocks t genesis_hash =
     let open Lwt_result_syntax in
@@ -3975,6 +4088,12 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
         (Snapshot_file_not_found snapshot_path)
     in
     let snapshot_version = Importer.snapshot_version snapshot_importer in
+    let* is_legacy_format = Version.is_legacy_format snapshot_version in
+    let*! () =
+      if is_legacy_format then
+        Store_events.(emit import_legacy_snapshot_version snapshot_version)
+      else Lwt.return_unit
+    in
     let snapshot_metadata = Importer.snapshot_metadata snapshot_importer in
     let* () =
       fail_unless
