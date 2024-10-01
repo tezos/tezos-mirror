@@ -362,6 +362,9 @@ let jobs pipeline_type =
         ~schedule_extended_test:(fun () -> Staged [])
     in
     let job_sanity_ci : tezos_job =
+      (* Quick, CI-related sanity checks.
+
+         Verifies that manifest and CIAO are up to date. *)
       job
         ~__POS__
         ~name:"sanity_ci"
@@ -375,6 +378,7 @@ let jobs pipeline_type =
           "make --silent -C ci check";
         ]
     in
+    (* Necromantic nix-related rites. *)
     let job_nix : tezos_job =
       job
         ~__POS__
