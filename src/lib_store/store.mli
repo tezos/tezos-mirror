@@ -210,6 +210,9 @@ type chain_store
     pruning is expected to be run (if set to Enabled) or not (if set
     to Disabled) during a storage maintenance.
 
+    @param maintenace_delay allows to introduce a delay prior to the
+    trigger of the storage maintenance
+
     @param readonly a flag that, if set to true, prevent writing
     throughout the store {b and} context.
       Default: false
@@ -223,6 +226,7 @@ val init :
   ?readonly:bool ->
   ?block_cache_limit:int ->
   ?context_pruning:Storage_maintenance.context_pruning ->
+  ?maintenance_delay:Storage_maintenance.delay ->
   store_dir:string ->
   context_dir:string ->
   allow_testchains:bool ->

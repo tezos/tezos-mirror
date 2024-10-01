@@ -101,26 +101,144 @@ let test_disabled_maintenance_delay =
   let* () = wait_merge in
   unit
 
-(* This is a temporary test to ensure that only the disabled mode is
-   implemented. *)
-let test_only_disabled_is_implemented =
+(* This test aims to check the behavior of the custom delayed storage
+   maintenance.  To do so, it will start 2 nodes, 1 with the delay set
+   to 2 and 1 without any delay and check the following behavior:
+
+                    regular_node           delayed_node
+    (A) LEVEL 1 : --------------------------------------
+         /\              |                       |
+    blocks_per_cycle     |                       |
+         \/              |                       |
+    (B) LEVEL 9 :  (storage maint.)              |
+         /\              |                       |
+     custom_delay        |                       |
+         \/              |                       |
+        LEVEL 11 :       |           (delayed storage maint.)
+         /\              |                       |
+   (blocks_per_cycle     |                       |
+          -              |                       |
+     custom_delay)       |                       |
+         \/              |                       |
+    (C) LEVEL 17 : (storage maint.)          (restart)
+         /\              |                       |
+     custom_delay        |                       |
+         \/              |                       |
+        LEVEL 19 :       |           (delayed storage maint.)
+         /\              |                       |
+   (blocks_per_cycle     |                       |
+          -              |                       |
+     custom_delay)       |                       |
+        LEVEL 25 : (storage maint.)   (restart + disable delay)
+        LEVEL 26 :       |                 (storage maint.)
+*)
+let test_custom_maintenance_delay =
   Protocol.register_test
     ~__FILE__
-    ~title:(Format.asprintf "storage maintenance allows disabled only")
-    ~tags:[team; "storage"; "maintenance"; "delay"; "enable"]
-    ~uses_client:false
-    ~uses_admin_client:false
-  @@ fun _protocol ->
-  let node = Node.create Node.[Synchronisation_threshold 0] in
-  let* () =
-    Node.spawn_config_update node [Storage_maintenance_delay "enabled"]
-    |> Process.check_error
-         ~msg:(rex "only supports \"disabled\" mode")
-         ~exit_code:124
+    ~title:(Format.asprintf "storage maintenance custom delay")
+    ~tags:[team; "storage"; "maintenance"; "delay"; "custom"]
+  @@ fun protocol ->
+  let custom_delay = 2 in
+  let* delayed_node =
+    Node.init
+      ~name:"delayed_node"
+      Node.
+        [
+          Synchronisation_threshold 0;
+          Storage_maintenance_delay (string_of_int custom_delay);
+        ]
   in
+  let* regular_node =
+    Node.init ~name:"regular_node" Node.[Synchronisation_threshold 0]
+  in
+  let* client = Client.init ~endpoint:(Node delayed_node) () in
+  let* () = Client.Admin.connect_address ~peer:regular_node client in
+  let* () =
+    Client.activate_protocol_and_wait ~protocol ~node:delayed_node client
+  in
+  let* (_ : int) = Node.wait_for_level regular_node 1 in
+  let blocks_per_cycle = 8 in
+  (* Step A: We bake enough blocks to trigger the first storage
+     maintenance. We expect the regular node to merge immediately and
+     the delayed node to merge after the given delay. *)
+  let merge_level_A = 1 in
+  let wait_delayed_storage_maintenance_A =
+    wait_for_complete_storage_maintenance delayed_node merge_level_A
+  in
+  let wait_regular_storage_maintenance_A =
+    wait_for_complete_storage_maintenance regular_node merge_level_A
+  in
+  let* () =
+    let nb = blocks_per_cycle in
+    Log.info "Baking %d blocks to trigger the regular storage maintenance" nb ;
+    bake_blocks delayed_node client ~blocks_to_bake:nb
+  in
+  Log.info "Waiting for the regular storage maintenance" ;
+  let* () = wait_regular_storage_maintenance_A in
+  let* () =
+    let nb = custom_delay in
+    Log.info "Baking %d blocks to trigger the delayed storage maintenance" nb ;
+    bake_blocks delayed_node client ~blocks_to_bake:nb
+  in
+  Log.info "Waiting for the delayed storage maintenance" ;
+  let* () = wait_delayed_storage_maintenance_A in
+  (* Step B: We bake enough blocks to trigger the delayed maintenance
+     but restart the node to check that the delay is maintained. *)
+  let merge_level_B = merge_level_A + blocks_per_cycle in
+  let wait_regular_storage_maintenance_B =
+    wait_for_complete_storage_maintenance regular_node merge_level_B
+  in
+  let* () =
+    let nb = blocks_per_cycle - custom_delay in
+    Log.info "Baking %d blocks to trigger the regular storage maintenance" nb ;
+    bake_blocks delayed_node client ~blocks_to_bake:nb
+  in
+  let* () = wait_regular_storage_maintenance_B in
+  Log.info "Restarting delayed storage maintenance node" ;
+  let* () = Node.terminate delayed_node in
+  let* () = Node.run delayed_node [] in
+  let* () = Node.wait_for_ready delayed_node in
+  let* () =
+    let nb = 1 in
+    Log.info
+      "Baking %d blocks should not trigger delayed storage maintenance"
+      nb ;
+    bake_blocks delayed_node client ~blocks_to_bake:nb
+  in
+  let wait_delayed_storage_maintenance_B =
+    wait_for_complete_storage_maintenance delayed_node merge_level_B
+  in
+  let* () =
+    let nb = 1 in
+    Log.info "Baking %d blocks should trigger delayed storage maintenance" nb ;
+    bake_blocks delayed_node client ~blocks_to_bake:nb
+  in
+  let* () = wait_delayed_storage_maintenance_B in
+  let merge_level_C = merge_level_B + blocks_per_cycle in
+  let* () =
+    let nb = blocks_per_cycle - custom_delay in
+    Log.info "Baking %d blocks to trigger the delayed storage maintenance" nb ;
+    bake_blocks delayed_node client ~blocks_to_bake:nb
+  in
+  Log.info "Restarting node and disable storage maintenance delay" ;
+  let* () = Node.terminate delayed_node in
+  let* () = Node.run delayed_node [Storage_maintenance_delay "disabled"] in
+  let* () = Node.wait_for_ready delayed_node in
+  let wait_delayed_storage_maintenance_C =
+    wait_for_complete_storage_maintenance delayed_node merge_level_C
+  in
+  let* () =
+    let nb = 1 in
+    Log.info
+      "Baking %d blocks should reset delayed storage maintenance and trigger \
+       the merge"
+      nb ;
+    bake_blocks delayed_node client ~blocks_to_bake:nb
+  in
+  let* () = wait_delayed_storage_maintenance_C in
   unit
 
 let register ~protocols =
   test_context_pruning_call protocols ;
   test_disabled_maintenance_delay protocols ;
-  test_only_disabled_is_implemented protocols
+  test_custom_maintenance_delay protocols

@@ -87,7 +87,7 @@ type t = {
     Shell_limits.operation_metadata_size_limit option;
       (** maximum operation metadata size allowed to be stored on disk *)
   context_pruning : Storage_maintenance.context_pruning option;
-  storage_maintenance_delay : Storage_maintenance.delay;
+  storage_maintenance_delay : Storage_maintenance.delay option;
 }
 
 val process_command : unit tzresult Lwt.t -> unit Cmdliner.Term.ret

@@ -81,7 +81,8 @@ let with_node f =
         Tezos_shell_services.Shell_limits.default_block_validator_limits
         Tezos_shell_services.Shell_limits.default_prevalidator_limits
         Tezos_shell_services.Shell_limits.default_chain_validator_limits
-        None
+        ?history_mode:None
+        ?maintenance_delay:None
     in
     f node
   in
