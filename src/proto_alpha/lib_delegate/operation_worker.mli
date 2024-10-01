@@ -23,8 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Launch processes to gather operations from the mempool and make them
-    available for the baker. *)
+(** The operation worker is responsible for listening to the node's mempool 
+    and collecting incoming operations in an accessible operation pool. Upon
+    request, it can monitor the (pre)quorum status for a given payload and
+    report its completion through the provided quorum stream.
+
+    Only one payload quorum or prequorum can be monitored at a time; new
+    monitoring requests override the previous one.
+*)
 
 open Protocol
 open Alpha_context
@@ -68,6 +74,11 @@ val get_quorum_event_stream : t -> event Lwt_stream.t
 
 (** {1 Observers} *)
 
+(** [monitor_preattestation_quorum state threshold get_slot_voting_power candidate]
+    Register [candidate] as the currently monitored payload, overriding any other
+    prequorum or quorum payload. Completion of the prequorum is signaled through the
+    quorum event stream.
+*)
 val monitor_preattestation_quorum :
   t ->
   consensus_threshold:int ->
@@ -75,6 +86,11 @@ val monitor_preattestation_quorum :
   candidate ->
   unit Lwt.t
 
+(** [monitor_attestation_quorum state threshold get_slot_voting_power candidate]
+    Register [candidate] as the currently monitored payload, overriding any other
+    prequorum or quorum payload. Completion of the quorum is signaled through the
+    quorum event stream.
+*)
 val monitor_attestation_quorum :
   t ->
   consensus_threshold:int ->
@@ -82,6 +98,12 @@ val monitor_attestation_quorum :
   candidate ->
   unit Lwt.t
 
+(** [cancel_monitoring state] removes current monitored payload.
+    Does nothing if no payload is being monitored.
+*)
 val cancel_monitoring : t -> unit
 
+(** [shutdown_worker state] closes the monitor_operations stream and
+    removes current monitored payload.
+*)
 val shutdown_worker : t -> (unit, exn list) result Lwt.t
