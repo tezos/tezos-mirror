@@ -307,16 +307,17 @@ module Events = struct
       ()
 
   let upgrade_status =
-    declare_2
+    declare_3
       ~section
       ~level:Notice
       ~name:"upgrade_status"
       ~msg:
-        "current version: {current_version}, available version: \
-         {available_version}"
-      ~pp1:Version.pp
-      ("current_version", Version.encoding)
+        "available upgrade: {available_upgrade}. Current version: \
+         {current_version}, available version: {available_version}"
+      ("available_upgrade", Data_encoding.bool)
       ~pp2:Version.pp
+      ("current_version", Version.encoding)
+      ~pp3:Version.pp
       ("available_version", Version.encoding)
 
   let emit = emit
@@ -449,8 +450,12 @@ let ensure_data_dir ?(mode = Is_compatible) genesis data_dir =
   | Some (version, _) ->
       tzfail (Invalid_data_dir_version (current_version, version))
 
-let upgrade_status data_dir =
+let upgrade_status ~data_dir =
   let open Lwt_result_syntax in
   let* data_dir_version = read_version_file (version_file data_dir) in
-  let*! () = Events.(emit upgrade_status (data_dir_version, current_version)) in
-  return_unit
+  let available_upgrade = Version.(data_dir_version < current_version) in
+  let*! () =
+    Events.(
+      emit upgrade_status (available_upgrade, data_dir_version, current_version))
+  in
+  return available_upgrade

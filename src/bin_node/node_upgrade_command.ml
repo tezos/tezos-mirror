@@ -57,7 +57,10 @@ module Term = struct
     & pos 0 (some (parser, printer)) None
     & info [] ~docv:"UPGRADE" ~doc
 
-  let upgrade_status ~data_dir = Data_version.upgrade_status data_dir
+  let upgrade_status ~data_dir =
+    let open Lwt_result_syntax in
+    let* _available_upgrade = Data_version.upgrade_status ~data_dir in
+    return_unit
 
   let run_upgrade ~data_dir ~sandbox_file (config : Config_file.t) =
     let open Lwt_result_syntax in
