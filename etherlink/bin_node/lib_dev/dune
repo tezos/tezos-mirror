@@ -31,6 +31,7 @@
   octez-l2-libs.layer2_store
   octez-l2-libs.smart-rollup
   octez-evm-node-libs.evm_node_migrations
+  octez-evm-node-libs.evm_node_kernels
   octez-libs.prometheus-app
   tezos-dal-node-services)
  (flags

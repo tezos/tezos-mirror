@@ -25,6 +25,17 @@ let shutdown =
     ~level:Info
     ()
 
+let reconstruct_replace_mainnet_kernel =
+  declare_0
+    ~section
+    ~name:"reconstruct_replace_mainnet_kernel"
+    ~msg:"Replacing initial mainnet kernel"
+    ~level:Info
+    ()
+
+let reconstruct_replace_mainnet_kernel () =
+  emit reconstruct_replace_mainnet_kernel ()
+
 let ready () = emit ready ()
 
 let shutdown () = emit shutdown ()

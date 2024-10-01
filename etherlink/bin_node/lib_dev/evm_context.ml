@@ -122,7 +122,6 @@ module Request = struct
     | Earliest_state : (Evm_state.t option, tztrace) t
     | Earliest_number : (Ethereum_types.quantity option, tztrace) t
     | Reconstruct : {
-        reconstruct_from_boot_sector : string;
         rollup_node_data_dir : string;
         genesis_level : int32;
         finalized_level : int32;
@@ -270,28 +269,16 @@ module Request = struct
         case
           (Tag 12)
           ~title:"Reconstruct"
-          (obj5
+          (obj4
              (req "request" (constant "reconstruct"))
-             (req "reconstruct_from_boot_sector" string)
              (req "rollup_node_data_dir" string)
              (req "genesis_level" int32)
              (req "finalized_level" int32))
           (function
             | View
                 (Reconstruct
-                  {
-                    reconstruct_from_boot_sector;
-                    rollup_node_data_dir;
-                    genesis_level;
-                    finalized_level;
-                    _;
-                  }) ->
-                Some
-                  ( (),
-                    reconstruct_from_boot_sector,
-                    rollup_node_data_dir,
-                    genesis_level,
-                    finalized_level )
+                  {rollup_node_data_dir; genesis_level; finalized_level; _}) ->
+                Some ((), rollup_node_data_dir, genesis_level, finalized_level)
             | _ -> None)
           (fun _ ->
             assert false
@@ -1109,9 +1096,30 @@ module State = struct
          found in the storage. *)
       return (current_block_number, evm_state)
 
-  let reconstruct_history ctxt ~reconstruct_from_boot_sector
-      ~rollup_node_data_dir ~genesis_level ~finalized_level ~levels_to_hashes
-      ~l2_blocks =
+  (** If we are reconstructing mainnet, the initial kernel is not
+      sufficient.  We need to override the kernel with an additional
+      patch that allows the compatibility with the reconstruct.
+
+      We determine if the replacement is needed based on the smart rollup
+      address. *)
+  let replace_mainnet_kernel_if_needed ctxt evm_state =
+    let open Lwt_result_syntax in
+    if
+      ctxt.smart_rollup_address
+      = Address.of_b58check_exn "sr1Ghq66tYK9y3r8CC1Tf8i8m5nxh8nTvZEf"
+    then
+      let*! () = Evm_context_events.reconstruct_replace_mainnet_kernel () in
+      let*! evm_state =
+        Evm_state.modify
+          ~key:"/kernel/boot.wasm"
+          ~value:Evm_node_kernels.mainnet_initial_kernel_reconstruct_compatible
+          evm_state
+      in
+      return evm_state
+    else return evm_state
+
+  let reconstruct_history ctxt ~rollup_node_data_dir ~genesis_level
+      ~finalized_level ~levels_to_hashes ~l2_blocks =
     let open Lwt_result_syntax in
     (* Smart Rollups do not process messages of genesis level. *)
     let first_level = Int32.succ genesis_level in
@@ -1126,9 +1134,10 @@ module State = struct
     in
 
     let config = pvm_config ctxt in
-    let rec go ~current_block_number evm_state tezos_level =
+    let rec go ~count_progress ~current_block_number evm_state tezos_level =
       if tezos_level > finalized_level then return_unit
       else
+        let*! () = count_progress 1 in
         let* messages = messages_of_level tezos_level in
         (* For now we use the mocked sol, ipl and eol of the debugger. *)
         let messages =
@@ -1171,11 +1180,11 @@ module State = struct
             (* Otherwise just move to the next tezos level. *)
             return (current_block_number, evm_state)
         in
-        go ~current_block_number evm_state (Int32.succ tezos_level)
-    in
-    (* Create a fresh evm state where the blocks will be applied one by one. *)
-    let* fresh_evm_state =
-      Evm_state.init ~kernel:reconstruct_from_boot_sector
+        go
+          ~count_progress
+          ~current_block_number
+          evm_state
+          (Int32.succ tezos_level)
     in
     (* We perform a first reboot to reveal the kernel. *)
     let* evm_state =
@@ -1183,13 +1192,21 @@ module State = struct
         ~data_dir:ctxt.data_dir
         ~log_file:"reconstruct"
         ~config
-        fresh_evm_state
+        ctxt.session.evm_state
         []
     in
+    let* evm_state = replace_mainnet_kernel_if_needed ctxt evm_state in
     let*! evm_state =
       Evm_state.modify ~key:"/__at_most_one_block" ~value:"" evm_state
     in
-    go ~current_block_number:Z.(pred zero) evm_state first_level
+    let total =
+      Int32.sub finalized_level first_level |> Int32.to_int |> Int.succ
+    in
+    let progress_bar =
+      Progress_bar.progress_bar ~counter:`Int ~message:"Reconstructing" total
+    in
+    Progress_bar.Lwt.with_reporter progress_bar @@ fun count_progress ->
+    go ~count_progress ~current_block_number:Z.(pred zero) evm_state first_level
 
   let wasm_pvm_version (ctxt : t) =
     let open Lwt_result_syntax in
@@ -1386,7 +1403,6 @@ module Handlers = struct
         | None -> return_none)
     | Reconstruct
         {
-          reconstruct_from_boot_sector;
           rollup_node_data_dir;
           genesis_level;
           finalized_level;
@@ -1397,7 +1413,6 @@ module Handlers = struct
         let ctxt = Worker.state self in
         State.reconstruct_history
           ctxt
-          ~reconstruct_from_boot_sector
           ~rollup_node_data_dir
           ~genesis_level
           ~finalized_level
@@ -1524,7 +1539,18 @@ let start ?kernel_path ~data_dir ~preimages ~preimages_endpoint
   let*! () = Evm_context_events.ready () in
   return init_status
 
-let init_context_from_rollup_node ~data_dir ~rollup_node_data_dir =
+let rollup_node_metadata ~rollup_node_data_dir =
+  let open Lwt_result_syntax in
+  let* metadata =
+    Metadata.Versioned.read_metadata_file ~dir:rollup_node_data_dir
+  in
+  match metadata with
+  | None -> failwith "missing metadata in the rollup node data dir"
+  | Some (V0 _) -> failwith "metadata has version 0, we need at least version 1"
+  | Some (V1 {rollup_address; genesis_info = {level; _}; _}) ->
+      return (Address.to_string rollup_address, level)
+
+let rollup_node_block_storage ~rollup_node_data_dir =
   let open Lwt_result_syntax in
   let open Rollup_node_storage in
   let* last_finalized_level, levels_to_hashes, l2_blocks =
@@ -1536,6 +1562,14 @@ let init_context_from_rollup_node ~data_dir ~rollup_node_data_dir =
       ~none:
         [error_of_fmt "Rollup node storage is missing the last finalized level"]
       final_level
+  in
+  return (final_level, levels_to_hashes, l2_blocks)
+
+let init_context_from_rollup_node ~data_dir ~rollup_node_data_dir =
+  let open Lwt_result_syntax in
+  let open Rollup_node_storage in
+  let* final_level, levels_to_hashes, l2_blocks =
+    rollup_node_block_storage ~rollup_node_data_dir
   in
   let* final_level_hash = Levels_to_hashes.find levels_to_hashes final_level in
   let*? final_level_hash =
@@ -1592,7 +1626,7 @@ let init_context_from_rollup_node ~data_dir ~rollup_node_data_dir =
     Irmin_context.checkout_exn evm_node_index checkpoint
   in
   let*! evm_state = Irmin_context.PVMState.get evm_node_context in
-  return (evm_node_context, evm_state, final_level, levels_to_hashes, l2_blocks)
+  return (evm_node_context, evm_state, final_level)
 
 let init_store_from_rollup_node ~data_dir ~evm_state ~irmin_context =
   let open Lwt_result_syntax in
@@ -1680,12 +1714,30 @@ let get_evm_events_from_rollup_node_state ~omit_delayed_tx_events evm_state =
 let apply_evm_events ?finalized_level events =
   worker_add_request ~request:(Apply_evm_events {finalized_level; events})
 
-let reconstruct ~reconstruct_from_boot_sector ~rollup_node_data_dir
-    ~genesis_level ~finalized_level ~levels_to_hashes ~l2_blocks =
+let reconstruct ~data_dir ~rollup_node_data_dir ~boot_sector =
+  let open Lwt_result_syntax in
+  let* () = lock_data_dir ~data_dir in
+  let* finalized_level, levels_to_hashes, l2_blocks =
+    rollup_node_block_storage ~rollup_node_data_dir
+  in
+  let* smart_rollup_address, genesis_level =
+    rollup_node_metadata ~rollup_node_data_dir
+  in
+  let* _loaded =
+    start
+      ~kernel_path:boot_sector
+      ~data_dir
+      ~preimages:Filename.Infix.(rollup_node_data_dir // "wasm_2_0_0")
+      ~preimages_endpoint:None
+      ~smart_rollup_address
+      ~fail_on_missing_blueprint:false
+      ~store_perm:`Read_write
+      ~block_storage_sqlite3:false
+      ()
+  in
   worker_wait_for_request
     (Reconstruct
        {
-         reconstruct_from_boot_sector;
          rollup_node_data_dir;
          genesis_level;
          finalized_level;
@@ -1694,27 +1746,19 @@ let reconstruct ~reconstruct_from_boot_sector ~rollup_node_data_dir
        })
 
 let init_from_rollup_node ~omit_delayed_tx_events ~data_dir
-    ~rollup_node_data_dir ?reconstruct_from_boot_sector () =
+    ~rollup_node_data_dir () =
   let open Lwt_result_syntax in
   let* () = lock_data_dir ~data_dir in
-  let* irmin_context, evm_state, finalized_level, levels_to_hashes, l2_blocks =
+  let* irmin_context, evm_state, finalized_level =
     init_context_from_rollup_node ~data_dir ~rollup_node_data_dir
   in
   let* evm_events =
     get_evm_events_from_rollup_node_state ~omit_delayed_tx_events evm_state
   in
-  let* smart_rollup_address, genesis_level =
-    let* metadata =
-      Metadata.Versioned.read_metadata_file ~dir:rollup_node_data_dir
-    in
-    match metadata with
-    | None -> failwith "missing metadata in the rollup node data dir"
-    | Some (V0 _) ->
-        failwith "metadata has version 0, we need at least version 1"
-    | Some (V1 {rollup_address; genesis_info = {level; _}; _}) ->
-        return (Address.to_string rollup_address, level)
-  in
   let* () = init_store_from_rollup_node ~data_dir ~evm_state ~irmin_context in
+  let* smart_rollup_address, _genesis_level =
+    rollup_node_metadata ~rollup_node_data_dir
+  in
   let* _loaded =
     start
       ~data_dir
@@ -1725,18 +1769,6 @@ let init_from_rollup_node ~omit_delayed_tx_events ~data_dir
       ~store_perm:`Read_write
       ~block_storage_sqlite3:false
       ()
-  in
-  let* () =
-    match reconstruct_from_boot_sector with
-    | Some reconstruct_from_boot_sector ->
-        reconstruct
-          ~reconstruct_from_boot_sector
-          ~rollup_node_data_dir
-          ~genesis_level
-          ~finalized_level
-          ~levels_to_hashes
-          ~l2_blocks
-    | None -> return_unit
   in
   worker_wait_for_request
     (Apply_evm_events
