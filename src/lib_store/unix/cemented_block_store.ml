@@ -27,10 +27,10 @@ open Store_errors
 
 (* Cemented files overlay:
 
-   | <n> x <offset (4 bytes)> | <n> x <blocks> |
+   | <n> x <offset (8 bytes)> | <n> x <blocks> |
 
    <offset> is an absolute offset in the file.
-   <blocks> are prefixed by 4 bytes of length
+   <blocks> are prefixed by 8 bytes of length
 *)
 (* On-disk index of block's hashes to level *)
 module Cemented_block_level_index =
@@ -354,9 +354,7 @@ let close cemented_store =
      terminated which means potential new reads won't be scheduled. *)
   Metadata_fd_cache.clear cemented_store.metadata_fd_cache
 
-(* FIXME: https://gitlab.com/tezos/tezos/-/issues/7034 Cemented file
-   cannot exceed 4Gib. *)
-let offset_length = 4 (* file offset *)
+let offset_length = 8 (* file offset *)
 
 let find_block_file cemented_store block_level =
   try
@@ -569,21 +567,8 @@ let read_block fd block_number =
   let* () =
     Lwt_utils_unix.read_bytes ~pos:0 ~len:offset_length fd offset_buffer
   in
-  let offset =
-    let ofs = Bytes.get_int32_be offset_buffer 0 in
-    (* We interpret the offset, written as an int32, as an unsigned
-       int32. This is allowed by the encoded scheme and allows one
-       additional bit to encode the offset. It enables dealing with
-       files up to 4Gib. *)
-    match Int32.unsigned_to_int ofs with
-    | Some v -> v
-    | None ->
-        (* It will be [None] on 32-bit machines which is not
-           supported. We default to [Int32.to_int] instead of [assert
-           false] *)
-        Int32.to_int ofs
-  in
-  let* _ofs = Lwt_unix.lseek fd offset Unix.SEEK_SET in
+  let offset = Bytes.get_int64_be offset_buffer 0 in
+  let* _ofs = Lwt_unix.LargeFile.lseek fd offset Unix.SEEK_SET in
   (* We move the cursor to the element's position *)
   let* block, _len = Block_repr_unix.read_next_block_exn fd in
   Lwt.return block
@@ -635,8 +620,6 @@ let get_cemented_block_by_hash ~read_metadata (cemented_store : t) hash =
   | Some level ->
       get_cemented_block_by_level ~read_metadata cemented_store level
 
-(* TODO/FIXME: https://gitlab.com/tezos/tezos/-/issues/7035
-   Cemented metadata cannot exceed 4Gib *)
 (* Hypothesis:
    - The block list is expected to be ordered by increasing
      level and no blocks are skipped.
@@ -766,10 +749,10 @@ let cement_blocks ?(check_consistency = true) (cemented_store : t)
                 Block_repr_unix.prune_raw_block_bytes block_bytes
               in
               (* We start by blitting the corresponding offset in the preamble part *)
-              Bytes.set_int32_be
+              Bytes.set_int64_be
                 offsets_buffer
                 (i * offset_length)
-                (Int32.of_int current_offset) ;
+                (Int64.of_int current_offset) ;
               (* We write the block in the file *)
               let*! () =
                 Lwt_utils_unix.write_bytes
@@ -942,8 +925,8 @@ let raw_iter_cemented_file f ({file; _} as cemented_blocks_file) =
     file_path
     (fun channel ->
       let nb_blocks = cemented_blocks_file_length cemented_blocks_file in
-      let* first_block_offset = Lwt_io.BE.read_int channel in
-      let* () = Lwt_io.set_position channel (Int64.of_int first_block_offset) in
+      let* first_block_offset = Lwt_io.BE.read_int64 channel in
+      let* () = Lwt_io.set_position channel first_block_offset in
       let rec loop n =
         if n = 0 then Lwt.return_unit
         else
@@ -1022,7 +1005,7 @@ let check_indexes_consistency ?(post_step = fun () -> Lwt.return_unit)
                 let*! () = Lwt_utils_unix.read_bytes ~len:len_offset fd bytes in
                 let offsets =
                   Data_encoding.Binary.of_bytes_exn
-                    Data_encoding.(Variable.array ~max_length:nb_blocks int32)
+                    Data_encoding.(Variable.array ~max_length:nb_blocks int64)
                     bytes
                 in
                 (* Cursor is now after the offset region *)
@@ -1032,7 +1015,7 @@ let check_indexes_consistency ?(post_step = fun () -> Lwt.return_unit)
                     let*! cur_offset = Lwt_unix.lseek fd 0 Unix.SEEK_CUR in
                     let* () =
                       fail_unless
-                        Compare.Int32.(Int32.of_int cur_offset = offsets.(n))
+                        Compare.Int64.(Int64.of_int cur_offset = offsets.(n))
                         (Inconsistent_cemented_store
                            (Bad_offset
                               {level = n; cycle = Naming.file_path file}))
@@ -1078,5 +1061,156 @@ let check_indexes_consistency ?(post_step = fun () -> Lwt.return_unit)
                 let*! _ = Lwt_utils_unix.safe_close fd in
                 Lwt.return_unit))
           table_list
+      in
+      return_unit
+
+(** [get_and_upgrade_offsets fd nb_blocks] obtains the list of [nb_blocks] offsets from the 
+    beginning of the file given by file descriptor [fd] and upgrades their sizes from 32-bits to 
+    64-bits, adjusting their values for the following blocks in the cemented blocks file. *)
+let get_and_upgrade_offsets fd nb_blocks =
+  let open Lwt_syntax in
+  (* Obtain the list of offsets (32-bit format) *)
+  let preamble_length = 4 * nb_blocks in
+  let bytes = Bytes.create preamble_length in
+  let* () = Lwt_utils_unix.read_bytes ~len:preamble_length fd bytes in
+  let offsets_32_bits =
+    Data_encoding.Binary.of_bytes_exn
+      Data_encoding.(Variable.array ~max_length:nb_blocks int32)
+      bytes
+  in
+  (* Transform the 32-bit offsets into 64-bit offsets and add preamble_length to all values.
+     The reasoning behind this is that we shift the blocks positions in the file with
+     (<new_offset_format_size> - <old_offset_format_size>) * nb_blocks = (8 - 4) * nb_blocks *)
+  let offsets_64_bits =
+    Array.map
+      (fun offset -> Int64.(add (of_int32 offset) (of_int preamble_length)))
+      offsets_32_bits
+  in
+  Lwt.return
+  @@ Data_encoding.Binary.to_bytes_exn
+       Data_encoding.(Variable.array ~max_length:nb_blocks int64)
+       offsets_64_bits
+
+(** [is_using_32_bit_offsets fd nb_blocks] checks whether the cemented file 
+    given by [fd] is formatted with 32 bit offsets; the decision
+    is taken based on whether the first offset points correctly to the first
+    block in the file or not; 
+    - offset = first 32 bits decoded as an int32
+    - first_block_offset = 4 (bytes) * [nb_blocks] (first block offset, given
+      that the file has 32-bit offsets)
+    Check whether (offset = first_block_offset) holds. If not, then we cannot
+    do the upgrade procedure. *)
+let is_using_32_bit_offsets fd nb_blocks =
+  let open Lwt_syntax in
+  (* For a 32-bit offset the size will be 4 bytes *)
+  let legacy_offset_length = 4 in
+  (* Save the current position of the file descriptor *)
+  let* current_position = Lwt_unix.lseek fd 0 Unix.SEEK_CUR in
+  (* Obtain the first offset of the file, altering the file descriptor position *)
+  let* _ofs = Lwt_unix.lseek fd 0 Unix.SEEK_SET in
+  let offset_buffer = Bytes.create legacy_offset_length in
+  (* Read the first offset in the offset array *)
+  let* () =
+    Lwt_utils_unix.read_bytes ~pos:0 ~len:legacy_offset_length fd offset_buffer
+  in
+  let offset = Bytes.get_int32_be offset_buffer 0 in
+  (* Restore the former position of the file descriptor *)
+  let* _ofs = Lwt_unix.lseek fd current_position Unix.SEEK_SET in
+  return Int32.(equal offset (mul (of_int legacy_offset_length) nb_blocks))
+
+(* Hypothesis: we expect a directory of cemented files with 32-bit offsets *)
+let v_3_2_upgrade chain_dir =
+  let open Lwt_result_syntax in
+  let cemented_blocks_dir = Naming.cemented_blocks_dir chain_dir in
+  let* cemented_blocks_files_opt = load_table cemented_blocks_dir in
+  match cemented_blocks_files_opt with
+  | None ->
+      (* This might be the case for rolling nodes, where no upgrade is needed as
+         there are not cemented block files. *)
+      return_unit
+  | Some cemented_blocks_files ->
+      let cemented_blocks_files = Array.to_list cemented_blocks_files in
+      let nb_cemented_files = List.length cemented_blocks_files in
+      let* () =
+        Animation.display_progress
+          ~pp_print_step:(fun fmt i ->
+            Format.fprintf
+              fmt
+              "Upgrading cemented files: %d/%d files"
+              i
+              nb_cemented_files)
+          ~progress_display_mode:Always
+          (fun notify ->
+            List.iter_es
+              (fun cemented_blocks_file ->
+                (* Original cemented blocks file *)
+                let file_path = Naming.file_path cemented_blocks_file.file in
+                let*! fd =
+                  Lwt_unix.openfile file_path [Unix.O_RDONLY; O_CLOEXEC] 0o444
+                in
+                (* Check if the file has 32-bit offsets format *)
+                let nb_blocks =
+                  cemented_blocks_file_length cemented_blocks_file
+                in
+                let*! has_32_bit_offsets =
+                  is_using_32_bit_offsets fd nb_blocks
+                in
+                if not has_32_bit_offsets then
+                  let*! () =
+                    Store_events.(emit upgrade_cemented_file_skip file_path)
+                  in
+                  return_unit
+                else
+                  (* Upgraded cemented blocks file *)
+                  let upgraded_file_path = file_path ^ "_upgraded" in
+                  let*! upgraded_fd =
+                    Lwt_unix.openfile
+                      upgraded_file_path
+                      [Unix.O_WRONLY; Unix.O_CREAT; Unix.O_TRUNC]
+                      0o644
+                  in
+                  (* Total number of blocks stored in the cemented blocks file*)
+                  let nb_blocks =
+                    Int32.to_int
+                    @@ cemented_blocks_file_length cemented_blocks_file
+                  in
+                  Lwt.finalize
+                    (fun () ->
+                      let*! bytes = get_and_upgrade_offsets fd nb_blocks in
+                      (* Write the 64-bit offsets list into the new file *)
+                      let*! () =
+                        Lwt_utils_unix.write_bytes
+                          ~pos:0
+                          ~len:(8 * nb_blocks)
+                          upgraded_fd
+                          bytes
+                      in
+                      (* Copy the rest of the block file *)
+                      let buffer_size = 4096 * 1024 in
+                      let buffer = Bytes.create buffer_size in
+                      let copy_bytes fd_in fd_out =
+                        let rec loop () =
+                          let*! bytes_read =
+                            Lwt_unix.read fd_in buffer 0 buffer_size
+                          in
+                          if bytes_read = 0 then Lwt.return_unit
+                          else
+                            let*! _bytes_written =
+                              Lwt_unix.write fd_out buffer 0 bytes_read
+                            in
+                            loop ()
+                        in
+                        loop ()
+                      in
+                      let*! () = copy_bytes fd upgraded_fd in
+                      (* Atomically replace the old cemented file with the upgraded one *)
+                      let*! () = Lwt_unix.rename upgraded_file_path file_path in
+                      return_unit)
+                    (fun () ->
+                      let*! () = Lwt_unix.close fd in
+                      let*! () = Lwt_unix.close upgraded_fd in
+                      let*! () = notify () in
+                      Lwt.return_unit))
+              cemented_blocks_files)
       in
       return_unit
