@@ -120,12 +120,8 @@ module Opam = struct
 
       These rules define when the opam job runs, and implements the
       delay used to run opam jobs in batches. *)
-  let opam_rules pipeline_type ~only_final_pipeline ?batch_index () =
-    let when_ =
-      match batch_index with
-      | Some batch_index -> Delayed (Minutes batch_index)
-      | None -> On_success
-    in
+  let opam_rules pipeline_type ~only_final_pipeline ~batch_index () =
+    let when_ = Delayed (Minutes batch_index) in
     match pipeline_type with
     | Schedule_extended_test -> [job_rule ~when_ ()]
     | Before_merging | Merge_train ->
