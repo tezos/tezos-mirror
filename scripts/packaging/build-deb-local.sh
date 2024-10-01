@@ -32,12 +32,12 @@ packages() {
 zcash() {
   # Link the zcash DAL parameters to be packaged
   if [ ! -e scripts/packaging/octez-data/zcash-params ]; then
-    ln -s ../../../_opam/share/zcash-params scripts/packaging/octez-data/
+    ln -s "$OPAM_SWITCH_PREFIX/share/zcash-params" scripts/packaging/octez-data/
   fi
 
   if [ ! -e scripts/packaging/octez-data/dal-trusted-setup ]; then
     scripts/install_dal_trusted_setup.sh
-    ln -s ../../../_opam/share/dal-trusted-setup scripts/packaging/octez-data/
+    ln -s "$OPAM_SWITCH_PREFIX/share/dal-trusted-setup" scripts/packaging/octez-data/
   fi
 
   cd scripts/packaging/octez-data
