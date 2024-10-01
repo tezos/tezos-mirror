@@ -217,7 +217,7 @@ val string_of_purpose : purpose -> string
     If no [msg] is given, the stderr is ignored.*)
 val check_error : ?exit_code:int -> ?msg:Base.rex -> t -> unit Lwt.t
 
-(** [run ?event_level ?event_sections_levels ?loser_mode ?allow_degraded
+(** [run ?endpoint ?event_level ?event_sections_levels ?loser_mode ?allow_degraded
     ?wait_ready node rollup_address arguments ]
     launches the given smart contract rollup node for the rollup at
     [rollup_address] with the given extra arguments. [event_level] and
@@ -228,6 +228,8 @@ val check_error : ?exit_code:int -> ?msg:Base.rex -> t -> unit Lwt.t
     ready. If [restart] is [true], it will stop and restart the node if it is
     already running.  *)
 val run :
+  ?env:string String_map.t ->
+  ?endpoint:string ->
   ?legacy:bool ->
   ?restart:bool ->
   ?mode:mode ->

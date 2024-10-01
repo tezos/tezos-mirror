@@ -323,13 +323,16 @@ let operators_params rollup_node =
     (Option.to_list rollup_node.persistent_state.default_operator)
     rollup_node.persistent_state.operators
 
-let make_command_arguments ?password_file node =
-  [
-    "--endpoint";
-    Client.string_of_endpoint ~hostname:true node.persistent_state.endpoint;
-    "--base-dir";
-    base_dir node;
-  ]
+let make_command_arguments ?endpoint ?password_file node =
+  let endpoint =
+    Option.value
+      ~default:
+        (Client.string_of_endpoint
+           ~hostname:true
+           node.persistent_state.endpoint)
+      endpoint
+  in
+  ["--endpoint"; endpoint; "--base-dir"; base_dir node]
   @ Cli_arg.optional_arg "password-filename" Fun.id password_file
 
 let spawn_command sc_node args =
@@ -636,16 +639,19 @@ let create ?runner ?path ?name ?color ?data_dir ~base_dir ?event_pipe
     mode
     (Node node)
 
-let do_runlike_command ?event_level ?event_sections_levels ?password_file node
-    arguments =
+let do_runlike_command ?env ?endpoint ?event_level ?event_sections_levels
+    ?password_file node arguments =
   if node.status <> Not_running then
     Test.fail "Smart contract rollup node %s is already running" node.name ;
   let on_terminate _status =
     trigger_ready node None ;
     unit
   in
-  let arguments = make_command_arguments ?password_file node @ arguments in
+  let arguments =
+    make_command_arguments ?password_file ?endpoint node @ arguments
+  in
   run
+    ?env
     ?runner:node.persistent_state.runner
     ?event_level
     ?event_sections_levels
@@ -654,7 +660,7 @@ let do_runlike_command ?event_level ?event_sections_levels ?password_file node
     arguments
     ~on_terminate
 
-let run ?(legacy = false) ?(restart = false) ?mode ?event_level
+let run ?env ?endpoint ?(legacy = false) ?(restart = false) ?mode ?event_level
     ?event_sections_levels ?(wait_ready = true) ?password_file node
     rollup_address extra_arguments =
   let* () = if restart then terminate node else return () in
@@ -673,6 +679,8 @@ let run ?(legacy = false) ?(restart = false) ?mode ?event_level
   in
   let* () =
     do_runlike_command
+      ?env
+      ?endpoint
       ?event_level
       ?event_sections_levels
       ?password_file
