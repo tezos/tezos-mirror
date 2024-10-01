@@ -1613,7 +1613,7 @@ module Chain = struct
               (* We mark the merge as on-going to prevent the merge from
                  being triggered and to update on-disk values. *)
               return_true
-          | Not_running when store_status <> Idle ->
+          | Not_running when not @@ Block_store_status.is_idle store_status ->
               (* Degenerate case, do the same as the Merge_failed case *)
               let*! () = Store_events.(emit notify_merge_error []) in
               return_true
@@ -3221,6 +3221,18 @@ let v_3_0_upgrade ~store_dir genesis =
       let* () = Block_store.v_3_0_upgrade chain_dir ~cleanups ~finalizers in
       let*! () = List.iter_s (fun f -> f ()) !finalizers in
       return_unit)
+
+let v_3_1_upgrade ~store_dir genesis ~upgrade_to_v3 =
+  let open Lwt_result_syntax in
+  let* () =
+    if upgrade_to_v3 then v_3_0_upgrade ~store_dir genesis else return_unit
+  in
+  (* Hypothesis: v_3_0_upgrade has been run before or is run here *)
+  let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
+  let chain_dir =
+    Naming.chain_dir (Naming.store_dir ~dir_path:store_dir) chain_id
+  in
+  Block_store.v_3_1_upgrade chain_dir
 
 (************ For testing and internal purposes only **************)
 module Unsafe = struct

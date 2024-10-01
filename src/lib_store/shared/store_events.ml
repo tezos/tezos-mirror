@@ -201,6 +201,22 @@ let start_retreiving_cycles =
     ~msg:"retrieving cycles from floating store"
     ()
 
+let load_block_store_status =
+  declare_0
+    ~section
+    ~level:Info
+    ~name:"load_block_store_status"
+    ~msg:"loading using legacy block_store_status encoding"
+    ()
+
+let fixed_block_store_status =
+  declare_0
+    ~section
+    ~level:Info
+    ~name:"fixed_block_store_status"
+    ~msg:"loading of block store status was successful"
+    ()
+
 let store_is_consistent =
   declare_0
     ~section

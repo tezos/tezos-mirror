@@ -133,10 +133,12 @@ val savepoint_file :
 val caboose_file :
   [`Chain_dir] directory -> ([`Caboose], block_descriptor) encoded_file
 
-type block_store_status = Idle | Merging
-
 val block_store_status_file :
-  [`Chain_dir] directory -> ([`Status], block_store_status) encoded_file
+  [`Chain_dir] directory -> ([`Status], Block_store_status.t) encoded_file
+
+val legacy_block_store_status_file :
+  [`Chain_dir] directory ->
+  ([`Status], Block_store_status.Legacy.t) encoded_file
 
 val cemented_blocks_dir :
   [< `Chain_dir | `Snapshot_dir | `Snapshot_tmp_dir | `Tar_archive] directory ->
