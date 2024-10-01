@@ -211,9 +211,13 @@ val count_values :
 module View : sig
   (** Returns the number of files currently opened by the key value
       store. Do note this number is an upper bound on the number of
-      file descriptors opened.      
+      file descriptors opened. This number should always be lower than [lru_size].     
   *)
   val opened_files : ('file, 'key, 'value) t -> int
+
+  (** Returns the number of ongoing actions happening on different
+    files. This number should always be lower than [lru_size]. *)
+  val ongoing_actions : ('file, 'key, 'value) t -> int
 end
 
 module Internal_for_tests : sig
