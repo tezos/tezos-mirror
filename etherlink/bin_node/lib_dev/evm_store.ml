@@ -7,80 +7,13 @@
 (*****************************************************************************)
 
 open Filename.Infix
-
-type error += Caqti_error of string
-
-type pool =
-  ( Caqti_lwt.connection,
-    [Caqti_error.connect | `K_error of tztrace] )
-  Caqti_lwt_unix.Pool.t
-
-type sqlite_journal_mode = Wal | Other
+include Sqlite
 
 type levels = {
   l1_level : int32;
   current_number : Ethereum_types.quantity;
   finalized : Ethereum_types.quantity;
 }
-
-module Db = struct
-  let caqti (p : ('a, Caqti_error.t) result Lwt.t) : 'a tzresult Lwt.t =
-    let open Lwt_result_syntax in
-    let*! p in
-    match p with
-    | Ok p -> return p
-    | Error err -> fail [Caqti_error (Caqti_error.show err)]
-
-  let caqti' (p : ('a, Caqti_error.t) result) : 'a tzresult Lwt.t =
-    let open Lwt_result_syntax in
-    match p with
-    | Ok p -> return p
-    | Error err -> fail [Caqti_error (Caqti_error.show err)]
-
-  let use_pool (pool : pool) (k : Caqti_lwt.connection -> 'a tzresult Lwt.t) =
-    let open Lwt_result_syntax in
-    let*! res =
-      Caqti_lwt_unix.Pool.use
-        (fun conn ->
-          let*! res = k conn in
-          match res with
-          | Ok res -> return res
-          | Error err -> fail (`K_error err))
-        pool
-    in
-    match res with
-    | Ok err -> return err
-    | Error (`K_error err) -> fail err
-    | Error (#Caqti_error.connect as err) ->
-        fail [Caqti_error (Caqti_error.show err)]
-
-  let start (module Db : Caqti_lwt.CONNECTION) = caqti @@ Db.start ()
-
-  let collect_list (module Db : Caqti_lwt.CONNECTION) req arg =
-    caqti @@ Db.collect_list req arg
-
-  let commit (module Db : Caqti_lwt.CONNECTION) = caqti @@ Db.commit ()
-
-  let rollback (module Db : Caqti_lwt.CONNECTION) = caqti @@ Db.rollback ()
-
-  let exec (module Db : Caqti_lwt.CONNECTION) req arg = caqti @@ Db.exec req arg
-
-  let find (module Db : Caqti_lwt.CONNECTION) req arg = caqti @@ Db.find req arg
-
-  let find_opt (module Db : Caqti_lwt.CONNECTION) req arg =
-    caqti @@ Db.find_opt req arg
-end
-
-type t = Pool : {db_pool : pool} -> t
-
-type conn =
-  | Raw_connection of (module Caqti_lwt.CONNECTION)
-  | Ongoing_transaction of (module Caqti_lwt.CONNECTION)
-
-let assert_in_transaction conn =
-  match conn with
-  | Raw_connection _ -> assert false
-  | Ongoing_transaction _ -> ()
 
 module Q = struct
   open Caqti_request.Infix
@@ -224,12 +157,6 @@ module Q = struct
         Ok {current_number; l1_level; finalized})
       (t3 level l1_level level)
 
-  let journal_mode =
-    custom
-      ~encode:(function Wal -> Ok "wal" | Other -> Ok "delete")
-      ~decode:(function "wal" -> Ok Wal | _ -> Ok Other)
-      string
-
   let table_exists =
     (string ->! bool)
     @@ {|
@@ -238,8 +165,6 @@ module Q = struct
       WHERE type='table'
         AND name=?
     )|}
-
-  let vacuum_request = (string ->. unit) @@ {|VACUUM main INTO ?|}
 
   module Schemas = struct
     let get_all =
@@ -286,15 +211,6 @@ module Q = struct
 
     let all : Evm_node_migrations.migration list =
       Evm_node_migrations.migrations version
-  end
-
-  module Journal_mode = struct
-    let get = (unit ->! journal_mode) @@ {|PRAGMA journal_mode|}
-
-    (* It does not appear possible to write a request {|PRAGMA journal_mode=?|}
-       accepted by caqti, sadly. *)
-
-    let set_wal = (unit ->! journal_mode) @@ {|PRAGMA journal_mode=wal|}
   end
 
   module Blueprints = struct
@@ -520,42 +436,6 @@ module Q = struct
   end
 end
 
-let with_connection conn k =
-  match conn with
-  | Ongoing_transaction conn -> k conn
-  | Raw_connection conn -> k conn
-
-let with_transaction conn k =
-  let open Lwt_result_syntax in
-  match conn with
-  | Raw_connection conn -> (
-      let* () = Db.start conn in
-      let*! res =
-        Lwt.catch
-          (fun () -> k (Ongoing_transaction conn))
-          (fun exn -> fail_with_exn exn)
-      in
-
-      match res with
-      | Ok x ->
-          let* () = Db.commit conn in
-          return x
-      | Error err ->
-          let* () = Db.rollback conn in
-          fail err)
-  | Ongoing_transaction _ ->
-      failwith "Internal error: attempting to perform a nested transaction"
-
-module Journal_mode = struct
-  let set_wal_journal_mode store =
-    let open Lwt_result_syntax in
-    with_connection store @@ fun conn ->
-    let* current_mode = Db.find conn Q.Journal_mode.get () in
-    when_ (current_mode <> Wal) @@ fun () ->
-    let* _wal = Db.find conn Q.Journal_mode.set_wal () in
-    return_unit
-end
-
 module Schemas = struct
   let get_all store =
     with_connection store @@ fun conn ->
@@ -599,43 +479,14 @@ module Migrations = struct
     Db.exec conn Q.Migrations.register_migration (id, M.name)
 end
 
-let use (Pool {db_pool}) k =
-  Db.use_pool db_pool @@ fun conn -> k (Raw_connection conn)
-
-type error += File_already_exists of string
-
-let uri path perm =
-  let write_perm =
-    match perm with `Read_only -> false | `Read_write -> true
-  in
-  Uri.of_string Format.(sprintf "sqlite3:%s?write=%b" path write_perm)
-
-let vacuum ~conn ~output_db_file =
-  let open Lwt_result_syntax in
-  let*! exists = Lwt_unix.file_exists output_db_file in
-  let*? () = error_when exists (File_already_exists output_db_file) in
-  let* () =
-    with_connection conn @@ fun conn ->
-    Db.exec conn Q.vacuum_request output_db_file
-  in
-  let* db_pool =
-    Db.caqti' @@ Caqti_lwt_unix.connect_pool (uri output_db_file `Read_write)
-  in
-  let* () = use (Pool {db_pool}) Journal_mode.set_wal_journal_mode in
-  return_unit
-
 let sqlite_file_name = "store.sqlite"
 
 let init ~data_dir ~perm () =
   let open Lwt_result_syntax in
   let path = data_dir // sqlite_file_name in
   let*! exists = Lwt_unix.file_exists path in
-  let* db_pool = Db.caqti' @@ Caqti_lwt_unix.connect_pool (uri path perm) in
-  let store = Pool {db_pool} in
-  use store @@ fun conn ->
-  let* () = Journal_mode.set_wal_journal_mode conn in
-  let* () =
-    with_transaction conn @@ fun conn ->
+  let migration conn =
+    Sqlite.assert_in_transaction conn ;
     let* () =
       if not exists then
         let* () = Migrations.create_table conn in
@@ -650,6 +501,15 @@ let init ~data_dir ~perm () =
         return_unit
     in
     let* migrations = Migrations.missing_migrations conn in
+    let*? () =
+      match (perm, migrations) with
+      | `Read_only, _ :: _ ->
+          error_with
+            "The store has %d missing migrations but was opened in read-only \
+             mode."
+            (List.length migrations)
+      | _, _ -> Ok ()
+    in
     let* () =
       List.iter_es
         (fun (i, ((module M : Evm_node_migrations.S) as mig)) ->
@@ -660,7 +520,7 @@ let init ~data_dir ~perm () =
     in
     return_unit
   in
-  return store
+  Sqlite.init ~path ~perm migration
 
 module Context_hashes = struct
   let store store number hash =
@@ -967,30 +827,3 @@ let reset store ~l2_level =
   let* () = Blocks.clear_after store l2_level in
   let* () = Transactions.clear_after store l2_level in
   return_unit
-
-(* Error registration *)
-let () =
-  register_error_kind
-    `Permanent
-    ~id:"evm_node_dev_caqti_error"
-    ~title:"Error raised by Caqti"
-    ~description:"Caqti raised an error while processing a SQL statement"
-    ~pp:(fun ppf msg ->
-      Format.fprintf
-        ppf
-        "Caqti raised an error while processing a SQL statement: %s"
-        msg)
-    Data_encoding.(obj1 (req "caqti_error" string))
-    (function Caqti_error err -> Some err | _ -> None)
-    (fun err -> Caqti_error err)
-
-let () =
-  register_error_kind
-    `Permanent
-    ~id:"evm_store_dev_file_already_exists"
-    ~title:"File already exists"
-    ~description:"Raise an error when the file already exists"
-    ~pp:(fun ppf path -> Format.fprintf ppf "The file %s already exists" path)
-    Data_encoding.(obj1 (req "file_already_exists" string))
-    (function File_already_exists path -> Some path | _ -> None)
-    (fun path -> File_already_exists path)

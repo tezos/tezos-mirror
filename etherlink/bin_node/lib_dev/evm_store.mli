@@ -6,11 +6,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** A handler to the node’s store. *)
-type t
-
-(** A direct connection to the node’s store, allowing to interact with it. *)
-type conn
+(** The EVM node’s store is built around and SQLite database. *)
+include module type of Sqlite
 
 (** [init ~data_dir ()] returns a handler to the EVM node store located under
     [data_dir]. If no store is located in [data_dir], an empty store is
@@ -26,27 +23,8 @@ type conn
 val init :
   data_dir:string -> perm:[`Read_only | `Read_write] -> unit -> t tzresult Lwt.t
 
-(** [use store k] executes [k] with a fresh connection to [store]. *)
-val use : t -> (conn -> 'a tzresult Lwt.t) -> 'a tzresult Lwt.t
-
 (** name of the sqlite file *)
 val sqlite_file_name : string
-
-(** Run VACUUM sqlite request *)
-val vacuum : conn:conn -> output_db_file:string -> unit tzresult Lwt.t
-
-(** [with_transaction conn k] wraps the accesses to the store from [conn] made
-    in the continuation [k] within
-    {{:https://www.sqlite.org/lang_transaction.html}a SQL transaction}. If [k]
-    fails, the transaction is rollbacked. Otherwise, the transaction is
-    committed. *)
-val with_transaction : conn -> (conn -> 'a tzresult Lwt.t) -> 'a tzresult Lwt.t
-
-(** [assert_in_transaction conn] raises an exception if a transaction has not
-    been started with [conn].
-
-    @raise Assert_failure *)
-val assert_in_transaction : conn -> unit
 
 module Schemas : sig
   (** [get_all conn] returns the list of SQL statements allowing to recreate
