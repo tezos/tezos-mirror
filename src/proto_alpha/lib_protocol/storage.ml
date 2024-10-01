@@ -2210,6 +2210,13 @@ module Dal = struct
                  (req "cell" H.encoding))
         end)
   end
+
+  module Total_attested_slots =
+    Make_single_data_storage (Registered) (Raw_context)
+      (struct
+        let name = ["total_attested_slots"]
+      end)
+      (Encoding.Int32)
 end
 
 module Zk_rollup = struct

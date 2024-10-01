@@ -1046,6 +1046,10 @@ module Dal : sig
              attested or to access its attestation ratio). *)
           (Dal_slot_repr.History.Pointer_hash.t * Dal_slot_repr.History.t) list
   end
+
+  (** The number of protocol-attested DAL slots for the current cycle. *)
+  module Total_attested_slots :
+    Single_data_storage with type t := Raw_context.t and type value = Int32.t
 end
 
 module Zk_rollup : sig
