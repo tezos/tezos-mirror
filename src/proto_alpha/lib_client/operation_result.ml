@@ -421,6 +421,7 @@ let pp_balance_updates ppf balance_updates =
           | Attesting_rewards -> "attesting rewards"
           | Baking_rewards -> "baking rewards"
           | Baking_bonuses -> "baking bonuses"
+          | Dal_attesting_rewards -> "DAL attesting rewards"
           | Storage_fees -> "storage fees"
           | Double_signing_punishments -> "double signing punishments"
           | Lost_attesting_rewards (pkh, p, r) ->
@@ -432,6 +433,8 @@ let pp_balance_updates ppf balance_updates =
                 | true, true -> ",participation,revelation"
               in
               Format.asprintf "lost attesting rewards(%a%s)" pp_baker pkh reason
+          | Lost_dal_attesting_rewards pkh ->
+              Format.asprintf "lost DAL attesting rewards(%a)" pp_baker pkh
           | Liquidity_baking_subsidies -> "liquidity baking subsidies"
           | Burned -> "burned"
           | Commitments bpkh ->

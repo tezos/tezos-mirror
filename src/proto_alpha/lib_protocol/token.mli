@@ -83,6 +83,7 @@ type infinite_source =
   | `Attesting_rewards  (** Consensus attesting rewards *)
   | `Baking_rewards  (** Consensus baking fixed rewards *)
   | `Baking_bonuses  (** Consensus baking variable bonus *)
+  | `Dal_attesting_rewards  (** DAL attesting rewards *)
   | `Minted  (** Generic source for test purpose *)
   | `Liquidity_baking_subsidies  (** Subsidy for liquidity-baking contract *)
   | `Sc_rollup_refutation_rewards
@@ -97,6 +98,8 @@ type infinite_sink =
   | `Double_signing_punishments  (** Consensus slashing *)
   | `Lost_attesting_rewards of Signature.Public_key_hash.t * bool * bool
     (** Consensus rewards not distributed because the participation of the delegate was too low. *)
+  | `Lost_dal_attesting_rewards of Signature.Public_key_hash.t
+    (** DAL rewards not distributed because the participation of the delegate was too low. *)
   | `Sc_rollup_refutation_punishments  (** Smart rollups refutation slashing *)
   | `Burned  (** Generic sink mainly for test purpose *) ]
 

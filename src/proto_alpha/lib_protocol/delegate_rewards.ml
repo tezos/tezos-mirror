@@ -75,6 +75,7 @@ module M = struct
     | Baking_reward_fixed_portion
     | Baking_reward_bonus_per_slot
     | Attesting_reward_per_slot
+    | Dal_attesting_reward_per_shard
     | Seed_nonce_revelation_tip
     | Vdf_revelation_tip
 
@@ -89,6 +90,7 @@ module M = struct
       | Baking_reward_bonus_per_slot ->
           issuance_weights.baking_reward_bonus_weight
       | Attesting_reward_per_slot -> issuance_weights.attesting_reward_weight
+      | Dal_attesting_reward_per_shard -> issuance_weights.dal_rewards_weight
       | Seed_nonce_revelation_tip ->
           (* Seed nonce revelation rewards are given every [blocks_per_commitment](=240)th block *)
           let blocks_per_commitment = Int32.to_int csts.blocks_per_commitment in
@@ -113,6 +115,10 @@ module M = struct
           else Tez_repr.div_exn rewards bonus_committee_size
       | Attesting_reward_per_slot ->
           Tez_repr.div_exn rewards csts.consensus_committee_size
+      | Dal_attesting_reward_per_shard ->
+          Tez_repr.div_exn
+            rewards
+            csts.dal.cryptobox_parameters.number_of_shards
       | _ -> rewards
     in
     Tez_repr.mul_q ~rounding:`Down base_rewards coeff
@@ -144,6 +150,9 @@ let baking_reward_bonus_per_slot ctxt =
 
 let attesting_reward_per_slot ctxt =
   reward_from_context ~ctxt ~reward_kind:Attesting_reward_per_slot
+
+let dal_attesting_reward_per_shard ctxt =
+  reward_from_context ~ctxt ~reward_kind:Dal_attesting_reward_per_shard
 
 let liquidity_baking_subsidy ctxt =
   let constants = Raw_context.constants ctxt in

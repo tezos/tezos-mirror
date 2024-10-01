@@ -53,10 +53,14 @@ type 'token balance =
   | Attesting_rewards : Tez_repr.t balance
   | Baking_rewards : Tez_repr.t balance
   | Baking_bonuses : Tez_repr.t balance
+  | Dal_attesting_rewards : Tez_repr.t balance
   | Storage_fees : Tez_repr.t balance
   | Double_signing_punishments : Tez_repr.t balance
   | Lost_attesting_rewards :
       Signature.Public_key_hash.t * bool * bool
+      -> Tez_repr.t balance
+  | Lost_dal_attesting_rewards :
+      Signature.Public_key_hash.t
       -> Tez_repr.t balance
   | Liquidity_baking_subsidies : Tez_repr.t balance
   | Burned : Tez_repr.t balance

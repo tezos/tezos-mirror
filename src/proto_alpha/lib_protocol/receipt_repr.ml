@@ -80,10 +80,14 @@ type 'token balance =
   | Attesting_rewards : Tez_repr.t balance
   | Baking_rewards : Tez_repr.t balance
   | Baking_bonuses : Tez_repr.t balance
+  | Dal_attesting_rewards : Tez_repr.t balance
   | Storage_fees : Tez_repr.t balance
   | Double_signing_punishments : Tez_repr.t balance
   | Lost_attesting_rewards :
       Signature.Public_key_hash.t * bool * bool
+      -> Tez_repr.t balance
+  | Lost_dal_attesting_rewards :
+      Signature.Public_key_hash.t
       -> Tez_repr.t balance
   | Liquidity_baking_subsidies : Tez_repr.t balance
   | Burned : Tez_repr.t balance
@@ -113,9 +117,11 @@ let token_of_balance : type token. token balance -> token Token.t = function
   | Attesting_rewards -> Token.Tez
   | Baking_rewards -> Token.Tez
   | Baking_bonuses -> Token.Tez
+  | Dal_attesting_rewards -> Token.Tez
   | Storage_fees -> Token.Tez
   | Double_signing_punishments -> Token.Tez
   | Lost_attesting_rewards _ -> Token.Tez
+  | Lost_dal_attesting_rewards _ -> Token.Tez
   | Liquidity_baking_subsidies -> Token.Tez
   | Burned -> Token.Tez
   | Commitments _ -> Token.Tez
@@ -147,6 +153,8 @@ let compare_balance :
       else
         let c = Compare.Bool.compare pa pb in
         if is_not_zero c then c else Compare.Bool.compare ra rb
+  | Lost_dal_attesting_rewards pkha, Lost_dal_attesting_rewards pkhb ->
+      Signature.Public_key_hash.compare pkha pkhb
   | Commitments bpkha, Commitments bpkhb ->
       Blinded_public_key_hash.compare bpkha bpkhb
   | Frozen_bonds (ca, ra), Frozen_bonds (cb, rb) ->
@@ -183,6 +191,8 @@ let compare_balance :
         | Sc_rollup_refutation_rewards -> 20
         | Staking_delegator_numerator _ -> 21
         | Staking_delegate_denominator _ -> 22
+        | Dal_attesting_rewards -> 23
+        | Lost_dal_attesting_rewards _ -> 24
         (* don't forget to add parameterized cases in the first part of the function *)
       in
       Compare.Int.compare (index ba) (index bb)
@@ -461,6 +471,25 @@ let balance_and_update_encoding =
              | Staking_delegate_denominator {delegate} -> Some ((), (), delegate)
              | _ -> None)
            (fun ((), (), delegate) -> Staking_delegate_denominator {delegate});
+         tez_case
+           (Tag 29)
+           ~title:"DAL_attesting_rewards"
+           (obj2
+              (req "kind" (constant "minted"))
+              (req "category" (constant "DAL attesting rewards")))
+           (function Dal_attesting_rewards -> Some ((), ()) | _ -> None)
+           (fun ((), ()) -> Dal_attesting_rewards);
+         tez_case
+           (Tag 30)
+           ~title:"Lost_DAL_attesting_rewards"
+           (obj3
+              (req "kind" (constant "burned"))
+              (req "category" (constant "lost DAL attesting rewards"))
+              (req "delegate" Signature.Public_key_hash.encoding))
+           (function
+             | Lost_dal_attesting_rewards delegate -> Some ((), (), delegate)
+             | _ -> None)
+           (fun ((), (), delegate) -> Lost_dal_attesting_rewards delegate);
        ]
 
 type update_origin =

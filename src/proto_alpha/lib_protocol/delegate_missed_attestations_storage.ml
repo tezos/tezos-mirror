@@ -43,6 +43,20 @@ let expected_slots_for_given_active_stake ctxt ~total_active_stake_weight
           (Z.of_int number_of_attestations_per_cycle))
        (Z.of_int64 total_active_stake_weight))
 
+let expected_dal_shards_for_given_active_stake ctxt ~total_active_stake_weight
+    ~active_stake_weight =
+  let blocks_per_cycle =
+    Int32.to_int (Constants_storage.blocks_per_cycle ctxt)
+  in
+  let number_of_shards = Constants_storage.dal_number_of_shards ctxt in
+  let number_of_shards_per_cycle = number_of_shards * blocks_per_cycle in
+  Z.to_int
+    (Z.div
+       (Z.mul
+          (Z.of_int64 active_stake_weight)
+          (Z.of_int number_of_shards_per_cycle))
+       (Z.of_int64 total_active_stake_weight))
+
 let remove_total_dal_attested_slots ctxt =
   Storage.Dal.Total_attested_slots.remove ctxt
 

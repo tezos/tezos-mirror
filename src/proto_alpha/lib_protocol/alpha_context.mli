@@ -2165,9 +2165,11 @@ module Receipt : sig
     | Attesting_rewards : Tez.t balance
     | Baking_rewards : Tez.t balance
     | Baking_bonuses : Tez.t balance
+    | Dal_attesting_rewards : Tez.t balance
     | Storage_fees : Tez.t balance
     | Double_signing_punishments : Tez.t balance
     | Lost_attesting_rewards : public_key_hash * bool * bool -> Tez.t balance
+    | Lost_dal_attesting_rewards : public_key_hash -> Tez.t balance
     | Liquidity_baking_subsidies : Tez.t balance
     | Burned : Tez.t balance
     | Commitments : Blinded_public_key_hash.t -> Tez.t balance
@@ -2372,6 +2374,8 @@ module Delegate : sig
 
     val attesting_reward_per_slot : t -> Tez.t tzresult
 
+    val dal_attesting_reward_per_shard : t -> Tez.t tzresult
+
     val liquidity_baking_subsidy : t -> Tez.t tzresult
 
     val seed_nonce_revelation_tip : t -> Tez.t tzresult
@@ -2383,6 +2387,7 @@ module Delegate : sig
         | Baking_reward_fixed_portion
         | Baking_reward_bonus_per_slot
         | Attesting_reward_per_slot
+        | Dal_attesting_reward_per_shard
         | Seed_nonce_revelation_tip
         | Vdf_revelation_tip
 
@@ -5296,6 +5301,7 @@ module Token : sig
     | `Attesting_rewards
     | `Baking_rewards
     | `Baking_bonuses
+    | `Dal_attesting_rewards
     | `Minted
     | `Liquidity_baking_subsidies
     | `Sc_rollup_refutation_rewards
@@ -5305,6 +5311,7 @@ module Token : sig
     [ `Storage_fees
     | `Double_signing_punishments
     | `Lost_attesting_rewards of public_key_hash * bool * bool
+    | `Lost_dal_attesting_rewards of public_key_hash
     | `Burned
     | `Sc_rollup_refutation_punishments
     | container ]
