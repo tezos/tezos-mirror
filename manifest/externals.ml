@@ -38,6 +38,8 @@ let asetmap = external_lib "asetmap" V.(at_least "0.8.1")
 
 let astring = external_lib "astring" V.True
 
+let bam_ppx = external_lib "bam-ppx" V.True
+
 let bheap = external_lib "bheap" V.(at_least "2.0.0")
 
 let bigarray_compat = external_lib "bigarray-compat" V.True
@@ -286,6 +288,8 @@ let ledgerwallet_tezos = external_lib "ledgerwallet-tezos" V.(at_least "0.4.0")
 let crowbar = external_lib "crowbar" V.(at_least "0.2")
 
 let ppx_hash = external_lib "ppx_hash" V.True
+
+let tezt_bam = external_lib "tezt-bam" V.True
 
 let tezt_lib =
   external_lib
