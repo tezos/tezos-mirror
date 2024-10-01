@@ -245,7 +245,7 @@ let chain_validator_limits_encoding =
              });
        ])
 
-let default_storage_maintenance_context_pruning = Storage_maintenance.Enabled
+let default_disable_context_pruning = false
 
 let default_storage_maintenance_delay = Storage_maintenance.Disabled
 
@@ -255,7 +255,7 @@ type limits = {
   peer_validator_limits : peer_validator_limits;
   chain_validator_limits : chain_validator_limits;
   history_mode : History_mode.t option;
-  context_pruning : Storage_maintenance.context_pruning option;
+  disable_context_pruning : bool option;
   storage_maintenance_delay : Storage_maintenance.delay option;
 }
 
@@ -266,7 +266,7 @@ let default_limits =
     peer_validator_limits = default_peer_validator_limits;
     chain_validator_limits = default_chain_validator_limits;
     history_mode = None;
-    context_pruning = Some Enabled;
+    disable_context_pruning = Some false;
     storage_maintenance_delay = Some Disabled;
   }
 
@@ -279,7 +279,7 @@ let limits_encoding =
            prevalidator_limits;
            chain_validator_limits;
            history_mode;
-           context_pruning;
+           disable_context_pruning;
            storage_maintenance_delay;
          } ->
       ( peer_validator_limits,
@@ -287,14 +287,14 @@ let limits_encoding =
         prevalidator_limits,
         chain_validator_limits,
         history_mode,
-        context_pruning,
+        disable_context_pruning,
         storage_maintenance_delay ))
     (fun ( peer_validator_limits,
            block_validator_limits,
            prevalidator_limits,
            chain_validator_limits,
            history_mode,
-           context_pruning,
+           disable_context_pruning,
            storage_maintenance_delay ) ->
       {
         peer_validator_limits;
@@ -302,7 +302,7 @@ let limits_encoding =
         prevalidator_limits;
         chain_validator_limits;
         history_mode;
-        context_pruning;
+        disable_context_pruning;
         storage_maintenance_delay;
       })
     (obj7
@@ -323,5 +323,5 @@ let limits_encoding =
           chain_validator_limits_encoding
           default_chain_validator_limits)
        (opt "history_mode" History_mode.encoding)
-       (opt "context_pruning" Storage_maintenance.context_pruning_encoding)
+       (opt "disable_context_pruning" bool)
        (opt "storage_maintenance_delay" Storage_maintenance.delay_encoding))
