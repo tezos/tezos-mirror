@@ -11,7 +11,9 @@
   octez-libs.event-logging
   octez-libs.test-helpers
   qcheck-alcotest
-  octez-alcotezt)
+  octez-alcotezt
+  tezt-bam)
+ (preprocess (pps bam-ppx))
  (library_flags (:standard -linkall))
  (flags
   (:standard)
