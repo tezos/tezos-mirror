@@ -51,15 +51,75 @@ type manual =
   | Yes  (** Add rule for manual start. *)
   | On_changes of Changeset.t  (** Add manual start on certain [changes:] *)
 
+(** Jobs testing the installability of the Octez opam packages.
+
+    The opam packages are split into two {i groups}: those installing
+    executables and the other jobs. The former group is tested more
+    often (being typically the leaves the dependency graph of opam
+    packages).
+
+    Due to the large number of packages, the opam testing jobs are
+    launched in a series of {i batches}. Jobs are grouped into batches as
+    per their expected duration. The expected duration is based on the
+    depth of it's dependency tree. Thus, jobs testing packages with a
+    deeper dependency tree are launched in the first batch (the
+    [batch_index] of all those jobs is 1).
+
+    The set of opam packages, their group, and the index of its batch,
+    is defined by manifest and written to the TSV file
+    [script-inputs/ci-opam-package-tests]. *)
 module Opam = struct
+  (** Opam package group.
+
+      Opam jobs are split into two groups:
+      - [Executable]: those that install an executable, e.g. [octez-client].
+      - [All]: remaining packages, e.g. [octez-libs]. *)
   type opam_package_group = Executable | All
 
+  (** Opam package meta-data.
+
+      An opam testing job is characterized by the package name, its
+      group and the index of the batch in which it will execute. *)
   type opam_package = {
     name : string;
     group : opam_package_group;
     batch_index : int;
   }
 
+  (** Opam packages and their meta data.
+
+      This is read from the file [script-inputs/ci-opam-package-tests],
+      which is written by manifest. *)
+  let opam_packages =
+    let ci_opam_package_tests = "script-inputs/ci-opam-package-tests" in
+    Fun.flip List.filter_map (read_lines_from_file ci_opam_package_tests)
+    @@ fun line ->
+    let fail () =
+      failwith
+        (sf "failed to parse %S: invalid line: %S" ci_opam_package_tests line)
+    in
+    if line = "" then None
+    else
+      match String.split_on_char '\t' line with
+      | [name; group; batch_index] ->
+          let batch_index =
+            match int_of_string_opt batch_index with
+            | Some i -> i
+            | None -> fail ()
+          in
+          let group =
+            match group with
+            | "exec" -> Executable
+            | "all" -> All
+            | _ -> fail ()
+          in
+          Some {name; group; batch_index}
+      | _ -> fail ()
+
+  (** Opam job rules.
+
+      These rules define when the opam job runs, and implements the
+      delay used to run opam jobs in batches. *)
   let opam_rules pipeline_type ~only_final_pipeline ?batch_index () =
     let when_ =
       match batch_index with
@@ -80,6 +140,11 @@ module Opam = struct
             ();
         ]
 
+  (** Constructs the opam package job for a given group and batch.
+
+      Separate packages with the same group and batch are tested in
+      separate jobs, which is implemented through parallel-matrix
+      jobs. *)
   let job_opam_packages ?dependencies pipeline_type group batch_index packages :
       tezos_job =
     job
@@ -136,8 +201,7 @@ module Opam = struct
       ~path:"$CI_PROJECT_DIR/_build/_sccache"
     |> enable_cargo_cache
 
-  let jobs_opam_packages ?dependencies pipeline_type opam_packages :
-      tezos_job list =
+  let jobs_opam_packages ?dependencies pipeline_type : tezos_job list =
     let package_by_group_index = Hashtbl.create 5 in
     List.iter
       (fun pkg ->
@@ -148,6 +212,12 @@ module Opam = struct
         in
         Hashtbl.replace package_by_group_index key (pkg.name :: packages))
       opam_packages ;
+    (* The [opam:prepare] job creates a local opam-repository from
+       which installability is tested. This repository is transferred
+       as an artifact to the opam package jobs.
+
+       Note: this preliminary step is very quick and could be folded
+       into the opam package jobs. *)
     let job_prepare =
       job
         ~__POS__
@@ -178,33 +248,6 @@ module Opam = struct
            :: jobs)
          package_by_group_index
          []
-
-  let ci_opam_package_tests = "script-inputs/ci-opam-package-tests"
-
-  let opam_packages =
-    Fun.flip List.filter_map (read_lines_from_file ci_opam_package_tests)
-    @@ fun line ->
-    let fail () =
-      failwith
-        (sf "failed to parse %S: invalid line: %S" ci_opam_package_tests line)
-    in
-    if line = "" then None
-    else
-      match String.split_on_char '\t' line with
-      | [name; group; batch_index] ->
-          let batch_index =
-            match int_of_string_opt batch_index with
-            | Some i -> i
-            | None -> fail ()
-          in
-          let group =
-            match group with
-            | "exec" -> Executable
-            | "all" -> All
-            | _ -> fail ()
-          in
-          Some {name; group; batch_index}
-      | _ -> fail ()
 end
 
 (* These are the set of Linux distributions and their release for
@@ -712,10 +755,7 @@ let jobs pipeline_type =
 
   (*Packaging jobs *)
   let packaging =
-    Opam.jobs_opam_packages
-      ~dependencies:dependencies_needs_start
-      pipeline_type
-      Opam.opam_packages
+    Opam.jobs_opam_packages ~dependencies:dependencies_needs_start pipeline_type
   in
   (* Dependencies for jobs that should run immediately after jobs
      [job_build_x86_64] in [Before_merging] if they are present
