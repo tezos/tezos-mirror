@@ -2149,20 +2149,7 @@ module Dal = struct
         let name = ["dal"]
       end)
 
-  (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3113
-
-     This is only for prototyping. Probably something smarter would be
-     to index each header directly. *)
-  (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3684
-
-     This storage should be carbonated. *)
   module Slot = struct
-    module Slot_context =
-      Make_subcontext (Registered) (Raw_context)
-        (struct
-          let name = ["slot"]
-        end)
-
     module Level_context =
       Make_indexed_subcontext
         (Make_subcontext (Registered) (Raw_context)
