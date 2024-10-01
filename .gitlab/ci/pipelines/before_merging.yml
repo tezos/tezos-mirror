@@ -126,7 +126,6 @@ trigger:
     allow_failure: false
   - when: always
   dependencies: []
-  allow_failure: false
   timeout: 10 minutes
   script:
   - echo 'Trigger pipeline!'

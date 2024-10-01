@@ -335,7 +335,6 @@ let jobs pipeline_type =
             ~__POS__
             ~image:Images.alpine
             ~stage:Stages.start
-            ~allow_failure:No
             ~rules:
               [
                 job_rule
