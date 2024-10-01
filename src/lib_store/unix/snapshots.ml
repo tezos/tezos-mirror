@@ -600,18 +600,13 @@ module Version = struct
    *)
 
   (* Used for old snapshot format versions *)
-  let legacy_version = 4
+  (* Keeping this for future use. *)
+  let _legacy_version = 4
 
   let current_version = 7
 
   (* List of versions that are supported *)
-  let supported_versions =
-    [
-      (legacy_version, `Legacy_format);
-      (5, `Legacy);
-      (6, `Legacy);
-      (current_version, `Current);
-    ]
+  let supported_versions = [(current_version, `Current)]
 
   let is_supported version =
     match List.assq_opt version supported_versions with
@@ -619,7 +614,8 @@ module Version = struct
     | None -> false
 
   (* Returns true if the given version uses a legacy data format. *)
-  let is_legacy_format version =
+  (* Keeping this for future use. *)
+  let _is_legacy_format version =
     let open Lwt_result_syntax in
     match List.assq_opt version supported_versions with
     | None ->
@@ -671,62 +667,12 @@ module Snapshot_metadata = struct
          (req "level" int32)
          (req "timestamp" Time.Protocol.encoding))
 
-  type legacy_metadata = {
-    chain_name : Distributed_db_version.Name.t;
-    history_mode : History_mode.t;
-    block_hash : Block_hash.t;
-    level : Int32.t;
-    timestamp : Time.Protocol.t;
-    context_elements : int;
-  }
-
-  let legacy_metadata_encoding =
-    let open Data_encoding in
-    conv
-      (fun {
-             chain_name;
-             history_mode;
-             block_hash;
-             level;
-             timestamp;
-             context_elements;
-           } ->
-        ( chain_name,
-          history_mode,
-          block_hash,
-          level,
-          timestamp,
-          context_elements ))
-      (fun ( chain_name,
-             history_mode,
-             block_hash,
-             level,
-             timestamp,
-             context_elements ) ->
-        {
-          chain_name;
-          history_mode;
-          block_hash;
-          level;
-          timestamp;
-          context_elements;
-        })
-      (obj6
-         (req "chain_name" Distributed_db_version.Name.encoding)
-         (req "mode" History_mode.encoding)
-         (req "block_hash" Block_hash.encoding)
-         (req "level" int32)
-         (req "timestamp" Time.Protocol.encoding)
-         (req "context_elements" int31))
-
-  type t = Current of metadata | Legacy of legacy_metadata
+  type t = Current of metadata
 
   let pp ppf metadata =
     let chain_name, block_hash, level, history_mode, timestamp =
       match metadata with
       | Current {chain_name; block_hash; level; history_mode; timestamp} ->
-          (chain_name, block_hash, level, history_mode, timestamp)
-      | Legacy {chain_name; block_hash; level; history_mode; timestamp; _} ->
           (chain_name, block_hash, level, history_mode, timestamp)
     in
     Format.fprintf
@@ -742,29 +688,15 @@ module Snapshot_metadata = struct
       History_mode.pp_short
       history_mode
 
-  let get_block_hash = function
-    | Current {block_hash; _} -> block_hash
-    | Legacy {block_hash; _} -> block_hash
+  let get_block_hash = function Current {block_hash; _} -> block_hash
 
-  let get_chain_name = function
-    | Current {chain_name; _} -> chain_name
-    | Legacy {chain_name; _} -> chain_name
+  let get_chain_name = function Current {chain_name; _} -> chain_name
 
-  let get_history_mode = function
-    | Current {history_mode; _} -> history_mode
-    | Legacy {history_mode; _} -> history_mode
+  let get_history_mode = function Current {history_mode; _} -> history_mode
 
   let read_metadata ~metadata_file =
     let open Lwt_result_syntax in
     let read_json json = Data_encoding.Json.destruct metadata_encoding json in
-    let* json = Lwt_utils_unix.Json.read_file metadata_file in
-    return (read_json json)
-
-  let read_legacy_metadata ~metadata_file =
-    let open Lwt_result_syntax in
-    let read_json json =
-      Data_encoding.Json.destruct legacy_metadata_encoding json
-    in
     let* json = Lwt_utils_unix.Json.read_file metadata_file in
     return (read_json json)
 end
@@ -783,18 +715,7 @@ module Snapshot_header = struct
          "snapshot_header"
          (merge_objs Version.encoding Snapshot_metadata.metadata_encoding))
 
-  type snapshot_header_legacy = Version.t * Snapshot_metadata.legacy_metadata
-
-  let snapshot_header_legacy_encoding =
-    let open Data_encoding in
-    obj1
-      (req
-         "snapshot_header"
-         (merge_objs
-            Version.encoding
-            Snapshot_metadata.legacy_metadata_encoding))
-
-  type t = Current of snapshot_header | Legacy of snapshot_header_legacy
+  type t = Current of snapshot_header
 
   let pp ppf = function
     | Current (version, metadata) ->
@@ -804,29 +725,15 @@ module Snapshot_header = struct
           Snapshot_metadata.pp
           (Snapshot_metadata.Current metadata)
           version
-    | Legacy (version, metadata) ->
-        Format.fprintf
-          ppf
-          "%a (snapshot version %d)"
-          Snapshot_metadata.pp
-          (Snapshot_metadata.Legacy metadata)
-          version
 
   let to_json = function
     | Current snapshot_header ->
         Data_encoding.Json.construct snapshot_header_encoding snapshot_header
-    | Legacy snapshot_header ->
-        Data_encoding.Json.construct
-          snapshot_header_legacy_encoding
-          snapshot_header
 
-  let get_version = function
-    | Current (version, _) -> version
-    | Legacy (version, _) -> version
+  let get_version = function Current (version, _) -> version
 
   let get_metadata = function
     | Current (_, metadata) -> Snapshot_metadata.Current metadata
-    | Legacy (_, metadata) -> Snapshot_metadata.Legacy metadata
 end
 
 type snapshot_format = Tar | Raw
@@ -892,56 +799,10 @@ let block_data_encoding =
           Operation_metadata_list_list_hash.encoding)
        (req " resulting_context_hash" Context_hash.encoding))
 
-type legacy_block_data = {
-  block_header : Block_header.t;
-  operations : Operation.t list list;
-  predecessor_header : Block_header.t;
-  predecessor_block_metadata_hash : Block_metadata_hash.t option;
-  predecessor_ops_metadata_hash : Operation_metadata_list_list_hash.t option;
-}
-
-let legacy_block_data_encoding =
-  let open Data_encoding in
-  conv
-    (fun {
-           block_header;
-           operations;
-           predecessor_header;
-           predecessor_block_metadata_hash;
-           predecessor_ops_metadata_hash;
-         } ->
-      ( operations,
-        block_header,
-        predecessor_header,
-        predecessor_block_metadata_hash,
-        predecessor_ops_metadata_hash ))
-    (fun ( operations,
-           block_header,
-           predecessor_header,
-           predecessor_block_metadata_hash,
-           predecessor_ops_metadata_hash ) ->
-      {
-        block_header;
-        operations;
-        predecessor_header;
-        predecessor_block_metadata_hash;
-        predecessor_ops_metadata_hash;
-      })
-    (obj5
-       (req "operations" (list (list (dynamic_size Operation.encoding))))
-       (req "block_header" (dynamic_size Block_header.encoding))
-       (req "predecessor_header" (dynamic_size Block_header.encoding))
-       (opt "predecessor_block_metadata_hash" Block_metadata_hash.encoding)
-       (opt
-          "predecessor_ops_metadata_hash"
-          Operation_metadata_list_list_hash.encoding))
-
 let default_snapshot_filename (metadata : Snapshot_metadata.t) =
   let chain_name, block_hash, level, history_mode =
     match metadata with
     | Current {chain_name; block_hash; level; history_mode; _} ->
-        (chain_name, block_hash, level, history_mode)
-    | Legacy {chain_name; block_hash; level; history_mode; _} ->
         (chain_name, block_hash, level, history_mode)
   in
   (* The generated filename follows this pattern:
@@ -1797,9 +1658,6 @@ module Raw_exporter : EXPORTER = struct
       | Current metadata ->
           Data_encoding.Json.(
             construct Snapshot_metadata.metadata_encoding metadata)
-      | Legacy _ ->
-          (* The export of legacy snapshots is not allowed. *)
-          assert false
     in
     Lwt_utils_unix.Json.write_file metadata_file metadata_json
 
@@ -2057,9 +1915,6 @@ module Tar_exporter : EXPORTER = struct
       | Snapshot_metadata.Current metadata ->
           Data_encoding.Json.(
             construct Snapshot_metadata.metadata_encoding metadata)
-      | Legacy metadata ->
-          Data_encoding.Json.(
-            construct Snapshot_metadata.legacy_metadata_encoding metadata)
     in
     let metadata_file =
       Naming.snapshot_metadata_file t.snapshot_tmp_dir |> Naming.file_path
@@ -2960,22 +2815,11 @@ module Raw_loader : LOADER = struct
     in
     Snapshot_metadata.read_metadata ~metadata_file
 
-  let load_snapshot_legacy_metadata t =
-    let metadata_file =
-      Naming.(snapshot_metadata_file t.snapshot_dir |> file_path)
-    in
-    Snapshot_metadata.read_legacy_metadata ~metadata_file
-
   let load_snapshot_header t =
     let open Lwt_result_syntax in
     let* version = load_snapshot_version t in
-    let* is_legacy_format = Version.is_legacy_format version in
-    if is_legacy_format then
-      let* legacy_metadata = load_snapshot_legacy_metadata t in
-      return (Snapshot_header.Legacy (version, legacy_metadata))
-    else
-      let* metadata = load_snapshot_metadata t in
-      return (Snapshot_header.Current (version, metadata))
+    let* metadata = load_snapshot_metadata t in
+    return (Snapshot_header.Current (version, metadata))
 
   let close _ = Lwt.return_unit
 end
@@ -3043,39 +2887,11 @@ module Tar_loader : LOADER = struct
     | Some metadata -> return metadata
     | None -> tzfail (Cannot_read {kind = `Metadata; path = filename})
 
-  let load_snapshot_legacy_metadata t =
-    let open Lwt_result_syntax in
-    let filename =
-      Naming.(snapshot_metadata_file t.snapshot_tar |> file_path)
-    in
-    let*! o =
-      let*! o = Onthefly.find_file t.tar ~filename in
-      match o with
-      | Some file -> (
-          let*! str = Onthefly.load_file t.tar file in
-          match Data_encoding.Json.from_string str with
-          | Ok json ->
-              Lwt.return_some
-                (Data_encoding.Json.destruct
-                   Snapshot_metadata.legacy_metadata_encoding
-                   json)
-          | Error _ -> Lwt.return_none)
-      | None -> Lwt.return_none
-    in
-    match o with
-    | Some metadata -> return metadata
-    | None -> tzfail (Cannot_read {kind = `Metadata; path = filename})
-
   let load_snapshot_header t =
     let open Lwt_result_syntax in
     let* version = load_snapshot_version t in
-    let* is_legacy_format = Version.is_legacy_format version in
-    if is_legacy_format then
-      let* legacy_metadata = load_snapshot_legacy_metadata t in
-      return (Snapshot_header.Legacy (version, legacy_metadata))
-    else
-      let* metadata = load_snapshot_metadata t in
-      return (Snapshot_header.Current (version, metadata))
+    let* metadata = load_snapshot_metadata t in
+    return (Snapshot_header.Current (version, metadata))
 
   let close t = Onthefly.close_in t.tar
 end
@@ -3213,34 +3029,9 @@ module Raw_importer : IMPORTER = struct
     match Data_encoding.Binary.of_string_opt block_data_encoding block_data with
     | Some block_data -> return block_data
     | None -> (
-        let* is_legacy_format = Version.is_legacy_format t.version in
         let* res =
-          if is_legacy_format then
-            Data_encoding.Binary.of_string_opt
-              legacy_block_data_encoding
-              block_data
-            |> Option.map
-                 (fun
-                   {
-                     block_header;
-                     operations;
-                     predecessor_header;
-                     predecessor_block_metadata_hash;
-                     predecessor_ops_metadata_hash;
-                   }
-                 ->
-                   {
-                     block_header;
-                     operations;
-                     predecessor_header;
-                     predecessor_block_metadata_hash;
-                     predecessor_ops_metadata_hash;
-                     resulting_context_hash = Context_hash.zero;
-                   })
-            |> return
-          else
-            return
-            @@ Data_encoding.Binary.of_string_opt block_data_encoding block_data
+          return
+          @@ Data_encoding.Binary.of_string_opt block_data_encoding block_data
         in
         match res with
         | Some v -> return v
@@ -3304,37 +3095,8 @@ module Raw_importer : IMPORTER = struct
     in
     let*! table_bytes = Lwt_utils_unix.read_file protocol_tbl_filename in
     let* res =
-      let* is_legacy_format = Version.is_legacy_format t.version in
-      if is_legacy_format then
-        (* Use the legacy encoding *)
-        match
-          Data_encoding.Binary.of_string_opt
-            Protocol_levels.Legacy.encoding
-            table_bytes
-        with
-        | Some table ->
-            let* res =
-              Protocol_levels.Legacy.fold_es
-                (fun proto_level activation_block map ->
-                  let protocol_info =
-                    {
-                      Protocol_levels.protocol =
-                        activation_block.Protocol_levels.Legacy.protocol;
-                      activation_block = activation_block.block;
-                      (* Only snapshot with legacy semantics will have
-                         legacy encoding. *)
-                      expect_predecessor_context = false;
-                    }
-                  in
-                  return (Protocol_levels.add proto_level protocol_info map))
-                table
-                Protocol_levels.empty
-            in
-            return_some res
-        | None -> return_none
-      else
-        Data_encoding.Binary.of_string_opt Protocol_levels.encoding table_bytes
-        |> return
+      Data_encoding.Binary.of_string_opt Protocol_levels.encoding table_bytes
+      |> return
     in
     match res with
     | Some v -> return v
@@ -3575,31 +3337,8 @@ module Tar_importer : IMPORTER = struct
     let*! o = Onthefly.load_from_filename t.tar ~filename in
     match o with
     | Some str -> (
-        let* is_legacy_format = Version.is_legacy_format t.version in
         let* res =
-          if is_legacy_format then
-            Data_encoding.Binary.of_string_opt legacy_block_data_encoding str
-            |> Option.map
-                 (fun
-                   {
-                     block_header;
-                     operations;
-                     predecessor_header;
-                     predecessor_block_metadata_hash;
-                     predecessor_ops_metadata_hash;
-                   }
-                 ->
-                   {
-                     block_header;
-                     operations;
-                     predecessor_header;
-                     predecessor_block_metadata_hash;
-                     predecessor_ops_metadata_hash;
-                     resulting_context_hash = Context_hash.zero;
-                   })
-            |> return
-          else
-            return @@ Data_encoding.Binary.of_string_opt block_data_encoding str
+          return @@ Data_encoding.Binary.of_string_opt block_data_encoding str
         in
         match res with
         | Some v -> return v
@@ -3657,37 +3396,8 @@ module Tar_importer : IMPORTER = struct
     match o with
     | Some str -> (
         let* res =
-          let* is_legacy_format = Version.is_legacy_format t.version in
-          if is_legacy_format then
-            (* Use the legacy encoding *)
-            match
-              Data_encoding.Binary.of_string_opt
-                Protocol_levels.Legacy.encoding
-                str
-            with
-            | Some table ->
-                let* res =
-                  Protocol_levels.Legacy.fold_es
-                    (fun proto_level activation_block map ->
-                      let protocol_info =
-                        {
-                          Protocol_levels.protocol =
-                            activation_block.Protocol_levels.Legacy.protocol;
-                          activation_block = activation_block.block;
-                          (* Only snapshot with legacy semantics will have
-                             legacy encoding. *)
-                          expect_predecessor_context = false;
-                        }
-                      in
-                      return (Protocol_levels.add proto_level protocol_info map))
-                    table
-                    Protocol_levels.empty
-                in
-                return_some res
-            | None -> return_none
-          else
-            Data_encoding.Binary.of_string_opt Protocol_levels.encoding str
-            |> return
+          Data_encoding.Binary.of_string_opt Protocol_levels.encoding str
+          |> return
         in
         match res with
         | Some v -> return v
@@ -4120,8 +3830,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
   let restore_and_apply_context snapshot_importer protocol_levels
       ?user_expected_block ~dst_context_dir ~user_activated_upgrades
       ~user_activated_protocol_overrides ~operation_metadata_size_limit
-      ~progress_display_mode ~legacy ~patch_context ~check_consistency
-      snapshot_metadata genesis chain_id =
+      ~patch_context ~check_consistency snapshot_metadata genesis chain_id =
     let open Lwt_result_syntax in
     let* ({
             block_header;
@@ -4165,108 +3874,57 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
           else predecessor_header.Block_header.shell.context
     in
     let* genesis_ctxt_hash, block_validation_result =
-      if legacy then
-        let*! context_index =
-          Context.init
-            ~readonly:false
-            ~index_log_size:default_index_log_size
-            ?patch_context
-            dst_context_dir
-        in
-        let* genesis_ctxt_hash =
-          Context.commit_genesis
-            context_index
-            ~chain_id
-            ~time:genesis.Genesis.time
-            ~protocol:genesis.protocol
-        in
-        let* context_elements =
-          match snapshot_metadata with
-          | Current _ ->
-              tzfail (Cannot_read {kind = `Metadata; path = "snapshot's file"})
-          | Legacy metadata -> return metadata.context_elements
-        in
-        let*! () = Event.(emit restoring_context) () in
-        let* () =
-          Importer.legacy_restore_context
-            snapshot_importer
-            context_index
-            ~expected_context_hash:imported_context_hash
-            ~nb_context_elements:context_elements
-            ~progress_display_mode
-        in
-        let*! () = Event.(emit context_restored) () in
-        let*! () = Event.(emit applying_target_block) () in
-        let* block_validation_result =
-          apply_context
-            context_index
-            ~imported_context_hash
-            chain_id
-            ~block_header
-            ~operations
-            ~predecessor_header
-            ~predecessor_block_metadata_hash
-            ~predecessor_ops_metadata_hash
-            ~user_activated_upgrades
-            ~user_activated_protocol_overrides
-            ~operation_metadata_size_limit
-        in
-        let*! () = Event.(emit target_block_applied) () in
-        let*! () = Context.close context_index in
-        return (genesis_ctxt_hash, block_validation_result)
-      else
-        let* () =
+      let* () =
+        Animation.three_dots
+          ~progress_display_mode:Auto
+          ~msg:"Importing context"
+        @@ fun () -> Importer.restore_context snapshot_importer ~dst_context_dir
+      in
+      let*! context_index =
+        Context.init
+          ~readonly:false
+          ~index_log_size:default_index_log_size
+          ?patch_context
+          dst_context_dir
+      in
+      let* genesis_ctxt_hash =
+        Context.commit_genesis
+          context_index
+          ~chain_id
+          ~time:genesis.Genesis.time
+          ~protocol:genesis.protocol
+      in
+      let*! () =
+        if check_consistency then
           Animation.three_dots
             ~progress_display_mode:Auto
-            ~msg:"Importing context"
+            ~msg:"Checking context integrity"
           @@ fun () ->
-          Importer.restore_context snapshot_importer ~dst_context_dir
-        in
-        let*! context_index =
-          Context.init
-            ~readonly:false
-            ~index_log_size:default_index_log_size
-            ?patch_context
-            dst_context_dir
-        in
-        let* genesis_ctxt_hash =
-          Context.commit_genesis
-            context_index
-            ~chain_id
-            ~time:genesis.Genesis.time
-            ~protocol:genesis.protocol
-        in
-        let*! () =
-          if check_consistency then
-            Animation.three_dots
-              ~progress_display_mode:Auto
-              ~msg:"Checking context integrity"
-            @@ fun () ->
-            Context.Checks.Pack.Integrity_check.run
-              ?ppf:None
-              ~root:dst_context_dir
-              ~auto_repair:false
-              ~always:false
-              ~heads:(Some [Context_hash.to_b58check imported_context_hash])
-              ()
-          else Lwt.return_unit
-        in
-        let* block_validation_result =
-          apply_context
-            context_index
-            ~imported_context_hash
-            chain_id
-            ~block_header
-            ~operations
-            ~predecessor_header
-            ~predecessor_block_metadata_hash
-            ~predecessor_ops_metadata_hash
-            ~user_activated_upgrades
-            ~user_activated_protocol_overrides
-            ~operation_metadata_size_limit
-        in
-        let*! () = Context.close context_index in
-        return (genesis_ctxt_hash, block_validation_result)
+          Context.Checks.Pack.Integrity_check.run
+            ?ppf:None
+            ~root:dst_context_dir
+            ~auto_repair:false
+            ~always:false
+            ~heads:(Some [Context_hash.to_b58check imported_context_hash])
+            ()
+        else Lwt.return_unit
+      in
+      let* block_validation_result =
+        apply_context
+          context_index
+          ~imported_context_hash
+          chain_id
+          ~block_header
+          ~operations
+          ~predecessor_header
+          ~predecessor_block_metadata_hash
+          ~predecessor_ops_metadata_hash
+          ~user_activated_upgrades
+          ~user_activated_protocol_overrides
+          ~operation_metadata_size_limit
+      in
+      let*! () = Context.close context_index in
+      return (genesis_ctxt_hash, block_validation_result)
     in
     let* () =
       check_context_hash_consistency
@@ -4371,7 +4029,6 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
     let* protocol_levels =
       restore_protocols snapshot_importer progress_display_mode
     in
-    let* legacy = Version.is_legacy_format snapshot_version in
     (* Restore context *)
     let* block_data, genesis_context_hash, block_validation_result =
       restore_and_apply_context
@@ -4382,8 +4039,6 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
         ~user_activated_upgrades
         ~user_activated_protocol_overrides
         ~operation_metadata_size_limit
-        ~progress_display_mode
-        ~legacy
         ~patch_context
         ~check_consistency
         snapshot_metadata
