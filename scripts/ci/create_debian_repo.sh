@@ -126,29 +126,32 @@ for release in $RELEASES; do             # unstable, jammy, noble ...
       done
     fi
 
+    cd "$TARGETDIR"
+    echo "Create the Packages file $TARGETDIR/${target}/Packages"
+    apt-ftparchive packages "dists/${release}" > \
+      "${target}/Packages"
+    gzip -k -f "${target}/Packages"
+    cd -
+
   done
-  # Create Release and sign
-  cd "$TARGETDIR"
-  echo "Create the Packages file ${target}/Packages"
-  apt-ftparchive packages "dists/${release}" > "${target}/Packages"
-  gzip -k -f "${target}/Packages"
 
   echo "Create the Release files using a static configuration file: \
-    dists/${release}/Release"
+    $TARGETDIR/dists/${release}/Release"
   apt-ftparchive \
     -o APT::FTPArchive::Release::Codename="$release" \
     -o APT::FTPArchive::Release::Architectures="noarch $ARCHITECTURES" \
     -c "$oldPWD/scripts/packaging/Release.conf" release \
-    "dists/${release}/" > "dists/${release}/Release"
+    "$TARGETDIR/dists/${release}/" > "$TARGETDIR/dists/${release}/Release"
 
   # sign the release file using GPG. Since gpg is run in a script we need to set
   # some variables and extra options to make it work. The InRelease file contains
   # both the gpg signature and the content of the Release file.
-  echo "Sign the release file: dists/${release}/InRelease"
+  echo "Sign the release file: $TARGETDIR/dists/${release}/InRelease"
   echo "$GPG_PASSPHRASE" |
     gpg --batch --passphrase-fd 0 --pinentry-mode loopback \
       -u "$GPG_KEY_ID" --clearsign \
-      -o "dists/${release}/InRelease" "dists/${release}/Release"
+      -o "$TARGETDIR/dists/${release}/InRelease" \
+      "$TARGETDIR/dists/${release}/Release"
 
   # back to base
   cd "$oldPWD"
