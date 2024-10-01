@@ -5,8 +5,9 @@ This document does not explain how smart rollup, smart rollup node,
 evm node and the kernel works.
 
 The following directory allows to initialise an octez-node on a
-specified network, a rollup node using a snapshot and start an evm
-node based on the rollup node data dir.
+specified network, a rollup node using a snapshot and start an EVM
+node either as proxy of the rollup node or as init en observer EVM
+node using a snapshot.
 
 The script `init.sh` is here to take care of every necessary steps to
 initialised all the node states. It can be called with
