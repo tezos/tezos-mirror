@@ -78,7 +78,16 @@ node, driven by the deployment of Etherlink Mainnet beta in May. These include:
   an improved UX for decentralized applications relying on the outbox of a
   Smart Rollup, like the Etherlink native bridge.
 
-Please see the Changelog for further information and other optimizations.
+Better logging UX
+~~~~~~~~~~~~~~~~~
+
+Octez v21.0 introduces several UX improvements to the :doc:`logging infrastructure <../user/logging>` including:
+
+- Clearer reporting of outdated nonces in baker logs
+- Listing the set of delegates used by a baker at startup
+- Coloured logs for most Octez binaries (including the node, baker and accuser)
+
+Please see the `Changelog`_ for further information and other optimizations.
 
 Update Instructions
 -------------------
