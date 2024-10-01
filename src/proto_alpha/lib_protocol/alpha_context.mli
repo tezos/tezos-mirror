@@ -2810,6 +2810,8 @@ module Dal : sig
 
     val expected_size_in_bits : max_index:Slot_index.t -> int
 
+    val intersection : t -> t -> t
+
     val record_number_of_attested_shards : context -> t -> int -> context
   end
 
