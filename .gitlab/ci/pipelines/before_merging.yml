@@ -130,7 +130,6 @@ trigger:
   timeout: 10 minutes
   script:
   - echo 'Trigger pipeline!'
-  - ./scripts/ci/check_alpine_version.sh
 
 sanity_ci:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -148,7 +147,6 @@ sanity_ci:
   - eval $(opam env)
   script:
   - make --silent -C manifest check
-  - ./scripts/ci/check_alpine_version.sh
   - make --silent -C ci check
 
 docker:hadolint:

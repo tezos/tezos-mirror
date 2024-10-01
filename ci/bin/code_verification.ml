@@ -329,9 +329,7 @@ let jobs pipeline_type =
 
            The purpose of this job is to implement a manual trigger
            for [Before_merging] pipelines, instead of running it on
-           each update to the merge request.
-
-           §2: We also perform some fast sanity checks. *)
+           each update to the merge request. *)
         let job_start =
           job
             ~__POS__
@@ -349,12 +347,7 @@ let jobs pipeline_type =
               ]
             ~timeout:(Minutes 10)
             ~name:"trigger"
-            [
-              "echo 'Trigger pipeline!'";
-              (* Check that the Alpine version of the trigger job's image
-                 corresponds to the value in scripts/version.sh. *)
-              "./scripts/ci/check_alpine_version.sh";
-            ]
+            ["echo 'Trigger pipeline!'"]
         in
         let make_dependencies ~before_merging ~schedule_extended_test:_ =
           before_merging job_start
@@ -379,9 +372,6 @@ let jobs pipeline_type =
         ~before_script:(before_script ~take_ownership:true ~eval_opam:true [])
         [
           "make --silent -C manifest check";
-          (* Check that the opam-repo images' Alpine version corresponds to
-             the value in scripts/version.sh. *)
-          "./scripts/ci/check_alpine_version.sh";
           (* Check that .gitlab-ci.yml is up to date. *)
           "make --silent -C ci check";
         ]
