@@ -262,13 +262,6 @@ let keep_everything_arg =
     ~doc:"Do not filter out files outside of the `/evm` directory"
     ()
 
-let reconstruct_arg =
-  Tezos_clic.arg
-    ~long:"reconstruct"
-    ~placeholder:"boot-sector.wasm"
-    ~doc:{|/!\ DO NOT USE. /!\"|}
-    Params.string
-
 let verbose_arg =
   Tezos_clic.switch
     ~short:'v'
@@ -1306,24 +1299,44 @@ let init_from_rollup_node_command =
   command
     ~desc:
       "initialises the EVM node data-dir using the data-dir of a rollup node."
-    (args3 data_dir_arg omit_delayed_tx_events_arg reconstruct_arg)
+    (args2 data_dir_arg omit_delayed_tx_events_arg)
     (prefixes ["init"; "from"; "rollup"; "node"]
     @@ rollup_node_data_dir_param @@ stop)
-    (fun (data_dir, omit_delayed_tx_events, reconstruct_from_boot_sector)
-         rollup_node_data_dir
-         () ->
-      match reconstruct_from_boot_sector with
-      | Some boot_sector ->
-          Evm_node_lib_dev.Evm_context.reconstruct
-            ~data_dir
-            ~rollup_node_data_dir
-            ~boot_sector
-      | None ->
-          Evm_node_lib_dev.Evm_context.init_from_rollup_node
-            ~omit_delayed_tx_events
-            ~data_dir
-            ~rollup_node_data_dir
-            ())
+    (fun (data_dir, omit_delayed_tx_events) rollup_node_data_dir () ->
+      Evm_node_lib_dev.Evm_context.init_from_rollup_node
+        ~omit_delayed_tx_events
+        ~data_dir
+        ~rollup_node_data_dir
+        ())
+
+let reconstruct_from_rollup_node_command =
+  let open Tezos_clic in
+  let rollup_node_data_dir_param =
+    Tezos_clic.param
+      ~name:"rollup-node-data-dir"
+      ~desc:(Format.sprintf "The path to the rollup node data directory.")
+      Params.string
+  in
+  let boot_sector_param =
+    Tezos_clic.param
+      ~name:"boot_sector"
+      ~desc:
+        "WASM boot sector that was used during the origination of the \
+         reconstructed rollup"
+      Params.string
+  in
+  command
+    ~desc:"Reconstruct block history from a rollup node directory"
+    (args1 data_dir_arg)
+    (prefixes ["reconstruct"; "from"; "rollup"; "node"]
+    @@ rollup_node_data_dir_param
+    @@ prefixes ["and"; "boot"; "sector"]
+    @@ boot_sector_param @@ stop)
+    (fun data_dir rollup_node_data_dir boot_sector () ->
+      Evm_node_lib_dev.Evm_context.reconstruct
+        ~data_dir
+        ~rollup_node_data_dir
+        ~boot_sector)
 
 let dump_to_rlp_command =
   let open Tezos_clic in
@@ -2404,7 +2417,7 @@ let debug_print_store_schemas_command =
       return_unit)
 
 (* List of commands not ready to be used by our end-users *)
-let in_development_commands = []
+let in_development_commands = [reconstruct_from_rollup_node_command]
 
 (* List of program commands *)
 let commands =
