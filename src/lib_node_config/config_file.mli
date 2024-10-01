@@ -140,7 +140,7 @@ val update :
   ?history_mode:History_mode.t ->
   ?network:blockchain_network ->
   ?latency:int ->
-  ?disable_context_pruning:bool ->
+  ?context_pruning:Storage_maintenance.context_pruning ->
   ?storage_maintenance_delay:Storage_maintenance.delay ->
   t ->
   t tzresult Lwt.t

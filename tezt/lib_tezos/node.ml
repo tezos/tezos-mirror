@@ -59,7 +59,7 @@ type argument =
   | RPC_additional_addr of string
   | RPC_additional_addr_external of string
   | Max_active_rpc_connections of int
-  | Disable_context_pruning
+  | Context_pruning of string
   | Storage_maintenance_delay of string
 
 let make_argument = function
@@ -94,7 +94,7 @@ let make_argument = function
   | RPC_additional_addr_external addr -> ["--external-rpc-addr"; addr]
   | Max_active_rpc_connections n ->
       ["--max-active-rpc-connections"; string_of_int n]
-  | Disable_context_pruning -> ["--disable-context-pruning"]
+  | Context_pruning x -> ["--context-pruning"; x]
   | Storage_maintenance_delay x -> ["--storage-maintenance-delay"; x]
 
 let make_arguments arguments = List.flatten (List.map make_argument arguments)
@@ -119,7 +119,7 @@ let is_redundant = function
   | Metadata_size_limit _, Metadata_size_limit _
   | Version, Version
   | Max_active_rpc_connections _, Max_active_rpc_connections _
-  | Disable_context_pruning, Disable_context_pruning
+  | Context_pruning _, Context_pruning _
   | Storage_maintenance_delay _, Storage_maintenance_delay _ ->
       true
   | Metrics_addr addr1, Metrics_addr addr2 -> addr1 = addr2
@@ -146,7 +146,7 @@ let is_redundant = function
   | RPC_additional_addr_external _, _
   | Version, _
   | Max_active_rpc_connections _, _
-  | Disable_context_pruning, _
+  | Context_pruning _, _
   | Storage_maintenance_delay _, _ ->
       false
 
