@@ -244,19 +244,6 @@ module Opam = struct
          []
 end
 
-(* These are the set of Linux distributions and their release for
-   which we test installation of current packages for debian and
-   the deprecated Serokell PPA binary packages for rpm. *)
-type install_octez_distribution =
-  | Ubuntu_noble
-  | Ubuntu_jammy
-  | Debian_bookworm
-
-let image_of_distribution = function
-  | Ubuntu_noble -> Images.ubuntu_noble
-  | Ubuntu_jammy -> Images.ubuntu_jammy
-  | Debian_bookworm -> Images.debian_bookworm
-
 (* Encodes the conditional [before_merging] pipeline and its unconditional variant
    [schedule_extended_test]. *)
 let jobs pipeline_type =
