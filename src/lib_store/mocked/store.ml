@@ -1824,8 +1824,8 @@ let store_dirs = ref []
 let context_dirs = ref []
 
 let init ?patch_context ?commit_genesis ?history_mode ?(readonly = false)
-    ?block_cache_limit ?disable_context_pruning:_ ?maintenance_delay:_
-    ~store_dir ~context_dir ~allow_testchains genesis =
+    ?block_cache_limit ?context_pruning:_ ?maintenance_delay:_ ~store_dir
+    ~context_dir ~allow_testchains genesis =
   let open Lwt_result_syntax in
   if List.mem ~equal:String.equal context_dir !context_dirs then
     Format.kasprintf

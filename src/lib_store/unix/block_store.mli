@@ -286,8 +286,8 @@ val default_cycle_size_limit : int32
     After the cementing, {!Cemented_block_store.trigger_gc} will be
     called with the given [history_mode]. When the merging thread
     succeeds, the callback [finalizer] will be called. Note that
-    depending on the [disable_context_pruning] flag, the context
-    pruning may be discarded.
+    depending on [context_pruning], the context pruning may be
+    discarded.
 
     If a merge thread is already occurring, this function will first
     wait for the previous merge to be done.
@@ -308,7 +308,7 @@ val merge_stores :
   new_head:Block_repr.t ->
   new_head_metadata:Block_repr.metadata ->
   cementing_highwatermark:int32 ->
-  disable_context_pruning:bool ->
+  context_pruning:Storage_maintenance.context_pruning ->
   unit tzresult Lwt.t
 
 val get_merge_status : t -> merge_status

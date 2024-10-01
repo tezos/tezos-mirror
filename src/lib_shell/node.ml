@@ -217,8 +217,8 @@ let check_context_consistency store =
       tzfail Non_recoverable_context
 
 let create ?(sandboxed = false) ?sandbox_parameters
-    ?(disable_context_pruning = false) ?history_mode ?maintenance_delay
-    ~singleprocess ~version ~commit_info
+    ?(context_pruning = Storage_maintenance.Enabled) ?history_mode
+    ?maintenance_delay ~singleprocess ~version ~commit_info
     {
       genesis;
       chain_name;
@@ -270,7 +270,7 @@ let create ?(sandboxed = false) ?sandbox_parameters
           ~context_dir:context_root
           ~allow_testchains:start_testchain
           ~readonly:false
-          ~disable_context_pruning
+          ~context_pruning
           ?maintenance_delay
           genesis
       in
@@ -313,7 +313,7 @@ let create ?(sandboxed = false) ?sandbox_parameters
           ~context_dir:context_root
           ~allow_testchains:start_testchain
           ~readonly:false
-          ~disable_context_pruning
+          ~context_pruning
           ?maintenance_delay
           genesis
       in

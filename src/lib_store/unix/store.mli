@@ -205,9 +205,9 @@ type chain_store
     @param block_cache_limit allows to override the size of the block
     cache to use. The minimal value is 1.
 
-    @param disable_context_pruning specifies whether or not the
-    context pruning is expected to be run (if set to true) or not (if
-    set to false -- default) during a storage maintenance.
+    @param context_pruning specifies whether or not the context
+    pruning is expected to be run (if set to Enabled) or not (if set
+    to Disabled) during a storage maintenance.
 
     @param maintenace_delay allows to introduce a delay prior to the
     trigger of the storage maintenance
@@ -224,7 +224,7 @@ val init :
   ?history_mode:History_mode.t ->
   ?readonly:bool ->
   ?block_cache_limit:int ->
-  ?disable_context_pruning:bool ->
+  ?context_pruning:Storage_maintenance.context_pruning ->
   ?maintenance_delay:Storage_maintenance.delay ->
   store_dir:string ->
   context_dir:string ->

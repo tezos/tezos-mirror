@@ -56,7 +56,7 @@ type config = {
 val create :
   ?sandboxed:bool ->
   ?sandbox_parameters:Data_encoding.json ->
-  ?disable_context_pruning:bool ->
+  ?context_pruning:Storage_maintenance.context_pruning ->
   ?history_mode:History_mode.t ->
   ?maintenance_delay:Storage_maintenance.delay ->
   singleprocess:bool ->
