@@ -118,6 +118,7 @@ _evm_unstripped_installer_preimages/
 
 # etherlink
 /etherlink/kernels-*
+etherlink-governance-observer
 
 # Terraform
 

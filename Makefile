@@ -583,3 +583,8 @@ wasm_runtime_gen_files::
 	@cd src/lib_wasm_runtime; cargo build 2> /dev/null
 
 octez-evm-node: wasm_runtime_gen_files
+
+.PHONY: build-etherlink-governance-observer
+build-etherlink-governance-observer:
+	@dune build ./etherlink/governance-metrics/src/governance_observer.exe
+	@cp -f ./_build/default/etherlink/governance-metrics/src/governance_observer.exe etherlink-governance-observer
