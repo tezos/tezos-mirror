@@ -45,12 +45,6 @@ type code_verification_pipeline =
   | Schedule_extended_test
   | Merge_train
 
-(** Configuration of manual jobs for [make_rules] *)
-type manual =
-  | No  (** Do not add rule for manual start. *)
-  | Yes  (** Add rule for manual start. *)
-  | On_changes of Changeset.t  (** Add manual start on certain [changes:] *)
-
 (** Jobs testing the installability of the Octez opam packages.
 
     The opam packages are split into two {i groups}: those installing
@@ -243,6 +237,12 @@ module Opam = struct
          package_by_group_index
          []
 end
+
+(** Configuration of manual jobs for [make_rules] *)
+type manual =
+  | No  (** Do not add rule for manual start. *)
+  | Yes  (** Add rule for manual start. *)
+  | On_changes of Changeset.t  (** Add manual start on certain [changes:] *)
 
 (* Encodes the conditional [before_merging] pipeline and its unconditional variant
    [schedule_extended_test]. *)
