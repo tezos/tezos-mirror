@@ -3,6 +3,24 @@
 Changelog
 '''''''''
 
+Version 21.0~rc3
+================
+
+General
+-------
+
+- Integrated binaries for Qena (MR :gl:`!15123`).
+
+DAL node
+--------
+
+- Fixed a memory leak in the DAL node.
+
+- Deactivate the metrics server by default
+
+- Fix ``--public-addr`` when the specified port was different
+  from the default one. (MR :gl:`!11732`)
+
 Version 21.0~rc1 and 21.0~rc2
 =============================
 
