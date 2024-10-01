@@ -696,6 +696,7 @@ module Ramp_up : sig
     baking_reward_fixed_portion : Tez_repr.t;
     baking_reward_bonus_per_slot : Tez_repr.t;
     attesting_reward_per_slot : Tez_repr.t;
+    dal_attesting_reward_per_shard : Tez_repr.t;
   }
 
   module Rewards :
