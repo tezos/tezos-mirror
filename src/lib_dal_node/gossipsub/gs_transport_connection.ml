@@ -305,10 +305,19 @@ let try_connect_point ?expected_peer_id p2p_layer point =
            seconds in some case). Blocking here means that processing of other
            messages from p2p_output_stream (including shards propagation) will
            be delayed. *)
-        let (_ : _ P2p.connection tzresult Lwt.t) =
-          P2p.connect ?expected_peer_id p2p_layer point
-        in
-        return_unit
+        Lwt.dont_wait
+          (fun () ->
+            let* (_ : _ P2p.connection tzresult) =
+              P2p.connect ?expected_peer_id p2p_layer point
+            in
+            return_unit)
+          (fun exn ->
+            Format.eprintf
+              "Warning: got an exception while trying to connect to %a: %s@."
+              Point.pp
+              point
+              (Printexc.to_string exn))
+        |> return
 
 let try_connect p2p_layer px_cache ~px_peer ~origin =
   let open Lwt_syntax in
