@@ -373,6 +373,22 @@ let rpc_server_is_ready =
     ~level:Notice
     ("point", P2p_point.Id.encoding)
 
+let metrics_server_starting =
+  declare_1
+    ~section:(section @ ["metrics"])
+    ~name:"metrics_service_start"
+    ~msg:"Starting metrics service at {endpoint}"
+    ~level:Notice
+    ("endpoint", P2p_point.Id.encoding)
+
+let metrics_server_not_starting =
+  declare_0
+    ~section:(section @ ["metrics"])
+    ~name:"metrics_service_no_start"
+    ~msg:"metrics service not enabled"
+    ~level:Notice
+    ()
+
 let metrics_server_is_ready =
   let open Internal_event.Simple in
   declare_2

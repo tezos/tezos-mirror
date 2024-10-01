@@ -71,7 +71,7 @@ type t = {
   expected_pow : float;
   network_name : string;
   endpoint : Uri.t;
-  metrics_addr : P2p_point.Id.t;
+  metrics_addr : P2p_point.Id.t option;
   profile : Profile_manager.t;
   history_mode : history_mode;
   version : int;
@@ -121,7 +121,7 @@ let default =
     expected_pow = default_expected_pow;
     network_name = default_network_name;
     endpoint = default_endpoint;
-    metrics_addr = default_metrics_addr;
+    metrics_addr = None;
     history_mode = default_history_mode;
     profile = Profile_manager.empty;
     version = current_version;
@@ -259,8 +259,8 @@ let encoding : t Data_encoding.t =
           (dft
              "metrics-addr"
              ~description:"The point for the DAL node metrics server"
-             P2p_point.Id.encoding
-             default_metrics_addr))
+             (Encoding.option P2p_point.Id.encoding)
+             None))
        (obj5
           (dft
              "history_mode"
@@ -429,7 +429,7 @@ let from_v0 v0 =
     expected_pow = v0.expected_pow;
     network_name = v0.network_name;
     endpoint = v0.endpoint;
-    metrics_addr = v0.metrics_addr;
+    metrics_addr = Some v0.metrics_addr;
     history_mode = v0.history_mode;
     profile = v0.profile;
     version = current_version;

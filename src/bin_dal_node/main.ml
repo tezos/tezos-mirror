@@ -60,7 +60,8 @@ let merge
     expected_pow = Option.value ~default:configuration.expected_pow expected_pow;
     endpoint = Option.value ~default:configuration.endpoint endpoint;
     profile;
-    metrics_addr = Option.value ~default:configuration.metrics_addr metrics_addr;
+    (* metrics are disabled unless a metrics_addr option is specified *)
+    metrics_addr;
     peers = peers @ configuration.peers;
     history_mode = Option.value ~default:configuration.history_mode history_mode;
     service_name = Option.either service_name configuration.service_name;
