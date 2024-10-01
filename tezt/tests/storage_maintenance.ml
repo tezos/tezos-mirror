@@ -68,4 +68,59 @@ let test_context_pruning_call =
   let* () = wait_context_gc and* () = wait_context_split in
   unit
 
-let register ~protocols = test_context_pruning_call protocols
+let wait_for_complete_storage_maintenance node target =
+  let filter json =
+    let level = JSON.(json |> as_int) in
+    if level = target then Some () else None
+  in
+  let wait_for_ending_merge () =
+    Node.wait_for node "end_merging_stores.v0" @@ fun _json -> Some ()
+  in
+  let* () = Node.wait_for node "start_merging_stores.v0" filter in
+  wait_for_ending_merge ()
+
+let test_disabled_maintenance_delay =
+  Protocol.register_test
+    ~__FILE__
+    ~title:(Format.asprintf "storage maintenance disabled delay")
+    ~tags:[team; "storage"; "maintenance"; "delay"; "disabled"]
+  @@ fun protocol ->
+  let* node =
+    Node.init
+      Node.[Synchronisation_threshold 0; Storage_maintenance_delay "disabled"]
+  in
+  let* client = Client.init ~endpoint:(Node node) () in
+  let* () = Client.activate_protocol_and_wait ~protocol ~node client in
+  let blocks_per_cycle = 8 in
+  let blocks_to_bake = 2 * blocks_per_cycle in
+  let wait_merge =
+    wait_for_complete_storage_maintenance node (blocks_per_cycle + 1)
+  in
+  let* () = bake_blocks node client ~blocks_to_bake in
+  Log.info "Waiting for the merge" ;
+  let* () = wait_merge in
+  unit
+
+(* This is a temporary test to ensure that only the disabled mode is
+   implemented. *)
+let test_only_disabled_is_implemented =
+  Protocol.register_test
+    ~__FILE__
+    ~title:(Format.asprintf "storage maintenance allows disabled only")
+    ~tags:[team; "storage"; "maintenance"; "delay"; "enable"]
+    ~uses_client:false
+    ~uses_admin_client:false
+  @@ fun _protocol ->
+  let node = Node.create Node.[Synchronisation_threshold 0] in
+  let* () =
+    Node.spawn_config_update node [Storage_maintenance_delay "enabled"]
+    |> Process.check_error
+         ~msg:(rex "only supports \"disabled\" mode")
+         ~exit_code:124
+  in
+  unit
+
+let register ~protocols =
+  test_context_pruning_call protocols ;
+  test_disabled_maintenance_delay protocols ;
+  test_only_disabled_is_implemented protocols
