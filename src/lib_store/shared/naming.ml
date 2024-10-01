@@ -172,6 +172,13 @@ let scheduled_maintenance dir =
     Data_encoding.(option int32)
     (Option.equal Int32.equal)
 
+let scheduled_maintenance dir =
+  make_encoded_file
+    dir
+    ~filename:"scheduled_maintenance"
+    Data_encoding.(option int32)
+    (Option.equal Int32.equal)
+
 let cemented_blocks_dir dir = mk_dir dir "cemented"
 
 let cemented_blocks_level_index_dir dir = mk_dir dir "level_index"
