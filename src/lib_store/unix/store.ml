@@ -226,7 +226,7 @@ let create_lockfile chain_dir =
   protect (fun () ->
       let* fd =
         Lwt_unix.openfile
-          (Naming.lock_file chain_dir |> Naming.file_path)
+          (Naming.lockfile chain_dir |> Naming.file_path)
           [Unix.O_CREAT; O_RDWR; O_CLOEXEC; O_SYNC]
           0o644
       in
@@ -467,6 +467,35 @@ module Block = struct
                operations_data_lengths = to_string ops_metadata;
              } ))
 
+  let set_protocol_level chain_store ~protocol_level
+      (block, protocol_hash, expect_predecessor_context) =
+    let open Lwt_result_syntax in
+    Shared.locked_use chain_store.chain_state (fun {protocol_levels_data; _} ->
+        let* () =
+          Stored_data.update_with protocol_levels_data (fun protocol_levels ->
+              let activation_block = descriptor block in
+              Lwt.return
+                Protocol_levels.(
+                  add
+                    protocol_level
+                    {
+                      protocol = protocol_hash;
+                      activation_block;
+                      expect_predecessor_context;
+                    }
+                    protocol_levels))
+        in
+        let*! () =
+          Store_events.(
+            emit
+              update_protocol_table
+              ( protocol_hash,
+                protocol_level,
+                Block_repr.hash block,
+                Block_repr.level block ))
+        in
+        return_unit)
+
   let store_block chain_store ~block_header ~operations validation_result =
     let open Lwt_result_syntax in
     let {
@@ -602,6 +631,38 @@ module Block = struct
             chain_store.block_store
             block
             resulting_context_hash
+        in
+        let protocol_level = Block_repr.proto_level block in
+        let* pred_block =
+          read_block chain_store (Block_repr.predecessor block)
+        in
+        let pred_proto_level = Block_repr.proto_level pred_block in
+        (* We update the protocol_table when a block contains a
+           protocol level change. *)
+        let* () =
+          if Compare.Int.(pred_proto_level < protocol_level) then
+            let context_index = chain_store.global_store.context_index in
+            let* resulting_context =
+              protect (fun () ->
+                  let*! c =
+                    Context_ops.checkout_exn
+                      context_index
+                      resulting_context_hash
+                  in
+                  return c)
+            in
+            let*! protocol_hash = Context_ops.get_protocol resulting_context in
+            let* (module NewProto) =
+              Registered_protocol.get_result protocol_hash
+            in
+            set_protocol_level
+              chain_store
+              ~protocol_level
+              ( block,
+                protocol_hash,
+                NewProto.expected_context_hash = Predecessor_resulting_context
+              )
+          else return_unit
         in
         let*! () =
           Store_events.(emit store_block) (hash, block_header.shell.level)
@@ -2556,34 +2617,7 @@ module Chain = struct
   let expect_predecessor_context_hash chain_store ~protocol_level =
     expect_predecessor_context_hash chain_store ~protocol_level
 
-  let set_protocol_level chain_store ~protocol_level
-      (block, protocol_hash, expect_predecessor_context) =
-    let open Lwt_result_syntax in
-    Shared.locked_use chain_store.chain_state (fun {protocol_levels_data; _} ->
-        let* () =
-          Stored_data.update_with protocol_levels_data (fun protocol_levels ->
-              let activation_block = Block.descriptor block in
-              Lwt.return
-                Protocol_levels.(
-                  add
-                    protocol_level
-                    {
-                      protocol = protocol_hash;
-                      activation_block;
-                      expect_predecessor_context;
-                    }
-                    protocol_levels))
-        in
-        let*! () =
-          Store_events.(
-            emit
-              update_protocol_table
-              ( protocol_hash,
-                protocol_level,
-                Block.hash block,
-                Block.level block ))
-        in
-        return_unit)
+  let set_protocol_level = Block.set_protocol_level
 
   let may_update_protocol_level chain_store ?pred ?protocol_level
       ~expect_predecessor_context (block, protocol_hash) =
