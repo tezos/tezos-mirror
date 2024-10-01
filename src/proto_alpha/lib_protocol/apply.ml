@@ -2296,7 +2296,11 @@ let record_attestation ctxt (mode : mode) (consensus : consensus_content)
         Option.fold
           ~none:(Result_syntax.return ctxt)
           ~some:(fun dal ->
-            Dal_apply.apply_attestation ctxt dal.attestation ~power:dal_power)
+            Dal_apply.apply_attestation
+              ctxt
+              ~tb_slot:consensus.slot
+              dal.attestation
+              ~power:dal_power)
           dal
       in
       return (ctxt, mk_attestation_result consensus_key power)

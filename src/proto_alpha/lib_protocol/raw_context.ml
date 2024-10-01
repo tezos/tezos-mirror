@@ -230,6 +230,8 @@ module Raw_dal = struct
         (** records the published slot headers *)
     slot_accountability : Dal_attestation_repr.Accountability.t;
         (** records attested shards, in order to determine protocol-attested slots *)
+    attestations : Dal_attestation_repr.t Slot_repr.Map.t;
+        (** records the included DAL attestations *)
   }
 
   let init ~number_of_slots =
@@ -238,6 +240,7 @@ module Raw_dal = struct
       slot_fee_market = Dal_slot_repr.Slot_market.init ~length:number_of_slots;
       slot_accountability =
         Dal_attestation_repr.Accountability.init ~number_of_slots;
+      attestations = Slot_repr.Map.empty;
     }
 end
 
@@ -2181,6 +2184,19 @@ module Dal = struct
   let[@inline] candidates ctxt =
     let dal = dal ctxt in
     Dal_slot_repr.Slot_market.candidates dal.slot_fee_market
+
+  let record_attestation ctxt ~tb_slot attestation =
+    let dal = dal ctxt in
+    update_dal
+      ctxt
+      {
+        dal with
+        attestations = Slot_repr.Map.add tb_slot attestation dal.attestations;
+      }
+
+  let[@inline] attestations ctxt =
+    let dal = dal ctxt in
+    dal.attestations
 
   let is_slot_index_attested ctxt =
     let dal = dal ctxt in

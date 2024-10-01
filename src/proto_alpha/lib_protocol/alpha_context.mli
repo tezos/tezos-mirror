@@ -2814,9 +2814,15 @@ module Dal : sig
 
     val expected_size_in_bits : max_index:Slot_index.t -> int
 
+    val number_of_attested_slots : t -> int
+
     val intersection : t -> t -> t
 
     val record_number_of_attested_shards : context -> t -> int -> context
+
+    val record_attestation : context -> tb_slot:Slot.t -> t -> context
+
+    val attestations : context -> t Slot.Map.t
   end
 
   type slot_id = {published_level : Raw_level.t; index : Slot_index.t}

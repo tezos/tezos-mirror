@@ -445,6 +445,14 @@ module Dal : sig
   val register_slot_header :
     t -> Dal_slot_repr.Header.t -> source:Contract_repr.t -> t tzresult
 
+  (** [record_attestation ctxt ~tb_slot attestation] records that the delegate
+      with Tenderbake slot [tb_slot] emitted [attestation]. *)
+  val record_attestation :
+    t -> tb_slot:Slot_repr.t -> Dal_attestation_repr.t -> t
+
+  (** [attestations] returns the recorded attestations *)
+  val attestations : t -> Dal_attestation_repr.t Slot_repr.Map.t
+
   (** [candidates ctxt] returns the current list of slot for which there is at
       least one candidate alongside the addresses that published them. *)
   val candidates : t -> (Dal_slot_repr.Header.t * Contract_repr.t) list

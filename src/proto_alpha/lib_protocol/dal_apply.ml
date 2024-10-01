@@ -61,9 +61,15 @@ let validate_attestation ctxt level slot consensus_key attestation =
     (let attester = pkh_of_consensus_key consensus_key in
      Dal_data_availibility_attester_not_in_committee {attester; level; slot})
 
-let apply_attestation ctxt attestation ~power =
+let apply_attestation ctxt attestation ~tb_slot ~power =
   let open Result_syntax in
   let* () = Dal.assert_feature_enabled ctxt in
+  let ctxt =
+    Dal.only_if_incentives_enabled
+      ctxt
+      ~default:(fun ctxt -> ctxt)
+      (fun ctxt -> Dal.Attestation.record_attestation ctxt ~tb_slot attestation)
+  in
   return
     (Dal.Attestation.record_number_of_attested_shards ctxt attestation power)
 

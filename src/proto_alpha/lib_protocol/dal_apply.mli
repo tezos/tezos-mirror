@@ -45,10 +45,12 @@ val validate_attestation :
   Dal.Attestation.t ->
   unit tzresult Lwt.t
 
-(** [apply_attestation ctxt attestation] records in the context that the given
-    [attestation] was issued and the corresponding attester has the given
+(** [apply_attestation ctxt attestation ~tb_slot ~power] records in the context
+    that the given [attestation] was issued by the delegate with initial
+    Tenderbake slot [tb_slot] and the corresponding attester has the given
     [power]. *)
-val apply_attestation : t -> Dal.Attestation.t -> power:int -> t tzresult
+val apply_attestation :
+  t -> Dal.Attestation.t -> tb_slot:Slot.t -> power:int -> t tzresult
 
 (** [validate_publish_commitment ctxt slot] ensures that [slot_header] is
    valid and prevents an operation containing [slot_header] to be
