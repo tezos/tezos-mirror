@@ -31,16 +31,16 @@ ReleaseCandidate | TestReleaseCandidate | Release | TestRelease)
   EXPECTED_VERSION="Octez $(echo "$gitlab_release_no_v" | tr '-' '~')"
   ;;
 Master)
-  DEBVERSION=1:$(date +'%Y%m%d%H%M')+$CI_COMMIT_TAG
-  DEBCHANGELOG="Packages for master $CI_COMMIT_TAG"
+  DEBVERSION=1:$(date +'%Y%m%d%H%M')+$CI_COMMIT_SHORT_SHA
+  DEBCHANGELOG="Packages for master $CI_COMMIT_SHORT_SHA"
   ;;
 SoftRelease)
-  DEBVERSION=1:$(date +'%Y%m%d%H%M')+$CI_COMMIT_TAG
-  DEBCHANGELOG="Packages for tag $CI_COMMIT_TAG"
+  DEBVERSION=1:$(date +'%Y%m%d%H%M')+${CI_COMMIT_TAG:-}
+  DEBCHANGELOG="Packages for tag ${CI_COMMIT_TAG:-}"
   ;;
 TestBranch)
   DEBVERSION=1:$(date +'%Y%m%d%H%M')+$CI_COMMIT_SHORT_SHA
-  DEBCHANGELOG="Test package commit $CI_COMMIT_REF_NAME"
+  DEBCHANGELOG="Test package commit ${CI_COMMIT_REF_NAME:-}"
   ;;
 *)
   echo "Cannot create package for this branch"
