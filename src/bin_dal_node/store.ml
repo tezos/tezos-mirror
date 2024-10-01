@@ -159,6 +159,14 @@ module Shards = struct
       ~number_of_keys_per_file:number_of_shards
       ()
 
+  let with_metrics store f =
+    let open Lwt_result_syntax in
+    let* r = f () in
+    let opened_files = KVS.View.opened_files store in
+    let ongoing_actions = KVS.View.ongoing_actions store in
+    Dal_metrics.update_kvs_shards_metrics ~opened_files ~ongoing_actions ;
+    return r
+
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4973
      Make storage more resilient to DAL parameters change. *)
   let are_shards_available store slot_id shard_indexes =
@@ -167,6 +175,7 @@ module Shards = struct
   let write_all shards_store slot_id shards =
     let open Lwt_result_syntax in
     let* () =
+      with_metrics shards_store @@ fun () ->
       Seq.ES.iter
         (fun {Cryptobox.index; share} ->
           let* exists =
@@ -202,7 +211,10 @@ module Shards = struct
 
   let read store slot_id shard_id =
     let open Lwt_result_syntax in
-    let*! res = KVS.read_value store file_layout slot_id shard_id in
+    let*! res =
+      with_metrics store @@ fun () ->
+      KVS.read_value store file_layout slot_id shard_id
+    in
     match res with
     | Ok share -> return {Cryptobox.share; index = shard_id}
     | Error [KVS.Missing_stored_kvs_data _] -> fail Errors.not_found
@@ -210,9 +222,15 @@ module Shards = struct
         let data_kind = Types.Store.Shard in
         fail @@ Errors.decoding_failed data_kind err
 
-  let count_values store slot_id = KVS.count_values store file_layout slot_id
+  let count_values store slot_id =
+    with_metrics store @@ fun () -> KVS.count_values store file_layout slot_id
 
-  let remove store slot_id = KVS.remove_file store file_layout slot_id
+  let remove store slot_id =
+    let open Lwt_result_syntax in
+    let* () =
+      with_metrics store @@ fun () -> KVS.remove_file store file_layout slot_id
+    in
+    return_unit
 
   let init node_store_dir shard_store_dir =
     let root_dir = Filename.concat node_store_dir shard_store_dir in
