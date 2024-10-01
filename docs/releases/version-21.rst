@@ -1,18 +1,33 @@
-Version 21.0~rc1 and 21.0~rc2
-=============================
+Version 21.0~rc3
+================
 
-Version 21 contains a new version (V13) of the protocol environment. This new version is used by both Quebec A and Quebec protocol proposals.
+
+Version 21 contains a new version (V13) of the protocol environment. This new version is used by both Qena and Quebec A/B protocol proposals.
 As a result, Octez version 21 is the first version compatible with these proposals.
 
-The two candidates differ only in their version of the Quebec protocol proposal:
+rc1 and rc2
+-----------
+
+The two first candidates both include the Quebec protocol proposal, and differ only in their version of Quebec:
   - ``Octez-v21.0~rc1`` contains the code for the ``Quebec A`` protocol proposal variant and its associated executables.
   - ``Octez-v21.0~rc2`` contains the code for the ``Quebec B`` protocol proposal variant and its associated executables.
 
 Please see the following announcement for more details on `Quebec A and Quebec B protocol proposal variants <https://research-development.nomadic-labs.com/quebec-announcement.html>`__.
 
-Note that starting from v21, Octez releases will not distribute the ``octez-evm-node``. You can refer to the `Etherlink documentation <https://docs.etherlink.com/network/evm-nodes>`__ for information on how to get its latest version.
+rc3
+---
 
-Should any of these protocol proposal variants be chosen during the current `Proposal governance period <https://www.tezosagora.org/period/130>`_, and the corresponding release candidate be stable enough, it will be released as ``Octez v21.0``.
+The third release candidate includes the `Qena protocol upgrade proposal <https://tezcapital.medium.com/qena-protocol-proposal-a-response-to-quebecs-adaptive-issuance-change-ac66a315efcc>`__ and its associated executables.
+
+Qena's source code and associated executables replace those from ``Quebec A`` and ``Quebec B``, which were included in previous release candidates. Thus, Octez v21.0~rc3 is not meant to be used in any network intended to operate a variant of Quebec (such as Quebecanet and Quebecbnet).
+
+.. warning::
+  Octez v21.0 will perform a user-activated protocol override (UAPO) to activate ``PtQenaB1PqFEfTe2og7bZTaPvMw2CxRyDFEwWNj3GiWp9ba4bJd`` (the hash of the version of Qena included in v21.0) instead of ``PsqenaVwjhUUm1JJXbrZTB1T5RVyQHBGDricbLPXjcZkxogDeTJ`` (the hash of the original implementation of Qena submitted to the on-chain governance mechanism).
+  There are no changes in protocol content or business logic between the version of Qena evaluated in the Proposal period and the one included in v21.0~rc3. The new hash is motivated by the need to provide a new, unique, internal identifier for the Qena protocol and other minor maintenance required to support it in Octez.
+
+v21.0~rc3 includes fixes and improvements for the Octez DAL node, notably addressing a memory leak in the DAL node and connectivity issues arising when the ``--public-addr`` option is used.
+
+Note that starting from v21, Octez releases will not distribute the ``octez-evm-node``. You can refer to the `Etherlink documentation <https://docs.etherlink.com/network/evm-nodes>`__ for information on how to get its latest version.
 
 Changes
 -------
@@ -23,7 +38,7 @@ Octez node storage upgrade
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 This new version allows the storage to scale to the increasing number of blocks per cycles, paving the way to reducing minimal block time further.
-When running a node with the legacy data directory, the user will encounter a message of the form::
+Octez v21 bumps the minimal storage and snapshot versions. When running a node with the legacy data directory, the user will encounter a message of the form::
 
   octez-node: Error:
               The data directory version is too old.
@@ -95,14 +110,14 @@ Update Instructions
 To update from sources::
 
   git fetch
-  git checkout octez-v21.0-rc1
+  git checkout octez-v21.0-rc3
   make clean
   opam switch remove . # To be used if the next step fails
   make build-deps
   eval $(opam env)
   make
 
-If you are using Docker instead, use the ``v21.0-rc1`` Docker images of Octez.
+If you are using Docker instead, use the ``v21.0-rc3`` Docker images of Octez.
 
 You can also install Octez using Opam by running ``opam install octez``.
 
