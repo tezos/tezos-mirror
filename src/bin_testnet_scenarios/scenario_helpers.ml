@@ -23,9 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [download ?runner url filename] downloads the file at [url],
-    stores it in a temporary file named [filename], and returns the
-    complete path to the downloaded file. *)
 let download ?runner url filename =
   Log.info "Download %s" url ;
   let path = Tezt.Temp.file filename in
