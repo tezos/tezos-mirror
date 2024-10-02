@@ -182,6 +182,85 @@ let check_operations_merkle_root hash header operations =
          found = computed_hash;
        })
 
+(* [with_retry_to_load_protocol bv peer f] tries to call [f], if it fails with an
+   [Unavailable_protocol] error, it fetches the protocol from the [peer] and retries
+   to call [f] *)
+let with_retry_to_load_protocol (bv : Types.state) ~peer f =
+  let open Lwt_syntax in
+  let* r = f () in
+  match r with
+  (* [Unavailable_protocol] is expected to be the
+     first error in the trace *)
+  | Error (Unavailable_protocol {protocol; _} :: _) ->
+      let* _ =
+        Protocol_validator.fetch_and_compile_protocol
+          bv.protocol_validator
+          ?peer
+          ~timeout:bv.limits.protocol_timeout
+          protocol
+      in
+      f ()
+  | _ -> Lwt.return r
+
+let errors_contains_context_error errors =
+  let rex =
+    (* Matching all the candidate to a context error:
+       - "[Ir]min|[Bb]rassaia": for any error from irmin or brassaia components
+       - "unknown inode key": to catch the so called inode error *)
+    Re.compile (Re.Perl.re "[Ii]rmin|[Bb]rassaia|unknown inode key")
+  in
+  let is_context_error error =
+    let error_s = Format.asprintf "%a" Error_monad.pp error in
+    match Re.exec rex error_s with exception Not_found -> false | _ -> true
+  in
+  List.exists is_context_error errors
+
+let apply_block worker ?canceler bv peer chain_store ~predecessor block_header
+    block_hash bv_operations =
+  let open Lwt_result_syntax in
+  let rec apply_block ~retry =
+    let*! () = Events.(emit applying_block) block_hash in
+    let*! r =
+      protect ~canceler:(Worker.canceler worker) (fun () ->
+          protect ?canceler (fun () ->
+              with_retry_to_load_protocol bv ~peer (fun () ->
+                  Block_validator_process.apply_block
+                    ~should_precheck:false
+                    bv.validation_process
+                    chain_store
+                    ~predecessor
+                    block_header
+                    bv_operations)))
+    in
+    match r with
+    | Error errs ->
+        (* This is a mitigation for context errors. If the application of the
+           block fails, we retry once. The external validator is shut down and
+           will restart on the new application request sent. This is done to
+           force a full reload of the context.
+
+           If the re-application fails, the errors will be raised and the node
+           will shutdown gracefully. *)
+        if retry && errors_contains_context_error errs then
+          match Block_validator_process.kind bv.validation_process with
+          | Block_validator_process.External_process ->
+              let*! () =
+                Events.(emit context_error_at_block_application)
+                  (block_hash, errs)
+              in
+              let*! () = Block_validator_process.close bv.validation_process in
+              let*! () = Events.(emit retry_block_application) block_hash in
+              apply_block ~retry:false
+          | Single_process ->
+              (* If the node is configured in single process mode we cannot
+                 mitigate. The application error is directly raised and the node
+                 will be shut down gracefully. *)
+              Lwt.return_error errs
+        else Lwt.return_error errs
+    | Ok application_result -> Lwt.return_ok application_result
+  in
+  apply_block ~retry:true
+
 let on_validation_request w
     {
       Request.chain_db;
@@ -227,22 +306,6 @@ let on_validation_request w
                   let* pred =
                     Store.Block.read_block chain_store header.shell.predecessor
                   in
-                  let with_retry_to_load_protocol f =
-                    let*! r = f () in
-                    match r with
-                    (* [Unavailable_protocol] is expected to be the
-                       first error in the trace *)
-                    | Error (Unavailable_protocol {protocol; _} :: _) ->
-                        let* _ =
-                          Protocol_validator.fetch_and_compile_protocol
-                            bv.protocol_validator
-                            ?peer
-                            ~timeout:bv.limits.protocol_timeout
-                            protocol
-                        in
-                        f ()
-                    | _ -> Lwt.return r
-                  in
                   let*! mempool = Store.Chain.mempool chain_store in
                   let bv_operations =
                     List.map
@@ -254,7 +317,7 @@ let on_validation_request w
                   let*! r =
                     protect ~canceler:(Worker.canceler w) (fun () ->
                         protect ?canceler (fun () ->
-                            with_retry_to_load_protocol (fun () ->
+                            with_retry_to_load_protocol bv ~peer (fun () ->
                                 precheck_block
                                   bv.validation_process
                                   chain_db
@@ -273,17 +336,16 @@ let on_validation_request w
                            before being fully applied. *)
                         Distributed_db.Advertise.prechecked_head chain_db header ;
                       let* result =
-                        protect ~canceler:(Worker.canceler w) (fun () ->
-                            protect ?canceler (fun () ->
-                                let*! () = Events.(emit applying_block) hash in
-                                with_retry_to_load_protocol (fun () ->
-                                    Block_validator_process.apply_block
-                                      ~should_precheck:false
-                                      bv.validation_process
-                                      chain_store
-                                      ~predecessor:pred
-                                      header
-                                      bv_operations)))
+                        apply_block
+                          w
+                          ?canceler
+                          bv
+                          peer
+                          chain_store
+                          ~predecessor:pred
+                          header
+                          hash
+                          bv_operations
                       in
                       Shell_metrics.Block_validator
                       .set_operation_per_pass_collector
@@ -410,22 +472,12 @@ let on_error (type a b) (_w : t) st (r : (a, b) Request.t) (errs : b) =
       (* Keep the worker alive. *)
       return_ok_unit
 
-(* This failsafe aims to look for an irmin error that is known to be
+(* This failsafe aims to look for a context error that is known to be
    critical and, if found, stop the node gracefully. *)
-let check_and_quit_on_irmin_errors errors =
+let check_and_quit_on_context_errors errors =
   let open Lwt_syntax in
-  let is_inode_error error =
-    match error with
-    | Exn (Failure s) -> (
-        let rex = Str.regexp_string "unknown inode key" in
-        try
-          let _ = Str.search_forward rex s 0 in
-          true
-        with Not_found -> false)
-    | _ -> false
-  in
-  if List.exists (fun error -> is_inode_error error) errors then
-    let* () = Events.(emit stopping_node_missing_irmin_key ()) in
+  if errors_contains_context_error errors then
+    let* () = Events.(emit stopping_node_missing_context_key ()) in
     let* _ = Lwt_exit.exit_and_wait 1 in
     return_unit
   else return_unit
@@ -462,7 +514,7 @@ let on_completion :
               Lwt.return_unit
           | errs ->
               let* () = Events.(emit validation_failure) (v.block, st, errs) in
-              let* () = check_and_quit_on_irmin_errors errs in
+              let* () = check_and_quit_on_context_errors errs in
               return_unit)
       | _ -> (* assert false *) Lwt.return_unit)
   | Request.Request_preapplication _, Preapplied _ -> (
@@ -475,7 +527,7 @@ let on_completion :
       match Request.view request with
       | Preapplication v ->
           let* () = Events.(emit preapplication_failure) (v.level, st, errs) in
-          let* () = check_and_quit_on_irmin_errors errs in
+          let* () = check_and_quit_on_context_errors errs in
           return_unit
       | _ -> (* assert false *) Lwt.return_unit)
   | Request.Request_validation _, Application_error_after_precheck errs -> (
@@ -486,7 +538,7 @@ let on_completion :
           let* () =
             Events.(emit application_failure_after_precheck) (v.block, st, errs)
           in
-          let* () = check_and_quit_on_irmin_errors errs in
+          let* () = check_and_quit_on_context_errors errs in
           return_unit
       | _ -> (* assert false *) Lwt.return_unit)
   | Request.Request_validation _, Precheck_failed errs -> (
@@ -500,7 +552,7 @@ let on_completion :
               Lwt.return_unit
           | errs ->
               let* () = Events.(emit precheck_failure) (v.block, st, errs) in
-              let* () = check_and_quit_on_irmin_errors errs in
+              let* () = check_and_quit_on_context_errors errs in
               return_unit)
       | _ -> (* assert false *) Lwt.return_unit)
   | _ -> (* assert false *) Lwt.return_unit

@@ -1063,6 +1063,7 @@ module External_validator_process = struct
               | err -> Lwt.reraise err)
         in
         let* () = Error_monad.cancel_with_exceptions canceler in
+        vp.validator_process <- Uninitialized ;
         Lwt.return_unit
     | Uninitialized | Exiting -> Lwt.return_unit
 end
@@ -1113,16 +1114,6 @@ let apply_block ?(simulate = false) ?(should_precheck = true)
   in
   let* metadata = Store.Block.get_block_metadata chain_store predecessor in
   let max_operations_ttl = Store.Block.max_operations_ttl metadata in
-  let* live_blocks, live_operations =
-    Store.Chain.compute_live_blocks chain_store ~block:predecessor
-  in
-  let*? () =
-    Block_validation.check_liveness
-      ~live_operations
-      ~live_blocks
-      block_hash
-      operations
-  in
   VP.apply_block
     ~simulate
     ~should_precheck
@@ -1134,8 +1125,25 @@ let apply_block ?(simulate = false) ?(should_precheck = true)
     operations
 
 let precheck_block (E {validator_process = (module VP); validator}) chain_store
-    ~predecessor header operations =
-  VP.precheck_block validator chain_store ~predecessor header operations
+    ~predecessor header block_hash operations =
+  let open Lwt_result_syntax in
+  let* live_blocks, live_operations =
+    Store.Chain.compute_live_blocks chain_store ~block:predecessor
+  in
+  let*? () =
+    Block_validation.check_liveness
+      ~live_operations
+      ~live_blocks
+      block_hash
+      operations
+  in
+  VP.precheck_block
+    validator
+    chain_store
+    ~predecessor
+    header
+    block_hash
+    operations
 
 let context_garbage_collection (E {validator_process = (module VP); validator})
     context_index context_hash ~gc_lockfile_path =
