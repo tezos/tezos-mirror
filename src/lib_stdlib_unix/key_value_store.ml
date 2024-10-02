@@ -897,10 +897,7 @@ end = struct
     if !closed then
       Lwt.return (Error (Error_monad.TzTrace.make (Closed {action = "remove"})))
     else
-      let on_file_closed ~on_file_opened:_ =
-        let+ () = may_remove_file layout.filepath in
-        Table.remove files layout.filepath
-      in
+      let on_file_closed ~on_file_opened:_ = may_remove_file layout.filepath in
       let p =
         Action.remove_file
           ~on_file_closed
@@ -910,7 +907,9 @@ end = struct
           layout.filepath
       in
       Table.replace last_actions layout.filepath (Remove p) ;
-      Table.replace files layout.filepath (Closing p) ;
+      (match Table.find_opt files layout.filepath with
+      | None -> ()
+      | Some _ -> Table.replace files layout.filepath (Closing p)) ;
       let* () = p in
       (* See [close_file] for an explanation of the lines below. *)
       (match Table.find_opt last_actions layout.filepath with
