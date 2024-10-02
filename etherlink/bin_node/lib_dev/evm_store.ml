@@ -243,6 +243,9 @@ module Q = struct
 
     let clear_after =
       (level ->. unit) @@ {|DELETE FROM blueprints WHERE id > ?|}
+
+    let clear_before =
+      (level ->. unit) @@ {|DELETE FROM blueprints WHERE id < ?|}
   end
 
   module Context_hashes = struct
@@ -265,6 +268,9 @@ module Q = struct
 
     let clear_after =
       (level ->. unit) @@ {|DELETE FROM context_hashes WHERE id > ?|}
+
+    let clear_before =
+      (level ->. unit) @@ {|DELETE FROM context_hashes WHERE id < ?|}
 
     let get_finalized =
       (unit ->? t2 level context_hash)
@@ -311,6 +317,10 @@ module Q = struct
     let clear_after =
       (level ->. unit)
       @@ {|DELETE FROM kernel_upgrades WHERE injected_before > ?|}
+
+    let clear_before =
+      (level ->. unit)
+      @@ {|DELETE FROM kernel_upgrades WHERE injected_before < ?|}
   end
 
   module Delayed_transactions = struct
@@ -329,6 +339,10 @@ module Q = struct
     let clear_after =
       (level ->. unit)
       @@ {|DELETE FROM delayed_transactions WHERE injected_before > ?|}
+
+    let clear_before =
+      (level ->. unit)
+      @@ {|DELETE FROM delayed_transactions WHERE injected_before < ?|}
   end
 
   module L1_l2_levels_relationships = struct
@@ -343,6 +357,10 @@ module Q = struct
     let clear_after =
       (level ->. unit)
       @@ {|DELETE FROM l1_l2_levels_relationships WHERE latest_l2_level > ?|}
+
+    let clear_before =
+      (level ->. unit)
+      @@ {|DELETE FROM l1_l2_levels_relationships WHERE latest_l2_level < ?|}
   end
 
   module Metadata = struct
@@ -438,6 +456,9 @@ module Q = struct
 
     let clear_after =
       (level ->. unit) @@ {|DELETE FROM transactions WHERE block_number > ?|}
+
+    let clear_before =
+      (level ->. unit) @@ {|DELETE FROM transactions WHERE block_number < ?|}
   end
 
   module Blocks = struct
@@ -461,6 +482,9 @@ module Q = struct
       @@ {eos|SELECT level FROM blocks WHERE hash = ?|eos}
 
     let clear_after = (level ->. unit) @@ {|DELETE FROM blocks WHERE level > ?|}
+
+    let clear_before =
+      (level ->. unit) @@ {|DELETE FROM blocks WHERE level < ?|}
   end
 
   let context_hash_of_block_hash =
@@ -603,6 +627,10 @@ module Context_hashes = struct
   let clear_after store l2_level =
     with_connection store @@ fun conn ->
     Db.exec conn Q.Context_hashes.clear_after l2_level
+
+  let clear_before store l2_level =
+    with_connection store @@ fun conn ->
+    Db.exec conn Q.Context_hashes.clear_before l2_level
 end
 
 module Kernel_upgrades = struct
@@ -629,6 +657,10 @@ module Kernel_upgrades = struct
     with_connection store @@ fun conn ->
     Db.exec conn Q.Kernel_upgrades.clear_after l2_level
 
+  let clear_before store l2_level =
+    with_connection store @@ fun conn ->
+    Db.exec conn Q.Kernel_upgrades.clear_before l2_level
+
   let activation_levels store =
     with_connection store @@ fun conn ->
     Db.collect_list conn Q.Kernel_upgrades.activation_levels ()
@@ -654,6 +686,10 @@ module Delayed_transactions = struct
   let clear_after store l2_level =
     with_connection store @@ fun conn ->
     Db.exec conn Q.Delayed_transactions.clear_after l2_level
+
+  let clear_before store l2_level =
+    with_connection store @@ fun conn ->
+    Db.exec conn Q.Delayed_transactions.clear_before l2_level
 end
 
 module Blueprints = struct
@@ -702,6 +738,10 @@ module Blueprints = struct
   let clear_after store l2_level =
     with_connection store @@ fun conn ->
     Db.exec conn Q.Blueprints.clear_after l2_level
+
+  let clear_before store l2_level =
+    with_connection store @@ fun conn ->
+    Db.exec conn Q.Blueprints.clear_before l2_level
 end
 
 module L1_l2_levels_relationships = struct
@@ -725,6 +765,10 @@ module L1_l2_levels_relationships = struct
   let clear_after store l2_level =
     with_connection store @@ fun conn ->
     Db.exec conn Q.L1_l2_levels_relationships.clear_after l2_level
+
+  let clear_before store l2_level =
+    with_connection store @@ fun conn ->
+    Db.exec conn Q.L1_l2_levels_relationships.clear_before l2_level
 end
 
 module Metadata = struct
@@ -885,6 +929,10 @@ module Transactions = struct
   let clear_after store level =
     with_connection store @@ fun conn ->
     Db.exec conn Q.Transactions.clear_after level
+
+  let clear_before store level =
+    with_connection store @@ fun conn ->
+    Db.exec conn Q.Transactions.clear_before level
 end
 
 module GC = struct
@@ -972,13 +1020,17 @@ module Blocks = struct
 
   let clear_after store level =
     with_connection store @@ fun conn -> Db.exec conn Q.Blocks.clear_after level
+
+  let clear_before store level =
+    with_connection store @@ fun conn ->
+    Db.exec conn Q.Blocks.clear_before level
 end
 
 let context_hash_of_block_hash store hash =
   with_connection store @@ fun conn ->
   Db.find_opt conn Q.context_hash_of_block_hash hash
 
-let reset store ~l2_level =
+let reset_after store ~l2_level =
   let open Lwt_result_syntax in
   let* () = Blueprints.clear_after store l2_level in
   let* () = Context_hashes.clear_after store l2_level in
@@ -987,4 +1039,15 @@ let reset store ~l2_level =
   let* () = Delayed_transactions.clear_after store l2_level in
   let* () = Blocks.clear_after store l2_level in
   let* () = Transactions.clear_after store l2_level in
+  return_unit
+
+let reset_before store ~l2_level =
+  let open Lwt_result_syntax in
+  let* () = Blueprints.clear_before store l2_level in
+  let* () = Context_hashes.clear_before store l2_level in
+  let* () = L1_l2_levels_relationships.clear_before store l2_level in
+  let* () = Kernel_upgrades.clear_before store l2_level in
+  let* () = Delayed_transactions.clear_before store l2_level in
+  let* () = Blocks.clear_before store l2_level in
+  let* () = Transactions.clear_before store l2_level in
   return_unit
