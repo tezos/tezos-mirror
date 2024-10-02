@@ -57,11 +57,11 @@ end = struct
   (* This rewriter handles ppxes starting with profiler. *)
   let namespace = "profiler"
 
-  type t = {action : string; attribute_name : string}
+  type t = {attribute_name : string}
 
   let create_constant action =
     let attribute_name = namespace ^ "." ^ action in
-    {action; attribute_name}
+    {attribute_name}
 
   (* [@profiler.aggregate] *)
   let aggregate_constant = create_constant "aggregate"
