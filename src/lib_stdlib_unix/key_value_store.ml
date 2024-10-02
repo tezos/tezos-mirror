@@ -864,7 +864,9 @@ end = struct
           layout.filepath
       in
       Table.replace last_actions layout.filepath (Remove p) ;
-      Table.replace files layout.filepath (Closing p) ;
+      (match Table.find_opt files layout.filepath with
+      | None -> ()
+      | Some _ -> Table.replace files layout.filepath (Closing p)) ;
       let* () = p in
       (* See [close_file] for an explanation of the lines below. *)
       (match Table.find_opt last_actions layout.filepath with
