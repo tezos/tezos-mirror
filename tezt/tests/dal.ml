@@ -8128,7 +8128,6 @@ let register ~protocols =
     "dal node GET \
      /profiles/<public_key_hash>/attested_levels/<level>/attestable_slots"
     ~producer_profiles:[0; 1; 2]
-    ~prover:false
     test_dal_node_get_attestable_slots
     protocols ;
   scenario_with_layer1_and_dal_nodes
