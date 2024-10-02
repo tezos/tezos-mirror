@@ -52,7 +52,7 @@ Shell RPCs
 The node provides some RPCs which are independent of the protocol.
 Their OpenAPI specification can be found at:
 
-- :src:`docs/api/rpc-openapi.json` (version 20.2)
+- :src:`docs/api/rpc-openapi.json` (version 20.3)
 - :src:`docs/api/rpc-openapi-rc.json` (version 21.0~rc1)
 - :src:`docs/api/rpc-openapi-dev.json` (version master)
 
@@ -64,12 +64,12 @@ Paris RPCs
 The OpenAPI specifications for RPCs which are specific to the ParisC (``PtParisC``)
 protocol can be found at:
 
-- :src:`docs/api/paris-openapi.json` (version 20.2)
+- :src:`docs/api/paris-openapi.json` (version 20.3)
 
 The OpenAPI specifications for RPCs which are related to the mempool
 and specific to the Paris protocol can be found at:
 
-- :src:`docs/api/paris-mempool-openapi.json` (version 20.2)
+- :src:`docs/api/paris-mempool-openapi.json` (version 20.3)
 
 Quebec RPCs
 -----------
@@ -113,7 +113,7 @@ Paris RPCs
 The OpenAPI specifications for the RPCs of the smart rollup node for the Paris
 (``PtParisB``) protocol can be found at:
 
-- :src:`docs/api/paris-smart-rollup-node-openapi.json` (version 20.2)
+- :src:`docs/api/paris-smart-rollup-node-openapi.json` (version 20.3)
 
 Quebec RPCs
 -----------
@@ -137,7 +137,7 @@ DAL Node
 The DAL node also provides RPCs.
 Their OpenAPI specification can be found at:
 
-- :src:`docs/api/dal-node-openapi.json` (version 20.2)
+- :src:`docs/api/dal-node-openapi.json` (version 20.3)
 - :src:`docs/api/dal-node-openapi-rc.json` (version 21.0~rc1)
 - :src:`docs/api/dal-node-openapi-dev.json` (version master)
 

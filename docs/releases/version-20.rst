@@ -1,4 +1,4 @@
-Version 20.2
+Version 20.3
 ============
 
 Version 20 contains a new version (V12) of the protocol environment,
@@ -30,7 +30,13 @@ Octez v20.1 also includes minor fixes to Smart Rollup nodes addressing issues ob
 
 Octez v20.2 fixes an implementation bug in the baker binary. We found that, under fringe degraded network health conditions, the baker might not behave as expected by the Tenderbake consensus algorithm.
 
-**Even though this scenario is highly unlikely, we still recommend Tezos bakers to upgrade to v20.2.**
+**Even though this scenario is highly unlikely, we still recommend Tezos bakers to upgrade to at least v20.2.**
+
+Octez v20.3 includes a new version (``3.2``) of the node's storage. The upgrade to this new version must be done manually, using ``octez-node upgrade storage``, before running a node with a data directory with an earlier storage version. 
+
+Upgrading the storage is irreversible and not backwards compatible: v20.3 nodes do not support data directories with an earlier storage version and earlier versions of Octez do not support the new version neither. 
+
+This operation should only take up to 10s in nodes operating in Rolling history mode, which is the recommended setup for bakers. However, it may require around 10 minutes for nodes operating on Full and Archive modes, depending on the performance of the machine. Users must be aware of the downtime during the upgrade that may impact their services.
 
 Changes
 -------
@@ -89,14 +95,14 @@ Update Instructions
 To update from sources::
 
   git fetch
-  git checkout octez-v20.2
+  git checkout octez-v20.3
   make clean
   opam switch remove . # To be used if the next step fails
   make build-deps
   eval $(opam env)
   make
 
-If you are using Docker instead, use the ``v20.2`` Docker images of Octez.
+If you are using Docker instead, use the ``octez-v20.3`` Docker images of Octez.
 
 You can also install Octez using Opam by running ``opam install octez``.
 
@@ -125,6 +131,7 @@ For more details, see :ref:`the installation instructions <installing_binaries>`
 Changelog
 ---------
 
+- `Version 20.3 <../CHANGES.html#version-20-3>`_
 - `Version 20.2 <../CHANGES.html#version-20-2>`_
 - `Version 20.1 <../CHANGES.html#version-20-1>`_
 - `Version 20.0 <../CHANGES.html#version-20-0>`_
