@@ -77,12 +77,12 @@ Qena RPCs
 The OpenAPI specifications for RPCs which are specific to the Qena (``PtQenaB1``)
 protocol proposal can be found at:
 
-- :src:`docs/api/qena-openapi.json` (version 21.0~rc1)
+- :src:`docs/api/qena-openapi.json` (version 21.0~rc3)
 
 The OpenAPI specifications for RPCs which are related to the mempool
 and specific to the Qena protocol proposal can be found at:
 
-- :src:`docs/api/qena-mempool-openapi.json` (version 21.0~rc1)
+- :src:`docs/api/qena-mempool-openapi.json` (version 21.0~rc3)
 
 Alpha RPCs
 ----------
