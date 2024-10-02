@@ -141,6 +141,8 @@ module type S = sig
 
   module View : sig
     val opened_files : ('file, 'key, 'value) t -> int
+
+    val ongoing_actions : ('file, 'key, 'value) t -> int
   end
 end
 
@@ -189,6 +191,10 @@ module R : S = struct
 
   module View = struct
     let opened_files table =
+      table |> Stdlib.Hashtbl.to_seq_keys |> Seq.map fst |> List.of_seq
+      |> List.sort_uniq compare |> List.length
+
+    let ongoing_actions table =
       table |> Stdlib.Hashtbl.to_seq_keys |> Seq.map fst |> List.of_seq
       |> List.sort_uniq compare |> List.length
   end
