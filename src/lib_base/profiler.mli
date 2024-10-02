@@ -229,7 +229,7 @@ val inc : profiler -> report -> unit
     ]} *)
 val record_f : profiler -> ?lod:lod -> string -> (unit -> 'a) -> 'a
 
-(** Same as [record_s] but for Lwt function *)
+(** Same as [record_f] but for Lwt function *)
 val record_s : profiler -> ?lod:lod -> string -> (unit -> 'a Lwt.t) -> 'a Lwt.t
 
 (** [aggregate_f profiler ?lod label f] will call:
