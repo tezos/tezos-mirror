@@ -28,6 +28,10 @@ General
 Node
 ----
 
+- Introduced a specific exit code for the ``octez-node upgrade storage
+  --status`` command. It now returns the exit code 1 when an upgrade
+  is availalbe. 0 is returned when the storage is up to date. (MR :gl:`!TBD`)
+
 Client
 ------
 
