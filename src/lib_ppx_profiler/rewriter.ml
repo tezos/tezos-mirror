@@ -55,7 +55,7 @@ module rec Constants : sig
   val get_attribute : t -> string
 
   val filter_out_all_handled_attributes :
-    Parsetree.attribute list -> Parsetree.attribute list
+    Ppxlib.attribute list -> Ppxlib.attribute list
 end = struct
   (* This rewriter handles ppxes starting with profiler. *)
   let namespace = "profiler"
@@ -176,7 +176,7 @@ and Rewriter : sig
 
   val get_location : t -> Ppxlib.location
 
-  val extract_rewriters : Parsetree.attribute list -> t list
+  val extract_rewriters : Ppxlib.attribute list -> t list
 end = struct
   type action =
     | Aggregate
@@ -435,7 +435,7 @@ end = struct
         (* [@ppx] *)
         Key.
           {level_of_detail = None; profiler_module = None; content = Key.Empty}
-    | _ -> Error.error loc (Invalid_payload payload)
+    | _ -> Error.error loc Invalid_payload
 
   let of_attribute ({Ppxlib.attr_payload; attr_loc; _} as attribute) =
     match

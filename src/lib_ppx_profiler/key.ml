@@ -10,7 +10,7 @@ type content =
   | Ident of string
   | String of string
   | List of Ppxlib.expression list
-  | Apply of Ppxlib.expression * Parsetree.expression list
+  | Apply of Ppxlib.expression * Ppxlib.expression list
   | Other of Ppxlib.expression
 
 type t = {
@@ -65,7 +65,7 @@ let to_expression loc {content; _} =
   | Other expr -> expr
 
 let pp_expr_list ppf expr_list =
-  (Format.pp_print_list Pprintast.expression) ppf expr_list
+  (Format.pp_print_list Ppxlib.Pprintast.expression) ppf expr_list
 
 let pp_content ppf {content; _} =
   match content with
@@ -77,11 +77,11 @@ let pp_content ppf {content; _} =
       Format.fprintf
         ppf
         "Apply %a %a"
-        Pprintast.expression
+        Ppxlib.Pprintast.expression
         expr
         pp_expr_list
         expr_list
-  | Other expr -> Format.fprintf ppf "Other %a" Pprintast.expression expr
+  | Other expr -> Format.fprintf ppf "Other %a" Ppxlib.Pprintast.expression expr
 
 let pp ppf t =
   Format.fprintf

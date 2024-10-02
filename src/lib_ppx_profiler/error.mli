@@ -7,7 +7,7 @@
 
 type error =
   | Invalid_action of string
-  | Invalid_payload of Parsetree.payload
+  | Invalid_payload
   | Invalid_aggregate of Key.t
   | Invalid_custom of Key.t
   | Invalid_mark of Key.t
