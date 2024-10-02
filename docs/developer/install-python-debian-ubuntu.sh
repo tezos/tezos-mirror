@@ -94,7 +94,7 @@ python install-poetry.py --version 1.8.3 --yes
 export PATH=$PATH:$HOME/.local/bin
 
 # [print poetry version]
-poetry --version # should output 1.2.2
+poetry --version # should output 1.8.3
 
 # [verify poetry version]
 [ "$(poetry --version)" = "Poetry (version 1.8.3)" ]
