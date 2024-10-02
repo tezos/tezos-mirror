@@ -69,6 +69,7 @@ module Transport_layer = struct
         Types.P2P.Metadata.Connection.
           {advertised_net_addr; advertised_net_port; is_bootstrap_peer}
       in
+      let config = {config with advertised_port = advertised_net_port} in
       P2p.create
         ~config
         ~limits
