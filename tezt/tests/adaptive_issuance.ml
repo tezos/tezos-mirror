@@ -1119,7 +1119,9 @@ let test_staking =
   let* bu = Operation_receipt.Balance_updates.from_result [bu] in
 
   (* check slashed and rewarded amounts *)
-  let global_limit_of_staking_over_baking = 5 in
+  let global_limit_of_staking_over_baking =
+    if Protocol.(number protocol <= 021) then 5 else 9
+  in
   (* It's critical that the rewarded amount cannot exceed the amount
      slashed from the baker's own deposits; otherwise, the baker may
      actually gain tez by purposefully double signing and denuncing
