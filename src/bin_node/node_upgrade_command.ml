@@ -59,8 +59,17 @@ module Term = struct
 
   let upgrade_status ~data_dir =
     let open Lwt_result_syntax in
-    let* _available_upgrade = Data_version.upgrade_status ~data_dir in
-    return_unit
+    let* available_upgrade = Data_version.upgrade_status ~data_dir in
+    (* To ease the scripting of this command, we cut the workflow
+       earlier and return an adequate exit code. *)
+    let exit_code =
+      if available_upgrade then
+        (* Exiting with 1 stands for an error that aims to reflect
+           that an upgrade is needed. *)
+        1
+      else 0
+    in
+    Lwt_exit.exit_and_raise exit_code
 
   let run_upgrade ~data_dir ~sandbox_file (config : Config_file.t) =
     let open Lwt_result_syntax in
@@ -125,7 +134,10 @@ module Term = struct
 
   let status =
     let open Cmdliner.Arg in
-    let doc = "Displays available upgrades." in
+    let doc =
+      "Displays available upgrades. The command returns the exit code 1 when \
+       an upgrade is available. Otherwise, 0 is returned."
+    in
     value & flag & info ~doc ["status"]
 
   let sandbox =
