@@ -874,8 +874,14 @@ struct
           | Needs_reveal Reveal_metadata
           | Needs_reveal Reveal_dal_parameters
           | Initial | First_after _ ->
-              return (state, fuel, tick, our_states))
+              return (state, fuel, tick, our_states)
+          | Needs_reveal (Request_adal_page _) ->
+              (* ADAL/FIXME: https://gitlab.com/tezos/tezos/-/milestones/410
+
+                 to be implemented when needed. *)
+              assert false)
     in
+
     go ~our_states fuel start_tick state
 
   let eval_metadata ~fuel ~our_states tick state ~metadata =

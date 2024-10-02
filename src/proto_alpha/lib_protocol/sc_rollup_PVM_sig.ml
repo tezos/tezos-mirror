@@ -218,6 +218,7 @@ type reveal =
   | Reveal_raw_data of Sc_rollup_reveal_hash.t
   | Reveal_metadata
   | Request_dal_page of Dal_slot_repr.Page.t
+  | Request_adal_page of unit (* TODO in next commit *)
   | Reveal_dal_parameters
       (** Request DAL parameters that were used for the slots published at
           the current inbox level. *)
@@ -260,7 +261,22 @@ let reveal_encoding =
       (function Reveal_dal_parameters -> Some () | _ -> None)
       (fun () -> Reveal_dal_parameters)
   in
-  union [case_raw_data; case_metadata; case_dal_page; case_dal_parameters]
+  let case_adal_page =
+    case
+      ~title:"Request_adaptive_dal_page"
+      (Tag 4)
+      (obj2 (kind "request_adaptive_dal_page") (req "todo" Data_encoding.unit))
+      (function Request_adal_page () -> Some ((), ()) | _ -> None)
+      (fun ((), ()) -> Request_adal_page ())
+  in
+  union
+    [
+      case_raw_data;
+      case_metadata;
+      case_dal_page;
+      case_dal_parameters;
+      case_adal_page;
+    ]
 
 (** [is_reveal_enabled] is the type of a predicate that tells if a kind of
      reveal is activated at a certain block level. *)
@@ -277,6 +293,12 @@ let is_reveal_enabled_predicate
         | Blake2B -> t.raw_data.blake2B)
     | Reveal_metadata -> t.metadata
     | Request_dal_page _ -> t.dal_page
+    | Request_adal_page _ ->
+        (* ADAL/FIXME: https://gitlab.com/tezos/tezos/-/milestones/410
+
+           Handle this case for adaptive DAL. We should probably add activation
+           level in the parameters. *)
+        assert false
     | Reveal_dal_parameters -> t.dal_parameters
   in
   Raw_level_repr.(current_block_level >= activation_level)
@@ -340,7 +362,8 @@ let input_request_encoding =
 let pp_reveal fmt = function
   | Reveal_raw_data hash -> Sc_rollup_reveal_hash.pp fmt hash
   | Reveal_metadata -> Format.pp_print_string fmt "Reveal metadata"
-  | Request_dal_page id -> Dal_slot_repr.Page.pp fmt id
+  | Request_dal_page id -> Format.fprintf fmt "DAL:%a" Dal_slot_repr.Page.pp id
+  | Request_adal_page () -> Format.fprintf fmt "ADAL:TODO"
   | Reveal_dal_parameters -> Format.pp_print_string fmt "Reveal DAL parameters"
 
 (** [pp_input_request fmt i] pretty prints the given input [i] to the formatter
@@ -368,6 +391,8 @@ let reveal_equal p1 p2 =
   | Reveal_metadata, _ -> false
   | Request_dal_page a, Request_dal_page b -> Dal_slot_repr.Page.equal a b
   | Request_dal_page _, _ -> false
+  | Request_adal_page (), Request_adal_page () -> true
+  | Request_adal_page _, _ -> false
   | Reveal_dal_parameters, Reveal_dal_parameters -> true
   | Reveal_dal_parameters, _ -> false
 
