@@ -1247,7 +1247,7 @@ let jobs pipeline_type =
     in
     (* Tezt jobs.
 
-       The tezt jobs are split into a set of special-purpose jobs running the
+       The Tezt jobs are split into a set of special-purpose jobs running the
        tests of the corresponding tag:
         - [tezt-memory-3k]: runs the jobs with tag [memory_3k],
         - [tezt-memory-4k]: runs the jobs with tag [memory_4k],
