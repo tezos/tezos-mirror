@@ -9,6 +9,7 @@ type error =
   | Invalid_action of string
   | Invalid_payload of Parsetree.payload
   | Invalid_aggregate of Key.t
+  | Invalid_custom of Key.t
   | Invalid_mark of Key.t
   | Invalid_record of Key.t
   | Invalid_span of Key.t
@@ -56,6 +57,12 @@ let error loc err =
              Found: @[<v 0>%a@]@."
             Key.pp
             key )
+    | Invalid_custom key ->
+        ( "Invalid custom.",
+          Format.asprintf
+            "@[<v 2>A [@profiler.custom] attribute must be a function \
+             application.@,\
+             Found: @[<v 0>%a@]@."
             Key.pp
             key )
     | Invalid_mark key ->
