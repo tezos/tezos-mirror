@@ -59,12 +59,12 @@ ref2_sha=$(git rev-parse "$ref2")
 
 fetches=0
 while [ $fetches -lt "$MAX_FETCHES" ] && ! git merge-base "$ref1_sha" "$ref2_sha" > /dev/null 2>&1; do
+  fetches=$((fetches + 1))
   if ! git fetch --quiet --deepen="$N" "$ORIGIN" "${ref1_sha}" "${ref2_sha}"; then
     echo "Couldn't fetch $N commits from ${ref1} and ${ref2} at the ${fetches}:th fetch." >&2
     # exit with status > 0 but <> 1 to distinguish from 'git merge-base' status codes.
     exit 2
   fi
-  fetches=$((fetches + 1))
 done
 
 git merge-base "$ref1_sha" "$ref2_sha"
