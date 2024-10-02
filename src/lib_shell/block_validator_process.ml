@@ -25,6 +25,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Profiler = struct
+  include (val Profiler.wrap Shell_profiling.block_validator_profiler)
+end
+
 type validator_environment = {
   user_activated_upgrades : User_activated.upgrades;
   user_activated_protocol_overrides : User_activated.protocol_overrides;
@@ -330,9 +334,7 @@ module Internal_validator_process = struct
     let report = Tezos_base.Profiler.report validator.headless in
     (match report with
     | None -> ()
-    | Some report -> (
-        try Profiler.inc Shell_profiling.block_validator_profiler report
-        with _ -> ())) ;
+    | Some report -> ( try Profiler.inc report with _ -> ())) ;
     return result
 
   let preapply_block validator ~chain_id ~timestamp ~protocol_data ~live_blocks
@@ -434,9 +436,7 @@ module Internal_validator_process = struct
     let report = Tezos_base.Profiler.report validator.headless in
     (match report with
     | None -> ()
-    | Some report -> (
-        try Profiler.inc Shell_profiling.block_validator_profiler report
-        with _ -> ())) ;
+    | Some report -> ( try Profiler.inc report with _ -> ())) ;
     return res
 
   let context_garbage_collection _validator context_index context_hash
@@ -506,9 +506,7 @@ module External_validator_process = struct
     let* res, report = send_request validator request in
     (match report with
     | None -> ()
-    | Some report -> (
-        try Profiler.inc Shell_profiling.block_validator_profiler report
-        with _ -> ())) ;
+    | Some report -> ( try Profiler.inc report with _ -> ())) ;
     return res
 
   let preapply_block validator ~chain_id ~timestamp ~protocol_data ~live_blocks
@@ -560,9 +558,7 @@ module External_validator_process = struct
     let* res, report = send_request validator request in
     (match report with
     | None -> ()
-    | Some report -> (
-        try Profiler.inc Shell_profiling.block_validator_profiler report
-        with _ -> ())) ;
+    | Some report -> ( try Profiler.inc report with _ -> ())) ;
     return res
 
   let context_garbage_collection validator _index context_hash ~gc_lockfile_path
