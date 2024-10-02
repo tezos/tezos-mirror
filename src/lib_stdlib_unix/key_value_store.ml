@@ -815,7 +815,16 @@ end = struct
       in
       let p = Action.read ~on_file_closed files last_actions layout key in
       Table.replace last_actions layout.filepath (Read p) ;
-      let+ _file, value = p in
+      let+ file, value = p in
+      (match file with
+      | None -> (
+          match Table.find_opt last_actions layout.filepath with
+          | Some (Read p) -> (
+              match Lwt.state p with
+              | Lwt.Return _ -> Table.remove last_actions layout.filepath
+              | _ -> ())
+          | _ -> ())
+      | Some _ -> ()) ;
       value
 
   (* Very similar to [read] action except we only look at the bitset
@@ -839,7 +848,16 @@ end = struct
         Action.value_exists ~on_file_closed files last_actions layout key
       in
       Table.replace last_actions layout.filepath (Value_exists p) ;
-      let+ _, exists = p in
+      let+ file, exists = p in
+      (match file with
+      | None -> (
+          match Table.find_opt last_actions layout.filepath with
+          | Some (Read p) -> (
+              match Lwt.state p with
+              | Lwt.Return _ -> Table.remove last_actions layout.filepath
+              | _ -> ())
+          | _ -> ())
+      | Some _ -> ()) ;
       exists
 
   (* Very similar to [value_exists] action except we look at the
@@ -861,7 +879,16 @@ end = struct
       in
       let p = Action.count_values ~on_file_closed files last_actions layout in
       Table.replace last_actions layout.filepath (Count_values p) ;
-      let+ _, count = p in
+      let+ file, count = p in
+      (match file with
+      | None -> (
+          match Table.find_opt last_actions layout.filepath with
+          | Some (Count_values p) -> (
+              match Lwt.state p with
+              | Lwt.Return _ -> Table.remove last_actions layout.filepath
+              | _ -> ())
+          | _ -> ())
+      | Some _ -> ()) ;
       count
 
   let write ?(override = false) {files; last_actions; lru; closed} layout key
@@ -913,7 +940,7 @@ end = struct
       let* () = p in
       (* See [close_file] for an explanation of the lines below. *)
       (match Table.find_opt last_actions layout.filepath with
-      | Some (Close p) -> (
+      | Some (Close p) | Some (Remove p) -> (
           match Lwt.state p with
           | Lwt.Return _ -> Table.remove last_actions layout.filepath
           | _ -> ())
