@@ -391,6 +391,10 @@ module Internal_validator_process = struct
         operations
     in
     validator.preapply_result <- Some apply_result ;
+    let report = Tezos_base.Profiler.report validator.headless in
+    (match report with
+    | None -> ()
+    | Some report -> ( try Profiler.inc report with _ -> ())) ;
     return result
 
   let validate_block validator chain_store ~predecessor header _hash operations
@@ -532,7 +536,10 @@ module External_validator_process = struct
           operations;
         }
     in
-    let* res, _report = send_request validator request in
+    let* res, report = send_request validator request in
+    (match report with
+    | None -> ()
+    | Some report -> ( try Profiler.inc report with _ -> ())) ;
     return res
 
   let validate_block validator chain_store ~predecessor header hash operations =
@@ -711,7 +718,9 @@ let preapply_block (E {validator_process = (module VP); validator} : t)
   let open Lwt_result_syntax in
   let chain_id = Store.Chain.chain_id chain_store in
   let* live_blocks, live_operations =
-    Store.Chain.compute_live_blocks chain_store ~block:predecessor
+    (Store.Chain.compute_live_blocks
+       chain_store
+       ~block:predecessor [@profiler.record_s "compute_live_blocks"])
   in
   let predecessor_shell_header = Store.Block.shell_header predecessor in
   let predecessor_hash = Store.Block.hash predecessor in
@@ -721,12 +730,18 @@ let preapply_block (E {validator_process = (module VP); validator} : t)
   let predecessor_ops_metadata_hash =
     Store.Block.all_operations_metadata_hash predecessor
   in
-  let* metadata = Store.Block.get_block_metadata chain_store predecessor in
+  let* metadata =
+    (Store.Block.get_block_metadata
+       chain_store
+       predecessor [@profiler.record_s "get_block_metadata"])
+  in
   let predecessor_max_operations_ttl =
     Store.Block.max_operations_ttl metadata
   in
   let* predecessor_resulting_context_hash =
-    Store.Block.resulting_context_hash chain_store predecessor
+    (Store.Block.resulting_context_hash
+       chain_store
+       predecessor [@profiler.record_s "resulting_context_hash"])
   in
   VP.preapply_block
     validator
