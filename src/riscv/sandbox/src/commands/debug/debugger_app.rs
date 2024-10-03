@@ -12,9 +12,8 @@ use octez_riscv::{
     machine_state::{
         bus::{main_memory::MainMemoryLayout, Address},
         csregisters::satp::{Satp, SvLength, TranslationAlgorithm},
-        instruction_cache::InstructionCacheLayout,
         mode::Mode,
-        AccessType, MachineCoreState,
+        AccessType, CacheLayouts, MachineCoreState,
     },
     program::Program,
     pvm::PvmHooks,
@@ -175,9 +174,7 @@ impl<'a, ML: MainMemoryLayout> DebuggerApp<'a, TestStepper<ML>> {
     }
 }
 
-impl<'hooks, ML: MainMemoryLayout, ICL: InstructionCacheLayout>
-    DebuggerApp<'_, PvmStepper<'hooks, ML, ICL>>
-{
+impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts> DebuggerApp<'_, PvmStepper<'hooks, ML, CL>> {
     /// Launch the Debugger app for a PVM.
     pub fn launch(
         fname: &str,
@@ -189,7 +186,7 @@ impl<'hooks, ML: MainMemoryLayout, ICL: InstructionCacheLayout>
     ) -> Result<()> {
         let hooks = PvmHooks::new(|_| {});
 
-        let mut stepper = PvmStepper::<'_, ML, ICL>::new(
+        let mut stepper = PvmStepper::<'_, ML, CL>::new(
             program,
             initrd,
             inbox,
