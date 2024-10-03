@@ -44,10 +44,17 @@
   fakeOpamSwitchPrefix =
     pkgs.runCommand
     "fake-opam-switch-prefix"
-    {}
+    {
+      buildInputs = with pkgs; [
+        curl
+        cacert
+      ];
+    }
     ''
       mkdir -p $out/share/zcash-params
       cp ${./images/ci/zcash-params}/* $out/share/zcash-params
+
+      OPAM_SWITCH_PREFIX="$out" ${./scripts}/install_dal_trusted_setup.sh
     '';
 
   mkFrameworkFlags = frameworks:
