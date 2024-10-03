@@ -298,46 +298,49 @@ let preapply_result_encoding :
        "preapplied_operations_result"
        (list (Preapply_result.encoding Tezos_rpc.Error.encoding)))
 
-let may_force_protocol_upgrade ~user_activated_upgrades ~level
-    (validation_result : Tezos_protocol_environment.validation_result) =
-  let open Lwt_syntax in
-  match
-    Block_header.get_forced_protocol_upgrade ~user_activated_upgrades ~level
-  with
-  | None -> return validation_result
-  | Some hash ->
-      let* context =
-        Tezos_protocol_environment.Context.set_protocol
-          validation_result.context
-          hash
-      in
-      return {validation_result with context}
-
 (** Applies user activated updates based either on block level or on
-    voted protocols *)
+    voted protocols.
+
+    From protocol [P] retrieved in the context:
+    - Does nothing if no User Activated Updates nor User Activated Protocol
+      Override are set.
+    - Set the protocol to [R] if a User Activated Updates to proto [Q] for the
+      given level is set and a User Activated Protocol Overrides from [Q] to [R]
+      is set.
+    - Set the protocol to [Q] if a User Activated Updates to proto [Q] for the
+      given level is set
+    - Set the protocol to [Q] if a User Activated Protocol Overrides is set.
+*)
 let may_patch_protocol ~user_activated_upgrades
     ~user_activated_protocol_overrides ~level
     (validation_result : Tezos_protocol_environment.validation_result) =
   let open Lwt_syntax in
   let context = validation_result.context in
   let* protocol = Context_ops.get_protocol context in
-  match
-    Block_header.get_voted_protocol_overrides
-      ~user_activated_protocol_overrides
-      protocol
-  with
-  | None ->
-      may_force_protocol_upgrade
-        ~user_activated_upgrades
-        ~level
-        validation_result
-  | Some replacement_protocol ->
-      let* context =
-        Tezos_protocol_environment.Context.set_protocol
-          validation_result.context
-          replacement_protocol
-      in
-      return {validation_result with context}
+  let next_protocol =
+    match
+      Block_header.get_forced_protocol_upgrade ~user_activated_upgrades ~level
+    with
+    | None -> protocol
+    | Some uau_protocol -> uau_protocol
+  in
+  let next_protocol =
+    match
+      Block_header.get_voted_protocol_overrides
+        ~user_activated_protocol_overrides
+        next_protocol
+    with
+    | None -> next_protocol
+    | Some uapo_protocol -> uapo_protocol
+  in
+  if Protocol_hash.equal next_protocol protocol then return validation_result
+  else
+    let* context =
+      Tezos_protocol_environment.Context.set_protocol
+        validation_result.context
+        next_protocol
+    in
+    return {validation_result with context}
 
 module Make (Proto : Protocol_plugin.T) = struct
   type 'operation_data preapplied_operation = {
