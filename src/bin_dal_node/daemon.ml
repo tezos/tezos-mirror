@@ -1115,7 +1115,16 @@ let run ~data_dir ~configuration_override =
   in
   (* Starts the metrics *after* the amplificator fork, to avoid forked opened
      sockets *)
-  let*! _metrics_server = Metrics.launch config.metrics_addr in
+  let* () =
+    match config.metrics_addr with
+    | None ->
+        let*! () = Event.(emit metrics_server_not_starting ()) in
+        return_unit
+    | Some metrics_addr ->
+        let*! () = Event.(emit metrics_server_starting metrics_addr) in
+        let*! _metrics_server = Metrics.launch metrics_addr in
+        return_unit
+  in
   (* Set value size hooks. *)
   Value_size_hooks.set_share_size
     (Cryptobox.Internal_for_tests.encoded_share_size cryptobox) ;

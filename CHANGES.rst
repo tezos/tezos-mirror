@@ -64,5 +64,11 @@ Data Availability Layer (DAL)
 DAL node
 ~~~~~~~~
 
+- **Breaking_change** The configuration value ``metrics-addr`` is now an option.
+  It should not break unless the value differs from the default value
+  (``0.0.0.0:11733``). The new default value is ``None``, so no metrics are
+  exported by default.
+
+
 Miscellaneous
 -------------

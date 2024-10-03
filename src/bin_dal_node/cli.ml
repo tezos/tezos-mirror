@@ -230,7 +230,7 @@ module Term = struct
       "The TCP address and optionally the port of the node's metrics server. \
        The default address is 0.0.0.0. The default port is 11733."
     in
-    let default_port = Configuration_file.default.metrics_addr |> snd in
+    let default_port = Configuration_file.default_metrics_port in
     Arg.(
       value
       & opt (some (p2p_point_arg ~default_port)) None

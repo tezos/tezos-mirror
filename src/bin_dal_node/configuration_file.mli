@@ -52,7 +52,7 @@ type t = {
   network_name : string;
       (** A string that identifies the network's name. E.g. dal-sandbox. *)
   endpoint : Uri.t;  (** The endpoint of a Tezos L1 node. *)
-  metrics_addr : P2p_point.Id.t;
+  metrics_addr : P2p_point.Id.t option;
       (** The TCP address of the node's server used to export metrics. *)
   profile : Profile_manager.t;
       (** The profiles determining the topics of interest. *)
@@ -65,6 +65,9 @@ type t = {
 
 (** [default] is the default configuration. *)
 val default : t
+
+(** [default_metrics_port] is the default network port opened for metrics *)
+val default_metrics_port : int
 
 (** [store_path config] returns a path for the store *)
 val store_path : t -> string
