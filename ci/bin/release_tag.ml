@@ -237,6 +237,9 @@ let octez_evm_node_jobs ?(test = false) () =
       ["./scripts/ci/create_gitlab_octez_evm_node_release.sh"]
   in
   [
+    (* Stage: sanity *)
+    job_datadog_pipeline_trace;
+    (* Stage: build *)
     job_static_arm64_release;
     job_static_x86_64_release;
     job_docker_amd64;
