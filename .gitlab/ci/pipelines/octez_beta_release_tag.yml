@@ -3,6 +3,7 @@
 
 stages:
 - images
+- sanity
 - build
 - publishing
 - prepare_release
@@ -51,6 +52,17 @@ oc.docker:ci:arm64:
     max: 1
     when:
     - runner_system_failure
+
+datadog_pipeline_trace:
+  image: ${ci_image_name}/build:${ci_image_tag}
+  stage: sanity
+  tags:
+  - gcp
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  script:
+  - DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags pipeline_type:$PIPELINE_TYPE
 
 oc.build:static-x86_64-linux-binaries:
   image: ${ci_image_name}/build:${ci_image_tag}

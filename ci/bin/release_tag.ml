@@ -151,6 +151,9 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
       ()
   in
   [
+    (* Stage: sanity *)
+    job_datadog_pipeline_trace;
+    (* Stage: build *)
     job_static_x86_64_release;
     job_static_arm64_release;
     job_docker_amd64;
