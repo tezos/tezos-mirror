@@ -1602,6 +1602,10 @@ module Anonymous = struct
     in
     {vs with anonymous_state}
 
+  let check_dal_entrapment_evidence vi
+      (_operation : Kind.dal_entrapment_evidence operation) =
+    Dal.assert_incentives_enabled vi.ctxt |> Lwt.return
+
   let check_drain_delegate info ~check_signature
       (operation : Kind.drain_delegate Operation.t) =
     let open Lwt_result_syntax in
@@ -2504,6 +2508,8 @@ let check_operation ?(check_signature = true) info (type kind)
       Anonymous.check_double_attestation_evidence info operation
   | Single (Double_baking_evidence _) ->
       Anonymous.check_double_baking_evidence info operation
+  | Single (Dal_entrapment_evidence _) ->
+      Anonymous.check_dal_entrapment_evidence info operation
   | Single (Drain_delegate _) ->
       Anonymous.check_drain_delegate info ~check_signature operation
   | Single (Seed_nonce_revelation _) ->
@@ -2572,6 +2578,9 @@ let check_operation_conflict (type kind) operation_conflict_state oph
         operation_conflict_state
         oph
         operation
+  | Single (Dal_entrapment_evidence _) ->
+      (* TODO: to be refined in the next commit *)
+      ok_unit
   | Single (Drain_delegate _) ->
       Anonymous.check_drain_delegate_conflict
         operation_conflict_state
@@ -2624,6 +2633,9 @@ let add_valid_operation operation_conflict_state oph (type kind)
         operation_conflict_state
         oph
         operation
+  | Single (Dal_entrapment_evidence _) ->
+      (* TODO: to be refined in the next commit *)
+      operation_conflict_state
   | Single (Drain_delegate _) ->
       Anonymous.add_drain_delegate operation_conflict_state oph operation
   | Single (Seed_nonce_revelation _) ->
@@ -2661,6 +2673,9 @@ let remove_operation operation_conflict_state (type kind)
         operation
   | Single (Double_baking_evidence _) ->
       Anonymous.remove_double_baking_evidence operation_conflict_state operation
+  | Single (Dal_entrapment_evidence _) ->
+      (* TODO: to be refined in the next commit *)
+      operation_conflict_state
   | Single (Drain_delegate _) ->
       Anonymous.remove_drain_delegate operation_conflict_state operation
   | Single (Seed_nonce_revelation _) ->
@@ -2809,6 +2824,11 @@ let validate_operation ?(check_signature = true)
           let operation_state =
             add_double_baking_evidence operation_state oph operation
           in
+          return {info; operation_state; block_state}
+      | Single (Dal_entrapment_evidence _) ->
+          let open Anonymous in
+          let* () = check_dal_entrapment_evidence info operation in
+          (* TODO: to be refined in the next commit *)
           return {info; operation_state; block_state}
       | Single (Drain_delegate _) ->
           let open Anonymous in

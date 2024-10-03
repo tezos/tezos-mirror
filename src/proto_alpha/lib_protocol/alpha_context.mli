@@ -4491,6 +4491,8 @@ module Kind : sig
 
   type double_baking_evidence = Double_baking_evidence_kind
 
+  type dal_entrapment_evidence = Dal_entrapment_evidence_kind
+
   type activate_account = Activate_account_kind
 
   type proposals = Proposals_kind
@@ -4641,6 +4643,12 @@ and _ contents =
       bh2 : Block_header.t;
     }
       -> Kind.double_baking_evidence contents
+  | Dal_entrapment_evidence : {
+      attestation : Kind.attestation operation;
+      slot_index : Dal.Slot_index.t;
+      shard_with_proof : Dal.Shard_with_proof.t;
+    }
+      -> Kind.dal_entrapment_evidence contents
   | Activate_account : {
       id : Ed25519.Public_key_hash.t;
       activation_code : Blinded_public_key_hash.activation_code;

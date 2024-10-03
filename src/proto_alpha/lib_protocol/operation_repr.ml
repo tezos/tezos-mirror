@@ -55,6 +55,8 @@ module Kind = struct
 
   type double_baking_evidence = Double_baking_evidence_kind
 
+  type dal_entrapment_evidence = Dal_entrapment_evidence_kind
+
   type activate_account = Activate_account_kind
 
   type proposals = Proposals_kind
@@ -260,6 +262,12 @@ and _ contents =
       bh2 : Block_header_repr.t;
     }
       -> Kind.double_baking_evidence contents
+  | Dal_entrapment_evidence : {
+      attestation : Kind.attestation operation;
+      slot_index : Dal_slot_index_repr.t;
+      shard_with_proof : Dal_slot_repr.Shard_with_proof.t;
+    }
+      -> Kind.dal_entrapment_evidence contents
   | Activate_account : {
       id : Ed25519.Public_key_hash.t;
       activation_code : Blinded_public_key_hash.activation_code;
@@ -1728,6 +1736,7 @@ let acceptable_pass (op : packed_operation) =
   | Single (Double_attestation_evidence _) -> Some anonymous_pass
   | Single (Double_preattestation_evidence _) -> Some anonymous_pass
   | Single (Double_baking_evidence _) -> Some anonymous_pass
+  | Single (Dal_entrapment_evidence _) -> Some anonymous_pass
   | Single (Activate_account _) -> Some anonymous_pass
   | Single (Drain_delegate _) -> Some anonymous_pass
   | Single (Manager_operation _) -> Some manager_pass
@@ -1816,7 +1825,8 @@ let check_signature (type kind) key chain_id (op : kind operation) =
             ( Failing_noop _ | Proposals _ | Ballot _ | Seed_nonce_revelation _
             | Vdf_revelation _ | Double_attestation_evidence _
             | Double_preattestation_evidence _ | Double_baking_evidence _
-            | Activate_account _ | Drain_delegate _ | Manager_operation _ ) ->
+            | Dal_entrapment_evidence _ | Activate_account _ | Drain_delegate _
+            | Manager_operation _ ) ->
             Generic_operation
         | Cons (Manager_operation _, _ops) -> Generic_operation
       in
@@ -1907,6 +1917,8 @@ let equal_contents_kind : type a b. a contents -> b contents -> (a, b) eq option
   | Double_preattestation_evidence _, _ -> None
   | Double_baking_evidence _, Double_baking_evidence _ -> Some Eq
   | Double_baking_evidence _, _ -> None
+  | Dal_entrapment_evidence _, Dal_entrapment_evidence _ -> Some Eq
+  | Dal_entrapment_evidence _, _ -> None
   | Activate_account _, Activate_account _ -> Some Eq
   | Activate_account _, _ -> None
   | Proposals _, Proposals _ -> Some Eq
@@ -2137,6 +2149,10 @@ type _ weight =
   | Weight_double_preattestation : round_infos -> anonymous_pass_type weight
   | Weight_double_attestation : round_infos -> anonymous_pass_type weight
   | Weight_double_baking : double_baking_infos -> anonymous_pass_type weight
+  | Weight_dal_entrapment_evidence :
+      (* TODO: to be refined in the next commit *)
+      unit
+      -> anonymous_pass_type weight
   | Weight_activate_account :
       Ed25519.Public_key_hash.t
       -> anonymous_pass_type weight
@@ -2251,6 +2267,8 @@ let weight_of : packed_operation -> operation_weight =
         consensus_infos_and_hash_from_block_header bh1
       in
       W (Anonymous, Weight_double_baking double_baking_infos)
+  | Single (Dal_entrapment_evidence _) ->
+      W (Anonymous, Weight_dal_entrapment_evidence ())
   | Single (Activate_account {id; _}) ->
       W (Anonymous, Weight_activate_account id)
   | Single (Drain_delegate {delegate; _}) ->
@@ -2404,11 +2422,10 @@ let compare_vote_weight w1 w2 =
 
    Two {!Activate_account} are compared as their [id].
 
-   When comparing different kind of anonymous operations, the order is
-   as follows: {!Double_preattestation_evidence} >
-   {!Double_attestation_evidence} > {!Double_baking_evidence} >
-   {!Vdf_revelation} > {!Seed_nonce_revelation} > {!Activate_account}.
-   *)
+   When comparing different kind of anonymous operations, the order is as
+   follows: {!Double_preattestation_evidence} > {!Double_attestation_evidence} >
+   {!Double_baking_evidence} > {!Dal_entrapment_evidence} > {!Vdf_revelation} >
+   {!Seed_nonce_revelation} > {!Activate_account}.  *)
 let compare_anonymous_weight w1 w2 =
   match (w1, w2) with
   | Weight_double_preattestation infos1, Weight_double_preattestation infos2 ->
@@ -2421,23 +2438,34 @@ let compare_anonymous_weight w1 w2 =
       if Compare.Int.(cmp <> 0) then cmp else -1
   | Weight_double_attestation infos1, Weight_double_attestation infos2 ->
       compare_round_infos infos1 infos2
-  | ( ( Weight_double_baking _ | Weight_seed_nonce_revelation _
-      | Weight_vdf_revelation _ | Weight_activate_account _
-      | Weight_drain_delegate _ ),
+  | ( ( Weight_double_baking _ | Weight_dal_entrapment_evidence _
+      | Weight_seed_nonce_revelation _ | Weight_vdf_revelation _
+      | Weight_activate_account _ | Weight_drain_delegate _ ),
       (Weight_double_preattestation _ | Weight_double_attestation _) ) ->
       -1
   | ( (Weight_double_preattestation _ | Weight_double_attestation _),
-      ( Weight_double_baking _ | Weight_seed_nonce_revelation _
-      | Weight_vdf_revelation _ | Weight_activate_account _
-      | Weight_drain_delegate _ ) ) ->
+      ( Weight_double_baking _ | Weight_dal_entrapment_evidence _
+      | Weight_seed_nonce_revelation _ | Weight_vdf_revelation _
+      | Weight_activate_account _ | Weight_drain_delegate _ ) ) ->
       1
   | Weight_double_baking infos1, Weight_double_baking infos2 ->
       compare_baking_infos infos1 infos2
-  | ( ( Weight_seed_nonce_revelation _ | Weight_vdf_revelation _
-      | Weight_activate_account _ | Weight_drain_delegate _ ),
+  | ( ( Weight_dal_entrapment_evidence _ | Weight_seed_nonce_revelation _
+      | Weight_vdf_revelation _ | Weight_activate_account _
+      | Weight_drain_delegate _ ),
       Weight_double_baking _ ) ->
       -1
   | ( Weight_double_baking _,
+      ( Weight_dal_entrapment_evidence _ | Weight_seed_nonce_revelation _
+      | Weight_vdf_revelation _ | Weight_activate_account _
+      | Weight_drain_delegate _ ) ) ->
+      1
+  | Weight_dal_entrapment_evidence (), Weight_dal_entrapment_evidence () -> 0
+  | ( ( Weight_seed_nonce_revelation _ | Weight_vdf_revelation _
+      | Weight_activate_account _ | Weight_drain_delegate _ ),
+      Weight_dal_entrapment_evidence _ ) ->
+      -1
+  | ( Weight_dal_entrapment_evidence (),
       ( Weight_seed_nonce_revelation _ | Weight_vdf_revelation _
       | Weight_activate_account _ | Weight_drain_delegate _ ) ) ->
       1

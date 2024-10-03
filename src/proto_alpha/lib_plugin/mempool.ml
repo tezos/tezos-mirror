@@ -556,6 +556,7 @@ let pre_filter info config
   | Single (Double_preattestation_evidence _)
   | Single (Double_attestation_evidence _)
   | Single (Double_baking_evidence _)
+  | Single (Dal_entrapment_evidence _)
   | Single (Activate_account _)
   | Single (Proposals _)
   | Single (Vdf_revelation _)
@@ -692,7 +693,8 @@ let find_manager {shell = _; protocol_data = Operation_data {contents; _}} =
       ( Preattestation _ | Attestation _ | Proposals _ | Ballot _
       | Seed_nonce_revelation _ | Vdf_revelation _ | Double_baking_evidence _
       | Double_preattestation_evidence _ | Double_attestation_evidence _
-      | Activate_account _ | Drain_delegate _ | Failing_noop _ ) ->
+      | Dal_entrapment_evidence _ | Activate_account _ | Drain_delegate _
+      | Failing_noop _ ) ->
       None
 
 (* The purpose of this module is to offer a version of
@@ -814,6 +816,7 @@ let sources_from_operation ctxt
   | Single (Double_preattestation_evidence _)
   | Single (Double_attestation_evidence _)
   | Single (Double_baking_evidence _)
+  | Single (Dal_entrapment_evidence _)
   | Single (Activate_account _)
   | Single (Vdf_revelation _) ->
       return_nil

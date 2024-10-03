@@ -1145,6 +1145,7 @@ let balance_updates_of_single_content :
   | Double_attestation_evidence_result {balance_updates; _}
   | Double_preattestation_evidence_result {balance_updates; _}
   | Double_baking_evidence_result {balance_updates; _}
+  | Dal_entrapment_evidence_result {balance_updates; _}
   | Activate_account_result balance_updates
   | Drain_delegate_result {balance_updates; _} ->
       balance_updates

@@ -1063,6 +1063,19 @@ let pp_contents_and_result :
           forbidden_delegate
           pp_balance_updates
           balance_updates
+    | ( Dal_entrapment_evidence
+          {attestation; slot_index = _; shard_with_proof = _},
+        Dal_entrapment_evidence_result {balance_updates} ) ->
+        Format.fprintf
+          ppf
+          "@[<v 2>Dal entrapment evidence:@,\
+           attestation: %a@,\
+           Balance updates:@,\
+          \  %a@]"
+          Operation_hash.pp
+          (Operation.hash attestation)
+          pp_balance_updates
+          balance_updates
     | Activate_account {id; _}, Activate_account_result bus ->
         Format.fprintf
           ppf

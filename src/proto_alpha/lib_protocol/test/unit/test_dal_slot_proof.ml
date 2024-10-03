@@ -238,7 +238,7 @@ struct
         (failing_check_produce_result
            ~__LOC__
            ~expected_error:
-             (Hist.Dal_proof_error
+             (Hist.Dal_page_proof_error
                 "Wrong page content for the given page index and slot \
                  commitment (page id=(published_level: 1, slot_index: 0, \
                  page_index: 2))."))
@@ -260,7 +260,7 @@ struct
         (failing_check_produce_result
            ~__LOC__
            ~expected_error:
-             (Hist.Dal_proof_error
+             (Hist.Dal_page_proof_error
                 "Wrong page content for the given page index and slot \
                  commitment (page id=(published_level: 1, slot_index: 0, \
                  page_index: 0))."))

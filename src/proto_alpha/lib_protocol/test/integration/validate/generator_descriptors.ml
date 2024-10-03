@@ -414,6 +414,17 @@ let double_consensus_descriptor =
         return (candidates_pre @ candidates_end));
   }
 
+let entrapment_descriptor =
+  let open Lwt_result_syntax in
+  {
+    parameters = Fun.id;
+    required_cycle = (fun _params -> 0);
+    required_block = (fun _ -> 0);
+    prelude = (From 0, fun state -> return ([], state));
+    opt_prelude = None;
+    candidates_generator = (fun _state -> return []);
+  }
+
 let double_baking_descriptor =
   {
     parameters = Fun.id;
@@ -796,6 +807,7 @@ type op_kind =
   | KActivate
   | KDbl_consensus
   | KDbl_baking
+  | KEntrapment
   | KDrain
   | KManager
 
@@ -809,6 +821,7 @@ let op_kind_of_packed_operation op =
   | Single (Double_attestation_evidence _) -> KDbl_consensus
   | Single (Double_preattestation_evidence _) -> KDbl_consensus
   | Single (Double_baking_evidence _) -> KDbl_baking
+  | Single (Dal_entrapment_evidence _) -> KEntrapment
   | Single (Activate_account _) -> KActivate
   | Single (Proposals _) -> KProposals
   | Single (Ballot _) -> KBallotExp
@@ -832,6 +845,7 @@ let pp_op_kind fmt kind =
     | KActivate -> "activate_account"
     | KDbl_consensus -> "double_consensus"
     | KDbl_baking -> "double_baking"
+    | KEntrapment -> "dal_entrapment"
     | KDrain -> "drain_delegate")
 
 let descriptor_of ~nb_bootstrap ~max_batch_size = function
@@ -846,6 +860,7 @@ let descriptor_of ~nb_bootstrap ~max_batch_size = function
   | KActivate -> activate_descriptor
   | KDbl_consensus -> double_consensus_descriptor
   | KDbl_baking -> double_baking_descriptor
+  | KEntrapment -> entrapment_descriptor
   | KDrain -> drain_delegate_descriptor
 
 let descriptors_of ~nb_bootstrap ~max_batch_size =
