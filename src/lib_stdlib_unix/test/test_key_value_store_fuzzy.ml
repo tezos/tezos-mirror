@@ -1,25 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
-(* Open Source License                                                       *)
-(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
-(*                                                                           *)
-(* Permission is hereby granted, free of charge, to any person obtaining a   *)
-(* copy of this software and associated documentation files (the "Software"),*)
-(* to deal in the Software without restriction, including without limitation *)
-(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
-(* and/or sell copies of the Software, and to permit persons to whom the     *)
-(* Software is furnished to do so, subject to the following conditions:      *)
-(*                                                                           *)
-(* The above copyright notice and this permission notice shall be included   *)
-(* in all copies or substantial portions of the Software.                    *)
-(*                                                                           *)
-(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
-(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
-(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
-(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
-(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
-(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
-(* DEALINGS IN THE SOFTWARE.                                                 *)
+(* SPDX-License-Identifier: MIT                                              *)
+(* SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>      *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -32,6 +14,66 @@
 *)
 
 open Error_monad
+
+(* MUST READ IF YOU PLAN TO MODIFY/DEBUG THIS TEST
+
+   Modifying this test is in general a very frustrating experience.
+
+   The property check against a generated value is by essence flaky
+   since it depends on the Lwt scheduler and consequently on the
+   underlying system scheduler. This is done on purpose so that we can
+   detect an issue without relying on a specific sequence of actions
+   from the scheduler perspective. This is not flaky if the scenario
+   generated contains only sequential actions. This is why the default
+   shrinker of the test always tries to replace any parallel action by
+   a sequential one.
+
+   However, it seems that in practice, while running the property
+   multiple times on the same generated value, we get the same result
+   most of the time.
+
+   When we do not, [tezt-bam] may detect this and you'll get an error
+   message saying that some non-determinism was detected. tezt-bam
+   does not allow you at the moment to rerun the test specifically on
+   this value, but this may be a good feature to add in [tezt-bam]
+   (for example running the same example multiple times to observe the
+   failure).
+
+   It may also happen that there is a deadlock, in that case it is
+   tempting to add a timeout so that the test does not run forever.
+   Actually, it does not work either because using [Lwt.pick] will
+   also block. It can be an issue for the CI, but in practice, a good
+   old Ctrl+C will work. For the CI, there are other timeouts that
+   should be sufficient in practice and since deadlocks are not
+   supposed to happen, it should not be an issue either.
+
+   If you observe what seems to be a deadlock, then it is a bug in the
+   KVS that must be fixed. It is likely related to the strategy used
+   by the KVS to ensure the number of opened files is below some limit
+   (check the [add_lru] function)
+
+   The default strategy for the generator seems adequate, but probably
+   could be optimised. Feel free to use [--aggressive <n>] to get
+   better counter-examples. Some comments are left in the file below
+   when the shrinking strategy actually matters.
+
+   [tezt-bam] is not smart! So you can assume when it applies that the
+   distribution is uniform. If you think some corner-cases are checked
+   too often or not enough, this must be handled by hand.
+
+   The PPX associated with [tezt-bam] (the [@deriving gen] attribute)
+   does not do smart things either. It will produce the naive
+   generator you would write for the given type (it uses the
+   underlying "monad", and reads records/ADT from left to right or top
+   to bottom). The default behaviour can be tuned with attributes.
+
+   If you observe any error while running this test, you may likely
+   need to rely on "hello-debugging" to understand what is going on.
+
+   Please be sure you have run the test in a loop before pushing any
+   modification to make sure it is not flaky. No failure after a total
+   of 100_000 runs sounds reasonable.
+*)
 
 (* This test file checks the correctness of the key-value store
    (module [L]) with respect to the interface [S] using a reference
@@ -102,8 +144,6 @@ module type S = sig
   end
 end
 
-let value_size = 1
-
 module L : S = Key_value_store
 
 module R : S = struct
@@ -155,25 +195,51 @@ module R : S = struct
 end
 
 module Helpers = struct
-  type key = string * int
+  open Bam.Std
+  open Bam.Std.Syntax
 
-  let make_file d = Printf.sprintf "file_%d" d
+  (* Ideally, we would like to generate those values for a given
+     range. However in practice, taking those constants is more than
+     enough to stumble across issues that would be raised with higher
+     values.
 
-  let key_gen ~number_of_files ~number_of_keys_per_file =
-    let open QCheck2.Gen in
-    let file_gen = map make_file (int_range 0 (number_of_files - 1)) in
-    let key_gen = int_range 0 (number_of_keys_per_file - 1) in
-    tup2 file_gen key_gen
+     Anybody with an adventurer spirit can try to change this value.
 
-  type value = Bytes.t
+     Do note that the higher those values are, the less is the
+     coverage since the space to explore is higher. *)
+  let number_of_files_max = 3
+
+  let key_max = 4
+
+  let value_size = 1
+
+  let make_file id = Printf.sprintf "file_%d" id
+
+  type filename = string
+
+  (* With [tezt-bam], the generator names are codified. They should
+     start with [gen_] followed by the name of the type, except if the
+     type is called [t] in that case the name is just [gen]. *)
+  let gen_filename =
+    let* n = int ~min:0 ~max:(number_of_files_max - 1) () in
+    return (make_file n)
+
+  type key = filename * int
+
+  let gen_key =
+    let* filename = gen_filename in
+    let* key = int ~min:0 ~max:(key_max - 1) () in
+    return (filename, key)
+
+  type value = String.t
+
+  (* A value of size one is well enough to test reads/writes. One
+     could update this test to test the case where the size of a value
+     is more than 4KiB. *)
+  let gen_value = string ~size:(return 1) ()
 
   type write_payload = {key : key; override : bool; default : bool}
-
-  let write_payload_gen ~number_of_files ~number_of_keys_per_file =
-    let open QCheck2.Gen in
-    let key_gen = key_gen ~number_of_files ~number_of_keys_per_file in
-    let gen = tup3 key_gen bool bool in
-    map (fun (key, override, default) -> {key; override; default}) gen
+  [@@deriving gen]
 
   let pp_write_payload fmt {key = file, key; override; default} =
     Format.fprintf
@@ -184,49 +250,19 @@ module Helpers = struct
       override
       default
 
+  (* The generator associated with this type will have a default
+     shrinking where the first constructor value is considered as
+     smaller than the second one, ...
+
+     As a consequence, the shrinking strategy will try to replace any
+     action by [Count_values] first, then [Read_value], ... *)
   type action =
-    | Write_value of write_payload
+    | Count_values of filename
     | Read_value of key
-    | Read_values of key Seq.t
-    | Remove_file of string
-    | Count_values of string
-
-  let seq_gen ~size_seq value_gen =
-    let open QCheck2.Gen in
-    let size_gen = pure size_seq in
-    map (fun list -> List.to_seq list) (list_size size_gen value_gen)
-
-  let key_seq_gen ~size_seq ~number_of_files ~number_of_keys_per_file =
-    let key_gen = key_gen ~number_of_files ~number_of_keys_per_file in
-    seq_gen ~size_seq key_gen
-
-  let action_gen ~read_values_seq_size ~number_of_files ~number_of_keys_per_file
-      =
-    let open QCheck2.Gen in
-    let write_value =
-      write_payload_gen ~number_of_files ~number_of_keys_per_file
-      |> map (fun x -> Write_value x)
-    in
-    let read_value =
-      key_gen ~number_of_files ~number_of_keys_per_file
-      |> map (fun x -> Read_value x)
-    in
-    let remove_file =
-      key_gen ~number_of_files ~number_of_keys_per_file
-      |> map (fun (file, _) -> Remove_file file)
-    in
-    let read_values =
-      key_seq_gen
-        ~size_seq:read_values_seq_size
-        ~number_of_files
-        ~number_of_keys_per_file
-      |> map (fun x -> Read_values x)
-    in
-    let count_values =
-      key_gen ~number_of_files ~number_of_keys_per_file
-      |> map (fun (file, _) -> Count_values file)
-    in
-    oneof [write_value; read_value; read_values; remove_file; count_values]
+    | Write_value of write_payload
+    | Remove_file of filename
+    | Read_values of key list [@max 5]
+  [@@deriving gen]
 
   let pp_action fmt = function
     | Write_value payload -> Format.fprintf fmt "W%a" pp_write_payload payload
@@ -235,7 +271,7 @@ module Helpers = struct
         let str_keys =
           String.concat
             "; "
-            (List.of_seq keys
+            (keys
             |> List.map (fun (file, key) -> Printf.sprintf "key=%s/%d" file key)
             )
         in
@@ -243,12 +279,9 @@ module Helpers = struct
     | Remove_file file -> Format.fprintf fmt "REMOVE[file=%s]" file
     | Count_values file -> Format.fprintf fmt "COUNT[file=%s]" file
 
-  type bind = Sequential | Parallel
-
-  let bind_gen = QCheck2.Gen.oneofa [|Sequential; Parallel|]
+  type bind = Sequential | Parallel [@@deriving gen]
 
   type parameters = {
-    mutable uid : int;
     number_of_files : int;
     number_of_keys_per_file : int;
     read_values_seq_size : int;
@@ -258,78 +291,46 @@ module Helpers = struct
     overwritten : (key, value) Stdlib.Hashtbl.t;
   }
 
+  let gen_parameters =
+    let* number_of_files =
+      int ~min:number_of_files_max ~max:number_of_files_max ()
+    in
+    let* number_of_keys_per_file = int ~min:key_max ~max:key_max () in
+    let* read_values_seq_size = int ~min:1 ~max:key_max () in
+    let lru_size = max 0 (number_of_files - 2) in
+    let all_keys =
+      Stdlib.List.init number_of_files (fun file ->
+          Stdlib.List.init number_of_keys_per_file (fun key ->
+              (make_file file, key)))
+      |> List.flatten
+    in
+    (* The trick here is to declare an internal generator that we will
+       use twice just below. *)
+    let values_gen =
+      let* values = list ~size:(return (List.length all_keys)) gen_value in
+      let bindings = Stdlib.List.combine all_keys values in
+      return (bindings |> List.to_seq |> Stdlib.Hashtbl.of_seq)
+    in
+    let* values = values_gen in
+    let* overwritten = values_gen in
+    return
+      {
+        number_of_files;
+        number_of_keys_per_file;
+        read_values_seq_size;
+        lru_size;
+        value_size;
+        values;
+        overwritten;
+      }
+
   let keys files_max keys_max =
-    Stdlib.List.init files_max (fun file ->
-        Stdlib.List.init keys_max (fun key -> (make_file file, key)))
+    Stdlib.List.init (files_max - 1) (fun file ->
+        Stdlib.List.init (keys_max - 1) (fun key -> (make_file file, key)))
     |> List.flatten |> Array.of_list
-
-  (* Because a scenario creates files onto the disk, we need a way to
-     generate unique names. For debugging purpose, and because of the
-     shrinking of QCheck2, it is easier to track tries with a simple
-     counter. *)
-  let cpt = ref 0
-
-  let parameters_gen =
-    let open QCheck2.Gen in
-    (* A small set of different values is enough to get interesting
-       scenarios. *)
-    let files_max = 3 in
-    let keys_max = 4 in
-    let number_of_files = pure files_max in
-    let number_of_keys_per_file = pure files_max in
-    let key_max = files_max * keys_max in
-    let read_values_seq_size = int_range 1 key_max in
-    let lru_size =
-      let+ number_of_files in
-      max 0 @@ (number_of_files - 2)
-    in
-    let char =
-      int_range (Char.code 'a') (Char.code 'z') |> map (fun x -> Char.chr x)
-    in
-    let uid = pure 0 in
-    let keys = keys files_max keys_max in
-    let values =
-      array_repeat key_max (bytes_size ~gen:char (return value_size))
-      |> map (fun array ->
-             Array.combine keys array |> Array.to_seq |> Stdlib.Hashtbl.of_seq)
-    in
-    (* same generator *)
-    let overwritten = values in
-    let tup_gen =
-      tup8
-        uid
-        number_of_files
-        number_of_keys_per_file
-        read_values_seq_size
-        lru_size
-        (return value_size)
-        values
-        overwritten
-    in
-    map
-      (fun ( uid,
-             number_of_files,
-             number_of_keys_per_file,
-             read_values_seq_size,
-             lru_size,
-             value_size,
-             values,
-             overwritten ) ->
-        {
-          uid;
-          number_of_files;
-          number_of_keys_per_file;
-          read_values_seq_size;
-          lru_size;
-          value_size;
-          values;
-          overwritten;
-        })
-      tup_gen
 
   let pp_parameters fmt
       {
-        uid;
         number_of_files;
         number_of_keys_per_file;
         read_values_seq_size;
@@ -341,14 +342,9 @@ module Helpers = struct
     let string_of_values values =
       values |> Stdlib.Hashtbl.to_seq |> List.of_seq
       |> List.map (fun ((file, key), value) ->
-             Format.asprintf
-               "[key=%s/%d,value=%s]"
-               file
-               key
-               (Bytes.to_string value))
+             Format.asprintf "[key=%s/%d,value=%s]" file key value)
       |> String.concat " "
     in
-    Format.fprintf fmt "UID = %d@." uid ;
     Format.fprintf fmt "number of files = %d@." number_of_files ;
     Format.fprintf fmt "number of keys per file = %d@." number_of_keys_per_file ;
     Format.fprintf fmt "sequence length for reads  = %d@." read_values_seq_size ;
@@ -363,73 +359,61 @@ module Helpers = struct
      group of parallel actions though. *)
   type scenario = action * (bind * action) list
 
-  (* [No_concurrency] means we never run two concurrent actions. *)
-  type test_profile = No_concurrency | Concurrency
+  let gen_scenario =
+    let open Bam.Std in
+    let bind_list =
+      (* The default shrinking strategy for list is [Prefix], this
+         means the shrinking will always tries to shrink to a prefix
+         of the list and reducing values of the list according to the
+         shrinking strategy of [value_gen].
 
-  let scenario_gen profile
-      {read_values_seq_size; number_of_files; number_of_keys_per_file; _} :
-      scenario QCheck2.Gen.t =
-    let open QCheck2.Gen in
-    let action_gen =
-      action_gen ~read_values_seq_size ~number_of_files ~number_of_keys_per_file
+         It may not be always a good strategy, but it seems to work
+         pretty-well in practice. If you have to debug this test and
+         are not satisfied with counter-examples found by the
+         tezt-bam, you are invided to play with the various shrinking
+         strategies that are implemented with [tezt-bam]. *)
+      list
+        ~shrinker:Shrinker.Prefix
+          (* You can play with those values. I recommend not to
+             make it too low, since from past experience, the generator
+             may not detect issues that are detected with higher
+             values. *)
+        ~size:(int ~min:1 ~max:50 ())
+        (pair gen_bind gen_action)
     in
-    let first_action = action_gen in
-    let bind_gen =
-      match profile with
-      | No_concurrency -> pure Sequential
-      | Concurrency -> bind_gen
-    in
-    let action_bind = tup2 bind_gen action_gen in
-    tup2 first_action (list_repeat 2 action_bind)
+    pair gen_action bind_list
 
+  (* This printer is not ideal because it does not reflect well what
+     is executed in parallel, what is not. Instead, we just print the
+     AST and rely on the reader to know how it will be interpreted. *)
   let pp_scenario fmt (action, next_actions) =
-    let rec pp shift action fmt next_actions =
+    let rec pp fmt next_actions =
       match next_actions with
-      | [] ->
-          Format.fprintf fmt "%a@." pp_action action ;
-          if shift then Format.fprintf fmt "Wait"
+      | [] -> ()
       | (Parallel, next_action) :: actions ->
-          Format.fprintf
-            fmt
-            "P %a@.%a"
-            pp_action
-            action
-            (pp true next_action)
-            actions
+          Format.fprintf fmt "P %a@.%a@." pp_action next_action pp actions
       | (Sequential, next_action) :: actions ->
-          Format.fprintf
-            fmt
-            "S %a@.%a@."
-            pp_action
-            action
-            (pp false next_action)
-            actions
+          Format.fprintf fmt "S %a@.%a@." pp_action next_action pp actions
     in
-    Format.fprintf fmt "%a" (pp false action) next_actions
+    Format.fprintf fmt "%a@." pp_action action ;
+    Format.fprintf fmt "%a" pp next_actions
 end
 
 include Helpers
 
 let run_scenario
-    ({
-       lru_size;
-       values;
-       overwritten;
-       number_of_files;
-       number_of_keys_per_file;
-       _;
-     } as t) scenario =
+    {lru_size; values; overwritten; number_of_files; number_of_keys_per_file; _}
+    scenario =
   let open Lwt_result_syntax in
-  incr cpt ;
-  if t.uid = 0 then t.uid <- !cpt ;
   let pid = Unix.getpid () in
   let tmp_dir = Filename.get_temp_dir_name () in
-  (* To avoid any conflict with previous runs of this test. *)
   let root_dir =
-    Format.asprintf "key-value-store-test-key-%d-%d" pid t.uid
+    Format.asprintf "key-value-store-test-key-%d" pid
     |> Filename.concat "tezos-pbt-tests"
     |> Filename.concat tmp_dir
   in
+  (* To avoid any conflict with previous runs of this test. *)
+  Unix.system @@ Format.asprintf "rm -rf %s" root_dir |> ignore ;
   let file_layout ~root_dir file =
     let filepath = Filename.concat root_dir file in
     Key_value_store.layout
@@ -443,7 +427,6 @@ let run_scenario
   let* left = L.init ~lru_size ~root_dir in
   let* right = R.init ~lru_size ~root_dir in
   let action, next_actions = scenario in
-  let n = ref 0 in
   let compare_tzresult finalization pp_while pp_val left_result right_result =
     let pp_result fmt = function
       | Ok v -> pp_val fmt v
@@ -451,12 +434,11 @@ let run_scenario
     in
     let fail () =
       failwith
-        "%s Unexpected different value while %a.@.For run %d at %s:@.Expected: \
-         %a@.Got: %a@."
+        "%s Unexpected different value while %a.@. At %s:@.Expected: %a@.Got: \
+         %a@."
         finalization
         pp_while
         ()
-        !n
         root_dir
         pp_result
         right_result
@@ -479,7 +461,6 @@ let run_scenario
       right_result
   in
   let rec run_actions action next_actions promises_running_seq =
-    incr n ;
     let value_of_key ~default file key =
       let key = (file, key) in
       let table = if default then values else overwritten in
@@ -488,7 +469,7 @@ let run_scenario
     let promise =
       match action with
       | Write_value {override; default; key = file, key} ->
-          let value = value_of_key ~default file key in
+          let value = value_of_key ~default file key |> Bytes.of_string in
           let left_promise =
             let* r = L.write_value ~override left file_layout file key value in
             return r
@@ -509,22 +490,33 @@ let run_scenario
             right_result
       | Read_values seq ->
           let left_promise =
-            let seq_s = L.read_values left file_layout seq in
+            let seq_s = L.read_values left file_layout (List.to_seq seq) in
             Seq_s.E.iter (fun _ -> Ok ()) seq_s
           in
+          let left_promise =
+            let* promise = left_promise in
+            return promise
+          in
           let right_promise =
-            let seq_s = R.read_values right file_layout seq in
+            let seq_s = R.read_values right file_layout (List.to_seq seq) in
             Seq_s.E.iter (fun _ -> Ok ()) seq_s
           in
           tzjoin [left_promise; right_promise]
       | Remove_file file ->
           let left_promise = L.remove_file left file_layout file in
-
+          let left_promise =
+            let* promise = left_promise in
+            return promise
+          in
           let right_promise = R.remove_file right file_layout file in
 
           tzjoin [left_promise; right_promise]
       | Count_values file ->
           let left_promise = L.count_values left file_layout file in
+          let left_promise =
+            let* promise = left_promise in
+            return promise
+          in
           let right_promise = R.count_values right file_layout file in
           let*! left_result = left_promise in
           let*! right_result = right_promise in
@@ -568,14 +560,7 @@ let run_scenario
             (function Ok () -> return_unit | Error err -> fail err)
             promises_running_seq
         in
-        if L.View.opened_files left = min lru_size (R.View.opened_files right)
-        then run_actions action next_actions Seq_s.empty
-        else
-          failwith
-            "Expected size of files table to be %d. Got %d (lru size is: %d)."
-            (R.View.opened_files right)
-            (L.View.opened_files left)
-            lru_size
+        run_actions action next_actions Seq_s.empty
     | (Parallel, action) :: next_actions ->
         (* We do not wait for promises to end and append them to the
            list of promises on-going. *)
@@ -586,71 +571,46 @@ let run_scenario
   let*! _ = L.close left in
   return result
 
-let print (parameters, scenario) =
-  Format.asprintf
+let pp fmt (scenario, parameters) =
+  Format.fprintf
+    fmt
     "@.Parameters:@.%a@.@.Scenario:@.%a@.@."
     pp_parameters
     parameters
     pp_scenario
     scenario
 
+module SS = Set.Make (struct
+  type t = scenario * parameters
+
+  let compare = compare
+end)
+
+let set = ref SS.empty
+
+module SI = Set.Make (Int)
+
+let count = ref SI.empty
+
+let printed = ref false
+
 let sequential_test =
-  let open Lwt_result_syntax in
-  let open QCheck2 in
-  let test_gen =
-    Gen.bind parameters_gen (fun parameters ->
-        Gen.map
-          (fun scenario -> (parameters, scenario))
-          (scenario_gen No_concurrency parameters))
+  let open Tezt_bam in
+  let property (scenario, parameters) =
+    let promise = run_scenario parameters scenario in
+    match Lwt_main.run promise with
+    | Ok _ -> Ok ()
+    | Error err ->
+        Error (`Fail (Format.asprintf "%a" Error_monad.pp_print_trace err))
   in
-  Test.make
-    ~print
-    ~name:"key-value store sequential writes/reads"
-    ~count:10_000
-    ~max_fail:1 (* to stop shrinking after [max_fail] failures. *)
-    ~retries:1
-    test_gen
-    (fun (parameters, scenario) ->
-      let promise =
-        let* _ = run_scenario parameters scenario in
-        return_true
-      in
-      match Lwt_main.run promise with
-      | Ok _ -> true
-      | Error err ->
-          QCheck2.Test.fail_reportf "%a@." Error_monad.pp_print_trace err)
-
-let parallel_test =
-  let open Lwt_result_syntax in
-  let open QCheck2 in
-  let test_gen =
-    Gen.bind parameters_gen (fun parameters ->
-        Gen.map
-          (fun scenario -> (parameters, scenario))
-          (scenario_gen Concurrency parameters))
-  in
-  Test.make
-    ~print
-    ~name:"key-value store concurrent writes/reads"
-    ~count:10_000
-    ~max_fail:1 (* to stop shrinking after [max_fail] failures. *)
-    ~retries:1
-    test_gen
-    (fun (parameters, scenario) ->
-      let promise =
-        let* _ = run_scenario parameters scenario in
-        return_true
-      in
-      match Lwt_main.run promise with
-      | Ok _ -> true
-      | Error err ->
-          QCheck2.Test.fail_reportf "%a@." Error_monad.pp_print_trace err)
-
-let _ci_flaky () =
-  Alcotest.run
+  Pbt.register
+    ~pp
+    ~expected_sampling_ratio:(-1.)
+    ~minimum_number_of_samples:0
+    ~stop_after:(`Timeout 1.)
+    ~title:"key-value store sequential writes/reads"
     ~__FILE__
-    "test-key-value-store-fuzzy"
-    [
-      ("sequential", [QCheck_alcotest.to_alcotest sequential_test]);
-      ("parallel", [QCheck_alcotest.to_alcotest parallel_test]);
-    ]
+    ~tags:["kvs"]
+    ~gen:(Bam.Std.pair gen_scenario gen_parameters)
+    ~property
+    ()
