@@ -299,10 +299,25 @@ let try_connect_point ?expected_peer_id p2p_layer point =
       if Option.is_some @@ P2p_pool.Connection.find_by_point pool point then
         return_unit (* already connected. *)
       else
-        let* (_ : _ P2p.connection tzresult) =
-          P2p.connect ?expected_peer_id p2p_layer point
-        in
-        return_unit
+        (* We don't wait for the promise to resolve here, because if the
+           advertised peer is not reachable or is not responding, we might block
+           until connection timeout is reached (we observed a timeout of 10
+           seconds in some case). Blocking here means that processing of other
+           messages from p2p_output_stream (including shards propagation) will
+           be delayed. *)
+        Lwt.dont_wait
+          (fun () ->
+            let* (_ : _ P2p.connection tzresult) =
+              P2p.connect ?expected_peer_id p2p_layer point
+            in
+            return_unit)
+          (fun exn ->
+            Format.eprintf
+              "Warning: got an exception while trying to connect to %a: %s@."
+              Point.pp
+              point
+              (Printexc.to_string exn))
+        |> return
 
 let try_connect p2p_layer px_cache ~px_peer ~origin =
   let open Lwt_syntax in
