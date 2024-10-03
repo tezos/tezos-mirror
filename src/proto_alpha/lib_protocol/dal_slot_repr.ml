@@ -118,6 +118,57 @@ end
 
 module Slot_index = Dal_slot_index_repr
 
+module Shard_with_proof = struct
+  type t = {shard : Dal.shard; proof : Dal.shard_proof}
+
+  let encoding =
+    let open Data_encoding in
+    conv
+      (fun {shard; proof} -> (shard, proof))
+      (fun (shard, proof) -> {shard; proof})
+      (obj2
+         (req "shard" Dal.shard_encoding)
+         (req "proof" Dal.shard_proof_encoding))
+
+  type error += Dal_shard_proof_error of string
+
+  let () =
+    let open Data_encoding in
+    register_error_kind
+      `Permanent
+      ~id:"dal_slot_repr.shard_with_proof.dal_shard_proof_error"
+      ~title:"DAL shard proof error"
+      ~description:"An error occurred while validating the DAL shard proof."
+      ~pp:(fun ppf e -> Format.fprintf ppf "DAL shard proof error: %s" e)
+      (obj1 (req "error" (string Plain)))
+      (function Dal_shard_proof_error e -> Some e | _ -> None)
+      (fun e -> Dal_shard_proof_error e)
+
+  let dal_proof_error reason = Dal_shard_proof_error reason
+
+  let proof_error reason = error @@ dal_proof_error reason
+
+  let verify cryptobox commitment t =
+    let open Result_syntax in
+    let fail_with_error_msg what =
+      Format.kasprintf
+        proof_error
+        "%s (for commitment = %a)."
+        what
+        Commitment.pp
+        commitment
+    in
+    match Dal.verify_shard cryptobox commitment t.shard t.proof with
+    | Ok () -> return ()
+    | Error `Invalid_shard -> fail_with_error_msg "Invalid shard"
+    | Error (`Invalid_degree_strictly_less_than_expected _) ->
+        fail_with_error_msg "Invalid_degree_strictly_less_than_expected"
+    | Error `Shard_length_mismatch ->
+        fail_with_error_msg "Shard_length_mismatch"
+    | Error (`Shard_index_out_of_range str) ->
+        fail_with_error_msg ("Shard_index_out_of_range (" ^ str ^ ")")
+end
+
 module Page = struct
   type content = Bytes.t
 
@@ -1052,7 +1103,7 @@ module History = struct
                   inc_proof)
 
     type error +=
-      | Dal_proof_error of string
+      | Dal_page_proof_error of string
       | Unexpected_page_size of {expected_size : int; page_size : int}
 
     let () =
@@ -1060,12 +1111,13 @@ module History = struct
       register_error_kind
         `Permanent
         ~id:"dal_slot_repr.slots_history.dal_proof_error"
-        ~title:"Dal proof error"
-        ~description:"Error occurred during Dal proof production or validation"
-        ~pp:(fun ppf e -> Format.fprintf ppf "Dal proof error: %s" e)
+        ~title:"DAL page proof error"
+        ~description:
+          "Error occurred during DAL page proof production or validation"
+        ~pp:(fun ppf e -> Format.fprintf ppf "DAL page proof error: %s" e)
         (obj1 (req "error" (string Plain)))
-        (function Dal_proof_error e -> Some e | _ -> None)
-        (fun e -> Dal_proof_error e)
+        (function Dal_page_proof_error e -> Some e | _ -> None)
+        (fun e -> Dal_page_proof_error e)
 
     let () =
       let open Data_encoding in
@@ -1090,7 +1142,7 @@ module History = struct
         (fun (expected_size, page_size) ->
           Unexpected_page_size {expected_size; page_size})
 
-    let dal_proof_error reason = Dal_proof_error reason
+    let dal_proof_error reason = Dal_page_proof_error reason
 
     let proof_error reason = error @@ dal_proof_error reason
 

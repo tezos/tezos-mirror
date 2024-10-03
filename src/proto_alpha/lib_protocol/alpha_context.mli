@@ -2926,6 +2926,12 @@ module Dal : sig
       context -> number_of_slots:int -> (context * Attestation.t) tzresult Lwt.t
   end
 
+  module Shard_with_proof : sig
+    type t = {shard : Dal.shard; proof : Dal.shard_proof}
+
+    val verify : cryptobox -> Slot.Commitment.t -> t -> unit tzresult
+  end
+
   module Operations : sig
     module Publish_commitment : sig
       type t = {
