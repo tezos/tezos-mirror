@@ -25,22 +25,20 @@
 
 open Error_monad
 
-type error += Missing_stored_data of string
+type error += Cannot_load_stored_data of string * string
 
 let () =
   register_error_kind
     `Permanent
-    ~id:"stdlib_unix.missing_stored_data"
-    ~title:"Missing stored data"
+    ~id:"stdlib_unix.cannot_load_stored_data"
+    ~title:"Cannod load stored data"
     ~description:"Failed to load stored data"
-    ~pp:(fun ppf path ->
-      Format.fprintf
-        ppf
-        "Failed to load on-disk data: no corresponding data found in file %s."
-        path)
-    Data_encoding.(obj1 (req "path" string))
-    (function Missing_stored_data path -> Some path | _ -> None)
-    (fun path -> Missing_stored_data path)
+    ~pp:(fun ppf (path, msg) ->
+      Format.fprintf ppf "Failed to load on-disk data from %s: %s." path msg)
+    Data_encoding.(obj2 (req "path" string) (req "msg" string))
+    (function
+      | Cannot_load_stored_data (path, msg) -> Some (path, msg) | _ -> None)
+    (fun (path, msg) -> Cannot_load_stored_data (path, msg))
 
 type 'a file = {
   encoding : 'a Data_encoding.t;
@@ -67,14 +65,15 @@ let read_json_file file =
       match r with
       | Ok json ->
           Lwt.return_some (Data_encoding.Json.destruct file.encoding json)
-      | _ -> Lwt.return_none)
+      | Error errs ->
+          Lwt.fail_with (Format.asprintf "%a" Error_monad.pp_print_trace errs))
 
 let read_file file =
   Lwt.try_bind
     (fun () -> Lwt_utils_unix.read_file file.path)
     (fun str ->
-      Lwt.return (Data_encoding.Binary.of_string_opt file.encoding str))
-    (fun _ -> Lwt.return_none)
+      Lwt.return_some (Data_encoding.Binary.of_string_exn file.encoding str))
+    (fun exn -> Lwt.fail exn)
 
 let get (Stored_data v) =
   Lwt_idle_waiter.task v.scheduler (fun () -> Lwt.return v.cache)
@@ -125,12 +124,19 @@ let update_with (Stored_data v) f =
 
 let load file =
   let open Lwt_result_syntax in
-  let*! o = if file.json then read_json_file file else read_file file in
-  match o with
-  | Some cache ->
-      let scheduler = Lwt_idle_waiter.create () in
-      return (Stored_data {cache; file; scheduler})
-  | None -> tzfail (Missing_stored_data file.path)
+  Lwt.catch
+    (fun () ->
+      let*! o = if file.json then read_json_file file else read_file file in
+      match o with
+      | Some cache ->
+          let scheduler = Lwt_idle_waiter.create () in
+          return (Stored_data {cache; file; scheduler})
+      | None -> tzfail (Cannot_load_stored_data (file.path, "cannot read file")))
+    (function
+      | exn ->
+          tzfail
+            (Cannot_load_stored_data
+               (file.path, Format.sprintf "%s" (Printexc.to_string exn))))
 
 let init file ~initial_data =
   let open Lwt_syntax in
