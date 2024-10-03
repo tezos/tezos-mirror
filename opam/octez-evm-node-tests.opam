@@ -16,6 +16,7 @@ depends: [
   "octez-alcotezt" {with-test}
   "octez-evm-node-libs" {with-test}
   "tezt-tezos" {with-test}
+  "octez-l2-libs" {with-test}
   "tezos-protocol-alpha" {with-test}
 ]
 build: [

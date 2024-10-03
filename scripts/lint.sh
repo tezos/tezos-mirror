@@ -44,6 +44,8 @@ license_check_exclude=$(
 src/lib_protocol_environment/sigs/.*
 src/riscv/lib/octez_riscv_api.ml
 src/riscv/lib/octez_riscv_api.mli
+etherlink/lib_wasm_runtime/ocaml-api/wasm_runtime_gen.ml
+etherlink/lib_wasm_runtime/ocaml-api/wasm_runtime_gen.mli
 EOF
 )
 

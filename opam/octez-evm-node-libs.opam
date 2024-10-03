@@ -13,6 +13,7 @@ depends: [
   "octez-libs"
   "octez-shell-libs"
   "octez-l2-libs"
+  "octez-rust-deps"
   "caqti-lwt" { >= "2.0.1" }
   "crunch" { >= "3.3.0" }
   "re" { >= "1.10.0" }

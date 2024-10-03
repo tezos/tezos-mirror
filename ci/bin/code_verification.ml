@@ -595,6 +595,23 @@ let jobs pipeline_type =
           [job_build_rpm_amd64]
       | Before_merging | Merge_train -> []
     in
+    let wasm_runtime_check : tezos_job =
+      job
+        ~__POS__
+        ~name:"wasm-runtime-check"
+        ~image:Images.CI.build
+        ~stage:Stages.build
+        ~dependencies:dependencies_needs_start
+        ~rules:(make_rules ~changes:changeset_wasm_runtime_check_files ())
+        ~before_script:
+          (before_script
+             ~take_ownership:true
+             ~source_version:true
+             ~eval_opam:true
+             [])
+        ["etherlink/lib_wasm_runtime/lint.sh"]
+      |> enable_cargo_cache |> enable_sccache
+    in
     let job_ocaml_check : tezos_job =
       job
         ~__POS__
@@ -650,6 +667,7 @@ let jobs pipeline_type =
       job_static_x86_64_experimental;
       job_build_x86_64_release;
       job_build_x86_64_exp_dev_extra;
+      wasm_runtime_check;
       job_ocaml_check;
       job_build_kernels;
       job_build_dsn_node;

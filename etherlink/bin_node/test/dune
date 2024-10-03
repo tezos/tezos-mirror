@@ -15,6 +15,7 @@
   octez-evm-node-libs.evm_node_lib_dev
   octez-libs.tezt-wrapper
   tezt-tezos
+  octez-l2-libs.layer2_store
   tezos-protocol-alpha.protocol)
  (library_flags (:standard -linkall))
  (flags
@@ -28,8 +29,9 @@
   -open Tezt_wrapper
   -open Tezt_wrapper.Base
   -open Tezt_tezos
-  -open Tezt_tezos.Runnable.Syntax)
- (modules test_rlp test_ethbloom test_call_tracer_algo))
+  -open Tezt_tezos.Runnable.Syntax
+  -open Tezos_layer2_store)
+ (modules test_rlp test_ethbloom test_call_tracer_algo test_wasm_runtime))
 
 (executable
  (name main)

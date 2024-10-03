@@ -30,7 +30,8 @@
   octez-evm-node-libs.evm_node_migrations
   octez-evm-node-libs.evm_node_kernels
   octez-libs.prometheus-app
-  tezos-dal-node-services)
+  tezos-dal-node-services
+  octez-evm-node-libs.evm_node_wasm_runtime)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
