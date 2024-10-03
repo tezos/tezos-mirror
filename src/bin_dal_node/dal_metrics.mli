@@ -42,6 +42,9 @@ val layer1_block_finalized_round : block_round:int32 -> unit
 (** Update the shards verification time with the given value.  *)
 val update_shards_verification_time : float -> unit
 
+(** Update the KVS shards metrics. *)
+val update_kvs_shards_metrics : opened_files:int -> ongoing_actions:int -> unit
+
 (** [sample_time ~sampling_frequency ~to_sample ~metric_updater] samples
     execution time of function [to_sample] at frequency
     [sampling_frequency]. Execution time if any is then provided to

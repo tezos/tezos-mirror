@@ -106,6 +106,26 @@ module Node_metrics = struct
       ~namespace
       ~subsystem
       name
+
+  let kvs_shards_opened_files =
+    let name = "kvs_shards_opened_files" in
+    Prometheus.Gauge.v
+      ~help:
+        "The size of the table containing opened files by the key-value store \
+         for shards"
+      ~namespace
+      ~subsystem
+      name
+
+  let kvs_shards_ongoing_actions =
+    let name = "kvs_shards_ongoing_actions" in
+    Prometheus.Gauge.v
+      ~help:
+        "The number of ongoing actions (at most 1 per file) associated with \
+         the key-value store for shards"
+      ~namespace
+      ~subsystem
+      name
 end
 
 module GS = struct
@@ -438,6 +458,12 @@ let layer1_block_finalized_round ~block_round =
 
 let update_shards_verification_time f =
   Prometheus.DefaultHistogram.observe Node_metrics.verify_shard_time f
+
+let update_kvs_shards_metrics ~opened_files ~ongoing_actions =
+  Prometheus.Gauge.set
+    Node_metrics.kvs_shards_ongoing_actions
+    (float ongoing_actions) ;
+  Prometheus.Gauge.set Node_metrics.kvs_shards_opened_files (float opened_files)
 
 let sample_time ~sampling_frequency ~to_sample ~metric_updater =
   if sampling_frequency > 0 && Random.int sampling_frequency <> 0 then

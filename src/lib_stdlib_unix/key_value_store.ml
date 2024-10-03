@@ -230,6 +230,8 @@ module Files : sig
 
   module View : sig
     val opened_files : 'value t -> int
+
+    val ongoing_actions : 'value t -> int
   end
 end = struct
   module LRU = Ringo.LRU_Collection
@@ -352,6 +354,8 @@ end = struct
 
   module View = struct
     let opened_files {files; _} = Table.length files
+
+    let ongoing_actions {last_actions; _} = Table.length last_actions
   end
 
   let init ~lru_size =
@@ -1079,6 +1083,8 @@ let remove_file {files; root_dir; _} file_layout file =
 
 module View = struct
   let opened_files {files; _} = Files.View.opened_files files
+
+  let ongoing_actions {files; _} = Files.View.ongoing_actions files
 end
 
 module Internal_for_tests = struct
