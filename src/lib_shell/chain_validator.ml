@@ -800,9 +800,6 @@ type launch_error = error trace
 
 let on_launch w _ parameters =
   let open Lwt_result_syntax in
-  let* () = may_load_protocols parameters in
-  let received_block_input = Lwt_watcher.create_input () in
-  let new_head_input = Lwt_watcher.create_input () in
   let notify_branch peer_id locator =
     Worker.Queue.push_request_now w (Notify_branch (peer_id, locator))
   in
@@ -818,6 +815,10 @@ let on_launch w _ parameters =
       parameters.chain_store
       {notify_branch; notify_head; disconnection}
   in
+  (* Fetching unknown protocols requires the DDB to be active. *)
+  let* () = may_load_protocols parameters in
+  let received_block_input = Lwt_watcher.create_input () in
+  let new_head_input = Lwt_watcher.create_input () in
   let prevalidator = ref None in
   let when_status_changes status =
     let*! () = Events.(emit synchronisation_status) status in
