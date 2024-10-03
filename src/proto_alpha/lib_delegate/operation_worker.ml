@@ -608,7 +608,6 @@ let run ?(monitor_node_operations = true)
        ~monitor_node_operations
        () [@profiler.record_f "make initial state"])
   in
-  (* TODO should we continue forever ? *)
   let rec worker_loop () =
     let* result =
       (monitor_operations cctxt [@profiler.record_s "monitor operations"])
