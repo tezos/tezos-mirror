@@ -945,14 +945,17 @@ module Make (Proto : Protocol_plugin.T) = struct
             in
             let open Lwt_result_syntax in
             let* validation_state =
-              Proto.validate_operation
-                ~check_signature:op.check_signature
-                pv.validation_state
-                op.hash
-                operation
+              (Proto.validate_operation
+                 ~check_signature:op.check_signature
+                 pv.validation_state
+                 op.hash
+                 operation [@profiler.record_s "validate_operation"])
             in
             let* application_state, receipt =
-              Proto.apply_operation pv.application_state op.hash operation
+              (Proto.apply_operation
+                 pv.application_state
+                 op.hash
+                 operation [@profiler.record_s "apply_operations"])
             in
             return (validation_state, application_state, receipt))
       in
@@ -1055,20 +1058,20 @@ module Make (Proto : Protocol_plugin.T) = struct
         {predecessor_hash; timestamp; block_header_data = protocol_data}
     in
     let* validation_state =
-      Proto.begin_validation
-        context
-        chain_id
-        mode
-        ~predecessor:predecessor_shell_header
-        ~cache
+      (Proto.begin_validation
+         context
+         chain_id
+         mode
+         ~predecessor:predecessor_shell_header
+         ~cache [@profiler.record_s "begin_validation"])
     in
     let* application_state =
-      Proto.begin_application
-        context
-        chain_id
-        mode
-        ~predecessor:predecessor_shell_header
-        ~cache
+      (Proto.begin_application
+         context
+         chain_id
+         mode
+         ~predecessor:predecessor_shell_header
+         ~cache [@profiler.record_s "begin_application"])
     in
     let preapply_state =
       {
@@ -1178,9 +1181,9 @@ module Make (Proto : Protocol_plugin.T) = struct
     in
     let* () = Proto.finalize_validation preapply_state.validation_state in
     let* validation_result, block_header_metadata =
-      Proto.finalize_application
-        preapply_state.application_state
-        (Some shell_header)
+      (Proto.finalize_application
+         preapply_state.application_state
+         (Some shell_header) [@profiler.record_s "finalize_application"])
     in
     let*! validation_result =
       may_patch_protocol
@@ -1257,11 +1260,11 @@ module Make (Proto : Protocol_plugin.T) = struct
       ({shell_header with context = header_context_hash}, validation_result_list)
     in
     let* block_metadata, ops_metadata =
-      compute_metadata
-        ~operation_metadata_size_limit
-        new_protocol_env_version
-        block_header_metadata
-        applied_ops_metadata
+      (compute_metadata
+         ~operation_metadata_size_limit
+         new_protocol_env_version
+         block_header_metadata
+         applied_ops_metadata [@profiler.record_s "compute_metadata"])
     in
     let max_operations_ttl =
       max

@@ -242,6 +242,7 @@ module Processing = struct
           predecessor_resulting_context_hash;
           operations;
         } ->
+        () [@profiler.record "preapply_block"] ;
         let*! block_preapplication_result =
           let* predecessor_context =
             Error_monad.catch_es (fun () ->
@@ -291,7 +292,9 @@ module Processing = struct
               Lwt.return (Ok res, Some last_preapplied_context)
           | Error _ as err -> Lwt.return (err, None)
         in
-        continue res cache cachable_result None
+        Tezos_protocol_environment.Environment_profiler.stop () ;
+        let report = Tezos_base.Profiler.report headless in
+        continue res cache cachable_result report
     | External_validation.Validate
         {
           chain_id;
