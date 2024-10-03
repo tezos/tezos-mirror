@@ -24,6 +24,50 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+val time : unit -> Profiler.time
+
+type state
+
+val empty : Profiler.verbosity -> state
+
+(** The [Base] functor helps to define other backend
+    without having to write the same functions again and again.
+
+    Given a way to get and set a [state] and an output function,
+    the functor will produce a module implementing the [DRIVER]
+    interface.
+
+    Note that the produced module will try to [output] report every
+    time [stamp], [inc], [mark], [span] or [stop] is used.
+    *)
+module Base (P : sig
+  type t
+
+  val get_state : t -> state
+
+  val set_state : t -> state -> unit
+
+  val output_report : (t -> Profiler.report -> unit) option
+end) : sig
+  val time : P.t -> Profiler.time
+
+  val record : P.t -> Profiler.verbosity -> Profiler.id -> unit
+
+  val aggregate : P.t -> Profiler.verbosity -> Profiler.id -> unit
+
+  val report : P.t -> Profiler.report option
+
+  val stamp : P.t -> Profiler.verbosity -> Profiler.id -> unit
+
+  val inc : P.t -> Profiler.report -> unit
+
+  val mark : P.t -> Profiler.verbosity -> Profiler.ids -> unit
+
+  val span : P.t -> Profiler.verbosity -> Profiler.span -> Profiler.ids -> unit
+
+  val stop : P.t -> unit
+end
+
 (** Memory driver allowing building intermediate reports with purpose
     of being included in external reports or manipulated directly. *)
 val headless : Profiler.verbosity Profiler.driver

@@ -312,16 +312,6 @@ let pp_report ?t0 ppf report =
   in
   Format.fprintf ppf "@[<v 0>%a@]" (pp_report t0 0) report
 
-(** The [Base] functor helps to define other backend
-    without having to write the same functions again and again.
-
-    Given a way to get and set a [state] and an output function,
-    the functor will produce a module implementing the [DRIVER]
-    interface.
-
-    Note that the produced module will try to [output] report every
-    time [stamp], [inc], [mark], [span] or [stop] is used.
-    *)
 module Base (P : sig
   type t
 

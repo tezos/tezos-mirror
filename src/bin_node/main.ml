@@ -24,6 +24,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Ensure that the prometheus profiler is linked. *)
+let () = (() [@profiler.custom ignore Prometheus_profiler.prometheus])
+
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4025
    Remove backwards compatible Tezos symlinks. *)
 let warn_if_argv0_name_not_octez () =
