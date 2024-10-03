@@ -260,6 +260,7 @@ end
 
 type state = {
   node_ctxt : Node_context.ro;
+  dal_node_ctxt : Dal_node_client.cctxt;
   recent_dal_injections : Recent_dal_injections.t;
   mutable count_messages : int;
   pending_messages : Pending_messages.t;
@@ -272,21 +273,15 @@ type state = {
 
 let inject_slot state ~slot_index ~slot_content =
   let open Lwt_result_syntax in
-  let {Node_context.dal_cctxt; _} = state.node_ctxt in
+  let dal_cctxt = state.dal_node_ctxt in
   let* commitment, operation =
-    match dal_cctxt with
-    | Some dal_cctxt ->
-        let* commitment, commitment_proof =
-          Dal_node_client.post_slot dal_cctxt ~slot_index slot_content
-        in
-        return
-          ( commitment,
-            L1_operation.Publish_dal_commitment
-              {slot_index; commitment; commitment_proof} )
-    | None ->
-        (* This should not be reachable, as we tested that some [dal_cctxt] is set
-           at startup before launching the worker. *)
-        assert false
+    let* commitment, commitment_proof =
+      Dal_node_client.post_slot dal_cctxt ~slot_index slot_content
+    in
+    return
+      ( commitment,
+        L1_operation.Publish_dal_commitment
+          {slot_index; commitment; commitment_proof} )
   in
   let* l1_hash =
     Injector.check_and_add_pending_operation
@@ -412,7 +407,7 @@ let on_produce_dal_slots state ~level =
            in
            inject_slot state ~slot_index ~slot_content)
 
-let init_dal_worker_state node_ctxt =
+let init_dal_worker_state node_ctxt dal_node_ctxt =
   let open Lwt_result_syntax in
   let dal_constants =
     let open Node_context in
@@ -444,6 +439,7 @@ let init_dal_worker_state node_ctxt =
   return
     {
       node_ctxt;
+      dal_node_ctxt;
       recent_dal_injections =
         Recent_dal_injections.create max_remembered_recent_injections;
       pending_messages =
@@ -455,7 +451,10 @@ let init_dal_worker_state node_ctxt =
 module Types = struct
   type nonrec state = state
 
-  type parameters = {node_ctxt : Node_context.ro}
+  type parameters = {
+    node_ctxt : Node_context.ro;
+    dal_node_ctxt : Dal_node_client.cctxt;
+  }
 end
 
 module Worker = Worker.MakeSingle (Name) (Request) (Types)
@@ -481,7 +480,8 @@ module Handlers = struct
 
   type launch_error = error trace
 
-  let on_launch _w () Types.{node_ctxt} = init_dal_worker_state node_ctxt
+  let on_launch _w () Types.{node_ctxt; dal_node_ctxt} =
+    init_dal_worker_state node_ctxt dal_node_ctxt
 
   let on_error (type a b) _w st (r : (a, b) Request.t) (errs : b) :
       unit tzresult Lwt.t =
@@ -514,10 +514,12 @@ let (worker_promise : Worker.infinite Worker.queue Worker.t Lwt.t), worker_waker
     =
   Lwt.task ()
 
-let start node_ctxt =
+let start node_ctxt dal_node_ctxt =
   let open Lwt_result_syntax in
   let node_ctxt = Node_context.readonly node_ctxt in
-  let+ worker = Worker.launch table () {node_ctxt} (module Handlers) in
+  let+ worker =
+    Worker.launch table () {node_ctxt; dal_node_ctxt} (module Handlers)
+  in
   Lwt.wakeup worker_waker worker
 
 let start_in_mode mode =
@@ -536,13 +538,14 @@ let init (node_ctxt : _ Node_context.t) =
   | Lwt.Fail exn ->
       (* Worker crashed, not recoverable. *)
       fail [Rollup_node_errors.No_dal_injector; Exn exn]
-  | Lwt.Sleep ->
+  | Lwt.Sleep -> (
       (* Never started, start it. *)
-      if
-        Option.is_some node_ctxt.Node_context.dal_cctxt
-        && start_in_mode node_ctxt.config.mode
-      then start node_ctxt
-      else return_unit
+      match node_ctxt.Node_context.dal_cctxt with
+      | None -> return_unit
+      | Some dal_node_ctxt ->
+          if start_in_mode node_ctxt.config.mode then
+            start node_ctxt dal_node_ctxt
+          else return_unit)
 
 (* This is a DAL injection worker for a single scoru *)
 let worker =
