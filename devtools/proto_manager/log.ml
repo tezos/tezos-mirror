@@ -73,11 +73,11 @@ let error ?name fmt =
 let warning fmt =
   Format.kasprintf (fun msg -> eprintfln "@{<yellow>Warning: %s@}" msg) fmt
 
-let blue fmt = Format.kasprintf (fun msg -> eprintfln "@{<blue>%s@}" msg) fmt
+let blue fmt = Format.kasprintf (fun msg -> printfln "@{<blue>%s@}" msg) fmt
 
-let green fmt = Format.kasprintf (fun msg -> eprintfln "@{<green>%s@}" msg) fmt
+let green fmt = Format.kasprintf (fun msg -> printfln "@{<green>%s@}" msg) fmt
 
-let cyan fmt = Format.kasprintf (fun msg -> eprintfln "@{<cyan>%s@}" msg) fmt
+let cyan fmt = Format.kasprintf (fun msg -> printfln "@{<cyan>%s@}" msg) fmt
 
 let magenta fmt =
-  Format.kasprintf (fun msg -> eprintfln "@{<magenta>%s@}" msg) fmt
+  Format.kasprintf (fun msg -> printfln "@{<magenta>%s@}" msg) fmt

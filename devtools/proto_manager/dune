@@ -8,7 +8,8 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   unix
-  cmdliner)
+  cmdliner
+  re)
  (link_flags
   (:standard)
   (:include %{workspace_root}/static-link-flags.sexp)))
