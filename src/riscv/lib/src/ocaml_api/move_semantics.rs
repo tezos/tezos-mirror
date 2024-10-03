@@ -94,14 +94,17 @@ impl<T> MutableState<T> {
     where
         T: Clone,
     {
-        match self {
-            MutableState::Owned(state) => f(state),
+        let (new, res) = match self {
+            MutableState::Owned(state) => return f(state),
             MutableState::Borrowed(arc_state) => {
-                // make_mut avoids making a clone if the current Arc
-                // is the only reference to the underlying state.
-                let state = Arc::make_mut(arc_state);
-                f(state)
+                // We don't know how many references there are to the Arc state because OCaml
+                // aliases the reference without invoking "clone" on the Rust side.
+                let mut state = arc_state.as_ref().clone();
+                let res = f(&mut state);
+                (MutableState::Owned(state), res)
             }
-        }
+        };
+        *self = new;
+        res
     }
 }
