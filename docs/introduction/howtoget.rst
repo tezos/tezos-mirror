@@ -454,6 +454,7 @@ Setting up the development environment from scratch
 If you plan to contribute to the Octez codebase, the way to go is to set up a
 complete development environment, by cloning the repository and compiling the
 sources using the provided makefile.
+You may either build all the executables, as illustrated below, or only a subset of the executables, as detailed in section :ref:`compile_sources`.
 
 **TL;DR**: From a fresh Debian Bookworm x86_64, you typically want to select a source branch in the Octez repository, e.g.:
 
@@ -633,16 +634,23 @@ command instead:
    * As a last resort, removing the ``_opam`` folder (as part of a ``git
      clean -dxf`` for example) allows to restart in a fresh environment.
 
+.. _compile_sources:
+
 Compile
 ~~~~~~~
 
 Once the dependencies are installed we can update OPAM's environment to
-refer to the new switch and compile the project:
+refer to the new switch and compile the project to build all the executables:
 
 .. literalinclude:: compile-sources.sh
   :language: shell
   :start-after: [compile sources]
   :end-before: [optional setup]
+
+.. note::
+
+  Instead of the simple ``make`` command above, you may use more restrictive targets in :src:`the makefile <Makefile>` to build only some subset of the executables.
+  For instance, you may exclude experimental executables using ``make release``; furthermore exclude executables such as the EVM node using ``make octez``; or even restrict to Layer 1 executables using ``make octez-layer1``.
 
 Lastly, you can also add the Octez binaries to your ``PATH`` variable,
 and after reading the Disclaimer a few

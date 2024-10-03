@@ -229,7 +229,7 @@ val inc : profiler -> report -> unit
     ]} *)
 val record_f : profiler -> ?lod:lod -> string -> (unit -> 'a) -> 'a
 
-(** Same as [record_s] but for Lwt function *)
+(** Same as {!record_f} but for Lwt function *)
 val record_s : profiler -> ?lod:lod -> string -> (unit -> 'a Lwt.t) -> 'a Lwt.t
 
 (** [aggregate_f profiler ?lod label f] will call:
@@ -240,7 +240,7 @@ val record_s : profiler -> ?lod:lod -> string -> (unit -> 'a Lwt.t) -> 'a Lwt.t
     ]} *)
 val aggregate_f : profiler -> ?lod:lod -> string -> (unit -> 'a) -> 'a
 
-(** Same as [aggregate_f] but for Lwt functions *)
+(** Same as {!aggregate_f} but for Lwt functions *)
 val aggregate_s :
   profiler -> ?lod:lod -> string -> (unit -> 'a Lwt.t) -> 'a Lwt.t
 
@@ -248,7 +248,7 @@ val aggregate_s :
     specifically around [f] *)
 val span_f : profiler -> ?lod:lod -> string list -> (unit -> 'a) -> 'a
 
-(** Same as [span_f] but for Lwt functions *)
+(** Same as {!span_f} but for Lwt functions *)
 val span_s :
   profiler -> ?lod:lod -> string list -> (unit -> 'a Lwt.t) -> 'a Lwt.t
 
@@ -322,7 +322,7 @@ module type GLOBAL_PROFILER = sig
       ]} *)
   val record_f : ?lod:lod -> string -> (unit -> 'a) -> 'a
 
-  (** Same as [record_f] but for Lwt function *)
+  (** Same as {!record_f} but for Lwt function *)
   val record_s : ?lod:lod -> string -> (unit -> 'a Lwt.t) -> 'a Lwt.t
 
   (** [aggregate_f ?lod label f] will call:
@@ -333,18 +333,18 @@ module type GLOBAL_PROFILER = sig
       ]} *)
   val aggregate_f : ?lod:lod -> string -> (unit -> 'a) -> 'a
 
-  (** Same as [aggregate_f] but for Lwt functions *)
+  (** Same as {!aggregate_f} but for Lwt functions *)
   val aggregate_s : ?lod:lod -> string -> (unit -> 'a Lwt.t) -> 'a Lwt.t
 
   (** [span_f ?lod label_list f] will compute [span] but specifically
       around [f] *)
   val span_f : ?lod:lod -> string list -> (unit -> 'a) -> 'a
 
-  (** Same as [span_f] but for Lwt functions *)
+  (** Same as {!span_f} but for Lwt functions *)
   val span_s : ?lod:lod -> string list -> (unit -> 'a Lwt.t) -> 'a Lwt.t
 end
 
-(** [wrap profiler] stores [profiler] in a [GLOBAL_PROFILER] module
+(** [wrap profiler] stores [profiler] in a {!GLOBAL_PROFILER} module
     allowing to use the [profiler] functions without having to provide it
     as a parameter *)
 val wrap : profiler -> (module GLOBAL_PROFILER)

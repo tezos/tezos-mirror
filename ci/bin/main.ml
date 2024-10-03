@@ -130,11 +130,11 @@ let () =
 (** {3 Release pipelines} *)
 
 let () =
-  (* Matches Octez release tags, e.g. [octez-v1.2.3] or [octez-v1.2.3-rc4]. *)
+  (* Matches Octez release tags, e.g. [octez-v1.2] or [octez-v1.2-rc4]. *)
   let octez_release_tag_re = "/^octez-v\\d+\\.\\d+(?:\\-rc\\d+)?$/" in
-  (* Matches Octez beta release tags, e.g. [octez-v1.2.3-beta5]. *)
+  (* Matches Octez beta release tags, e.g. [octez-v1.2-beta5]. *)
   let octez_beta_release_tag_re = "/^octez-v\\d+\\.\\d+\\-beta\\d*$/" in
-  (* Matches Etherlink release tags, e.g. [etherlink-v1.2.3] or [etherlink-v1.2.3-rc4]. *)
+  (* Matches Etherlink release tags, e.g. [etherlink-v1.2] or [etherlink-v1.2-rc4]. *)
   let octez_evm_node_release_tag_re =
     "/^octez-evm-node-v\\d+\\.\\d+(?:\\-rc\\d+)?$/"
   in
