@@ -23,6 +23,53 @@
 //! Blocks must never cross page boundaries, as two pages that lie next to each other in physical
 //! memory have no guarantees of being consecutive in virtual memory - even if they are at one
 //! point.
+//!
+//! # Determinism
+//!
+//! Some special care is required when thinking about block execution
+//! with respect to determinism.
+//!
+//! Blocks fundamentally rely on being executed 'as a whole'. This is
+//! required to be able to make the most of various optimisations we
+//! can apply to groups of instructions, while ensuring that we are
+//! compatible with the remaining infrastructure of the stepper at block
+//! entry/exit.
+//! For example, this could include something as simple as not
+//! updating the step counter until we exit a block.
+//!
+//! Only ever running blocks when sufficient steps remain, however,
+//! causes determinism issues. Namely, when insufficient steps remain
+//! to run a block, what do we do?
+//!
+//! The obvious solution is to fall back to the instruction cache, and
+//! continue our *fetch/parse/run* cycle. This exact solution, however,
+//! causes divergence: the instructions we end up executing from the
+//! instruction cache, could be completely different to those stored in
+//! the block cache, for the same physical address.
+//!
+//! This can occur due to the differring nature of cache entries between
+//! the instruction & block cache: entries in the instruction cache are
+//! 1 instruction per slot, whereas in the block cache it's instead a
+//! block (a sequence of instructions) per slot. Therefore, an entry
+//! getting overriden in the instruction/block cache at address *A*, does
+//! not invalidate all instructions in the block cache that correspond
+//! to *A*, as they could also exist in blocks at nearby preceding
+//! addresses.
+//!
+//! ## Solution
+//!
+//! Instead, we introduce the notion of a [`PartialBlock`], that can
+//! remember that we were executing a _specific_ entry in the block cache
+//! - and indeed the progress made.
+//!
+//! Then, when insufficient steps are remaining to run a block in full,
+//! we proceed to run the block anyway, but step-by-step. Once we
+//! exhaust any remaining steps, we save progress in a partial block,
+//! and execute the remainder of it with [`BlockCache::complete_current_block`]
+//! on the next iteration.
+//!
+//! Since we now guarantee that we always execute the _same_ set of instructions,
+//! no matter how many steps are remaining, we solve this possible divergence.
 
 use crate::cache_utils::Sizes;
 use crate::state_backend::{self, ManagerClone};
@@ -37,6 +84,7 @@ use crate::{
 };
 
 use super::address_translation::PAGE_OFFSET_WIDTH;
+use super::bus::main_memory::MainMemoryLayout;
 use super::instruction_cache::ValidatedCacheEntry;
 use super::MachineCoreState;
 use super::{
@@ -150,6 +198,60 @@ pub const TEST_CACHE_BITS: usize = 12;
 /// The default instruction cache for tests.
 pub const TEST_CACHE_SIZE: usize = 1 << TEST_CACHE_BITS;
 
+/// Layout of a partial block.
+pub type PartialBlockLayout = (Atom<u64>, Atom<bool>, Atom<u8>);
+
+/// Structure used to remember that a block was only partway executed
+/// before needing to pause due to `steps == steps_max`.
+///
+/// If a block is being partially executed, if either:
+/// - an error occurs
+/// - a jump or branch occurs
+/// then the partial block is reset, and execution will continue with
+/// a potentially different block.
+pub struct PartialBlock<M: ManagerBase> {
+    phys_addr: Cell<u64, M>,
+    in_progress: Cell<bool, M>,
+    progress: Cell<u8, M>,
+}
+
+impl<M: ManagerClone> Clone for PartialBlock<M> {
+    fn clone(&self) -> Self {
+        Self {
+            phys_addr: self.phys_addr.clone(),
+            in_progress: self.in_progress.clone(),
+            progress: self.progress.clone(),
+        }
+    }
+}
+
+impl<M: ManagerBase> PartialBlock<M> {
+    fn bind(space: AllocatedOf<PartialBlockLayout, M>) -> Self {
+        Self {
+            phys_addr: space.0,
+            in_progress: space.1,
+            progress: space.2,
+        }
+    }
+
+    fn struct_ref(&self) -> AllocatedOf<PartialBlockLayout, Ref<'_, M>> {
+        (
+            self.phys_addr.struct_ref(),
+            self.in_progress.struct_ref(),
+            self.progress.struct_ref(),
+        )
+    }
+
+    fn reset(&mut self)
+    where
+        M: ManagerWrite,
+    {
+        self.in_progress.write(false);
+        self.phys_addr.write(0);
+        self.progress.write(0);
+    }
+}
+
 /// Trait for capturing the different possible layouts of the instruction cache (i.e.
 /// controlling the number of cache entries present).
 pub trait BlockCacheLayout: state_backend::Layout {
@@ -183,6 +285,7 @@ pub type Layout<const BITS: usize, const SIZE: usize> = (
     Atom<Address>,
     Atom<Address>,
     Atom<FenceCounter>,
+    PartialBlockLayout,
     Sizes<BITS, SIZE, CachedLayout>,
 );
 
@@ -195,8 +298,9 @@ impl<const BITS: usize, const SIZE: usize> BlockCacheLayout for Layout<BITS, SIZ
             current_block_addr: space.0,
             next_instr_addr: space.1,
             fence_counter: space.2,
+            partial_block: PartialBlock::bind(space.3),
             entries: space
-                .3
+                .4
                 .into_iter()
                 .map(Cached::bind)
                 .collect::<Vec<_>>()
@@ -226,6 +330,7 @@ impl<const BITS: usize, const SIZE: usize> BlockCacheLayout for Layout<BITS, SIZ
             cache.current_block_addr.struct_ref(),
             cache.next_instr_addr.struct_ref(),
             cache.fence_counter.struct_ref(),
+            cache.partial_block.struct_ref(),
             cache.entries.iter().map(Cached::struct_ref).collect(),
         )
     }
@@ -246,6 +351,7 @@ pub struct BlockCache<BCL: BlockCacheLayout, M: ManagerBase> {
     current_block_addr: Cell<Address, M>,
     next_instr_addr: Cell<Address, M>,
     fence_counter: Cell<FenceCounter, M>,
+    partial_block: PartialBlock<M>,
     entries: BCL::Entries<M>,
 }
 
@@ -274,6 +380,7 @@ impl<BCL: BlockCacheLayout, M: ManagerBase> BlockCache<BCL, M> {
         self.fence_counter.write(FenceCounter::INITIAL);
         self.reset_to(0);
         BCL::entries_reset(&mut self.entries);
+        self.partial_block.reset();
     }
 
     /// Obtain a structure with references to the bound regions of this type.
@@ -349,20 +456,144 @@ impl<BCL: BlockCacheLayout, M: ManagerBase> BlockCache<BCL, M> {
     /// Lookup a block by a physical address.
     ///
     /// If one is found it can then be executed with [`Block::run_block`].
+    ///
+    /// *NB* before running any block, you must ensure no partial block
+    /// is in progress with [`BlockCache::complete_current_block`].
     pub fn get_block(&mut self, phys_addr: Address) -> Option<Block<M>>
     where
-        M: ManagerReadWrite,
+        M: ManagerRead,
     {
+        debug_assert!(
+            !self.partial_block.in_progress.read(),
+            "Get block was called with a partial block in progress"
+        );
+
         let entry = BCL::entry_mut(&mut self.entries, phys_addr);
 
         if entry.address.read() == phys_addr
             && self.fence_counter.read() == entry.fence_counter.read()
         {
-            let block = entry.block();
-            Some(block)
+            Some(entry.block())
         } else {
             None
         }
+    }
+
+    /// Complete a block that was only partially executed.
+    ///
+    /// This can happen when `steps + block.len_instr() > steps_max`, in
+    /// which case we only executed instructions until `steps == steps_max`.
+    pub fn complete_current_block<ML: MainMemoryLayout>(
+        &mut self,
+        core: &mut MachineCoreState<ML, M>,
+        steps: &mut usize,
+        max_steps: usize,
+    ) -> Result<(), EnvironException>
+    where
+        M: ManagerReadWrite,
+    {
+        if !self.partial_block.in_progress.read() {
+            return Ok(());
+        }
+
+        self.run_partial_inner(core, steps, max_steps)
+    }
+
+    /// Run a block against the machine state.
+    ///
+    /// When calling this function, there must be no partial block in progress. To ensure
+    /// this, you must always run [`BlockCache::complete_current_block`] prior to fetching
+    /// and running a new block.
+    pub fn run_block_partial<ML>(
+        &mut self,
+        core: &mut MachineCoreState<ML, M>,
+        block_addr: Address,
+        steps: &mut usize,
+        max_steps: usize,
+    ) -> Result<(), EnvironException>
+    where
+        ML: main_memory::MainMemoryLayout,
+        M: ManagerReadWrite,
+    {
+        // start a new block
+        self.partial_block.in_progress.write(true);
+        self.partial_block.progress.write(0);
+        self.partial_block.phys_addr.write(block_addr);
+
+        self.run_partial_inner(core, steps, max_steps)
+    }
+
+    fn run_partial_inner<ML>(
+        &mut self,
+        core: &mut MachineCoreState<ML, M>,
+        steps: &mut usize,
+        max_steps: usize,
+    ) -> Result<(), EnvironException>
+    where
+        ML: main_memory::MainMemoryLayout,
+        M: ManagerReadWrite,
+    {
+        // Protect against partial blocks being executed when
+        // no steps are remaining
+        if *steps >= max_steps {
+            return Ok(());
+        }
+
+        let mut progress = self.partial_block.progress.read();
+        let address = self.partial_block.phys_addr.read();
+
+        let entry = BCL::entry_mut(&mut self.entries, address);
+        let mut instr_pc = core.hart.pc.read();
+
+        let range = progress as usize..entry.len_instr.read() as usize;
+        for i in entry.instr[range].iter() {
+            match core.run_instr_cacheable(i.as_ref()) {
+                Ok(ProgramCounterUpdate::Next(width)) => {
+                    instr_pc += width as u64;
+                    core.hart.pc.write(instr_pc);
+                    *steps += 1;
+                    progress += 1;
+
+                    if *steps >= max_steps {
+                        break;
+                    }
+                }
+                Ok(ProgramCounterUpdate::Set(instr_pc)) => {
+                    // Setting the instr_pc implies execution continuing
+                    // elsewhere - and no longer within the current block.
+                    //
+                    // TODO RV-245
+                    // We should make branching instructions return `Add`
+                    // variant, in the case that the jump condition is
+                    // not met - to allow further instructions in the
+                    // block to be executed directly.
+                    core.hart.pc.write(instr_pc);
+                    *steps += 1;
+                    self.partial_block.reset();
+                    return Ok(());
+                }
+                Err(e) => {
+                    self.partial_block.reset();
+                    // Exceptions lead to a new address being set to handle it,
+                    // with no guarantee of it being the next instruction.
+                    core.handle_step_result(instr_pc, Err(e))?;
+                    // If we succesfully handled an error, need to increment steps one more.
+                    *steps += 1;
+                    return Ok(());
+                }
+            }
+        }
+
+        if progress == entry.len_instr.read() {
+            // We finished the block in exactly the number of steps left
+            self.partial_block.reset();
+        } else {
+            // Remember the progress made through the block, when we later
+            // continue executing it
+            self.partial_block.progress.write(progress);
+        }
+
+        Ok(())
     }
 }
 
@@ -372,6 +603,7 @@ impl<BCL: BlockCacheLayout, M: ManagerClone> Clone for BlockCache<BCL, M> {
             current_block_addr: self.current_block_addr.clone(),
             fence_counter: self.fence_counter.clone(),
             next_instr_addr: self.next_instr_addr.clone(),
+            partial_block: self.partial_block.clone(),
             entries: BCL::clone_entries(&self.entries),
         }
     }
@@ -390,7 +622,11 @@ impl<'a, M: ManagerRead> Block<'a, M> {
 
     /// Run a block against the machine state.
     ///
-    /// When calling this function, there must be at least `block.num_instr()` steps remaining.
+    /// When calling this function, there must be no partial block in progress. To ensure
+    /// this, you must always run [`BlockCache::complete_current_block`] prior to fetching
+    /// and running a new block.
+    ///
+    /// There _must_ also be sufficient steps remaining, to execute the block in full.
     pub fn run_block<ML>(
         &mut self,
         core: &mut MachineCoreState<ML, M>,
@@ -466,9 +702,14 @@ mod tests {
     use super::*;
     use crate::{
         backend_test, create_state,
-        machine_state::address_translation::PAGE_SIZE,
-        machine_state::registers::{a0, t0, t1},
-        parser::instruction::{CIBTypeArgs, SBTypeArgs},
+        machine_state::{
+            address_translation::PAGE_SIZE,
+            bus,
+            main_memory::tests::T1K,
+            registers::{a0, a1, t0, t1},
+            MachineCoreState, MachineCoreStateLayout,
+        },
+        parser::instruction::{CIBTypeArgs, ITypeArgs, SBTypeArgs},
     };
 
     pub type TestLayout = Layout<TEST_CACHE_BITS, TEST_CACHE_SIZE>;
@@ -571,5 +812,75 @@ mod tests {
         let block = state.get_block(phys_addr + 10);
         assert!(block.is_some());
         assert_eq!(5, block.unwrap().num_instr());
+    });
+
+    backend_test!(test_partial_block_executes, F, {
+        let mut core_state = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
+        let mut block_state = create_state!(BlockCache, TestLayout, F, TestLayout);
+
+        let addiw = InstrCacheable::Addiw(ITypeArgs {
+            rd: a1,
+            rs1: a1,
+            imm: 257,
+        });
+
+        let block_addr = bus::start_of_main_memory::<T1K>();
+
+        for offset in 0..10 {
+            block_state.push_instr::<4>(ValidatedCacheEntry::from_raw(
+                block_addr + offset * 4,
+                addiw,
+            ));
+        }
+
+        core_state.hart.pc.write(block_addr);
+
+        // Execute the first 5 instructions
+        let mut steps = 0;
+        block_state
+            .run_block_partial(&mut core_state, block_addr, &mut steps, 5)
+            .unwrap();
+
+        assert_eq!(steps, 5);
+        assert!(block_state.partial_block.in_progress.read());
+        assert_eq!(5, block_state.partial_block.progress.read());
+        assert_eq!(block_addr, block_state.partial_block.phys_addr.read());
+        assert_eq!(block_addr + 5 * 4, core_state.hart.pc.read());
+
+        // Execute no steps
+        let mut steps = 0;
+        block_state
+            .complete_current_block(&mut core_state, &mut steps, 0)
+            .unwrap();
+
+        assert_eq!(steps, 0);
+        assert!(block_state.partial_block.in_progress.read());
+        assert_eq!(5, block_state.partial_block.progress.read());
+        assert_eq!(block_addr, block_state.partial_block.phys_addr.read());
+        assert_eq!(block_addr + 5 * 4, core_state.hart.pc.read());
+
+        // Execute the next 2 instructions
+        let mut steps = 0;
+        block_state
+            .complete_current_block(&mut core_state, &mut steps, 2)
+            .unwrap();
+
+        assert_eq!(steps, 2);
+        assert!(block_state.partial_block.in_progress.read());
+        assert_eq!(7, block_state.partial_block.progress.read());
+        assert_eq!(block_addr, block_state.partial_block.phys_addr.read());
+        assert_eq!(block_addr + 7 * 4, core_state.hart.pc.read());
+
+        // Finish the block. We don't consume all the steps
+        let mut steps = 0;
+        block_state
+            .complete_current_block(&mut core_state, &mut steps, 5)
+            .unwrap();
+
+        assert_eq!(steps, 3);
+        assert!(!block_state.partial_block.in_progress.read());
+        assert_eq!(0, block_state.partial_block.progress.read());
+        assert_eq!(0, block_state.partial_block.phys_addr.read());
+        assert_eq!(block_addr + 10 * 4, core_state.hart.pc.read());
     });
 }
