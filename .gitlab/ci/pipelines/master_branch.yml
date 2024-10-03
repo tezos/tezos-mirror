@@ -3,6 +3,7 @@
 
 stages:
 - images
+- sanity
 - build
 - test_coverage
 - doc
@@ -284,6 +285,17 @@ oc.docker:arm64:
     DOCKER_BUILD_TARGET: without-evm-artifacts
     IMAGE_ARCH_PREFIX: arm64_
     EXECUTABLE_FILES: script-inputs/released-executables script-inputs/experimental-executables
+
+datadog_pipeline_trace:
+  image: ${ci_image_name}/build:${ci_image_tag}
+  stage: sanity
+  tags:
+  - gcp
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  script:
+  - DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags pipeline_type:$PIPELINE_TYPE
 
 oc.unified_coverage:
   image: ${ci_image_name}/test:${ci_image_tag}
