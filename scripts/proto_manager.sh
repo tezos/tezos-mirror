@@ -139,6 +139,7 @@ function usage() {
   c="${green}-c${reset}"
   a="${green}-a${reset}"
   d="${green}-d${reset}"
+  F="${green}-F${reset}"
   from="${green}--from${reset}"
   to="${green}--to${reset}"
   as="${green}--as${reset}"
@@ -148,6 +149,7 @@ function usage() {
   hash="${green}--hash${reset}"
   copy="${green}--copy${reset}"
   delete="${green}--delete${reset}"
+  force_snapshot="${green}--force-snapshot${reset}"
   ## colored vars
   alpha="${red}alpha${reset}"
   beta="${red}beta${reset}"
@@ -192,6 +194,10 @@ ${yellow}tl;dr:${reset}
   ${script} ${hash} ${f} ${beta}
   or
   ${script} ${hash} ${from} ${beta}
+To update the hash of a previously snapshotted protocol:
+  ${script} ${hash} ${f} ${beta} ${F}
+  or
+  ${script} ${hash} ${from} ${beta} ${force_snapshot}
 
 - To copy stockholm_023 known as stockholm into beta and link it in the node, client and codec:
   ${script} ${copy} ${from} ${stockholm_023} ${as} ${stockholm} ${to} ${beta}
@@ -253,6 +259,10 @@ while true; do
   --)
     shift
     break
+    ;;
+  --force-snapshot | -F)
+    is_snapshot=true
+    shift
     ;;
   *)
     break
@@ -369,7 +379,7 @@ if [[ ${command} == "snapshot" ]]; then
     error "To ${red}snapshot${reset}, protocol_target should be of the form [a-z]+_[0-9][0-9][0-9]" 1>&2
     clean_and_exit 1 "${LINENO}"
   fi
-  warn if source_label is given that it will not be used
+  # warn if source_label is given that it will not be used
   if [[ -n ${source_label} ]]; then
     warning "source_label will not be used for stabilisation"
   fi
