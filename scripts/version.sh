@@ -11,7 +11,7 @@
 ## `lib.protocol-compiler/octez-protocol-compiler.opam`
 ##
 ## This script is also sourced in the Makefile, as such it should be compatible
-## with both the make and sh syntax
+## with both make and sh syntaxes
 
 export ocaml_version=4.14.2
 # Used for sanity check in Makefile.
