@@ -350,9 +350,9 @@ module Summary = struct
 
   include Metric (Child)
 
-  let observe t v =
+  let observe ?(n = 1.0) t v =
     let open Child in
-    t.count <- t.count +. 1.0 ;
+    t.count <- t.count +. n ;
     t.sum <- t.sum +. v
 
   let time t gettimeofday fn =
