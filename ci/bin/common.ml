@@ -1181,6 +1181,17 @@ let job_build_dsn_node ?rules () : tezos_job =
          ["octez-dsn-node"])
   |> enable_kernels |> enable_sccache |> enable_cargo_cache
 
+let job_datadog_pipeline_trace : tezos_job =
+  job
+    ~__POS__
+    ~name:"datadog_pipeline_trace"
+    ~image:Images.CI.build
+    ~stage:Stages.sanity
+    [
+      "DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags \
+       pipeline_type:$PIPELINE_TYPE";
+    ]
+
 module Tezt = struct
   (** Create a tezt job.
 
