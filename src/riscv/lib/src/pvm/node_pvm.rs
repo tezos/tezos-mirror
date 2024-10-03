@@ -82,6 +82,16 @@ pub struct NodePvm {
 }
 
 impl NodePvm {
+    fn with_backend_mut<T, F>(&mut self, f: F) -> T
+    where
+        F: FnOnce(&mut State<SliceManager>) -> T,
+    {
+        let placed = <StateLayout as Layout>::placed().into_location();
+        let space = self.backend.allocate(placed);
+        let mut state = State::bind(space);
+        f(&mut state)
+    }
+
     fn with_backend<T, F>(&self, f: F) -> T
     where
         F: FnOnce(&State<SliceManagerRO>) -> T,
@@ -90,18 +100,6 @@ impl NodePvm {
         let space = self.backend.allocate_ro(placed);
         let state = State::bind(space);
         f(&state)
-    }
-
-    fn with_new_backend<F>(&self, f: F) -> Self
-    where
-        F: FnOnce(&mut State<SliceManager>),
-    {
-        let mut backend = self.backend.clone();
-        let placed = <StateLayout as Layout>::placed().into_location();
-        let space = backend.allocate(placed);
-        let mut state = State::bind(space);
-        f(&mut state);
-        Self { backend }
     }
 
     pub fn empty() -> Self {
@@ -134,8 +132,8 @@ impl NodePvm {
         self.with_backend(|state| state.message_counter.read())
     }
 
-    pub fn install_boot_sector(&self, loader: &[u8], kernel: &[u8]) -> Self {
-        self.with_new_backend(|state| {
+    pub fn install_boot_sector(&mut self, loader: &[u8], kernel: &[u8]) {
+        self.with_backend_mut(|state| {
             let program =
                 Program::<M100M>::from_elf(loader).expect("Could not parse Hermit loader");
             state
@@ -146,29 +144,27 @@ impl NodePvm {
         })
     }
 
-    pub fn compute_step(&self, pvm_hooks: &mut PvmHooks) -> Self {
-        self.with_new_backend(|state| {
+    pub fn compute_step(&mut self, pvm_hooks: &mut PvmHooks) {
+        self.with_backend_mut(|state| {
             state.pvm.eval_one(pvm_hooks);
             state.tick.write(state.tick.read() + 1);
         })
     }
 
-    pub fn compute_step_many(&self, pvm_hooks: &mut PvmHooks, max_steps: usize) -> (Self, i64) {
-        let mut backend = self.backend.clone();
-        let placed = <StateLayout as Layout>::placed().into_location();
-        let space = backend.allocate(placed);
-        let mut state = State::bind(space);
-        let steps = state.pvm.eval_max(pvm_hooks, Bound::Included(max_steps));
-        state.tick.write(state.tick.read() + steps as u64);
-        (Self { backend }, steps as i64)
+    pub fn compute_step_many(&mut self, pvm_hooks: &mut PvmHooks, max_steps: usize) -> i64 {
+        self.with_backend_mut(|state| {
+            let steps = state.pvm.eval_max(pvm_hooks, Bound::Included(max_steps));
+            state.tick.write(state.tick.read() + steps as u64);
+            steps as i64
+        })
     }
 
     pub fn hash(&self) -> Hash {
         self.with_backend(|state| state.struct_ref().hash().unwrap())
     }
 
-    pub fn set_input_message(&self, level: u32, message_counter: u64, input: Vec<u8>) -> Self {
-        self.with_new_backend(|state| {
+    pub fn set_input_message(&mut self, level: u32, message_counter: u64, input: Vec<u8>) {
+        self.with_backend_mut(|state| {
             assert!(
                 state
                     .pvm
@@ -183,8 +179,8 @@ impl NodePvm {
         })
     }
 
-    pub fn set_metadata(&self, rollup_address: &[u8; 20], origination_level: u32) -> Self {
-        self.with_new_backend(|state| {
+    pub fn set_metadata(&mut self, rollup_address: &[u8; 20], origination_level: u32) {
+        self.with_backend_mut(|state| {
             assert!(
                 state
                     .pvm
