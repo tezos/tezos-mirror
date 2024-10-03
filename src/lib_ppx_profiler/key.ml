@@ -13,7 +13,11 @@ type content =
   | Apply of Ppxlib.expression * Parsetree.expression list
   | Other of Ppxlib.expression
 
-type t = {label : string option; content : content}
+type t = {
+  level_of_detail : string option;
+  profiler_module : string option;
+  content : content;
+}
 
 let[@inline] content {content; _} = content
 
@@ -22,8 +26,8 @@ let rec embed_list loc = function
   | [e] -> [%expr [[%e e]]]
   | a :: q -> [%expr [%e a] :: [%e embed_list loc q]]
 
-let to_label loc {label; _} =
-  match label with
+let get_level_of_detail loc {level_of_detail; _} =
+  match level_of_detail with
   | Some name ->
       Ppxlib.Ast_builder.Default.(
         econstruct
@@ -42,6 +46,13 @@ let to_label loc {label; _} =
              ~args:(Ppxlib_ast.Ast.Pcstr_tuple [])
              ~res:None))
         None
+
+(* This could return a module_expr instead but right now it works
+   and that's all we're asking *)
+let get_profiler_module {profiler_module; _} =
+  match profiler_module with
+  | Some name -> Ppxlib.Lident name
+  | None -> Ppxlib.Lident "Profiler"
 
 let to_expression loc {content; _} =
   match content with
@@ -75,7 +86,8 @@ let pp_content ppf {content; _} =
 let pp ppf t =
   Format.fprintf
     ppf
-    "%s %a"
-    (Option.value ~default:"No label" t.label)
+    "%s %s %a"
+    (Option.value ~default:"No lvl of detail" t.level_of_detail)
+    (Option.value ~default:"No Profiler module" t.profiler_module)
     pp_content
     t

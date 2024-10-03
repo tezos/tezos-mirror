@@ -13,9 +13,15 @@ type content =
   | Apply of Ppxlib.expression * Parsetree.expression list
   | Other of Ppxlib.expression
 
-type t = {label : string option; content : content}
+type t = {
+  level_of_detail : string option;
+  profiler_module : string option;
+  content : content;
+}
 
-val to_label : Ppxlib.Location.t -> t -> Ppxlib.expression
+val get_level_of_detail : Ppxlib.Location.t -> t -> Ppxlib.expression
+
+val get_profiler_module : t -> Longident.t
 
 val to_expression : Ppxlib.Location.t -> t -> Ppxlib.expression
 

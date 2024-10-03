@@ -144,24 +144,22 @@ end = struct
 end
 
 and Rewriter : sig
-  type content = {key : Key.t; location : Ppxlib.location}
+  type action =
+    | Aggregate
+    | Aggregate_f
+    | Aggregate_s
+    | Mark
+    | Record
+    | Record_f
+    | Record_s
+    | Reset_block_section
+    | Span
+    | Span_f
+    | Span_s
+    | Stamp
+    | Stop
 
-  val get_key : content -> Key.t
-
-  type t =
-    | Aggregate of content
-    | Aggregate_f of content
-    | Aggregate_s of content
-    | Mark of content
-    | Record of content
-    | Record_f of content
-    | Record_s of content
-    | Reset_block_section of content
-    | Span of content
-    | Span_f of content
-    | Span_s of content
-    | Stamp of content
-    | Stop of content
+  type t = {key : Key.t; action : action; location : Ppxlib.location}
 
   val to_constant : t -> Constants.t
 
@@ -172,123 +170,112 @@ and Rewriter : sig
 
   val extract_rewriters : Parsetree.attribute list -> t list
 end = struct
-  type content = {key : Key.t; location : Ppxlib.location}
+  type action =
+    | Aggregate
+    | Aggregate_f
+    | Aggregate_s
+    | Mark
+    | Record
+    | Record_f
+    | Record_s
+    | Reset_block_section
+    | Span
+    | Span_f
+    | Span_s
+    | Stamp
+    | Stop
 
-  let get_key content = content.key
-
-  type t =
-    | Aggregate of content
-    | Aggregate_f of content
-    | Aggregate_s of content
-    | Mark of content
-    | Record of content
-    | Record_f of content
-    | Record_s of content
-    | Reset_block_section of content
-    | Span of content
-    | Span_f of content
-    | Span_s of content
-    | Stamp of content
-    | Stop of content
+  type t = {key : Key.t; action : action; location : Ppxlib.location}
 
   let aggregate key location =
     match Key.content key with
-    | Key.Apply _ | Key.Ident _ | Key.String _ -> Aggregate {key; location}
+    | Key.Apply _ | Key.Ident _ | Key.String _ -> Aggregate
     | _ -> Error.error location (Error.Invalid_aggregate key)
 
   let aggregate_f key location =
     match Key.content key with
-    | Key.Apply _ | Key.Ident _ | Key.String _ -> Aggregate_f {key; location}
+    | Key.Apply _ | Key.Ident _ | Key.String _ -> Aggregate_f
     | _ -> Error.error location (Error.Invalid_aggregate key)
 
   let aggregate_s key location =
     match Key.content key with
-    | Key.Apply _ | Key.Ident _ | Key.String _ -> Aggregate_s {key; location}
+    | Key.Apply _ | Key.Ident _ | Key.String _ -> Aggregate_s
     | _ -> Error.error location (Error.Invalid_aggregate key)
 
   let mark key location =
     match Key.content key with
-    | Key.Apply _ | Key.Ident _ | Key.List _ -> Mark {key; location}
+    | Key.Apply _ | Key.Ident _ | Key.List _ -> Mark
     | _ -> Error.error location (Error.Invalid_mark key)
 
   let record key location =
     match Key.content key with
-    | Key.Apply _ | Key.Ident _ | Key.String _ -> Record {key; location}
+    | Key.Apply _ | Key.Ident _ | Key.String _ -> Record
     | _ -> Error.error location (Error.Invalid_record key)
 
   let record_f key location =
     match Key.content key with
-    | Key.Apply _ | Key.Ident _ | Key.String _ -> Record_f {key; location}
+    | Key.Apply _ | Key.Ident _ | Key.String _ -> Record_f
     | _ -> Error.error location (Error.Invalid_record key)
 
   let record_s key location =
     match Key.content key with
-    | Key.Apply _ | Key.Ident _ | Key.String _ -> Record_s {key; location}
+    | Key.Apply _ | Key.Ident _ | Key.String _ -> Record_s
     | _ -> Error.error location (Error.Invalid_record key)
 
   let reset_block_section key location =
     match Key.content key with
-    | Key.Apply _ | Key.Ident _ | Key.String _ ->
-        Reset_block_section {key; location}
+    | Key.Apply _ | Key.Ident _ | Key.String _ -> Reset_block_section
     | _ -> Error.error location (Error.Invalid_record key)
 
   let span key location =
     match Key.content key with
-    | Key.Apply _ | Key.Ident _ | Key.List _ -> Span {key; location}
+    | Key.Apply _ | Key.Ident _ | Key.List _ -> Span
     | _ -> Error.error location (Error.Invalid_span key)
 
   let span_f key location =
     match Key.content key with
-    | Key.Apply _ | Key.Ident _ | Key.List _ -> Span_f {key; location}
+    | Key.Apply _ | Key.Ident _ | Key.List _ -> Span_f
     | _ -> Error.error location (Error.Invalid_span key)
 
   let span_s key location =
     match Key.content key with
-    | Key.Apply _ | Key.Ident _ | Key.List _ -> Span_s {key; location}
+    | Key.Apply _ | Key.Ident _ | Key.List _ -> Span_s
     | _ -> Error.error location (Error.Invalid_span key)
 
   let stamp key location =
     match Key.content key with
-    | Key.Apply _ | Key.Ident _ | Key.String _ -> Stamp {key; location}
+    | Key.Apply _ | Key.Ident _ | Key.String _ -> Stamp
     | _ -> Error.error location (Error.Invalid_span key)
 
   let stop key location =
     match Key.content key with
-    | Key.Empty -> Stop {key; location}
+    | Key.Empty -> Stop
     | _ -> Error.error location (Error.Invalid_stop key)
 
-  let get_location = function
-    | Aggregate c
-    | Aggregate_f c
-    | Aggregate_s c
-    | Mark c
-    | Record c
-    | Record_f c
-    | Record_s c
-    | Reset_block_section c
-    | Span c
-    | Span_f c
-    | Span_s c
-    | Stamp c
-    | Stop c ->
-        c.location
+  let get_location {location; _} = location
 
-  let to_constant = function
-    | Aggregate _ -> Constants.aggregate_constant
-    | Aggregate_f _ -> Constants.aggregate_f_constant
-    | Aggregate_s _ -> Constants.aggregate_s_constant
-    | Mark _ -> Constants.mark_constant
-    | Record _ -> Constants.record_constant
-    | Record_f _ -> Constants.record_f_constant
-    | Record_s _ -> Constants.record_s_constant
-    | Reset_block_section _ -> Constants.record_s_constant
-    | Span _ -> Constants.span_constant
-    | Span_f _ -> Constants.span_f_constant
-    | Span_s _ -> Constants.span_s_constant
-    | Stamp _ -> Constants.stamp_constant
-    | Stop _ -> Constants.stop_constant
+  let to_constant {action; _} =
+    match action with
+    | Aggregate -> Constants.aggregate_constant
+    | Aggregate_f -> Constants.aggregate_f_constant
+    | Aggregate_s -> Constants.aggregate_s_constant
+    | Mark -> Constants.mark_constant
+    | Record -> Constants.record_constant
+    | Record_f -> Constants.record_f_constant
+    | Record_s -> Constants.record_s_constant
+    | Reset_block_section -> Constants.record_s_constant
+    | Span -> Constants.span_constant
+    | Span_f -> Constants.span_f_constant
+    | Span_s -> Constants.span_s_constant
+    | Stamp -> Constants.stamp_constant
+    | Stop -> Constants.stop_constant
 
-  let association_constant_rewriter =
+  module StringMap = Map.Make (String)
+
+  (* Map associating to each constant (like "aggregate", "record" etc)
+     a function that checks that the keys are consistent and, if they are,
+     returns an action *)
+  let association_constant_action_maker =
     [
       (Constants.aggregate_constant, aggregate);
       (Constants.aggregate_f_constant, aggregate_f);
@@ -305,49 +292,43 @@ end = struct
       (Constants.stop_constant, stop);
     ]
     |> List.map (fun (const, fn) -> (Constants.get_attribute const, fn))
+    |> List.to_seq |> StringMap.of_seq
 
-  let of_string loc =
-    let module StringMap = Map.Make (String) in
-    let association_constant_rewriter =
-      association_constant_rewriter |> List.to_seq |> StringMap.of_seq
-    in
-    fun attribute ->
-      match StringMap.find_opt attribute association_constant_rewriter with
-      | Some res -> Some res
-      | None ->
-          (* Raise an Error if the ppx starts with [@profiler.action ...]
-             but action is not handled by this ppx *)
-          if String.starts_with ~prefix:"profiler." attribute then
-            match String.split_on_char '.' attribute with
-            | [_; action] -> Error.error loc Error.(Invalid_action action)
-            | _ -> None
-          else None
+  let get_action_maker loc attribute =
+    match StringMap.find_opt attribute association_constant_action_maker with
+    | Some res -> Some res
+    | None ->
+        (* Raise an Error if the ppx starts with [@profiler.action ...]
+           but action is not handled by this ppx *)
+        if String.starts_with ~prefix:"profiler." attribute then
+          match String.split_on_char '.' attribute with
+          | [_; action] -> Error.error loc Error.(Invalid_action action)
+          | _ -> None
+        else None
 
   (** Transforms a rewriter in an OCaml function call:
       - [@profiler.aggregate_s ...] will create a proper
         Parsetree Lident representing Profiler.aggregate_s *)
-  let to_fully_qualified_lident_expr =
-    let profiler_module = Ppxlib.Lident "Profiler" in
-    fun t loc ->
-      let lident =
-        Ppxlib.Ldot
-          ( profiler_module,
-            match t with
-            | Aggregate _ -> "aggregate"
-            | Aggregate_f _ -> "aggregate_f"
-            | Aggregate_s _ -> "aggregate_s"
-            | Mark _ -> "mark"
-            | Record _ -> "record"
-            | Record_f _ -> "record_f"
-            | Record_s _ -> "record_s"
-            | Reset_block_section _ -> "reset_block_section"
-            | Span _ -> "span"
-            | Span_f _ -> "span_f"
-            | Span_s _ -> "span_s"
-            | Stamp _ -> "stamp"
-            | Stop _ -> "stop" )
-      in
-      Ppxlib.Ast_helper.Exp.ident {txt = lident; loc}
+  let to_fully_qualified_lident_expr t loc =
+    let lident =
+      Ppxlib.Ldot
+        ( Key.get_profiler_module t.key,
+          match t.action with
+          | Aggregate -> "aggregate"
+          | Aggregate_f -> "aggregate_f"
+          | Aggregate_s -> "aggregate_s"
+          | Mark -> "mark"
+          | Record -> "record"
+          | Record_f -> "record_f"
+          | Record_s -> "record_s"
+          | Reset_block_section -> "reset_block_section"
+          | Span -> "span"
+          | Span_f -> "span_f"
+          | Span_s -> "span_s"
+          | Stamp -> "stamp"
+          | Stop -> "stop" )
+    in
+    Ppxlib.Ast_helper.Exp.ident {txt = lident; loc}
 
   (** [extract_list e] destruct [e] as [Some list] or returns [None] *)
   let rec extract_list = function
@@ -377,6 +358,27 @@ end = struct
         | Some labels -> Key.List labels
         | None -> Error.error loc Error.(Malformed_attribute structure))
 
+  let exists_field field string =
+    let Ppxlib.{txt; _}, _ = field in
+    txt = Ppxlib.Lident string
+
+  let extract_field_from_record loc record string =
+    match List.find (fun field -> exists_field field string) record with
+    | _, Ppxlib.{pexp_desc = Pexp_construct ({txt = Lident ident; _}, None); _}
+      ->
+        Some ident
+    | field -> Error.error loc Error.(Improper_field field)
+    | exception Not_found -> None
+
+  let extract_from_record loc record =
+    let level_of_detail =
+      extract_field_from_record loc record "level_of_detail"
+    in
+    let profiler_module =
+      extract_field_from_record loc record "profiler_module"
+    in
+    (level_of_detail, profiler_module)
+
   let extract_key_from_payload loc payload =
     match payload with
     | Ppxlib.PStr
@@ -385,36 +387,45 @@ end = struct
             [%e?
               {
                 pexp_desc =
-                  Pexp_construct ({txt = Lident label; _}, Some structure);
+                  Pexp_apply
+                    ( {pexp_desc = Pexp_record (record, _); _},
+                      [(Nolabel, structure)] );
                 _;
               }]];
-        ]
-      when not (String.equal label "::") ->
-        (* If the construct is "::" the payload attribute is a list but there's a trick:
-           - [ [@profiler.mark Terse ["label"]] ] is a [Construct("Terse", Some expression)]
-           - [ [@profiler.mark ["label"]] ] is a [Construct("::", Some expression)]
-           The AST handles [Terse ...] and [ ["label"] ] in the same way so we
-           need to make sure that we don't include the list case in this branch *)
-        (* [@ppx Terse|Detailed|Verbose ...] *)
+        ] ->
+        (* [@ppx {<other infos>} ...] *)
+        let level_of_detail, profiler_module = extract_from_record loc record in
+        (match (level_of_detail, profiler_module) with
+        | None, None -> Error.error loc Error.(Improper_record record)
+        | _ -> ()) ;
         Key.
           {
-            label = Some label;
+            level_of_detail;
+            profiler_module;
             content = extract_content_from_structure loc structure;
           }
     | Ppxlib.PStr [[%stri [%e? structure]]] ->
         (* [@ppx ...] *)
         Key.
-          {label = None; content = extract_content_from_structure loc structure}
+          {
+            level_of_detail = None;
+            profiler_module = None;
+            content = extract_content_from_structure loc structure;
+          }
     | Ppxlib.PStr [] ->
         (* [@ppx] *)
-        Key.{label = None; content = Key.Empty}
+        Key.
+          {level_of_detail = None; profiler_module = None; content = Key.Empty}
     | _ -> Error.error loc (Invalid_payload payload)
 
   let of_attribute ({Ppxlib.attr_payload; attr_loc; _} as attribute) =
-    match Ppxlib_helper.get_attribute_name attribute |> of_string attr_loc with
-    | Some rewriter ->
+    match
+      Ppxlib_helper.get_attribute_name attribute |> get_action_maker attr_loc
+    with
+    | Some action_maker ->
         let key = extract_key_from_payload attr_loc attr_payload in
-        Some (rewriter key attr_loc)
+        let action = action_maker key attr_loc in
+        Some {key; location = attr_loc; action}
     | None -> None
 
   let extract_rewriters = List.filter_map of_attribute
