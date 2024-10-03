@@ -67,6 +67,17 @@ module Dal_node = struct
       let listen_addr = Format.asprintf "0.0.0.0:%d" net_port in
       create ?name ~path ?runner ~rpc_port ~metrics_addr ~listen_addr ~node ()
       |> Lwt.return
+
+    let run ?(memtrace = false) ?event_level dal_node =
+      let name = name dal_node in
+      let filename =
+        Format.asprintf "%s/%s-trace.ctf" (Filename.get_temp_dir_name ()) name
+      in
+      let env =
+        if memtrace then Some (String_map.singleton "MEMTRACE" filename)
+        else None
+      in
+      run ?env ?event_level dal_node
   end
 end
 
