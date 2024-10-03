@@ -1442,6 +1442,7 @@ let _octez_stdlib_unix_test =
     ]
     ~path:"src/lib_stdlib_unix/test/"
     ~opam:"octez-libs"
+    ~preprocess:(pps bam_ppx)
     ~deps:
       [
         octez_error_monad |> open_ |> open_ ~m:"TzLwtreslib";
@@ -1450,6 +1451,7 @@ let _octez_stdlib_unix_test =
         octez_test_helpers |> open_;
         qcheck_alcotest;
         alcotezt;
+        tezt_bam;
       ]
 
 let octez_dal_config =

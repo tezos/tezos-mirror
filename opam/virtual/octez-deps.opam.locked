@@ -1,6 +1,6 @@
 opam-version: "2.0"
 name: "octez-deps"
-version: "dev"
+version: "~dev"
 synopsis:
   "Virtual package depending on Octez dependencies (profile: octez-deps)"
 description:
@@ -20,6 +20,8 @@ depends: [
   "asetmap" {= "0.8.1"}
   "asn1-combinators" {= "0.2.6"}
   "astring" {= "0.8.5"}
+  "bam" {= "0.2"}
+  "bam-ppx" {= "0.2"}
   "base" {= "v0.16.3"}
   "base-bigarray" {= "base"}
   "base-bytes" {= "base"}
@@ -208,6 +210,7 @@ depends: [
   "terminal" {= "0.4.0"}
   "tezos-sapling-parameters" {= "1.1.0"}
   "tezt" {= "4.1.0"}
+  "tezt-bam" {= "0.2"}
   "time_now" {= "v0.16.0"}
   "tls" {= "0.17.5"}
   "tls-lwt" {= "0.17.5"}

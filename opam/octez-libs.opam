@@ -82,6 +82,8 @@ depends: [
   "octez-rust-deps" { = version }
   "lwt-watcher" { = "0.2" }
   "bigstring" {with-test}
+  "bam-ppx" {with-test}
+  "tezt-bam" {with-test}
 ]
 x-opam-monorepo-opam-provided: [
   "tezos-sapling-parameters"
