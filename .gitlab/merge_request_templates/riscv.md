@@ -36,8 +36,8 @@ make -C src/riscv all
 
 |  | `master` | This MR | Improvement |
 |--|----------|---------|-------------|
-| $MyMachine | X.XXX TPS (1/XXX native) | X.XXX TPS (1/XXX native) | XX.XX% |
-| Benchmark Machine | Y.YYY TPS (1/YYY native) | Y.YYY TPS (1/YYY native) | YY.YY% |
+| $MyMachine | X.XXX TPS | X.XXX TPS | XX.XX% |
+| Benchmark Machine | Y.YYY TPS | Y.YYY TPS | YY.YY% |
 
 # Tasks for the Author
 
