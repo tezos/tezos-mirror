@@ -1001,7 +1001,7 @@ let replay ?on_terminate ?event_level ?event_sections_levels ?(strict = false)
     node
     arguments
 
-let init ?runner ?path ?name ?color ?data_dir ?event_pipe ?net_port
+let init ?runner ?path ?name ?env ?color ?data_dir ?event_pipe ?net_port
     ?advertised_net_port ?metrics_addr ?metrics_port ?rpc_external ?rpc_host
     ?rpc_port ?rpc_tls ?event_level ?event_sections_levels ?patch_config
     ?snapshot arguments =
@@ -1045,7 +1045,13 @@ let init ?runner ?path ?name ?color ?data_dir ?event_pipe ?net_port
     | None -> unit
   in
   let* () =
-    run ?patch_config ?event_level ?event_sections_levels node singleprocess_arg
+    run
+      ?env
+      ?patch_config
+      ?event_level
+      ?event_sections_levels
+      node
+      singleprocess_arg
   in
   let* () = wait_for_ready node in
   return node
