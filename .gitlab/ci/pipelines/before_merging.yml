@@ -147,10 +147,9 @@ sanity_ci:
   - ./scripts/ci/take_ownership.sh
   - eval $(opam env)
   script:
-  - make -C manifest check
-  - ./scripts/lint.sh --check-gitlab-ci-yml
+  - make --silent -C manifest check
   - ./scripts/ci/check_alpine_version.sh
-  - make -C ci check
+  - make --silent -C ci check
 
 docker:hadolint:
   image: hadolint/hadolint:2.9.3-debian

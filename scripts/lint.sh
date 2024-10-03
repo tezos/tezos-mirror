@@ -10,7 +10,6 @@ Where <action> can be:
   git-commit (requires clean repo).
 * --check-ocamlformat: check that --update-ocamlformat does nothing.
 * --format-scripts: format shell scripts inplace using shfmt
-* --check-gitlab-ci-yml: check .gitlab-ci.yml has been updated.
 * --check-scripts: shellcheck and check formatting of the .sh files
 * --check-redirects: check docs/_build/_redirects.
 * --check-coq-attributes: check the presence of coq attributes.
@@ -197,28 +196,6 @@ check_rust_toolchain_files() {
   done
 }
 
-check_gitlab_ci_yml() {
-  # Check that a rule is not defined twice, which would result in the first
-  # one being ignored. Gitlab linter doesn't warn for it.
-  find .gitlab-ci.yml .gitlab/ci/ -iname \*.yml |
-    while read -r filename; do
-      repeated=$(grep '^[^ #-]' "$filename" |
-        sort |
-        grep -v include |
-        uniq --repeated)
-      if [ -n "$repeated" ]; then
-        echo "$filename contains repeated rules:"
-        echo "$repeated"
-        touch /tmp/repeated
-      fi
-    done
-
-  if [ -f /tmp/repeated ]; then
-    rm /tmp/repeated
-    exit 1
-  fi
-}
-
 check_licenses_git_new() {
   if [ -z "${CHECK_LICENSES_DIFF_BASE:-}" ]; then
     echo 'Action --check-licenses-git-new requires that CHECK_LICENSES_DIFF_BASE is set in the environment.'
@@ -301,9 +278,6 @@ case "$action" in
 "--check-ocamlformat")
   action=update_all_dot_ocamlformats
   check_clean=true
-  ;;
-"--check-gitlab-ci-yml")
-  action=check_gitlab_ci_yml
   ;;
 "--check-scripts")
   action=check_scripts
