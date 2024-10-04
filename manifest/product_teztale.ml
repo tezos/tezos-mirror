@@ -171,6 +171,10 @@ let _teztale_archiver =
          octez_rpc_http_client_unix |> open_;
          octez_rpc_http |> open_;
          octez_version_value;
+         tls_lwt
+         (* tls-lwt is depopt of conduit-lwt-unix, but we need conduit-lwt-unix
+            to be compiled with it in teztale *);
+         conduit_lwt_unix;
          teztale_library_base |> open_;
          x509;
        ]
