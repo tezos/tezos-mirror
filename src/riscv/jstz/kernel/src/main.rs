@@ -29,4 +29,10 @@ pub fn entry(host: &mut impl Runtime) {
 
     // Delegate to Jstz kernel
     jstz_kernel::entry(host);
+
+    // Forcibly reset the garbage collector, to prevent the slowdown over time.
+    //
+    // It's safe to do so at this point, as jstz does not maintain references to any part of boa
+    // between runs.
+    boa_gc::gc_reset();
 }
