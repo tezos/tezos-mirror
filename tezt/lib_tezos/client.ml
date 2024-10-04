@@ -776,12 +776,14 @@ let dal_node_arg dal_node_endpoint client =
   | None, Some dal_node -> ["--dal-node"; Dal_node.rpc_endpoint dal_node]
   | None, None -> []
 
-let spawn_bake_for ?endpoint ?protocol ?(keys = [Constant.bootstrap1.alias])
-    ?minimal_fees ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte
+let spawn_bake_for ?env ?endpoint ?protocol
+    ?(keys = [Constant.bootstrap1.alias]) ?minimal_fees
+    ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte
     ?(minimal_timestamp = true) ?mempool ?(ignore_node_mempool = false) ?count
     ?force ?context_path ?dal_node_endpoint ?ai_vote ?(state_recorder = false)
     client =
   spawn_command
+    ?env
     ?endpoint
     client
     (optional_arg "protocol" Protocol.hash protocol
@@ -805,11 +807,12 @@ let spawn_bake_for ?endpoint ?protocol ?(keys = [Constant.bootstrap1.alias])
     @ optional_arg "adaptive-issuance-vote" ai_vote_to_string ai_vote
     @ optional_switch "record_state" state_recorder)
 
-let bake_for ?endpoint ?protocol ?keys ?minimal_fees
+let bake_for ?env ?endpoint ?protocol ?keys ?minimal_fees
     ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?minimal_timestamp
     ?mempool ?ignore_node_mempool ?count ?force ?context_path ?dal_node_endpoint
     ?ai_vote ?state_recorder ?expect_failure client =
   spawn_bake_for
+    ?env
     ?endpoint
     ?keys
     ?minimal_fees
@@ -828,7 +831,7 @@ let bake_for ?endpoint ?protocol ?keys ?minimal_fees
     client
   |> Process.check ?expect_failure
 
-let bake_for_and_wait_level ?endpoint ?protocol ?keys ?minimal_fees
+let bake_for_and_wait_level ?env ?endpoint ?protocol ?keys ?minimal_fees
     ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?minimal_timestamp
     ?mempool ?ignore_node_mempool ?count ?force ?context_path ?level_before
     ?node ?dal_node_endpoint ?ai_vote ?state_recorder client =
@@ -849,6 +852,7 @@ let bake_for_and_wait_level ?endpoint ?protocol ?keys ?minimal_fees
     level_before ;
   let* () =
     bake_for
+      ?env
       ?endpoint
       ?protocol
       ?keys
@@ -868,12 +872,13 @@ let bake_for_and_wait_level ?endpoint ?protocol ?keys ?minimal_fees
   in
   Node.wait_for_level node (actual_level_before + 1)
 
-let bake_for_and_wait ?endpoint ?protocol ?keys ?minimal_fees
+let bake_for_and_wait ?env ?endpoint ?protocol ?keys ?minimal_fees
     ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?minimal_timestamp
     ?mempool ?ignore_node_mempool ?count ?force ?context_path ?level_before
     ?node ?dal_node_endpoint ?ai_vote client =
   let* (_level : int) =
     bake_for_and_wait_level
+      ?env
       ?endpoint
       ?protocol
       ?keys
@@ -1072,10 +1077,11 @@ let spawn_transfer ?env ?hooks ?log_output ?endpoint ?(wait = "none") ?burn_cap
     @ (if simulation then ["--simulation"] else [])
     @ if force then ["--force"] else [])
 
-let transfer ?hooks ?log_output ?endpoint ?wait ?burn_cap ?fee ?gas_limit
+let transfer ?env ?hooks ?log_output ?endpoint ?wait ?burn_cap ?fee ?gas_limit
     ?safety_guard ?storage_limit ?counter ?entrypoint ?arg ?simulation ?force
     ?expect_failure ~amount ~giver ~receiver client =
   spawn_transfer
+    ?env
     ?log_output
     ?endpoint
     ?hooks
@@ -1415,10 +1421,11 @@ let drain_delegate ?hooks ?endpoint ?(wait = "none") ?expect_failure ~delegate
     @ destination @ [consensus_key])
   |> Process.check ?expect_failure
 
-let spawn_originate_contract ?hooks ?log_output ?endpoint ?(wait = "none") ?init
-    ?burn_cap ?gas_limit ?(dry_run = false) ?(force = false) ~alias ~amount ~src
-    ~prg client =
+let spawn_originate_contract ?env ?hooks ?log_output ?endpoint ?(wait = "none")
+    ?init ?burn_cap ?gas_limit ?(dry_run = false) ?(force = false) ~alias
+    ~amount ~src ~prg client =
   spawn_command
+    ?env
     ?hooks
     ?log_output
     ?endpoint
@@ -1490,10 +1497,11 @@ let convert_script_to_json ?endpoint ~script client =
 let convert_data_to_json ?endpoint ~data ?typecheck client =
   convert_michelson_to_json ~kind:Data ?endpoint ~input:data ?typecheck client
 
-let originate_contract ?hooks ?log_output ?endpoint ?wait ?init ?burn_cap
+let originate_contract ?env ?hooks ?log_output ?endpoint ?wait ?init ?burn_cap
     ?gas_limit ?dry_run ?force ~alias ~amount ~src ~prg client =
   let* client_output =
     spawn_originate_contract
+      ?env
       ?endpoint
       ?log_output
       ?hooks

@@ -34,4 +34,5 @@ let () =
   Evm_rollup.register ~testnet ;
   Evm_rollup_upgrade.register ~testnet ;
   Dal.register () ;
+  Upgrade_etherlink.register () ;
   Test.run ()
