@@ -337,12 +337,11 @@ Miscellaneous commands:
     -d --wallet-dir <path>: client data directory (absent: TEZOS_CLIENT_DIR env)
   
   init from rollup node <rollup-node-data-dir> [--data-dir <data-dir>]
-      [--omit-delayed-tx-events] [--reconstruct <boot-sector.wasm>]
+      [--omit-delayed-tx-events]
     initialises the EVM node data-dir using the data-dir of a rollup node.
     <rollup-node-data-dir>: The path to the rollup node data directory.
     --data-dir <data-dir>: The path to the EVM node data directory
     --omit-delayed-tx-events: Don't populate the delayed transactions in the store of the EVM node. This is necessary when creating the data dir for an observer EVM node because delayed transactions are going to be fetched from the sequencer.
-    --reconstruct <boot-sector.wasm>: /!\ DO NOT USE. /!\"
   
   transform dump <dump.json> to rlp <dump.rlp> [-k --keep-everything]
     Transforms the JSON list of instructions to a RLP list

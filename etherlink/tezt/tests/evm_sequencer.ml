@@ -1836,8 +1836,8 @@ let test_init_from_rollup_node_data_dir =
   in
 
   let* () =
-    Evm_node.init_from_rollup_node_data_dir
-      ~reconstruct:boot_sector
+    Evm_node.reconstruct_from_rollup_node_data_dir
+      ~boot_sector
       evm_node'
       sc_rollup_node
   in

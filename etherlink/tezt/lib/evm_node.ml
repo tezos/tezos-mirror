@@ -1046,17 +1046,36 @@ let init ?patch_config ?name ?runner ?mode ?data_dir ?rpc_addr ?rpc_port
   let* () = run evm_node in
   return evm_node
 
-let init_from_rollup_node_data_dir ?reconstruct
-    ?(omit_delayed_tx_events = false) evm_node rollup_node =
+let init_from_rollup_node_data_dir ?(omit_delayed_tx_events = false) evm_node
+    rollup_node =
   let rollup_node_data_dir = Sc_rollup_node.data_dir rollup_node in
   let process =
     spawn_command
       evm_node
       (["init"; "from"; "rollup"; "node"; rollup_node_data_dir]
       @ data_dir_arg evm_node
-      @ Cli_arg.optional_arg "reconstruct" Fun.id reconstruct
       @ Cli_arg.optional_switch "omit-delayed-tx-events" omit_delayed_tx_events
       )
+  in
+  Process.check process
+
+let reconstruct_from_rollup_node_data_dir ~boot_sector evm_node rollup_node =
+  let rollup_node_data_dir = Sc_rollup_node.data_dir rollup_node in
+  let process =
+    spawn_command
+      evm_node
+      ([
+         "reconstruct";
+         "from";
+         "rollup";
+         "node";
+         rollup_node_data_dir;
+         "and";
+         "boot";
+         "sector";
+         boot_sector;
+       ]
+      @ data_dir_arg evm_node)
   in
   Process.check process
 
