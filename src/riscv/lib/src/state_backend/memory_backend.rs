@@ -547,39 +547,6 @@ impl backend::ManagerSerialise for SliceManagerRO<'_> {
     }
 }
 
-pub mod test_helpers {
-    use super::{InMemoryBackend, SliceManager};
-    use crate::state_backend::{
-        test_helpers::{TestBackend, TestBackendBase, TestBackendFactory},
-        Backend, Layout,
-    };
-
-    impl<L: Layout> TestBackendBase for InMemoryBackend<L> {
-        type Manager<'backend> = SliceManager<'backend>;
-    }
-
-    impl<L: Layout> TestBackend for InMemoryBackend<L> {
-        type Layout = L;
-
-        fn allocate(
-            &mut self,
-            placed: crate::state_backend::PlacedOf<Self::Layout>,
-        ) -> crate::state_backend::AllocatedOf<Self::Layout, Self::Manager<'_>> {
-            Backend::allocate(self, placed)
-        }
-    }
-
-    pub struct InMemoryBackendFactory;
-
-    impl TestBackendFactory for InMemoryBackendFactory {
-        type Backend<L: Layout> = InMemoryBackend<L>;
-
-        fn new<L: Layout>() -> Self::Backend<L> {
-            InMemoryBackend::<L>::new().0
-        }
-    }
-}
-
 #[cfg(test)]
 pub mod tests {
     use super::*;

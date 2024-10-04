@@ -336,9 +336,10 @@ const fn cacheable_uncompressed(phys_addr: Address) -> bool {
 mod tests {
     use super::*;
     use crate::{
-        backend_test, create_backend, create_state,
+        backend_test, create_state,
         machine_state::registers::{a0, t0, t1},
         parser::instruction::{CIBTypeArgs, InstrCacheable, SBTypeArgs},
+        state_backend::test_helpers::copy_via_serde,
     };
 
     pub type TestInstructionCacheLayout = Layout<TEST_CACHE_BITS, TEST_CACHE_SIZE>;
@@ -348,12 +349,10 @@ mod tests {
     // `UnknownInstr` being executed, rather than an `OutOfBounds` error (for reading from
     // devices).
     backend_test!(test_fetch_before_cache_misses, F, {
-        let mut backend = create_backend!(TestInstructionCacheLayout, F);
         let mut state = create_state!(
             InstructionCache,
             TestInstructionCacheLayout,
             F,
-            backend,
             TestInstructionCacheLayout
         );
 
@@ -369,12 +368,10 @@ mod tests {
     // we do not invalidate the instruction cache, although the physical address of
     // the second half of the instruction does actually change!
     backend_test!(test_never_cache_across_page_boundaries, F, {
-        let mut backend = create_backend!(TestInstructionCacheLayout, F);
         let mut state = create_state!(
             InstructionCache,
             TestInstructionCacheLayout,
             F,
-            backend,
             TestInstructionCacheLayout
         );
 
@@ -398,13 +395,7 @@ mod tests {
     // Ensure
     // - on rebind the cached instructions are still present
     // - able to cache possibly overlapping instructions
-    #[test]
-    fn test_rebind() {
-        // TODO: RV-210: Generalise for all testable backends.
-        type F = crate::state_backend::memory_backend::test_helpers::InMemoryBackendFactory;
-
-        let mut backend = create_backend!(TestInstructionCacheLayout, F);
-
+    backend_test!(test_rebind, F, {
         let compressed_bytes = 0x4505;
         let compressed = InstrCacheable::CLi(CIBTypeArgs { rd_rs1: a0, imm: 1 });
 
@@ -418,12 +409,11 @@ mod tests {
         let phys_addr_uncompressed = 6;
         let phys_addr_compressed = 8;
 
-        {
+        let space: AllocatedOf<TestInstructionCacheLayout, F::Manager> = {
             let mut state = create_state!(
                 InstructionCache,
                 TestInstructionCacheLayout,
                 F,
-                backend,
                 TestInstructionCacheLayout
             );
 
@@ -435,17 +425,14 @@ mod tests {
                 Some(&uncompressed),
                 state.fetch_instr(phys_addr_uncompressed)
             );
-        }
+
+            copy_via_serde::<TestInstructionCacheLayout, _, _>(&state.struct_ref())
+        };
 
         // Rebind state
         {
-            let mut state = create_state!(
-                InstructionCache,
-                TestInstructionCacheLayout,
-                F,
-                backend,
-                TestInstructionCacheLayout
-            );
+            let mut state: InstructionCache<TestInstructionCacheLayout, F::Manager> =
+                InstructionCache::bind(space);
 
             assert_eq!(Some(&compressed), state.fetch_instr(phys_addr_compressed));
             assert_eq!(
@@ -453,5 +440,5 @@ mod tests {
                 state.fetch_instr(phys_addr_uncompressed)
             );
         }
-    }
+    });
 }

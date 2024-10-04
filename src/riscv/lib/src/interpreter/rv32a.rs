@@ -219,7 +219,7 @@ where
 #[cfg(test)]
 mod test {
     use crate::{
-        backend_test, create_backend, create_state,
+        backend_test, create_state,
         interpreter::atomics::{SC_FAILURE, SC_SUCCESS},
         machine_state::{
             bus::{devices::DEVICES_ADDRESS_SPACE_LENGTH, main_memory::tests::T1K},
@@ -234,8 +234,7 @@ mod test {
     macro_rules! test_lrsc {
         ($name:ident, $lr: ident, $sc: ident, $align: expr, $t: ident) => {
             backend_test!($name, F, {
-                let mut backend = create_backend!(MachineCoreStateLayout<T1K>, F);
-                let state = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, backend, T1K);
+                let state = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
                 let state_cell = std::cell::RefCell::new(state);
 
                 proptest!(|(
@@ -277,8 +276,7 @@ mod test {
     macro_rules! test_amo {
         ($instr: ident, $f: expr, $align: expr, $t: ident) => {
             backend_test!($instr, F, {
-                let mut backend = create_backend!(MachineCoreStateLayout<T1K>, F);
-                let state = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, backend, T1K);
+                let state = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
                 let state_cell = std::cell::RefCell::new(state);
 
                 proptest!(|(

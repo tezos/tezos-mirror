@@ -79,7 +79,7 @@ impl TrapMode {
 #[cfg(test)]
 mod tests {
     use crate::{
-        backend_test, create_backend, create_state,
+        backend_test, create_state,
         machine_state::{
             backend::tests::test_determinism,
             mode::{Mode, ModeCell, ModeLayout},
@@ -96,12 +96,10 @@ mod tests {
     }
 
     backend_test!(test_mode_read_write, F, {
-        let mut backend = create_backend!(ModeLayout, F);
-
         Mode::iter().for_each(|mode| {
             let first_value = mode;
 
-            let mut inst = create_state!(ModeCell, ModeLayout, F, backend);
+            let mut inst = create_state!(ModeCell, ModeLayout, F);
 
             inst.write(first_value);
             assert_eq!(inst.read(), first_value);

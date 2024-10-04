@@ -310,19 +310,14 @@ impl<L: MainMemoryLayout, M: backend::ManagerRead> PartialEq for MainMemory<L, M
 #[cfg(test)]
 pub mod tests {
     use crate::{
-        backend_test, create_backend,
-        machine_state::{
-            backend::{tests::test_determinism, Layout},
-            bus::AddressableWrite,
-        },
-        state_backend::test_helpers::TestBackend,
+        backend_test,
+        machine_state::{backend::tests::test_determinism, bus::AddressableWrite},
     };
 
     gen_memory_layout!(T1K = 1 KiB);
 
     backend_test!(test_endianess, F, {
-        let mut backend = create_backend!(T1K, F);
-        let mut memory = backend.allocate(T1K::placed().into_location());
+        let mut memory = F::allocate::<T1K>();
 
         memory.write(0, 0x1122334455667788u64).unwrap();
 

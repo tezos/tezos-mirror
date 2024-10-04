@@ -219,7 +219,7 @@ where
 #[cfg(test)]
 mod test {
     use crate::{
-        backend_test, create_backend, create_state,
+        backend_test, create_state,
         interpreter::atomics::{SC_FAILURE, SC_SUCCESS},
         machine_state::{
             bus::{devices::DEVICES_ADDRESS_SPACE_LENGTH, main_memory::tests::T1K},

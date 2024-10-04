@@ -435,15 +435,12 @@ impl<M: backend::ManagerClone> Clone for FRegisters<M> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        backend_test, create_backend, create_state, machine_state::backend::tests::test_determinism,
-    };
+    use crate::{backend_test, create_state, machine_state::backend::tests::test_determinism};
     use arbitrary_int::Number;
     use strum::IntoEnumIterator;
 
     backend_test!(test_zero, F, {
-        let mut backend = create_backend!(XRegistersLayout, F);
-        let mut registers = create_state!(XRegisters, XRegistersLayout, F, backend);
+        let mut registers = create_state!(XRegisters, XRegistersLayout, F);
 
         // x0 should always read 0.
         assert_eq!(registers.read(x0), 0);
@@ -459,8 +456,7 @@ mod tests {
     ];
 
     backend_test!(test_arbitrary_register, F, {
-        let mut backend = create_backend!(XRegistersLayout, F);
-        let mut registers = create_state!(XRegisters, XRegistersLayout, F, backend);
+        let mut registers = create_state!(XRegisters, XRegistersLayout, F);
 
         // Initialise the registers with something.
         for reg in NONZERO_REGISTERS {

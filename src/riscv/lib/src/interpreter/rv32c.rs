@@ -271,7 +271,7 @@ where
 #[cfg(test)]
 mod tests {
     use crate::{
-        backend_test, create_backend, create_state,
+        backend_test, create_state,
         machine_state::{
             bus::main_memory::tests::T1K, registers::a4, MachineCoreState, MachineCoreStateLayout,
         },
@@ -287,14 +287,7 @@ mod tests {
             (u64::MAX - 1, 100, 98_i64 as u64),
         ];
         for (init_pc, imm, res_pc) in test_case {
-            let mut backend = create_backend!(MachineCoreStateLayout<T1K>, F);
-            let mut state = create_state!(
-                MachineCoreState,
-                MachineCoreStateLayout<T1K>,
-                F,
-                backend,
-                T1K
-            );
+            let mut state = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
 
             state.hart.pc.write(init_pc);
             let new_pc = state.hart.run_cj(imm);
@@ -305,14 +298,7 @@ mod tests {
     });
 
     backend_test!(run_caddi, F, {
-        let mut backend = create_backend!(MachineCoreStateLayout<T1K>, F);
-        let state = create_state!(
-            MachineCoreState,
-            MachineCoreStateLayout<T1K>,
-            F,
-            backend,
-            T1K
-        );
+        let state = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
         let state_cell = std::cell::RefCell::new(state);
 
         proptest!(|(

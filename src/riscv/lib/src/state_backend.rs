@@ -301,8 +301,11 @@ impl<M: ManagerRead> ManagerRead for Ref<'_, M> {
     }
 }
 
-pub mod test_helpers {
-    use super::{AllocatedOf, Layout, ManagerReadWrite, ManagerSerialise, PlacedOf};
+#[cfg(test)]
+pub(crate) mod test_helpers {
+    use super::{
+        AllocatedOf, Layout, ManagerClone, ManagerDeserialise, ManagerReadWrite, ManagerSerialise,
+    };
 
     /// Generate a test against all test backends.
     #[macro_export]
@@ -315,50 +318,61 @@ pub mod test_helpers {
                     $expr
                 }
 
-                inner::<$crate::state_backend::memory_backend::test_helpers::InMemoryBackendFactory>();
                 inner::<$crate::state_backend::owned_backend::test_helpers::OwnedTestBackendFactory>();
             }
         };
     }
 
-    /// Equivalent to [`BackendBase`] but for testing purposes
-    pub trait TestBackendBase {
-        type Manager<'backend>: ManagerReadWrite + ManagerSerialise;
-    }
-
-    /// Equivalent to [`Backend`] but for testing purposes
-    pub trait TestBackend: TestBackendBase {
-        type Layout: Layout;
-
-        fn allocate(
-            &mut self,
-            placed: PlacedOf<Self::Layout>,
-        ) -> AllocatedOf<Self::Layout, Self::Manager<'_>>;
-    }
-
     /// This lets you construct backends for any layout.
     pub trait TestBackendFactory {
-        type Backend<L: Layout>: TestBackend<Layout = L>;
+        /// Manager used in testing
+        type Manager: ManagerReadWrite + ManagerSerialise + ManagerDeserialise + ManagerClone;
 
-        /// Construct a backend for the given layout `L`.
-        fn new<L: Layout>() -> Self::Backend<L>;
+        /// Allocate using the test backend manager.
+        fn allocate<L: Layout>() -> AllocatedOf<L, Self::Manager>;
+    }
+
+    /// Copy the allocated space by serialising and deserialising it.
+    pub fn copy_via_serde<L, N, M>(refs: &AllocatedOf<L, N>) -> AllocatedOf<L, M>
+    where
+        L: Layout,
+        N: ManagerSerialise,
+        AllocatedOf<L, N>: serde::Serialize,
+        M: ManagerDeserialise,
+        AllocatedOf<L, M>: serde::de::DeserializeOwned,
+    {
+        let data = crate::storage::binary::serialise(refs).unwrap();
+        crate::storage::binary::deserialise(&data).unwrap()
+    }
+
+    /// Assert that two values are different. If they differ, offer a command to run that shows the
+    /// structural differences between the values.
+    pub fn assert_eq_struct<T>(lhs: &T, rhs: &T)
+    where
+        T: serde::Serialize + PartialEq,
+    {
+        if lhs != rhs {
+            let (file_lhs, path_lhs) = tempfile::NamedTempFile::new().unwrap().keep().unwrap();
+            serde_json::to_writer_pretty(file_lhs, lhs).unwrap();
+            eprintln!("Lhs is located at {}", path_lhs.display());
+
+            let (file_rhs, path_rhs) = tempfile::NamedTempFile::new().unwrap().keep().unwrap();
+            serde_json::to_writer_pretty(file_rhs, rhs).unwrap();
+            eprintln!("Rhs is located at {}", path_rhs.display());
+
+            eprintln!("Run the following to diff them:");
+            eprintln!("jd {} {}", path_lhs.display(), path_rhs.display());
+
+            panic!("Assertion failed: values are different");
+        }
     }
 }
 
 #[cfg(test)]
 pub mod tests {
-    use super::{
-        random_backend::Randomised,
-        test_helpers::{TestBackendBase, TestBackendFactory},
-        *,
-    };
+    use super::{random_backend::Randomised, *};
     use crate::backend_test;
     use std::{collections::hash_map::RandomState, hash::BuildHasher};
-
-    /// Construct the manager for a given backend lifetime `'a`, a test backend
-    /// factory `F` and a specific layout `L`.
-    pub type ManagerFor<'a, F, L> =
-        <<F as TestBackendFactory>::Backend<L> as TestBackendBase>::Manager<'a>;
 
     /// Run `f` twice against two different randomised backends and see if the
     /// resulting backend state is the same afterwards.
@@ -401,52 +415,28 @@ pub mod tests {
         assert_eq!(snapshot1, snapshot2);
     }
 
-    /// Given a `StateLayout` and a [`TestBackendFactory`] type,
-    /// create the backend for that layout.
-    #[macro_export]
-    macro_rules! create_backend {
-        ($StateLayout:ty, $Factory:ty) => {
-            <$Factory as $crate::state_backend::test_helpers::TestBackendFactory>::new::<$StateLayout>()
-        };
-    }
-
     /// Given a `State<M: Manager>`, optionally its `StateLayout`,
     /// a [`TestBackendFactory`] type, a `backend` created with `create_backend!` macro,
     /// create the location and return the created `State<M>`.
     #[macro_export]
     macro_rules! create_state {
         // For an extra generic in the state (MachineState for example)
-        ($State:tt, $StateLayout:ty, $Factory:ty, $backend:ident $(, $ExtraGenerics:ty)*) => {
+        ($State:tt, $StateLayout:ty, $Factory:ty $(, $ExtraGenerics:ty)*) => {
             {
-                use $crate::state_backend::{test_helpers::TestBackend, Layout};
-                let loc = <$StateLayout>::placed().into_location();
                 let new_state =
                     $State::<
                         $($ExtraGenerics,)*
-                        <<$Factory as $crate::state_backend::test_helpers::TestBackendFactory>::Backend<$StateLayout> as $crate::state_backend::test_helpers::TestBackendBase>::Manager<'_>
+                        <$Factory as $crate::state_backend::test_helpers::TestBackendFactory>::Manager,
                     >::bind(
-                        $backend.allocate(loc),
+                        <$Factory as $crate::state_backend::test_helpers::TestBackendFactory>::allocate::<$StateLayout>(),
                     );
 
                 new_state
             }
         };
 
-        ($State:tt, $StateLayout:ty, $Factory:ty, $backend:ident) => {
-            {
-                use $crate::state_backend::{Backend, BackendManagement, Layout};
-                let loc = <$StateLayout>::placed().into_location();
-                let new_state =
-                    $State::<<<$Factory as $crate::state_backend::test_helpers::TestBackendFactory>::Backend<$StateLayout> as BackendManagement>::Manager<'_>>::bind(
-                        $backend.allocate(loc),
-                    );
-
-                new_state
-            }
-        };
-
-        ($State:tt, $Factory:ty, $backend:ident) => {
-            create_state!($State, paste::paste!([<$State Layout>]), $Factory, $backend)
+        ($State:tt, $Factory:ty) => {
+            create_state!($State, paste::paste!([<$State Layout>]), $Factory)
         };
     }
 
@@ -467,8 +457,6 @@ pub mod tests {
             }
         }
 
-        let mut backend = create_backend!(ExampleLayout, F);
-
         let (first_loc, second_loc) = ExampleLayout::placed().into_location();
         let first_loc = first_loc.as_array();
 
@@ -481,7 +469,7 @@ pub mod tests {
         let first_value: u64 = rand::random();
         let second_value: [u32; 4] = rand::random();
 
-        let mut instance = create_state!(Example, ExampleLayout, F, backend);
+        let mut instance = create_state!(Example, ExampleLayout, F);
 
         instance.first.write(first_value);
         assert_eq!(instance.first.read(), first_value);

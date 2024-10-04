@@ -1052,7 +1052,7 @@ mod tests {
     use crate::{
         backend_test,
         bits::{Bits64, FixedWidthBits},
-        create_backend, create_state,
+        create_state,
         machine_state::{
             address_translation::pte::{PPNField, PageTableEntry},
             bus::{main_memory::M1M, start_of_main_memory, AddressableWrite},
@@ -1069,6 +1069,7 @@ mod tests {
             instruction::{CIBTypeArgs, ITypeArgs, Instr, InstrCacheable, SBTypeArgs},
             parse_block,
         },
+        state_backend::test_helpers::{assert_eq_struct, copy_via_serde, TestBackendFactory},
         traps::{EnvironException, Exception, TrapContext},
     };
     use crate::{bits::u64, machine_state::bus::main_memory::M1K};
@@ -1083,8 +1084,7 @@ mod tests {
     }
 
     backend_test!(test_step, F, {
-        let mut backend = create_backend!(MachineStateLayout<T1K, TestCacheLayouts>, F);
-        let state = create_state!(MachineState, MachineStateLayout<T1K, TestCacheLayouts>, F, backend, T1K, TestCacheLayouts);
+        let state = create_state!(MachineState, MachineStateLayout<T1K, TestCacheLayouts>, F, T1K, TestCacheLayouts);
         let state_cell = std::cell::RefCell::new(state);
 
         proptest!(|(
@@ -1131,8 +1131,7 @@ mod tests {
     });
 
     backend_test!(test_step_env_exc, F, {
-        let mut backend = create_backend!(MachineStateLayout<T1K, TestCacheLayouts>, F);
-        let state = create_state!(MachineState, MachineStateLayout<T1K, TestCacheLayouts>, F, backend, T1K, TestCacheLayouts);
+        let state = create_state!(MachineState, MachineStateLayout<T1K, TestCacheLayouts>, F, T1K, TestCacheLayouts);
         let state_cell = std::cell::RefCell::new(state);
 
         proptest!(|(
@@ -1168,8 +1167,7 @@ mod tests {
     });
 
     backend_test!(test_step_exc_mm, F, {
-        let mut backend = create_backend!(MachineStateLayout<T1K, TestCacheLayouts>, F);
-        let state = create_state!(MachineState, MachineStateLayout<T1K, TestCacheLayouts>, F, backend, T1K, TestCacheLayouts);
+        let state = create_state!(MachineState, MachineStateLayout<T1K, TestCacheLayouts>, F, T1K, TestCacheLayouts);
         let state_cell = std::cell::RefCell::new(state);
 
         proptest!(|(
@@ -1212,8 +1210,7 @@ mod tests {
     });
 
     backend_test!(test_step_exc_us, F, {
-        let mut backend = create_backend!(MachineStateLayout<T1K, TestCacheLayouts>, F);
-        let state = create_state!(MachineState, MachineStateLayout<T1K, TestCacheLayouts>, F, backend, T1K, TestCacheLayouts);
+        let state = create_state!(MachineState, MachineStateLayout<T1K, TestCacheLayouts>, F, T1K, TestCacheLayouts);
         let state_cell = std::cell::RefCell::new(state);
 
         proptest!(|(
@@ -1262,11 +1259,7 @@ mod tests {
 
     // Test that the machine state does not behave differently when potential ephermeral state is
     // reset that may impact instruction caching.
-    #[test]
-    fn test_instruction_cache() {
-        // TODO: RV-210: Generalise for all testable backends.
-        type F = crate::state_backend::memory_backend::test_helpers::InMemoryBackendFactory;
-
+    backend_test!(test_instruction_cache, F, {
         // Instruction that writes the value in t1 to the address t0.
         const I_WRITE_T1_TO_ADDRESS_T0: u32 = 0b0011000101010000000100011;
         assert_eq!(
@@ -1300,11 +1293,14 @@ mod tests {
             }))]
         );
 
-        let mut backend = create_backend!(MachineStateLayout<M1K, TestCacheLayouts>, F);
+        type LocalLayout = MachineStateLayout<M1K, TestCacheLayouts>;
+
+        type LocalMachineState<F> =
+            MachineState<M1K, TestCacheLayouts, <F as TestBackendFactory>::Manager>;
 
         // Configure the machine state.
-        {
-            let mut state = create_state!(MachineState, MachineStateLayout<M1K, TestCacheLayouts>, F, backend, M1K, TestCacheLayouts);
+        let base_state = {
+            let mut state = create_state!(MachineState, LocalLayout, F, M1K, TestCacheLayouts);
             state.reset();
 
             let start_ram = start_of_main_memory::<M1K>();
@@ -1329,46 +1325,53 @@ mod tests {
                 .hart
                 .xregisters
                 .write(t1, I_LOAD_6_INTO_T2 as u64);
-        }
 
-        let mut alt_backend = backend.clone();
+            state
+        };
 
         // Perform 2 steps consecutively in one backend.
-        let result = {
-            let mut state = create_state!(MachineState, MachineStateLayout<M1K, TestCacheLayouts>, F, backend, M1K, TestCacheLayouts);
+        let state = {
+            let mut state = LocalMachineState::<F>::bind(copy_via_serde::<LocalLayout, _, _>(
+                &base_state.struct_ref(),
+            ));
+
             state.step().unwrap();
             state.step().unwrap();
-            state.core.hart.xregisters.read(t2)
+
+            state
         };
 
         // Perform 2 steps separately in another backend by re-binding the state between steps.
-        let alt_result = {
-            {
-                let mut state = create_state!(MachineState, MachineStateLayout<M1K, TestCacheLayouts>, F, alt_backend, M1K, TestCacheLayouts);
+        let alt_state = {
+            let alt_state = {
+                let mut state = LocalMachineState::<F>::bind(copy_via_serde::<LocalLayout, _, _>(
+                    &base_state.struct_ref(),
+                ));
                 state.step().unwrap();
-            }
+                state
+            };
 
             {
-                let mut state = create_state!(MachineState, MachineStateLayout<M1K, TestCacheLayouts>, F, alt_backend, M1K, TestCacheLayouts);
+                let mut state = LocalMachineState::<F>::bind(copy_via_serde::<LocalLayout, _, _>(
+                    &alt_state.struct_ref(),
+                ));
                 state.step().unwrap();
-                state.core.hart.xregisters.read(t2)
+                state
             }
         };
 
         // The two backends should have the same state.
-        assert_eq!(result, alt_result);
-        assert_eq!(backend, alt_backend);
-    }
+        assert_eq!(
+            state.core.hart.xregisters.read(t2),
+            alt_state.core.hart.xregisters.read(t2)
+        );
+
+        assert_eq_struct(&state.struct_ref(), &alt_state.struct_ref());
+    });
 
     // Test that the machine state does not behave differently when potential ephermeral state is
     // reset that may impact instruction address translation caching.
-    #[test]
-    fn test_instruction_address_cache() {
-        // TODO: RV-210: Generalise for all testable backends.
-        type F = crate::state_backend::memory_backend::test_helpers::InMemoryBackendFactory;
-
-        let mut backend = create_backend!(MachineStateLayout<M1M, TestCacheLayouts>, F);
-
+    backend_test!(test_instruction_address_cache, F, {
         // Specify the physcal memory layout.
         let main_mem_addr = start_of_main_memory::<M1M>();
         let code0_addr = main_mem_addr;
@@ -1520,9 +1523,15 @@ mod tests {
             ]
         );
 
+        type LocalLayout = MachineStateLayout<M1M, TestCacheLayouts>;
+
+        type LocalMachineState<F> =
+            MachineState<M1M, TestCacheLayouts, <F as TestBackendFactory>::Manager>;
+
         // Configure the state backend.
-        {
-            let mut state = create_state!(MachineState, MachineStateLayout<M1M, TestCacheLayouts>, F, backend, M1M, TestCacheLayouts);
+        let base_state = {
+            let mut state: LocalMachineState<F> =
+                create_state!(MachineState, LocalLayout, F, M1M, TestCacheLayouts);
             state.reset();
 
             state
@@ -1544,34 +1553,49 @@ mod tests {
                 .hart
                 .xregisters
                 .write(t1, root_page_table_virt_addr);
-        }
 
-        let mut alt_backend = backend.clone();
+            state
+        };
 
-        //  2 steps consecutively against one backend.
-        let result = {
-            let mut state = create_state!(MachineState, MachineStateLayout<M1M, TestCacheLayouts>, F, backend, M1M, TestCacheLayouts);
+        // Run 2 steps consecutively against one backend.
+        let state = {
+            let mut state: LocalMachineState<F> =
+                MachineState::bind(copy_via_serde::<LocalLayout, _, _>(
+                    &base_state.struct_ref(),
+                ));
+
             state.step().unwrap();
             state.step().unwrap();
-            state.core.hart.xregisters.read(a0)
+
+            state
         };
 
         // Perform 2 steps separately in another backend by re-binding the state between steps.
-        let alt_result = {
-            {
-                let mut state = create_state!(MachineState, MachineStateLayout<M1M, TestCacheLayouts>, F, alt_backend, M1M, TestCacheLayouts);
+        let alt_state = {
+            let alt_state = {
+                let mut state: LocalMachineState<F> =
+                    MachineState::bind(copy_via_serde::<LocalLayout, _, _>(
+                        &base_state.struct_ref(),
+                    ));
                 state.step().unwrap();
-            }
+                state
+            };
             {
-                let mut state = create_state!(MachineState, MachineStateLayout<M1M, TestCacheLayouts>, F, alt_backend, M1M, TestCacheLayouts);
+                let mut state: LocalMachineState<F> =
+                    MachineState::bind(copy_via_serde::<LocalLayout, _, _>(
+                        &alt_state.struct_ref(),
+                    ));
                 state.step().unwrap();
-                state.core.hart.xregisters.read(a0)
+                state
             }
         };
 
         // Both backends should have transitioned to the same state.
-        assert_eq!(result, 1);
-        assert_eq!(result, alt_result);
-        assert_eq!(backend, alt_backend);
-    }
+        assert_eq!(state.core.hart.xregisters.read(a0), 1);
+        assert_eq!(
+            state.core.hart.xregisters.read(a0),
+            alt_state.core.hart.xregisters.read(a0)
+        );
+        assert_eq_struct(&state.struct_ref(), &alt_state.struct_ref());
+    });
 }

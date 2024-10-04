@@ -76,7 +76,7 @@ mod test {
     use crate::{
         backend_test,
         bits::Bits64,
-        create_backend, create_state,
+        create_state,
         machine_state::{
             bus::{devices::DEVICES_ADDRESS_SPACE_LENGTH, main_memory::tests::T1K},
             csregisters::{
@@ -95,14 +95,7 @@ mod test {
     const OUT_OF_BOUNDS_OFFSET: i64 = 1024;
 
     backend_test!(test_cfsd_cfld, F, {
-        let mut backend = create_backend!(MachineCoreStateLayout<T1K>, F);
-        let state = create_state!(
-            MachineCoreState,
-            MachineCoreStateLayout<T1K>,
-            F,
-            backend,
-            T1K
-        );
+        let state = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
         let state_cell = std::cell::RefCell::new(state);
 
         proptest!(|(
@@ -141,14 +134,7 @@ mod test {
     });
 
     backend_test!(test_cfsdsp_cfldsp, F, {
-        let mut backend = create_backend!(MachineCoreStateLayout<T1K>, F);
-        let state = create_state!(
-            MachineCoreState,
-            MachineCoreStateLayout<T1K>,
-            F,
-            backend,
-            T1K
-        );
+        let state = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
         let state_cell = std::cell::RefCell::new(state);
 
         proptest!(|(

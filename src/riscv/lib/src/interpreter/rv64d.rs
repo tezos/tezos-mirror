@@ -549,7 +549,7 @@ mod tests {
     use crate::{
         backend_test,
         bits::Bits64,
-        create_backend, create_state,
+        create_state,
         machine_state::{
             bus::{devices::DEVICES_ADDRESS_SPACE_LENGTH, main_memory::tests::T1K},
             csregisters::{
@@ -566,8 +566,7 @@ mod tests {
     use proptest::prelude::*;
 
     backend_test!(test_fmv_d, F, {
-        let mut backend = create_backend!(HartStateLayout, F);
-        let state = create_state!(HartState, HartStateLayout, F, backend);
+        let state = create_state!(HartState, HartStateLayout, F);
         let state_cell = std::cell::RefCell::new(state);
 
         proptest!(|(
@@ -595,14 +594,7 @@ mod tests {
     });
 
     backend_test!(test_load_store, F, {
-        let mut backend = create_backend!(MachineCoreStateLayout<T1K>, F);
-        let state = create_state!(
-            MachineCoreState,
-            MachineCoreStateLayout<T1K>,
-            F,
-            backend,
-            T1K
-        );
+        let state = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
         let state_cell = std::cell::RefCell::new(state);
 
         proptest!(|(

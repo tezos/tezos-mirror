@@ -509,12 +509,12 @@ impl<const LEN: usize, M: ManagerClone> Clone for DynCells<LEN, M> {
 #[cfg(test)]
 pub(crate) mod tests {
     use crate::{
-        backend_test, create_backend,
+        backend_test,
         state_backend::{
             layout::{Atom, Layout},
-            test_helpers::TestBackend,
+            test_helpers::copy_via_serde,
             Array, CellRead, CellReadWrite, CellWrite, Choreographer, DynCells, Elem, LazyCell,
-            Location, ManagerAlloc, ManagerBase,
+            Location, ManagerAlloc, ManagerBase, Ref,
         },
     };
     use serde::ser::SerializeTuple;
@@ -567,8 +567,7 @@ pub(crate) mod tests {
         const LEN: usize = 64;
         type OurLayout = (Array<u64, LEN>, Array<u64, LEN>);
 
-        let mut backend = create_backend!(OurLayout, F);
-        let (mut array1, mut array2) = backend.allocate(OurLayout::placed().into_location());
+        let (mut array1, mut array2) = F::allocate::<OurLayout>();
 
         // Allocate two consecutive arrays
         // let mut array1 = manager.allocate_region(array1_place);
@@ -610,8 +609,7 @@ pub(crate) mod tests {
 
     backend_test!(test_cell_overlap, F, {
         type OurLayout = (Atom<[u64; 4]>, Atom<[u64; 4]>);
-        let mut backend = create_backend!(OurLayout, F);
-        let (mut cell1, mut cell2) = backend.allocate(OurLayout::placed().into_location());
+        let (mut cell1, mut cell2) = F::allocate::<OurLayout>();
 
         // Cell should be zero-initialised.
         assert_eq!(cell1.read(), [0; 4]);
@@ -634,11 +632,7 @@ pub(crate) mod tests {
         assert_eq!(cell1.read(), cell1_value);
     });
 
-    #[test]
-    fn test_lazy_cell() {
-        // TODO: RV-210: Generalise for all testable backends.
-        type F = crate::state_backend::memory_backend::test_helpers::InMemoryBackendFactory;
-
+    backend_test!(test_lazy_cell, F, {
         #[derive(Debug, Clone, Copy, PartialEq, Eq)]
         struct Wrapper(u64);
 
@@ -656,10 +650,8 @@ pub(crate) mod tests {
 
         type OurLayout = Atom<u64>;
 
-        let mut backend = create_backend!(OurLayout, F);
-
-        let expected = {
-            let cell = backend.allocate(OurLayout::placed().into_location());
+        let (expected, space) = {
+            let cell = F::allocate::<OurLayout>();
 
             // Cell should be zero-initialised.
             assert_eq!(cell.read(), 0);
@@ -677,13 +669,15 @@ pub(crate) mod tests {
             let new = Wrapper(rand::random());
             assert_eq!(old, lazy.replace(new));
 
-            new.0
+            let space =
+                copy_via_serde::<OurLayout, Ref<'_, F::Manager>, F::Manager>(&lazy.struct_ref());
+
+            (new.0, space)
         };
 
         // Rebinding, check cell contents
-        let cell = backend.allocate(OurLayout::placed().into_location());
-        assert_eq!(cell.read(), expected);
-    }
+        assert_eq!(space.read(), expected);
+    });
 
     backend_test!(
         #[should_panic]
@@ -711,8 +705,7 @@ pub(crate) mod tests {
                 }
             }
 
-            let mut backend = create_backend!(FlipperLayout, F);
-            let mut state = backend.allocate(FlipperLayout::placed().into_location());
+            let mut state = F::allocate::<FlipperLayout>();
 
             // This should panic because we are trying to write an element at the address which
             // corresponds to the end of the buffer.
@@ -740,10 +733,8 @@ pub(crate) mod tests {
             }
         }
 
-        let mut backend = create_backend!(FlipperLayout, F);
-
         // Writing to one item of the region must convert to stored format.
-        let mut region = backend.allocate(FlipperLayout::placed().into_location());
+        let mut region = F::allocate::<FlipperLayout>();
 
         region.write(0, Flipper { a: 13, b: 37 });
         assert_eq!(region.read::<Flipper>(0), Flipper { a: 13, b: 37 });
@@ -781,10 +772,8 @@ pub(crate) mod tests {
     backend_test!(test_region_stored_format, F, {
         type FlipperLayout = Array<Flipper, 4>;
 
-        let mut backend = create_backend!(FlipperLayout, F);
-
         // Writing to one item of the region must convert to stored format.
-        let mut region = backend.allocate(FlipperLayout::placed().into_location());
+        let mut region = F::allocate::<FlipperLayout>();
 
         region.write(0, Flipper { a: 13, b: 37 });
         assert_eq!(region.read(0), Flipper { a: 13, b: 37 });
