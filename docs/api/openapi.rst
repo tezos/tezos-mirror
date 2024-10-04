@@ -53,7 +53,7 @@ The node provides some RPCs which are independent of the protocol.
 Their OpenAPI specification can be found at:
 
 - :src:`docs/api/rpc-openapi.json` (version 20.3)
-- :src:`docs/api/rpc-openapi-rc.json` (version 21.0~rc1)
+- :src:`docs/api/rpc-openapi-rc.json` (version 21.0~rc3)
 - :src:`docs/api/rpc-openapi-dev.json` (version master)
 
 .. TODO tezos/tezos#2170: add/remove section(s)
@@ -77,12 +77,12 @@ Qena RPCs
 The OpenAPI specifications for RPCs which are specific to the Qena (``PtQenaB1``)
 protocol proposal can be found at:
 
-- :src:`docs/api/qena-openapi.json` (version 21.0~rc1)
+- :src:`docs/api/qena-openapi.json` (version 21.0~rc3)
 
 The OpenAPI specifications for RPCs which are related to the mempool
 and specific to the Qena protocol proposal can be found at:
 
-- :src:`docs/api/qena-mempool-openapi.json` (version 21.0~rc1)
+- :src:`docs/api/qena-mempool-openapi.json` (version 21.0~rc3)
 
 Alpha RPCs
 ----------
@@ -138,7 +138,7 @@ The DAL node also provides RPCs.
 Their OpenAPI specification can be found at:
 
 - :src:`docs/api/dal-node-openapi.json` (version 20.3)
-- :src:`docs/api/dal-node-openapi-rc.json` (version 21.0~rc1)
+- :src:`docs/api/dal-node-openapi-rc.json` (version 21.0~rc3)
 - :src:`docs/api/dal-node-openapi-dev.json` (version master)
 
 .. _openapi_generate:
