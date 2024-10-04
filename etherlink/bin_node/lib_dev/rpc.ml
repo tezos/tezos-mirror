@@ -34,14 +34,7 @@ let main ~data_dir ~evm_node_endpoint ~(config : Configuration.t) =
       ~evm_node_endpoint
       ()
   in
-  let* ctxt =
-    Evm_ro_context.load
-      ~data_dir
-      ~preimages:config.kernel_execution.preimages
-      ?preimages_endpoint:config.kernel_execution.preimages_endpoint
-      ~finalized_view:config.finalized_view
-      ()
-  in
+  let* ctxt = Evm_ro_context.load ~data_dir config in
   let* () = Evm_ro_context.preload_known_kernels ctxt in
   let rpc_backend = Evm_ro_context.ro_backend ctxt config ~evm_node_endpoint in
 

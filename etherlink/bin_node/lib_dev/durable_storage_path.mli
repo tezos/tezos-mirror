@@ -98,11 +98,15 @@ module Indexes : sig
 end
 
 module Transaction_receipt : sig
+  val receipts : path
+
   (** Path to the given transaction receipt. *)
   val receipt : hash -> path
 end
 
 module Transaction_object : sig
+  val objects : path
+
   (** Path to the given transaction object. *)
   val object_ : hash -> path
 end

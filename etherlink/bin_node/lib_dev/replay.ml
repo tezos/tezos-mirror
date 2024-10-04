@@ -45,20 +45,9 @@ let alter_evm_state ~kernel_path ~kernel_verbosity evm_state =
   | None -> return evm_state
   | Some kernel_verbosity -> patch_verbosity ~kernel_verbosity evm_state
 
-let main ?profile ?kernel_path ?kernel_verbosity ~data_dir ~preimages
-    ~preimages_endpoint number =
+let main ?profile ?kernel_path ?kernel_verbosity ~data_dir config number =
   let open Lwt_result_syntax in
-  let* ro_ctxt =
-    Evm_ro_context.load
-      ~data_dir
-      ~preimages
-      ?preimages_endpoint
-      ~finalized_view:
-        (* The block parameter won’t be used so this parameter is effectively
-           ignored during a replay *)
-        false
-      ()
-  in
+  let* ro_ctxt = Evm_ro_context.load ~data_dir config in
   let alter_evm_state = alter_evm_state ~kernel_path ~kernel_verbosity in
   let* apply_result =
     Evm_ro_context.replay ro_ctxt ?profile ~alter_evm_state number

@@ -103,10 +103,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
     Evm_ro_context.load
       ~smart_rollup_address:smart_rollup_address_typed
       ~data_dir
-      ~preimages:configuration.kernel_execution.preimages
-      ?preimages_endpoint:configuration.kernel_execution.preimages_endpoint
-      ~finalized_view:configuration.finalized_view
-      ()
+      configuration
   in
   let ro_backend = Evm_ro_context.ro_backend ro_ctxt configuration in
 

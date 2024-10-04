@@ -335,3 +335,52 @@ let get_delayed_inbox_item evm_state hash =
       in
       return res
   | _ -> failwith "invalid delayed inbox item"
+
+let clear_block_storage block evm_state =
+  let open Lwt_syntax in
+  (* We have 2 path to clear related to block storage:
+     1. The predecessor block.
+     2. The indexes (which is a bit trickier).
+
+     We can remove only the predecessor block because the current block is
+     necessary to produce the next block. Block production starts by reading
+     the head to retrieve information such as parent block hash.
+  *)
+  let (Qty number) = block.number in
+  (* Handles case (1.). *)
+  let* evm_state =
+    if number > Z.zero then
+      let pred_block_path = Durable_storage_path.Block.by_hash block.parent in
+      delete ~kind:Value evm_state pred_block_path
+    else return evm_state
+  in
+  (* Handles case (2.). *)
+  let* evm_state =
+    (* The opcode BLOCKHASH must return the hash of the last 256 complete blocks,
+       see the yellow paper for the specification.
+       The kernel uses the indexable storage to retrieve the last 256 blocks,
+       so we garbage collect only what's possible. *)
+    let to_keep = Z.of_int 256 in
+    if number >= to_keep then
+      let index_path =
+        Durable_storage_path.Indexes.block_by_number
+          (Nth (Z.sub number to_keep))
+      in
+      delete ~kind:Value evm_state index_path
+    else return evm_state
+  in
+  (* Receipts are not necessary for the kernel, we can just remove
+     the directories. *)
+  let* evm_state =
+    delete
+      ~kind:Directory
+      evm_state
+      Durable_storage_path.Transaction_receipt.receipts
+  in
+  let* evm_state =
+    delete
+      ~kind:Directory
+      evm_state
+      Durable_storage_path.Transaction_object.objects
+  in
+  return evm_state

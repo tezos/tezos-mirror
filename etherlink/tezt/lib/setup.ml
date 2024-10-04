@@ -359,10 +359,18 @@ let register_test ~__FILE__ ?block_storage_sqlite3 ?sequencer_rpc_port
     @ (if enable_dal then [Constant.octez_dal_node] else [])
     @ additional_uses
   in
+  let block_storage_sqlite3 =
+    Option.value
+      ~default:
+        ((* If the value is not provided, we need to deactivate it for everything
+              but latest. *)
+         kernel_tag = "latest")
+      block_storage_sqlite3
+  in
   let body protocol =
     let* sequencer_setup =
       setup_sequencer
-        ?block_storage_sqlite3
+        ~block_storage_sqlite3
         ?sequencer_rpc_port
         ?sequencer_private_rpc_port
         ~mainnet_compat:false
