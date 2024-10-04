@@ -162,4 +162,5 @@ let jobs =
     job_build_x86_64_exp_dev_extra;
     job_build_kernels;
     job_tezt_fetch_records;
+    job_datadog_pipeline_trace;
   ]

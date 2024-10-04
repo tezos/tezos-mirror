@@ -27,7 +27,7 @@ graph TB
   test -.->|COPY bisect-ppx-report, ocamlformat| e2etest
 ```
 
-The images, their content and indented usage, are:
+The images, their content and intended usage, are:
 
 | Image          | Contents                           | Usage                             |
 |----------------|------------------------------------|-----------------------------------|

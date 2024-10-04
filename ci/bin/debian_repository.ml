@@ -442,7 +442,10 @@ let register ~auto ~description pipeline_type =
     | Release, _ -> "debian_repository_release"
   in
   let jobs, _, _, _, _ = jobs pipeline_type in
-  Pipeline.register_child pipeline_name ~description ~jobs
+  Pipeline.register_child
+    pipeline_name
+    ~description
+    ~jobs:(job_datadog_pipeline_trace :: jobs)
 
 let child_pipeline_partial =
   register

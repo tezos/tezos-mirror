@@ -423,6 +423,7 @@ module Pipeline = struct
                     name = None;
                     auto_cancel = None;
                   };
+                Variables [("PIPELINE_TYPE", name)];
               ])
         @ [Stages stages]
       in

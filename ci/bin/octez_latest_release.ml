@@ -12,4 +12,9 @@
    Octez Docker distribution. *)
 
 let jobs ?(test = false) () =
-  [Common.job_docker_promote_to_latest ~ci_docker_hub:(not test) ()]
+  [
+    (* Stage: sanity *)
+    Common.job_datadog_pipeline_trace;
+    (* main job *)
+    Common.job_docker_promote_to_latest ~ci_docker_hub:(not test) ();
+  ]

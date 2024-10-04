@@ -3,6 +3,7 @@
 
 stages:
 - images
+- sanity
 - build
 - test
 
@@ -527,3 +528,15 @@ oc.tezt:fetch-records:
     - tezt/records/*.json
     - tezt/records/*.json.broken
     when: always
+
+datadog_pipeline_trace:
+  image: ${ci_image_name}/build:${ci_image_tag}
+  stage: sanity
+  tags:
+  - gcp
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  interruptible: false
+  script:
+  - DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags pipeline_type:$PIPELINE_TYPE

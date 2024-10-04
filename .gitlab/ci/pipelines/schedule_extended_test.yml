@@ -111,6 +111,18 @@ oc.docker:ci:arm64:
     when:
     - runner_system_failure
 
+datadog_pipeline_trace:
+  image: ${ci_image_name}/build:${ci_image_tag}
+  stage: sanity
+  tags:
+  - gcp
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  interruptible: false
+  script:
+  - DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags pipeline_type:$PIPELINE_TYPE
+
 sanity_ci:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: sanity

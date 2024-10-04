@@ -137,6 +137,8 @@ let jobs =
     job_build_arm64_exp_dev_extra;
     job_docker_amd64_experimental;
     job_docker_arm64_experimental;
+    (* Stage: sanity *)
+    job_datadog_pipeline_trace;
     (* Stage: test_coverage *)
     job_unified_coverage_default;
   ]

@@ -534,6 +534,7 @@ let jobs pipeline_type =
       | Schedule_extended_test -> []
     in
     [
+      job_datadog_pipeline_trace;
       job_sanity_ci;
       job_docker_hadolint;
       job_oc_ocaml_fmt;
