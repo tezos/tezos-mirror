@@ -219,6 +219,10 @@ let next_move (module Plugin : Protocol_plugin_sig.S) node_ctxt state_cache
             start_state
         in
         let choice = start_tick in
+        Metrics.wrap (fun () ->
+            let opponent = Signature.Public_key_hash.to_b58check opponent in
+            Metrics.Refutation.clear_state_refutation_game
+              [opponent; Int32.to_string game.start_level]) ;
         return (Octez_smart_rollup.Game.Move {choice; step = Proof proof})
   in
 
@@ -269,6 +273,42 @@ let play_timeout (node_ctxt : _ Node_context.t) stakers =
   in
   return_unit
 
+let pick_timeout ~role timeout =
+  match role with Alice -> timeout.alice_timeout | Bob -> timeout.bob_timeout
+
+let metric_helper ~node_ctxt ~self ~game ~opponent
+    ~(plugin : Protocol_plugins.proto_plugin) =
+  let open Lwt_result_syntax in
+  let module Plugin = (val plugin) in
+  let* timeout_opt =
+    Plugin.Refutation_game_helpers.timeout node_ctxt ~self ~opponent
+  in
+  Lwt.return_ok (Option.map (pick_timeout ~role:game.turn) timeout_opt)
+
+let register_turn_metric ~node_ctxt ~self ~game ~opponent ~plugin turn =
+  Metrics.wrap_lwt @@ fun () ->
+  let open Lwt_result_syntax in
+  Lwt.return_ok
+  @@ dont_wait
+       (fun () ->
+         let* timeout_option =
+           metric_helper ~node_ctxt ~self ~game ~opponent ~plugin
+         in
+         (match timeout_option with
+         | Some timeout_player ->
+             let opponent = Signature.Public_key_hash.to_b58check opponent in
+             Metrics.Refutation.set_state_refutation_game
+               ~labels:[opponent; Int32.to_string game.start_level]
+               turn ;
+             Metrics.Refutation.set_block_timeout
+               ~labels:[opponent; Int32.to_string game.start_level]
+               timeout_player
+         | None -> ()) ;
+         return ())
+       (fun trace ->
+         Event.metrics_error (Format.asprintf "%a" pp_print_trace trace))
+       (fun exn -> Event.metrics_error (Printexc.to_string exn))
+
 let play node_ctxt state_cache ~self ~commitment_period_tick_offset game
     opponent =
   let open Lwt_result_syntax in
@@ -276,6 +316,10 @@ let play node_ctxt state_cache ~self ~commitment_period_tick_offset game
   let* plugin = Protocol_plugins.last_proto_plugin node_ctxt in
   match turn ~self game index with
   | Our_turn {opponent} ->
+      let module Plugin = (val plugin) in
+      let* () =
+        register_turn_metric ~node_ctxt ~self ~game ~opponent ~plugin OurTurn
+      in
       play_next_move
         plugin
         node_ctxt
@@ -285,10 +329,19 @@ let play node_ctxt state_cache ~self ~commitment_period_tick_offset game
         opponent
   | Their_turn ->
       let module Plugin = (val plugin) in
+      let* () =
+        register_turn_metric ~node_ctxt ~self ~game ~opponent ~plugin TheirTurn
+      in
       let* timeout_reached =
         Plugin.Refutation_game_helpers.timeout_reached node_ctxt ~self ~opponent
       in
       when_ timeout_reached @@ fun () ->
+      Metrics.wrap (fun () ->
+          let opponent = Signature.Public_key_hash.to_b58check opponent in
+          Metrics.Refutation.(
+            set_state_refutation_game
+              ~labels:[opponent; Int32.to_string game.start_level]
+              Timeout)) ;
       let*! () = Refutation_game_event.timeout_detected opponent in
       play_timeout node_ctxt index
 

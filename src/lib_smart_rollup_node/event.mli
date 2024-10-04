@@ -53,6 +53,9 @@ val metrics_ended : string -> unit Lwt.t
     (Doesn't wait for event to be emited. *)
 val metrics_ended_dont_wait : string -> unit
 
+(** [metrics_error error] emits the event that the metrics has an error. *)
+val metrics_error : string -> unit
+
 (** [kernel_debug str] emits the event that the kernel has logged [str]. *)
 val kernel_debug : string -> unit Lwt.t
 
