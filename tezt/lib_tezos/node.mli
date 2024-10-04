@@ -629,11 +629,16 @@ val memory_consumption : t -> observe_memory_consumption Lwt.t
     [~snapshot:(file, do_reconstruct)], where file is the path to the snapshot.
     If [reconstruct] is [true], then [--reconstruct] is passed to the import
     command.
- *)
+
+    The [env] argument, if specified, allows adding new environment
+    variables when executing the [run] command of the octez-node. If
+    any environment variable is already defined internally they
+    will overwrite the ones provided via [env]. *)
 val init :
   ?runner:Runner.t ->
   ?path:string ->
   ?name:string ->
+  ?env:string String_map.t ->
   ?color:Log.Color.t ->
   ?data_dir:string ->
   ?event_pipe:string ->
