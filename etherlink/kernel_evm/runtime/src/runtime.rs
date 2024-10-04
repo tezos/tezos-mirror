@@ -207,17 +207,23 @@ impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>, Internal: InternalRuntime> S
 
     #[inline(always)]
     fn last_run_aborted(&self) -> Result<bool, RuntimeError> {
-        self.host.borrow().last_run_aborted()
+        // This function is never used by the kernel. Be aware that if you need to use it, you also
+        // need to modify the WASM Runtime.
+        unimplemented!()
     }
 
     #[inline(always)]
     fn upgrade_failed(&self) -> Result<bool, RuntimeError> {
-        self.host.borrow().upgrade_failed()
+        // This function is never used by the kernel. Be aware that if you need to use it, you also
+        // need to modify the WASM Runtime.
+        unimplemented!()
     }
 
     #[inline(always)]
     fn restart_forced(&self) -> Result<bool, RuntimeError> {
-        self.host.borrow().restart_forced()
+        // This function is never used by the kernel. Be aware that if you need to use it, you also
+        // need to modify the WASM Runtime.
+        unimplemented!()
     }
 
     #[inline(always)]
@@ -227,7 +233,9 @@ impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>, Internal: InternalRuntime> S
 
     #[inline(always)]
     fn runtime_version(&self) -> Result<String, RuntimeError> {
-        self.host.borrow().runtime_version()
+        // This function is never used by the kernel. Be aware that if you need to use it, you also
+        // need to modify the WASM Runtime.
+        unimplemented!()
     }
 }
 
