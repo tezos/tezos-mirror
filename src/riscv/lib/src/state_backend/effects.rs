@@ -5,7 +5,8 @@
 use std::marker::PhantomData;
 
 use super::{
-    AllocatedOf, Atom, Cell, Elem, ManagerBase, ManagerRead, ManagerReadWrite, ManagerWrite, Ref,
+    AllocatedOf, Atom, Cell, Elem, ManagerBase, ManagerClone, ManagerRead, ManagerReadWrite,
+    ManagerWrite, Ref,
 };
 
 /// XXX: Workaround trait for not having enum variants as const-generics
@@ -19,7 +20,7 @@ pub trait EffectGetter {
 
 pub type EffectCellLayout<T> = Atom<T>;
 
-pub struct EffectCell<T: Elem, EG: EffectGetter, M: ManagerBase> {
+pub struct EffectCell<T: Elem, EG, M: ManagerBase> {
     inner: Cell<T, M>,
     _pd: PhantomData<EG>,
 }
@@ -62,5 +63,14 @@ impl<T: Elem, EG: EffectGetter, M: ManagerBase> EffectCell<T, EG, M> {
         M: ManagerReadWrite,
     {
         (self.inner.replace(value), EG::EFFECT)
+    }
+}
+
+impl<T: Elem, EG, M: ManagerClone> Clone for EffectCell<T, EG, M> {
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+            _pd: PhantomData,
+        }
     }
 }

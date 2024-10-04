@@ -4,8 +4,8 @@
 
 use super::{
     hash::{Hash, HashError, RootHashable},
-    AllocatedOf, Array, Atom, Elem, ManagerBase, ManagerDeserialise, ManagerRead, ManagerReadWrite,
-    ManagerSerialise, ManagerWrite, Ref,
+    AllocatedOf, Array, Atom, Elem, ManagerBase, ManagerClone, ManagerDeserialise, ManagerRead,
+    ManagerReadWrite, ManagerSerialise, ManagerWrite, Ref,
 };
 
 /// Single element of type `E`
@@ -84,6 +84,22 @@ impl<E: serde::Serialize + Elem, M: ManagerSerialise> RootHashable for Cell<E, M
     }
 }
 
+impl<E: Eq + Elem, M: ManagerRead> PartialEq for Cell<E, M> {
+    fn eq(&self, other: &Self) -> bool {
+        self.read() == other.read()
+    }
+}
+
+impl<E: Eq + Elem, M: ManagerRead> Eq for Cell<E, M> {}
+
+impl<E: Elem, M: ManagerClone> Clone for Cell<E, M> {
+    fn clone(&self) -> Self {
+        Self {
+            region: self.region.clone(),
+        }
+    }
+}
+
 /// A [Cell] wrapper that holds an additional in-memory
 /// representation of the stored value. This value is lazily
 /// constructed on the first [read] or [replace].
@@ -140,6 +156,15 @@ impl<E: Elem, T, M: ManagerBase> LazyCell<E, T, M> {
                 *n = Some(self.inner.read().into());
                 n.as_ref().unwrap()
             }
+        }
+    }
+}
+
+impl<E: Elem, T: Copy, M: ManagerClone> Clone for LazyCell<E, T, M> {
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+            value: self.value.clone(),
         }
     }
 }
@@ -381,6 +406,20 @@ impl<E: serde::Serialize + Elem, const LEN: usize, M: ManagerSerialise> RootHash
     }
 }
 
+impl<E: Eq + Elem, const LEN: usize, M: ManagerRead> PartialEq for Cells<E, LEN, M> {
+    fn eq(&self, other: &Self) -> bool {
+        (0..LEN).all(|i| self.read(i) == other.read(i))
+    }
+}
+
+impl<E: Elem, const LEN: usize, M: ManagerClone> Clone for Cells<E, LEN, M> {
+    fn clone(&self) -> Self {
+        Self {
+            region: M::clone_region(&self.region),
+        }
+    }
+}
+
 /// Multiple elements of an unspecified type
 pub struct DynCells<const LEN: usize, M: ManagerBase + ?Sized> {
     region: M::DynRegion<LEN>,
@@ -456,6 +495,14 @@ impl<'de, const LEN: usize, M: ManagerDeserialise> serde::Deserialize<'de> for D
 impl<const LEN: usize, M: ManagerSerialise> RootHashable for DynCells<LEN, M> {
     fn hash(&self) -> Result<Hash, HashError> {
         Hash::blake2b_hash(self)
+    }
+}
+
+impl<const LEN: usize, M: ManagerClone> Clone for DynCells<LEN, M> {
+    fn clone(&self) -> Self {
+        Self {
+            region: M::clone_dyn_region(&self.region),
+        }
     }
 }
 

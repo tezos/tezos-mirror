@@ -102,3 +102,11 @@ impl<M: backend::ManagerBase> ReservationSet<M> {
         start_addr != UNSET_VALUE && start_addr == align_address(addr, SIZE)
     }
 }
+
+impl<M: backend::ManagerClone> Clone for ReservationSet<M> {
+    fn clone(&self) -> Self {
+        Self {
+            start_addr: self.start_addr.clone(),
+        }
+    }
+}

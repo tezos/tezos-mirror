@@ -7,15 +7,10 @@ use crate::{
     machine_state::{bus::main_memory::M100M, mode::Mode, DefaultCacheLayouts},
     program::Program,
     pvm::common::{Pvm, PvmHooks, PvmLayout, PvmStatus},
-    state_backend::{
-        self,
-        hash::RootHashable,
-        memory_backend::{InMemoryBackend, SliceManager, SliceManagerRO},
-        Backend, Layout,
-    },
+    state_backend::{self, hash::RootHashable, owned_backend::Owned, AllocatedOf},
     storage::{self, Hash, Repo},
 };
-use std::{ops::Bound, path::Path};
+use std::{fmt, ops::Bound, path::Path};
 use thiserror::Error;
 
 pub type StateLayout = (
@@ -68,44 +63,72 @@ impl<M: state_backend::ManagerBase> State<M> {
     }
 }
 
+impl<M: state_backend::ManagerClone> Clone for State<M> {
+    fn clone(&self) -> Self {
+        Self {
+            pvm: self.pvm.clone(),
+            level_is_set: self.level_is_set.clone(),
+            level: self.level.clone(),
+            message_counter: self.message_counter.clone(),
+            tick: self.tick.clone(),
+        }
+    }
+}
+
+impl<M: state_backend::ManagerSerialise> fmt::Debug for State<M> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let refs = self.struct_ref();
+        let rendered = if f.alternate() {
+            serde_json::to_string_pretty(&refs)
+        } else {
+            serde_json::to_string(&refs)
+        }
+        .expect("Could not serialize PVM state");
+        f.write_str(&rendered)
+    }
+}
+
 #[derive(Error, Debug)]
 pub enum PvmError {
     #[error("Serialization error: {0}")]
     SerializationError(String),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct NodePvm {
-    backend: InMemoryBackend<StateLayout>,
+    state: Box<State<Owned>>,
 }
+
+impl PartialEq for NodePvm {
+    fn eq(&self, other: &Self) -> bool {
+        self.state.struct_ref() == other.state.struct_ref()
+    }
+}
+
+impl Eq for NodePvm {}
 
 impl NodePvm {
     fn with_backend_mut<T, F>(&mut self, f: F) -> T
     where
-        F: FnOnce(&mut State<SliceManager>) -> T,
+        F: FnOnce(&mut State<Owned>) -> T,
     {
-        let placed = <StateLayout as Layout>::placed().into_location();
-        let space = self.backend.allocate(placed);
-        let mut state = State::bind(space);
-        f(&mut state)
+        f(&mut self.state)
     }
 
     fn with_backend<T, F>(&self, f: F) -> T
     where
-        F: FnOnce(&State<SliceManagerRO>) -> T,
+        F: FnOnce(&State<Owned>) -> T,
     {
-        let placed = <StateLayout as Layout>::placed().into_location();
-        let space = self.backend.allocate_ro(placed);
-        let state = State::bind(space);
-        f(&state)
+        f(&self.state)
     }
 
     pub fn empty() -> Self {
-        let (mut backend, placed) = InMemoryBackend::<StateLayout>::new();
-        let space = backend.allocate(placed);
+        let space = Owned::allocate::<StateLayout>();
         let mut state = State::bind(space);
         state.reset();
-        Self { backend }
+        Self {
+            state: Box::new(state),
+        }
     }
 
     pub fn get_status(&self) -> PvmStatus {
@@ -189,24 +212,6 @@ impl NodePvm {
             state.tick.write(state.tick.read() + 1);
         })
     }
-
-    pub fn to_bytes(&self) -> &[u8] {
-        self.backend.borrow()
-    }
-
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, PvmError> {
-        if bytes.len() != StateLayout::placed().size() {
-            Err(PvmError::SerializationError(format!(
-                "Unexpected byte buffer size (expected {}, got {})",
-                StateLayout::placed().size(),
-                bytes.len()
-            )))
-        } else {
-            let mut backend = InMemoryBackend::<StateLayout>::new().0;
-            backend.borrow_mut().copy_from_slice(bytes);
-            Ok(Self { backend })
-        }
-    }
 }
 
 #[derive(Error, Debug)]
@@ -235,14 +240,19 @@ impl PvmStorage {
 
     /// Create a new commit for `state` and  return the commit id.
     pub fn commit(&mut self, state: &NodePvm) -> Result<Hash, PvmStorageError> {
-        Ok(self.repo.commit(state.to_bytes())?)
+        Ok(state.with_backend(|state| {
+            let struct_ref = state.struct_ref();
+            self.repo.commit_serialised(&struct_ref)
+        })?)
     }
 
     /// Checkout the PVM state committed under `id`, if the commit exists.
     pub fn checkout(&self, id: &Hash) -> Result<NodePvm, PvmStorageError> {
-        let bytes = self.repo.checkout(id)?;
-        let state = NodePvm::from_bytes(&bytes)?;
-        Ok(state)
+        let allocated: AllocatedOf<StateLayout, Owned> = self.repo.checkout_serialised(id)?;
+        let state = State::bind(allocated);
+        Ok(NodePvm {
+            state: Box::new(state),
+        })
     }
 
     /// A snapshot is a new repo to which only `id` has been committed.

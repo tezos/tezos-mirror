@@ -11,6 +11,7 @@ use crate::{
 pub type XipCellLayout = ();
 
 /// Dummy cell for MIP and SIP (effectively always 0)
+#[derive(Clone)]
 pub struct XipCell;
 
 impl XipCell {

@@ -185,6 +185,19 @@ impl<M: backend::ManagerBase> HartState<M> {
     }
 }
 
+impl<M: backend::ManagerClone> Clone for HartState<M> {
+    fn clone(&self) -> Self {
+        Self {
+            xregisters: self.xregisters.clone(),
+            fregisters: self.fregisters.clone(),
+            csregisters: self.csregisters.clone(),
+            mode: self.mode.clone(),
+            pc: self.pc.clone(),
+            reservation_set: self.reservation_set.clone(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::{

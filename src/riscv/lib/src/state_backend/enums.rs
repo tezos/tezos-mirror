@@ -4,7 +4,7 @@
 
 use super::{
     AllocatedOf, Atom, Cell, CellBase, CellRead, CellReadWrite, CellWrite, Elem, ManagerBase,
-    ManagerRead, ManagerReadWrite, ManagerWrite, Ref,
+    ManagerClone, ManagerRead, ManagerReadWrite, ManagerWrite, Ref,
 };
 use std::marker::PhantomData;
 
@@ -66,6 +66,20 @@ where
         M: ManagerRead,
     {
         T::from(self.cell.read())
+    }
+}
+
+impl<T, R, M> Clone for EnumCell<T, R, M>
+where
+    T: From<R> + Default,
+    R: From<T> + Elem,
+    M: ManagerClone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            cell: self.cell.clone(),
+            _pd: PhantomData,
+        }
     }
 }
 

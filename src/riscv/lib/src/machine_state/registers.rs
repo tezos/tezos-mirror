@@ -207,6 +207,14 @@ impl<M: backend::ManagerBase> XRegisters<M> {
     }
 }
 
+impl<M: backend::ManagerClone> Clone for XRegisters<M> {
+    fn clone(&self) -> Self {
+        Self {
+            registers: self.registers.clone(),
+        }
+    }
+}
+
 /// Floating-point number register index
 #[allow(non_camel_case_types)] // To make names consistent with specification
 #[repr(usize)]
@@ -338,7 +346,9 @@ impl fmt::Display for FRegister {
     Clone,
     Copy,
     PartialEq,
+    Eq,
     PartialOrd,
+    Ord,
     Default,
     Debug,
     derive_more::From,
@@ -411,6 +421,14 @@ impl<M: backend::ManagerBase> FRegisters<M> {
         M: backend::ManagerWrite,
     {
         self.registers.write(reg as usize, val)
+    }
+}
+
+impl<M: backend::ManagerClone> Clone for FRegisters<M> {
+    fn clone(&self) -> Self {
+        Self {
+            registers: self.registers.clone(),
+        }
     }
 }
 

@@ -122,7 +122,7 @@ macro_rules! struct_layout {
         $( , )?
     }) => {
         paste::paste! {
-            #[derive(serde::Deserialize, serde::Serialize)]
+            #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq)]
             $vis struct [<$layout_t F>]<
                 $(
                     [<$field_name:upper>]

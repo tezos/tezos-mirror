@@ -1656,6 +1656,14 @@ impl<M: backend::ManagerBase> CSRegisters<M> {
     }
 }
 
+impl<M: backend::ManagerClone> Clone for CSRegisters<M> {
+    fn clone(&self) -> Self {
+        Self {
+            registers: self.registers.clone(),
+        }
+    }
+}
+
 #[cfg(test)]
 #[allow(clippy::identity_op)]
 mod tests {

@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: MIT
 
 use super::{
-    AllocatedOf, Elem, Layout, Location, ManagerAlloc, ManagerBase, ManagerDeserialise,
-    ManagerRead, ManagerReadWrite, ManagerSerialise, ManagerWrite,
+    AllocatedOf, Elem, Layout, Location, ManagerAlloc, ManagerBase, ManagerClone,
+    ManagerDeserialise, ManagerRead, ManagerReadWrite, ManagerSerialise, ManagerWrite,
 };
 use serde::ser::SerializeTuple;
 use std::{
@@ -14,6 +14,7 @@ use std::{
 };
 
 /// Manager that allows state binders to own the state storage
+#[derive(Clone, Copy, Debug)]
 pub struct Owned;
 
 impl Owned {
@@ -268,6 +269,19 @@ impl ManagerDeserialise for Owned {
         let vec: Vec<u8> = serde::Deserialize::deserialize(deserializer)?;
         vec.try_into()
             .map_err(|_err| serde::de::Error::custom("Dynamic region of mismatching length"))
+    }
+}
+
+impl ManagerClone for Owned {
+    fn clone_region<E: Elem, const LEN: usize>(
+        region: &Self::Region<E, LEN>,
+    ) -> Self::Region<E, LEN> {
+        #[allow(clippy::clone_on_copy)]
+        region.clone()
+    }
+
+    fn clone_dyn_region<const LEN: usize>(region: &Self::DynRegion<LEN>) -> Self::DynRegion<LEN> {
+        region.clone()
     }
 }
 
