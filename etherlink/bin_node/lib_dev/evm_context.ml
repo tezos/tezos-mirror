@@ -25,6 +25,7 @@ type parameters = {
   fail_on_missing_blueprint : bool;
   store_perm : [`Read_only | `Read_write];
   block_storage_sqlite3 : bool;
+  garbage_collector : Configuration.garbage_collector option;
 }
 
 type session_state = {
@@ -34,7 +35,13 @@ type session_state = {
   mutable current_block_hash : Ethereum_types.block_hash;
   mutable pending_upgrade : Evm_events.Upgrade.t option;
   mutable evm_state : Evm_state.t;
+  mutable last_split_block : (Ethereum_types.quantity * Time.Protocol.t) option;
+      (** Garbage collector session related information. *)
 }
+
+type history =
+  | Full of {parameters : Configuration.garbage_collector}
+  | Archive
 
 type t = {
   data_dir : string;
@@ -46,6 +53,7 @@ type t = {
   session : session_state;
   fail_on_missing_blueprint : bool;
   block_storage_sqlite3 : bool;
+  history : history;
 }
 
 type store_info = {
@@ -386,12 +394,46 @@ module State = struct
     let* () = Evm_store.Context_hashes.store store number checkpoint in
     return context
 
-  let commit_next_head (ctxt : t) conn evm_state =
-    commit
-      conn
-      ctxt.session.context
-      evm_state
-      ctxt.session.next_blueprint_number
+  let maybe_split_context ctxt conn timestamp level =
+    let open Lwt_result_syntax in
+    match ctxt.history with
+    | Archive -> return_none
+    | Full {parameters} ->
+        let split =
+          match ctxt.session.last_split_block with
+          | None -> true
+          | Some (_level, last_split_timestamp) ->
+              let timestamp = Time.Protocol.to_seconds timestamp in
+              let last_split_timestamp =
+                Time.Protocol.to_seconds last_split_timestamp
+              in
+              Compare.Int64.(
+                timestamp
+                >= Int64.(
+                     add
+                       last_split_timestamp
+                       (of_int parameters.split_frequency_in_seconds)))
+        in
+        if split then (
+          Irmin_context.split ctxt.index ;
+          let* () = Evm_store.GC.update_last_split conn level timestamp in
+          let*! () = Evm_context_events.gc_split level timestamp in
+          return_some (level, timestamp))
+        else return_none
+
+  let commit_next_head (ctxt : t) conn timestamp evm_state =
+    let open Lwt_result_syntax in
+    let* context =
+      commit
+        conn
+        ctxt.session.context
+        evm_state
+        ctxt.session.next_blueprint_number
+    in
+    let* split_info =
+      maybe_split_context ctxt conn timestamp ctxt.session.next_blueprint_number
+    in
+    return (context, split_info)
 
   let replace_current_commit (ctxt : t) conn evm_state =
     let (Qty next) = ctxt.session.next_blueprint_number in
@@ -759,13 +801,15 @@ module State = struct
             ctxt.session.next_blueprint_number
         in
 
-        let* context = commit_next_head ctxt conn evm_state in
-        return (evm_state, context, block.hash, kernel_upgrade)
+        let* context, split_info =
+          commit_next_head ctxt conn timestamp evm_state
+        in
+        return (evm_state, context, block.hash, kernel_upgrade, split_info)
     | Apply_failure (* Did not produce a block *) ->
         let*! () = Blueprint_events.invalid_blueprint_produced next in
         tzfail (Cannot_apply_blueprint {local_state_level = Z.pred next})
 
-  let on_new_head ctxt ~applied_upgrade evm_state context block_hash
+  let on_new_head ?split_info ctxt ~applied_upgrade evm_state context block_hash
       blueprint_with_events =
     let open Lwt_syntax in
     let (Qty level) = ctxt.session.next_blueprint_number in
@@ -773,6 +817,10 @@ module State = struct
     ctxt.session.context <- context ;
     ctxt.session.next_blueprint_number <- Qty (Z.succ level) ;
     ctxt.session.current_block_hash <- block_hash ;
+    Option.iter
+      (fun (split_level, split_timestamp) ->
+        ctxt.session.last_split_block <- Some (split_level, split_timestamp))
+      split_info ;
     Blueprints_watcher.notify blueprint_with_events ;
     if applied_upgrade then ctxt.session.pending_upgrade <- None ;
     let* head_info in
@@ -782,7 +830,7 @@ module State = struct
 
   let apply_blueprint ctxt timestamp payload delayed_transactions =
     let open Lwt_result_syntax in
-    let* evm_state, context, current_block_hash, kernel_upgrade =
+    let* evm_state, context, current_block_hash, kernel_upgrade, split_info =
       with_store_transaction ctxt @@ fun conn ->
       apply_blueprint_store_unsafe
         ctxt
@@ -793,6 +841,7 @@ module State = struct
     in
     let*! () =
       on_new_head
+        ?split_info
         ctxt
         ~applied_upgrade:Option.(is_some kernel_upgrade)
         evm_state
@@ -875,9 +924,9 @@ module State = struct
       (preload_kernel_from_level ctxt)
       (earliest_level @ activation_levels)
 
-  let init ?kernel_path ~block_storage_sqlite3 ~fail_on_missing_blueprint
-      ~data_dir ~preimages ~preimages_endpoint ?smart_rollup_address ~store_perm
-      () =
+  let init ?kernel_path ~block_storage_sqlite3 ?garbage_collector
+      ~fail_on_missing_blueprint ~data_dir ~preimages ~preimages_endpoint
+      ?smart_rollup_address ~store_perm () =
     let open Lwt_result_syntax in
     let*! () =
       Lwt_utils_unix.create_dir (Evm_state.kernel_logs_directory ~data_dir)
@@ -961,6 +1010,14 @@ module State = struct
                initial kernel"
     in
 
+    let* history, last_split_block =
+      match garbage_collector with
+      | Some parameters ->
+          let* last_split_opt = Evm_store.GC.last_split conn in
+          return (Full {parameters}, last_split_opt)
+      | None -> return (Archive, None)
+    in
+
     let ctxt =
       {
         index;
@@ -976,10 +1033,12 @@ module State = struct
             current_block_hash;
             pending_upgrade;
             evm_state;
+            last_split_block;
           };
         store;
         fail_on_missing_blueprint;
         block_storage_sqlite3;
+        history;
       }
     in
 
@@ -1294,6 +1353,7 @@ module Handlers = struct
         fail_on_missing_blueprint;
         store_perm;
         block_storage_sqlite3;
+        garbage_collector;
       } =
     let open Lwt_result_syntax in
     let* ctxt, status =
@@ -1306,6 +1366,7 @@ module Handlers = struct
         ~fail_on_missing_blueprint
         ~store_perm
         ~block_storage_sqlite3
+        ?garbage_collector
         ()
     in
     Lwt.wakeup execution_config_waker @@ (ctxt.data_dir, pvm_config ctxt) ;
@@ -1517,7 +1578,7 @@ let export_store ~data_dir ~output_db_file =
 
 let start ?kernel_path ~data_dir ~preimages ~preimages_endpoint
     ?smart_rollup_address ~fail_on_missing_blueprint ~store_perm
-    ~block_storage_sqlite3 () =
+    ~block_storage_sqlite3 ?garbage_collector () =
   let open Lwt_result_syntax in
   let* () = lock_data_dir ~data_dir in
   let* worker =
@@ -1533,6 +1594,7 @@ let start ?kernel_path ~data_dir ~preimages ~preimages_endpoint
         fail_on_missing_blueprint;
         store_perm;
         block_storage_sqlite3;
+        garbage_collector;
       }
       (module Handlers)
   in

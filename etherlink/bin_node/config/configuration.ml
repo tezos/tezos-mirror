@@ -29,12 +29,15 @@ type kernel_execution_config = {
   preimages_endpoint : Uri.t option;
 }
 
+type garbage_collector = {split_frequency_in_seconds : int}
+
 type experimental_features = {
   drop_duplicate_on_injection : bool;
   enable_send_raw_transaction : bool;
   node_transaction_validation : bool;
   block_storage_sqlite3 : bool;
   overwrite_simulation_tick_limit : bool;
+  garbage_collector : garbage_collector option;
 }
 
 type sequencer = {
@@ -125,6 +128,7 @@ let default_experimental_features =
     node_transaction_validation = false;
     block_storage_sqlite3 = false;
     overwrite_simulation_tick_limit = false;
+    garbage_collector = None;
   }
 
 let default_data_dir = Filename.concat (Sys.getenv "HOME") ".octez-evm-node"
@@ -645,6 +649,17 @@ let observer_encoding =
           bool
           default_rollup_node_tracking))
 
+let garbage_collector_encoding =
+  let open Data_encoding in
+  conv
+    (fun {split_frequency_in_seconds} -> split_frequency_in_seconds)
+    (fun split_frequency_in_seconds -> {split_frequency_in_seconds})
+    (obj1
+       (req
+          "split_frequency_in_seconds"
+          ~description:"Frequency of irmin context split in seconds"
+          int31))
+
 let experimental_features_encoding =
   let open Data_encoding in
   conv
@@ -654,25 +669,29 @@ let experimental_features_encoding =
            node_transaction_validation;
            block_storage_sqlite3;
            overwrite_simulation_tick_limit;
+           garbage_collector;
          } ->
       ( drop_duplicate_on_injection,
         enable_send_raw_transaction,
         node_transaction_validation,
         block_storage_sqlite3,
-        overwrite_simulation_tick_limit ))
+        overwrite_simulation_tick_limit,
+        garbage_collector ))
     (fun ( drop_duplicate_on_injection,
            enable_send_raw_transaction,
            node_transaction_validation,
            block_storage_sqlite3,
-           overwrite_simulation_tick_limit ) ->
+           overwrite_simulation_tick_limit,
+           garbage_collector ) ->
       {
         drop_duplicate_on_injection;
         enable_send_raw_transaction;
         node_transaction_validation;
         block_storage_sqlite3;
         overwrite_simulation_tick_limit;
+        garbage_collector;
       })
-    (obj5
+    (obj6
        (dft
           ~description:
             "Request the rollup node to filter messages it has already \
@@ -706,7 +725,11 @@ let experimental_features_encoding =
              confusing UX for users, where eth_estimateGas fails when eth_call \
              succeeded."
           bool
-          false))
+          false)
+       (opt
+          "garbage_collector"
+          ~description:"Enables garbage collector in the node."
+          garbage_collector_encoding))
 
 let proxy_encoding =
   let open Data_encoding in

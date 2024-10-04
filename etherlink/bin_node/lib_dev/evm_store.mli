@@ -173,6 +173,20 @@ module Transactions : sig
     conn -> Ethereum_types.quantity -> Transaction_receipt.t list tzresult Lwt.t
 end
 
+module GC : sig
+  val last_gc :
+    conn -> (Ethereum_types.quantity * Time.Protocol.t) option tzresult Lwt.t
+
+  val update_last_gc :
+    conn -> Ethereum_types.quantity -> Time.Protocol.t -> unit tzresult Lwt.t
+
+  val last_split :
+    conn -> (Ethereum_types.quantity * Time.Protocol.t) option tzresult Lwt.t
+
+  val update_last_split :
+    conn -> Ethereum_types.quantity -> Time.Protocol.t -> unit tzresult Lwt.t
+end
+
 module L1_l2_levels_relationships : sig
   type t = {
     l1_level : int32;

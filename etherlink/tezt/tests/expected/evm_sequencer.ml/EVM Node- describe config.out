@@ -133,7 +133,12 @@
            limit. This can be useful to execute calls that will not be
            injected in transactions (similarly to what the Uniswap V3
            frontend does to prepare swaps). However, it can lead to confusing
-           UX for users, where eth_estimateGas fails when eth_call succeeded. */ },
+           UX for users, where eth_estimateGas fails when eth_call succeeded. */,
+      "garbage_collector"?:
+        { /* Enables garbage collector in the node. */
+          "split_frequency_in_seconds":
+            integer ∈ [-2^30, 2^30]
+            /* Frequency of irmin context split in seconds */ } },
   "proxy"?:
     { "finalized_view"?:
         boolean

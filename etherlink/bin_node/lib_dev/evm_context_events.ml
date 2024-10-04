@@ -33,9 +33,22 @@ let reconstruct_replace_mainnet_kernel =
     ~level:Info
     ()
 
-let reconstruct_replace_mainnet_kernel () =
-  emit reconstruct_replace_mainnet_kernel ()
+let gc_split =
+  declare_2
+    ~section
+    ~name:"evm_context_gc_split"
+    ~msg:"Splitting Irmin context at level {level} ({timestamp})"
+    ~level:Info
+    ~pp1:Ethereum_types.pp_quantity
+    ~pp2:Time.Protocol.pp_hum
+    ("level", Ethereum_types.quantity_encoding)
+    ("timestamp", Time.Protocol.encoding)
 
 let ready () = emit ready ()
 
 let shutdown () = emit shutdown ()
+
+let reconstruct_replace_mainnet_kernel () =
+  emit reconstruct_replace_mainnet_kernel ()
+
+let gc_split level timestamp = emit gc_split (level, timestamp)
