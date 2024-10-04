@@ -1638,8 +1638,33 @@ let init_observer cloud configuration ~bootstrap teztale ~slot_index i agent =
   in
   Lwt.return {node; dal_node; slot_index}
 
+let init_etherlink_dal_node ~bootstrap ~next_agent ~name ~dal_slots ~network =
+  match dal_slots with
+  | [] -> none
+  | dal_slots ->
+      let name = Format.asprintf "etherlink-%s-dal-operator" name in
+      let* agent = next_agent ~name in
+      let* node =
+        Node.init
+          ~name
+          ~arguments:
+            [Peer bootstrap.node_p2p_endpoint; History_mode (Rolling (Some 79))]
+          network
+          agent
+      in
+      let* dal_node = Dal_node.Agent.create ~name ~node agent in
+      let* () =
+        Dal_node.init_config
+          ~expected_pow:(Network.expected_pow Cli.network)
+          ~producer_profiles:dal_slots
+          ~peers:[bootstrap.dal_node_p2p_endpoint]
+          dal_node
+      in
+      let* () = Dal_node.Agent.run ~memtrace:Cli.memtrace dal_node in
+      some dal_node
+
 let init_etherlink_operator_setup cloud configuration name ~bootstrap ~dal_slots
-    account agent =
+    account agent next_agent =
   let is_sequencer = configuration.etherlink_sequencer in
   let name = Format.asprintf "etherlink-%s-node" name in
   let data_dir =
@@ -1690,24 +1715,12 @@ let init_etherlink_operator_setup cloud configuration name ~bootstrap ~dal_slots
       ()
   in
   let* dal_node =
-    match configuration.etherlink_dal_slots with
-    | [] -> none
-    | dal_slots ->
-        let* dal_node =
-          Dal_node.Agent.create
-            ~name:(Format.asprintf "etherlink-%s-dal-node" name)
-            ~node
-            agent
-        in
-        let* () =
-          Dal_node.init_config
-            ~expected_pow:(Network.expected_pow Cli.network)
-            ~producer_profiles:dal_slots
-            ~peers:[bootstrap.dal_node_p2p_endpoint]
-            dal_node
-        in
-        let* () = Dal_node.Agent.run ~memtrace:Cli.memtrace dal_node in
-        some dal_node
+    init_etherlink_dal_node
+      ~bootstrap
+      ~next_agent
+      ~name
+      ~dal_slots:configuration.etherlink_dal_slots
+      ~network:configuration.network
   in
   let* sc_rollup_node =
     Sc_rollup_node.Agent.create
@@ -1901,6 +1914,7 @@ let init_etherlink cloud configuration ~bootstrap etherlink_rollup_operator_key
       ~bootstrap
       etherlink_rollup_operator_key
       operator_agent
+      next_agent
   in
   let accounts = Tezt_etherlink.Eth_account.bootstrap_accounts in
   let* producers_agents =
@@ -2286,6 +2300,9 @@ let benchmark () =
       List.init configuration.dal_node_producers (fun _ -> `Producer);
       List.map (fun _ -> `Observer) configuration.observer_slot_indices;
       (if configuration.etherlink then [`Etherlink_operator] else []);
+      (if configuration.etherlink && configuration.etherlink_dal_slots <> []
+       then [`Etherlink_dal_node]
+       else []);
       List.init configuration.etherlink_producers (fun i ->
           `Etherlink_producer i);
     ]
@@ -2307,7 +2324,7 @@ let benchmark () =
                      let machine_type = List.nth list i in
                      Configuration.make ?docker_image ~machine_type ()
                    with _ -> default_vm_configuration))
-           | `Producer | `Observer -> (
+           | `Producer | `Observer | `Etherlink_dal_node -> (
                match configuration.producer_machine_type with
                | None -> Configuration.make ?docker_image ()
                | Some machine_type ->
