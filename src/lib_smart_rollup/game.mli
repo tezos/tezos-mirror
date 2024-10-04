@@ -35,6 +35,12 @@ module V1 : sig
       }
     | Move of {choice : Z.t; step : step}
 
+  type timeout = {
+    alice_timeout : int;
+    bob_timeout : int;
+    last_turn_level : int32;
+  }
+
   type index = {
     alice : Signature.Public_key_hash.t;
     bob : Signature.Public_key_hash.t;

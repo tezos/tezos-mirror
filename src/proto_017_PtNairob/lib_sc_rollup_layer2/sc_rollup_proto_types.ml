@@ -284,6 +284,8 @@ module Game = struct
 
   type t = Sc_rollup.Game.t
 
+  type timeout = Sc_rollup.Game.timeout
+
   type conflict = Sc_rollup.Refutation_storage.conflict
 
   let dissection_chunk_of_octez Octez_smart_rollup.Game.{state_hash; tick} :
@@ -438,6 +440,23 @@ module Game = struct
       start_level = Raw_level.to_int32 start_level;
       inbox_level = Raw_level.to_int32 inbox_level;
       game_state = game_state_to_octez game_state;
+    }
+
+  let timeout_of_octez
+      Octez_smart_rollup.Game.{alice_timeout; bob_timeout; last_turn_level} :
+      Sc_rollup.Game.timeout =
+    {
+      alice = alice_timeout;
+      bob = bob_timeout;
+      last_turn_level = Raw_level.of_int32_exn last_turn_level;
+    }
+
+  let timeout_to_octez Sc_rollup.Game.{alice; bob; last_turn_level} :
+      Octez_smart_rollup.Game.timeout =
+    {
+      alice_timeout = alice;
+      bob_timeout = bob;
+      last_turn_level = Raw_level.to_int32 last_turn_level;
     }
 
   let conflict_of_octez
