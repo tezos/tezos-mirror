@@ -1818,6 +1818,190 @@
                "show": true
             }
          ]
+      },
+      {
+         "id": 23,
+         "type": "row",
+         "title": "Amplification",
+         "collapse": false,
+         "collapsed": false,
+         "gridPos": {
+            "h": 8,
+            "w": 24,
+            "x": 0,
+            "y": 132
+         },
+         "panels": [ ],
+         "repeat": "",
+         "repeatIteration": null,
+         "repeatRowId": null,
+         "showTitle": true,
+         "titleSize": "h6"
+      },
+      {
+         "id": 24,
+         "type": "timeseries",
+         "title": "Total number of reconstructions",
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 132
+         },
+         "datasource": "Prometheus",
+         "targets": [
+            {
+               "refId": "This is a query",
+               "expr": "dal_node_amplification_reconstructions_done_count{app=\"$node_instance\"}",
+               "range": true,
+               "instant": false,
+               "legendFormat": "Reconstructions done",
+               "format": "time_series",
+               "exemplar": false
+            },
+            {
+               "refId": "B",
+               "expr": "dal_node_amplification_reconstructions_aborted_count{app=\"$node_instance\"}",
+               "range": true,
+               "instant": false,
+               "hide": false,
+               "legendFormat": "Reconstructions aborted"
+            },
+            {
+               "refId": "C",
+               "expr": "dal_node_amplification_reconstructions_started_count{app=\"$node_instance\"}",
+               "range": true,
+               "instant": false,
+               "hide": false,
+               "legendFormat": "Reconstructions started"
+            }
+         ],
+         "options": {
+            "tooltip": {
+               "mode": "single",
+               "sort": "none"
+            },
+            "legend": {
+               "showLegend": true,
+               "displayMode": "list",
+               "placement": "bottom",
+               "calcs": []
+            }
+         }
+      },
+      {
+         "id": 25,
+         "type": "timeseries",
+         "title": "Average number of reconstructions (1-minute interval)",
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 132
+         },
+         "datasource": "Prometheus",
+         "targets": [
+            {
+               "refId": "This is a query",
+               "expr": "rate(dal_node_amplification_reconstructions_done_count{app=\"$node_instance\"}[1m]) * 60",
+               "range": true,
+               "instant": false,
+               "legendFormat": "Reconstructions done",
+               "format": "time_series",
+               "exemplar": false
+            },
+            {
+               "refId": "B",
+               "expr": "rate(dal_node_amplification_reconstructions_aborted_count{app=\"$node_instance\"}[1m] ) * 60",
+               "range": true,
+               "instant": false,
+               "hide": false,
+               "legendFormat": "Reconstructions aborted"
+            },
+            {
+               "refId": "C",
+               "expr": "rate(dal_node_amplification_reconstructions_started_count{app=\"$node_instance\"}[1m]) * 60",
+               "range": true,
+               "instant": false,
+               "hide": false,
+               "legendFormat": "Reconstructions started"
+            }
+         ],
+         "options": {
+            "tooltip": {
+               "mode": "single",
+               "sort": "none"
+            },
+            "legend": {
+               "showLegend": true,
+               "displayMode": "list",
+               "placement": "bottom",
+               "calcs": []
+            }
+         }
+      },
+      {
+         "id": 27,
+         "type": "timeseries",
+         "title": "Amplification queue length (octez-dal-node main process)",
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "Prometheus",
+         "targets": [
+           {
+             "disableTextWrap": false,
+             "editorMode": "builder",
+             "expr": "dal_node_amplification_queue_length{app=\"$node_instance\"}",
+             "fullMetaSearch": false,
+             "includeNullMetadata": false,
+             "instant": false,
+             "legendFormat": "Number of reconstructions queued",
+             "range": true,
+             "refId": "A"
+           }
+         ],
+         "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 8,
+            "y": 140
+         }
+      },
+      {
+         "id": 28,
+         "type": "timeseries",
+         "title": "Reconstruction duration",
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "Prometheus",
+         "targets": [
+           {
+             "disableTextWrap": false,
+             "expr": "rate(dal_node_amplification_complete_duration_seconds_sum{app=\"$node_instance\"}[$__rate_interval]) / rate(dal_node_amplification_complete_duration_seconds_count{app=\"$node_instance\"}[$__rate_interval])",
+             "fullMetaSearch": false,
+             "includeNullMetadata": false,
+             "instant": false,
+             "legendFormat": "Average amplification time (ipc, proof and publication)",
+             "range": true,
+             "refId": "A"
+           }
+         ],
+         "fieldConfig": {
+            "defaults": {
+               "custom": {
+                  "drawStyle": "points",
+                  "lineInterpolation": "linear"
+               }
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 16,
+            "y": 140
+         }
       }
    ],
    "refresh": "",
@@ -1853,7 +2037,7 @@
          },
          {
             "allValue": ".*",
-            "current": { 
+            "current": {
                 "text": "0",
                 "value": "0"
  },

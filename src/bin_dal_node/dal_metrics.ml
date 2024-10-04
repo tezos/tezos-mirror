@@ -12,7 +12,7 @@ module Node_metrics = struct
   let subsystem = "node"
 
   let number_of_reconstructions_started =
-    let name = "number_of_reconstructions_started" in
+    let name = "amplification_reconstructions_started_count" in
     Prometheus.Counter.v
       ~help:"Number of reconstructions started for observer's amplification"
       ~namespace
@@ -20,7 +20,7 @@ module Node_metrics = struct
       name
 
   let number_of_reconstructions_done =
-    let name = "number_of_reconstructions_done" in
+    let name = "amplification_reconstructions_done_count" in
     Prometheus.Counter.v
       ~help:"Number of reconstructions finished for observer's amplification"
       ~namespace
@@ -28,11 +28,29 @@ module Node_metrics = struct
       name
 
   let number_of_reconstructions_aborted =
-    let name = "number_of_reconstructions_aborted" in
+    let name = "amplification_reconstructions_aborted_count" in
     Prometheus.Counter.v
       ~help:
         "Number of reconstructions aborted for observer's amplification, \
          because observer received all the shards during its random delay"
+      ~namespace
+      ~subsystem
+      name
+
+  let amplification_queue_length =
+    let name = "amplification_queue_length" in
+    Prometheus.Gauge.v
+      ~help:"Length of enqueued reconstruction tasks"
+      ~namespace
+      ~subsystem
+      name
+
+  let amplification_complete_duration =
+    let name = "amplification_complete_duration_seconds" in
+    Prometheus.DefaultHistogram.v
+      ~help:
+        "Total duration between the reception of a shard and the publication \
+         after a reconstruction"
       ~namespace
       ~subsystem
       name
@@ -424,6 +442,14 @@ let reconstruction_started () =
 
 let reconstruction_done () =
   Prometheus.Counter.inc_one Node_metrics.number_of_reconstructions_done
+
+let update_amplification_complete_duration duration =
+  Prometheus.DefaultHistogram.observe
+    Node_metrics.amplification_complete_duration
+    duration
+
+let update_amplification_queue_length n =
+  Int.to_float n |> Prometheus.Gauge.set Node_metrics.amplification_queue_length
 
 let reconstruction_aborted () =
   Prometheus.Counter.inc_one Node_metrics.number_of_reconstructions_aborted
