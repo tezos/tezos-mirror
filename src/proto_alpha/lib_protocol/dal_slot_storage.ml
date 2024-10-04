@@ -111,6 +111,25 @@ let update_number_of_attested_slots ctxt num_attested_slots =
               ctxt
               Int32.(add v (of_int num_attested_slots)))
 
+(* TODO https://gitlab.com/tezos/tezos/-/issues/7647
+   Consider if it is better to store commitments only for attestation lag
+   levels, by:
+   - either reducing the slashing period,
+   - or adding commitments to accusations and using the skip list to check if
+     the commitment was published.
+*)
+(* Commitments need to be stored for as long as a DAL entrapment evidence can be
+   successfully emitted for a given published level. *)
+let remove_old_headers ctxt ~published_level =
+  let open Lwt_syntax in
+  let denunciation_period =
+    Constants_repr.max_slashing_period
+    * (Int32.to_int @@ Constants_storage.blocks_per_cycle ctxt)
+  in
+  match Raw_level_repr.(sub published_level denunciation_period) with
+  | None -> return ctxt
+  | Some level -> Storage.Dal.Slot.Headers.remove ctxt level
+
 let finalize_pending_slot_headers ctxt ~number_of_slots =
   let open Lwt_result_syntax in
   let {Level_repr.level = raw_level; _} = Raw_context.current_level ctxt in
@@ -119,7 +138,7 @@ let finalize_pending_slot_headers ctxt ~number_of_slots =
   | None -> return (ctxt, Dal_attestation_repr.empty)
   | Some published_level ->
       let* published_slots = find_slot_headers ctxt published_level in
-      let*! ctxt = Storage.Dal.Slot.Headers.remove ctxt published_level in
+      let*! ctxt = remove_old_headers ctxt ~published_level in
       let* ctxt, attestation, slot_headers_statuses =
         match published_slots with
         | None -> return (ctxt, Dal_attestation_repr.empty, [])
