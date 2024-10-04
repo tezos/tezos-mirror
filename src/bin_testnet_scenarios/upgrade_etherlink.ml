@@ -6,8 +6,8 @@
 (*****************************************************************************)
 
 (*
-     Invocation : 
-        - dune exec src/bin_testnet_scenarios/main.exe -- -f upgrade_etherlink.ml -a network=mainnet --verbose --keep-temp -a upgrade-kernel=<NEW_KERNEL> 
+     Invocation :
+        - dune exec src/bin_testnet_scenarios/main.exe -- -f upgrade_etherlink.ml -a network=mainnet --verbose --keep-temp -a upgrade-kernel=<NEW_KERNEL>
         - dune exec src/bin_testnet_scenarios/main.exe -- -f upgrade_etherlink.ml -a network=mainnet --verbose --keep-temp -a upgrade-kernel=<NEW_KERNEL> -a node-snapshot=<OCTEZ_NODE_ROLLING_SNAPSHOT> -a rollup-node-snapshot=<ROLLUP_NODE_FULL_SNAPSHOT>
 *)
 
@@ -17,7 +17,7 @@ let protocol_of_string s =
   match String.lowercase_ascii s with
   | "alpha" -> Protocol.Alpha
   | "parisc" | "paris" -> Protocol.ParisC
-  | "quebeca" -> Protocol.Quebeca
+  | "qena" -> Protocol.Qena
   | s -> failwith (sf "%s is an invalid protocol" s)
 
 let bake ~env rollup_node node yes_wallet () =

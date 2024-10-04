@@ -33,7 +33,7 @@ depopts: [
   "octez-protocol-018-Proxford-libs"
   "octez-protocol-019-PtParisB-libs"
   "octez-protocol-020-PsParisC-libs"
-  "octez-protocol-021-PsquebeC-libs"
+  "octez-protocol-021-PtQenaB1-libs"
   "octez-protocol-alpha-libs"
 ]
 build: [

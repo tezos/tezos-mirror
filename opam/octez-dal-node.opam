@@ -19,7 +19,7 @@ depends: [
   "octez-crawler" { = version }
   "memtrace"
   "octez-protocol-020-PsParisC-libs" { = version }
-  "octez-protocol-021-PsquebeC-libs" { = version }
+  "octez-protocol-021-PtQenaB1-libs" { = version }
 ]
 depopts: [
   "octez-protocol-alpha-libs"

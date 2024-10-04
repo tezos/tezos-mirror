@@ -3,7 +3,7 @@
   "info": {
     "title": "Octez Protocol alpha RPC",
     "description": "The RPC API for protocol alpha served by the Octez node.",
-    "version": "Octez 21.0~beta11+dev (2209c392)"
+    "version": "Octez 21.0~beta11+dev (39e8de63)"
   },
   "paths": {
     "/": {

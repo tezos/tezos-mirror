@@ -77,9 +77,9 @@
   (select PsParisC_machine.ml from
    (octez-protocol-020-PsParisC-libs.client -> PsParisC_machine.real.ml)
    (-> PsParisC_machine.no.ml))
-  (select PsquebeC_machine.ml from
-   (octez-protocol-021-PsquebeC-libs.client -> PsquebeC_machine.real.ml)
-   (-> PsquebeC_machine.no.ml))
+  (select PtQenaB1_machine.ml from
+   (octez-protocol-021-PtQenaB1-libs.client -> PtQenaB1_machine.real.ml)
+   (-> PtQenaB1_machine.no.ml))
   (select alpha_machine.ml from
    (octez-protocol-alpha-libs.client -> alpha_machine.real.ml)
    (-> alpha_machine.no.ml)))
@@ -99,18 +99,18 @@
   -open Lib_teztale_base))
 
 (rule
- (target PsquebeC_machine.real.ml)
+ (target PtQenaB1_machine.real.ml)
  (mode fallback)
  (deps beta_machine.real.ml)
  (action
   (progn
-   (copy beta_machine.real.ml PsquebeC_machine.real.ml)
+   (copy beta_machine.real.ml PtQenaB1_machine.real.ml)
    (run
     sed
-    -i.bak -e s/Tezos_client_beta/Tezos_client_PsquebeC/g -e
-    s/Tezos_protocol_beta/Tezos_protocol_PsquebeC/g -e
-    s/Tezos_protocol_plugin_beta/Tezos_protocol_plugin_PsquebeC/g
-    PsquebeC_machine.real.ml))))
+    -i.bak -e s/Tezos_client_beta/Tezos_client_PtQenaB1/g -e
+    s/Tezos_protocol_beta/Tezos_protocol_PtQenaB1/g -e
+    s/Tezos_protocol_plugin_beta/Tezos_protocol_plugin_PtQenaB1/g
+    PtQenaB1_machine.real.ml))))
 
 (rule
  (target PsParisC_machine.real.ml)
@@ -142,7 +142,7 @@
 
 (rule (action (write-file alpha_machine.no.ml "module M = struct end")))
 
-(rule (action (write-file PsquebeC_machine.no.ml "module M = struct end")))
+(rule (action (write-file PtQenaB1_machine.no.ml "module M = struct end")))
 
 (rule (action (write-file PsParisC_machine.no.ml "module M = struct end")))
 

@@ -1,0 +1,33 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_021_PtQenaB1_mockup_simulator)
+ (public_name octez-protocol-021-PtQenaB1-libs.bakings.mockup-simulator)
+ (libraries
+  octez-libs.base
+  tezos-protocol-021-PtQenaB1.protocol
+  octez-protocol-021-PtQenaB1-libs.client
+  octez-shell-libs.client-commands
+  octez-protocol-021-PtQenaB1-libs.baking
+  octez-libs.stdlib-unix
+  octez-shell-libs.client-base-unix
+  tezos-protocol-021-PtQenaB1.parameters
+  octez-shell-libs.mockup
+  octez-shell-libs.mockup-proxy
+  octez-shell-libs.mockup-commands
+  octez-protocol-021-PtQenaB1-libs.baking.tenderbrute
+  tezt.core)
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_protocol_021_PtQenaB1
+  -open Tezos_protocol_021_PtQenaB1.Protocol
+  -open Tezos_client_021_PtQenaB1
+  -open Tezos_client_commands
+  -open Tezos_baking_021_PtQenaB1
+  -open Tezos_stdlib_unix
+  -open Tezos_client_base_unix
+  -open Tezos_protocol_021_PtQenaB1_parameters
+  -open Tenderbrute_021_PtQenaB1
+  -open Tezt_core))

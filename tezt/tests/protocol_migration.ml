@@ -1058,9 +1058,9 @@ let test_forked_migration_bakers ~migrate_from ~migrate_to =
   check_blocks ~level_from ~level_to
 
 let test_migration_min_delegated_in_cycle =
-  (* Paris -> Quebec *)
+  (* Paris -> Qena *)
   let _migrate_from = Protocol.ParisC in
-  let migrate_to = Protocol.Quebeca in
+  let migrate_to = Protocol.Qena in
 
   Protocol.register_regression_test
     ~__FILE__
@@ -1265,7 +1265,10 @@ let test_migration_min_delegated_in_cycle =
       ~migrate_to
   in
 
-  Log.info ~color:Log.Color.FG.green "First block of Quebec." ;
+  Log.info
+    ~color:Log.Color.FG.green
+    "First block of %s."
+    (Protocol.name migrate_to) ;
   let* () = check_current_cycle ~cycle:2 in
   let* () = staking_balance ~delegate:baker () in
   let* () = staking_balance ~delegate:other_account () in

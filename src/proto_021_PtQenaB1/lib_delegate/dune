@@ -1,0 +1,110 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_baking_021_PtQenaB1)
+ (public_name octez-protocol-021-PtQenaB1-libs.baking)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.base
+  octez-libs.clic
+  octez-version.value
+  tezos-protocol-021-PtQenaB1.protocol
+  tezos-protocol-021-PtQenaB1.protocol.lifted
+  octez-protocol-021-PtQenaB1-libs.plugin
+  octez-proto-libs.protocol-environment
+  octez-shell-libs.shell-services
+  octez-shell-libs.client-base
+  octez-protocol-021-PtQenaB1-libs.client
+  octez-shell-libs.client-commands
+  octez-libs.stdlib
+  octez-libs.stdlib-unix
+  octez-libs.tezos-context
+  octez-libs.rpc-http-client-unix
+  octez-shell-libs.context-ops
+  octez-libs.rpc
+  octez-libs.rpc-http
+  octez-libs.crypto-dal
+  tezos-dal-node-services
+  lwt-canceler
+  lwt-exit
+  uri)
+ (preprocess (pps octez-libs.ppx_profiler))
+ (preprocessor_deps (env_var TEZOS_PPX_PROFILER))
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_protocol_021_PtQenaB1
+  -open Tezos_protocol_021_PtQenaB1_lifted
+  -open Tezos_protocol_plugin_021_PtQenaB1
+  -open Tezos_shell_services
+  -open Tezos_client_base
+  -open Tezos_client_021_PtQenaB1
+  -open Tezos_client_commands
+  -open Tezos_stdlib
+  -open Tezos_stdlib_unix
+  -open Tezos_context
+  -open Tezos_context_ops
+  -open Tezos_rpc_http
+  -open Tezos_crypto_dal)
+ (modules (:standard \ Baking_commands Baking_commands_registration)))
+
+(library
+ (name tezos_baking_021_PtQenaB1_commands)
+ (public_name octez-protocol-021-PtQenaB1-libs.baking-commands)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.base
+  tezos-protocol-021-PtQenaB1.protocol
+  tezos-protocol-021-PtQenaB1.parameters
+  octez-libs.stdlib-unix
+  octez-proto-libs.protocol-environment
+  octez-shell-libs.shell-services
+  octez-shell-libs.client-base
+  octez-protocol-021-PtQenaB1-libs.client
+  octez-shell-libs.client-commands
+  octez-protocol-021-PtQenaB1-libs.baking
+  octez-libs.rpc
+  uri)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_protocol_021_PtQenaB1
+  -open Tezos_protocol_021_PtQenaB1_parameters
+  -open Tezos_stdlib_unix
+  -open Tezos_shell_services
+  -open Tezos_client_base
+  -open Tezos_client_021_PtQenaB1
+  -open Tezos_client_commands
+  -open Tezos_baking_021_PtQenaB1)
+ (modules Baking_commands))
+
+(library
+ (name tezos_baking_021_PtQenaB1_commands_registration)
+ (public_name octez-protocol-021-PtQenaB1-libs.baking-commands.registration)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.base
+  tezos-protocol-021-PtQenaB1.protocol
+  octez-proto-libs.protocol-environment
+  octez-shell-libs.shell-services
+  octez-shell-libs.client-base
+  octez-protocol-021-PtQenaB1-libs.client
+  octez-shell-libs.client-commands
+  octez-protocol-021-PtQenaB1-libs.baking
+  octez-protocol-021-PtQenaB1-libs.baking-commands
+  octez-libs.rpc)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_protocol_021_PtQenaB1
+  -open Tezos_shell_services
+  -open Tezos_client_base
+  -open Tezos_client_021_PtQenaB1
+  -open Tezos_client_commands
+  -open Tezos_baking_021_PtQenaB1
+  -open Tezos_baking_021_PtQenaB1_commands)
+ (modules Baking_commands_registration))
