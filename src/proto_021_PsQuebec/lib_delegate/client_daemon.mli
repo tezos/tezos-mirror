@@ -39,7 +39,7 @@ module Baker : sig
     ?pre_emptive_forge_time:Q.t ->
     ?force_apply_from_round:int ->
     ?remote_calls_timeout:Q.t ->
-    ?context_path:string ->
+    ?context_root_path:string ->
     ?state_recorder:Baking_configuration.state_recorder_config ->
     chain:Shell_services.chain ->
     keep_alive:bool ->

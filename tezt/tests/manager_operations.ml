@@ -204,9 +204,7 @@ module Helpers = struct
        deserialization cost of the parameters. (This is captured by the test
        Deserialization.test_deserialization_gas_accounting.)
     *)
-    Client.bake_for_and_wait
-      ~context_path:(Node.data_dir node // "context")
-      client
+    Client.bake_for_and_wait ~context_path:(Node.data_dir node) client
 
   (** Initialize a network with two nodes *)
   let init ?(event_sections_levels = [("prevalidator", `Debug)]) ~protocol () =

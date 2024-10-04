@@ -979,7 +979,7 @@ let may_commit_genesis chain_store context_index genesis =
       in
       return_unit
 
-let reconstruct ?patch_context ~store_dir ~context_dir genesis
+let reconstruct ?patch_context ~store_dir ~context_root_dir genesis
     ~user_activated_upgrades ~user_activated_protocol_overrides
     ~operation_metadata_size_limit ~progress_display_mode =
   let open Lwt_result_syntax in
@@ -990,7 +990,7 @@ let reconstruct ?patch_context ~store_dir ~context_dir genesis
       ~block_cache_limit:1
       ?patch_context
       ~store_dir
-      ~context_dir
+      ~context_root_dir
       ~allow_testchains:false
       genesis
   in

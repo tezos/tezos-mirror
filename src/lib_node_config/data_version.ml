@@ -28,8 +28,6 @@ open Filename.Infix
 
 let store_dir data_dir = data_dir // "store"
 
-let context_dir data_dir = data_dir // "context"
-
 let protocol_dir data_dir = data_dir // "protocol"
 
 let lock_file data_dir = data_dir // "lock"

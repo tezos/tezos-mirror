@@ -68,14 +68,22 @@ let irmin_dir = "context"
 
 let brassaia_dir = "brassaia_context"
 
+let backend_variable = "TEZOS_CONTEXT_BACKEND"
+
 let irmin_context_dir root = Filename.(concat root irmin_dir)
 
 let brassaia_context_dir root = Filename.(concat root brassaia_dir)
 
-let init ~kind ?patch_context ?readonly ?index_log_size path =
+let context_dir root =
+  match Sys.getenv_opt backend_variable with
+  | Some "Brassaia" -> brassaia_context_dir root
+  | _ -> irmin_context_dir root
+
+let init ~kind ?patch_context ?readonly ?index_log_size context_root_dir =
   let open Lwt_syntax in
+  let irmin_dir = irmin_context_dir context_root_dir in
   let init_context () =
-    let* () = Events.(emit initializing_context) ("irmin", path) in
+    let* () = Events.(emit initializing_context) ("irmin", irmin_dir) in
     let patch_context =
       Option.map
         (fun f context ->
@@ -84,11 +92,12 @@ let init ~kind ?patch_context ?readonly ?index_log_size path =
           return @@ Shell_context.unwrap_disk_context context)
         patch_context
     in
-    Context.init ?patch_context ?readonly ?index_log_size path
+    Context.init ?patch_context ?readonly ?index_log_size irmin_dir
   in
 
+  let brassaia_dir = brassaia_context_dir context_root_dir in
   let init_brassaia_context () =
-    let* () = Events.(emit initializing_context) ("brassaia", path) in
+    let* () = Events.(emit initializing_context) ("brassaia", brassaia_dir) in
     let patch_context =
       Option.map
         (fun f context ->
@@ -97,7 +106,7 @@ let init ~kind ?patch_context ?readonly ?index_log_size path =
           return @@ Brassaia_context.unwrap_disk_context context)
         patch_context
     in
-    Brassaia.init ?patch_context ?readonly ?index_log_size path
+    Brassaia.init ?patch_context ?readonly ?index_log_size brassaia_dir
   in
 
   let open Lwt_syntax in
@@ -107,14 +116,16 @@ let init ~kind ?patch_context ?readonly ?index_log_size path =
       Disk_index index
   | `Memory ->
       let+ index =
-        Tezos_context_memory.Context.init ?readonly ?index_log_size path
+        Tezos_context_memory.Context.init ?readonly ?index_log_size irmin_dir
       in
       Memory_index index
   | `Brassaia ->
       let+ index = init_brassaia_context () in
       Brassaia_index index
   | `Brassaia_memory ->
-      let+ index = Brassaia_memory.init ?readonly ?index_log_size path in
+      let+ index =
+        Brassaia_memory.init ?readonly ?index_log_size brassaia_dir
+      in
       Brassaia_memory_index index
   | `Duo_index ->
       let* irmin_index = init_context () in
@@ -122,16 +133,16 @@ let init ~kind ?patch_context ?readonly ?index_log_size path =
       Duo_index {irmin_index; brassaia_index}
   | `Duo_index_memory ->
       let* irmin_index =
-        Tezos_context_memory.Context.init ?readonly ?index_log_size path
+        Tezos_context_memory.Context.init ?readonly ?index_log_size irmin_dir
       in
       let+ brassaia_index =
-        Brassaia_memory.init ?readonly ?index_log_size path
+        Brassaia_memory.init ?readonly ?index_log_size brassaia_dir
       in
       Duo_memory_index {irmin_index; brassaia_index}
 
 (* Wrapper over init that uses an environment variable ('TEZOS_CONTEXT_BACKEND')
    to select the backend between Memory|Brassaia_memory and Disk|Brassaia *)
-let init ~kind ?patch_context ?readonly ?index_log_size path =
+let init ~kind ?patch_context ?readonly ?index_log_size context_root_dir =
   let open Lwt_syntax in
   let backend_variable = "TEZOS_CONTEXT_BACKEND" in
   (* Gather the initialisation profiling otherwise aggregates will behave
@@ -141,20 +152,31 @@ let init ~kind ?patch_context ?readonly ?index_log_size path =
   | Some "Brassaia" -> (
       match kind with
       | `Disk ->
-          init ~kind:`Brassaia ?patch_context ?readonly ?index_log_size path
+          init
+            ~kind:`Brassaia
+            ?patch_context
+            ?readonly
+            ?index_log_size
+            context_root_dir
       | `Memory ->
           init
             ~kind:`Brassaia_memory
             ?patch_context
             ?readonly
             ?index_log_size
-            path
-      | _ -> init ~kind ?patch_context ?readonly ?index_log_size path)
+            context_root_dir
+      | _ ->
+          init ~kind ?patch_context ?readonly ?index_log_size context_root_dir)
   | Some "Duo" -> (
       match kind with
       | `Disk ->
           let* () = Events.(emit warning_experimental) () in
-          init ~kind:`Duo_index ?patch_context ?readonly ?index_log_size path
+          init
+            ~kind:`Duo_index
+            ?patch_context
+            ?readonly
+            ?index_log_size
+            context_root_dir
       | `Memory ->
           let* () = Events.(emit warning_experimental) () in
           init
@@ -162,9 +184,10 @@ let init ~kind ?patch_context ?readonly ?index_log_size path =
             ?patch_context
             ?readonly
             ?index_log_size
-            path
-      | _ -> init ~kind ?patch_context ?readonly ?index_log_size path)
-  | _ -> init ~kind ?patch_context ?readonly ?index_log_size path
+            context_root_dir
+      | _ ->
+          init ~kind ?patch_context ?readonly ?index_log_size context_root_dir)
+  | _ -> init ~kind ?patch_context ?readonly ?index_log_size context_root_dir
 
 let index (context : Environment_context.t) =
   match[@profiler.span_f {verbosity = Notice} ["context_ops"; "index"]]

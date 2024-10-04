@@ -713,8 +713,8 @@ let create_initial_state cctxt ?(synchronize = true) ~chain config
     Baking_state.(
       match config.Baking_configuration.validation with
       | Node -> return Node
-      | Local {context_path} ->
-          let* index = Baking_simulator.load_context ~context_path in
+      | Local {context_root_path} ->
+          let* index = Baking_simulator.load_context ~context_root_path in
           return (Local index)
       | ContextIndex index -> return (Local index))
   in

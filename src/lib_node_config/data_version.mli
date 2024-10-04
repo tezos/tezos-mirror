@@ -81,11 +81,6 @@ val upgrade_data_dir :
     a valid directory name. *)
 val store_dir : string -> string
 
-(** [context_dir dir] is a directory within [dir] that the node uses
-    for its context. In order for [context_dir dir] to be valid, [dir]
-    must be a valid directory name.*)
-val context_dir : string -> string
-
 (** [protocol_dir dir] is a directory within [dir] that the node uses
     for its protocol. In order for [protocol_dir dir] to be valid,
     [dir] must be a valid directory name.*)

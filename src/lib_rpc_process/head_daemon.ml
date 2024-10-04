@@ -117,11 +117,11 @@ let init_store ~allow_testchains ~readonly parameters =
      the consistency checks. *)
   let config = parameters.config in
   let store_dir = Data_version.store_dir config.data_dir in
-  let context_dir = Data_version.context_dir config.data_dir in
+  let context_root_dir = config.data_dir in
   Store.init
     ?history_mode:config.shell.history_mode
     ~store_dir
-    ~context_dir
+    ~context_root_dir
     ~allow_testchains
     ~readonly
     config.blockchain_network.genesis

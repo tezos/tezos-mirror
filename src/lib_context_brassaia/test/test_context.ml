@@ -147,7 +147,7 @@ struct
 
   let wrap_context_init f _ () =
     Lwt_utils_unix.with_tempdir "tezos_test_" (fun base_dir ->
-        let root = base_dir // "context" in
+        let root = base_dir // "brassaia_context" in
         let* idx = Context.init root in
         let*!! genesis =
           Context.commit_genesis

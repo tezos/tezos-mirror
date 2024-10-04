@@ -314,7 +314,7 @@ let bake_with_mempool ?protocol node client mempool =
   Client.bake_for_and_wait
     ?protocol
     ~force:true
-    ~context_path:(Node.data_dir node // "context")
+    ~context_path:(Node.data_dir node)
     client
 
 let get_current_head_hash state =
@@ -557,15 +557,11 @@ let baking_operation_exception =
   (* We use [context_path] to ensure the baker will not use the
      preapply RPC. Indeed, this test was introduced because of a bug
      that happens when the baker does not use the preapply RPC. *)
-  let* () =
-    Client.bake_for_and_wait ~context_path:(data_dir // "context") client
-  in
+  let* () = Client.bake_for_and_wait ~context_path:data_dir client in
   let wait_injection = Node.wait_for_request ~request:`Inject node in
   let*! () = Client.reveal ~fee:Tez.one ~src:new_account.alias client in
   let* () = wait_injection in
-  let* () =
-    Client.bake_for_and_wait ~context_path:(data_dir // "context") client
-  in
+  let* () = Client.bake_for_and_wait ~context_path:data_dir client in
   let* _ =
     Operation.Manager.(
       inject
@@ -582,7 +578,7 @@ let baking_operation_exception =
         ]
         client)
   in
-  Client.bake_for_and_wait ~context_path:(data_dir // "context") client
+  Client.bake_for_and_wait ~context_path:data_dir client
 
 let init ?(overrides = []) protocol =
   let* sandbox_node = Node.init [Synchronisation_threshold 0; Private_mode] in

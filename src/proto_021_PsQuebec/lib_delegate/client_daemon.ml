@@ -69,7 +69,7 @@ module Baker = struct
       ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?votes
       ?extra_operations ?dal_node_endpoint ?dal_node_timeout_percentage
       ?pre_emptive_forge_time ?force_apply_from_round ?remote_calls_timeout
-      ?context_path ?state_recorder ~chain ~keep_alive delegates =
+      ?context_root_path ?state_recorder ~chain ~keep_alive delegates =
     let open Lwt_result_syntax in
     let process () =
       let* user_activated_upgrades =
@@ -123,7 +123,7 @@ module Baker = struct
           ~pre_emptive_forge_time
           ?force_apply_from_round
           ?remote_calls_timeout
-          ?context_path
+          ?context_root_path
           ~user_activated_upgrades
           ?state_recorder
           ()

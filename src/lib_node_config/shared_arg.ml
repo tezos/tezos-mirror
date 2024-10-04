@@ -991,7 +991,7 @@ let patch_config ?(may_override_network = false) ?(emit = Event.emit)
              the data directory was never used to run an node.
              Thus, the network configuration can be reset. *)
           let*! context_dir =
-            Lwt_unix.file_exists @@ Data_version.context_dir
+            Lwt_unix.file_exists @@ Tezos_context_ops.Context_ops.context_dir
             @@ Option.value ~default:cfg.data_dir args.data_dir
           in
           let*! store_dir =

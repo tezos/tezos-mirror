@@ -14,6 +14,17 @@ type t = Environment_context.t
 (** Values of type [index] are used to [checkout] contexts specified by their hash. *)
 type index
 
+(** Environment variable allowing to chose the
+    context provider (Irmin/Brassaia/Duo) *)
+val backend_variable : string
+
+(** [context_dir root] returns the context's directory depending on the backend
+    that was chosen
+
+    This function should always be used when doing operations
+    on the context directory. *)
+val context_dir : string -> string
+
 (** [init] uses an environment variable ('TEZOS_CONTEXT_BACKEND')
     to select the `Disk backend between `Shell and `Brassaia *)
 val init :
