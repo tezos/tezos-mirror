@@ -141,6 +141,8 @@ module type S = sig
 
   module View : sig
     val opened_files : ('file, 'key, 'value) t -> int
+
+    val ongoing_actions : ('file, 'key, 'value) t -> int
   end
 end
 
@@ -189,6 +191,10 @@ module R : S = struct
 
   module View = struct
     let opened_files table =
+      table |> Stdlib.Hashtbl.to_seq_keys |> Seq.map fst |> List.of_seq
+      |> List.sort_uniq compare |> List.length
+
+    let ongoing_actions table =
       table |> Stdlib.Hashtbl.to_seq_keys |> Seq.map fst |> List.of_seq
       |> List.sort_uniq compare |> List.length
   end
@@ -560,7 +566,26 @@ let run_scenario
             (function Ok () -> return_unit | Error err -> fail err)
             promises_running_seq
         in
-        run_actions action next_actions Seq_s.empty
+        (* After waiting for all the promises to be executed, the
+           number of opened files in theory should not exceed the
+           number of files in the LRU. *)
+        if L.View.opened_files left <= lru_size then
+          if L.View.ongoing_actions left <= lru_size then
+            run_actions action next_actions Seq_s.empty
+          else
+            failwith
+              "Expected size of actions table to be at most %d. Got %d \
+               (remaining actions: %d)."
+              lru_size
+              (L.View.ongoing_actions left)
+              (List.length next_actions + 1)
+        else
+          failwith
+            "Expected size of files table to be at most %d. Got %d (remaining \
+             actions: %d)."
+            lru_size
+            (L.View.opened_files left)
+            (List.length next_actions + 1)
     | (Parallel, action) :: next_actions ->
         (* We do not wait for promises to end and append them to the
            list of promises on-going. *)
