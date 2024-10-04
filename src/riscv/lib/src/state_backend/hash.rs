@@ -102,14 +102,16 @@ impl RootHashable for Hash {
 
 impl<T: RootHashable> RootHashable for [T] {
     fn hash(&self) -> Result<Hash, HashError> {
-        let mut hashes: Vec<u8> = Vec::new();
+        let mut hashes: Vec<u8> = Vec::with_capacity(DIGEST_SIZE * self.len());
 
         self.iter().try_for_each(|e| {
-            let hash: [u8; DIGEST_SIZE] = e.hash()?.into();
-            hashes.extend_from_slice(&hash);
+            hashes.extend_from_slice(e.hash()?.as_ref());
             Ok::<(), HashError>(())
         })?;
 
+        // TODO RV-250: Instead of building the whole input and hashing it,
+        // we should use incremental hashing, which isn't currently supported
+        // in `tezos_crypto_rs`.
         Hash::blake2b_hash_bytes(&hashes)
     }
 }
@@ -178,6 +180,9 @@ impl HashWriter {
 
     /// Hash the contents of the buffer.
     fn flush_buffer(&mut self) -> Result<(), HashError> {
+        // TODO RV-250: Instead of building the whole input and hashing it,
+        // we should use incremental hashing, which isn't currently supported
+        // in `tezos_crypto_rs`.
         let hash = Hash::blake2b_hash_bytes(&self.buffer)?;
         self.hashes.push(hash);
         self.buffer.clear();

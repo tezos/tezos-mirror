@@ -61,6 +61,7 @@ mod enums;
 pub mod hash;
 mod layout;
 pub mod owned_backend;
+pub mod proof_backend;
 mod region;
 
 #[cfg(test)]
