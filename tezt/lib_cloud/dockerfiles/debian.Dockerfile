@@ -15,6 +15,8 @@ RUN apt-get update && apt-get install -y \
     docker.io screen \
     # Necessary certificates for mirages dependencies
     ca-certificates \
+    # nginx is used as reverse proxy to balance the load between DAL nodes
+    nginx \
     # DL3015: Use --no-install-recommends
     --no-install-recommends && \
     # DL3009: Delete the apt-get lists after Installing

@@ -27,6 +27,8 @@ RUN apt-get update && apt-get install -y \
     ca-certificates \
     # jq is useful for pretty-printing json
     jq \
+    # nginx is used as reverse proxy to balance the load between DAL nodes
+    nginx \
     # DL3015: Use --no-install-recommends
     --no-install-recommends && \
     # DL3009: Delete the apt-get lists after Installing

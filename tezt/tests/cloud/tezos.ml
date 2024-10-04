@@ -51,12 +51,16 @@ module Dal_node = struct
   include Tezt_tezos.Dal_node
 
   module Agent = struct
-    let create ?net_port
+    let create_from_endpoint ?net_port
         ?(path = Uses.path Constant.octez_dal_node |> Filename.basename) ?name
-        ~node agent =
+        ?rpc_port ~l1_node_endpoint agent =
       let* path = Agent.copy agent ~source:path in
       let runner = Agent.runner agent in
-      let rpc_port = Agent.next_available_port agent in
+      let rpc_port =
+        match rpc_port with
+        | None -> Agent.next_available_port agent
+        | Some rpc_port -> rpc_port
+      in
       let net_port =
         match net_port with
         | None -> Agent.next_available_port agent
@@ -65,8 +69,24 @@ module Dal_node = struct
       let metrics_port = Agent.next_available_port agent in
       let metrics_addr = Format.asprintf "0.0.0.0:%d" metrics_port in
       let listen_addr = Format.asprintf "0.0.0.0:%d" net_port in
-      create ?name ~path ?runner ~rpc_port ~metrics_addr ~listen_addr ~node ()
+      create_from_endpoint
+        ?name
+        ~path
+        ?runner
+        ~rpc_port
+        ~metrics_addr
+        ~listen_addr
+        ~l1_node_endpoint
+        ()
       |> Lwt.return
+
+    let create ?net_port ?path ?name ~node agent =
+      create_from_endpoint
+        ?net_port
+        ?path
+        ?name
+        ~l1_node_endpoint:(Node.as_rpc_endpoint node)
+        agent
 
     let run ?(memtrace = false) ?event_level dal_node =
       let name = name dal_node in
