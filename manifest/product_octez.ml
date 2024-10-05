@@ -1445,7 +1445,7 @@ let _octez_stdlib_unix_test =
     ]
     ~path:"src/lib_stdlib_unix/test/"
     ~opam:"octez-libs"
-    ~preprocess:(pps bam_ppx)
+    ~preprocess:(ppses [ppx_hash; bam_ppx])
     ~deps:
       [
         octez_error_monad |> open_ |> open_ ~m:"TzLwtreslib";
