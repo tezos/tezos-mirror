@@ -295,3 +295,5 @@ let adaptive_issuance_ns_enable c = (adaptive_issuance c).ns_enable
 
 let direct_ticket_spending_enable c =
   (Raw_context.constants c).direct_ticket_spending_enable
+
+let aggregate_attestation c = (Raw_context.constants c).aggregate_attestation

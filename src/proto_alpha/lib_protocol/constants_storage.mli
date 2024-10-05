@@ -182,3 +182,6 @@ val consensus_key_activation_delay : Raw_context.t -> int
     slashing of the funds that are currently in its frozen deposit. *)
 
 val slashable_deposits_period : Raw_context.t -> int
+
+(* attestation aggregation feature flag *)
+val aggregate_attestation : Raw_context.t -> bool

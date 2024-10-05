@@ -313,6 +313,8 @@ let constants_mainnet : Constants.Parametric.t =
        - Split [allow_forged] into [allow_tickets] and [allow_lazy_storage_id]: #2964
        - Introduce a new Ticket constructor in Michelson: #6643 *)
     direct_ticket_spending_enable = false;
+    (* attestation aggregation feature flag *)
+    aggregate_attestation = false;
   }
 
 let constants_sandbox =

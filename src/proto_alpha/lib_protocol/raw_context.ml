@@ -1192,6 +1192,7 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
                  zk_rollup = _;
                  adaptive_issuance = _;
                  direct_ticket_spending_enable;
+                 aggregate_attestation;
                }
                 : Previous.t) =
             c
@@ -1241,6 +1242,7 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
             zk_rollup;
             adaptive_issuance;
             direct_ticket_spending_enable;
+            aggregate_attestation;
           }
         in
         let*! ctxt = add_constants ctxt constants in
@@ -1527,6 +1529,7 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
             zk_rollup;
             adaptive_issuance;
             direct_ticket_spending_enable;
+            aggregate_attestation = false;
           }
         in
         let*! ctxt = add_constants ctxt constants in
