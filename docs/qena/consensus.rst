@@ -289,9 +289,10 @@ for double baking is a fixed percentage of the frozen deposit
 double (pre)attestations, the formula is more complex, as it depends
 on the number of attestation slots that participated in the
 misbehavior; see :doc:`adaptive_slashing` for more details.
-The payload producer that includes the misbehavior evidence will be rewarded a
+The payload producer that includes the misbehavior evidence is rewarded a
 seventh of the slashed amount, which corresponds to ``1 /
-(GLOBAL_LIMIT_OF_STAKING_OVER_BAKING + 2)``.
+(GLOBAL_LIMIT_OF_STAKING_OVER_BAKING + 2)``; the rest of the slashed
+amount is burned.
 
 If a delegate's deposit is smaller than the slashed amount, the deposit is
 simply emptied.
@@ -399,8 +400,6 @@ Consensus related protocol parameters
      - ``bonus / (CONSENSUS_COMMITTEE_SIZE / 3)`` = 0.001143 tez
    * - ``ATTESTING_REWARD_PER_SLOT``
      - ``attesting_reward / CONSENSUS_COMMITTEE_SIZE`` = 0.000761 tez
-   * - ``GLOBAL_LIMIT_OF_STAKING_OVER_BAKING``
-     - 5
 
 The above list of protocol parameters is a subset of the :ref:`protocol constants <protocol_constants_qena>`.
 

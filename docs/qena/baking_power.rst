@@ -402,7 +402,7 @@ relative to the baker's own staked tez. It defaults to ``0``, meaning
 no staked contribution from external stakers at all. It can be set to
 any non-negative value (with a one millionth precision); however, the
 ``GLOBAL_LIMIT_OF_STAKING_OVER_BAKING`` constant, set to ``5``,
-ensures that external stakers may never contribute more than five time
+ensures that external stakers may never contribute more than five times
 as much staked tez as the baker itself, regardless of the delegate's
 own limit.
 If the amount of external staked

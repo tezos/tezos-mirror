@@ -401,8 +401,8 @@ staked tez the external stakers can contribute to the baking power,
 relative to the baker's own staked tez. It defaults to ``0``, meaning
 no staked contribution from external stakers at all. It can be set to
 any non-negative value (with a one millionth precision); however, the
-``GLOBAL_LIMIT_OF_STAKING_OVER_BAKING`` constant, set to ``5``,
-ensures that external stakers may never contribute more than five time
+``GLOBAL_LIMIT_OF_STAKING_OVER_BAKING`` constant, set to ``9``,
+ensures that external stakers may never contribute more than nine times
 as much staked tez as the baker itself, regardless of the delegate's
 own limit.
 If the amount of external staked
@@ -414,7 +414,7 @@ overdelegated too), so they will weigh half as much.
 
 .. code-block:: python
 
-  global_limit_of_staking_over_baking = 5
+  global_limit_of_staking_over_baking = 9
   actual_limit_of_staking_over_baking = min(limit_of_staking_over_baking, global_limit_of_staking_over_baking)
   max_allowed_external_staked = own_staked * actual_limit_of_staking_over_baking
   external_staked_after_limits = min(external_staked, max_allowed_external_staked)
@@ -427,7 +427,7 @@ The purpose of this feature is to ensure that the baker's
 ``own_staked``, that is, the part of the security deposit that belongs
 to the baker itself, always represents a sizable portion of its
 baking power. In other words, it guarantees that the baker always has
-its own skin in the game. Besides, the global limit of ``5`` ensures
+its own skin in the game. Besides, the global limit of ``9`` ensures
 that a baker can never increase its own balance by denouncing its own
 double baking or double attesting misbehavior; indeed, the reward that
 would be given to the author of a denunciation is guaranteed to be
