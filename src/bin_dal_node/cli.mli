@@ -32,6 +32,8 @@ module Types = Tezos_dal_node_services.Types
     can be used to register a function when the user invokes the
     command. *)
 
+type experimental_features = {sqlite3_backend : bool}
+
 type options = {
   data_dir : string option;
       (** Directory containing files related to the DAL node. *)
@@ -52,6 +54,7 @@ type options = {
   service_name : string option;
       (** Name of the service provided by this node. *)
   service_namespace : string option;  (** Namespace for the service. *)
+  experimental_features : experimental_features;  (** Experimental features.  *)
 }
 
 (** Subcommands that can be used by the DAL node. In the future this type

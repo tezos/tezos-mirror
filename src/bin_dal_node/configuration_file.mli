@@ -36,7 +36,7 @@ type history_mode =
 
 (** Configuration settings for experimental features, with no backward
     compatibility guarantees. *)
-type experimental_features = bool
+type experimental_features = {sqlite3_backend : bool}
 
 type t = {
   data_dir : string;  (** The path to the DAL node data directory. *)

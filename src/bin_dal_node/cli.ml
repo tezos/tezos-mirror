@@ -307,13 +307,27 @@ module Term = struct
       & opt (some service_namespace_arg) None
       & info ~docs ~doc ~env:service_namespace_env ["service-namespace"])
 
+  (* Experimental features. *)
+
+  let sqlite3_backend =
+    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7527
+       Remove this command line argument once the SQLite3 backend is
+       the default one. *)
+    let open Cmdliner in
+    let doc =
+      "Experimental feature, please dont use it unless you know what you are \
+       doing. Configure the DAL node store to use SQLite3 as a storage \
+       backend. "
+    in
+    Arg.(value & flag & info ~docs ~doc ["sqlite3-backend"])
+
   let term process =
     Cmdliner.Term.(
       ret
         (const process $ data_dir $ rpc_addr $ expected_pow $ net_addr
        $ public_addr $ endpoint $ metrics_addr $ attester_profile
        $ producer_profile $ observer_profile $ bootstrap_profile $ peers
-       $ history_mode $ service_name $ service_namespace))
+       $ history_mode $ service_name $ service_namespace $ sqlite3_backend))
 end
 
 module Run = struct
@@ -373,6 +387,8 @@ module Config = struct
     Cmdliner.Cmd.group ~default info [Init.cmd run]
 end
 
+type experimental_features = {sqlite3_backend : bool}
+
 type options = {
   data_dir : string option;
   rpc_addr : P2p_point.Id.t option;
@@ -386,6 +402,7 @@ type options = {
   history_mode : Configuration_file.history_mode option;
   service_name : string option;
   service_namespace : string option;
+  experimental_features : experimental_features;
 }
 
 type t = Run | Config_init
@@ -393,7 +410,7 @@ type t = Run | Config_init
 let make ~run =
   let run subcommand data_dir rpc_addr expected_pow listen_addr public_addr
       endpoint metrics_addr attesters producers observers bootstrap_flag peers
-      history_mode service_name service_namespace =
+      history_mode service_name service_namespace sqlite3_backend =
     let run profile =
       run
         subcommand
@@ -410,6 +427,7 @@ let make ~run =
           history_mode;
           service_name;
           service_namespace;
+          experimental_features = {sqlite3_backend};
         }
     in
     let profile = Operator_profile.make ~attesters ~producers ?observers () in
