@@ -42,6 +42,21 @@ manifest: $(foreach file, $(SOURCE), _build/$(file))
 	ocamlc -bin-annot -g -w @1..3@5..28@30..39@43@46..47@49..57@61..62 \
 		-I _build str.cma $^ -o manifest
 
+# Running 'make -C manifest l1-deps.svg' produces
+# the dependency graph of the main Layer 1 executables
+# (node, client, baker, accuser) in 'manifest/octez-deps.svg'.
+# It requires the 'dot' executable (apt install graphviz).
+l1-deps.dot: manifest
+	(cd .. && manifest/manifest --dep-graph manifest/$@ \
+		--dep-graph-source src/bin_node \
+		--dep-graph-source src/bin_client \
+		--dep-graph-source src/proto_alpha/bin_baker \
+		--dep-graph-source src/proto_alpha/bin_accuser \
+		--dep-graph-without src/proto_0)
+
+%.svg: %.dot
+	dot -Tsvg $^ > $@
+
 # Used in the CI.
 .PHONY: check
 check: all
@@ -55,4 +70,4 @@ check: all
 
 .PHONY: clean
 clean:
-	rm -rf _build manifest
+	rm -rf _build manifest l1-deps.dot l1-deps.svg
