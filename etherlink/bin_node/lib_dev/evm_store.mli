@@ -14,10 +14,6 @@ include module type of Sqlite
     created. Also returns if the store was created ([true]) or was already
     existing ([false]).
 
-    If [sqlite_journal_mode] is [`Force mode], then the journal mode of the
-    SQLite database is updated if necessary to match the requested
-    configuration. With [`Identity], the journal mode is left untouched.
-
     If [perm] is [`Read_only], then SQL requests requiring write access will
     fail. With [`Read_write], they will succeed as expected. *)
 val init :
