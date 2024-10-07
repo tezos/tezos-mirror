@@ -34,6 +34,10 @@ type history_mode =
           profile. *)
   | Full  (** [Full] keeps the shards forever *)
 
+(** Configuration settings for experimental features, with no backward
+    compatibility guarantees. *)
+type experimental_features = bool
+
 type t = {
   data_dir : string;  (** The path to the DAL node data directory. *)
   rpc_addr : P2p_point.Id.t;
@@ -60,7 +64,8 @@ type t = {
   version : int;  (** The version of the configuration. *)
   service_name : string option;
       (** Name of the service provided by this node. *)
-  service_namespace : string option;  (** Namespace for the service *)
+  service_namespace : string option;  (** Namespace for the service. *)
+  experimental_features : experimental_features;  (** Experimental features.  *)
 }
 
 (** [default] is the default configuration. *)
