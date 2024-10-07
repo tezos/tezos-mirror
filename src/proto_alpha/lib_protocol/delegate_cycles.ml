@@ -116,84 +116,6 @@ let distribute_attesting_rewards ctxt last_cycle unrevealed_nonces =
     (ctxt, [])
     delegates
 
-let adjust_frozen_stakes ctxt ~deactivated_delegates :
-    (Raw_context.t * Receipt_repr.balance_updates) tzresult Lwt.t =
-  let open Lwt_result_syntax in
-  (* Note: deactivated_delegates have just been removed from the set of
-     active delegates with minimal stake by [update_activity] so the two
-     following iterations are on disjoint sets of delegates. *)
-  let* ctxt, balance_updates =
-    Stake_storage.fold_on_active_delegates_with_minimal_stake_es
-      ctxt
-      ~order:`Undefined
-      ~init:(ctxt, [])
-      ~f:(fun delegate (ctxt, balance_updates) ->
-        let*! has_been_denounced =
-          Pending_denunciations_storage.has_pending_denunciations ctxt delegate
-        in
-        if has_been_denounced then return (ctxt, balance_updates)
-          (* we don't autostake on behalf of delegates who will be slashed *)
-        else
-          let* full_staking_balance =
-            Stake_storage.get_full_staking_balance ctxt delegate
-          in
-          let own_frozen =
-            Full_staking_balance_repr.own_frozen full_staking_balance
-          in
-          let*? optimal_frozen =
-            Stake_context.optimal_frozen_wrt_delegated_without_ai
-              ctxt
-              full_staking_balance
-          in
-          let* deposit_limit =
-            Delegate_storage.frozen_deposits_limit ctxt delegate
-          in
-          let optimal_frozen =
-            match deposit_limit with
-            | None -> optimal_frozen
-            | Some deposit_limit -> Tez_repr.min optimal_frozen deposit_limit
-          in
-          let* ctxt, new_balance_updates =
-            if Tez_repr.(optimal_frozen > own_frozen) then
-              let*? optimal_to_stake =
-                Tez_repr.(optimal_frozen -? own_frozen)
-              in
-              Staking.stake
-                ctxt
-                ~for_next_cycle_use_only_after_slashing:true
-                ~amount:(`At_most optimal_to_stake)
-                ~sender:delegate
-                ~delegate
-            else if Tez_repr.(optimal_frozen < own_frozen) then
-              let*? to_unstake = Tez_repr.(own_frozen -? optimal_frozen) in
-              Staking.request_unstake
-                ctxt
-                ~for_next_cycle_use_only_after_slashing:true
-                ~sender_contract:Contract_repr.(Implicit delegate)
-                ~delegate
-                to_unstake
-            else
-              Staking.finalize_unstake
-                ctxt
-                ~for_next_cycle_use_only_after_slashing:true
-                Contract_repr.(Implicit delegate)
-          in
-          return (ctxt, new_balance_updates @ balance_updates))
-  in
-  List.fold_left_es
-    (fun (ctxt, balance_updates) delegate ->
-      let+ ctxt, new_balance_updates =
-        Staking.request_unstake
-          ctxt
-          ~for_next_cycle_use_only_after_slashing:true
-          ~sender_contract:(Implicit delegate)
-          ~delegate
-          Tez_repr.max_mutez
-      in
-      (ctxt, new_balance_updates @ balance_updates))
-    (ctxt, balance_updates)
-    deactivated_delegates
-
 let cycle_end ctxt last_cycle =
   let open Lwt_result_syntax in
   (* attributing attesting rewards   *)
@@ -209,13 +131,6 @@ let cycle_end ctxt last_cycle =
   let*! ctxt = Already_denounced_storage.clear_outdated_cycle ctxt ~new_cycle in
   (* Deactivating delegates which didn't participate to consensus for too long *)
   let* ctxt, deactivated_delegates = update_activity ctxt last_cycle in
-  (* Applying autostaking. Do not move before slashing. Keep before rights
-     computation for optimising rights*)
-  let* ctxt, autostake_balance_updates =
-    match Staking.staking_automation ctxt with
-    | Manual_staking -> return (ctxt, [])
-    | Auto_staking -> adjust_frozen_stakes ctxt ~deactivated_delegates
-  in
   (* Computing future staking rights *)
   let* ctxt =
     Delegate_sampler.select_new_distribution_at_cycle_end ctxt ~new_cycle
@@ -238,10 +153,7 @@ let cycle_end ctxt last_cycle =
   let* ctxt =
     Adaptive_issuance_storage.update_stored_rewards_at_cycle_end ctxt ~new_cycle
   in
-  let balance_updates =
-    slashing_balance_updates @ attesting_balance_updates
-    @ autostake_balance_updates
-  in
+  let balance_updates = slashing_balance_updates @ attesting_balance_updates in
   return (ctxt, balance_updates, deactivated_delegates)
 
 let init_first_cycles ctxt =

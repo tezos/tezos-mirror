@@ -25,7 +25,6 @@
 
 type error +=
   | Cannot_stake_with_unfinalizable_unstake_requests_to_another_delegate
-  | Manual_staking_forbidden
 
 (** [stake ctxt ~sender ~for_next_cycle_use_only_after_slashing ~delegate amount]
     add [amount] as [sender]'s stake to [delegate].
@@ -76,11 +75,3 @@ val finalize_unstake :
   for_next_cycle_use_only_after_slashing:bool ->
   Contract_repr.t ->
   (Raw_context.t * Receipt_repr.balance_updates) tzresult Lwt.t
-
-(** Staking can be either automated or manual. If Adaptive Issuance is
-    enabled, staking must be manual. *)
-type staking_automation = Auto_staking | Manual_staking
-
-val staking_automation : Raw_context.t -> staking_automation
-
-val check_manual_staking_allowed : Raw_context.t -> unit tzresult
