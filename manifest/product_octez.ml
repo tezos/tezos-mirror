@@ -5531,7 +5531,7 @@ end = struct
             ("test_scenario_base", N.(number >= 019));
             ("test_scenario_stake", N.(number >= 019));
             ("test_scenario_rewards", N.(number >= 019));
-            ("test_scenario_autostaking", N.(number >= 019));
+            ("test_scenario_autostaking", N.(number >= 019 && number <= 021));
             ("test_scenario_slashing", N.(number >= 019));
             ("test_scenario_slashing_stakers", N.(number >= 019));
             ("test_scenario_deactivation", N.(number >= 019));
