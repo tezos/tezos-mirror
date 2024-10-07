@@ -131,6 +131,11 @@ module Last_processed_level : Single_value_store.S with type value = int32
 
 module First_seen_level : Single_value_store.S with type value = int32
 
+(** Storage backend for storage components supporting multiple backends. *)
+module Storage_backend : sig
+  type kind
+end
+
 (** The DAL node store. *)
 type t
 
@@ -144,7 +149,7 @@ val first_seen_level : t -> First_seen_level.t
 
 (** [finalized_commitments t] returns the cache of commitments indexed
     by level and then by slot id associated with the store [t]. The
-    maximum number of levels is given by {!Constants.slot_id_cache_size}. 
+    maximum number of levels is given by {!Constants.slot_id_cache_size}.
     No more than [number_of_slots] commitments can be stored per level. *)
 val finalized_commitments : t -> Slot_id_cache.t
 
