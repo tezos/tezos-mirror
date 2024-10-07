@@ -367,6 +367,14 @@ module Args = struct
 
   let get_binaries_directory = get_arg_value ~arg:binaries_directory_arg
 
+  let fail_on_empty_baker_args baker_args =
+    if List.is_empty baker_args then (
+      Format.eprintf
+        "Cannot run agnostic baker without any baker arguments. Please refer \
+         to the following help:@." ;
+      print_help () ;
+      exit 1)
+
   let parse_args all_args =
     let all_args = Array.to_list all_args in
     (* Specific vesrion case *)
@@ -375,6 +383,7 @@ module Args = struct
     let all_args = Option.value ~default:[] (List.tl all_args) in
     (* Split agnostic baker and baker arguments, that aims to be delimited by -- *)
     let agnostic_baker_args, baker_args = split_args all_args in
+    let () = fail_on_empty_baker_args baker_args in
     let () = help_cmd agnostic_baker_args in
     let endpoint =
       Option.value
