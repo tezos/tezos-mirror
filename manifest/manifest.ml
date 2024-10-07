@@ -3762,7 +3762,8 @@ let ( packages_dir,
       remove_extra_files,
       manifezt,
       dep_graph,
-      dep_graph_source ) =
+      dep_graph_source,
+      dep_graph_without ) =
   let packages_dir = ref "packages" in
   let url = ref "" in
   let sha256 = ref "" in
@@ -3772,6 +3773,7 @@ let ( packages_dir,
   let manifezt = ref false in
   let dep_graph = ref None in
   let dep_graph_source = ref [] in
+  let dep_graph_without = ref [] in
   let anonymous_args = ref [] in
   let anon_fun arg = anonymous_args := arg :: !anonymous_args in
   let spec =
@@ -3806,6 +3808,12 @@ let ( packages_dir,
            of the unique node whose identifier contains PATTERN. If this \
            argument is repeated, the result is the union of each subgraph thus \
            selected." );
+        ( "--dep-graph-without",
+          Arg.String
+            (fun pattern -> dep_graph_without := pattern :: !dep_graph_without),
+          "<PATTERN> Restrict the --dep-graph to nodes whose identifier \
+           contains PATTERN. This argument can be repeated to restrict the \
+           graph further." );
         ( "--",
           Arg.Rest anon_fun,
           " Assume the remaining arguments are anonymous arguments." );
@@ -3848,7 +3856,8 @@ let ( packages_dir,
     !remove_extra_files,
     manifezt,
     !dep_graph,
-    !dep_graph_source )
+    !dep_graph_source,
+    !dep_graph_without )
 
 let generate_opam_ci_input opam_release_graph =
   (* We only need to test released packages, since those are the only one
@@ -4369,7 +4378,7 @@ let precheck () =
   check_opam_with_test_consistency () ;
   if !has_error then exit 1
 
-let generate_dependency_graph ?(source = []) filename =
+let generate_dependency_graph ?(source = []) ?(without = []) filename =
   let module Node = struct
     type t = Target.internal
 
@@ -4418,6 +4427,18 @@ let generate_dependency_graph ?(source = []) filename =
         in
         G.sourced_at matching_nodes graph
   in
+  (* Remove unwanted nodes. *)
+  let graph =
+    let remove graph pattern =
+      let graph =
+        G.filter graph @@ fun node _ -> not (Node.id_matches pattern node)
+      in
+      G.map graph @@ fun _ edges ->
+      Fun.flip G.Nodes.filter edges @@ fun edge ->
+      not (Node.id_matches pattern edge)
+    in
+    List.fold_left remove graph without
+  in
   (* Remove redundant edges. *)
   let graph = G.simplify graph in
   write_raw filename @@ fun fmt -> G.output_dot_file fmt graph
@@ -4433,7 +4454,11 @@ let generate ~make_tezt_exe ~tezt_exe_deps ~default_profile ~add_to_meta_package
     | Some changes ->
         list_tests_to_run_after_changes ~tezt_exe ~tezt_exe_deps changes ;
         exit 0) ;
-    Option.iter (generate_dependency_graph ~source:dep_graph_source) dep_graph ;
+    Option.iter
+      (generate_dependency_graph
+         ~source:dep_graph_source
+         ~without:dep_graph_without)
+      dep_graph ;
     Target.can_register := false ;
     generate_dune_files () ;
     generate_opam_files () ;

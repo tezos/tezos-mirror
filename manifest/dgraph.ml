@@ -24,6 +24,10 @@ module type S = sig
 
   val add : node -> node -> t -> t
 
+  val map : t -> (node -> Nodes.t -> Nodes.t) -> t
+
+  val filter : t -> (node -> Nodes.t -> bool) -> t
+
   val nodes : t -> Nodes.t
 
   val output_dot_file : Format.formatter -> t -> unit

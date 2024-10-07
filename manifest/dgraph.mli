@@ -43,6 +43,12 @@ module type S = sig
   (** Add a directed edge to a graph. *)
   val add : node -> node -> t -> t
 
+  (** Apply a function to modify the edges from each node. *)
+  val map : t -> (node -> Nodes.t -> Nodes.t) -> t
+
+  (** Remove nodes that do not match a predicate. *)
+  val filter : t -> (node -> Nodes.t -> bool) -> t
+
   (** Get the set of nodes in a graph. *)
   val nodes : t -> Nodes.t
 
