@@ -30,7 +30,6 @@
 #
 # @abate = Pietro Abate
 # @ACoquereau = Albin Coquereau
-# @andrea.cerone = Andrea Cerone
 # @arvidnl = Arvid Jakobsson
 # @dianegalloiswong = Diane Gallois-Wong
 # @emturner = Emma Turner
@@ -52,19 +51,19 @@
 # @pe.cornilleau = Pierre-Emmanuel Cornilleau
 # @phink = Paul Lafourge
 # @picdc = Pierrick Couderc
+# @polubelova = Marina Polubelova
 # @rafoo_ = Raphaël Cauderlier
 # @rodibozman = Rodi-Can Bozman
 # @romain.nl = Romain
 # @ryan.tan3 = Ryan Tan
 # @Saroupille = François Thiré
 # @sribaroud = Sylvain R.
-# @tomjack = Tom Jack
 # @vch9 = Valentin Chaboche
 # @vect0r = Victor Allombert
 # @victor-dumitrescu = Victor Dumitrescu
 # @yrg = Yann Regis-Gianas
 #
-* @abate @ACoquereau @andrea.cerone @arvidnl @dianegalloiswong @emturner @eugenz @iguerNL @jobjo @julien.sagot.nl @julien.t @Killian-Delarue @lrand @lthms @MBourgoin @mattiasdrp @mebsout @murbard @naih @NicVolanschi @ole.kruger @pe.cornilleau @phink @picdc @rafoo_ @rodibozman @romain.nl @ryan.tan3 @Saroupille @sribaroud @tomjack @vch9 @vect0r @victor-dumitrescu @yrg
+* @abate @ACoquereau @arvidnl @dianegalloiswong @emturner @eugenz @iguerNL @jobjo @julien.sagot.nl @julien.t @Killian-Delarue @lrand @lthms @MBourgoin @mattiasdrp @mebsout @murbard @naih @NicVolanschi @ole.kruger @pe.cornilleau @phink @picdc @polubelova @rafoo_ @rodibozman @romain.nl @ryan.tan3 @Saroupille @sribaroud @vch9 @vect0r @victor-dumitrescu @yrg
 
 # CODEOWNERS Owners
 #
