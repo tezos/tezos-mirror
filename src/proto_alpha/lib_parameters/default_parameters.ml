@@ -198,7 +198,7 @@ let constants_mainnet : Constants.Parametric.t =
     blocks_per_cycle = 10800l;
     blocks_per_commitment = 240l;
     nonce_revelation_threshold = 960l;
-    cycles_per_voting_period = 5l;
+    cycles_per_voting_period = 14l;
     hard_gas_limit_per_operation = Gas.Arith.(integral_of_int_exn 1_040_000);
     hard_gas_limit_per_block = Gas.Arith.(integral_of_int_exn 1_386_666);
     (* When reducing blocks time, consider adapting this constant so

@@ -1562,7 +1562,11 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
              this protocol for mainnet *)
           if Int32.(equal constants.blocks_per_cycle 30720l) then
             let new_constants : Constants_parametric_repr.t =
-              {constants with blocks_per_cycle = 10800l}
+              {
+                constants with
+                blocks_per_cycle = 10800l;
+                cycles_per_voting_period = 14l;
+              }
             in
             let* ctxt =
               update_cycle_eras
