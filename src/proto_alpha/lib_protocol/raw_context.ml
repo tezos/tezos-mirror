@@ -1149,7 +1149,6 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
                  adaptive_rewards_params = _;
                  activation_vote_enable;
                  force_activation;
-                 ns_enable;
                }
                 : Previous.adaptive_issuance) =
             c.adaptive_issuance
@@ -1162,7 +1161,6 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
               adaptive_rewards_params;
               activation_vote_enable;
               force_activation;
-              ns_enable;
             }
         in
         let issuance_weights =
@@ -1445,7 +1443,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
                  activation_vote_enable;
                  autostaking_enable = _;
                  force_activation;
-                 ns_enable;
+                 ns_enable = _;
                }
                 : Previous.adaptive_issuance) =
             c.adaptive_issuance
@@ -1458,7 +1456,6 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
               adaptive_rewards_params;
               activation_vote_enable;
               force_activation;
-              ns_enable;
             }
         in
         let issuance_weights =

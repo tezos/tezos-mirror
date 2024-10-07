@@ -152,8 +152,6 @@ type adaptive_issuance = {
     (* For testing purposes. If set to true, the adaptive issuance feature is
        enabled without waiting to reach the launch_ema_threshold.*)
     bool;
-  ns_enable : (* If set to true, enables the NS feature *)
-              bool;
 }
 
 type issuance_weights = {

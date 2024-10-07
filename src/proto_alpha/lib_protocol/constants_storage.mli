@@ -158,8 +158,6 @@ val adaptive_issuance_rewards_params :
 
 val adaptive_issuance_force_activation : Raw_context.t -> bool
 
-val adaptive_issuance_ns_enable : Raw_context.t -> bool
-
 val direct_ticket_spending_enable : Raw_context.t -> bool
 
 val allow_tz4_delegate_enable : Raw_context.t -> bool
