@@ -69,6 +69,9 @@ val is_empty : t -> bool
 (** Allows to make custom list of uris. *)
 val make_custom : Uri.t list -> t
 
+(** Adds a config uri to a config. *)
+val add_uri_to_config : Uri.t -> t -> t
+
 (** The serialization format. *)
 val encoding : t Data_encoding.t
 

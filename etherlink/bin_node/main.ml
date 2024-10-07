@@ -744,6 +744,24 @@ let register_wallet ?password_filename ~wallet_dir () =
   in
   wallet_ctxt
 
+let make_event_config ~verbosity ~daily_logs_path
+    ?(daily_logs_section_prefixes = []) () =
+  let open Tezos_event_logging.Internal_event in
+  let open Tezos_base_unix.Internal_event_unix in
+  let open Tezos_base.Internal_event_config in
+  let config = make_with_defaults ~verbosity () in
+  let uri =
+    make_config_uri
+      ~create_dirs:true
+      ~daily_logs:7
+      ~level:Info
+      ~format:"pp-rfc5424"
+      ~chmod:0o640
+      ~section_prefixes:daily_logs_section_prefixes
+      (`Path Filename.Infix.(daily_logs_path // "daily.log"))
+  in
+  add_uri_to_config uri config
+
 let start_sequencer ?password_filename ~wallet_dir ~data_dir ?rpc_addr ?rpc_port
     ?rpc_batch_limit ?cors_origins ?cors_headers ?tx_pool_timeout_limit
     ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit ~keep_alive
@@ -800,9 +818,9 @@ let start_sequencer ?password_filename ~wallet_dir ~data_dir ?rpc_addr ?rpc_port
   let*! () =
     let open Tezos_base_unix.Internal_event_unix in
     let config =
-      make_with_defaults
+      make_event_config
         ~verbosity:configuration.verbose
-        ~enable_default_daily_logs_at:Filename.Infix.(data_dir // "daily_logs")
+        ~daily_logs_path:Filename.Infix.(data_dir // "daily_logs")
           (* Show only above Info rpc_server events, they are not
              relevant as we do not have a REST-API server. If not
              set, the daily logs are polluted with these
@@ -881,9 +899,9 @@ let start_threshold_encryption_sequencer ?password_filename ~wallet_dir
   let*! () =
     let open Tezos_base_unix.Internal_event_unix in
     let config =
-      make_with_defaults
+      make_event_config
         ~verbosity:configuration.verbose
-        ~enable_default_daily_logs_at:Filename.Infix.(data_dir // "daily_logs")
+        ~daily_logs_path:Filename.Infix.(data_dir // "daily_logs")
           (* Show only above Info rpc_server events, they are not
              relevant as we do not have a REST-API server. If not
              set, the daily logs are polluted with these
@@ -1011,10 +1029,9 @@ let rpc_command =
       let*! () =
         let open Tezos_base_unix.Internal_event_unix in
         let config =
-          make_with_defaults
+          make_event_config
             ~verbosity:config.verbose
-            ~enable_default_daily_logs_at:
-              Filename.Infix.(data_dir // "daily_logs")
+            ~daily_logs_path:Filename.Infix.(data_dir // "daily_logs")
               (* Show only above Info rpc_server events, they are not
                  relevant as we do not have a REST-API server. If not
                  set, the daily logs are polluted with these
@@ -1076,9 +1093,9 @@ let start_observer ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?rpc_batch_limit
   let*! () =
     let open Tezos_base_unix.Internal_event_unix in
     let config =
-      make_with_defaults
+      make_event_config
         ~verbosity:config.verbose
-        ~enable_default_daily_logs_at:Filename.Infix.(data_dir // "daily_logs")
+        ~daily_logs_path:Filename.Infix.(data_dir // "daily_logs")
           (* Show only above Info rpc_server events, they are not
              relevant as we do not have a REST-API server. If not
              set, the daily logs are polluted with these
