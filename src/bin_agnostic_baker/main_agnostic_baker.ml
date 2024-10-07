@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
-(* Copyright (c) 2018-2024 Nomadic Labs, <contact@nomadic-labs.com>          *)
+(* Copyright (c) 2024 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -72,13 +72,30 @@ module Events = struct
       ("proto", Protocol_hash.encoding)
       ~pp1:Protocol_hash.pp_short
 
+  let stopping_baker =
+    declare_1
+      ~section
+      ~level:Notice
+      ~name:"stopping_baker"
+      ~msg:"stopping baker for protocol {proto}"
+      ("proto", Protocol_hash.encoding)
+      ~pp1:Protocol_hash.pp_short
+
   let starting_daemon =
     declare_0
       ~section
       ~alternative_color
       ~level:Notice
       ~name:"starting_daemon"
-      ~msg:"starting agnostic daemon"
+      ~msg:"agnostic baker started"
+      ()
+
+  let stopping_daemon =
+    declare_0
+      ~section
+      ~level:Notice
+      ~name:"stopping_daemon"
+      ~msg:"stopping agnostic daemon"
       ()
 
   let protocol_encountered =
@@ -178,7 +195,11 @@ module Parameters = struct
 end
 
 module Baker = struct
-  type t = Lwt_process.process_none option
+  type t = {
+    protocol_hash : Protocol_hash.t;
+    binary_path : string;
+    process : Lwt_process.process_none;
+  }
 
   let baker_path ?(user_path = "./") proto_hash =
     let short_name =
@@ -186,9 +207,13 @@ module Baker = struct
     in
     Format.sprintf "%soctez-baker-%s" user_path short_name
 
-  let _shutdown p = p#terminate
+  let shutdown {process; protocol_hash; _} =
+    let open Lwt_syntax in
+    let* () = Events.(emit stopping_baker) protocol_hash in
+    process#terminate ;
+    Lwt.return_unit
 
-  let spawn_baker proto_hash ~binaries_directory ~baker_args =
+  let spawn_baker protocol_hash ~binaries_directory ~baker_args =
     let open Lwt_result_syntax in
     let args_as_string =
       Format.asprintf
@@ -198,18 +223,24 @@ module Baker = struct
            Format.pp_print_string)
         baker_args
     in
-    let*! () = Events.(emit starting_baker) (proto_hash, args_as_string) in
-    let path = baker_path ?user_path:binaries_directory proto_hash in
-    let baker_args = path :: baker_args in
+    let*! () = Events.(emit starting_baker) (protocol_hash, args_as_string) in
+    let binary_path = baker_path ?user_path:binaries_directory protocol_hash in
+    let baker_args = binary_path :: baker_args in
     let baker_args = Array.of_list baker_args in
-    let p =
+    let process =
       Lwt_process.open_process_none
         ~stdout:`Keep
         ~stderr:`Keep
-        (path, baker_args)
+        (binary_path, baker_args)
     in
-    let*! () = Events.(emit baker_running) proto_hash in
-    return p
+    let*! () = Events.(emit baker_running) protocol_hash in
+    let t = {protocol_hash; binary_path; process} in
+    let _ccid =
+      Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
+          let*! () = shutdown t in
+          Lwt.return_unit)
+    in
+    return t
 end
 
 module RPC = struct
@@ -265,15 +296,6 @@ module RPC = struct
     in
     let uri = Format.sprintf "%s/chains/main/blocks/head/metadata" node_addr in
     call_and_wrap_rpc ~node_addr ~uri ~f
-end
-
-module Daemon = struct
-  type state = {
-    binaries_directory : string option;
-    node_endpoint : string;
-    baker_args : string list;
-    mutable current_baker : Baker.t;
-  }
 
   let get_current_proposal ~node_addr =
     let open Lwt_result_syntax in
@@ -288,7 +310,7 @@ module Daemon = struct
         "%s/chains/main/blocks/head/votes/current_proposal"
         node_addr
     in
-    RPC.call_and_wrap_rpc ~node_addr ~uri ~f
+    call_and_wrap_rpc ~node_addr ~uri ~f
 
   let get_current_period ~node_addr =
     let open Lwt_result_syntax in
@@ -331,7 +353,16 @@ module Daemon = struct
     let uri =
       Format.sprintf "%s/chains/main/blocks/head/votes/current_period" node_addr
     in
-    RPC.call_and_wrap_rpc ~node_addr ~uri ~f
+    call_and_wrap_rpc ~node_addr ~uri ~f
+end
+
+module Daemon = struct
+  type state = {
+    binaries_directory : string option;
+    node_endpoint : string;
+    baker_args : string list;
+    mutable current_baker : Baker.t option;
+  }
 
   let monitor_heads ~node_addr =
     let open Lwt_result_syntax in
@@ -363,7 +394,7 @@ module Daemon = struct
       let*! v = Lwt_stream.get head_stream in
       match v with
       | Some _tick ->
-          let* period_kind, remaining = get_current_period ~node_addr in
+          let* period_kind, remaining = RPC.get_current_period ~node_addr in
           let*! () = Events.(emit period_status) (period_kind, remaining) in
           loop ()
       | None -> return_unit
@@ -433,8 +464,13 @@ module Daemon = struct
     let open Lwt_result_syntax in
     let node_addr = state.node_endpoint in
     let*! () = Events.(emit starting_daemon) () in
+    let _ccid =
+      Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
+          let*! () = Events.(emit stopping_daemon) () in
+          Lwt.return_unit)
+    in
     let* () = may_start_initial_baker state in
-    let* _protocol_proposal = get_current_proposal ~node_addr in
+    let* _protocol_proposal = RPC.get_current_proposal ~node_addr in
     let* head_stream = monitor_heads ~node_addr in
     (* Monitoring voting periods through heads monitoring to avoid
        missing UAUs. *)
@@ -553,15 +589,15 @@ let run () =
 
 let () =
   let open Lwt_result_syntax in
-  let main_promise () = run () in
+  let main_promise =
+    Lwt.catch run (function
+        | Failure msg -> failwith "%s" msg
+        | exn -> failwith "%s" (Printexc.to_string exn))
+  in
   Stdlib.exit
     (Lwt_main.run
        (let*! retcode =
-          let*! r =
-            Lwt.catch main_promise (function
-                | Failure msg -> failwith "%s" msg
-                | exn -> failwith "%s" (Printexc.to_string exn))
-          in
+          let*! r = Lwt_exit.wrap_and_exit main_promise in
           match r with
           | Ok () -> Lwt.return 0
           | Error errs ->
