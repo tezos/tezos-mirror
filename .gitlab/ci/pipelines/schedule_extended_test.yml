@@ -118,6 +118,7 @@ datadog_pipeline_trace:
   - gcp
   dependencies:
   - oc.docker:ci:amd64
+  allow_failure: true
   timeout: 60 minutes
   interruptible: false
   script:

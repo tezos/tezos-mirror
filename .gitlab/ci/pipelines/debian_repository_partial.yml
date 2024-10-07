@@ -43,6 +43,7 @@ datadog_pipeline_trace:
   - gcp
   dependencies:
   - oc.docker:ci:amd64
+  allow_failure: true
   timeout: 60 minutes
   script:
   - DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags pipeline_type:$PIPELINE_TYPE
