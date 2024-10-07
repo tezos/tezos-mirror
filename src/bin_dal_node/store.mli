@@ -131,23 +131,8 @@ module Last_processed_level : Single_value_store.S with type value = int32
 
 module First_seen_level : Single_value_store.S with type value = int32
 
-type t = private {
-  slot_header_statuses : Statuses.t;  (** Statuses store *)
-  shards : Shards.t;  (** Shards store *)
-  slots : Slots.t;  (** Slots store *)
-  skip_list_cells : Skip_list_cells.t;  (** Skip list cells store *)
-  cache :
-    (Cryptobox.slot * Cryptobox.share array * Cryptobox.shard_proof array)
-    Commitment_indexed_cache.t;
-      (* The length of the array is the number of shards per slot *)
-  finalized_commitments : Slot_id_cache.t;
-      (** Cache of commitments indexed by level and then by slot id. The maximum
-          number of levels is given by {!Constants.slot_id_cache_size}. No more
-          than [number_of_slots] commitments can be stored per level. *)
-  last_processed_level : Last_processed_level.t;
-      (** Last processed level store *)
-  first_seen_level : First_seen_level.t;  (** First seen level store *)
-}
+(** The DAL node store. *)
+type t
 
 (** [cache t] returns the cache associated with the store [t]. *)
 val cache :

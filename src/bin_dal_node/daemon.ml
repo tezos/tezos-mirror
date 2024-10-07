@@ -143,7 +143,7 @@ module Handler = struct
     let slot_index = message_id.Types.Message_id.slot_index in
     match
       Store.Slot_id_cache.find_opt
-        store.finalized_commitments
+        (Store.finalized_commitments store)
         Types.Slot_id.
           {slot_level = message_id.Types.Message_id.level; slot_index}
     with
@@ -260,7 +260,8 @@ module Handler = struct
       (slot_id : Types.slot_id) =
     let open Lwt_syntax in
     let* () =
-      let* res = Store.Shards.remove store.shards slot_id in
+      let shards_store = Store.shards store in
+      let* res = Store.Shards.remove shards_store slot_id in
       match res with
       | Ok () ->
           Event.(
@@ -272,7 +273,8 @@ module Handler = struct
               (slot_id.slot_level, slot_id.slot_index, err))
     in
     let* () =
-      let* res = Store.Slots.remove_slot store.slots ~slot_size slot_id in
+      let slots_store = Store.slots store in
+      let* res = Store.Slots.remove_slot slots_store ~slot_size slot_id in
       match res with
       | Ok () ->
           Event.(emit removed_slot (slot_id.slot_level, slot_id.slot_index))
@@ -290,16 +292,17 @@ module Handler = struct
      cells attested at that level. *)
   let remove_old_level_stored_data proto_parameters ctxt current_level =
     let open Lwt_syntax in
+    let store = Node_context.get_store ctxt in
+    let skip_list_cells_store = Store.skip_list_cells store in
     Node_context.level_to_gc ctxt proto_parameters ~current_level
     |> Option.iter_s (fun oldest_level ->
-           let store = Node_context.get_store ctxt in
            let* () =
              (* TODO: https://gitlab.com/tezos/tezos/-/issues/7258
                 We may want to remove this check. *)
              if supports_refutations ctxt then
                let* res =
                  Store.Skip_list_cells.remove
-                   store.skip_list_cells
+                   skip_list_cells_store
                    ~attested_level:oldest_level
                in
                match res with
@@ -316,7 +319,7 @@ module Handler = struct
              let* res =
                Store.Statuses.remove_level_status
                  ~level:oldest_level
-                 store.slot_header_statuses
+                 (Store.slot_header_statuses store)
              in
              match res with
              | Ok () -> Event.(emit removed_status oldest_level)
@@ -422,7 +425,7 @@ module Handler = struct
     in
     let store = Node_context.get_store ctxt in
     Store.Skip_list_cells.insert
-      store.skip_list_cells
+      (Store.skip_list_cells store)
       ~attested_level:block_level
       cells_of_level
 
@@ -514,7 +517,8 @@ module Handler = struct
       Event.(emit layer1_node_final_block (block_level, block_round))
     in
     (* This should be done at the end of the function. *)
-    Store.Last_processed_level.save store.last_processed_level block_level
+    let last_processed_level_store = Store.last_processed_level store in
+    Store.Last_processed_level.save last_processed_level_store block_level
 
   let rec try_process_block ~retries ctxt cctxt proto_parameters
       finalized_shell_header =
@@ -622,7 +626,7 @@ let daemonize handlers =
 let connect_gossipsub_with_p2p gs_worker transport_layer node_store node_ctxt
     amplificator =
   let open Gossipsub in
-  let shards_handler ({shards; _} : Store.t) =
+  let shards_handler shards =
     let save_and_notify = Store.Shards.write_all shards in
     fun Types.Message.{share; _}
         Types.Message_id.{commitment; shard_index; level; slot_index; _} ->
@@ -916,7 +920,8 @@ let clean_up_store ctxt cctxt ~last_processed_level ~first_seen_level head_level
           else return_unit
         in
         let* () =
-          Store.Last_processed_level.save store.last_processed_level level
+          let last_processed_level_store = Store.last_processed_level store in
+          Store.Last_processed_level.save last_processed_level_store level
         in
         clean_up_at_level (Int32.succ level)
     in
@@ -1045,9 +1050,11 @@ let run ~data_dir ~configuration_override =
   (* Initialize store *)
   let* store = Store.init config in
   let* last_processed_level =
-    Store.Last_processed_level.load store.last_processed_level
+    let last_processed_level_store = Store.last_processed_level store in
+    Store.Last_processed_level.load last_processed_level_store
   in
-  let* first_seen_level = Store.First_seen_level.load store.first_seen_level in
+  let first_seen_level_store = Store.first_seen_level store in
+  let* first_seen_level = Store.First_seen_level.load first_seen_level_store in
   (* Get the current L1 head and its DAL plugin and parameters. *)
   let* header = Shell_services.Blocks.Header.shell_header cctxt () in
   let head_level = header.Block_header.level in
@@ -1073,7 +1080,7 @@ let run ~data_dir ~configuration_override =
   let* () = check_history_mode config profile_ctxt proto_parameters in
   let* () =
     match first_seen_level with
-    | None -> Store.First_seen_level.save store.first_seen_level head_level
+    | None -> Store.First_seen_level.save first_seen_level_store head_level
     | Some _ -> return_unit
   in
   let* () =
@@ -1163,7 +1170,8 @@ let run ~data_dir ~configuration_override =
     (* We reload the last processed level because [clean_up_store] has likely
        modified it. *)
     let* last_notified_level =
-      Store.Last_processed_level.load store.last_processed_level
+      let last_processed_level_store = Store.last_processed_level store in
+      Store.Last_processed_level.load last_processed_level_store
     in
     let open Constants in
     let*! crawler =
@@ -1178,7 +1186,13 @@ let run ~data_dir ~configuration_override =
     return crawler
   in
   (* Activate the p2p instance. *)
-  connect_gossipsub_with_p2p gs_worker transport_layer store ctxt amplificator ;
+  let shards_store = Store.shards store in
+  connect_gossipsub_with_p2p
+    gs_worker
+    transport_layer
+    shards_store
+    ctxt
+    amplificator ;
   let*! () =
     Gossipsub.Transport_layer.activate ~additional_points:points transport_layer
   in
