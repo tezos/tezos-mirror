@@ -20,7 +20,7 @@ set -eu
 export RELEASETYPE=
 export VERSION=
 
-if [ "$CI_COMMIT_REF_NAME" = "master" ]; then
+if [ "${CI_COMMIT_REF_NAME:-}" = "master" ]; then
   # master is protected by default.
   # protected, tag, master
   # Since it's master, we ignore the tag
@@ -32,7 +32,7 @@ else
     . ./scripts/ci/octez-release.sh
   fi
 
-  if [ ! "${CI_COMMIT_REF_PROTECTED}" = "false" ]; then
+  if [ ! "${CI_COMMIT_REF_PROTECTED:-}" = "false" ]; then
     if [ -n "${CI_COMMIT_TAG:-}" ]; then
       if [ -n "${gitlab_release_no_v:-}" ]; then
         export VERSION="${gitlab_release_no_v:-}"
