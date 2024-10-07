@@ -580,6 +580,6 @@ clean-kernels:
 
 .PHONY: wasm_runtime_gen_files
 wasm_runtime_gen_files::
-	@cd etherlink/lib_wasm_runtime; cargo build 2> /dev/null
+	@cd src/lib_wasm_runtime; cargo build 2> /dev/null
 
 octez-evm-node: wasm_runtime_gen_files

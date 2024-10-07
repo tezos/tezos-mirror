@@ -5,7 +5,7 @@ START_DIR="$(pwd)"
 TOPLEVEL="$(git rev-parse --show-toplevel)"
 FILES=("wasm_runtime_gen.ml" "wasm_runtime_gen.mli")
 
-cd "$TOPLEVEL/etherlink/lib_wasm_runtime" || exit 3
+cd "$TOPLEVEL/src/lib_wasm_runtime" || exit 3
 
 # shellcheck disable=SC2317
 function cleanup() {

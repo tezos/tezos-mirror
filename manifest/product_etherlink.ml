@@ -82,7 +82,7 @@ let evm_node_config =
 let wasm_runtime_callbacks =
   octez_evm_node_lib
     "wasm_runtime_callbacks"
-    ~path:"etherlink/lib_wasm_runtime_callbacks"
+    ~path:"src/lib_wasm_runtime_callbacks"
     ~synopsis:
       "Callbacks implementing the I/O functions required to implement the host \
        functions of the WASM runtime"
@@ -96,7 +96,7 @@ let wasm_runtime_callbacks =
 let wasm_runtime_callbacks_tests =
   tezt
     ["test_vector"; "test_store"]
-    ~path:"etherlink/lib_wasm_runtime_callbacks/test"
+    ~path:"src/lib_wasm_runtime_callbacks/test"
     ~opam:"octez-evm-wasm-runtime-tests"
     ~synopsis:"Tests for the WASM Runtime"
     ~with_macos_security_framework:true
@@ -117,7 +117,7 @@ let wasm_runtime_callbacks_tests =
 let wasm_runtime =
   octez_evm_node_lib
     "evm_node_wasm_runtime"
-    ~path:"etherlink/lib_wasm_runtime/ocaml-api"
+    ~path:"src/lib_wasm_runtime/ocaml-api"
     ~synopsis:"WASM runtime compatible with the WASM PVM"
     ~deps:[octez_layer2_store |> open_; octez_rust_deps; wasm_runtime_callbacks]
     ~flags:
