@@ -149,6 +149,40 @@ type t = private {
   first_seen_level : First_seen_level.t;  (** First seen level store *)
 }
 
+(** [cache t] returns the cache associated with the store [t]. *)
+val cache :
+  t -> (slot * share array * shard_proof array) Commitment_indexed_cache.t
+
+(** [first_seen_level t] returns the first seen level store associated
+    with the store [t]. *)
+val first_seen_level : t -> First_seen_level.t
+
+(** [finalized_commitments t] returns the cache of commitments indexed
+    by level and then by slot id associated with the store [t]. The
+    maximum number of levels is given by {!Constants.slot_id_cache_size}. 
+    No more than [number_of_slots] commitments can be stored per level. *)
+val finalized_commitments : t -> Slot_id_cache.t
+
+(** [last_processed_level t] returns the last processed level store
+    associated with the store [t]. *)
+val last_processed_level : t -> Last_processed_level.t
+
+(** [shards t] returns the shards store associated with the store
+    [t]. *)
+val shards : t -> Shards.t
+
+(** [skip_list_cells t] returns the skip list cells store associated
+    with the store [t]. *)
+val skip_list_cells : t -> Skip_list_cells.t
+
+(** [slot_header_statuses t] returns the statuses store  associated with the store
+    [t]. *)
+val slot_header_statuses : t -> Statuses.t
+
+(** [slots t] returns the slots store associated with the store
+    [t]. *)
+val slots : t -> Slots.t
+
 (** [cache_entry store commitment entry] adds or replace an entry to
     the cache with key [commitment]. *)
 val cache_entry :
