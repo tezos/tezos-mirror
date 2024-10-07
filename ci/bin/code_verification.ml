@@ -660,7 +660,7 @@ let jobs pipeline_type =
              ~source_version:true
              ~eval_opam:true
              [])
-        ["etherlink/lib_wasm_runtime/lint.sh"]
+        ["src/lib_wasm_runtime/lint.sh"]
       |> enable_cargo_cache |> enable_sccache
     in
     let job_ocaml_check : tezos_job =
