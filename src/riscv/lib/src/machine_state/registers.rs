@@ -13,7 +13,9 @@ use std::fmt;
 /// Integer register index
 #[allow(non_camel_case_types)] // To make names consistent with specification
 #[repr(u8)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub enum XRegister {
     // The `usize` representation of these constructors shall be used as an
     // index into the 31-element array holding the registers.
@@ -218,7 +220,19 @@ impl<M: backend::ManagerClone> Clone for XRegisters<M> {
 /// Floating-point number register index
 #[allow(non_camel_case_types)] // To make names consistent with specification
 #[repr(usize)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, strum::EnumIter, Hash)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    strum::EnumIter,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+)]
 pub enum FRegister {
     f0 = 0,
     f1,

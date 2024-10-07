@@ -106,72 +106,9 @@ impl<E: Copy, M: ManagerClone> Clone for Cell<E, M> {
     }
 }
 
-/// A [Cell] wrapper that holds an additional in-memory
-/// representation of the stored value. This value is lazily
-/// constructed on the first [read] or [replace].
-///
-/// LazyCell's are not directly allocated, instead, you should
-/// [wrap] an allocated Cell during your `bind` step.
-///
-/// [read]: LazyCell::read
-/// [replace]: LazyCell::replace
-/// [wrap]: LazyCell::wrap
-pub struct LazyCell<E: 'static, T, M: ManagerBase + ?Sized> {
-    inner: Cell<E, M>,
-    value: std::cell::Cell<Option<T>>,
-}
-
-impl<E: Copy, T, M: ManagerBase> LazyCell<E, T, M> {
-    /// Wrap an allocated [Cell] into a [LazyCell].
-    pub fn wrap(inner: Cell<E, M>) -> Self {
-        Self {
-            inner,
-            value: std::cell::Cell::new(None),
-        }
-    }
-
-    /// Reset a LazyCell to an underlying raw value, clearing
-    /// the in-memory value.
-    ///
-    /// This is required for 'faster reset' of large regions of
-    /// [LazyCell]. This will no-longer be required once
-    /// RV-170 is implemented.
-    pub fn reset(&mut self, value: E)
-    where
-        M: ManagerWrite,
-    {
-        self.inner.write(value);
-        self.value.set(None);
-    }
-
-    /// Obtain a structure with references to the bound regions of this type.
-    pub fn struct_ref(&self) -> AllocatedOf<Atom<E>, Ref<'_, M>> {
-        self.inner.struct_ref()
-    }
-
-    /// Read the in-memory value as a reference, rather than copying as
-    /// [`CellRead::read`] does.
-    pub fn read_ref(&mut self) -> &T
-    where
-        M: ManagerRead,
-        T: From<E>,
-    {
-        match self.value.get_mut() {
-            Some(v) => v,
-            n @ None => {
-                *n = Some(self.inner.read().into());
-                n.as_ref().unwrap()
-            }
-        }
-    }
-}
-
-impl<E: Copy, T: Copy, M: ManagerClone> Clone for LazyCell<E, T, M> {
-    fn clone(&self) -> Self {
-        Self {
-            inner: self.inner.clone(),
-            value: self.value.clone(),
-        }
+impl<E, M: ManagerRead> AsRef<E> for Cell<E, M> {
+    fn as_ref(&self) -> &E {
+        M::region_ref(&self.region.region, 0)
     }
 }
 
@@ -183,10 +120,6 @@ pub trait CellBase {
 
 impl<E: 'static, M: ManagerBase> CellBase for Cell<E, M> {
     type Value = E;
-}
-
-impl<E: 'static, T, M: ManagerBase> CellBase for LazyCell<E, T, M> {
-    type Value = T;
 }
 
 impl<E: CellBase> CellBase for &E {
@@ -207,20 +140,6 @@ impl<E: Copy, M: ManagerRead> CellRead for Cell<E, M> {
     #[inline(always)]
     fn read(&self) -> E {
         Cell::read(self)
-    }
-}
-
-impl<E: Copy, T: Copy + From<E>, M: ManagerRead> CellRead for LazyCell<E, T, M> {
-    #[inline]
-    fn read(&self) -> T {
-        if let Some(value) = self.value.get() {
-            return value;
-        }
-
-        let value = self.inner.read().into();
-        self.value.set(Some(value));
-
-        value
     }
 }
 
@@ -251,14 +170,6 @@ impl<E: Copy, M: ManagerWrite> CellWrite for Cell<E, M> {
     }
 }
 
-impl<E: Copy + From<T>, T: Copy, M: ManagerWrite> CellWrite for LazyCell<E, T, M> {
-    #[inline(always)]
-    fn write(&mut self, value: T) {
-        self.value.set(Some(value));
-        self.inner.write(value.into())
-    }
-}
-
 impl<E: CellWrite> CellWrite for &mut E {
     #[inline(always)]
     fn write(&mut self, value: Self::Value) {
@@ -276,20 +187,6 @@ impl<E: Copy, M: ManagerReadWrite> CellReadWrite for Cell<E, M> {
     #[inline(always)]
     fn replace(&mut self, value: E) -> E {
         Cell::replace(self, value)
-    }
-}
-
-impl<E: Copy + From<T>, T: Copy + From<E>, M: ManagerReadWrite> CellReadWrite
-    for LazyCell<E, T, M>
-{
-    #[inline]
-    fn replace(&mut self, value: T) -> T {
-        let old_inner = self.inner.replace(value.into());
-
-        match self.value.replace(Some(value)) {
-            Some(old) => old,
-            None => old_inner.into(),
-        }
     }
 }
 
@@ -527,9 +424,7 @@ pub(crate) mod tests {
         backend_test,
         state_backend::{
             layout::{Atom, Layout},
-            test_helpers::copy_via_serde,
-            Array, CellRead, CellReadWrite, CellWrite, DynCells, Elem, LazyCell, ManagerAlloc,
-            ManagerBase, Ref,
+            Array, DynCells, Elem, ManagerAlloc, ManagerBase,
         },
     };
     use serde::ser::SerializeTuple;
@@ -645,53 +540,6 @@ pub(crate) mod tests {
 
         // Cell 1 should not have its value changed.
         assert_eq!(cell1.read(), cell1_value);
-    });
-
-    backend_test!(test_lazy_cell, F, {
-        #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-        struct Wrapper(u64);
-
-        impl From<u64> for Wrapper {
-            fn from(v: u64) -> Self {
-                Self(v)
-            }
-        }
-
-        impl From<Wrapper> for u64 {
-            fn from(Wrapper(v): Wrapper) -> Self {
-                v
-            }
-        }
-
-        type OurLayout = Atom<u64>;
-
-        let (expected, space) = {
-            let cell = F::allocate::<OurLayout>();
-
-            // Cell should be zero-initialised.
-            assert_eq!(cell.read(), 0);
-
-            let mut lazy = LazyCell::wrap(cell);
-
-            assert_eq!(Wrapper(0), lazy.read());
-
-            let new = Wrapper(rand::random());
-            lazy.write(new);
-            assert_eq!(new, lazy.read());
-
-            let old = new;
-
-            let new = Wrapper(rand::random());
-            assert_eq!(old, lazy.replace(new));
-
-            let space =
-                copy_via_serde::<OurLayout, Ref<'_, F::Manager>, F::Manager>(&lazy.struct_ref());
-
-            (new.0, space)
-        };
-
-        // Rebinding, check cell contents
-        assert_eq!(space.read(), expected);
     });
 
     backend_test!(

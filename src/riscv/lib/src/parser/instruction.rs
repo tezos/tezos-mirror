@@ -13,41 +13,41 @@ use crate::{
 use enum_tag::EnumTag;
 use std::fmt;
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub struct RTypeArgs {
     pub rd: XRegister,
     pub rs1: XRegister,
     pub rs2: XRegister,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub struct ITypeArgs {
     pub rd: XRegister,
     pub rs1: XRegister,
     pub imm: i64,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub struct SBTypeArgs {
     pub rs1: XRegister,
     pub rs2: XRegister,
     pub imm: i64,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub struct UJTypeArgs {
     pub rd: XRegister,
     pub imm: i64,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub struct CsrArgs {
     pub rd: XRegister,
     pub rs1: XRegister,
     pub csr: CSRegister,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub struct CsriArgs {
     pub rd: XRegister,
     pub imm: i64,
@@ -68,40 +68,40 @@ pub struct FenceArgs {
     pub succ: FenceSet,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub struct FRegToXRegArgs {
     pub rd: XRegister,
     pub rs1: FRegister,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub struct XRegToFRegArgs {
     pub rd: FRegister,
     pub rs1: XRegister,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub struct XRegToFRegArgsWithRounding {
     pub rd: FRegister,
     pub rs1: XRegister,
     pub rm: InstrRoundingMode,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub struct FRegToXRegArgsWithRounding {
     pub rd: XRegister,
     pub rs1: FRegister,
     pub rm: InstrRoundingMode,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub struct FCmpArgs {
     pub rs1: FRegister,
     pub rs2: FRegister,
     pub rd: XRegister,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub struct FRArgs {
     pub rs1: FRegister,
     pub rs2: FRegister,
@@ -109,7 +109,7 @@ pub struct FRArgs {
 }
 
 /// There are 6 supported rounding modes that an instruction may use.
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub enum InstrRoundingMode {
     Dynamic,
     Static(RoundingMode),
@@ -131,7 +131,7 @@ impl InstrRoundingMode {
 
 /// Floating-point R-type instruction, containing
 /// rounding mode, and one input argument.
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub struct FR1ArgWithRounding {
     pub rs1: FRegister,
     pub rm: InstrRoundingMode,
@@ -140,7 +140,7 @@ pub struct FR1ArgWithRounding {
 
 /// Floating-point R-type instruction, containing
 /// rounding mode, and two input arguments.
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub struct FR2ArgsWithRounding {
     pub rs1: FRegister,
     pub rs2: FRegister,
@@ -150,7 +150,7 @@ pub struct FR2ArgsWithRounding {
 
 /// Floating-point R-type instruction, containing
 /// rounding mode, and three input arguments.
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub struct FR3ArgsWithRounding {
     pub rs1: FRegister,
     pub rs2: FRegister,
@@ -159,14 +159,14 @@ pub struct FR3ArgsWithRounding {
     pub rd: FRegister,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub struct FStoreArgs {
     pub rs1: XRegister,
     pub rs2: FRegister,
     pub imm: i64,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub struct FLoadArgs {
     pub rs1: XRegister,
     pub rd: FRegister,
@@ -175,7 +175,7 @@ pub struct FLoadArgs {
 
 // R-type instructions with 2 additional bits which specify memory ordering
 // constraints as viewed by other RISC-V harts
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub struct AmoArgs {
     pub rd: XRegister,
     pub rs1: XRegister,
@@ -186,41 +186,41 @@ pub struct AmoArgs {
 
 // Compressed instruction types
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub struct CRTypeArgs {
     pub rd_rs1: XRegister,
     pub rs2: XRegister,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub struct CRJTypeArgs {
     pub rs1: XRegister,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub struct CJTypeArgs {
     pub imm: i64,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub struct CIBTypeArgs {
     pub rd_rs1: XRegister,
     pub imm: i64,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub struct CIBDTypeArgs {
     pub rd_rs1: FRegister,
     pub imm: i64,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub struct CSSTypeArgs {
     pub rs2: XRegister,
     pub imm: i64,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub struct CSSDTypeArgs {
     pub rs2: FRegister,
     pub imm: i64,
@@ -229,7 +229,9 @@ pub struct CSSDTypeArgs {
 /// RISC-V parsed instructions. Along with legal instructions, potentially
 /// illegal instructions are parsed as `Unknown` or `UnknownCompressed`.
 /// These instructions are successfully parsed, but must not be interpreted.
-#[derive(Debug, PartialEq, Eq, Clone, Copy, EnumTag, Hash)]
+#[derive(
+    Debug, PartialEq, Eq, Clone, Copy, EnumTag, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub enum InstrCacheable {
     // RV64I R-type instructions
     Add(RTypeArgs),

@@ -93,6 +93,9 @@ pub trait ManagerRead: ManagerBase {
     /// Read an element in the region.
     fn region_read<E: Copy, const LEN: usize>(region: &Self::Region<E, LEN>, index: usize) -> E;
 
+    /// Obtain a reference to an element in the region.
+    fn region_ref<E: 'static, const LEN: usize>(region: &Self::Region<E, LEN>, index: usize) -> &E;
+
     /// Read all elements in the region.
     fn region_read_all<E: Copy, const LEN: usize>(region: &Self::Region<E, LEN>) -> Vec<E>;
 
@@ -233,6 +236,10 @@ impl<M: ManagerSerialise> ManagerSerialise for Ref<'_, M> {
 impl<M: ManagerRead> ManagerRead for Ref<'_, M> {
     fn region_read<E: Copy, const LEN: usize>(region: &Self::Region<E, LEN>, index: usize) -> E {
         M::region_read(region, index)
+    }
+
+    fn region_ref<E: 'static, const LEN: usize>(region: &Self::Region<E, LEN>, index: usize) -> &E {
+        M::region_ref(region, index)
     }
 
     fn region_read_all<E: Copy, const LEN: usize>(region: &Self::Region<E, LEN>) -> Vec<E> {

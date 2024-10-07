@@ -4,10 +4,6 @@
 
 use crate::{
     machine_state::bus::Address,
-    parser::{
-        instruction::{Instr, InstrCacheable},
-        parse,
-    },
     state_backend::{Layout, ManagerAlloc, ManagerBase, Many},
 };
 use std::{convert::Infallible, marker::PhantomData};
@@ -29,44 +25,6 @@ impl FenceCounter {
     #[inline]
     pub fn next(self) -> Self {
         Self(self.0.wrapping_add(1))
-    }
-}
-
-/// Unparsed instruction used for storing cached instructions in the state.
-///
-/// Compressed instructions are represented as the lower-16 bits of the u32, with upper-16 bits
-/// set to zero.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[repr(transparent)]
-pub struct Unparsed(pub u32);
-
-impl From<Unparsed> for (InstrCacheable, Unparsed) {
-    fn from(unparsed: Unparsed) -> Self {
-        let bytes = unparsed.0;
-        let upper = bytes as u16;
-
-        let instr = parse(upper, || {
-            Result::<u16, Infallible>::Ok((bytes >> 16) as u16)
-        })
-        .unwrap();
-
-        match instr {
-            Instr::Cacheable(i) => (i, unparsed),
-            // As written, this code path is unreachable.
-            // We can convert it into a static requirement by allowing
-            // errors on bind, instead
-            //
-            // TODO RV-221: on bind, we should error if an instruction's
-            //      bytes correspond to an Uncacheable instruction, rather
-            //      than returning an 'Unknown' instruction.
-            Instr::Uncacheable(_) => (InstrCacheable::Unknown { instr: bytes }, unparsed),
-        }
-    }
-}
-
-impl From<(InstrCacheable, Unparsed)> for Unparsed {
-    fn from((_, unparsed): (InstrCacheable, Unparsed)) -> Self {
-        unparsed
     }
 }
 

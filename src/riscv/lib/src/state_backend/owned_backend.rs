@@ -37,7 +37,9 @@ impl ManagerAlloc for Owned {
 
     fn allocate_dyn_region<const LEN: usize>(&mut self) -> Self::DynRegion<LEN> {
         unsafe {
-            let layout = std::alloc::Layout::new::<[u8; LEN]>();
+            let layout = std::alloc::Layout::new::<[u8; LEN]>()
+                .align_to(4096)
+                .unwrap();
             let alloc = std::alloc::alloc_zeroed(layout);
             Box::from_raw(alloc.cast())
         }
@@ -50,6 +52,10 @@ impl ManagerRead for Owned {
         index: usize,
     ) -> E {
         region[index]
+    }
+
+    fn region_ref<E: 'static, const LEN: usize>(region: &Self::Region<E, LEN>, index: usize) -> &E {
+        &region[index]
     }
 
     fn region_read_all<E: StaticCopy, const LEN: usize>(region: &Self::Region<E, LEN>) -> Vec<E> {
