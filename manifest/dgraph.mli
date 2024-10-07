@@ -23,6 +23,9 @@ module type NODE = sig
 
       Node identifiers are used in DOT outputs. *)
   val id : t -> string
+
+  (** Return the attributes to assign to a node in a [.dot] file. *)
+  val attributes : t -> (string * string) list
 end
 
 module type S = sig

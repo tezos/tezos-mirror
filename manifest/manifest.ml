@@ -4400,6 +4400,11 @@ let generate_dependency_graph ?(source = []) ?(without = []) filename =
       string_contains pattern (id node)
 
     let compare a b = String.compare (id a) (id b)
+
+    let attributes (node : t) =
+      match node.kind with
+      | Public_library _ | Private_library _ -> [("shape", "box")]
+      | Public_executable _ | Private_executable _ | Test_executable _ -> []
   end in
   let module G = Dgraph.Make (Node) in
   (* Make the direct dependency graph. *)

@@ -11,6 +11,8 @@ module type NODE = sig
   val compare : t -> t -> int
 
   val id : t -> string
+
+  val attributes : t -> (string * string) list
 end
 
 module type S = sig
@@ -48,6 +50,14 @@ module Make (Node : NODE) : S with type node = Node.t = struct
   let empty = Map.empty
 
   let add a b graph =
+    (* Ensure [b] is in the graph even if it has no outgoing edge.
+       [output_dot_file] relies on all nodes being in the map. *)
+    let graph =
+      Fun.flip (Map.update b) graph @@ function
+      | None -> Some Nodes.empty
+      | Some _ as x -> x
+    in
+    (* Add the edge. *)
     Fun.flip (Map.update a) graph @@ function
     | None -> Some (Nodes.singleton b)
     | Some old -> Some (Nodes.add b old)
@@ -71,14 +81,24 @@ module Make (Node : NODE) : S with type node = Node.t = struct
     fold graph Nodes.empty @@ fun node _ acc -> Nodes.add node acc
 
   let output_dot_file fmt graph =
+    let quote_id id =
+      let name = String.map (function '"' -> '_' | c -> c) id in
+      "\"" ^ name ^ "\""
+    in
+    let node_id node = quote_id (Node.id node) in
     Format.fprintf fmt "@[<v 2>digraph {" ;
     ( iter graph @@ fun source targets ->
+      Format.fprintf
+        fmt
+        "@ @[%s[%s]@]"
+        (node_id source)
+        (String.concat
+           ","
+           (List.map
+              (fun (k, v) -> quote_id k ^ "=" ^ quote_id v)
+              (Node.attributes source))) ;
       Fun.flip Nodes.iter targets @@ fun target ->
-      let dot_id node =
-        let name = String.map (function '"' -> '_' | c -> c) (Node.id node) in
-        "\"" ^ name ^ "\""
-      in
-      Format.fprintf fmt "@ @[%s -> %s@]" (dot_id source) (dot_id target) ) ;
+      Format.fprintf fmt "@ @[%s -> %s@]" (node_id source) (node_id target) ) ;
     Format.fprintf fmt "@]@ }@."
 
   (* Return the set of nodes reachable from [node]. *)
