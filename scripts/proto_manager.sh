@@ -138,6 +138,7 @@ function usage() {
   p="${green}-p${reset}"
   c="${green}-c${reset}"
   a="${green}-a${reset}"
+  d="${green}-d${reset}"
   from="${green}--from${reset}"
   to="${green}--to${reset}"
   as="${green}--as${reset}"
@@ -146,11 +147,13 @@ function usage() {
   snapshot="${green}--snapshot${reset}"
   hash="${green}--hash${reset}"
   copy="${green}--copy${reset}"
+  delete="${green}--delete${reset}"
   ## colored vars
   alpha="${red}alpha${reset}"
   beta="${red}beta${reset}"
   stockholm_023="${red}stockholm_023${reset}"
   stockholm="${magenta}stockholm${reset}"
+  pt_stockholm="${red}023_PtStockh${reset}"
   script=${blue}$0${reset}
 
   echo -e "
@@ -166,6 +169,8 @@ ${red}Options:${reset}
     Updates the hash of a protocol.
   ${c}, ${copy}
     Copy a protocol.
+  ${d}, ${delete} ${red}<protocol_source_dirname>${reset}
+    Delete a protocol from the source code.
   ${f}, ${from} ${red}<protocol_source>${reset}
     The source protocol to stabilise or snapshot.
   ${t}, ${to} ${red}<protocol_target>${reset}
@@ -192,6 +197,16 @@ ${yellow}tl;dr:${reset}
   ${script} ${copy} ${from} ${stockholm_023} ${as} ${stockholm} ${to} ${beta}
   or
   ${script} ${c} ${f} ${stockholm_023} ${a} ${stockholm} ${t} ${beta}
+
+- To delete a snapshotted protocol from the source code:
+  ${script} ${delete} ${pt_stockholm} ${as} ${stockholm}
+  or
+  ${script} ${d} ${pt_stockholm} ${a} ${stockholm}
+
+- To delete a protocol in stabilisation from the source code:
+  ${script} ${delete} ${beta}
+  or
+  ${script} ${d} ${beta}
 "
 }
 
@@ -217,6 +232,11 @@ while true; do
   -c | --copy)
     command="copy"
     shift
+    ;;
+  -d | --delete)
+    command="delete"
+    protocol_source="$2"
+    shift 2
     ;;
   -f | --from)
     protocol_source="$2"
@@ -248,20 +268,25 @@ fi
 
 ## ensure command is known
 case ${command} in
-stabilise | snapshot | hash | copy) ;;
+stabilise | snapshot | hash | copy | delete) ;;
 *)
   error "Unknown command: ${command}" 1>&2
-  error "Command should be one of stabilise, snapshot, hash or copy" 1>&2
+  error "Command should be one of stabilise, snapshot, hash, copy or delete" 1>&2
   usage 1>&2
   print_and_exit 1 "${LINENO}"
   ;;
 esac
 
-if [[ -z ${protocol_source} ]]; then
-  error "No protocol source specified" 1>&2
-  usage 1>&2
-  print_and_exit 1 "${LINENO}"
-fi
+case ${command} in
+delete) ;;
+*)
+  if [[ -z ${protocol_source} ]]; then
+    error "No protocol source specified" 1>&2
+    usage 1>&2
+    print_and_exit 1 "${LINENO}"
+  fi
+  ;;
+esac
 
 case ${command} in
 stabilise | snapshot | copy)
@@ -434,7 +459,7 @@ function sanity_check_before_script() {
     print_and_exgxit 1 "${LINENO}"
   fi
 
-  if [[ ${command} == "copy" ]]; then
+  if [[ ${command} == "copy" ]] || [[ ${command} == "delete" ]]; then
     if ! [[ -d "docs/${source_label}" ]]; then
       error "'docs/${source_label}'" "does not exist" 1>&2
       print_and_exit 1 "${LINENO}"
@@ -1400,6 +1425,19 @@ function remove_from_tezt_tests() {
   ocamlformat -i tezt/lib_tezos/protocol.mli
   commit "tezt: adapt lib_tezos/protocol.ml"
 
+  # if Protocol.${capitalized_label} is used in tezt/tests/protocol_migration.ml, ask what to use instead (default is Alpha)
+  if grep -q "Protocol.${capitalized_label}" tezt/tests/protocol_migration.ml; then
+    echo "Please replace 'Protocol.${capitalized_label}' in tezt/tests/protocol_migration.ml"
+    grep -C 3 "Protocol.${capitalized_label}" tezt/tests/protocol_migration.ml
+    # query the user for the Protocol to use instead and replace it
+    read -r -p "What Protocol should be used instead? " -e -i "Alpha" replacing_protocol
+    #ensure the user input is capitalized
+    capitalized_replacing_protocol=$(tr '[:lower:]' '[:upper:]' <<< "${replacing_protocol:0:1}")${replacing_protocol:1}
+    sed -i.old -e "s/Protocol.${capitalized_label}/Protocol.${capitalized_replacing_protocol}/g" tezt/tests/protocol_migration.ml
+    ocamlformat -i tezt/tests/protocol_migration.ml
+    commit_if_changes "tezt: adapt protocol_migration.ml"
+  fi
+
   sed -i.old -e "/| Protocol.${capitalized_label} -> */d" tezt/tests/sc_rollup_migration.ml
   sed -i.old -e "/| Protocol.${capitalized_label} -> */d" tezt/tests/sc_rollup.ml
   ocamlformat -i tezt/tests/sc_rollup_migration.ml
@@ -1527,7 +1565,7 @@ function remove_docs() {
   commit "docs: update docs Makefile"
 
   sed -i.old -e "/${capitalized_label} .*/d" docs/index.rst
-  commit "docs: remove ${capitalized_label} from docs/index.rst"
+  commit_if_changes "docs: remove ${capitalized_label} from docs/index.rst"
 }
 
 function delete_protocol() {
@@ -2021,6 +2059,22 @@ copy)
   label=${protocol_target}
   version=${protocol_target}
   snapshot_protocol "${protocol_source}" "${protocol_target}"
+  ;;
+delete)
+  echo "Source_label: ${source_label}"
+  echo "Protocol_source: ${protocol_source}"
+  if [[ -z ${source_label} ]]; then
+    # deleting a protocol in stabilisation
+    source_label=${protocol_source}
+    short_hash=$(echo "${protocol_source}" | cut -d'_' -f2)
+    capitalized_label=$(tr '[:lower:]' '[:upper:]' <<< "${source_label:0:1}")${source_label:1}
+    delete_protocol
+  else
+    short_hash=$(echo "${protocol_source}" | cut -d'_' -f2)
+    version=$(echo "${protocol_source}" | cut -d'_' -f1)
+    capitalized_label=$(tr '[:lower:]' '[:upper:]' <<< "${source_label:0:1}")${source_label:1}
+    delete_protocol
+  fi
   ;;
 esac
 
