@@ -43,6 +43,9 @@ module type S = sig
   (** Add a directed edge to a graph. *)
   val add : node -> node -> t -> t
 
+  (** Get the set of nodes in a graph. *)
+  val nodes : t -> Nodes.t
+
   (** Output a DOT file with a [digraph] containing all edges from a graph.
 
       Usage: [output_dot_file fmt graph]
@@ -55,6 +58,9 @@ module type S = sig
 
       Removes edges [A -> C] such that there is another path [A -> B -> ... -> C] already. *)
   val simplify : t -> t
+
+  (** Take the subgraph of nodes reachable from some specific nodes. *)
+  val sourced_at : Nodes.t -> t -> t
 end
 
 (** Make a directed graph module from a node module. *)

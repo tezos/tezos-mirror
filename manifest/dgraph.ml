@@ -24,9 +24,13 @@ module type S = sig
 
   val add : node -> node -> t -> t
 
+  val nodes : t -> Nodes.t
+
   val output_dot_file : Format.formatter -> t -> unit
 
   val simplify : t -> t
+
+  val sourced_at : Nodes.t -> t -> t
 end
 
 module Make (Node : NODE) : S with type node = Node.t = struct
@@ -55,6 +59,13 @@ module Make (Node : NODE) : S with type node = Node.t = struct
 
   let map graph f = Map.mapi f graph
 
+  let fold graph acc f = Map.fold f graph acc
+
+  let filter graph f = Map.filter f graph
+
+  let nodes graph =
+    fold graph Nodes.empty @@ fun node _ acc -> Nodes.add node acc
+
   let output_dot_file fmt graph =
     Format.fprintf fmt "@[<v 2>digraph {" ;
     ( iter graph @@ fun source targets ->
@@ -65,6 +76,14 @@ module Make (Node : NODE) : S with type node = Node.t = struct
       in
       Format.fprintf fmt "@ @[%s -> %s@]" (dot_id source) (dot_id target) ) ;
     Format.fprintf fmt "@]@ }@."
+
+  (* Return the set of nodes reachable from [node]. *)
+  let reachable_set node graph =
+    let rec gather node acc =
+      if Nodes.mem node acc then acc
+      else Nodes.fold gather (get node graph) (Nodes.add node acc)
+    in
+    gather node Nodes.empty
 
   (* [transitive_closure] returns the same as
      [map graph @@ fun node _ -> reachable_set node graph]
@@ -115,4 +134,13 @@ module Make (Node : NODE) : S with type node = Node.t = struct
     (* Only keep [edge] if there is no other edge from which one can reach [edge]. *)
     Fun.flip Nodes.for_all (Nodes.remove edge edges) @@ fun other_edge ->
     not (mem other_edge edge transitive_closure)
+
+  let sourced_at sources graph =
+    let nodes_to_keep =
+      let add_reachable source acc =
+        Nodes.union acc (reachable_set source graph)
+      in
+      Nodes.fold add_reachable sources Nodes.empty
+    in
+    filter graph @@ fun node _ -> Nodes.mem node nodes_to_keep
 end

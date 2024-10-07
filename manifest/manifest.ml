@@ -3757,7 +3757,12 @@ let check_opam_with_test_consistency () =
 
 let usage_msg = "Usage: " ^ Sys.executable_name ^ " [OPTIONS]"
 
-let packages_dir, release, remove_extra_files, manifezt, dep_graph =
+let ( packages_dir,
+      release,
+      remove_extra_files,
+      manifezt,
+      dep_graph,
+      dep_graph_source ) =
   let packages_dir = ref "packages" in
   let url = ref "" in
   let sha256 = ref "" in
@@ -3766,6 +3771,7 @@ let packages_dir, release, remove_extra_files, manifezt, dep_graph =
   let version = ref "" in
   let manifezt = ref false in
   let dep_graph = ref None in
+  let dep_graph_source = ref [] in
   let anonymous_args = ref [] in
   let anon_fun arg = anonymous_args := arg :: !anonymous_args in
   let spec =
@@ -3793,6 +3799,13 @@ let packages_dir, release, remove_extra_files, manifezt, dep_graph =
           Arg.String (fun file -> dep_graph := Some file),
           "<FILE> Output the dune library dependency graph in FILE using dot \
            syntax." );
+        ( "--dep-graph-source",
+          Arg.String
+            (fun pattern -> dep_graph_source := pattern :: !dep_graph_source),
+          "<PATTERN> Restrict the --dep-graph to nodes that are dependencies \
+           of the unique node whose identifier contains PATTERN. If this \
+           argument is repeated, the result is the union of each subgraph thus \
+           selected." );
         ( "--",
           Arg.Rest anon_fun,
           " Assume the remaining arguments are anonymous arguments." );
@@ -3830,7 +3843,12 @@ let packages_dir, release, remove_extra_files, manifezt, dep_graph =
         exit 1
     | true, files -> Some files
   in
-  (!packages_dir, release, !remove_extra_files, manifezt, !dep_graph)
+  ( !packages_dir,
+    release,
+    !remove_extra_files,
+    manifezt,
+    !dep_graph,
+    !dep_graph_source )
 
 let generate_opam_ci_input opam_release_graph =
   (* We only need to test released packages, since those are the only one
@@ -4351,12 +4369,26 @@ let precheck () =
   check_opam_with_test_consistency () ;
   if !has_error then exit 1
 
-let generate_dependency_graph filename =
+let generate_dependency_graph ?(source = []) filename =
   let module Node = struct
     type t = Target.internal
 
     let id (node : t) =
       node.path ^ "\n" ^ Target.name_for_errors (Internal node)
+
+    let id_matches pattern node =
+      let string_contains sub str =
+        (* Not the most efficient implementation but oh well. *)
+        let sub_len = String.length sub in
+        let str_len = String.length str in
+        let rec find ofs =
+          if str_len < ofs + sub_len then false
+          else if String.equal sub (String.sub str ofs sub_len) then true
+          else find (ofs + 1)
+        in
+        find 0
+      in
+      string_contains pattern (id node)
 
     let compare a b = String.compare (id a) (id b)
   end in
@@ -4372,6 +4404,20 @@ let generate_dependency_graph filename =
         ()
     | Some internal_dep -> graph := G.add internal internal_dep !graph ) ;
   let graph = !graph in
+  (* Restrict it to dependencies of [source]. *)
+  let graph =
+    match source with
+    | [] -> graph
+    | _ :: _ ->
+        let matching_nodes =
+          G.nodes graph
+          |> G.Nodes.filter (fun node ->
+                 List.exists
+                   (fun pattern -> Node.id_matches pattern node)
+                   source)
+        in
+        G.sourced_at matching_nodes graph
+  in
   (* Remove redundant edges. *)
   let graph = G.simplify graph in
   write_raw filename @@ fun fmt -> G.output_dot_file fmt graph
@@ -4387,7 +4433,7 @@ let generate ~make_tezt_exe ~tezt_exe_deps ~default_profile ~add_to_meta_package
     | Some changes ->
         list_tests_to_run_after_changes ~tezt_exe ~tezt_exe_deps changes ;
         exit 0) ;
-    Option.iter generate_dependency_graph dep_graph ;
+    Option.iter (generate_dependency_graph ~source:dep_graph_source) dep_graph ;
     Target.can_register := false ;
     generate_dune_files () ;
     generate_opam_files () ;
