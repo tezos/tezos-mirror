@@ -96,4 +96,6 @@ val protocol_dir : string -> string
     valid directory name. *)
 val lock_file : string -> string
 
-val upgrade_status : string -> unit tzresult Lwt.t
+(** [upgrade_status ~data_dir] returns whether or not an upgrade is
+    available. In addition to that, it prints a user friendly log. *)
+val upgrade_status : data_dir:string -> bool tzresult Lwt.t

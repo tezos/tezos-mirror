@@ -57,6 +57,41 @@ module Term = struct
     & pos 0 (some (parser, printer)) None
     & info [] ~docv:"UPGRADE" ~doc
 
+  let upgrade_status ~data_dir =
+    let open Lwt_result_syntax in
+    let* available_upgrade = Data_version.upgrade_status ~data_dir in
+    (* To ease the scripting of this command, we cut the workflow
+       earlier and return an adequate exit code. *)
+    let exit_code =
+      if available_upgrade then
+        (* Exiting with 1 stands for an error that aims to reflect
+           that an upgrade is needed. *)
+        1
+      else 0
+    in
+    Lwt_exit.exit_and_raise exit_code
+
+  let run_upgrade ~data_dir ~sandbox_file (config : Config_file.t) =
+    let open Lwt_result_syntax in
+    let* sandbox_parameters =
+      match (config.blockchain_network.genesis_parameters, sandbox_file) with
+      | None, None -> return_none
+      | Some parameters, None ->
+          return_some (parameters.context_key, parameters.values)
+      | _, Some filename -> (
+          let*! r = Lwt_utils_unix.Json.read_file filename in
+          match r with
+          | Error _err ->
+              tzfail (Node_run_command.Invalid_sandbox_file filename)
+          | Ok json -> return_some ("sandbox_parameter", json))
+    in
+    let genesis = config.blockchain_network.genesis in
+    Data_version.upgrade_data_dir
+      ~data_dir
+      genesis
+      ~chain_name:config.blockchain_network.chain_name
+      ~sandbox_parameters
+
   let process subcommand data_dir config_file status sandbox_file =
     let run =
       let open Lwt_result_syntax in
@@ -81,30 +116,8 @@ module Term = struct
                            data_dir))))
               ~filename:(Data_version.lock_file data_dir)
               (fun () ->
-                let genesis = config.blockchain_network.genesis in
-                if status then Data_version.upgrade_status data_dir
-                else
-                  let* sandbox_parameters =
-                    match
-                      ( config.blockchain_network.genesis_parameters,
-                        sandbox_file )
-                    with
-                    | None, None -> return_none
-                    | Some parameters, None ->
-                        return_some (parameters.context_key, parameters.values)
-                    | _, Some filename -> (
-                        let*! r = Lwt_utils_unix.Json.read_file filename in
-                        match r with
-                        | Error _err ->
-                            tzfail
-                              (Node_run_command.Invalid_sandbox_file filename)
-                        | Ok json -> return_some ("sandbox_parameter", json))
-                  in
-                  Data_version.upgrade_data_dir
-                    ~data_dir
-                    genesis
-                    ~chain_name:config.blockchain_network.chain_name
-                    ~sandbox_parameters)
+                if status then upgrade_status ~data_dir
+                else run_upgrade ~data_dir ~sandbox_file config)
           in
           match r with
           | Error (Exn (Unix.Unix_error (Unix.ENOENT, _, _)) :: _) ->
@@ -121,7 +134,10 @@ module Term = struct
 
   let status =
     let open Cmdliner.Arg in
-    let doc = "Displays available upgrades." in
+    let doc =
+      "Displays available upgrades. The command returns the exit code 1 when \
+       an upgrade is available. Otherwise, 0 is returned."
+    in
     value & flag & info ~doc ["status"]
 
   let sandbox =
