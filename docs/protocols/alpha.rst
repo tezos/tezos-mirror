@@ -49,7 +49,16 @@ Errors
 Protocol parameters
 -------------------
 
+- Lower the number of blocks per cycle (``blocks_per_cycle``) from
+  30720 (~2.8 days) to 10800 (~1 day). (MR :gl:`!15196`)
 
+- Update the number of cycles per voting period
+  (``cycles_per_voting_period``) from 5 cycles (that is, ~14.2 days
+  with old cycle duration) to 14 cycles (~14 days with new cycle
+  duration). (MR :gl:`!15196`)
+
+- Lower the number of blocks per cycle (``blocks_per_cycle``) for
+  ghostnet to 10800 (~12 hours). (MR :gl:`!15196`)
 
 Bug Fixes
 ---------
