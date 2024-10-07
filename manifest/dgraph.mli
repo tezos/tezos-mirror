@@ -50,6 +50,11 @@ module type S = sig
       The result can be compiled to e.g. an SVG using: [dot -O -Tsvg filename]
       where [dot] can be installed on Debian with [apt install graphviz]. *)
   val output_dot_file : Format.formatter -> t -> unit
+
+  (** Remove redundant edges.
+
+      Removes edges [A -> C] such that there is another path [A -> B -> ... -> C] already. *)
+  val simplify : t -> t
 end
 
 (** Make a directed graph module from a node module. *)

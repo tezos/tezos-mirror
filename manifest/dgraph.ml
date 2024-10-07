@@ -25,6 +25,8 @@ module type S = sig
   val add : node -> node -> t -> t
 
   val output_dot_file : Format.formatter -> t -> unit
+
+  val simplify : t -> t
 end
 
 module Make (Node : NODE) : S with type node = Node.t = struct
@@ -42,7 +44,16 @@ module Make (Node : NODE) : S with type node = Node.t = struct
     | None -> Some (Nodes.singleton b)
     | Some old -> Some (Nodes.add b old)
 
+  let get node graph =
+    match Map.find_opt node graph with
+    | None -> Nodes.empty
+    | Some nodes -> nodes
+
+  let mem a b graph = Nodes.mem b (get a graph)
+
   let iter graph f = Map.iter f graph
+
+  let map graph f = Map.mapi f graph
 
   let output_dot_file fmt graph =
     Format.fprintf fmt "@[<v 2>digraph {" ;
@@ -54,4 +65,54 @@ module Make (Node : NODE) : S with type node = Node.t = struct
       in
       Format.fprintf fmt "@ @[%s -> %s@]" (dot_id source) (dot_id target) ) ;
     Format.fprintf fmt "@]@ }@."
+
+  (* [transitive_closure] returns the same as
+     [map graph @@ fun node _ -> reachable_set node graph]
+     but hopefully more efficiently thanks to memoization. *)
+  (* There is probably a more efficient implementation of this.
+     Fast matrix exponentiation is O(n^2.37) for non-sparse graphs,
+     Ffloyd-Warshall is O(n^3). *)
+  let transitive_closure graph =
+    (* [reachable_set] computes the set of nodes reachable from [node],
+       and its results are memoized in [memoized]. *)
+    let memoized = ref Map.empty in
+    (* [seen] contains the path that we took to reach [node];
+       it is used to detect cycles. It would be more efficient to use a [Nodes.t],
+       but a list allows to display the path in error messages.
+       As long as the depth of the graph is not too big it's ok. *)
+    let rec reachable_set seen node =
+      if List.exists (fun other_node -> Node.compare node other_node = 0) seen
+      then
+        let seen = List.rev (node :: seen) in
+        failwith
+          (Node.id node ^ " is involved in a cycle: "
+          ^ String.concat " -> " (List.map Node.id seen))
+      else
+        let seen = node :: seen in
+        match Map.find_opt node !memoized with
+        | Some result -> result
+        | None ->
+            (* Recursively compute the set of reachable nodes for each
+               directly reachable node, and take the union. *)
+            let directly_reachable = get node graph in
+            let acc = Nodes.add node directly_reachable in
+            let result =
+              Nodes.fold
+                (fun node acc -> Nodes.union acc (reachable_set seen node))
+                directly_reachable
+                acc
+            in
+            (* Save result for later (memoize). *)
+            memoized := Map.add node result !memoized ;
+            result
+    in
+    map graph (fun node _ -> reachable_set [] node)
+
+  let simplify direct_graph =
+    let transitive_closure = transitive_closure direct_graph in
+    map direct_graph @@ fun _ edges ->
+    Fun.flip Nodes.filter edges @@ fun edge ->
+    (* Only keep [edge] if there is no other edge from which one can reach [edge]. *)
+    Fun.flip Nodes.for_all (Nodes.remove edge edges) @@ fun other_edge ->
+    not (mem other_edge edge transitive_closure)
 end

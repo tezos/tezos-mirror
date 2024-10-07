@@ -4372,6 +4372,8 @@ let generate_dependency_graph filename =
         ()
     | Some internal_dep -> graph := G.add internal internal_dep !graph ) ;
   let graph = !graph in
+  (* Remove redundant edges. *)
+  let graph = G.simplify graph in
   write_raw filename @@ fun fmt -> G.output_dot_file fmt graph
 
 let generate ~make_tezt_exe ~tezt_exe_deps ~default_profile ~add_to_meta_package
