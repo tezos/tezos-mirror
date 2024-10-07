@@ -277,7 +277,6 @@ type t = {
   consensus_threshold : int;
   limit_of_delegation_over_baking : int;
   percentage_of_frozen_deposits_slashed_per_double_baking : Percentage.t;
-  percentage_of_frozen_deposits_slashed_per_double_attestation : Percentage.t;
   max_slashing_per_block : Percentage.t;
   max_slashing_threshold : int;
   testnet_dictator : Signature.Public_key_hash.t option;
@@ -592,7 +591,6 @@ let encoding =
             ( ( c.minimal_participation_ratio,
                 c.limit_of_delegation_over_baking,
                 c.percentage_of_frozen_deposits_slashed_per_double_baking,
-                c.percentage_of_frozen_deposits_slashed_per_double_attestation,
                 c.max_slashing_per_block,
                 c.max_slashing_threshold,
                 c.testnet_dictator,
@@ -638,7 +636,6 @@ let encoding =
                ( ( minimal_participation_ratio,
                    limit_of_delegation_over_baking,
                    percentage_of_frozen_deposits_slashed_per_double_baking,
-                   percentage_of_frozen_deposits_slashed_per_double_attestation,
                    max_slashing_per_block,
                    max_slashing_threshold,
                    testnet_dictator,
@@ -685,7 +682,6 @@ let encoding =
         consensus_threshold;
         limit_of_delegation_over_baking;
         percentage_of_frozen_deposits_slashed_per_double_baking;
-        percentage_of_frozen_deposits_slashed_per_double_attestation;
         max_slashing_per_block;
         max_slashing_threshold;
         testnet_dictator;
@@ -743,14 +739,11 @@ let encoding =
                 (req "consensus_committee_size" int31)
                 (req "consensus_threshold" int31))
              (merge_objs
-                (obj8
+                (obj7
                    (req "minimal_participation_ratio" Ratio_repr.encoding)
                    (req "limit_of_delegation_over_baking" uint8)
                    (req
                       "percentage_of_frozen_deposits_slashed_per_double_baking"
-                      Percentage.encoding)
-                   (req
-                      "percentage_of_frozen_deposits_slashed_per_double_attestation"
                       Percentage.encoding)
                    (req "max_slashing_per_block" Percentage.encoding)
                    (req "max_slashing_threshold" int31)

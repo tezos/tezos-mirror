@@ -1219,7 +1219,6 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
                  minimal_participation_ratio;
                  limit_of_delegation_over_baking;
                  percentage_of_frozen_deposits_slashed_per_double_baking;
-                 percentage_of_frozen_deposits_slashed_per_double_attestation;
                  max_slashing_per_block;
                  max_slashing_threshold;
                  (* The `testnet_dictator` should absolutely be None on mainnet *)
@@ -1272,7 +1271,6 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             minimal_participation_ratio;
             limit_of_delegation_over_baking;
             percentage_of_frozen_deposits_slashed_per_double_baking;
-            percentage_of_frozen_deposits_slashed_per_double_attestation;
             max_slashing_per_block;
             max_slashing_threshold;
             (* The `testnet_dictator` should absolutely be None on mainnet *)
@@ -1512,7 +1510,8 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
                  minimal_participation_ratio;
                  limit_of_delegation_over_baking;
                  percentage_of_frozen_deposits_slashed_per_double_baking;
-                 percentage_of_frozen_deposits_slashed_per_double_attestation;
+                 percentage_of_frozen_deposits_slashed_per_double_attestation =
+                   _;
                  max_slashing_per_block;
                  max_slashing_threshold;
                  (* The `testnet_dictator` should absolutely be None on mainnet *)
@@ -1562,7 +1561,6 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             minimal_participation_ratio;
             limit_of_delegation_over_baking;
             percentage_of_frozen_deposits_slashed_per_double_baking;
-            percentage_of_frozen_deposits_slashed_per_double_attestation;
             max_slashing_per_block;
             max_slashing_threshold;
             (* The `testnet_dictator` should absolutely be None on mainnet *)
