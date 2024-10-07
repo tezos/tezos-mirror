@@ -75,13 +75,13 @@ val store_path : t -> string
 (** [save config] writes config file in [config.data_dir] *)
 val save : t -> unit tzresult Lwt.t
 
-val load : data_dir:string -> (t, Error_monad.tztrace) result Lwt.t
+val load : data_dir:string -> t tzresult Lwt.t
 
-(** [identity_file t] returns the absolute path to the "identity.json"
-    file of the DAL node, based on the configuration [t]. *)
+(** [identity_file config] returns the absolute path to the
+    "identity.json" file of the DAL node, based on the configuration
+    [config]. *)
 val identity_file : t -> string
 
-(** [peers_file data_dir] returns the absolute path to the
-    "peers.json" file of the DAL node, based on the configuration
-    [t]. *)
+(** [peers_file config] returns the absolute path to the "peers.json"
+    file of the DAL node, based on the configuration [config]. *)
 val peers_file : t -> string

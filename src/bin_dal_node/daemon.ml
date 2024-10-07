@@ -298,7 +298,7 @@ module Handler = struct
                 We may want to remove this check. *)
              if supports_refutations ctxt then
                let* res =
-                 Skip_list_cells_store.remove
+                 Store.Skip_list_cells.remove
                    store.skip_list_cells
                    ~attested_level:oldest_level
                in
