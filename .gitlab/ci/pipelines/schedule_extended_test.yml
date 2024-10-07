@@ -509,7 +509,7 @@ wasm-runtime-check:
   - eval $(opam env)
   - . ./scripts/ci/sccache-start.sh
   script:
-  - etherlink/lib_wasm_runtime/lint.sh
+  - src/lib_wasm_runtime/lint.sh
   after_script:
   - ./scripts/ci/sccache-stop.sh
   variables:
