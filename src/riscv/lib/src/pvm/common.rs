@@ -266,15 +266,15 @@ impl<
 mod tests {
     use super::*;
     use crate::{
-        machine_state::TestCacheLayouts,
         machine_state::{
             bus::{
                 main_memory::{M1K, M1M},
                 start_of_main_memory, AddressableRead,
             },
             registers::{a0, a1, a2, a3, a6, a7},
+            TestCacheLayouts,
         },
-        state_backend::{memory_backend::InMemoryBackend, tests::test_determinism, Backend},
+        state_backend::{owned_backend::Owned, tests::test_determinism},
     };
     use rand::{thread_rng, Fill};
     use std::mem;
@@ -288,8 +288,7 @@ mod tests {
         type L = PvmLayout<ML, TestCacheLayouts>;
 
         // Setup PVM
-        let (mut backend, placed) = InMemoryBackend::<L>::new();
-        let space = backend.allocate(placed);
+        let space = Owned::allocate::<L>();
         let mut pvm = Pvm::<ML, TestCacheLayouts, _>::bind(space);
         pvm.reset();
 
@@ -384,8 +383,7 @@ mod tests {
         let mut hooks = PvmHooks::new(|c| buffer.push(c));
 
         // Setup PVM
-        let (mut backend, placed) = InMemoryBackend::<L>::new();
-        let space = backend.allocate(placed);
+        let space = Owned::allocate::<L>();
         let mut pvm = Pvm::<ML, TestCacheLayouts, _>::bind(space);
         pvm.reset();
 
