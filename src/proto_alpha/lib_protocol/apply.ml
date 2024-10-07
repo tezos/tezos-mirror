@@ -397,15 +397,6 @@ let apply_stake ~ctxt ~sender ~amount ~destination ~before_operation =
   match delegate_opt with
   | None -> tzfail Stake_modification_with_no_delegate_set
   | Some delegate ->
-      let allowed =
-        Signature.Public_key_hash.(delegate = sender)
-        || Constants.adaptive_issuance_enable ctxt
-      in
-      let*? () =
-        error_unless
-          allowed
-          Staking_for_delegator_while_external_staking_disabled
-      in
       let* {limit_of_staking_over_baking_millionth; _} =
         Delegate.Staking_parameters.of_delegate ctxt delegate
       in

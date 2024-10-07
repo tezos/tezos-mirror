@@ -112,14 +112,8 @@ let patch_script ctxt (address, hash, patched_code) =
 let prepare ctxt ~level ~predecessor_timestamp ~timestamp =
   let open Lwt_result_syntax in
   let* ctxt =
-    Raw_context.prepare
-      ~level
-      ~predecessor_timestamp
-      ~timestamp
-      ~adaptive_issuance_enable:false
-      ctxt
+    Raw_context.prepare ~level ~predecessor_timestamp ~timestamp ctxt
   in
-  let* ctxt = Adaptive_issuance_storage.set_adaptive_issuance_enable ctxt in
   Storage.Pending_migration.remove ctxt
 
 (* Start of code to remove at next automatic protocol snapshot *)

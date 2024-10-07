@@ -41,7 +41,6 @@ let to_raw_context (b : Block.t) =
       ~level:b.header.shell.level
       ~predecessor_timestamp:b.header.shell.timestamp
       ~timestamp:b.header.shell.timestamp
-      ~adaptive_issuance_enable:false
   in
   ctxt
 

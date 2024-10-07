@@ -69,37 +69,28 @@ let launch_cycle ctxt = Storage.Adaptive_issuance.Activation.get ctxt
 let safe_cycle_add c i = if Compare.Int.(i >= 0) then Cycle_repr.add c i else c
 
 let check_determined_cycle ctxt cycle =
-  let ai_enable = Constants_storage.adaptive_issuance_enable ctxt in
-  if ai_enable then
-    let ctxt_cycle = (Raw_context.current_level ctxt).cycle in
-    let cycles_delay = Constants_storage.issuance_modification_delay ctxt in
-    fail_unless
-      Cycle_repr.(
-        ctxt_cycle <= cycle && cycle <= safe_cycle_add ctxt_cycle cycles_delay)
-      (Undetermined_issuance_coeff_for_cycle cycle)
-  else return_unit
+  let ctxt_cycle = (Raw_context.current_level ctxt).cycle in
+  let cycles_delay = Constants_storage.issuance_modification_delay ctxt in
+  fail_unless
+    Cycle_repr.(
+      ctxt_cycle <= cycle && cycle <= safe_cycle_add ctxt_cycle cycles_delay)
+    (Undetermined_issuance_coeff_for_cycle cycle)
 
 let get_reward_coeff ctxt ~cycle =
   let open Lwt_result_syntax in
   let* () = check_determined_cycle ctxt cycle in
-  let ai_enable = Constants_storage.adaptive_issuance_enable ctxt in
-  if ai_enable then
-    (* Even if AI is enabled, the storage can be empty: this is the case for
-       the first 5 cycles after AI is enabled *)
-    let* k_opt = Storage.Issuance_coeff.find ctxt cycle in
-    return (Option.value ~default:default_reward k_opt)
-  else return default_reward
+  (* Even if AI is enabled, the storage can be empty: this is the case for
+     the first 5 cycles after AI is enabled *)
+  let* k_opt = Storage.Issuance_coeff.find ctxt cycle in
+  return (Option.value ~default:default_reward k_opt)
 
 let get_reward_bonus ctxt ~cycle =
   let open Lwt_result_syntax in
   match cycle with
   | None -> return default_bonus
   | Some cycle ->
-      let ai_enable = Constants_storage.adaptive_issuance_enable ctxt in
-      if ai_enable then
-        let* k_opt = Storage.Issuance_bonus.find ctxt cycle in
-        return (Option.value ~default:default_bonus k_opt)
-      else return default_bonus
+      let* k_opt = Storage.Issuance_bonus.find ctxt cycle in
+      return (Option.value ~default:default_bonus k_opt)
 
 let load_reward_coeff ctxt ~cycle =
   let open Lwt_result_syntax in
@@ -279,84 +270,77 @@ let compute_coeff =
 
 let compute_and_store_reward_coeff_at_cycle_end ctxt ~new_cycle =
   let open Lwt_result_syntax in
-  let ai_enable = Constants_storage.adaptive_issuance_enable ctxt in
-  if not ai_enable then return ctxt
-  else
-    let* launch_cycle = launch_cycle ctxt in
-    let reward_params =
-      Constants_storage.adaptive_issuance_rewards_params ctxt
-    in
-    let modification_delay =
-      Constants_storage.issuance_modification_delay ctxt
-    in
-    let for_cycle = safe_cycle_add new_cycle modification_delay in
-    let before_for_cycle = Cycle_repr.pred for_cycle in
-    let* total_supply = Storage.Contract.Total_supply.get ctxt in
-    let* total_stake = Stake_storage.get_total_active_stake ctxt for_cycle in
-    let base_total_issued_per_minute =
-      (Constants_storage.issuance_weights ctxt).base_total_issued_per_minute
-    in
-    let total_frozen_stake = Stake_repr.get_frozen total_stake in
-    let* previous_bonus = get_reward_bonus ctxt ~cycle:before_for_cycle in
-    let blocks_per_cycle =
-      Constants_storage.blocks_per_cycle ctxt |> Int64.of_int32
-    in
-    let minimal_block_delay =
-      Constants_storage.minimal_block_delay ctxt |> Period_repr.to_seconds
-    in
-    let seconds_per_cycle = Int64.mul blocks_per_cycle minimal_block_delay in
-    let q_total_supply = Tez_repr.to_mutez total_supply |> Q.of_int64 in
-    let q_total_frozen_stake =
-      Tez_repr.to_mutez total_frozen_stake |> Q.of_int64
-    in
-    let stake_ratio =
-      Q.div q_total_frozen_stake q_total_supply (* = portion of frozen stake *)
-    in
-    (* Once computed here, the minimum is final. *)
-    let issuance_ratio_min =
-      compute_min ~launch_cycle ~new_cycle ~reward_params
-    in
-    (* Once computed here, the maximum is final. If it would have been smaller than
-       the min, then it is set to the min. *)
-    let issuance_ratio_max =
-      compute_max
-        ~issuance_ratio_min
-        ~stake_ratio
-        ~launch_cycle
-        ~new_cycle
-        ~reward_params
-    in
-    (* Compute the static curve, within the given bounds *)
-    let base_reward_coeff_ratio =
-      compute_reward_coeff_ratio_without_bonus
-        ~stake_ratio
-        ~issuance_ratio_max
-        ~issuance_ratio_min
-    in
-    (* Compute the dynamic curve. Keeps the sum static + dynamic within the
-       given bounds *)
-    let*? bonus =
-      compute_bonus
-        ~issuance_ratio_max
-        ~seconds_per_cycle
-        ~stake_ratio
-        ~base_reward_coeff_ratio
-        ~previous_bonus
-        ~reward_params
-    in
-    (* Compute the multiplicative coefficient to apply to the base rewards *)
-    let coeff =
-      compute_coeff
-        ~issuance_ratio_max
-        ~issuance_ratio_min
-        ~base_total_issued_per_minute
-        ~base_reward_coeff_ratio
-        ~q_total_supply
-        ~bonus
-    in
-    let*! ctxt = Storage.Issuance_bonus.add ctxt for_cycle bonus in
-    let*! ctxt = Storage.Issuance_coeff.add ctxt for_cycle coeff in
-    return ctxt
+  let* launch_cycle = launch_cycle ctxt in
+  let reward_params = Constants_storage.adaptive_issuance_rewards_params ctxt in
+  let modification_delay = Constants_storage.issuance_modification_delay ctxt in
+  let for_cycle = safe_cycle_add new_cycle modification_delay in
+  let before_for_cycle = Cycle_repr.pred for_cycle in
+  let* total_supply = Storage.Contract.Total_supply.get ctxt in
+  let* total_stake = Stake_storage.get_total_active_stake ctxt for_cycle in
+  let base_total_issued_per_minute =
+    (Constants_storage.issuance_weights ctxt).base_total_issued_per_minute
+  in
+  let total_frozen_stake = Stake_repr.get_frozen total_stake in
+  let* previous_bonus = get_reward_bonus ctxt ~cycle:before_for_cycle in
+  let blocks_per_cycle =
+    Constants_storage.blocks_per_cycle ctxt |> Int64.of_int32
+  in
+  let minimal_block_delay =
+    Constants_storage.minimal_block_delay ctxt |> Period_repr.to_seconds
+  in
+  let seconds_per_cycle = Int64.mul blocks_per_cycle minimal_block_delay in
+  let q_total_supply = Tez_repr.to_mutez total_supply |> Q.of_int64 in
+  let q_total_frozen_stake =
+    Tez_repr.to_mutez total_frozen_stake |> Q.of_int64
+  in
+  let stake_ratio =
+    Q.div q_total_frozen_stake q_total_supply (* = portion of frozen stake *)
+  in
+  (* Once computed here, the minimum is final. *)
+  let issuance_ratio_min =
+    compute_min ~launch_cycle ~new_cycle ~reward_params
+  in
+  (* Once computed here, the maximum is final. If it would have been smaller than
+     the min, then it is set to the min. *)
+  let issuance_ratio_max =
+    compute_max
+      ~issuance_ratio_min
+      ~stake_ratio
+      ~launch_cycle
+      ~new_cycle
+      ~reward_params
+  in
+  (* Compute the static curve, within the given bounds *)
+  let base_reward_coeff_ratio =
+    compute_reward_coeff_ratio_without_bonus
+      ~stake_ratio
+      ~issuance_ratio_max
+      ~issuance_ratio_min
+  in
+  (* Compute the dynamic curve. Keeps the sum static + dynamic within the
+     given bounds *)
+  let*? bonus =
+    compute_bonus
+      ~issuance_ratio_max
+      ~seconds_per_cycle
+      ~stake_ratio
+      ~base_reward_coeff_ratio
+      ~previous_bonus
+      ~reward_params
+  in
+  (* Compute the multiplicative coefficient to apply to the base rewards *)
+  let coeff =
+    compute_coeff
+      ~issuance_ratio_max
+      ~issuance_ratio_min
+      ~base_total_issued_per_minute
+      ~base_reward_coeff_ratio
+      ~q_total_supply
+      ~bonus
+  in
+  let*! ctxt = Storage.Issuance_bonus.add ctxt for_cycle bonus in
+  let*! ctxt = Storage.Issuance_coeff.add ctxt for_cycle coeff in
+  return ctxt
 
 let clear_outdated_reward_data ctxt ~new_cycle =
   let open Lwt_syntax in
@@ -378,21 +362,8 @@ let load_reward_coeff ctxt =
 let init_from_genesis ctxt =
   let open Lwt_result_syntax in
   let* ctxt = Storage.Adaptive_issuance.Launch_ema.init ctxt 0l in
-  let ctxt = Raw_context.set_adaptive_issuance_enable ctxt in
   let current_cycle = (Level_storage.current ctxt).cycle in
   Storage.Adaptive_issuance.Activation.init ctxt (Some current_cycle)
-
-let set_adaptive_issuance_enable ctxt =
-  let open Lwt_result_syntax in
-  let+ enable =
-    let+ launch_cycle = launch_cycle ctxt in
-    match launch_cycle with
-    | None -> false
-    | Some launch_cycle ->
-        let current_cycle = (Level_storage.current ctxt).cycle in
-        Cycle_repr.(current_cycle >= launch_cycle)
-  in
-  if enable then Raw_context.set_adaptive_issuance_enable ctxt else ctxt
 
 let update_ema ctxt ~vote =
   let open Lwt_result_syntax in

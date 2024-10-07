@@ -57,7 +57,6 @@ let dummy_context () =
       ~timestamp:Time.Protocol.epoch
       (* ~fitness:[] *)
       (block.context : Tezos_protocol_environment.Context.t)
-      ~adaptive_issuance_enable:false
   in
   return ctxt
 
