@@ -175,7 +175,6 @@ fn compute<Host: Runtime>(
             allocated_ticks,
             retriable,
             sequencer_pool_address,
-            limits,
             tracer_input,
         )? {
             ExecutionResult::Valid(ExecutionInfo {
