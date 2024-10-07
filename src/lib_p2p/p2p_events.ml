@@ -639,20 +639,30 @@ module P2p_maintainance = struct
       ("duration", Time.System.Span.encoding)
 
   let too_few_connections =
-    declare_1
+    declare_4
       ~section
       ~name:"too_few_connections_maintenance"
-      ~msg:"too few connections ({connections})"
+      ~msg:
+        "too few connections (conn.: {connections}, min. target: {min_target}, \
+         conf: [{min_connections};{expected_connections}])"
       ~level:Notice
       ("connections", Data_encoding.int31)
+      ("min_target", Data_encoding.int31)
+      ("expected_connections", Data_encoding.int31)
+      ("min_connections", Data_encoding.int31)
 
   let too_many_connections =
-    declare_1
+    declare_4
       ~section
       ~name:"too_many_connections_maintenance"
-      ~msg:"too many connections (will kill {connections})"
+      ~msg:
+        "too many connections (will kill {connections} to reach {max_target}, \
+         conf: [{expected_connections};{max_connections}])"
       ~level:Debug
       ("connections", Data_encoding.int31)
+      ("max_target", Data_encoding.int31)
+      ("expected_connections", Data_encoding.int31)
+      ("max_connections", Data_encoding.int31)
 end
 
 module P2p_welcome = struct

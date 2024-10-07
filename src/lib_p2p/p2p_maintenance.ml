@@ -261,7 +261,13 @@ and too_few_connections ~rng t n_connected =
   let open Lwt_result_syntax in
   (* try and contact new peers *)
   t.log Too_few_connections ;
-  let*! () = Events.(emit too_few_connections) n_connected in
+  let*! () =
+    Events.(emit too_few_connections)
+      ( n_connected,
+        t.bounds.min_target,
+        t.config.expected_connections,
+        t.config.min_connections )
+  in
   let min_to_contact = t.bounds.min_target - n_connected in
   let max_to_contact = t.bounds.max_target - n_connected in
   let*! success = try_to_contact t min_to_contact max_to_contact in
@@ -273,7 +279,13 @@ and too_many_connections ~rng t n_connected =
   (* kill random connections *)
   t.log Too_many_connections ;
   let n = n_connected - t.bounds.max_target in
-  let* () = Events.(emit too_many_connections) n in
+  let* () =
+    Events.(emit too_many_connections)
+      ( n,
+        t.bounds.max_target,
+        t.config.expected_connections,
+        t.config.max_connections )
+  in
   let connections = random_connections ~rng t.pool n in
   let* () =
     List.iter_p (P2p_conn.disconnect ~reason:Maintenance_too_many) connections
