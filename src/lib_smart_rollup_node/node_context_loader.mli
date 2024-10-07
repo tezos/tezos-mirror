@@ -39,7 +39,6 @@ val init :
   #Client_context.full ->
   data_dir:string ->
   irmin_cache_size:int ->
-  index_buffer_size:int ->
   ?log_kernel_debug_file:string ->
   ?last_whitelist_update:Z.t * Int32.t ->
   'a Store_sigs.mode ->

@@ -430,19 +430,14 @@ let () =
   and* last_context_split_level =
     Node_context.get_last_context_split_level node_ctxt
   in
-  let first_available_level =
+  let first_available_level, last_gc_started_at =
     match started_gc_info with
-    | Some {first_available_level = l; _} -> l
-    | None -> node_ctxt.genesis_info.level
-  in
-  let last_gc_started_at =
-    match started_gc_info with
-    | Some {last_gc_level; _} -> Some last_gc_level
-    | None -> None
+    | Some gc -> (gc.gc_target, Some gc.gc_triggered_at)
+    | None -> (node_ctxt.genesis_info.level, None)
   in
   let last_successful_gc_target =
     match successful_gc_info with
-    | Some {first_available_level = l; _} -> Some l
+    | Some {gc_target = l; _} -> Some l
     | None -> None
   in
   return

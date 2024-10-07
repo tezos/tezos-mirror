@@ -229,7 +229,7 @@ let generate_proof (node_ctxt : _ Node_context.t)
              ~error:(Format.kasprintf Stdlib.failwith "%a" pp_print_trace))
         @@
         let open Lwt_result_syntax in
-        let* messages = Messages.get node_ctxt witness in
+        let* messages = Node_context.get_messages node_ctxt witness in
         let*? hist = Inbox.payloads_history_of_all_messages messages in
         return hist
     end

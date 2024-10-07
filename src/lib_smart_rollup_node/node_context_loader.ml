@@ -64,15 +64,11 @@ let create_sync_info () =
   }
 
 let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
-    ~index_buffer_size ?log_kernel_debug_file ?last_whitelist_update mode
-    l1_ctxt genesis_info ~(lcc : lcc) ~lpc kind current_protocol
+    ?log_kernel_debug_file ?last_whitelist_update mode l1_ctxt genesis_info
+    ~(lcc : lcc) ~lpc kind current_protocol
     Configuration.(
-      {
-        sc_rollup_address = rollup_address;
-        l2_blocks_cache_size;
-        dal_node_endpoint;
-        _;
-      } as configuration) =
+      {sc_rollup_address = rollup_address; dal_node_endpoint; _} as
+      configuration) =
   let open Lwt_result_syntax in
   let* lockfile = lock ~data_dir in
   let metadata =
@@ -93,13 +89,7 @@ let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
   let dal_cctxt =
     Option.map Dal_node_client.make_unix_cctxt dal_node_endpoint
   in
-  let* store =
-    Node_context.Node_store.load
-      mode
-      ~index_buffer_size
-      ~l2_blocks_cache_size
-      Configuration.(default_storage_dir data_dir)
-  in
+  let* store = Node_context.Node_store.load mode ~data_dir in
   let*? (module Plugin : Protocol_plugin_sig.S) =
     Protocol_plugins.proto_plugin_for_protocol current_protocol.hash
   in
@@ -206,7 +196,7 @@ let close ({cctxt; store; context; l1_ctxt; finaliser; _} as node_ctxt) =
   let*! () = message "Closing context@." in
   let*! () = Context.close context in
   let*! () = message "Closing store@." in
-  let* () = Node_context.Node_store.close store in
+  let*! () = Node_context.Node_store.close store in
   let*! () = message "Releasing lock@." in
   let*! () = unlock node_ctxt in
   return_unit
@@ -287,17 +277,17 @@ module For_snapshots = struct
         ~l1_blocks_cache_size
         cctxt
     in
-    let* lcc = Store.Lcc.read store.Store.lcc in
+    let* lcc = Store.State.LCC.get store in
     let lcc =
       match lcc with
-      | Some lcc -> lcc
+      | Some (commitment, level) -> {commitment; level}
       | None ->
           {
             commitment = metadata.genesis_info.commitment_hash;
             level = metadata.genesis_info.level;
           }
     in
-    let* lpc = Store.Lpc.read store.Store.lpc in
+    let* lpc = Store.Commitments.find_lpc store in
     let*! lockfile =
       Lwt_unix.openfile (Filename.temp_file "lock" "") [] 0o644
     in
@@ -395,13 +385,7 @@ module Internal_for_tests = struct
         }
     in
     let* lockfile = lock ~data_dir in
-    let* store =
-      Node_context.Node_store.load
-        Read_write
-        ~index_buffer_size
-        ~l2_blocks_cache_size
-        Configuration.(default_storage_dir data_dir)
-    in
+    let* store = Node_context.Node_store.load Read_write ~data_dir in
     let*? (module Plugin : Protocol_plugin_sig.S) =
       Protocol_plugins.proto_plugin_for_protocol current_protocol.hash
     in
@@ -506,6 +490,6 @@ module Internal_for_tests = struct
       create_node_context cctxt current_protocol ~data_dir Wasm_2_0_0
     in
     let*! () = Context.close node_ctxt.context in
-    let* () = Node_context.Node_store.close node_ctxt.store in
+    let*! () = Node_context.Node_store.close node_ctxt.store in
     return node_ctxt
 end

@@ -74,3 +74,7 @@ val cardinal : t -> int
 
 (** [to_z t] Returns the sum of powers of two of the given bitset. *)
 val to_z : t -> Z.t
+
+(** [from_z i] builds a bitset from its integer representation (partial
+    function). *)
+val from_z : Z.t -> t tzresult

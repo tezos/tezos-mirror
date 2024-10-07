@@ -202,7 +202,7 @@ let generate_proof (node_ctxt : _ Node_context.t)
         @@
         let open Lwt_result_syntax in
         let* messages =
-          Messages.get
+          Node_context.get_messages
             node_ctxt
             (Sc_rollup_proto_types.Merkelized_payload_hashes_hash.to_octez
                witness)

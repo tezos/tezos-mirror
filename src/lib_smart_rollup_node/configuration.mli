@@ -76,7 +76,7 @@ type gc_parameters = {
       (** Number of blocks before splitting the context. *)
 }
 
-type history_mode =
+type history_mode = Store.State.history_mode =
   | Archive
       (** The whole history of the rollup (starting at its genesis) is kept *)
   | Full

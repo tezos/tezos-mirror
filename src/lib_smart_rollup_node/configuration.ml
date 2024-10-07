@@ -51,7 +51,7 @@ type gc_parameters = {
   context_splitting_period : int option;
 }
 
-type history_mode = Archive | Full
+type history_mode = Store.State.history_mode = Archive | Full
 
 type outbox_destination_filter =
   | Any_destination
@@ -726,7 +726,7 @@ let encoding default_display : t Data_encoding.t =
                 "loop_retry_delay"
                 Data_encoding.float
                 default_loop_retry_delay)
-             (opt "index_buffer_size" int31)
+             (opt "index_buffer_size" int31 ~description:"Deprecated")
              (opt "irmin_cache_size" int31)
              (dft "log-kernel-debug" Data_encoding.bool false)
              (dft "no-degraded" Data_encoding.bool false)

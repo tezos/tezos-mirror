@@ -70,7 +70,7 @@ let check_store_version store_dir =
 
 let get_head (store : _ Store.t) =
   let open Lwt_result_syntax in
-  let* head = Store.L2_head.read store.l2_head in
+  let* head = Store.L2_blocks.find_head store in
   let*? head =
     match head with
     | None ->
@@ -120,10 +120,7 @@ let pre_export_checks_and_get_snapshot_header cctxt ~no_checks ~data_dir =
     | Some m -> Ok m
   in
   let*? () = Context.Version.check metadata.context_version in
-  let* store =
-    Store.load Read_only ~index_buffer_size:0 ~l2_blocks_cache_size:1 store_dir
-  in
-
+  let* store = Store.init Read_only ~data_dir in
   let* head = get_head store in
   let level = head.Sc_rollup_block.header.level in
   let* (module Plugin) =
@@ -131,7 +128,7 @@ let pre_export_checks_and_get_snapshot_header cctxt ~no_checks ~data_dir =
   in
   let (module C) = Plugin.Pvm.context metadata.kind in
   let* context = Context.load (module C) ~cache_size:1 Read_only context_dir in
-  let* history_mode = Store.History_mode.read store.history_mode in
+  let* history_mode = Store.State.History_mode.get store in
   let*? history_mode =
     match history_mode with
     | None -> error_with "No history mode information in %S." data_dir
@@ -143,10 +140,8 @@ let pre_export_checks_and_get_snapshot_header cctxt ~no_checks ~data_dir =
   in
   let* () =
     unless no_checks @@ fun () ->
-    let* last_commitment =
-      Store.Commitments.read store.commitments last_commitment_hash
-    in
-    let last_commitment, () =
+    let* last_commitment = Store.Commitments.find store last_commitment_hash in
+    let last_commitment =
       WithExceptions.Option.get ~loc:__LOC__ last_commitment
     in
     (* Check if predecessor commitment exist on chain as a safety measure,
@@ -159,7 +154,7 @@ let pre_export_checks_and_get_snapshot_header cctxt ~no_checks ~data_dir =
   in
   (* Closing context and stores after checks *)
   let*! () = Context.close context in
-  let* () = Store.close store in
+  let*! () = Store.close store in
   return
     {
       Header.version = V0;
@@ -171,9 +166,9 @@ let pre_export_checks_and_get_snapshot_header cctxt ~no_checks ~data_dir =
 
 let first_available_level ~data_dir store =
   let open Lwt_result_syntax in
-  let* gc_levels = Store.Gc_levels.read store.Store.gc_levels in
-  match gc_levels with
-  | Some {first_available_level; _} -> return first_available_level
+  let* first_available_level = Store.State.Last_gc_target.get store in
+  match first_available_level with
+  | Some first_available_level -> return first_available_level
   | None -> (
       let* metadata = Metadata.read_metadata_file ~dir:data_dir in
       match metadata with
@@ -187,20 +182,18 @@ let check_some hash what = function
 
 let check_block_data_and_get_content (store : _ Store.t) context hash =
   let open Lwt_result_syntax in
-  let* b = Store.L2_blocks.read store.l2_blocks hash in
-  let*? _b, header = check_some hash "L2 block" b in
-  let* messages = Store.Messages.read store.messages header.inbox_witness in
-  let*? _messages, _ = check_some hash "messages" messages in
-  let* inbox = Store.Inboxes.read store.inboxes header.inbox_hash in
-  let*? inbox, () = check_some hash "inbox" inbox in
+  let* b = Store.L2_blocks.find store hash in
+  let*? {header; _} = check_some hash "L2 block" b in
+  let* messages = Store.Messages.find store header.inbox_witness in
+  let*? _level, _messages = check_some hash "messages" messages in
+  let* inbox = Store.Inboxes.find store header.inbox_hash in
+  let*? inbox = check_some hash "inbox" inbox in
   let* commitment =
     match header.commitment_hash with
     | None -> return_none
     | Some commitment_hash ->
-        let* commitment =
-          Store.Commitments.read store.commitments commitment_hash
-        in
-        let*? commitment, () = check_some hash "commitment" commitment in
+        let* commitment = Store.Commitments.find store commitment_hash in
+        let*? commitment = check_some hash "commitment" commitment in
         return_some commitment
   in
   (* Ensure head context is available. *)
@@ -444,31 +437,27 @@ let check_lcc metadata cctxt (store : _ Store.t) (head : Sc_rollup_block.t)
     (* The snapshot is older than the current LCC *)
     return_unit
   else
-    let* lcc_block_hash =
-      Store.Levels_to_hashes.find store.levels_to_hashes lcc.level
-    in
+    let* lcc_block_hash = Store.L2_levels.find store lcc.level in
     let*? lcc_block_hash =
       match lcc_block_hash with
       | None -> error_with "No block for LCC level %ld" lcc.level
       | Some h -> Ok h
     in
-    let* lcc_block_header =
-      Store.L2_blocks.header store.l2_blocks lcc_block_hash
-    in
-    match lcc_block_header with
+    let* lcc_block = Store.L2_blocks.find store lcc_block_hash in
+    match lcc_block with
     | None ->
         failwith
           "Unknown block %a for LCC level %ld"
           Block_hash.pp
           lcc_block_hash
           lcc.level
-    | Some {commitment_hash = None; _} ->
+    | Some {header = {commitment_hash = None; _}; _} ->
         failwith
           "No commitment for block %a for LCC level %ld"
           Block_hash.pp
           lcc_block_hash
           lcc.level
-    | Some {commitment_hash = Some commitment_hash; _} ->
+    | Some {header = {commitment_hash = Some commitment_hash; _}; _} ->
         fail_unless Commitment.Hash.(lcc.commitment = commitment_hash)
         @@ error_of_fmt
              "Snapshot contains %a for LCC at level %ld but was expected to be \
@@ -487,7 +476,9 @@ let reconstruct_level_context rollup_ctxt ~predecessor
   let open Lwt_result_syntax in
   let* block = Node_context.get_l2_block_by_level node_ctxt level in
   let* inbox = Node_context.get_inbox node_ctxt block.header.inbox_hash
-  and* messages = Messages.get node_ctxt block.header.inbox_witness in
+  and* messages =
+    Node_context.get_messages node_ctxt block.header.inbox_witness
+  in
   let* (module Plugin) =
     Protocol_plugins.proto_plugin_for_level node_ctxt level
   in
@@ -510,13 +501,7 @@ let with_modify_data_dir cctxt ~data_dir ~apply_unsafe_patches
   let store_dir = Configuration.default_storage_dir data_dir in
   let context_dir = Configuration.default_context_dir data_dir in
   let* () = check_store_version store_dir in
-  let* store =
-    Store.load
-      Read_write
-      ~index_buffer_size:1000
-      ~l2_blocks_cache_size:100
-      store_dir
-  in
+  let* store = Store.init Read_write ~data_dir in
   let* head = get_head store in
   let* (module Plugin) =
     Protocol_plugins.proto_plugin_for_level_with_store store head.header.level
@@ -562,7 +547,7 @@ let with_modify_data_dir cctxt ~data_dir ~apply_unsafe_patches
   in
   let* () = f node_ctxt ~head in
   let*! () = Context.close context in
-  let* () = Store.close store in
+  let*! () = Store.close store in
   return_unit
 
 let reconstruct_context_from_first_available_level
@@ -612,13 +597,7 @@ let post_checks ?(apply_unsafe_patches = false) ~action ~message snapshot_header
   let context_dir = Configuration.default_context_dir dest in
   (* Load context and stores in read-only to run checks. *)
   let* () = check_store_version store_dir in
-  let* store =
-    Store.load
-      Read_only
-      ~index_buffer_size:1000
-      ~l2_blocks_cache_size:100
-      store_dir
-  in
+  let* store = Store.init Read_only ~data_dir:dest in
   let* head = get_head store in
   let* (module Plugin) =
     Protocol_plugins.proto_plugin_for_level_with_store store head.header.level
@@ -658,7 +637,7 @@ let post_checks ?(apply_unsafe_patches = false) ~action ~message snapshot_header
     check_l2_chain ~message ~data_dir:dest store context head check_block_data
   in
   let*! () = Context.close context in
-  let* () = Store.close store in
+  let*! () = Store.close store in
   return_unit
 
 let post_export_checks ~snapshot_file =
@@ -676,11 +655,9 @@ let post_export_checks ~snapshot_file =
     snapshot_header
     ~dest
 
-let operator_local_file_regexp = Re.Str.regexp "^storage/lpc$"
-
 let snapshotable_files_regexp =
   Re.Str.regexp
-    "^\\(storage/.*\\|context/.*\\|wasm_2_0_0/.*\\|arith/.*\\|riscv/.*\\|context/.*\\|metadata$\\)"
+    "^\\(storage/version\\|context/.*\\|wasm_2_0_0/.*\\|arith/.*\\|riscv/.*\\|context/.*\\|metadata$\\)"
 
 let maybe_cancel_gc ~rollup_node_endpoint =
   let open Lwt_syntax in
@@ -772,12 +749,10 @@ let export_dir (header : Header.t) ~unlock ~compression ~data_dir ~dest
       | Some dest -> Filename.concat dest dest_file_name
       | None -> dest_file_name
     in
-    let*! () =
-      let open Lwt_syntax in
-      let* () = Option.iter_s Lwt_utils_unix.create_dir dest in
+    let* () =
+      let*! () = Option.iter_s Lwt_utils_unix.create_dir dest in
       let include_file relative_path =
         Re.Str.string_match snapshotable_files_regexp relative_path 0
-        && not (Re.Str.string_match operator_local_file_regexp relative_path 0)
       in
       let files =
         Tezos_stdlib_unix.Utils.fold_files
@@ -789,6 +764,10 @@ let export_dir (header : Header.t) ~unlock ~compression ~data_dir ~dest
               (full_path, relative_path) :: acc)
           []
       in
+      Lwt_utils_unix.with_tempdir "rollup_node_sqlite_export_" @@ fun tmp_dir ->
+      let output_db_file = Filename.concat tmp_dir Store.sqlite_file_name in
+      let* () = Store.export_store ~data_dir ~output_db_file in
+      let files = (output_db_file, Store.sqlite_file_name) :: files in
       let writer =
         match compression with
         | On_the_fly -> gzip_writer
@@ -828,14 +807,9 @@ let export_compact cctxt ~no_checks ~compression ~data_dir ~dest ~filename =
   in
   Lwt_utils_unix.with_tempdir "snapshot_temp_" @@ fun tmp_dir ->
   let tmp_context_dir = Configuration.default_context_dir tmp_dir in
-  let tmp_store_dir = Configuration.default_storage_dir tmp_dir in
   let*! () = Lwt_utils_unix.create_dir tmp_context_dir in
-  let*! () = Lwt_utils_unix.create_dir tmp_store_dir in
-  let store_dir = Configuration.default_storage_dir data_dir in
   let context_dir = Configuration.default_context_dir data_dir in
-  let* store =
-    Store.load Read_only ~index_buffer_size:0 ~l2_blocks_cache_size:1 store_dir
-  in
+  let* store = Store.init Read_only ~data_dir in
   let* metadata = Metadata.read_metadata_file ~dir:data_dir in
   let*? metadata =
     match metadata with
@@ -850,21 +824,18 @@ let export_compact cctxt ~no_checks ~compression ~data_dir ~dest ~filename =
   let (module C) = Plugin.Pvm.context metadata.kind in
   let* context = Context.load (module C) ~cache_size:1 Read_only context_dir in
   let* first_level = first_available_level ~data_dir store in
-  let* first_block_hash =
-    Store.Levels_to_hashes.find store.levels_to_hashes first_level
-  in
-  let first_block_hash =
-    WithExceptions.Option.get first_block_hash ~loc:__LOC__
-  in
-  let* first_block = Store.L2_blocks.read store.l2_blocks first_block_hash in
-  let _, first_block = WithExceptions.Option.get first_block ~loc:__LOC__ in
+  let* first_block = Store.L2_blocks.find_by_level store first_level in
+  let first_block = WithExceptions.Option.get first_block ~loc:__LOC__ in
   let* () =
     Progress_bar.Lwt.with_background_spinner
       ~message:
         (Format.sprintf
            "Exporting context snapshot with first level %ld"
            first_level)
-    @@ Context.export_snapshot context first_block.context ~path:tmp_context_dir
+    @@ Context.export_snapshot
+         context
+         first_block.header.context
+         ~path:tmp_context_dir
   in
   let ( // ) = Filename.concat in
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/6857
@@ -879,8 +850,10 @@ let export_compact cctxt ~no_checks ~compression ~data_dir ~dest ~filename =
     if Sys.file_exists path then
       Tezos_stdlib_unix.Utils.copy_file ~src:path ~dst:(tmp_dir // a)
   in
-  Tezos_stdlib_unix.Utils.copy_dir store_dir tmp_store_dir ;
+  let output_db_file = Filename.concat tmp_dir Store.sqlite_file_name in
+  let* () = Store.export_store ~data_dir ~output_db_file in
   copy_file "metadata" ;
+  copy_dir "storage" ;
   copy_dir "wasm_2_0_0" ;
   copy_dir "arith" ;
   copy_dir "riscv" ;
@@ -901,19 +874,12 @@ let export_compact cctxt ~no_checks ~compression ~data_dir ~dest ~filename =
 
 let pre_import_checks cctxt ~no_checks ~data_dir (snapshot_header : Header.t) =
   let open Lwt_result_syntax in
-  let store_dir = Configuration.default_storage_dir data_dir in
   (* Load stores in read-only to make simple checks. *)
-  let* store =
-    Store.load
-      Read_write
-      ~index_buffer_size:1000
-      ~l2_blocks_cache_size:100
-      store_dir
-  in
-  let* metadata = Metadata.read_metadata_file ~dir:data_dir
-  and* history_mode = Store.History_mode.read store.history_mode
-  and* head = Store.L2_head.read store.l2_head in
-  let* () = Store.close store in
+  let* store = Store.init Read_write ~data_dir in
+  let* metadata = Metadata.read_metadata_file ~dir:data_dir in
+  let* history_mode = Store.State.History_mode.get store in
+  let* head = Store.L2_blocks.find_head store in
+  let*! () = Store.close store in
   let*? () =
     let open Result_syntax in
     match (metadata, history_mode) with
@@ -991,16 +957,8 @@ let correct_history_mode ~data_dir (snapshot_header : Header.t)
       assert false
   | Some Archive, Archive | Some Full, Full -> return_unit
   | Some Full, Archive ->
-      let* hist_store =
-        Store.History_mode.load
-          ~path:
-            (Filename.concat
-               (Configuration.default_storage_dir data_dir)
-               "history_mode")
-          Read_write
-      in
-      let* () = Store.History_mode.write hist_store Full in
-      return_unit
+      let* store = Store.init Read_write ~data_dir in
+      Store.State.History_mode.set store Full
 
 let import ~apply_unsafe_patches ~no_checks ~force cctxt ~data_dir
     ~snapshot_file =
@@ -1024,6 +982,10 @@ let import ~apply_unsafe_patches ~no_checks ~force cctxt ~data_dir
       ~snapshot_file
       ~dest:data_dir
   in
+  let rm f =
+    try Unix.unlink f with Unix.Unix_error (Unix.ENOENT, _, _) -> ()
+  in
+  List.iter rm Store.extra_sqlite_files ;
   let* () = maybe_reconstruct_context cctxt ~data_dir ~apply_unsafe_patches in
   let* () =
     correct_history_mode ~data_dir snapshot_header original_history_mode
