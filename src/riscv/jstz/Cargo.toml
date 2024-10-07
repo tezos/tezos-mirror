@@ -13,16 +13,17 @@ tezos-smart-rollup-debug = { path = "../../kernel_sdk/debug" }
 tezos-smart-rollup-panic-hook = { path = "../../kernel_sdk/panic-hook" }
 tezos-smart-rollup-storage = { path = "../../kernel_sdk/storage" }
 # Patches from the jstz repo are dropped, copying them here
-boa_ast = { git = "https://github.com/trilitech/boa.git", branch = "ryutamago/fix-undefined-to-json" }
-boa_engine = { git = "https://github.com/trilitech/boa.git", branch = "ryutamago/fix-undefined-to-json" }
-boa_gc = { git = "https://github.com/trilitech/boa.git", branch = "ryutamago/fix-undefined-to-json" }
-boa_interner = { git = "https://github.com/trilitech/boa.git", branch = "ryutamago/fix-undefined-to-json" }
-boa_macros = { git = "https://github.com/trilitech/boa.git", branch = "ryutamago/fix-undefined-to-json" }
-boa_parser = { git = "https://github.com/trilitech/boa.git", branch = "ryutamago/fix-undefined-to-json" }
-boa_profiler = { git = "https://github.com/trilitech/boa.git", branch = "ryutamago/fix-undefined-to-json" }
+boa_ast = { git = "https://github.com/trilitech/boa.git", branch = "emturner@boa-gc-reset" }
+boa_engine = { git = "https://github.com/trilitech/boa.git", branch = "emturner@boa-gc-reset" }
+boa_gc = { git = "https://github.com/trilitech/boa.git", branch = "emturner@boa-gc-reset" }
+boa_interner = { git = "https://github.com/trilitech/boa.git", branch = "emturner@boa-gc-reset" }
+boa_macros = { git = "https://github.com/trilitech/boa.git", branch = "emturner@boa-gc-reset" }
+boa_parser = { git = "https://github.com/trilitech/boa.git", branch = "emturner@boa-gc-reset" }
+boa_profiler = { git = "https://github.com/trilitech/boa.git", branch = "emturner@boa-gc-reset" }
 
 [workspace.dependencies]
 base64 = "0.22.0"
+boa_gc = "0.17"
 http = "1.1.0"
 bincode = "1.3.3"
 regex = "1.10.4"
