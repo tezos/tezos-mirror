@@ -76,7 +76,7 @@ let init_with_stakers () =
           Half
     |+ Empty
   in
-  init_constants () --> activate_ai `Force
+  init_constants ()
   --> begin_test
         ~force_attest_all:true
         [

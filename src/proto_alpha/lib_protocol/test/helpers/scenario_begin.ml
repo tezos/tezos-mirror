@@ -46,43 +46,6 @@ let start_with_list ~(constants : (string * constants) list) :
         (Format.asprintf "%s: Cannot build scenarios from empty list" __LOC__)
   | _ -> fold_tag (fun constants -> start_with ~constants) constants
 
-let activate_ai mode =
-  match mode with
-  | `Force ->
-      log ~color:event_color "Forcing AI activation at initial cycle"
-      --> set S.Adaptive_issuance.force_activation true
-  | `Zero_threshold ->
-      (* Requires to wait until AI is activated *)
-      log ~color:event_color "Setting ai vote threshold to 0"
-      --> set S.Adaptive_issuance.force_activation false
-      --> set S.Adaptive_issuance.launch_ema_threshold 0l
-  | `With_vote_threshold t ->
-      (* Requires to wait for the votes to pass the threshold, then
-         wait some more before AI is activated *)
-      log ~color:event_color "Setting ai vote threshold to %ld" t
-      --> set S.Adaptive_issuance.force_activation false
-      --> set S.Adaptive_issuance.activation_vote_enable true
-      --> set S.Adaptive_issuance.launch_ema_threshold t
-  | `Force_and_vote_with_threshold t ->
-      (* Force should have priority on the vote *)
-      log
-        ~color:event_color
-        "Forcing AI activation at initial cycle, and setting ai vote threshold \
-         to %ld"
-        t
-      --> set S.Adaptive_issuance.force_activation true
-      --> set S.Adaptive_issuance.activation_vote_enable true
-      --> set S.Adaptive_issuance.launch_ema_threshold t
-  | `No ->
-      (* AI cannot be activated. *)
-      log ~color:event_color "Setting AI as impossible to activate"
-      --> set
-            S.Adaptive_issuance.launch_ema_threshold
-            (Int32.succ
-               Protocol.Per_block_votes_repr.Internal_for_tests.ema_max)
-      --> set S.Adaptive_issuance.force_activation false
-      --> set S.Adaptive_issuance.activation_vote_enable false
-
 (** Initializes the constants for testing, with well chosen default values.
     Recommended over [start] or [start_with] *)
 let init_constants ?(default = Test) ?(reward_per_block = 0L)
@@ -110,19 +73,18 @@ let init_constants ?(default = Test) ?(reward_per_block = 0L)
   --> set S.minimal_block_delay Protocol.Alpha_context.Period.one_minute
   --> set S.cost_per_byte Tez.zero
   --> set S.consensus_threshold 0
-  --> (if deactivate_dynamic then
-         set
-           S.Adaptive_issuance.Adaptive_rewards_params.max_bonus
-           (Protocol.Issuance_bonus_repr.max_bonus_parameter_of_Q_exn Q.zero)
-       else Empty)
-  --> set S.Adaptive_issuance.force_activation true
+  -->
+  if deactivate_dynamic then
+    set
+      S.Adaptive_issuance.Adaptive_rewards_params.max_bonus
+      (Protocol.Issuance_bonus_repr.max_bonus_parameter_of_Q_exn Q.zero)
+  else Empty
 
 (** Initialize the test, given some initial parameters *)
 let begin_test ?(burn_rewards = false) ?(force_attest_all = false)
     delegates_name_list : (constants, t) scenarios =
   exec (fun (constants : constants) ->
       let open Lwt_result_syntax in
-      let constants = constants |> S.Adaptive_issuance.force_activation true in
       let bootstrap = "__bootstrap__" in
       let delegates_name_list = bootstrap :: delegates_name_list in
       (* Override threshold value if activate *)
