@@ -5,6 +5,7 @@
 //
 // SPDX-License-Identifier: MIT
 
+use crate::extensions::WithGas;
 use crate::internal_runtime::{ExtendedRuntime, InternalRuntime};
 use crate::runtime::Runtime;
 use tezos_evm_logging::Verbosity;
@@ -255,5 +256,11 @@ impl<Host: Runtime> SafeStorage<&mut Host> {
 
     pub fn revert(&mut self) -> Result<(), RuntimeError> {
         self.host.store_delete(&TMP_PATH)
+    }
+}
+
+impl<Host: Runtime> WithGas for SafeStorage<&mut Host> {
+    fn add_execution_gas(&mut self, gas: u64) {
+        self.host.add_execution_gas(gas)
     }
 }

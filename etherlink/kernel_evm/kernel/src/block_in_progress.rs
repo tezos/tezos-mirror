@@ -269,6 +269,10 @@ impl BlockInProgress {
                 hex::encode(transaction.tx_hash)
             );
         };
+        // This is wrong, as for now `gas_used` contains the execution gas + gas
+        // for DA fees. This will be resolved in the next commit.
+        host.add_execution_gas(gas_used);
+
         self.add_gas(gas_used.into())?;
 
         // account for transaction ticks
