@@ -16,40 +16,6 @@
 open State_account
 open Tez_helpers.Ez_tez
 open Scenario
-open Log_helpers
-
-let assert_balance_evolution ~loc ~for_accounts ~part ~name ~old_balance
-    ~new_balance compare =
-  let open Lwt_result_syntax in
-  let old_b, new_b =
-    match part with
-    | `liquid ->
-        ( Q.of_int64 @@ Tez.to_mutez old_balance.liquid_b,
-          Q.of_int64 @@ Tez.to_mutez new_balance.liquid_b )
-    | `staked -> (old_balance.staked_b, new_balance.staked_b)
-    | `unstaked_frozen ->
-        ( Q.of_int64 @@ Tez.to_mutez old_balance.unstaked_frozen_b,
-          Q.of_int64 @@ Tez.to_mutez new_balance.unstaked_frozen_b )
-    | `unstaked_finalizable ->
-        ( Q.of_int64 @@ Tez.to_mutez old_balance.unstaked_finalizable_b,
-          Q.of_int64 @@ Tez.to_mutez new_balance.unstaked_finalizable_b )
-  in
-  if List.mem ~equal:String.equal name for_accounts then
-    if compare new_b old_b then return_unit
-    else (
-      Log.debug ~color:warning_color "Balances changes failed:@." ;
-      Log.debug "@[<v 2>Old Balance@ %a@]@." balance_pp old_balance ;
-      Log.debug "@[<v 2>New Balance@ %a@]@." balance_pp new_balance ;
-      Log.debug
-        "@[<v 2>Diff between balances@ %a@]@."
-        Q.pp_print
-        Q.(new_b - old_b) ;
-      failwith "%s Unexpected stake evolution for %s" loc name)
-  else (
-    Log.error
-      "Test_scenario_autostaking.assert_balance_evolution: account %s not found"
-      name ;
-    assert false)
 
 let gt_diff diff new_b old_b =
   let diff = Q.of_int64 @@ Tez.to_mutez diff in

@@ -370,7 +370,7 @@ let begin_test_with_rewards_checks ~init_limit =
   --> stake "staker" (Amount (Tez.of_mutez 111_000_000_000L))
   --> check_snapshot_balances
         ~f:
-          (Test_scenario_autostaking.assert_balance_evolution
+          (assert_balance_evolution
              ~loc:__LOC__
              ~for_accounts:["staker"]
              ~part:`staked
@@ -400,7 +400,7 @@ let test_rewards_with_limit_change =
   (* The last cycle when the staker gets rewards *)
   --> check_snapshot_balances
         ~f:
-          (Test_scenario_autostaking.assert_balance_evolution
+          (assert_balance_evolution
              ~loc:__LOC__
              ~for_accounts:["staker"]
              ~part:`staked
@@ -497,7 +497,7 @@ let test_overstake =
     let gt_diff (diff : Q.t) new_b old_b = Q.equal new_b (Q.add old_b diff) in
     check_snapshot_balances
       ~f:
-        (Test_scenario_autostaking.assert_balance_evolution
+        (assert_balance_evolution
            ~loc
            ~for_accounts:[name]
            ~part:`staked
