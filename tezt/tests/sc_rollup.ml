@@ -1042,10 +1042,11 @@ let test_gc variant ?(tags = []) ~challenge_window ~commitment_period
     |> List.rev |> List.hd
   in
   let nb_suffix = int_of_string last_suffix in
+  let split_period = max (challenge_window / 5) 1 in
   let max_nb_split =
     match history_mode with
     | Archive -> 0
-    | _ -> (level - origination_level + challenge_window - 1) / challenge_window
+    | _ -> (level - first_available_level + 1) / split_period
   in
   Check.((nb_suffix <= max_nb_split) int)
     ~error_msg:"Expected at most %R context suffix files, instead got %L" ;
@@ -6472,7 +6473,6 @@ let register_protocol_independent () =
     ~challenge_window:5
     ~commitment_period:2
     ~history_mode:Full
-    ~tags:[Tag.flaky]
     protocols ;
   test_gc
     "sparse_gc"
@@ -6480,7 +6480,6 @@ let register_protocol_independent () =
     ~challenge_window:10
     ~commitment_period:5
     ~history_mode:Full
-    ~tags:[Tag.flaky]
     protocols ;
   test_gc
     "no_gc"
