@@ -5,7 +5,7 @@
 use std::marker::PhantomData;
 
 use super::{
-    AllocatedOf, Atom, Cell, Elem, ManagerBase, ManagerClone, ManagerRead, ManagerReadWrite,
+    AllocatedOf, Atom, Cell, ManagerBase, ManagerClone, ManagerRead, ManagerReadWrite,
     ManagerWrite, Ref,
 };
 
@@ -20,12 +20,12 @@ pub trait EffectGetter {
 
 pub type EffectCellLayout<T> = Atom<T>;
 
-pub struct EffectCell<T: Elem, EG, M: ManagerBase> {
+pub struct EffectCell<T: 'static, EG, M: ManagerBase> {
     inner: Cell<T, M>,
     _pd: PhantomData<EG>,
 }
 
-impl<T: Elem, EG: EffectGetter, M: ManagerBase> EffectCell<T, EG, M> {
+impl<T: 'static, EG, M: ManagerBase> EffectCell<T, EG, M> {
     pub fn bind(space: AllocatedOf<EffectCellLayout<T>, M>) -> Self {
         Self {
             inner: space,
@@ -37,7 +37,9 @@ impl<T: Elem, EG: EffectGetter, M: ManagerBase> EffectCell<T, EG, M> {
     pub fn struct_ref(&self) -> AllocatedOf<EffectCellLayout<T>, Ref<'_, M>> {
         self.inner.struct_ref()
     }
+}
 
+impl<T: Copy, EG: EffectGetter, M: ManagerBase> EffectCell<T, EG, M> {
     #[inline(always)]
     pub fn read(&self) -> T
     where
@@ -66,7 +68,7 @@ impl<T: Elem, EG: EffectGetter, M: ManagerBase> EffectCell<T, EG, M> {
     }
 }
 
-impl<T: Elem, EG, M: ManagerClone> Clone for EffectCell<T, EG, M> {
+impl<T: Copy, EG, M: ManagerClone> Clone for EffectCell<T, EG, M> {
     fn clone(&self) -> Self {
         Self {
             inner: self.inner.clone(),

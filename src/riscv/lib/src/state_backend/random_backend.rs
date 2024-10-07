@@ -4,7 +4,7 @@
 
 use super::{
     owned_backend::Owned, Elem, Location, ManagerAlloc, ManagerBase, ManagerRead, ManagerReadWrite,
-    ManagerWrite,
+    ManagerWrite, StaticCopy,
 };
 use rand::Fill;
 use std::{cell, mem, rc, slice};
@@ -24,13 +24,13 @@ impl Randomised {
 }
 
 impl ManagerBase for Randomised {
-    type Region<E: Elem, const LEN: usize> = rc::Rc<cell::RefCell<[E; LEN]>>;
+    type Region<E: 'static, const LEN: usize> = rc::Rc<cell::RefCell<[E; LEN]>>;
 
     type DynRegion<const LEN: usize> = rc::Rc<cell::RefCell<Box<[u8; LEN]>>>;
 }
 
 impl ManagerAlloc for Randomised {
-    fn allocate_region<E: Elem, const LEN: usize>(
+    fn allocate_region<E: 'static, const LEN: usize>(
         &mut self,
         _loc: Location<[E; LEN]>,
     ) -> Self::Region<E, LEN> {
@@ -84,15 +84,18 @@ impl ManagerAlloc for Randomised {
 }
 
 impl ManagerRead for Randomised {
-    fn region_read<E: Elem, const LEN: usize>(region: &Self::Region<E, LEN>, index: usize) -> E {
+    fn region_read<E: StaticCopy, const LEN: usize>(
+        region: &Self::Region<E, LEN>,
+        index: usize,
+    ) -> E {
         Owned::region_read(&region.borrow(), index)
     }
 
-    fn region_read_all<E: Elem, const LEN: usize>(region: &Self::Region<E, LEN>) -> Vec<E> {
+    fn region_read_all<E: StaticCopy, const LEN: usize>(region: &Self::Region<E, LEN>) -> Vec<E> {
         Owned::region_read_all(&region.borrow())
     }
 
-    fn region_read_some<E: Elem, const LEN: usize>(
+    fn region_read_some<E: StaticCopy, const LEN: usize>(
         region: &Self::Region<E, LEN>,
         offset: usize,
         buffer: &mut [E],
@@ -117,7 +120,7 @@ impl ManagerRead for Randomised {
 }
 
 impl ManagerWrite for Randomised {
-    fn region_write<E: Elem, const LEN: usize>(
+    fn region_write<E: StaticCopy, const LEN: usize>(
         region: &mut Self::Region<E, LEN>,
         index: usize,
         value: E,
@@ -125,11 +128,14 @@ impl ManagerWrite for Randomised {
         Owned::region_write(&mut region.borrow_mut(), index, value)
     }
 
-    fn region_write_all<E: Elem, const LEN: usize>(region: &mut Self::Region<E, LEN>, value: &[E]) {
+    fn region_write_all<E: StaticCopy, const LEN: usize>(
+        region: &mut Self::Region<E, LEN>,
+        value: &[E],
+    ) {
         Owned::region_write_all(&mut region.borrow_mut(), value)
     }
 
-    fn region_write_some<E: Elem, const LEN: usize>(
+    fn region_write_some<E: StaticCopy, const LEN: usize>(
         region: &mut Self::Region<E, LEN>,
         index: usize,
         buffer: &[E],
@@ -155,7 +161,7 @@ impl ManagerWrite for Randomised {
 }
 
 impl ManagerReadWrite for Randomised {
-    fn region_replace<E: Elem, const LEN: usize>(
+    fn region_replace<E: StaticCopy, const LEN: usize>(
         region: &mut Self::Region<E, LEN>,
         index: usize,
         value: E,

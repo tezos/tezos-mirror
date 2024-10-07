@@ -14,11 +14,11 @@ use std::num::NonZeroUsize;
 
 /// Single element of type `E`
 #[repr(transparent)]
-pub struct Cell<E: Elem, M: ManagerBase + ?Sized> {
+pub struct Cell<E: 'static, M: ManagerBase + ?Sized> {
     region: Cells<E, 1, M>,
 }
 
-impl<E: Elem, M: ManagerBase> Cell<E, M> {
+impl<E: 'static, M: ManagerBase> Cell<E, M> {
     /// Bind this state to the single element region.
     pub fn bind(region: M::Region<E, 1>) -> Self {
         Self {
@@ -32,7 +32,9 @@ impl<E: Elem, M: ManagerBase> Cell<E, M> {
             region: self.region.struct_ref(),
         }
     }
+}
 
+impl<E: Copy, M: ManagerBase> Cell<E, M> {
     /// Read the value managed by the cell.
     #[inline(always)]
     pub fn read(&self) -> E
@@ -61,7 +63,7 @@ impl<E: Elem, M: ManagerBase> Cell<E, M> {
     }
 }
 
-impl<E: serde::Serialize + Elem, M: ManagerSerialise> serde::Serialize for Cell<E, M> {
+impl<E: serde::Serialize, M: ManagerSerialise> serde::Serialize for Cell<E, M> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -70,7 +72,7 @@ impl<E: serde::Serialize + Elem, M: ManagerSerialise> serde::Serialize for Cell<
     }
 }
 
-impl<'de, E: serde::Deserialize<'de> + Elem, M: ManagerDeserialise> serde::Deserialize<'de>
+impl<'de, E: serde::Deserialize<'de>, M: ManagerDeserialise> serde::Deserialize<'de>
     for Cell<E, M>
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -82,21 +84,21 @@ impl<'de, E: serde::Deserialize<'de> + Elem, M: ManagerDeserialise> serde::Deser
     }
 }
 
-impl<E: serde::Serialize + Elem, M: ManagerSerialise> RootHashable for Cell<E, M> {
+impl<E: serde::Serialize, M: ManagerSerialise> RootHashable for Cell<E, M> {
     fn hash(&self) -> Result<Hash, HashError> {
         Hash::blake2b_hash(self)
     }
 }
 
-impl<E: Eq + Elem, M: ManagerRead> PartialEq for Cell<E, M> {
+impl<E: Eq + Copy, M: ManagerRead> PartialEq for Cell<E, M> {
     fn eq(&self, other: &Self) -> bool {
         self.read() == other.read()
     }
 }
 
-impl<E: Eq + Elem, M: ManagerRead> Eq for Cell<E, M> {}
+impl<E: Eq + Copy, M: ManagerRead> Eq for Cell<E, M> {}
 
-impl<E: Elem, M: ManagerClone> Clone for Cell<E, M> {
+impl<E: Copy, M: ManagerClone> Clone for Cell<E, M> {
     fn clone(&self) -> Self {
         Self {
             region: self.region.clone(),
@@ -114,12 +116,12 @@ impl<E: Elem, M: ManagerClone> Clone for Cell<E, M> {
 /// [read]: LazyCell::read
 /// [replace]: LazyCell::replace
 /// [wrap]: LazyCell::wrap
-pub struct LazyCell<E: Elem, T, M: ManagerBase + ?Sized> {
+pub struct LazyCell<E: 'static, T, M: ManagerBase + ?Sized> {
     inner: Cell<E, M>,
     value: std::cell::Cell<Option<T>>,
 }
 
-impl<E: Elem, T, M: ManagerBase> LazyCell<E, T, M> {
+impl<E: Copy, T, M: ManagerBase> LazyCell<E, T, M> {
     /// Wrap an allocated [Cell] into a [LazyCell].
     pub fn wrap(inner: Cell<E, M>) -> Self {
         Self {
@@ -164,7 +166,7 @@ impl<E: Elem, T, M: ManagerBase> LazyCell<E, T, M> {
     }
 }
 
-impl<E: Elem, T: Copy, M: ManagerClone> Clone for LazyCell<E, T, M> {
+impl<E: Copy, T: Copy, M: ManagerClone> Clone for LazyCell<E, T, M> {
     fn clone(&self) -> Self {
         Self {
             inner: self.inner.clone(),
@@ -179,11 +181,11 @@ pub trait CellBase {
     type Value;
 }
 
-impl<E: Elem, M: ManagerBase> CellBase for Cell<E, M> {
+impl<E: 'static, M: ManagerBase> CellBase for Cell<E, M> {
     type Value = E;
 }
 
-impl<E: Elem, T, M: ManagerBase> CellBase for LazyCell<E, T, M> {
+impl<E: 'static, T, M: ManagerBase> CellBase for LazyCell<E, T, M> {
     type Value = T;
 }
 
@@ -201,14 +203,14 @@ pub trait CellRead: CellBase {
     fn read(&self) -> Self::Value;
 }
 
-impl<E: Elem, M: ManagerRead> CellRead for Cell<E, M> {
+impl<E: Copy, M: ManagerRead> CellRead for Cell<E, M> {
     #[inline(always)]
     fn read(&self) -> E {
         Cell::read(self)
     }
 }
 
-impl<E: Elem, T: Copy + From<E>, M: ManagerRead> CellRead for LazyCell<E, T, M> {
+impl<E: Copy, T: Copy + From<E>, M: ManagerRead> CellRead for LazyCell<E, T, M> {
     #[inline]
     fn read(&self) -> T {
         if let Some(value) = self.value.get() {
@@ -242,14 +244,14 @@ pub trait CellWrite: CellBase {
     fn write(&mut self, value: Self::Value);
 }
 
-impl<E: Elem, M: ManagerWrite> CellWrite for Cell<E, M> {
+impl<E: Copy, M: ManagerWrite> CellWrite for Cell<E, M> {
     #[inline(always)]
     fn write(&mut self, value: E) {
         Cell::write(self, value)
     }
 }
 
-impl<E: Elem + From<T>, T: Copy, M: ManagerWrite> CellWrite for LazyCell<E, T, M> {
+impl<E: Copy + From<T>, T: Copy, M: ManagerWrite> CellWrite for LazyCell<E, T, M> {
     #[inline(always)]
     fn write(&mut self, value: T) {
         self.value.set(Some(value));
@@ -270,14 +272,14 @@ pub trait CellReadWrite: CellRead + CellWrite {
     fn replace(&mut self, value: Self::Value) -> Self::Value;
 }
 
-impl<E: Elem, M: ManagerReadWrite> CellReadWrite for Cell<E, M> {
+impl<E: Copy, M: ManagerReadWrite> CellReadWrite for Cell<E, M> {
     #[inline(always)]
     fn replace(&mut self, value: E) -> E {
         Cell::replace(self, value)
     }
 }
 
-impl<E: Elem + From<T>, T: Copy + From<E>, M: ManagerReadWrite> CellReadWrite
+impl<E: Copy + From<T>, T: Copy + From<E>, M: ManagerReadWrite> CellReadWrite
     for LazyCell<E, T, M>
 {
     #[inline]
@@ -300,11 +302,11 @@ impl<E: CellReadWrite> CellReadWrite for &mut E {
 
 /// Multiple elements of type `E`
 #[repr(transparent)]
-pub struct Cells<E: Elem, const LEN: usize, M: ManagerBase + ?Sized> {
+pub struct Cells<E: 'static, const LEN: usize, M: ManagerBase + ?Sized> {
     region: M::Region<E, LEN>,
 }
 
-impl<E: Elem, const LEN: usize, M: ManagerBase> Cells<E, LEN, M> {
+impl<E: 'static, const LEN: usize, M: ManagerBase> Cells<E, LEN, M> {
     /// Bind this state to the given region.
     pub fn bind(region: M::Region<E, LEN>) -> Self {
         Self { region }
@@ -314,7 +316,9 @@ impl<E: Elem, const LEN: usize, M: ManagerBase> Cells<E, LEN, M> {
     pub fn struct_ref(&self) -> AllocatedOf<Array<E, LEN>, Ref<'_, M>> {
         Cells::bind(&self.region)
     }
+}
 
+impl<E: Copy, const LEN: usize, M: ManagerBase> Cells<E, LEN, M> {
     /// Read an element in the region.
     #[inline]
     pub fn read(&self, index: usize) -> E
@@ -379,7 +383,7 @@ impl<E: Elem, const LEN: usize, M: ManagerBase> Cells<E, LEN, M> {
     }
 }
 
-impl<E: serde::Serialize + Elem, const LEN: usize, M: ManagerSerialise> serde::Serialize
+impl<E: serde::Serialize, const LEN: usize, M: ManagerSerialise> serde::Serialize
     for Cells<E, LEN, M>
 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -390,7 +394,7 @@ impl<E: serde::Serialize + Elem, const LEN: usize, M: ManagerSerialise> serde::S
     }
 }
 
-impl<'de, E: serde::Deserialize<'de> + Elem, const LEN: usize, M: ManagerDeserialise>
+impl<'de, E: serde::Deserialize<'de>, const LEN: usize, M: ManagerDeserialise>
     serde::Deserialize<'de> for Cells<E, LEN, M>
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -402,21 +406,19 @@ impl<'de, E: serde::Deserialize<'de> + Elem, const LEN: usize, M: ManagerDeseria
     }
 }
 
-impl<E: serde::Serialize + Elem, const LEN: usize, M: ManagerSerialise> RootHashable
-    for Cells<E, LEN, M>
-{
+impl<E: serde::Serialize, const LEN: usize, M: ManagerSerialise> RootHashable for Cells<E, LEN, M> {
     fn hash(&self) -> Result<Hash, HashError> {
         Hash::blake2b_hash(self)
     }
 }
 
-impl<E: Eq + Elem, const LEN: usize, M: ManagerRead> PartialEq for Cells<E, LEN, M> {
+impl<E: Eq + Copy, const LEN: usize, M: ManagerRead> PartialEq for Cells<E, LEN, M> {
     fn eq(&self, other: &Self) -> bool {
         (0..LEN).all(|i| self.read(i) == other.read(i))
     }
 }
 
-impl<E: Elem, const LEN: usize, M: ManagerClone> Clone for Cells<E, LEN, M> {
+impl<E: Copy, const LEN: usize, M: ManagerClone> Clone for Cells<E, LEN, M> {
     fn clone(&self) -> Self {
         Self {
             region: M::clone_region(&self.region),

@@ -4,7 +4,7 @@
 
 use super::{
     AllocatedOf, Elem, Layout, Location, ManagerAlloc, ManagerBase, ManagerClone,
-    ManagerDeserialise, ManagerRead, ManagerReadWrite, ManagerSerialise, ManagerWrite,
+    ManagerDeserialise, ManagerRead, ManagerReadWrite, ManagerSerialise, ManagerWrite, StaticCopy,
 };
 use serde::ser::SerializeTuple;
 use std::{
@@ -26,13 +26,13 @@ impl Owned {
 }
 
 impl ManagerBase for Owned {
-    type Region<E: Elem, const LEN: usize> = [E; LEN];
+    type Region<E: 'static, const LEN: usize> = [E; LEN];
 
     type DynRegion<const LEN: usize> = Box<[u8; LEN]>;
 }
 
 impl ManagerAlloc for Owned {
-    fn allocate_region<E: Elem, const LEN: usize>(
+    fn allocate_region<E: 'static, const LEN: usize>(
         &mut self,
         _loc: Location<[E; LEN]>,
     ) -> Self::Region<E, LEN> {
@@ -52,15 +52,18 @@ impl ManagerAlloc for Owned {
 }
 
 impl ManagerRead for Owned {
-    fn region_read<E: Elem, const LEN: usize>(region: &Self::Region<E, LEN>, index: usize) -> E {
+    fn region_read<E: StaticCopy, const LEN: usize>(
+        region: &Self::Region<E, LEN>,
+        index: usize,
+    ) -> E {
         region[index]
     }
 
-    fn region_read_all<E: Elem, const LEN: usize>(region: &Self::Region<E, LEN>) -> Vec<E> {
+    fn region_read_all<E: StaticCopy, const LEN: usize>(region: &Self::Region<E, LEN>) -> Vec<E> {
         region.to_vec()
     }
 
-    fn region_read_some<E: Elem, const LEN: usize>(
+    fn region_read_some<E: StaticCopy, const LEN: usize>(
         region: &Self::Region<E, LEN>,
         offset: usize,
         buffer: &mut [E],
@@ -105,7 +108,7 @@ impl ManagerRead for Owned {
 }
 
 impl ManagerWrite for Owned {
-    fn region_write<E: Elem, const LEN: usize>(
+    fn region_write<E: StaticCopy, const LEN: usize>(
         region: &mut Self::Region<E, LEN>,
         index: usize,
         value: E,
@@ -113,11 +116,14 @@ impl ManagerWrite for Owned {
         region[index] = value;
     }
 
-    fn region_write_all<E: Elem, const LEN: usize>(region: &mut Self::Region<E, LEN>, value: &[E]) {
+    fn region_write_all<E: StaticCopy, const LEN: usize>(
+        region: &mut Self::Region<E, LEN>,
+        value: &[E],
+    ) {
         region.copy_from_slice(value)
     }
 
-    fn region_write_some<E: Elem, const LEN: usize>(
+    fn region_write_some<E: StaticCopy, const LEN: usize>(
         region: &mut Self::Region<E, LEN>,
         index: usize,
         buffer: &[E],
@@ -162,7 +168,7 @@ impl ManagerWrite for Owned {
 }
 
 impl ManagerReadWrite for Owned {
-    fn region_replace<E: Elem, const LEN: usize>(
+    fn region_replace<E: StaticCopy, const LEN: usize>(
         region: &mut Self::Region<E, LEN>,
         index: usize,
         value: E,
@@ -172,7 +178,7 @@ impl ManagerReadWrite for Owned {
 }
 
 impl ManagerSerialise for Owned {
-    fn serialise_region<E: serde::Serialize + Elem, const LEN: usize, S: serde::Serializer>(
+    fn serialise_region<E: serde::Serialize + 'static, const LEN: usize, S: serde::Serializer>(
         region: &Self::Region<E, LEN>,
         serializer: S,
     ) -> Result<S::Ok, S::Error> {
@@ -205,7 +211,7 @@ impl ManagerSerialise for Owned {
 impl ManagerDeserialise for Owned {
     fn deserialise_region<
         'de,
-        E: serde::de::Deserialize<'de> + Elem,
+        E: serde::de::Deserialize<'de> + 'static,
         const LEN: usize,
         D: serde::de::Deserializer<'de>,
     >(
@@ -273,7 +279,7 @@ impl ManagerDeserialise for Owned {
 }
 
 impl ManagerClone for Owned {
-    fn clone_region<E: Elem, const LEN: usize>(
+    fn clone_region<E: StaticCopy, const LEN: usize>(
         region: &Self::Region<E, LEN>,
     ) -> Self::Region<E, LEN> {
         #[allow(clippy::clone_on_copy)]

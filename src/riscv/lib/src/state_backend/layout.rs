@@ -57,7 +57,7 @@ pub struct Atom<T> {
     _pd: PhantomData<T>,
 }
 
-impl<T: super::Elem> Layout for Atom<T> {
+impl<T: 'static> Layout for Atom<T> {
     type Placed = Location<T>;
 
     fn place_with(alloc: &mut Choreographer) -> Self::Placed {
@@ -82,7 +82,7 @@ pub struct Array<T, const LEN: usize> {
     _pd: PhantomData<T>,
 }
 
-impl<T: super::Elem, const LEN: usize> Layout for Array<T, LEN> {
+impl<T: 'static, const LEN: usize> Layout for Array<T, LEN> {
     type Placed = Location<[T; LEN]>;
 
     fn place_with(alloc: &mut Choreographer) -> Self::Placed {

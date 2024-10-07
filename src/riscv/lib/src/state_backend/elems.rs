@@ -2,8 +2,13 @@
 //
 // SPDX-License-Identifier: MIT
 
+/// Types that can be copied and contain no non-static references
+pub trait StaticCopy: Copy + 'static {}
+
+impl<T: Copy + 'static> StaticCopy for T {}
+
 /// Elements that may be stored using a [Backend]
-pub trait Elem: Copy + 'static {
+pub trait Elem: StaticCopy {
     /// Copy from `source` and convert to stored representation.
     fn store(&mut self, source: &Self);
 

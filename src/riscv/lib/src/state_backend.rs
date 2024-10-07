@@ -77,7 +77,7 @@ pub use region::*;
 /// Manager of the state backend storage
 pub trait ManagerBase {
     /// Region that has been allocated in the state storage
-    type Region<E: Elem, const LEN: usize>;
+    type Region<E: 'static, const LEN: usize>;
 
     /// Dynamic region represents a fixed-sized byte vector that has been allocated in the state storage
     type DynRegion<const LEN: usize>;
@@ -86,7 +86,7 @@ pub trait ManagerBase {
 /// Manager with allocation capabilities
 pub trait ManagerAlloc: ManagerBase {
     /// Allocate a region in the state storage.
-    fn allocate_region<E: Elem, const LEN: usize>(
+    fn allocate_region<E, const LEN: usize>(
         &mut self,
         loc: Location<[E; LEN]>,
     ) -> Self::Region<E, LEN>;
@@ -101,13 +101,13 @@ pub trait ManagerAlloc: ManagerBase {
 /// Manager with read capabilities
 pub trait ManagerRead: ManagerBase {
     /// Read an element in the region.
-    fn region_read<E: Elem, const LEN: usize>(region: &Self::Region<E, LEN>, index: usize) -> E;
+    fn region_read<E: Copy, const LEN: usize>(region: &Self::Region<E, LEN>, index: usize) -> E;
 
     /// Read all elements in the region.
-    fn region_read_all<E: Elem, const LEN: usize>(region: &Self::Region<E, LEN>) -> Vec<E>;
+    fn region_read_all<E: Copy, const LEN: usize>(region: &Self::Region<E, LEN>) -> Vec<E>;
 
     /// Read `buffer.len()` elements from the region, starting at `offset`.
-    fn region_read_some<E: Elem, const LEN: usize>(
+    fn region_read_some<E: Copy, const LEN: usize>(
         region: &Self::Region<E, LEN>,
         offset: usize,
         buffer: &mut [E],
@@ -130,17 +130,17 @@ pub trait ManagerRead: ManagerBase {
 /// Manager with write capabilities
 pub trait ManagerWrite: ManagerBase {
     /// Update an element in the region.
-    fn region_write<E: Elem, const LEN: usize>(
+    fn region_write<E: Copy, const LEN: usize>(
         region: &mut Self::Region<E, LEN>,
         index: usize,
         value: E,
     );
 
     /// Update all elements in the region.
-    fn region_write_all<E: Elem, const LEN: usize>(region: &mut Self::Region<E, LEN>, value: &[E]);
+    fn region_write_all<E: Copy, const LEN: usize>(region: &mut Self::Region<E, LEN>, value: &[E]);
 
     /// Update a subset of elements in the region starting at `index`.
-    fn region_write_some<E: Elem, const LEN: usize>(
+    fn region_write_some<E: Copy, const LEN: usize>(
         region: &mut Self::Region<E, LEN>,
         index: usize,
         buffer: &[E],
@@ -164,7 +164,7 @@ pub trait ManagerWrite: ManagerBase {
 /// Manager with capabilities that require both read and write
 pub trait ManagerReadWrite: ManagerRead + ManagerWrite {
     /// Update the element in the region and return the previous value.
-    fn region_replace<E: Elem, const LEN: usize>(
+    fn region_replace<E: Copy, const LEN: usize>(
         region: &mut Self::Region<E, LEN>,
         index: usize,
         value: E,
@@ -174,7 +174,7 @@ pub trait ManagerReadWrite: ManagerRead + ManagerWrite {
 /// Manager with the ability to serialise regions
 pub trait ManagerSerialise: ManagerBase {
     /// Serialise the contents of the region.
-    fn serialise_region<E: serde::Serialize + Elem, const LEN: usize, S: serde::Serializer>(
+    fn serialise_region<E: serde::Serialize, const LEN: usize, S: serde::Serializer>(
         region: &Self::Region<E, LEN>,
         serializer: S,
     ) -> Result<S::Ok, S::Error>;
@@ -191,7 +191,7 @@ pub trait ManagerDeserialise: ManagerBase {
     /// Deserialise a region.
     fn deserialise_region<
         'de,
-        E: serde::Deserialize<'de> + Elem,
+        E: serde::Deserialize<'de>,
         const LEN: usize,
         D: serde::Deserializer<'de>,
     >(
@@ -207,7 +207,7 @@ pub trait ManagerDeserialise: ManagerBase {
 /// Manager with the ability to clone regions
 pub trait ManagerClone: ManagerBase {
     /// Clone the region.
-    fn clone_region<E: Elem, const LEN: usize>(
+    fn clone_region<E: Copy, const LEN: usize>(
         region: &Self::Region<E, LEN>,
     ) -> Self::Region<E, LEN>;
 
@@ -219,13 +219,13 @@ pub trait ManagerClone: ManagerBase {
 pub struct Ref<'backend, M>(std::marker::PhantomData<&'backend M>);
 
 impl<'backend, M: ManagerBase> ManagerBase for Ref<'backend, M> {
-    type Region<E: Elem, const LEN: usize> = &'backend M::Region<E, LEN>;
+    type Region<E: 'static, const LEN: usize> = &'backend M::Region<E, LEN>;
 
     type DynRegion<const LEN: usize> = &'backend M::DynRegion<LEN>;
 }
 
 impl<M: ManagerSerialise> ManagerSerialise for Ref<'_, M> {
-    fn serialise_region<E: serde::Serialize + Elem, const LEN: usize, S: serde::Serializer>(
+    fn serialise_region<E: serde::Serialize, const LEN: usize, S: serde::Serializer>(
         region: &Self::Region<E, LEN>,
         serializer: S,
     ) -> Result<S::Ok, S::Error> {
@@ -241,15 +241,15 @@ impl<M: ManagerSerialise> ManagerSerialise for Ref<'_, M> {
 }
 
 impl<M: ManagerRead> ManagerRead for Ref<'_, M> {
-    fn region_read<E: Elem, const LEN: usize>(region: &Self::Region<E, LEN>, index: usize) -> E {
+    fn region_read<E: Copy, const LEN: usize>(region: &Self::Region<E, LEN>, index: usize) -> E {
         M::region_read(region, index)
     }
 
-    fn region_read_all<E: Elem, const LEN: usize>(region: &Self::Region<E, LEN>) -> Vec<E> {
+    fn region_read_all<E: Copy, const LEN: usize>(region: &Self::Region<E, LEN>) -> Vec<E> {
         M::region_read_all(region)
     }
 
-    fn region_read_some<E: Elem, const LEN: usize>(
+    fn region_read_some<E: Copy, const LEN: usize>(
         region: &Self::Region<E, LEN>,
         offset: usize,
         buffer: &mut [E],
