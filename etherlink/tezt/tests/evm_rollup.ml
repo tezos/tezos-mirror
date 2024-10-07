@@ -3267,7 +3267,6 @@ let test_mainnet_ghostnet_kernel_migration =
         ~error_prefix:"After migration"
         evm_setup
     in
-
     ensure_config_setup_integrity
       ~config_result:sanity_check.config_result
       evm_setup
@@ -3340,6 +3339,13 @@ let test_latest_kernel_migration protocols =
       let indexes = List.sort compare indexes in
       Check.((indexes = ["accounts"; "blocks"; "transactions"]) (list string))
         ~error_msg:"Expected indexes to be %R, got %L" ;
+      let*@ zero_address_nonce =
+        Rpc.get_transaction_count
+          ~address:"0x0000000000000000000000000000000000000000"
+          evm_setup.evm_node
+      in
+      Check.((zero_address_nonce = 0L) int64)
+        ~error_msg:"The nonce should be 0 before the upgrade, got %L" ;
       return
         {transfer_result; block_result; config_result; simple_storage_address}
     in
@@ -3385,6 +3391,13 @@ let test_latest_kernel_migration protocols =
           ~error_prefix:"After migration"
           evm_setup
       in
+      let*@ zero_address_nonce =
+        Rpc.get_transaction_count
+          ~address:"0x0000000000000000000000000000000000000000"
+          evm_setup.evm_node
+      in
+      Check.((zero_address_nonce = 1L) int64)
+        ~error_msg:"The nonce should be 1 after the upgrade, got %L" ;
       ensure_config_setup_integrity
         ~config_result:sanity_check.config_result
         evm_setup
