@@ -298,7 +298,7 @@ let reply_receiver_job {process; query_store; _} node_context =
     in
     let shards = List.to_seq shards in
     let* () =
-      Store.(Shards.write_all node_store.shards slot_id shards)
+      Store.Shards.write_all node_store.shards slot_id shards
       |> Errors.to_tzresult
     in
     let* () =

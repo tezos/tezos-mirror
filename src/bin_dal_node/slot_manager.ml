@@ -314,7 +314,7 @@ let publish_slot_data ~level_committee (node_store : Store.t) ~slot_size
         |> Seq.mapi (fun index share -> Cryptobox.{index; share})
       in
       let* () =
-        Store.(Shards.write_all node_store.shards slot_id shards)
+        Store.Shards.write_all node_store.shards slot_id shards
         |> Errors.to_tzresult
       in
       let* () =
