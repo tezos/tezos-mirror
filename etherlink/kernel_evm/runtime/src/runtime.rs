@@ -14,7 +14,7 @@ use std::{
 };
 
 use crate::{
-    internal_runtime::{ExtendedRuntime, InternalRuntime},
+    internal_runtime::{ExtendedRuntime, InternalHost, InternalRuntime},
     mock_internal::MockInternal,
 };
 use tezos_evm_logging::{Level, Verbosity};
@@ -24,10 +24,13 @@ use tezos_smart_rollup_host::{
     dal_parameters::RollupDalParameters,
     input::Message,
     metadata::RollupMetadata,
-    path::Path,
+    path::{Path, RefPath},
     runtime::{Runtime as SdkRuntime, RuntimeError, ValueType},
 };
 use tezos_smart_rollup_mock::MockHost;
+
+// Set by the node, contains the verbosity for the logs
+pub const VERBOSITY_PATH: RefPath = RefPath::assert_from(b"/evm/logging_verbosity");
 
 pub trait Runtime: SdkRuntime + InternalRuntime + ExtendedRuntime + Verbosity {}
 
@@ -283,6 +286,29 @@ impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>, Internal: InternalRuntime> V
     }
 }
 
+pub fn read_logs_verbosity<Host: tezos_smart_rollup_host::runtime::Runtime>(
+    host: &Host,
+) -> Level {
+    match host.store_read_all(&VERBOSITY_PATH) {
+        Ok(value) if value.len() == 1 => {
+            Level::try_from(value[0]).unwrap_or(Level::default())
+        }
+        _ => Level::default(),
+    }
+}
+
+impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>> KernelHost<R, Host, InternalHost> {
+    pub fn init(host: Host) -> Self {
+        let internal_storage = InternalHost();
+        let logs_verbosity = read_logs_verbosity(host.borrow());
+        Self {
+            host,
+            internal: internal_storage,
+            logs_verbosity,
+            _pd: PhantomData,
+        }
+    }
+}
 pub type MockKernelHost = KernelHost<MockHost, MockHost, MockInternal>;
 
 impl Default for MockKernelHost {
