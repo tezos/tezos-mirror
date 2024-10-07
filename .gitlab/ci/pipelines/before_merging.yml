@@ -258,6 +258,7 @@ oc.misc_checks:
   - ./scripts/ci/lint_misc_check.sh
   - scripts/check_wasm_pvm_regressions.sh check
   - etherlink/scripts/check_evm_store_migrations.sh check
+  - ./scripts/check_rollup_node_sql_migrations.sh check
   - ./scripts/ci/lint_check_licenses.sh
 
 check_jsonnet_fmt:
