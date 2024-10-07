@@ -64,6 +64,10 @@ let variables : variables =
     ("CARGO_NET_OFFLINE", "true");
     (* Reduce the verbosity of Cargo. *)
     ("CARGO_TERM_QUIET", "true");
+    (* Enable timestamps for each line in job logs.
+
+       https://docs.gitlab.com/ee/ci/yaml/ci_job_log_timestamps.html *)
+    ("FF_TIMESTAMPS", "true");
   ]
 
 (** {2 Pipeline types} *)
