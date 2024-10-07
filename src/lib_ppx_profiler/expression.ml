@@ -39,6 +39,14 @@ let add_unit_function ~lod expr fun_name loc key =
           [%e Key.to_expression loc key] ;
         [%e expr]]
 
+(** [add_custom_function_apply _ key] will create
+      {[
+        key
+      ]}
+
+    [key] is a function application *)
+let add_custom_function_apply loc key = [%expr [%e Key.to_expression loc key]]
+
 let rewrite rewriters t =
   let loc = Ppxlib_helper.get_loc t in
   List.fold_left
@@ -67,7 +75,9 @@ let rewrite rewriters t =
             expr
             (Rewriter.to_fully_qualified_lident_expr rewriter loc)
             loc
-            rewriter.key)
+            rewriter.key
+          (* Custom functions *)
+      | Rewriter.Custom -> add_custom_function_apply loc rewriter.key)
     t
     rewriters
 

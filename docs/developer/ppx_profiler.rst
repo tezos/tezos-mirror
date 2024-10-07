@@ -81,7 +81,7 @@ This will be preprocessed into
 How to use this PPX?
 --------------------
 
-There are two types of functions in the Profiler library.
+There are three types of functions in the Profiler library.
 
 1. Inline functions
 ^^^^^^^^^^^^^^^^^^^
@@ -147,6 +147,21 @@ with
 
    (read_test_line () [@profiler.record_f "read_test_line"])
    ...
+
+3. Custom functions
+^^^^^^^^^^^^^^^^^^^^^
+
+You may want to declare a function that should only be used when the PPX is
+active. In this case you don't want to compile nor call this function when the
+PPX is disabled as it may create noise.
+
+This PPX library provides a special construct:
+
+- ``[profiler.custom function_application]``
+
+With ``function_application ::= <fun_name> <args>``.
+
+This construct will be preprocessed as ``fun_name args``.
 
 Structure of an attribute
 -------------------------
