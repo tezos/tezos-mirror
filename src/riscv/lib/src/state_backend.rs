@@ -215,33 +215,6 @@ pub trait ManagerClone: ManagerBase {
     fn clone_dyn_region<const LEN: usize>(region: &Self::DynRegion<LEN>) -> Self::DynRegion<LEN>;
 }
 
-/// State backend with manager
-pub trait BackendManagement {
-    /// Backend manager
-    type Manager<'backend>: ManagerReadWrite;
-
-    /// Backend manager for readonly operations
-    type ManagerRO<'backend>: ManagerRead;
-}
-
-/// State backend storage
-pub trait Backend: BackendManagement + Sized {
-    /// Structural representation of the states that this backend supports
-    type Layout: layout::Layout;
-
-    /// Allocate regions for the given layout placement.
-    fn allocate(
-        &mut self,
-        placed: PlacedOf<Self::Layout>,
-    ) -> AllocatedOf<Self::Layout, Self::Manager<'_>>;
-
-    /// Allocate regions for the given layout placement.
-    fn allocate_ro(
-        &self,
-        placed: PlacedOf<Self::Layout>,
-    ) -> AllocatedOf<Self::Layout, Self::ManagerRO<'_>>;
-}
-
 /// Manager wrapper around `M` whose regions are immutable references to regions of `M`
 pub struct Ref<'backend, M>(std::marker::PhantomData<&'backend M>);
 
