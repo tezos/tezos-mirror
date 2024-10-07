@@ -320,20 +320,23 @@ module Args = struct
 
   let help_arg = "--help"
 
+  let print_help () =
+    Format.printf
+      "Usage:\n\
+      \  octez-agnostic-baker [OCTEZ-AGNOSTIC-BAKER-COMMANDS] -- \
+       [OCTEZ-BAKER-COMMANDS]@.@." ;
+    Format.printf
+      "OCTEZ-AGNOSTIC-BAKER-COMMANDS:\n\
+      \  %s: display help\n\
+      \  %s: path to the octez-baker binaries@.@."
+      help_arg
+      binaries_directory_arg ;
+    Format.printf
+      "OCTEZ-BAKER-COMMANDS:\n Run ./octez-baker-<PROTOCOL_HASH> --help@."
+
   let help_cmd args =
     if List.mem ~equal:String.equal help_arg args then (
-      Format.printf
-        "Usage:\n\
-        \  octez-agnostic-baker [OCTEZ-AGNOSTIC-BAKER-COMMANDS] -- \
-         [OCTEZ-BAKER-COMMANDS]@.@." ;
-      Format.printf
-        "OCTEZ-AGNOSTIC-BAKER-COMMANDS:\n\
-        \  %s: display help\n\
-        \  %s: path to the octez-baker binaries@.@."
-        help_arg
-        binaries_directory_arg ;
-      Format.printf
-        "OCTEZ-BAKER-COMMANDS:\n Run ./octez-baker-<PROTOCOL_HASH> --help@." ;
+      print_help () ;
       exit 0)
     else ()
 
