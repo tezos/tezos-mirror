@@ -301,7 +301,12 @@ impl<M: ManagerClone> Clone for AccessCache<M> {
     fn clone(&self) -> Self {
         Self {
             fence_counter: self.fence_counter.clone(),
-            entries: self.entries.clone(),
+            entries: self
+                .entries
+                .to_vec()
+                .try_into()
+                .map_err(|_| "mismatched vector lengths in translation cache")
+                .unwrap(),
         }
     }
 }

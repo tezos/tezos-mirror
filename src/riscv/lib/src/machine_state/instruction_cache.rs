@@ -199,7 +199,11 @@ impl<const BITS: usize, const SIZE: usize> InstructionCacheLayout for Layout<BIT
     }
 
     fn clone_entries<M: ManagerClone>(entries: &Self::Entries<M>) -> Self::Entries<M> {
-        entries.clone()
+        entries
+            .to_vec()
+            .try_into()
+            .map_err(|_| "mismatching vector lengths in instruction cache")
+            .unwrap()
     }
 }
 

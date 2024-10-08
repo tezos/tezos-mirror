@@ -1063,7 +1063,7 @@ mod tests {
             },
             mode::Mode,
             registers::{a0, a1, a2, t0, t1, t2, zero},
-            TestCacheLayouts,
+            DefaultCacheLayouts, TestCacheLayouts,
         },
         parser::{
             instruction::{CIBTypeArgs, ITypeArgs, Instr, InstrCacheable, SBTypeArgs},
@@ -1597,5 +1597,14 @@ mod tests {
             alt_state.core.hart.xregisters.read(a0)
         );
         assert_eq_struct(&state.struct_ref(), &alt_state.struct_ref());
+    });
+
+    // Ensure that cloning the machine state does not result in a stack overflow
+    backend_test!(test_machine_state_cloneable, F, {
+        let state = create_state!(MachineState, MachineStateLayout<M1M, DefaultCacheLayouts>, F, M1M, DefaultCacheLayouts);
+
+        let second = state.clone();
+
+        assert_eq_struct(&state.struct_ref(), &second.struct_ref());
     });
 }
