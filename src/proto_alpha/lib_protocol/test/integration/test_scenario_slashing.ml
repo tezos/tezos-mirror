@@ -102,7 +102,6 @@ let test_multiple_misbehaviors =
     --> make_denunciations ()
   in
   init_constants ~blocks_per_cycle:24l ~reward_per_block:0L ()
-  --> set S.Adaptive_issuance.autostaking_enable false
   --> (Tag "No AI" --> activate_ai `No |+ Tag "Yes AI" --> activate_ai `Force)
   --> branch_flag S.Adaptive_issuance.ns_enable
   --> begin_test ["delegate"; "bootstrap1"; "bootstrap2"; "bootstrap3"]
@@ -195,7 +194,6 @@ let check_has_slots ~loc baker_name =
 let test_delegate_forbidden =
   let crd (_, state) = state.State.constants.consensus_rights_delay in
   init_constants ~blocks_per_cycle:32l ()
-  --> set S.Adaptive_issuance.autostaking_enable false
   --> activate_ai `No
   --> branch_flag S.Adaptive_issuance.ns_enable
   --> begin_test ["delegate"; "bootstrap1"; "bootstrap2"]
@@ -251,9 +249,7 @@ let test_delegate_forbidden =
          --> check_is_forbidden ~loc:__LOC__ "delegate")
 
 let test_slash_unstake =
-  init_constants ()
-  --> set S.Adaptive_issuance.autostaking_enable false
-  --> activate_ai `No
+  init_constants () --> activate_ai `No
   --> branch_flag S.Adaptive_issuance.ns_enable
   --> begin_test ["delegate"; "bootstrap1"; "bootstrap2"]
   --> set_baker "bootstrap1" --> next_cycle --> unstake "delegate" Half
@@ -265,7 +261,6 @@ let test_slash_unstake =
 let test_slash_monotonous_stake =
   let scenario ~offending_op ~op ~early_d =
     init_constants ~blocks_per_cycle:16l ()
-    --> set S.Adaptive_issuance.autostaking_enable false
     --> activate_ai `No
     --> branch_flag S.Adaptive_issuance.ns_enable
     --> begin_test ["delegate"; "bootstrap1"]
@@ -323,7 +318,6 @@ let test_slash_monotonous_stake =
 
 let test_slash_timing =
   init_constants ~blocks_per_cycle:8l ()
-  --> set S.Adaptive_issuance.autostaking_enable false
   --> activate_ai `No
   --> branch_flag S.Adaptive_issuance.ns_enable
   --> begin_test ["delegate"; "bootstrap1"]
@@ -349,9 +343,7 @@ let test_no_shortcut_for_cheaters =
   let consensus_rights_delay =
     Default_parameters.constants_test.consensus_rights_delay
   in
-  init_constants ()
-  --> set S.Adaptive_issuance.autostaking_enable false
-  --> activate_ai `Force
+  init_constants () --> activate_ai `Force
   --> begin_test ["delegate"; "bootstrap1"]
   --> stake "delegate" (Amount (Tez.of_mutez 1_800_000_000_000L))
   --> next_cycle --> double_bake "delegate" --> make_denunciations ()
@@ -377,9 +369,7 @@ let test_slash_correct_amount_after_stake_from_unstake =
   let consensus_rights_delay =
     Default_parameters.constants_test.consensus_rights_delay
   in
-  init_constants ()
-  --> set S.Adaptive_issuance.autostaking_enable false
-  --> activate_ai `Force
+  init_constants () --> activate_ai `Force
   --> begin_test ["delegate"; "bootstrap1"]
   --> stake "delegate" (Amount (Tez.of_mutez 1_800_000_000_000L))
   --> next_cycle
@@ -400,7 +390,6 @@ let test_slash_correct_amount_after_stake_from_unstake =
 (* Test a non-zero request finalizes for a non-zero amount if it hasn't been slashed 100% *)
 let test_mini_slash =
   init_constants ()
-  --> set S.Adaptive_issuance.autostaking_enable false
   --> (Tag "Yes AI" --> activate_ai `Force --> begin_test ["delegate"; "baker"]
       |+ Tag "No AI" --> activate_ai `No --> begin_test ["delegate"; "baker"])
   --> unstake "delegate" (Amount Tez.one_mutez)
@@ -417,9 +406,7 @@ let test_mini_slash =
           state.constants.consensus_rights_delay + 1)
 
 let test_slash_rounding =
-  init_constants ()
-  --> set S.Adaptive_issuance.autostaking_enable false
-  --> activate_ai `Force
+  init_constants () --> activate_ai `Force
   --> branch_flag S.Adaptive_issuance.ns_enable
   --> begin_test ["delegate"; "baker"]
   --> set_baker "baker"

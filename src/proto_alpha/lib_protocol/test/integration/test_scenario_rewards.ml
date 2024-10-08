@@ -25,7 +25,6 @@ open Scenario
 let test_wait_rewards_no_ai_no_auto =
   (* Prime number to always trigger roundings *)
   init_constants ~reward_per_block:1_000_000_007L ()
-  --> set S.Adaptive_issuance.autostaking_enable false
   --> activate_ai `No
   --> begin_test ["delegate1"; "delegate2"; "delegate3"]
   --> wait_n_cycles 20
@@ -200,7 +199,6 @@ let test_ai_curve_activation_time =
     state.State.constants.consensus_rights_delay
   in
   init_constants ~reward_per_block:1_000_000_000L ~deactivate_dynamic:true ()
-  --> set S.Adaptive_issuance.autostaking_enable false
   --> activate_ai `Zero_threshold
   --> begin_test ~burn_rewards:true [""]
   --> next_block --> save_current_rate (* before AI rate *)
@@ -238,7 +236,6 @@ let test_static_decreasing =
   in
   init_constants ~reward_per_block:1L ~deactivate_dynamic:true ()
   (* Set rate bounds that should not be reached *)
-  --> set S.Adaptive_issuance.autostaking_enable false
   --> set
         S.Adaptive_issuance.Adaptive_rewards_params.issuance_ratio_final_min
         Q.(1 // 100_000)
@@ -282,7 +279,6 @@ let test_static_timing =
   in
   init_constants ~reward_per_block:1L ~deactivate_dynamic:true ()
   (* Set rate bounds that should not be reached *)
-  --> set S.Adaptive_issuance.autostaking_enable false
   --> set
         S.Adaptive_issuance.Adaptive_rewards_params.issuance_ratio_final_min
         Q.(1 // 100_000)

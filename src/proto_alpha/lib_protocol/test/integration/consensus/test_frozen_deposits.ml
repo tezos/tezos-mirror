@@ -163,17 +163,7 @@ let adjust_staking_towards_limit ~limit ~block ~account ~contract =
 
 let test_limit_with_overdelegation () =
   let open Lwt_result_syntax in
-  let constants =
-    {
-      constants with
-      adaptive_issuance =
-        {
-          Default_parameters.constants_test.adaptive_issuance with
-          autostaking_enable = false;
-        };
-      limit_of_delegation_over_baking = 9;
-    }
-  in
+  let constants = {constants with limit_of_delegation_over_baking = 9} in
   let* genesis, contracts = Context.init_with_constants2 constants in
   let (contract1, account1), (contract2, account2) =
     get_first_2_accounts_contracts contracts
