@@ -4380,12 +4380,34 @@ let precheck () =
 
 let generate_dependency_graph ?(source = []) ?(without = []) filename =
   let module Node = struct
-    type t = Target.internal
+    type t = {target : Target.internal; size : int}
 
-    let id (node : t) = node.path ^ " " ^ Target.name_for_errors (Internal node)
+    let make (target : Target.internal) =
+      let size =
+        let all () =
+          (* As a first approximation we ignore modules with only an .mli for now. *)
+          Sys.readdir target.path |> Array.to_list
+          |> List.filter (fun f ->
+                 match Filename.extension f with
+                 | ".ml" | ".mli" | ".mll" | ".mly" -> true
+                 | _ -> false)
+          |> List.length
+        in
+        match target.modules with
+        | All -> all ()
+        | Modules list -> List.length list
+        | All_modules_except list -> all () - List.length list
+      in
+      {target; size}
+
+    let id (node : t) =
+      node.target.path ^ " " ^ Target.name_for_errors (Internal node.target)
 
     let label (node : t) =
-      node.path ^ "\\n" ^ Target.name_for_errors (Internal node)
+      node.target.path ^ "\\n"
+      ^ Target.name_for_errors (Internal node.target)
+      ^ "\\n" ^ string_of_int node.size ^ " OCaml file"
+      ^ if node.size = 1 then "" else "s"
 
     let id_matches pattern node =
       let string_contains sub str =
@@ -4406,7 +4428,7 @@ let generate_dependency_graph ?(source = []) ?(without = []) filename =
     let attributes (node : t) =
       ("label", label node)
       ::
-      (match node.kind with
+      (match node.target.kind with
       | Public_library _ | Private_library _ -> [("shape", "box")]
       | Public_executable _ | Private_executable _ | Test_executable _ -> [])
   end in
@@ -4420,7 +4442,8 @@ let generate_dependency_graph ?(source = []) ?(without = []) filename =
     | None ->
         (* Not an internal dependency, exclude from the graph. *)
         ()
-    | Some internal_dep -> graph := G.add internal internal_dep !graph ) ;
+    | Some internal_dep ->
+        graph := G.add (Node.make internal) (Node.make internal_dep) !graph ) ;
   let graph = !graph in
   (* Restrict it to dependencies of [source]. *)
   let graph =
