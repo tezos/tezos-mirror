@@ -57,6 +57,9 @@ l1-deps.dot: manifest
 %.svg: %.dot
 	dot -Tsvg $^ > $@
 
+%.png: %.dot
+	dot -Tpng $^ > $@
+
 # Used in the CI.
 .PHONY: check
 check: all
