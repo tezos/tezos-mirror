@@ -344,7 +344,7 @@ pub(crate) mod test_helpers {
 pub mod tests {
     use super::{random_backend::Randomised, *};
     use crate::backend_test;
-    use std::{collections::hash_map::RandomState, hash::BuildHasher};
+    use tests::hash::RootHashable;
 
     /// Run `f` twice against two different randomised backends and see if the
     /// resulting backend state is the same afterwards.
@@ -352,39 +352,34 @@ pub mod tests {
     where
         L: Layout,
         T: Fn(AllocatedOf<L, Randomised>),
+        for<'a> AllocatedOf<L, Randomised<'a>>: RootHashable,
     {
-        let hash_state = RandomState::default();
-
-        let (start1, snapshot1) = {
-            let placed = L::placed().into_location();
-            let mut manager = Randomised::default();
-
-            let space = L::allocate(&mut manager, placed);
-            let initial_checksum = hash_state.hash_one(manager.snapshot_regions());
+        let mut regions1 = Vec::new();
+        let start1 = {
+            let space = Randomised::allocate::<L>(&mut regions1);
+            let initial_checksum = space.hash().unwrap();
 
             f(space);
 
-            (initial_checksum, manager.snapshot_regions())
+            initial_checksum
         };
 
-        let snapshot2 = {
-            loop {
-                let placed = L::placed().into_location();
-                let mut manager = Randomised::default();
-                let space = L::allocate(&mut manager, placed);
+        let mut regions2 = Vec::new();
+        loop {
+            regions2.clear();
+            let space = Randomised::allocate::<L>(&mut regions2);
 
-                // Ensure the two states start differently.
-                if hash_state.hash_one(manager.snapshot_regions()) == start1 {
-                    continue;
-                }
-
-                f(space);
-
-                break manager.snapshot_regions();
+            // Ensure the two states start differently.
+            if space.hash().unwrap() == start1 {
+                continue;
             }
-        };
 
-        assert_eq!(snapshot1, snapshot2);
+            f(space);
+
+            break;
+        }
+
+        assert_eq!(regions1, regions2);
     }
 
     /// Given a `State<M: Manager>`, optionally its `StateLayout`,

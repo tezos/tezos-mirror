@@ -3,96 +3,119 @@
 // SPDX-License-Identifier: MIT
 
 use super::{
-    owned_backend::Owned, Elem, Location, ManagerAlloc, ManagerBase, ManagerRead, ManagerReadWrite,
-    ManagerWrite, StaticCopy,
+    hash::{Hash, HashError, RootHashable},
+    owned_backend::Owned,
+    AllocatedOf, Elem, Layout, Location, ManagerAlloc, ManagerBase, ManagerRead, ManagerReadWrite,
+    ManagerSerialise, ManagerWrite, StaticCopy,
 };
 use rand::Fill;
-use std::{cell, mem, rc, slice};
+use std::{alloc, boxed::Box, slice};
 
-/// Backend manager that randomises the allocated regions
-#[derive(Default)]
-pub struct Randomised {
-    rng: rand::rngs::OsRng,
-    snapshoters: Vec<Box<dyn Fn() -> Vec<u8>>>,
+/// Captured randomised region that can be compared and hashed
+#[derive(Debug)]
+pub struct Captured {
+    layout: alloc::Layout,
+    data: *const u8,
 }
 
-impl Randomised {
-    /// Collect snapshots of all allocated regions.
-    pub fn snapshot_regions(&self) -> Vec<Vec<u8>> {
-        self.snapshoters.iter().map(|f| f()).collect()
+impl AsRef<[u8]> for Captured {
+    fn as_ref(&self) -> &[u8] {
+        unsafe { slice::from_raw_parts(self.data, self.layout.size()) }
     }
 }
 
-impl ManagerBase for Randomised {
-    type Region<E: 'static, const LEN: usize> = rc::Rc<cell::RefCell<[E; LEN]>>;
-
-    type DynRegion<const LEN: usize> = rc::Rc<cell::RefCell<Box<[u8; LEN]>>>;
+impl PartialEq for Captured {
+    fn eq(&self, other: &Self) -> bool {
+        self.as_ref() == other.as_ref()
+    }
 }
 
-impl ManagerAlloc for Randomised {
+impl RootHashable for Captured {
+    fn hash(&self) -> Result<Hash, HashError> {
+        Hash::blake2b_hash_bytes(self.as_ref())
+    }
+}
+
+impl Drop for Captured {
+    fn drop(&mut self) {
+        unsafe {
+            alloc::dealloc(self.data as *mut u8, self.layout);
+        }
+    }
+}
+
+/// Backend manager that randomises the allocated regions
+pub struct Randomised<'a> {
+    rng: rand::rngs::OsRng,
+    regions: &'a mut Vec<Captured>,
+}
+
+impl<'a> Randomised<'a> {
+    /// Allocate randomised regions.
+    pub fn allocate<L: Layout>(regions: &'a mut Vec<Captured>) -> AllocatedOf<L, Self> {
+        let mut backend = Self {
+            rng: rand::rngs::OsRng,
+            regions,
+        };
+
+        L::allocate(&mut backend, L::placed().into_location())
+    }
+}
+
+impl<'a> ManagerBase for Randomised<'a> {
+    type Region<E: 'static, const LEN: usize> = &'a mut [E; LEN];
+
+    type DynRegion<const LEN: usize> = &'a mut [u8; LEN];
+}
+
+impl<'a> ManagerAlloc for Randomised<'a> {
     fn allocate_region<E: 'static, const LEN: usize>(
         &mut self,
         _loc: Location<[E; LEN]>,
     ) -> Self::Region<E, LEN> {
-        let region = unsafe {
-            let mut zeroed: [E; LEN] = mem::zeroed();
+        unsafe {
+            let layout = alloc::Layout::new::<[E; LEN]>();
+            let data = alloc::alloc(layout);
 
-            slice::from_raw_parts_mut(zeroed.as_mut_ptr().cast::<u8>(), mem::size_of_val(&zeroed))
+            slice::from_raw_parts_mut(data.cast::<u8>(), layout.size())
                 .try_fill(&mut self.rng)
                 .unwrap();
 
-            zeroed
-        };
+            self.regions.push(Captured { layout, data });
 
-        let region = rc::Rc::new(cell::RefCell::new(region));
-
-        let region_clone = region.clone();
-        self.snapshoters.push(Box::new(move || {
-            let region = region_clone.borrow();
-            let slice = unsafe {
-                slice::from_raw_parts(region.as_ptr().cast::<u8>(), mem::size_of::<[E; LEN]>())
-            };
-            slice.to_vec()
-        }));
-
-        region
+            &mut *data.cast::<[E; LEN]>()
+        }
     }
 
     fn allocate_dyn_region<const LEN: usize>(
         &mut self,
         _loc: Location<[u8; LEN]>,
     ) -> Self::DynRegion<LEN> {
-        let mut boxed: Box<[u8; LEN]> = unsafe {
-            let layout = std::alloc::Layout::new::<[u8; LEN]>();
-            let alloc = std::alloc::alloc_zeroed(layout);
-            Box::from_raw(alloc.cast())
-        };
+        unsafe {
+            let layout = alloc::Layout::new::<[u8; LEN]>();
+            let data = alloc::alloc(layout);
 
-        boxed.try_fill(&mut self.rng).unwrap();
+            slice::from_raw_parts_mut(data.cast::<u8>(), layout.size())
+                .try_fill(&mut self.rng)
+                .unwrap();
 
-        let region = rc::Rc::new(cell::RefCell::new(boxed));
+            self.regions.push(Captured { layout, data });
 
-        let region_clone = region.clone();
-        self.snapshoters.push(Box::new(move || {
-            let region = region_clone.borrow();
-            let slice = unsafe { &*region.as_ptr().cast::<[u8; LEN]>() };
-            slice.to_vec()
-        }));
-
-        region
+            &mut *data.cast::<[u8; LEN]>()
+        }
     }
 }
 
-impl ManagerRead for Randomised {
+impl<'a> ManagerRead for Randomised<'a> {
     fn region_read<E: StaticCopy, const LEN: usize>(
         region: &Self::Region<E, LEN>,
         index: usize,
     ) -> E {
-        Owned::region_read(&region.borrow(), index)
+        Owned::region_read(region, index)
     }
 
     fn region_read_all<E: StaticCopy, const LEN: usize>(region: &Self::Region<E, LEN>) -> Vec<E> {
-        Owned::region_read_all(&region.borrow())
+        Owned::region_read_all(region)
     }
 
     fn region_read_some<E: StaticCopy, const LEN: usize>(
@@ -100,14 +123,24 @@ impl ManagerRead for Randomised {
         offset: usize,
         buffer: &mut [E],
     ) {
-        Owned::region_read_some(&region.borrow(), offset, buffer)
+        Owned::region_read_some(region, offset, buffer)
     }
 
     fn dyn_region_read<E: Elem, const LEN: usize>(
         region: &Self::DynRegion<LEN>,
         address: usize,
     ) -> E {
-        Owned::dyn_region_read(&region.borrow(), address)
+        // SAFETY: The pointer has been allocated using the global allocator and can therefore be
+        // used with [`Box`]. Additionally, the box is leaked to prevent its destructor from being
+        // called.
+        let boxed = unsafe { Box::from_raw(region.as_ptr() as *mut [u8; LEN]) };
+
+        let value = Owned::dyn_region_read(&boxed, address);
+
+        // Prevent the destructor from running.
+        Box::leak(boxed);
+
+        value
     }
 
     fn dyn_region_read_all<E: Elem, const LEN: usize>(
@@ -115,24 +148,32 @@ impl ManagerRead for Randomised {
         address: usize,
         values: &mut [E],
     ) {
-        Owned::dyn_region_read_all(&region.borrow(), address, values)
+        // SAFETY: The pointer has been allocated using the global allocator and can therefore be
+        // used with [`Box`]. Additionally, the box is leaked to prevent its destructor from being
+        // called.
+        let boxed = unsafe { Box::from_raw(region.as_ptr() as *mut [u8; LEN]) };
+
+        Owned::dyn_region_read_all(&boxed, address, values);
+
+        // Prevent the destructor from running.
+        Box::leak(boxed);
     }
 }
 
-impl ManagerWrite for Randomised {
+impl<'a> ManagerWrite for Randomised<'a> {
     fn region_write<E: StaticCopy, const LEN: usize>(
         region: &mut Self::Region<E, LEN>,
         index: usize,
         value: E,
     ) {
-        Owned::region_write(&mut region.borrow_mut(), index, value)
+        Owned::region_write(region, index, value);
     }
 
     fn region_write_all<E: StaticCopy, const LEN: usize>(
         region: &mut Self::Region<E, LEN>,
         value: &[E],
     ) {
-        Owned::region_write_all(&mut region.borrow_mut(), value)
+        Owned::region_write_all(region, value);
     }
 
     fn region_write_some<E: StaticCopy, const LEN: usize>(
@@ -140,7 +181,7 @@ impl ManagerWrite for Randomised {
         index: usize,
         buffer: &[E],
     ) {
-        Owned::region_write_some(&mut region.borrow_mut(), index, buffer)
+        Owned::region_write_some(region, index, buffer);
     }
 
     fn dyn_region_write<E: Elem, const LEN: usize>(
@@ -148,7 +189,15 @@ impl ManagerWrite for Randomised {
         address: usize,
         value: E,
     ) {
-        Owned::dyn_region_write(&mut region.borrow_mut(), address, value)
+        // SAFETY: The pointer has been allocated using the global allocator and can therefore be
+        // used with [`Box`]. Additionally, the box is leaked to prevent its destructor from being
+        // called.
+        let mut boxed = unsafe { Box::from_raw(region.as_mut_ptr() as *mut [u8; LEN]) };
+
+        Owned::dyn_region_write(&mut boxed, address, value);
+
+        // Prevent the destructor from running.
+        Box::leak(boxed);
     }
 
     fn dyn_region_write_all<E: Elem, const LEN: usize>(
@@ -156,16 +205,50 @@ impl ManagerWrite for Randomised {
         address: usize,
         values: &[E],
     ) {
-        Owned::dyn_region_write_all(&mut region.borrow_mut(), address, values)
+        // SAFETY: The pointer has been allocated using the global allocator and can therefore be
+        // used with [`Box`]. Additionally, the box is leaked to prevent its destructor from being
+        // called.
+        let mut boxed = unsafe { Box::from_raw(region.as_mut_ptr() as *mut [u8; LEN]) };
+
+        Owned::dyn_region_write_all(&mut boxed, address, values);
+
+        // Prevent the destructor from running.
+        Box::leak(boxed);
     }
 }
 
-impl ManagerReadWrite for Randomised {
+impl<'a> ManagerReadWrite for Randomised<'a> {
     fn region_replace<E: StaticCopy, const LEN: usize>(
         region: &mut Self::Region<E, LEN>,
         index: usize,
         value: E,
     ) -> E {
-        Owned::region_replace(&mut region.borrow_mut(), index, value)
+        Owned::region_replace(region, index, value)
+    }
+}
+
+impl<'a> ManagerSerialise for Randomised<'a> {
+    fn serialise_region<E: serde::Serialize + 'static, const LEN: usize, S: serde::Serializer>(
+        region: &Self::Region<E, LEN>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        Owned::serialise_region(region, serializer)
+    }
+
+    fn serialise_dyn_region<const LEN: usize, S: serde::Serializer>(
+        region: &Self::DynRegion<LEN>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        // SAFETY: The pointer has been allocated using the global allocator and can therefore be
+        // used with [`Box`]. Additionally, the box is leaked to prevent its destructor from being
+        // called.
+        let boxed = unsafe { Box::from_raw(region.as_ptr() as *mut [u8; LEN]) };
+
+        let value = Owned::serialise_dyn_region(&boxed, serializer);
+
+        // Prevent the destructor from running.
+        Box::leak(boxed);
+
+        value
     }
 }
