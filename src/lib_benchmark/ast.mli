@@ -59,7 +59,7 @@ module type S = sig
   val pp : Format.formatter -> _ t -> unit
 
   (** To OCaml parsetree *)
-  val to_expression : _ t -> Parsetree.expression
+  val to_expression : _ t -> Ppxlib.expression
 
   (** Existentials *)
 
