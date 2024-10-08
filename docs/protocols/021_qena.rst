@@ -52,6 +52,10 @@ Adaptive Issuance
 - Changed the protocol constant value of ``edge_of_staking_over_delegating``
   from 2 to 3. (MR :gl:`!14555`)
 
+- Bumped the
+  :ref:`GLOBAL_LIMIT_OF_STAKING_OVER_BAKING<overstaking_alpha>`
+  protocol constant from 5 to 9.  (MR :gl:`!14905`)
+
 Gas improvements
 ----------------
 
