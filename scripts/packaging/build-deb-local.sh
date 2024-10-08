@@ -56,6 +56,15 @@ rm -f scripts/packaging/*.deb
 
 TARGET=all
 
+if [ -z "${CI:-}" ]; then
+  echo "Warning: You are compiling the debian packages locally."
+  echo
+  echo "    This script should be only used for development."
+  echo "    The version of the debian packages is set to be '0.0.1-1'"
+  echo "    The version of the octez binaries depends on the git branch / tag"
+  echo
+fi
+
 while [ $# -gt 0 ]; do
   case ${1} in
   "binaries")

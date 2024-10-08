@@ -114,6 +114,9 @@ getOctezVersion() {
 
   . scripts/ci/octez-packages-version.sh
 
+  # provide defaults for local compilation
+  COMMIT_SHORT_SHA=${CI_COMMIT_SHORT_SHA:-$(git rev-parse --short HEAD)}
+
   case "$RELEASETYPE" in
   ReleaseCandidate | TestReleaseCandidate | Release | TestRelease)
     # rpm version do not accept '-' as a character
@@ -121,14 +124,13 @@ getOctezVersion() {
     RET=$(echo "$VERSION" | tr '-' '~')
     ;;
   SoftRelease)
-    RET=$(date +'%Y%m%d%H%M')+$(echo "$CI_COMMIT_TAG" | tr '-' '_')
+    RET=$(date +'%Y%m%d%H%M')+$(echo "${CI_COMMIT_TAG:-}" | tr '-' '_')
     ;;
   Master | TestBranch)
-    RET=$(date +'%Y%m%d%H%M')+$CI_COMMIT_SHORT_SHA
+    RET=$(date +'%Y%m%d%H%M')+$COMMIT_SHORT_SHA
     ;;
   *)
-    echo "Cannot create package for this branch"
-    exit 1
+    RET=$(date +'%Y%m%d%H%M')+$COMMIT_SHORT_SHA
     ;;
   esac
 
