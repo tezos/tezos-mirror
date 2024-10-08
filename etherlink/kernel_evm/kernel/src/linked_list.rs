@@ -35,7 +35,7 @@ struct LinkedListPointer<Id, Elt> {
 }
 
 /// Each element in the list has a pointer
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 struct Pointer<Id, Elt> {
     /// Current index of the pointer
     id: Id,
@@ -218,7 +218,7 @@ impl<Id: Decodable + Encodable + AsRef<[u8]>, Elt: Encodable + Decodable>
 #[allow(dead_code)]
 impl<Id, Elt> LinkedList<Id, Elt>
 where
-    Id: AsRef<[u8]> + Encodable + Decodable + Clone,
+    Id: AsRef<[u8]> + Encodable + Decodable + Clone + PartialEq,
     Elt: Encodable + Decodable + Clone,
 {
     /// Load a list from the storage.
@@ -292,10 +292,22 @@ where
                 // And the save the data
                 back.save_data(host, &self.path, elt)?;
                 // update the back pointer of the list
-                self.pointers = Some(LinkedListPointer {
-                    front: front.clone(),
-                    back,
-                });
+
+                // Before the addition, penultimate might be the front
+                // *and* the back of the list. The back is always updated to
+                // the inserted cell, but the front cell might need an update.
+                if penultimate.id == front.id {
+                    self.pointers = Some(LinkedListPointer {
+                        front: penultimate,
+                        back,
+                    });
+                } else {
+                    // If not, we need to update only the back pointer.
+                    self.pointers = Some(LinkedListPointer {
+                        front: front.clone(),
+                        back,
+                    });
+                }
             }
             None => {
                 // This case corresponds to the empty list
@@ -367,11 +379,20 @@ where
                 };
                 // update the pointer
                 new_front.save(host, &self.path)?;
-                // update the list pointers
-                self.pointers = Some(LinkedListPointer {
-                    front: new_front,
-                    back: back.clone(),
-                });
+
+                // If the list has 2 elements and if the front is removed,
+                // then the front and the back are equal.
+                if new_front.id == back.id {
+                    self.pointers = Some(LinkedListPointer {
+                        front: new_front.clone(),
+                        back: new_front,
+                    });
+                } else {
+                    self.pointers = Some(LinkedListPointer {
+                        front: new_front,
+                        back: back.clone(),
+                    });
+                }
             }
             // The end of the list is being removed
             (Some(previous), None) => {
@@ -380,11 +401,19 @@ where
                     ..previous
                 };
                 new_back.save(host, &self.path)?;
-                // update the list pointers
-                self.pointers = Some(LinkedListPointer {
-                    front: front.clone(),
-                    back: new_back,
-                });
+                // If the list has 2 elements and if the back is removed,
+                // then the front and the back are equal.
+                if new_back.id == front.id {
+                    self.pointers = Some(LinkedListPointer {
+                        front: new_back.clone(),
+                        back: new_back,
+                    });
+                } else {
+                    self.pointers = Some(LinkedListPointer {
+                        front: front.clone(),
+                        back: new_back,
+                    });
+                }
             }
             // Removes an element between two elements
             (Some(previous), Some(next)) => {
@@ -399,6 +428,36 @@ where
                 };
                 new_previous.save(host, &self.path)?;
                 new_next.save(host, &self.path)?;
+
+                // We remove the second item of a list of three. It means back and front
+                // have been updated and are pointing to each other now.
+                if new_previous.clone().id == front.clone().id
+                    && new_next.clone().id == back.clone().id
+                {
+                    self.pointers = Some(LinkedListPointer {
+                        front: new_previous.clone(),
+                        back: new_next.clone(),
+                    });
+                } else {
+                    // If the new previous is the front pointer, we need to
+                    // update the front pointer to handle the new next pointer
+                    if new_previous.clone().id == front.clone().id {
+                        self.pointers = Some(LinkedListPointer {
+                            front: new_previous,
+                            back: back.clone(),
+                        });
+                    } else {
+                        // Similarly to the previous case. If the new next is the
+                        // back pointer, we need to update the back pointer to handle
+                        // the previous pointer.
+                        if new_next.clone().id == back.clone().id {
+                            self.pointers = Some(LinkedListPointer {
+                                front: front.clone(),
+                                back: new_next.clone(),
+                            });
+                        }
+                    }
+                }
             }
         };
         self.save(host)?;
@@ -444,18 +503,17 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::LinkedList;
+    use super::*;
     use proptest::prelude::*;
     use proptest::proptest;
     use rlp::{Decodable, DecoderError, Encodable};
     use std::collections::HashMap;
-    use tezos_ethereum::transaction::TRANSACTION_HASH_SIZE;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup_debug::Runtime;
     use tezos_smart_rollup_host::path::RefPath;
 
-    #[derive(Clone)]
-    struct Hash([u8; TRANSACTION_HASH_SIZE]);
+    #[derive(Clone, PartialEq, Debug)]
+    struct Hash([u8; 8]);
 
     impl Encodable for Hash {
         fn rlp_append(&self, s: &mut rlp::RlpStream) {
@@ -479,6 +537,62 @@ mod tests {
         }
     }
 
+    fn traverse_f(
+        host: &MockKernelHost,
+        list_path: &OwnedPath,
+        pointer: Pointer<Hash, u8>,
+        f: &dyn Fn(&Pointer<Hash, u8>) -> Option<Hash>,
+    ) -> (Pointer<Hash, u8>, usize) {
+        let mut size = 0;
+        let mut cell = pointer.clone();
+        loop {
+            size += 1;
+            match f(&cell) {
+                None => break,
+                Some(next) => {
+                    match Pointer::<Hash, u8>::read(host, list_path, &next).unwrap() {
+                        Some(next) => cell = next,
+                        None => {
+                            panic!("Pointer should exist in storage");
+                        }
+                    }
+                }
+            }
+        }
+        (cell, size)
+    }
+
+    fn traverse(host: &MockKernelHost, list: &LinkedList<Hash, u8>) -> usize {
+        let Some(LinkedListPointer {
+            ref front,
+            ref back,
+        }) = list.pointers
+        else {
+            return 0;
+        };
+
+        let (found_front, size_from_back) =
+            traverse_f(host, &list.path, back.clone(), &|cell: &Pointer<
+                Hash,
+                u8,
+            >| {
+                cell.previous.clone()
+            });
+        let (found_back, size_from_front) =
+            traverse_f(host, &list.path, front.clone(), &|cell: &Pointer<
+                Hash,
+                u8,
+            >| {
+                cell.next.clone()
+            });
+
+        assert_eq!(found_front, front.clone());
+        assert_eq!(found_back, back.clone());
+        assert_eq!(size_from_back, size_from_front);
+
+        size_from_back
+    }
+
     fn assert_length(
         host: &MockKernelHost,
         list: &LinkedList<Hash, u8>,
@@ -492,7 +606,12 @@ mod tests {
         assert_eq!(
             expected_len, actual_length,
             "Unexpected length for the list"
-        )
+        );
+        let traverse_length = traverse(host, list);
+        assert_eq!(
+            expected_len, traverse_length as u64,
+            "Traverse size is unexpected"
+        );
     }
 
     #[test]
@@ -509,7 +628,7 @@ mod tests {
         let host = MockKernelHost::default();
         let path = RefPath::assert_from(b"/list");
         let list = LinkedList::new(&path, &host).expect("list should be created");
-        let hash = Hash([0; TRANSACTION_HASH_SIZE]);
+        let hash = Hash([0; 8]);
         let read: Option<u8> = list.find(&host, &hash).expect("storage should work");
         assert!(read.is_none())
     }
@@ -519,7 +638,7 @@ mod tests {
         let mut host = MockKernelHost::default();
         let path = RefPath::assert_from(b"/list");
         let mut list = LinkedList::new(&path, &host).expect("list should be created");
-        let id = Hash([0x0; TRANSACTION_HASH_SIZE]);
+        let id = Hash([0x0; 8]);
         let elt = 0x32_u8;
 
         list.push(&mut host, &id, &elt)
@@ -538,7 +657,7 @@ mod tests {
         let mut host = MockKernelHost::default();
         let path = RefPath::assert_from(b"/list");
         let mut list = LinkedList::new(&path, &host).expect("list should be created");
-        let id = Hash([0x0; TRANSACTION_HASH_SIZE]);
+        let id = Hash([0x0; 8]);
         let elt = 0x32_u8;
 
         assert_length(&host, &list, 0u64);
@@ -558,7 +677,7 @@ mod tests {
         let mut host = MockKernelHost::default();
         let path = RefPath::assert_from(b"/list");
         let mut list = LinkedList::new(&path, &host).expect("list should be created");
-        let id = Hash([0x0; TRANSACTION_HASH_SIZE]);
+        let id = Hash([0x0; 8]);
 
         let removed: Option<u8> =
             list.remove(&mut host, &id).expect("storage should work");
@@ -571,7 +690,7 @@ mod tests {
         let mut host = MockKernelHost::default();
         let path = RefPath::assert_from(b"/list");
         let mut list = LinkedList::new(&path, &host).expect("list should be created");
-        let id = Hash([0x0; TRANSACTION_HASH_SIZE]);
+        let id = Hash([0x0; 8]);
         let elt = 0x32_u8;
 
         list.push(&mut host, &id, &elt)
@@ -590,8 +709,8 @@ mod tests {
         let mut host = MockKernelHost::default();
         let path = RefPath::assert_from(b"/list");
         let mut list = LinkedList::new(&path, &host).expect("list should be created");
-        let id_1 = Hash([0x0; TRANSACTION_HASH_SIZE]);
-        let id_2 = Hash([0x1; TRANSACTION_HASH_SIZE]);
+        let id_1 = Hash([0x0; 8]);
+        let id_2 = Hash([0x1; 8]);
 
         list.push(&mut host, &id_1, &0x32_u8)
             .expect("storage should workd");
@@ -611,8 +730,8 @@ mod tests {
         let mut host = MockKernelHost::default();
         let path = RefPath::assert_from(b"/list");
         let mut list = LinkedList::new(&path, &host).expect("list should be created");
-        let id_1 = Hash([0x0; TRANSACTION_HASH_SIZE]);
-        let id_2 = Hash([0x1; TRANSACTION_HASH_SIZE]);
+        let id_1 = Hash([0x0; 8]);
+        let id_2 = Hash([0x1; 8]);
 
         list.push(&mut host, &id_1, &0x32_u8)
             .expect("storage should workd");
@@ -634,8 +753,8 @@ mod tests {
         let path = RefPath::assert_from(b"/list");
         let mut list: LinkedList<Hash, u8> =
             LinkedList::new(&path, &host).expect("list should be created");
-        let id_1 = Hash([0x0; TRANSACTION_HASH_SIZE]);
-        let id_2 = Hash([0x1; TRANSACTION_HASH_SIZE]);
+        let id_1 = Hash([0x0; 8]);
+        let id_2 = Hash([0x1; 8]);
         list.push(&mut host, &id_1, &0x32_u8)
             .expect("push should have worked");
         list.push(&mut host, &id_2, &0x33_u8)
@@ -647,29 +766,114 @@ mod tests {
     }
 
     fn fill_list(
-        elements: &HashMap<[u8; TRANSACTION_HASH_SIZE], u8>,
+        elements: &HashMap<[u8; 8], u8>,
     ) -> (MockKernelHost, LinkedList<Hash, u8>) {
         let mut host = MockKernelHost::default();
         let path = RefPath::assert_from(b"/list");
         let mut list = LinkedList::new(&path, &host).expect("list should be created");
-        for (id, elt) in elements {
+        for (pos, (id, elt)) in elements.iter().enumerate() {
             list.push(&mut host, &Hash(*id), elt)
                 .expect("storage should work");
-            assert!(!list.is_empty())
+
+            assert_length(&host, &list, pos as u64 + 1);
         }
         (host, list)
     }
 
-    fn elements() -> impl Strategy<Value = HashMap<[u8; TRANSACTION_HASH_SIZE], u8>> {
-        prop::collection::hash_map(any::<[u8; 32]>(), any::<u8>(), 1..10)
+    fn make_list(n: u8, host: &mut MockKernelHost) -> (LinkedList<Hash, u8>, Vec<Hash>) {
+        let path = RefPath::assert_from(b"/list");
+        let mut list = LinkedList::new(&path, host).expect("list should be created");
+        let mut elements = vec![];
+        for i in 0..n {
+            let id = Hash([i; 8]);
+            list.push(host, &id, &i).unwrap();
+            elements.push(id);
+        }
+
+        (list, elements)
+    }
+
+    #[test]
+    fn test_push_4_remove_pos_0() {
+        let mut host = MockKernelHost::default();
+        let (mut list, elements) = make_list(4, &mut host);
+
+        assert_length(&host, &list, 4);
+        let _: Option<u8> = list
+            .remove(&mut host, &elements[0])
+            .expect("storage should work");
+        assert_length(&host, &list, 3);
+    }
+
+    #[test]
+    fn test_push_4_remove_pos_1() {
+        let mut host = MockKernelHost::default();
+        let (mut list, elements) = make_list(4, &mut host);
+
+        assert_length(&host, &list, 4);
+        let _: Option<u8> = list
+            .remove(&mut host, &elements[1])
+            .expect("storage should work");
+        assert_length(&host, &list, 3);
+    }
+
+    #[test]
+    fn test_push_4_remove_pos_2() {
+        let mut host = MockKernelHost::default();
+        let (mut list, elements) = make_list(4, &mut host);
+
+        assert_length(&host, &list, 4);
+        let _: Option<u8> = list
+            .remove(&mut host, &elements[2])
+            .expect("storage should work");
+        assert_length(&host, &list, 3);
+    }
+
+    #[test]
+    fn test_push_4_remove_pos_3() {
+        let mut host = MockKernelHost::default();
+        let (mut list, elements) = make_list(4, &mut host);
+
+        assert_length(&host, &list, 4);
+        let _: Option<u8> = list
+            .remove(&mut host, &elements[3])
+            .expect("storage should work");
+        assert_length(&host, &list, 3);
+    }
+
+    fn elements() -> impl Strategy<Value = (HashMap<[u8; 8], u8>, usize)> {
+        // Generate a HashMap with keys of size [u8; 32] and u8 values
+        prop::collection::hash_map(any::<[u8; 8]>(), any::<u8>(), 1..10).prop_flat_map(
+            |map| {
+                let map_len = map.len(); // Get the length of the HashMap
+
+                // Ensure there's at least one element in the map
+                let random_index_strategy = 0..map_len; // Strategy to pick a random index
+
+                // Return the HashMap and the randomly selected index value
+                (Just(map.clone()), random_index_strategy)
+                    .prop_map(move |(map, idx)| (map, idx))
+            },
+        )
     }
 
     proptest! {
 
-        #![proptest_config(ProptestConfig::with_cases(50))]
+        #![proptest_config(ProptestConfig::with_cases(200))]
 
         #[test]
-        fn test_pushed_elements_are_present(elements in elements()) {
+        fn test_push_remove_consistency((elements, idx) in elements()) {
+            let (mut host, mut list) = fill_list(&elements);
+
+            let elt = elements.keys().nth(idx).unwrap();
+            list.remove(&mut host, &Hash(*elt)).unwrap();
+
+            assert_length(&host, &list, (elements.len() as u64) - 1);
+
+        }
+
+        #[test]
+        fn test_pushed_elements_are_present((elements, _) in elements()) {
             let (host, list) = fill_list(&elements);
             for (id, elt) in & elements {
                 let read: u8 = list.find(&host, &Hash(*id)).expect("storage should work").expect("element should be present");
@@ -678,7 +882,7 @@ mod tests {
         }
 
         #[test]
-        fn test_push_element_create_non_empty_list(elements in elements()) {
+        fn test_push_element_create_non_empty_list((elements, _) in elements()) {
             let mut host = MockKernelHost::default();
             let path = RefPath::assert_from(b"/list");
             let mut list = LinkedList::new(&path, &host).expect("list should be created");
@@ -690,7 +894,7 @@ mod tests {
         }
 
         #[test]
-        fn test_remove_from_empty_creates_empty_list(elements: Vec<[u8; TRANSACTION_HASH_SIZE]>) {
+        fn test_remove_from_empty_creates_empty_list(elements: Vec<[u8; 8]>) {
             let mut host = MockKernelHost::default();
             let path = RefPath::assert_from(b"/list");
             let mut list = LinkedList::new(&path, &host).expect("list should be created");
@@ -702,7 +906,7 @@ mod tests {
         }
 
         #[test]
-        fn test_remove_returns_the_appropriate_element(elements in elements()) {
+        fn test_remove_returns_the_appropriate_element((elements, _) in elements()) {
             let (mut host, mut list) = fill_list(&elements);
             let mut length : u64 = elements.len().try_into().unwrap();
             for (id, elt) in &elements {
@@ -714,7 +918,7 @@ mod tests {
         }
 
         #[test]
-        fn test_remove_everything_creates_the_empty_list(elements in elements()) {
+        fn test_remove_everything_creates_the_empty_list((elements, _) in elements()) {
             let (mut host, mut list) = fill_list(&elements);
             for (id, _) in elements {
                 let _: u8 = list.remove(&mut host, &Hash(id)).expect("storage should work").expect("element should be present");
@@ -723,7 +927,7 @@ mod tests {
         }
 
         #[test]
-        fn test_list_is_kept_between_reboots(elements in elements()) {
+        fn test_list_is_kept_between_reboots((elements, _) in elements()) {
             let mut host = MockKernelHost::default();
             let path = RefPath::assert_from(b"/list");
             for (id, elt) in &elements {
@@ -743,7 +947,7 @@ mod tests {
         }
 
         #[test]
-        fn test_pop_first_after_push(elements in elements()) {
+        fn test_pop_first_after_push((elements, _) in elements()) {
             let mut host = MockKernelHost::default();
             let path = RefPath::assert_from(b"/list");
             let mut list = LinkedList::new(&path, &host).expect("list should be created");
@@ -756,7 +960,7 @@ mod tests {
         }
 
         #[test]
-        fn test_pop_first_keep_the_order(elements in elements()) {
+        fn test_pop_first_keep_the_order((elements, _) in elements()) {
             let mut host = MockKernelHost::default();
             let path = RefPath::assert_from(b"/list");
             let mut list = LinkedList::new(&path, &host).expect("list should be created");
