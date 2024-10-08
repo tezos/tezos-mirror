@@ -5502,29 +5502,34 @@ end = struct
       let name_dash = Name.name_dash name in
       let number = Name.number name in
       let path = Name.base_path name in
+      let modules =
+        [
+          ("test_baking", true);
+          ("test_consensus_key", true);
+          ("test_deactivation", true);
+          ("test_delegation", true);
+          ("test_double_baking", true);
+          ("test_double_attestation", N.(number >= 018));
+          ("test_double_endorsement", N.(number <= 017));
+          ("test_double_preattestation", N.(number >= 018));
+          ("test_double_preendorsement", N.(number <= 017));
+          ("test_attestation", N.(number >= 018));
+          ("test_endorsement", N.(number <= 017));
+          ("test_frozen_deposits", true);
+          ("test_helpers_rpcs", true);
+          ("test_participation", true);
+          ("test_preattestation_functor", N.(number >= 018));
+          ("test_preendorsement_functor", N.(number <= 017));
+          ("test_preattestation", N.(number >= 018));
+          ("test_preendorsement", N.(number <= 017));
+          ("test_seed", true);
+          ("test_aggregate", N.(number >= 022));
+        ]
+        |> conditional_list
+      in
       let _integration_consensus =
         tezt
-          [
-            "test_baking";
-            "test_consensus_key";
-            "test_deactivation";
-            "test_delegation";
-            "test_double_baking";
-            (if N.(number >= 018) then "test_double_attestation"
-             else "test_double_endorsement");
-            (if N.(number >= 018) then "test_double_preattestation"
-             else "test_double_preendorsement");
-            (if N.(number >= 018) then "test_attestation"
-             else "test_endorsement");
-            "test_frozen_deposits";
-            "test_helpers_rpcs";
-            "test_participation";
-            (if N.(number >= 018) then "test_preattestation_functor"
-             else "test_preendorsement_functor");
-            (if N.(number >= 018) then "test_preattestation"
-             else "test_preendorsement");
-            "test_seed";
-          ]
+          modules
           ~path:(path // "lib_protocol/test/integration/consensus")
           ~with_macos_security_framework:true
           ~opam:(sf "tezos-protocol-%s-tests" name_dash)
