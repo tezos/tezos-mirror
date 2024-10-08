@@ -5,9 +5,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [id tree] is the identity function, returning [tree] untouched.
+type context
 
-    It will be removed in a later version, but is introduced temporarily to
-    prove the library is working. *)
-external wasm_runtime_id : Irmin_context.tree -> Irmin_context.tree
-  = "wasm_runtime_id"
+external wasm_runtime_new_context : unit -> context = "wasm_runtime_new_context"
+
+val wasm_runtime_run :
+  preimages_dir:string ->
+  entrypoint:string ->
+  context ->
+  Irmin_context.tree ->
+  bytes ->
+  int32 ->
+  string list ->
+  Irmin_context.tree

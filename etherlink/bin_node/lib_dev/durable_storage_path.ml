@@ -12,6 +12,8 @@ open Ethereum_types
 
 type path = string
 
+let reboot_counter = "/readonly/kernel/env/reboot_counter"
+
 let evm_node_flag = "/__evm_node"
 
 module EVM = struct

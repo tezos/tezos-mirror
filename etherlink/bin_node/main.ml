@@ -1503,6 +1503,7 @@ let patch_kernel_command =
             ~preimages_endpoint:None
             ~fail_on_missing_blueprint:true
             ~block_storage_sqlite3:false
+            ~wasm_runtime:false
             ()
         in
         Evm_context.patch_kernel ?block_number kernel_path
@@ -2343,6 +2344,7 @@ let patch_state_command =
             ~preimages_endpoint:None
             ~fail_on_missing_blueprint:true
             ~block_storage_sqlite3:false
+            ~wasm_runtime:false
             ()
         in
         Evm_context.patch_state ?block_number ~key ~value ()

@@ -8,3 +8,6 @@
 let () = Wasm_runtime_callbacks.register ()
 
 include Wasm_runtime_gen
+
+let wasm_runtime_run ~preimages_dir ~entrypoint ctxt =
+  wasm_runtime_run ctxt preimages_dir entrypoint

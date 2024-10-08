@@ -12,6 +12,8 @@ open Ethereum_types
 
 type path = string
 
+val reboot_counter : string
+
 val evm_node_flag : path
 
 val chain_id : path

@@ -18,8 +18,7 @@
   octez-shell-libs.client-base-unix
   octez-l2-libs.sqlite
   octez-evm-node-libs.evm_node_lib_dev
-  octez-evm-node-libs.evm_node_config
-  octez-rust-deps)
+  octez-evm-node-libs.evm_node_config)
  (link_flags
   (:standard)
   (:include %{workspace_root}/static-link-flags.sexp)

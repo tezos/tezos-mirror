@@ -44,6 +44,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
       ~store_perm:`Read_write
       ~block_storage_sqlite3:
         configuration.experimental_features.block_storage_sqlite3
+      ~wasm_runtime:configuration.experimental_features.next_wasm_runtime
       ()
   in
   let*! (Qty next_blueprint_number) = Evm_context.next_blueprint_number () in

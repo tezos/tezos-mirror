@@ -60,6 +60,7 @@ type experimental_features = {
   block_storage_sqlite3 : bool;
   overwrite_simulation_tick_limit : bool;
   garbage_collector : garbage_collector option;
+  next_wasm_runtime : bool;
 }
 
 type sequencer = {

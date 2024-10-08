@@ -38,6 +38,7 @@ type experimental_features = {
   block_storage_sqlite3 : bool;
   overwrite_simulation_tick_limit : bool;
   garbage_collector : garbage_collector option;
+  next_wasm_runtime : bool;
 }
 
 type sequencer = {
@@ -129,6 +130,7 @@ let default_experimental_features =
     block_storage_sqlite3 = false;
     overwrite_simulation_tick_limit = false;
     garbage_collector = None;
+    next_wasm_runtime = false;
   }
 
 let default_data_dir = Filename.concat (Sys.getenv "HOME") ".octez-evm-node"
@@ -670,19 +672,22 @@ let experimental_features_encoding =
            block_storage_sqlite3;
            overwrite_simulation_tick_limit;
            garbage_collector;
+           next_wasm_runtime;
          } ->
       ( drop_duplicate_on_injection,
         enable_send_raw_transaction,
         node_transaction_validation,
         block_storage_sqlite3,
         overwrite_simulation_tick_limit,
-        garbage_collector ))
+        garbage_collector,
+        next_wasm_runtime ))
     (fun ( drop_duplicate_on_injection,
            enable_send_raw_transaction,
            node_transaction_validation,
            block_storage_sqlite3,
            overwrite_simulation_tick_limit,
-           garbage_collector ) ->
+           garbage_collector,
+           next_wasm_runtime ) ->
       {
         drop_duplicate_on_injection;
         enable_send_raw_transaction;
@@ -690,8 +695,9 @@ let experimental_features_encoding =
         block_storage_sqlite3;
         overwrite_simulation_tick_limit;
         garbage_collector;
+        next_wasm_runtime;
       })
-    (obj6
+    (obj7
        (dft
           ~description:
             "Request the rollup node to filter messages it has already \
@@ -729,7 +735,14 @@ let experimental_features_encoding =
        (opt
           "garbage_collector"
           ~description:"Enables garbage collector in the node."
-          garbage_collector_encoding))
+          garbage_collector_encoding)
+       (dft
+          "next_wasm_runtime"
+          ~description:
+            "Enable or disable the experimental WASM runtime that is expected \
+             to replace the Smart Rollup’s Fast Exec runtime"
+          bool
+          false))
 
 let proxy_encoding =
   let open Data_encoding in

@@ -7,6 +7,8 @@
 
 open Ethereum_types
 
+type config = {config : Config.config; wasm_runtime : bool}
+
 module Bare_context = struct
   module Tree = Irmin_context.Tree
 
@@ -80,12 +82,12 @@ let execute ?(wasm_pvm_fallback = false) ?(profile = false)
           ~no_reboot:false
           0l
           inbox
-          {config with flamecharts_directory = data_dir}
+          {config.config with flamecharts_directory = data_dir}
           Custom_section.FuncMap.empty
           evm_state
       in
       return evm_state
-    else
+    else if not config.wasm_runtime then
       let hooks =
         Tezos_scoru_wasm.Hooks.(
           no_hooks
@@ -100,11 +102,28 @@ let execute ?(wasm_pvm_fallback = false) ?(profile = false)
           ~wasm_entrypoint
           0l
           inbox
-          config
+          config.config
           Inbox
           evm_state
       in
+      return evm_state
+    else
+      (* The [inbox] parameter is inherited from the WASM debugger, where the
+         inbox is a list of list of messages (because it supports running the
+         fast exec for several Tezos level in a raw).
 
+         As far as the EVM node is concerned, we only “emulate” one Tezos level
+         at a time, so we only keep the first item ([inbox] is in parctise
+         always a singleton). *)
+      let inbox = match Seq.uncons inbox with Some (x, _) -> x | _ -> [] in
+      let*! evm_state =
+        Wasm_runtime.run
+          ~preimages_dir:config.config.preimage_directory
+          ~entrypoint:wasm_entrypoint
+          evm_state
+          config.config.destination
+          inbox
+      in
       return evm_state
   in
   let* evm_state = eval evm_state in
@@ -126,10 +145,25 @@ let execute ?(wasm_pvm_fallback = false) ?(profile = false)
   in
   return evm_state
 
-let modify ~key ~value evm_state = Wasm.set_durable_value evm_state key value
+let modify ?edit_readonly ~key ~value evm_state =
+  Wasm.set_durable_value ?edit_readonly evm_state key value
 
 let flag_local_exec evm_state =
   modify evm_state ~key:Durable_storage_path.evm_node_flag ~value:""
+
+let init_reboot_counter evm_state =
+  let initial_reboot_counter =
+    Data_encoding.(
+      Binary.to_string_exn
+        Little_endian.int32
+        Z.(
+          to_int32 @@ succ Tezos_scoru_wasm.Constants.maximum_reboots_per_input))
+  in
+  modify
+    ~edit_readonly:true
+    ~key:Durable_storage_path.reboot_counter
+    ~value:initial_reboot_counter
+    evm_state
 
 let init ~kernel =
   let open Lwt_result_syntax in
@@ -137,6 +171,9 @@ let init ~kernel =
   let* evm_state =
     Wasm.start ~tree:evm_state Tezos_scoru_wasm.Wasm_pvm_state.V3 kernel
   in
+  (* The WASM Runtime completely ignores the reboot counter, but some versions
+     of the Etherlink kernel will need it to exist. *)
+  let*! evm_state = init_reboot_counter evm_state in
   let*! evm_state = flag_local_exec evm_state in
   return evm_state
 

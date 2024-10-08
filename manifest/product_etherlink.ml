@@ -308,7 +308,6 @@ let _evm_node =
         octez_sqlite |> open_;
         evm_node_lib_dev;
         evm_node_config |> open_;
-        octez_rust_deps;
       ]
     ~bisect_ppx:Yes
 

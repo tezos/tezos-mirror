@@ -14,6 +14,7 @@ type t = {
   index : Irmin_context.ro_index;
   finalized_view : bool;
   block_storage_sqlite3 : bool;
+  wasm_runtime : bool;
 }
 
 (** [load ~data_dir configuration] creates a new read-only handler on the

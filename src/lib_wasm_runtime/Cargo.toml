@@ -8,6 +8,8 @@ edition = "2021"
 ocaml-build = { version = "1.*", features = ["dune"] }
 
 [dependencies]
+hex = "*"
 ocaml = { version = "1.*" }
-wasmer = { path = "../../src/rust_deps/wasmer-3.3.0/lib/api", features = [] }
+wasmer = { path = "../../src/rust_deps/wasmer-3.3.0/lib/api", default-features = false, features = ["cranelift", "jit"] }
 wasmer-compiler-cranelift = { path = "../../src/rust_deps/wasmer-3.3.0/lib/compiler-cranelift" }
+tezos_crypto_rs = { version = "0.6", default-features = false }
