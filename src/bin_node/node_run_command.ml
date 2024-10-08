@@ -13,6 +13,9 @@ type error += RPC_Port_already_in_use of P2p_point.Id.t list
 
 type error += Invalid_sandbox_file of string
 
+(** Profiler for RPC server. *)
+module Profiler = (val Profiler.wrap Shell_profiling.rpc_server_profiler)
+
 let () =
   register_error_kind
     `Permanent
@@ -452,7 +455,14 @@ let launch_rpc_server ?middleware (config : Config_file.t) dir rpc_server_kind
     if path = "/metrics" then
       let*! response = Metrics_server.callback conn req body in
       Lwt.return (`Response response)
-    else Tezos_rpc_http_server.RPC_server.resto_callback server conn req body
+    else
+      (* Every call on endpoints which is not in [/metrics]
+         path will be logged inside the RPC report. *)
+      Tezos_rpc_http_server.RPC_server.resto_callback
+        server
+        conn
+        req
+        body [@profiler.span_s [path]]
   in
   let update_metrics uri meth =
     Prometheus.Summary.(time (labels rpc_metrics [uri; meth]) Sys.time)

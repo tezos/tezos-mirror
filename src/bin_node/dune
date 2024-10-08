@@ -155,6 +155,8 @@
   (select void_for_linking-octez-protocol-alpha-libs-plugin-registerer from
    (octez-protocol-alpha-libs.plugin-registerer -> void_for_linking-octez-protocol-alpha-libs-plugin-registerer.empty)
    (-> void_for_linking-octez-protocol-alpha-libs-plugin-registerer.empty)))
+ (preprocess (pps octez-libs.ppx_profiler))
+ (preprocessor_deps (env_var TEZOS_PPX_PROFILER))
  (link_flags
   (:standard)
   (:include %{workspace_root}/static-link-flags.sexp)

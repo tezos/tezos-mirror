@@ -45,6 +45,7 @@ let all_profilers =
     ("merge", merge_profiler);
     ("p2p_reader", p2p_reader_profiler);
     ("requester", requester_profiler);
+    ("rpc_server", rpc_server_profiler);
   ]
 
 let activate_all ~profiler_maker =

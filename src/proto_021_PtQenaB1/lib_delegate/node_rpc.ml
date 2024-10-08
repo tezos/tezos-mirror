@@ -38,6 +38,13 @@ module Profiler = struct
     Baking_profiler.create_reset_block_section Baking_profiler.node_rpc_profiler
 end
 
+module RPC_profiler = struct
+  include (val Tezos_base.Profiler.wrap RPC_profiler.rpc_client_profiler)
+
+  let[@warning "-32"] reset_block_section =
+    RPC_profiler.create_reset_block_section RPC_profiler.rpc_client_profiler
+end
+
 let inject_block cctxt ?(force = false) ~chain signed_block_header operations =
   let signed_shell_header_bytes =
     Data_encoding.Binary.to_bytes_exn Block_header.encoding signed_block_header
@@ -296,7 +303,10 @@ let monitor_valid_proposals cctxt ~chain ?cache () =
   in
   let stream =
     let map (_chain_id, block_hash, block_header, operations) =
-      () [@profiler.reset_block_section block_hash] ;
+      ()
+      [@profiler.reset_block_section {profiler_module = Profiler} block_hash]
+      [@profiler.reset_block_section
+        {profiler_module = RPC_profiler} block_hash] ;
       (let*! map_result =
          proposal cctxt ?cache ~operations ~chain block_hash block_header
        in
