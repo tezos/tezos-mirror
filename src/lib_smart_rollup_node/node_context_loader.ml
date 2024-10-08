@@ -80,12 +80,7 @@ let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
     }
   in
   let* () = update_metadata metadata ~data_dir in
-  let* () =
-    Store_migration.maybe_run_migration
-      metadata
-      ~storage_dir:(Configuration.default_storage_dir data_dir)
-      ~index_buffer_size:Configuration.default_index_buffer_size
-  in
+  let* () = Store_migration.maybe_run_migration metadata ~data_dir in
   let dal_cctxt =
     Option.map Dal_node_client.make_unix_cctxt dal_node_endpoint
   in

@@ -31,13 +31,13 @@ let messages_store_location ~storage_dir =
   let open Filename.Infix in
   storage_dir // "messages"
 
-let version_of_unversioned_store ~storage_dir ~index_buffer_size =
+let version_of_unversioned_store ~storage_dir =
   let open Lwt_syntax in
   let path = messages_store_location ~storage_dir in
   let* messages_store_v0 =
-    Store_v0.Messages.load ~path ~cache_size:1 Read_only ~index_buffer_size
+    Store_v0.Messages.load ~path ~cache_size:1 Read_only ~index_buffer_size:100
   and* messages_store_v1 =
-    Store_v1.Messages.load ~path ~cache_size:1 Read_only ~index_buffer_size
+    Store_v1.Messages.load ~path ~cache_size:1 Read_only ~index_buffer_size:100
   in
   let cleanup () =
     let open Lwt_syntax in
@@ -66,67 +66,79 @@ let version_of_unversioned_store ~storage_dir ~index_buffer_size =
   in
   Lwt.finalize guess_version cleanup
 
-let version_of_store ~storage_dir ~index_buffer_size =
+let version_of_store ~storage_dir =
   let open Lwt_result_syntax in
   let* version = Store_version.read_version_file ~dir:storage_dir in
   match version with
   | Some v -> return_some (v, Version_known)
   | None ->
-      let+ v = version_of_unversioned_store ~storage_dir ~index_buffer_size in
+      let+ v = version_of_unversioned_store ~storage_dir in
       Option.map (fun v -> (v, Unintialized_version)) v
 
+(** Type of parameter for migration functor {!Make}. *)
 module type MIGRATION_ACTIONS = sig
+  (** Type of store from which data is migrated. *)
   type from_store
 
+  (** Type of store to which the data is migrated. *)
   type dest_store
 
+  (** Action or actions to migrate data associated to a block. NOTE:
+      [dest_store] is an empty R/W store initialized in a temporary location. *)
   val migrate_block_action :
     from_store -> dest_store -> Sc_rollup_block.t -> unit tzresult Lwt.t
 
+  (** The final actions to be performed in the migration. In particular, this is
+      where data from the temporary store in [dest_store] in [tmp_dir] should be
+      reported in the actual [storage_dir]. *)
   val final_actions :
-    storage_dir:string ->
+    data_dir:string ->
     tmp_dir:string ->
     from_store ->
     dest_store ->
     unit tzresult Lwt.t
 end
 
-module type S = sig
-  val migrate :
+let migrations = Stdlib.Hashtbl.create 7
+
+module type STORE = sig
+  type 'a t constraint 'a = [< `Read | `Write > `Read]
+
+  val version : Store_version.t
+
+  val close : _ t -> unit tzresult Lwt.t
+
+  val load : 'a Store_sigs.mode -> data_dir:string -> 'a t tzresult Lwt.t
+
+  val iter_l2_blocks :
+    ?progress:string ->
     Metadata.t ->
-    storage_dir:string ->
-    index_buffer_size:int ->
+    _ t ->
+    (Sc_rollup_block.t -> unit tzresult Lwt.t) ->
     unit tzresult Lwt.t
 end
 
-let migrations = Stdlib.Hashtbl.create 7
-
 module Make
-    (S_from : Store_sig.S)
-    (S_dest : Store_sig.S)
+    (S_from : STORE)
+    (S_dest : STORE)
     (Actions : MIGRATION_ACTIONS
                  with type from_store := Store_sigs.ro S_from.t
-                  and type dest_store := Store_sigs.rw S_dest.t) : S = struct
-  let tmp_dir ~storage_dir =
-    Filename.concat (Configuration.default_storage_dir storage_dir)
+                  and type dest_store := Store_sigs.rw S_dest.t) =
+struct
+  let tmp_dir ~data_dir =
+    Filename.concat data_dir
     @@ Format.asprintf
-         "migration_%a_%a"
+         "store_migration_%a_%a"
          Store_version.pp
          S_from.version
          Store_version.pp
          S_dest.version
 
-  let migrate metadata ~storage_dir ~index_buffer_size =
+  let migrate metadata ~data_dir =
     let open Lwt_result_syntax in
-    let* source_store =
-      S_from.load
-        Read_only
-        ~l2_blocks_cache_size:1
-        storage_dir
-        ~index_buffer_size
-    in
+    let* source_store = S_from.load Read_only ~data_dir in
 
-    let tmp_dir = tmp_dir ~storage_dir in
+    let tmp_dir = tmp_dir ~data_dir in
     let*! tmp_dir_exists = Lwt_utils_unix.dir_exists tmp_dir in
     let*? () =
       if tmp_dir_exists then
@@ -141,9 +153,7 @@ module Make
       else Ok ()
     in
     let*! () = Lwt_utils_unix.create_dir tmp_dir in
-    let* dest_store =
-      S_dest.load Read_write ~l2_blocks_cache_size:1 tmp_dir ~index_buffer_size
-    in
+    let* dest_store = S_dest.load Read_write ~data_dir:tmp_dir in
     let cleanup () =
       let open Lwt_syntax in
       let* (_ : unit tzresult) = S_from.close source_store
@@ -166,15 +176,31 @@ module Make
           (Actions.migrate_block_action source_store dest_store)
       in
       let* () =
-        Actions.final_actions ~storage_dir ~tmp_dir source_store dest_store
+        Actions.final_actions ~data_dir ~tmp_dir source_store dest_store
       in
       let*! () = Lwt_utils_unix.remove_dir tmp_dir in
-      Store_version.write_version_file ~dir:storage_dir S_dest.version
+      Store_version.write_version_file
+        ~dir:(Configuration.default_storage_dir data_dir)
+        S_dest.version
     in
     Lwt.finalize run_migration cleanup
 
   let () = Stdlib.Hashtbl.add migrations S_from.version (S_dest.version, migrate)
 end
+
+module Wrap_old (S : Store_sig.S) : STORE with type 'a t = 'a S.t = struct
+  include S
+
+  let load mode ~data_dir =
+    load
+      mode
+      (Configuration.default_storage_dir data_dir)
+      ~index_buffer_size:100
+      ~l2_blocks_cache_size:1
+end
+
+module Make_old_old (S_from : Store_sig.S) (S_dest : Store_sig.S) =
+  Make (Wrap_old (S_from)) (Wrap_old (S_dest))
 
 let migration_path ~from ~dest =
   let rec path acc from dest =
@@ -201,9 +227,10 @@ let migration_path ~from ~dest =
   in
   path [] from dest
 
-let maybe_run_migration metadata ~storage_dir ~index_buffer_size =
+let maybe_run_migration metadata ~data_dir =
   let open Lwt_result_syntax in
-  let* current_version = version_of_store ~storage_dir ~index_buffer_size in
+  let storage_dir = Configuration.default_storage_dir data_dir in
+  let* current_version = version_of_store ~storage_dir in
   let last_version = Store.version in
   match (current_version, last_version) with
   | None, _ ->
@@ -230,13 +257,15 @@ let maybe_run_migration metadata ~storage_dir ~index_buffer_size =
       | Some migrations ->
           Format.printf "Starting store migration@." ;
           let+ () =
-            List.iter_es
-              (fun migrate -> migrate metadata ~storage_dir ~index_buffer_size)
-              migrations
+            List.iter_es (fun migrate -> migrate metadata ~data_dir) migrations
           in
           Format.printf "Store migration completed@.")
 
 module V1_migrations = struct
+  let messages_store_location ~data_dir =
+    let open Filename.Infix in
+    Configuration.default_storage_dir data_dir // "messages"
+
   let convert_store_messages
       (messages, (block_hash, timestamp, number_of_messages)) =
     ( messages,
@@ -291,22 +320,20 @@ module V1_migrations = struct
           new_root
           (fun _new_tree -> return old_tree)
 
-  let final_actions ~storage_dir ~tmp_dir (_v0_store : _ Store_v0.t)
+  let final_actions ~data_dir ~tmp_dir (_v0_store : _ Store_v0.t)
       (v1_store : _ Store_v1.t) =
     let open Lwt_result_syntax in
-    let*! () =
-      Lwt_utils_unix.remove_dir (messages_store_location ~storage_dir)
-    in
+    let*! () = Lwt_utils_unix.remove_dir (messages_store_location ~data_dir) in
     let*! () =
       Lwt_unix.rename
-        (messages_store_location ~storage_dir:tmp_dir)
-        (messages_store_location ~storage_dir)
+        (messages_store_location ~data_dir:tmp_dir)
+        (messages_store_location ~data_dir)
     in
     let*! () = migrate_dal_processed_slots_irmin v1_store in
     return_unit
 
   module From_v0 =
-    Make (Store_v0) (Store_v1)
+    Make_old_old (Store_v0) (Store_v1)
       (struct
         let migrate_block_action = migrate_messages
 
@@ -315,17 +342,17 @@ module V1_migrations = struct
 end
 
 module V2_migrations = struct
-  let messages_store_location ~storage_dir =
+  let messages_store_location ~data_dir =
     let open Filename.Infix in
-    storage_dir // "messages"
+    Configuration.default_storage_dir data_dir // "messages"
 
-  let commitments_store_location ~storage_dir =
+  let commitments_store_location ~data_dir =
     let open Filename.Infix in
-    storage_dir // "commitments"
+    Configuration.default_storage_dir data_dir // "commitments"
 
-  let inboxes_store_location ~storage_dir =
+  let inboxes_store_location ~data_dir =
     let open Filename.Infix in
-    storage_dir // "inboxes"
+    Configuration.default_storage_dir data_dir // "inboxes"
 
   let migrate_messages read_messages (v2_store : _ Store_v2.t)
       (l2_block : Sc_rollup_block.t) =
@@ -368,36 +395,32 @@ module V2_migrations = struct
           ~key:l2_block.header.inbox_hash
           ~value:inbox
 
-  let final_actions ~storage_dir ~tmp_dir _ _ =
+  let final_actions ~data_dir ~tmp_dir _ _ =
     let open Lwt_result_syntax in
+    let*! () = Lwt_utils_unix.remove_dir (messages_store_location ~data_dir) in
     let*! () =
-      Lwt_utils_unix.remove_dir (messages_store_location ~storage_dir)
+      Lwt_utils_unix.remove_dir (commitments_store_location ~data_dir)
     in
+    let*! () = Lwt_utils_unix.remove_dir (inboxes_store_location ~data_dir) in
     let*! () =
-      Lwt_utils_unix.remove_dir (commitments_store_location ~storage_dir)
-    in
-    let*! () =
-      Lwt_utils_unix.remove_dir (inboxes_store_location ~storage_dir)
+      Lwt_unix.rename
+        (messages_store_location ~data_dir:tmp_dir)
+        (messages_store_location ~data_dir)
     in
     let*! () =
       Lwt_unix.rename
-        (messages_store_location ~storage_dir:tmp_dir)
-        (messages_store_location ~storage_dir)
+        (commitments_store_location ~data_dir:tmp_dir)
+        (commitments_store_location ~data_dir)
     in
     let*! () =
       Lwt_unix.rename
-        (commitments_store_location ~storage_dir:tmp_dir)
-        (commitments_store_location ~storage_dir)
-    in
-    let*! () =
-      Lwt_unix.rename
-        (inboxes_store_location ~storage_dir:tmp_dir)
-        (inboxes_store_location ~storage_dir)
+        (inboxes_store_location ~data_dir:tmp_dir)
+        (inboxes_store_location ~data_dir)
     in
     return_unit
 
   module From_v1 =
-    Make (Store_v1) (Store_v2)
+    Make_old_old (Store_v1) (Store_v2)
       (struct
         let migrate_block_action v1_store v2_store l2_block =
           let open Lwt_result_syntax in
@@ -423,7 +446,7 @@ module V2_migrations = struct
       end)
 
   module From_v0 =
-    Make (Store_v0) (Store_v2)
+    Make_old_old (Store_v0) (Store_v2)
       (struct
         let migrate_block_action v0_store v2_store l2_block =
           let open Lwt_result_syntax in
@@ -450,9 +473,9 @@ module V2_migrations = struct
 end
 
 module V3_migrations = struct
-  let levels_store_location ~storage_dir =
+  let levels_store_location ~data_dir =
     let open Filename.Infix in
-    storage_dir // "levels_to_hashes"
+    Configuration.default_storage_dir data_dir // "levels_to_hashes"
 
   let recompute_level (v3_store : _ Store_v3.t) (l2_block : Sc_rollup_block.t) =
     Store_v3.Levels_to_hashes.add
@@ -461,18 +484,18 @@ module V3_migrations = struct
       l2_block.header.level
       l2_block.header.block_hash
 
-  let final_actions ~storage_dir ~tmp_dir _ _ =
+  let final_actions ~data_dir ~tmp_dir _ _ =
     let open Lwt_result_syntax in
-    let*! () = Lwt_utils_unix.remove_dir (levels_store_location ~storage_dir) in
+    let*! () = Lwt_utils_unix.remove_dir (levels_store_location ~data_dir) in
     let*! () =
       Lwt_unix.rename
-        (levels_store_location ~storage_dir:tmp_dir)
-        (levels_store_location ~storage_dir)
+        (levels_store_location ~data_dir:tmp_dir)
+        (levels_store_location ~data_dir)
     in
     return_unit
 
   module From_v2 =
-    Make (Store_v2) (Store_v3)
+    Make_old_old (Store_v2) (Store_v3)
       (struct
         let migrate_block_action _v2_store v3_store l2_block =
           recompute_level v3_store l2_block
@@ -482,9 +505,9 @@ module V3_migrations = struct
 end
 
 module V4_migrations = struct
-  let messages_store_location ~storage_dir =
+  let messages_store_location ~data_dir =
     let open Filename.Infix in
-    storage_dir // "messages"
+    Configuration.default_storage_dir data_dir // "messages"
 
   let migrate_messages (v3_store : _ Store_v3.t) (v4_store : _ Store_v4.t)
       (l2_block : Sc_rollup_block.t) =
@@ -502,23 +525,293 @@ module V4_migrations = struct
           ~header
           ~value:messages
 
-  let final_actions ~storage_dir ~tmp_dir _ _ =
+  let final_actions ~data_dir ~tmp_dir _ _ =
     let open Lwt_result_syntax in
-    let*! () =
-      Lwt_utils_unix.remove_dir (messages_store_location ~storage_dir)
-    in
+    let*! () = Lwt_utils_unix.remove_dir (messages_store_location ~data_dir) in
     let*! () =
       Lwt_unix.rename
-        (messages_store_location ~storage_dir:tmp_dir)
-        (messages_store_location ~storage_dir)
+        (messages_store_location ~data_dir:tmp_dir)
+        (messages_store_location ~data_dir)
     in
     return_unit
 
   module From_v3 =
-    Make (Store_v3) (Store_v4)
+    Make_old_old (Store_v3) (Store_v4)
       (struct
         let migrate_block_action v3_store v4_store l2_block =
           migrate_messages v3_store v4_store l2_block
+
+        let final_actions = final_actions
+      end)
+end
+
+module V5_sqlite_migrations = struct
+  module Wraped_v5 : STORE with type 'a t = 'a Store_v5.t = struct
+    include Store_v5
+
+    type 'a t = 'a Store_v5.t constraint 'a = [< `Read | `Write > `Read]
+
+    let load mode ~data_dir = init mode ~data_dir
+
+    let close store = close store |> Lwt_result.ok
+
+    let iter_l2_blocks ?progress:_ _ _ _ =
+      (* unsused *)
+      assert false
+  end
+
+  let migrate_messages (v4_store : _ Store_v4.t) (v5_store : _ Store_v5.t)
+      (l2_block : Sc_rollup_block.t) =
+    let open Lwt_result_syntax in
+    let* messages =
+      Store_v4.Messages.read v4_store.messages l2_block.header.inbox_witness
+    in
+    match messages with
+    | None -> failwith "Missing messages for %ld" l2_block.header.level
+    | Some (messages, _pred) ->
+        Store_v5.Messages.store
+          v5_store
+          ~level:l2_block.header.level
+          l2_block.header.inbox_witness
+          messages
+
+  let migrate_inbox (v4_store : _ Store_v4.t) (v5_store : _ Store_v5.t)
+      (l2_block : Sc_rollup_block.t) =
+    let open Lwt_result_syntax in
+    let* inbox =
+      Store_v4.Inboxes.read v4_store.inboxes l2_block.header.inbox_hash
+    in
+    match inbox with
+    | None -> failwith "Missing inbox for %ld" l2_block.header.level
+    | Some (inbox, ()) ->
+        let* _inbox_hash = Store_v5.Inboxes.store v5_store inbox in
+        return_unit
+
+  let migrate_commitment (v4_store : _ Store_v4.t) (v5_store : _ Store_v5.t)
+      (l2_block : Sc_rollup_block.t) =
+    let open Lwt_result_syntax in
+    match l2_block.header.commitment_hash with
+    | None -> return_unit
+    | Some commitment_hash -> (
+        let* commitment =
+          Store_v4.Commitments.read v4_store.commitments commitment_hash
+        in
+        match commitment with
+        | None -> failwith "Missing commitment for %ld" l2_block.header.level
+        | Some (commitment, ()) -> (
+            let* _commitment_hash =
+              Store_v5.Commitments.store v5_store commitment
+            in
+            let* commitment_published_at_level =
+              Store_v4.Commitments_published_at_level.find
+                v4_store.commitments_published_at_level
+                commitment_hash
+            in
+            match commitment_published_at_level with
+            | None -> return_unit
+            | Some {first_published_at_level; published_at_level} ->
+                Store_v5.Commitments_published_at_levels.register
+                  v5_store
+                  commitment_hash
+                  {first_published_at_level; published_at_level}))
+
+  let migrate_dal_slot_headers (v4_store : _ Store_v4.t)
+      (v5_store : _ Store_v5.t) (l2_block : Sc_rollup_block.t) =
+    let open Lwt_result_syntax in
+    let* headers =
+      Store_v4.Dal_slots_headers.list_values
+        v4_store.irmin_store
+        ~primary_key:l2_block.header.block_hash
+    in
+    List.iter_es
+      (Store_v5.Dal_slots_headers.store v5_store l2_block.header.block_hash)
+      headers
+
+  let migrate_dal_slot_statuses (v4_store : _ Store_v4.t)
+      (v5_store : _ Store_v5.t) (l2_block : Sc_rollup_block.t) =
+    let open Lwt_result_syntax in
+    let* statuses =
+      Store_v4.Dal_slots_statuses.list_secondary_keys_with_values
+        v4_store.irmin_store
+        ~primary_key:l2_block.header.block_hash
+    in
+    List.iter_es
+      (fun (slot_index, status) ->
+        Store_v5.Dal_slots_statuses.store
+          v5_store
+          l2_block.header.block_hash
+          slot_index
+          status)
+      statuses
+
+  let migrate_l2_block (v4_store : _ Store_v4.t) (v5_store : _ Store_v5.t)
+      (l2_block : Sc_rollup_block.t) =
+    let open Lwt_result_syntax in
+    let* () =
+      Store_v5.L2_levels.store
+        v5_store
+        l2_block.header.level
+        l2_block.header.block_hash
+    in
+    let* () = migrate_messages v4_store v5_store l2_block in
+    let* () = migrate_inbox v4_store v5_store l2_block in
+    let* () = migrate_commitment v4_store v5_store l2_block in
+    let* () = migrate_dal_slot_headers v4_store v5_store l2_block in
+    let* () = migrate_dal_slot_statuses v4_store v5_store l2_block in
+    Store_v5.L2_blocks.store v5_store l2_block
+
+  let migrate_outbox_messages (v4_store : _ Store_v4.t)
+      (v5_store : _ Store_v5.t) =
+    let open Lwt_result_syntax in
+    Store_v4.Outbox_messages.iter v4_store.outbox_messages
+    @@ fun ~outbox_level ~messages ~executed_messages ->
+    let*? indexes = Bitset.from_list messages in
+    let* () =
+      Store_v5.Outbox_messages.register_outbox_messages
+        v5_store
+        ~outbox_level
+        ~indexes
+    in
+    List.iter_es
+      (fun index ->
+        Store_v5.Outbox_messages.set_outbox_message_executed
+          v5_store
+          ~outbox_level
+          ~index)
+      executed_messages
+
+  let migrate_protocols (v4_store : _ Store_v4.t) (v5_store : _ Store_v5.t) =
+    let open Lwt_result_syntax in
+    let* protocols = Store_v4.Protocols.read v4_store.protocols in
+    match protocols with
+    | None -> return_unit
+    | Some protocols ->
+        List.rev protocols
+        |> List.iter_es
+             (fun Store_v4.Protocols.{level; proto_level; protocol} ->
+               let level =
+                 match level with
+                 | First_known l -> Store_v5.Protocols.First_known l
+                 | Activation_level l -> Activation_level l
+               in
+               Store_v5.Protocols.store v5_store {level; proto_level; protocol})
+
+  let migrate_rollup_node_state (v4_store : _ Store_v4.t)
+      (v5_store : _ Store_v5.t) =
+    let open Lwt_result_syntax in
+    (* migrate lcc *)
+    let* lcc = Store_v4.Lcc.read v4_store.lcc in
+    let* () =
+      match lcc with
+      | None -> return_unit
+      | Some {commitment; level} ->
+          Store_v5.State.LCC.set v5_store (commitment, level)
+    in
+    (* migrate lpc *)
+    let* lpc = Store_v4.Lpc.read v4_store.lpc in
+    let* () =
+      match lpc with
+      | None -> return_unit
+      | Some commitment ->
+          let hash = Commitment.hash commitment in
+          Store_v5.State.LPC.set v5_store (hash, commitment.inbox_level)
+    in
+    (* migrate head *)
+    let* head = Store_v4.L2_head.read v4_store.l2_head in
+    let* () =
+      match head with
+      | None -> return_unit
+      | Some head ->
+          Store_v5.State.L2_head.set
+            v5_store
+            (head.header.block_hash, head.header.level)
+    in
+    (* migrate finalized *)
+    let* finalized =
+      Store_v4.Last_finalized_level.read v4_store.last_finalized_level
+    in
+    let* () =
+      match finalized with
+      | None -> return_unit
+      | Some finalized_level ->
+          let* finalized_hash =
+            Store_v5.L2_levels.find v5_store finalized_level
+          in
+          let finalized_hash =
+            WithExceptions.Option.get ~loc:__LOC__ finalized_hash
+          in
+          Store_v5.State.Finalized_level.set
+            v5_store
+            (finalized_hash, finalized_level)
+    in
+    (* migrate context split *)
+    let* split =
+      Store_v4.Last_context_split.read v4_store.last_context_split_level
+    in
+    let* () =
+      match split with
+      | None -> return_unit
+      | Some l -> Store_v5.State.Last_context_split.set v5_store l
+    in
+    (* migrate last GC *)
+    let* gc = Store_v4.Gc_levels.read v4_store.gc_levels in
+    let* () =
+      match gc with
+      | None -> return_unit
+      | Some {last_gc_level; first_available_level} ->
+          let* () =
+            Store_v5.State.Last_gc_target.set v5_store first_available_level
+          in
+          Store_v5.State.Last_gc_triggered_at.set v5_store last_gc_level
+    in
+    (* migrate last successful GC *)
+    let* gc = Store_v4.Gc_levels.read v4_store.successful_gc_levels in
+    let* () =
+      match gc with
+      | None -> return_unit
+      | Some {last_gc_level; first_available_level} ->
+          let* () =
+            Store_v5.State.Last_successful_gc_target.set
+              v5_store
+              first_available_level
+          in
+          Store_v5.State.Last_successful_gc_triggered_at.set
+            v5_store
+            last_gc_level
+    in
+    (* migrate history mode *)
+    let* history_mode = Store_v4.History_mode.read v4_store.history_mode in
+    let* () =
+      match history_mode with
+      | None -> return_unit
+      | Some m -> Store_v5.State.History_mode.set v5_store m
+    in
+    return_unit
+
+  let final_actions ~data_dir ~tmp_dir v4_store v5_store =
+    let open Lwt_result_syntax in
+    let* () = migrate_outbox_messages v4_store v5_store in
+    let* () = migrate_protocols v4_store v5_store in
+    let* () = migrate_rollup_node_state v4_store v5_store in
+    let*! () =
+      Lwt_utils_unix.remove_dir (Configuration.default_storage_dir data_dir)
+    in
+    let mv file =
+      let src = Filename.concat tmp_dir file in
+      let*! exists = Lwt_unix.file_exists src in
+      if not exists then Lwt.return_unit
+      else Lwt_unix.rename src (Filename.concat data_dir file)
+    in
+    let*! () =
+      List.iter_s mv Sql_store.(sqlite_file_name :: extra_sqlite_files)
+    in
+    return_unit
+
+  module From_v4 =
+    Make
+      (Wrap_old (Store_v4)) (Wraped_v5)
+      (struct
+        let migrate_block_action = migrate_l2_block
 
         let final_actions = final_actions
       end)
