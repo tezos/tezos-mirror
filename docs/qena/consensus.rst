@@ -380,7 +380,7 @@ Consensus related protocol parameters
    * - ``CONSENSUS_RIGHTS_DELAY``
      - 2 cycles
    * - ``GLOBAL_LIMIT_OF_STAKING_OVER_BAKING``
-     - 5
+     - 9
    * - ``LIMIT_OF_DELEGATION_OVER_BAKING``
      - 9
    * - ``MINIMAL_STAKE``
