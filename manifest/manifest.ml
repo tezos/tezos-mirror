@@ -4452,9 +4452,19 @@ let generate_dependency_graph ?(source = []) ?(without = []) filename =
     let attributes (node : t) =
       ("label", label node)
       ::
-      (match node.target.kind with
+      (match (metadata node).recompile_percent with
+      | None -> []
+      | Some percent ->
+          (* Reach 100% red when [percent >= cap]. *)
+          let cap = 75 in
+          let rgb =
+            Printf.sprintf "#%02x0000" (min 255 (max 0 (percent * 255 / cap)))
+          in
+          [("color", rgb); ("fontcolor", rgb)])
+      @
+      match node.target.kind with
       | Public_library _ | Private_library _ -> [("shape", "box")]
-      | Public_executable _ | Private_executable _ | Test_executable _ -> [])
+      | Public_executable _ | Private_executable _ | Test_executable _ -> []
   end in
   let module G = Dgraph.Make (Node) in
   (* Make the direct dependency graph. *)
