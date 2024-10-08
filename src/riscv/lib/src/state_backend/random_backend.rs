@@ -5,7 +5,7 @@
 use super::{
     hash::{Hash, HashError, RootHashable},
     owned_backend::Owned,
-    AllocatedOf, Elem, Layout, Location, ManagerAlloc, ManagerBase, ManagerRead, ManagerReadWrite,
+    AllocatedOf, Elem, Layout, ManagerAlloc, ManagerBase, ManagerRead, ManagerReadWrite,
     ManagerSerialise, ManagerWrite, StaticCopy,
 };
 use rand::Fill;
@@ -58,7 +58,7 @@ impl<'a> Randomised<'a> {
             regions,
         };
 
-        L::allocate(&mut backend, L::placed().into_location())
+        L::allocate(&mut backend)
     }
 }
 
@@ -69,10 +69,7 @@ impl<'a> ManagerBase for Randomised<'a> {
 }
 
 impl<'a> ManagerAlloc for Randomised<'a> {
-    fn allocate_region<E: 'static, const LEN: usize>(
-        &mut self,
-        _loc: Location<[E; LEN]>,
-    ) -> Self::Region<E, LEN> {
+    fn allocate_region<E: 'static, const LEN: usize>(&mut self) -> Self::Region<E, LEN> {
         unsafe {
             let layout = alloc::Layout::new::<[E; LEN]>();
             let data = alloc::alloc(layout);
@@ -87,10 +84,7 @@ impl<'a> ManagerAlloc for Randomised<'a> {
         }
     }
 
-    fn allocate_dyn_region<const LEN: usize>(
-        &mut self,
-        _loc: Location<[u8; LEN]>,
-    ) -> Self::DynRegion<LEN> {
+    fn allocate_dyn_region<const LEN: usize>(&mut self) -> Self::DynRegion<LEN> {
         unsafe {
             let layout = alloc::Layout::new::<[u8; LEN]>();
             let data = alloc::alloc(layout);

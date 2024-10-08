@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: MIT
 
 use super::{
-    AllocatedOf, Elem, Layout, Location, ManagerAlloc, ManagerBase, ManagerClone,
-    ManagerDeserialise, ManagerRead, ManagerReadWrite, ManagerSerialise, ManagerWrite, StaticCopy,
+    AllocatedOf, Elem, Layout, ManagerAlloc, ManagerBase, ManagerClone, ManagerDeserialise,
+    ManagerRead, ManagerReadWrite, ManagerSerialise, ManagerWrite, StaticCopy,
 };
 use serde::ser::SerializeTuple;
 use std::{
@@ -20,8 +20,7 @@ pub struct Owned;
 impl Owned {
     /// Allocate regions for the given layout.
     pub fn allocate<L: Layout>() -> AllocatedOf<L, Self> {
-        let places = L::placed();
-        L::allocate(&mut Self, places.into_location())
+        L::allocate(&mut Self)
     }
 }
 
@@ -32,17 +31,11 @@ impl ManagerBase for Owned {
 }
 
 impl ManagerAlloc for Owned {
-    fn allocate_region<E: 'static, const LEN: usize>(
-        &mut self,
-        _loc: Location<[E; LEN]>,
-    ) -> Self::Region<E, LEN> {
+    fn allocate_region<E: 'static, const LEN: usize>(&mut self) -> Self::Region<E, LEN> {
         unsafe { std::mem::zeroed() }
     }
 
-    fn allocate_dyn_region<const LEN: usize>(
-        &mut self,
-        _loc: Location<[u8; LEN]>,
-    ) -> Self::DynRegion<LEN> {
+    fn allocate_dyn_region<const LEN: usize>(&mut self) -> Self::DynRegion<LEN> {
         unsafe {
             let layout = std::alloc::Layout::new::<[u8; LEN]>();
             let alloc = std::alloc::alloc_zeroed(layout);
