@@ -275,17 +275,22 @@ let test_AI_activation =
   in
 
   assert (limit_after = 5000000 && edge_after = 500000000) ;
-  log_step 3 "Check staking is not allowed before AI activation" ;
-  let stake =
-    Client.spawn_stake ~wait:"1" (Tez.of_int 1) ~staker:"bootstrap2" client
-  in
+  log_step
+    3
+    "Check staking is not allowed before AI activation (only for protocols up \
+     to Q)" ;
   let* () =
-    Process.check_error
-      ~msg:
-        (rex
-           "Manual staking operations are forbidden because staking is \
-            currently automated.")
-      stake
+    if Protocol.(number protocol <= 021) then
+      let stake =
+        Client.spawn_stake ~wait:"1" (Tez.of_int 1) ~staker:"bootstrap2" client
+      in
+      Process.check_error
+        ~msg:
+          (rex
+             "Manual staking operations are forbidden because staking is \
+              currently automated.")
+        stake
+    else unit
   in
 
   log_step 4 "Activate AI" ;
