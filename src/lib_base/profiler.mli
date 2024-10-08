@@ -348,3 +348,13 @@ end
     allowing to use the [profiler] functions without having to provide it
     as a parameter *)
 val wrap : profiler -> (module GLOBAL_PROFILER)
+
+(** [profiler_file_suffix] is made for distinguishing the files meant for profiling. *)
+val profiler_file_suffix : string
+
+(** [parse_profiling_vars default_dir] checks for the existence of the following environment variables:
+   - PROFILING: determines the level of detail of the profiling output (terse / detailed / verbose).
+     If no valid profiling argument is provided, profiling will be disabled.
+   - PROFILING_OUTPUT_DIR: specifies where the profiling output will be written, defaults to the current
+     [default_dir] data directory if not provided. *)
+val parse_profiling_vars : string -> lod option * string

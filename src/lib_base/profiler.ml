@@ -431,3 +431,36 @@ let wrap profiler =
     let span_s ?lod ids f = span_s ?lod profiler ids f
   end in
   (module Wrapped : GLOBAL_PROFILER)
+
+let profiler_file_suffix = "_profiling.txt"
+
+let parse_profiling_vars (default_dir : string) =
+  let max_lod =
+    match Sys.getenv_opt "PROFILING" |> Option.map String.lowercase_ascii with
+    | Some "verbose" -> Some Verbose
+    | Some "detailed" -> Some Detailed
+    | Some ("true" | "on" | "yes" | "terse") -> Some Terse
+    | Some invalid_value ->
+        Printf.eprintf
+          "Warning: Invalid PROFILING value '%s', disabling profiling.\n"
+          invalid_value ;
+        None
+    | None ->
+        Option.map (fun _ -> Terse) (Sys.getenv_opt "PROFILING_OUTPUT_DIR")
+  in
+  let output_dir =
+    match Sys.getenv_opt "PROFILING_OUTPUT_DIR" with
+    | None -> default_dir
+    | Some output_dir -> (
+        match Sys.is_directory output_dir with
+        | true -> output_dir
+        | false ->
+            Stdlib.failwith
+              (Printf.sprintf
+                 "Error: Profiling output directory '%s' is not a directory."
+                 output_dir)
+        | exception Sys_error _ ->
+            Sys.mkdir output_dir 0o777 ;
+            output_dir)
+  in
+  (max_lod, output_dir)
