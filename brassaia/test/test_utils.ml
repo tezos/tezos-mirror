@@ -3,6 +3,7 @@ module Tezos_context_disk = Tezos_context_brassaia_disk.Tezos_context_disk
 module Conf = Tezos_context_encoding.Context_binary.Conf
 module Schema = Tezos_context_encoding.Context.Schema
 module Context = Tezos_context_disk.Context
+module Path = Brassaia.Path
 open Lwt_syntax
 
 (* Same as [let* but handle errors using [Assert.fail_msg]. *)
@@ -16,7 +17,7 @@ let ( let*!! ) x f =
 
 let commit = Context.commit ~time:Time.Protocol.epoch ~message:""
 
-type action = Add of Schema.Path.t * bytes | Remove of Schema.Path.t
+type action = Add of Path.t * bytes | Remove of Path.t
 
 let create_block idx com updates =
   let* o = Context.checkout idx com in

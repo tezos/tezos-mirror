@@ -17,16 +17,9 @@
 open! Import
 include Proof_intf
 
-module Make
-    (C : Type.S)
-    (H : Type.S)
-    (S : sig
-      type step [@@deriving brassaia]
-    end) =
-struct
+module Make (C : Type.S) (H : Type.S) = struct
   type contents = C.t [@@deriving brassaia]
   type hash = H.t [@@deriving brassaia]
-  type step = S.step [@@deriving brassaia]
   type kinded_hash = [ `Contents of hash | `Node of hash ]
 
   (* Custom Repr encoding to be coherent with the previous binary
@@ -48,14 +41,14 @@ struct
   type tree =
     | Contents of contents
     | Blinded_contents of hash
-    | Node of (step * tree) list
+    | Node of (Path.step * tree) list
     | Blinded_node of hash
     | Inode of inode_tree inode
     | Extender of inode_tree inode_extender
 
   and inode_tree =
     | Blinded_inode of hash
-    | Inode_values of (step * tree) list
+    | Inode_values of (Path.step * tree) list
     | Inode_tree of inode_tree inode
     | Inode_extender of inode_tree inode_extender
   [@@deriving brassaia]
@@ -76,7 +69,7 @@ struct
     |~ case1 "contents" (pair contents_t unit) (fun (c, ()) -> Contents c)
     |~ case1 "blinded-contents" (pair hash_t unit) (fun (h, ()) ->
            Blinded_contents h)
-    |~ case1 "node" (list (pair step_t tree_t)) (fun h -> Node h)
+    |~ case1 "node" (list (pair Path.step_t tree_t)) (fun h -> Node h)
     |~ case1 "blinded-node" hash_t (fun h -> Blinded_node h)
     |~ case1 "inode" (inode_t inode_tree_t) (fun i -> Inode i)
     |~ case1 "extender" (inode_extender_t inode_tree_t) (fun e -> Extender e)
@@ -84,7 +77,7 @@ struct
 
   type elt =
     | Contents of contents
-    | Node of (step * kinded_hash) list
+    | Node of (Path.step * kinded_hash) list
     | Inode of hash inode
     | Inode_extender of hash inode_extender
   [@@deriving brassaia]
@@ -125,13 +118,12 @@ let bad_stream_too_short_fmt s fmt =
   Fmt.kstr (bad_stream_too_short ("Proof.Env." ^ s)) fmt
 
 module Env
-    (B : Backend.S)
-    (P : S
-           with type contents := B.Contents.Val.t
-            and type hash := B.Hash.t
-            and type step := B.Node.Val.step) =
+    (Backend : Backend.S)
+    (Proof : S
+               with type contents := Backend.Contents.Val.t
+                and type hash := Backend.Hash.t) =
 struct
-  module H = B.Hash
+  module H = Backend.Hash
 
   module Hashes = struct
     include Hashtbl.Make (struct
@@ -153,14 +145,14 @@ struct
 
   module Set = struct
     type produce = {
-      nodes : B.Node.Val.t Hashes.t;
-      contents : B.Contents.Val.t Hashes.t;
+      nodes : Backend.Node.Val.t Hashes.t;
+      contents : Backend.Contents.Val.t Hashes.t;
     }
     [@@deriving brassaia]
 
     type deserialise = {
-      nodes : B.Node_portable.t Hashes.t;
-      contents : B.Contents.Val.t Hashes.t;
+      nodes : Backend.Node_portable.t Hashes.t;
+      contents : Backend.Contents.Val.t Hashes.t;
     }
     [@@deriving brassaia]
 
@@ -184,15 +176,15 @@ struct
     type produce = {
       set : unit Hashes.t;
       singleton_inodes : (int * H.t) Hashes.t;
-      rev_elts : (H.t * P.elt) list ref;
+      rev_elts : (H.t * Proof.elt) list ref;
       rev_elts_size : int ref;
     }
     [@@deriving brassaia]
 
     type consume = {
-      nodes : B.Node_portable.t Hashes.t;
-      contents : B.Contents.Val.t Hashes.t;
-      stream : P.elt Seq.t ref;
+      nodes : Backend.Node_portable.t Hashes.t;
+      contents : Backend.Contents.Val.t Hashes.t;
+      stream : Proof.elt Seq.t ref;
     }
     [@@deriving brassaia]
 
@@ -239,7 +231,7 @@ struct
       | [] -> (Reversed_list.rev acc, h)
       | (i', h') :: rest -> accumulate_segments ~acc:(i' :: acc) h' rest
     in
-    let inode = P.Inode { length; proofs } in
+    let inode = Proof.Inode { length; proofs } in
     match proofs with
     | [ (i, h) ] -> (
         match forward_lookup h singleton_inodes with
@@ -254,11 +246,11 @@ struct
             let i, h = accumulate_segments ~acc:[ i ] h ls in
             match i with
             | [] | [ _ ] -> assert false
-            | segments -> P.Inode_extender { length; segments; proof = h }))
+            | segments -> Proof.Inode_extender { length; segments; proof = h }))
     | _ -> inode
 
-  let post_processing singleton_inodes (stream : (hash * P.elt) list) :
-      P.elt list =
+  let post_processing singleton_inodes (stream : (hash * Proof.elt) list) :
+      Proof.elt list =
     let skips = Hashes.create 13 in
     (* [skips] are the elements of the [stream] that are included in the
        extenders, they will be removed from the final stream. *)
@@ -267,9 +259,9 @@ struct
       | (h, elt) :: rest ->
           if Hashes.mem skips h then aux rev_elts rest
           else
-            let elt' : P.elt =
-              match (elt : P.elt) with
-              | P.Inode { length; proofs } ->
+            let elt' : Proof.elt =
+              match (elt : Proof.elt) with
+              | Proof.Inode { length; proofs } ->
                   apply_extenders ~length singleton_inodes skips proofs
               | Node ls -> Node ls
               | Contents c -> Contents c
@@ -337,7 +329,7 @@ struct
     t := Empty;
     res
 
-  module Contents_hash = Hash.Typed (H) (B.Contents.Val)
+  module Contents_hash = Hash.Typed (H) (Backend.Contents.Val)
 
   let check_contents_integrity v h =
     let h' = Contents_hash.hash v in
@@ -347,7 +339,7 @@ struct
 
   let check_node_integrity v h =
     let h' =
-      try B.Node_portable.hash_exn ~force:false v
+      try Backend.Node_portable.hash_exn ~force:false v
       with Not_found ->
         (* [v] is out of [of_proof], it is supposed to have its hash available
            without IOs.
@@ -366,19 +358,20 @@ struct
 
        [head v] might trigger IOs. It is fine because [v] is already wrapped
        with [with_handler]. *)
-    match B.Node.Val.head v with
+    match Backend.Node.Val.head v with
     | `Node l ->
         let l =
           List.map
             (function
-              | step, `Contents k -> (step, `Contents (B.Contents.Key.to_hash k))
-              | step, `Node k -> (step, `Node (B.Node.Key.to_hash k)))
+              | step, `Contents k ->
+                  (step, `Contents (Backend.Contents.Key.to_hash k))
+              | step, `Node k -> (step, `Node (Backend.Node.Key.to_hash k)))
             l
         in
-        P.Node l
-    | `Inode (length, proofs) -> P.Inode { length; proofs }
+        Proof.Node l
+    | `Inode (length, proofs) -> Proof.Inode { length; proofs }
 
-  let rehydrate_stream_node ~depth (elt : P.elt) h =
+  let rehydrate_stream_node ~depth (elt : Proof.elt) h =
     let bad_stream_exn_fmt = bad_stream_exn_fmt "rehydrate_stream_node" in
     match elt with
     | Contents _ ->
@@ -386,7 +379,7 @@ struct
           "found contents at depth %d when looking for node with hash %a" depth
           pp_hash h
     | Node l -> (
-        match B.Node_portable.of_proof ~depth (`Values l) with
+        match Backend.Node_portable.of_proof ~depth (`Values l) with
         | Some v -> v
         | None ->
             bad_stream_exn_fmt
@@ -396,7 +389,7 @@ struct
         let proofs = List.map (fun (i, h) -> (i, `Blinded h)) proofs in
         let inode = `Inode (length, proofs) in
         let v =
-          match B.Node_portable.of_proof ~depth inode with
+          match Backend.Node_portable.of_proof ~depth inode with
           | Some v -> v
           | None ->
               bad_stream_exn_fmt
@@ -412,7 +405,7 @@ struct
             (`Blinded proof) (List.rev segments)
         in
         let v =
-          match B.Node_portable.of_proof ~depth elt with
+          match Backend.Node_portable.of_proof ~depth elt with
           | Some v -> v
           | None ->
               bad_stream_exn_fmt
@@ -422,7 +415,7 @@ struct
         in
         v
 
-  let rehydrate_stream_contents (elt : P.elt) h =
+  let rehydrate_stream_contents (elt : Proof.elt) h =
     let err k =
       bad_stream_exn_fmt "find_contents"
         "found %s when looking Contents with hash %a" k pp_hash h
@@ -489,7 +482,7 @@ struct
         (* Registering when seen for the first time *)
         if not @@ Hashes.mem set h then (
           Hashes.add set h ();
-          let h_elt : hash * P.elt = (h, Contents v) in
+          let h_elt : hash * Proof.elt = (h, Contents v) in
           Stream.push cache h_elt 0)
     | Stream (Consume _) ->
         (* This phase has no repo pointer *)
@@ -513,7 +506,7 @@ struct
     | Set (Produce set) ->
         (* This is needed in order to achieve sharing on inode's pointers. In
            other words, each node present in the [before] tree should have a
-           single [P.Node.Val.t] representative that will witness all the lazy
+           single [Proof.Node.Val.t] representative that will witness all the lazy
            inode loadings. *)
         Hashes.find_opt set.nodes h
     | Set (Serialise set) ->
@@ -582,14 +575,14 @@ struct
                 let v =
                   (* Call [with_handler] before [head] because the later might
                      perform reads *)
-                  B.Node_portable.with_handler (find_recpnode t) v
+                  Backend.Node_portable.with_handler (find_recpnode t) v
                 in
                 let (_ : [ `Node of _ | `Inode of _ ]) =
                   (* At produce time [dehydrate_stream_node] called [head] which
                      might have performed IOs. If it did then we must consume
                      the stream accordingly right now in order to preserve
                      stream ordering. *)
-                  B.Node_portable.head v
+                  Backend.Node_portable.head v
                 in
                 check_node_integrity v h;
                 Hashes.add nodes h v;
@@ -606,13 +599,13 @@ struct
         match find ~expected_depth k with
         | None -> None
         | Some v ->
-            let h = B.Node.Key.to_hash k in
+            let h = Backend.Node.Key.to_hash k in
             if not @@ Hashes.mem set h then (
               Hashes.add set h ();
               let elt = dehydrate_stream_node v in
               let () =
                 match elt with
-                | P.Inode { proofs = [ bucket ]; _ } ->
+                | Proof.Inode { proofs = [ bucket ]; _ } ->
                     Hashes.add singleton_inodes h bucket
                 | _ -> ()
               in
@@ -650,7 +643,7 @@ struct
 
              If [new_hash] then it additionally should be wrapped before
              calling [dehydrate_stream_node] as this call may trigger IOs. *)
-          B.Node.Val.with_handler (add_recnode_from_store t) v
+          Backend.Node.Val.with_handler (add_recnode_from_store t) v
         in
         if new_hash then (
           Hashes.add set h ();
@@ -664,7 +657,7 @@ struct
           in
           let () =
             match elt with
-            | P.Inode { proofs = [ bucket ]; _ } ->
+            | Proof.Inode { proofs = [ bucket ]; _ } ->
                 Hashes.add singleton_inodes h bucket
             | _ -> ()
           in

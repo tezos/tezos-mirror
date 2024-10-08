@@ -18,10 +18,8 @@
 open! Import
 open Store_properties
 
-open struct
-  module type Node_portable = Node.Portable.S
-  module type Commit_portable = Commit.Portable.S
-end
+module type Node_portable = Node.Portable.S
+module type Commit_portable = Commit.Portable.S
 
 (** [S] is what a backend must define in order to be made an brassaia store. *)
 module type S = sig
@@ -37,18 +35,12 @@ module type S = sig
 
   (** A node store. *)
   module Node :
-    Node.Store
-      with type hash = Hash.t
-       and type Val.contents_key = Contents.key
-       and module Path = Schema.Path
+    Node.Store with type hash = Hash.t and type Val.contents_key = Contents.key
 
   (** A node abstraction that is portable from different repos. Similar to
       [Node.Val]. *)
   module Node_portable :
-    Node_portable
-      with type node := Node.value
-       and type hash := Hash.t
-       and type step := Schema.Path.step
+    Node_portable with type node := Node.value and type hash := Hash.t
 
   (** A commit store. *)
   module Commit :

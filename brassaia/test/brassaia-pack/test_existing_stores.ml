@@ -96,10 +96,9 @@ module V2_maker = Brassaia_pack_unix.Maker (Conf)
 module Schema_v2 = struct
   open Brassaia
   module Contents = Contents.String_v2
-  module Path = Path.String_list
   module Branch = Branch.String
   module Hash = Hash.SHA1
-  module Node = Node.Generic_key.Make_v2 (Hash) (Path)
+  module Node = Node.Generic_key.Make_v2 (Hash)
   module Commit = Commit.Generic_key.Make_v2 (Hash)
   module Info = Info.Default
 end

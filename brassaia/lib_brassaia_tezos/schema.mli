@@ -17,7 +17,5 @@
 include
   Brassaia.Schema.Extended
     with type Contents.t = bytes
-     and type Path.t = string list
-     and type Path.step = string
      and type Branch.t = string
      and module Info = Brassaia.Info.Default

@@ -15,38 +15,36 @@
  *)
 
 open Astring
-include Path_intf
 
-module String_list = struct
-  type step = string [@@deriving brassaia]
+type step = string
+[@@deriving brassaia ~pp ~compare ~to_bin_string ~of_bin_string]
 
-  let step_encoding : step Data_encoding.t = Data_encoding.string
+let step_encoding : step Data_encoding.t = Data_encoding.string
 
-  type t = step list
+type t = step list [@@deriving brassaia ~pp ~compare]
 
-  let encoding = Data_encoding.(list step_encoding)
-  let empty = []
-  let is_empty l = l = []
-  let cons s t = s :: t
-  let rcons t s = t @ [ s ]
-  let decons = function [] -> None | h :: t -> Some (h, t)
+let encoding = Data_encoding.(list step_encoding)
+let empty = []
+let is_empty l = l = []
+let cons s t = s :: t
+let rcons t s = t @ [ s ]
+let decons = function [] -> None | h :: t -> Some (h, t)
 
-  let rdecons l =
-    match List.rev l with [] -> None | h :: t -> Some (List.rev t, h)
+let rdecons l =
+  match List.rev l with [] -> None | h :: t -> Some (List.rev t, h)
 
-  let map l f = List.map f l
-  let init x = x
+let map l f = List.map f l
+let init x = x
 
-  let pp ppf t =
-    let len = List.fold_left (fun acc s -> 1 + acc + String.length s) 1 t in
-    let buf = Buffer.create len in
-    List.iter
-      (fun s ->
-        Buffer.add_char buf '/';
-        Buffer.add_string buf s)
-      t;
-    Fmt.string ppf (Buffer.contents buf)
+let pp ppf t =
+  let len = List.fold_left (fun acc s -> 1 + acc + String.length s) 1 t in
+  let buf = Buffer.create len in
+  List.iter
+    (fun s ->
+      Buffer.add_char buf '/';
+      Buffer.add_string buf s)
+    t;
+  Fmt.string ppf (Buffer.contents buf)
 
-  let of_string s = Ok (List.filter (( <> ) "") (String.cuts s ~sep:"/"))
-  let t = Type.like ~pp ~of_string Type.(list step_t)
-end
+let of_string s = Ok (List.filter (( <> ) "") (String.cuts s ~sep:"/"))
+let t = Type.like ~pp ~of_string Type.(list step_t)

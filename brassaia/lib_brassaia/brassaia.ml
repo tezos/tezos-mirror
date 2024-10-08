@@ -66,13 +66,9 @@ module Maker_generic_key (Backend : Maker_generic_key_args) = struct
       end
 
       module Node = struct
-        module Value =
-          Node.Generic_key.Make (S.Hash) (S.Path) (Contents_key) (Node_key)
-
+        module Value = Node.Generic_key.Make (S.Hash) (Contents_key) (Node_key)
         module Backend = Backend.Node_store.Make (S.Hash) (Value)
-
-        include
-          Node.Generic_key.Store (Contents) (Backend) (S.Hash) (Value) (S.Path)
+        include Node.Generic_key.Store (Contents) (Backend) (S.Hash) (Value)
       end
 
       module Node_portable = Node.Value.Portable
@@ -231,9 +227,8 @@ module Of_storage (M : Storage.Make) (H : Hash.S) (V : Contents.S) = struct
     module Hash = H
     module Contents = V
     module Info = Info.Default
-    module Path = Path.String_list
     module Branch = Branch.String
-    module Node = Node.Make (Hash) (Path)
+    module Node = Node.Make (Hash)
     module Commit = Commit.Make (Hash)
   end)
 end

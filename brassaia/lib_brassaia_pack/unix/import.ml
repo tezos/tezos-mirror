@@ -76,6 +76,7 @@ module type S = Brassaia_pack.S
 module Conf = Brassaia_pack.Conf
 module Layout = Brassaia_pack.Layout
 module Indexable = Brassaia_pack.Indexable
+module Path = Brassaia.Path
 
 module Result_syntax = struct
   let ( let+ ) res f = Result.map f res

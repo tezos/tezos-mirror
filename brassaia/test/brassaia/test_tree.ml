@@ -19,10 +19,9 @@ open Brassaia
 
 module Schema = struct
   module Contents = Contents.String
-  module Path = Path.String_list
   module Branch = Branch.String
   module Hash = Hash.BLAKE2B
-  module Node = Node.Generic_key.Make (Hash) (Path)
+  module Node = Node.Generic_key.Make (Hash)
   module Commit = Commit.Make (Hash)
   module Info = Info.Default
 end
@@ -438,7 +437,7 @@ let persist_tree ?clear : Store.tree -> Store.tree Lwt.t =
   let* () = Store.set_tree_exn ?clear ~info:Store.Info.none store [] tree in
   Store.tree store
 
-type path = Store.Path.t [@@deriving brassaia ~pp ~equal]
+type path = Path.t [@@deriving brassaia ~pp ~equal]
 
 let test_clear _ () =
   (* 1. Build a tree *)
@@ -839,7 +838,7 @@ let suite =
     Alcotest_lwt.test_case "add" `Quick test_add;
     Alcotest_lwt.test_case "remove" `Quick test_remove;
     Alcotest_lwt.test_case "update" `Quick test_update;
-    Alcotest_lwt.test_case "clear" `Slow test_clear;
+    Alcotest_lwt.test_case "clear" `Quick test_clear;
     Alcotest_lwt.test_case "minimal_reads" `Quick test_minimal_reads;
     Alcotest_lwt.test_case "fold" `Quick test_fold_force;
     Alcotest_lwt.test_case "Broken.hashes" `Quick Broken.test_hashes;

@@ -582,14 +582,10 @@ struct
 end
 
 module Stats (S : sig
-  type step
-
-  val step_t : step Brassaia.Type.t
-
   module Hash : Brassaia.Hash.S
 end) =
 struct
-  type step = Node of S.step | Inode
+  type step = Node of Path.step | Inode
   type path = step list
 
   module Metrics : sig
@@ -696,7 +692,7 @@ struct
 
     let pp_step ppf = function
       | Inode -> Fmt.pf ppf "-"
-      | Node x -> Fmt.pf ppf "%a" (Brassaia.Type.pp S.step_t) x
+      | Node x -> Fmt.pf ppf "%a" (Brassaia.Type.pp Path.step_t) x
 
     let pp_path = Fmt.list ~sep:(Fmt.any "/") pp_step
 
