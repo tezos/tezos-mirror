@@ -37,6 +37,8 @@ module type S = sig
   val simplify : t -> t
 
   val sourced_at : Nodes.t -> t -> t
+
+  val reverse : t -> t
 end
 
 module Make (Node : NODE) : S with type node = Node.t = struct
@@ -167,4 +169,11 @@ module Make (Node : NODE) : S with type node = Node.t = struct
       Nodes.fold add_reachable sources Nodes.empty
     in
     filter graph @@ fun node _ -> Nodes.mem node nodes_to_keep
+
+  let reverse graph =
+    (* Start from [graph] without its edges, to ensure that all nodes stay in the graph. *)
+    let acc = map graph (fun _ _ -> Nodes.empty) in
+    (* Add all edges back but reversed. *)
+    fold graph acc @@ fun node edges acc ->
+    Nodes.fold (fun edge acc -> add edge node acc) edges acc
 end

@@ -70,6 +70,9 @@ module type S = sig
 
   (** Take the subgraph of nodes reachable from some specific nodes. *)
   val sourced_at : Nodes.t -> t -> t
+
+  (** Reverse all edges of a graph. *)
+  val reverse : t -> t
 end
 
 (** Make a directed graph module from a node module. *)
