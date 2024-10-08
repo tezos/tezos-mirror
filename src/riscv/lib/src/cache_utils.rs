@@ -8,7 +8,7 @@ use crate::{
         instruction::{Instr, InstrCacheable},
         parse,
     },
-    state_backend::{Choreographer, Elem, Layout, ManagerAlloc, ManagerBase, Many, Placed},
+    state_backend::{Choreographer, Layout, ManagerAlloc, ManagerBase, Many, Placed},
 };
 use std::{convert::Infallible, marker::PhantomData};
 
@@ -32,28 +32,6 @@ impl FenceCounter {
     }
 }
 
-impl Elem for FenceCounter {
-    #[inline(always)]
-    fn store(&mut self, source: &Self) {
-        self.0.store(&source.0);
-    }
-
-    #[inline(always)]
-    fn to_stored_in_place(&mut self) {
-        self.0.to_stored_in_place();
-    }
-
-    #[inline(always)]
-    fn from_stored_in_place(&mut self) {
-        self.0.from_stored_in_place();
-    }
-
-    #[inline(always)]
-    fn from_stored(source: &Self) -> Self {
-        Self(u32::from_stored(&source.0))
-    }
-}
-
 /// Unparsed instruction used for storing cached instructions in the state.
 ///
 /// Compressed instructions are represented as the lower-16 bits of the u32, with upper-16 bits
@@ -61,28 +39,6 @@ impl Elem for FenceCounter {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[repr(transparent)]
 pub struct Unparsed(pub u32);
-
-impl Elem for Unparsed {
-    #[inline(always)]
-    fn store(&mut self, source: &Self) {
-        self.0.store(&source.0)
-    }
-
-    #[inline(always)]
-    fn to_stored_in_place(&mut self) {
-        self.0.to_stored_in_place()
-    }
-
-    #[inline(always)]
-    fn from_stored_in_place(&mut self) {
-        self.0.from_stored_in_place()
-    }
-
-    #[inline(always)]
-    fn from_stored(source: &Self) -> Self {
-        Self(u32::from_stored(&source.0))
-    }
-}
 
 impl From<Unparsed> for (InstrCacheable, Unparsed) {
     fn from(unparsed: Unparsed) -> Self {
