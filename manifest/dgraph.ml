@@ -43,39 +43,39 @@ module Make (Node : NODE) : S with type node = Node.t = struct
   type node = Node.t
 
   module Nodes = Set.Make (Node)
-  module Map = Map.Make (Node)
+  module Node_map = Map.Make (Node)
 
-  type t = Nodes.t Map.t
+  type t = Nodes.t Node_map.t
 
-  let empty = Map.empty
+  let empty = Node_map.empty
 
   let add a b graph =
     (* Ensure [b] is in the graph even if it has no outgoing edge.
        [output_dot_file] relies on all nodes being in the map. *)
     let graph =
-      Fun.flip (Map.update b) graph @@ function
+      Fun.flip (Node_map.update b) graph @@ function
       | None -> Some Nodes.empty
       | Some _ as x -> x
     in
     (* Add the edge. *)
-    Fun.flip (Map.update a) graph @@ function
+    Fun.flip (Node_map.update a) graph @@ function
     | None -> Some (Nodes.singleton b)
     | Some old -> Some (Nodes.add b old)
 
   let get node graph =
-    match Map.find_opt node graph with
+    match Node_map.find_opt node graph with
     | None -> Nodes.empty
     | Some nodes -> nodes
 
   let mem a b graph = Nodes.mem b (get a graph)
 
-  let iter graph f = Map.iter f graph
+  let iter graph f = Node_map.iter f graph
 
-  let map graph f = Map.mapi f graph
+  let map graph f = Node_map.mapi f graph
 
-  let fold graph acc f = Map.fold f graph acc
+  let fold graph acc f = Node_map.fold f graph acc
 
-  let filter graph f = Map.filter f graph
+  let filter graph f = Node_map.filter f graph
 
   let nodes graph =
     fold graph Nodes.empty @@ fun node _ acc -> Nodes.add node acc
@@ -118,7 +118,7 @@ module Make (Node : NODE) : S with type node = Node.t = struct
   let transitive_closure graph =
     (* [reachable_set] computes the set of nodes reachable from [node],
        and its results are memoized in [memoized]. *)
-    let memoized = ref Map.empty in
+    let memoized = ref Node_map.empty in
     (* [seen] contains the path that we took to reach [node];
        it is used to detect cycles. It would be more efficient to use a [Nodes.t],
        but a list allows to display the path in error messages.
@@ -132,7 +132,7 @@ module Make (Node : NODE) : S with type node = Node.t = struct
           ^ String.concat " -> " (List.map Node.id seen))
       else
         let seen = node :: seen in
-        match Map.find_opt node !memoized with
+        match Node_map.find_opt node !memoized with
         | Some result -> result
         | None ->
             (* Recursively compute the set of reachable nodes for each
@@ -146,7 +146,7 @@ module Make (Node : NODE) : S with type node = Node.t = struct
                 acc
             in
             (* Save result for later (memoize). *)
-            memoized := Map.add node result !memoized ;
+            memoized := Node_map.add node result !memoized ;
             result
     in
     map graph (fun node _ -> reachable_set [] node)
