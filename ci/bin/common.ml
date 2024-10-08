@@ -1184,6 +1184,7 @@ let job_build_dsn_node ?rules () : tezos_job =
 let job_datadog_pipeline_trace : tezos_job =
   job
     ~__POS__
+    ~allow_failure:Yes
     ~name:"datadog_pipeline_trace"
     ~image:Images.CI.build
     ~stage:Stages.sanity
