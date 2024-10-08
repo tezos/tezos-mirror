@@ -13,6 +13,7 @@ depends: [
   "octez-libs" { = version }
   "tezos-dal-node-services" { = version }
   "octez-shell-libs" { = version }
+  "octez-l2-libs" { = version }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
