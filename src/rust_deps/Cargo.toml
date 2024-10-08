@@ -19,4 +19,4 @@ path = "../riscv/lib"
 features = ["ocaml-api"]
 
 [dependencies.octez-evm-node-wasm-runtime]
-path = "../../etherlink/lib_wasm_runtime"
+path = "../../src/lib_wasm_runtime"
