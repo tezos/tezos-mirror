@@ -33,7 +33,7 @@ let finalize_current_slot_headers ctxt =
     (Raw_context.current_level ctxt).level
     (Raw_context.Dal.candidates ctxt)
 
-let compute_slot_headers_statuses ~is_slot_attested seen_slot_headers =
+let compute_slot_headers_statuses ~is_slot_attested published_slot_headers =
   let open Dal_slot_repr in
   let fold_attested_slots (rev_attested_slot_headers, attestation)
       (slot, slot_publisher) =
@@ -53,7 +53,7 @@ let compute_slot_headers_statuses ~is_slot_attested seen_slot_headers =
     List.fold_left
       fold_attested_slots
       ([], Dal_attestation_repr.empty)
-      seen_slot_headers
+      published_slot_headers
   in
   (List.rev rev_attested_slot_headers, bitset)
 
@@ -102,19 +102,19 @@ let finalize_pending_slot_headers ctxt ~number_of_slots =
   match Raw_level_repr.(sub raw_level dal.attestation_lag) with
   | None -> return (ctxt, Dal_attestation_repr.empty)
   | Some published_level ->
-      let* seen_slots = find_slot_headers ctxt published_level in
+      let* published_slots = find_slot_headers ctxt published_level in
       let*! ctxt = Storage.Dal.Slot.Headers.remove ctxt published_level in
       let* ctxt, attestation, slot_headers_statuses =
-        match seen_slots with
+        match published_slots with
         | None -> return (ctxt, Dal_attestation_repr.empty, [])
-        | Some seen_slots ->
+        | Some published_slots ->
             let slot_headers_statuses, attestation =
               let is_slot_attested slot =
                 Raw_context.Dal.is_slot_index_attested
                   ctxt
                   slot.Dal_slot_repr.Header.id.index
               in
-              compute_slot_headers_statuses ~is_slot_attested seen_slots
+              compute_slot_headers_statuses ~is_slot_attested published_slots
             in
             return (ctxt, attestation, slot_headers_statuses)
       in
