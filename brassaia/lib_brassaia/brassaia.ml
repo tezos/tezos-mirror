@@ -67,15 +67,12 @@ module Maker_generic_key (Backend : Maker_generic_key_args) = struct
 
       module Node = struct
         module Value =
-          Node.Generic_key.Make (S.Hash) (S.Path) (S.Metadata) (Contents_key)
-            (Node_key)
+          Node.Generic_key.Make (S.Hash) (S.Path) (Contents_key) (Node_key)
 
         module Backend = Backend.Node_store.Make (S.Hash) (Value)
 
         include
-          Node.Generic_key.Store (Contents) (Backend) (S.Hash) (Value)
-            (S.Metadata)
-            (S.Path)
+          Node.Generic_key.Store (Contents) (Backend) (S.Hash) (Value) (S.Path)
       end
 
       module Node_portable = Node.Value.Portable
@@ -171,7 +168,6 @@ end
 
 module KV_maker (CA : Content_addressable.Maker) (AW : Atomic_write.Maker) =
 struct
-  type metadata = unit
   type hash = Schema.default_hash
   type info = Info.default
 
@@ -222,7 +218,6 @@ let remote_store (type t) (module M : Generic_key.S with type t = t) (t : t) =
   let module X : Store.Generic_key.S with type t = t = M in
   Sync.remote_store (module X) t
 
-module Metadata = Metadata
 module Json_tree = Store.Json_tree
 module Export_for_backends = Export_for_backends
 module Storage = Storage
@@ -236,10 +231,9 @@ module Of_storage (M : Storage.Make) (H : Hash.S) (V : Contents.S) = struct
     module Hash = H
     module Contents = V
     module Info = Info.Default
-    module Metadata = Metadata.None
     module Path = Path.String_list
     module Branch = Branch.String
-    module Node = Node.Make (Hash) (Path) (Metadata)
+    module Node = Node.Make (Hash) (Path)
     module Commit = Commit.Make (Hash)
   end)
 end

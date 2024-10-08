@@ -39,23 +39,8 @@ module Of_core (S : Core) = struct
       (fun acc -> function k, `Node n -> (k, n) :: acc | _ -> acc)
       [] kvs
 
-  (* [Merge.alist] expects us to return an option. [C.merge] does
-       that, but we need to consider the metadata too... *)
-  let merge_metadata merge_contents =
-    (* This gets us [C.t option, S.Val.Metadata.t]. We want [(C.t *
-       S.Val.Metadata.t) option]. *)
-    let explode = function
-      | None -> (None, S.Metadata.default)
-      | Some (c, m) -> (Some c, m)
-    in
-    let implode = function None, _ -> None | Some c, m -> Some (c, m) in
-    Merge.like [%typ: (S.contents_key * S.metadata) option]
-      (Merge.pair merge_contents S.Metadata.merge)
-      explode implode
-
   let merge_contents merge_key =
-    Merge.alist S.step_t (Type.pair S.contents_key_t S.metadata_t) (fun _step ->
-        merge_metadata merge_key)
+    Merge.alist S.step_t S.contents_key_t (fun _step -> merge_key)
 
   let merge_node merge_key =
     Merge.alist S.step_t S.node_key_t (fun _step -> merge_key)
@@ -84,12 +69,9 @@ module Make_core
 
       val step_encoding : step Data_encoding.t
     end)
-    (Metadata : Metadata.S)
     (Contents_key : Key.S with type hash = Hash.t)
     (Node_key : Key.S with type hash = Hash.t) =
 struct
-  module Metadata = Metadata
-
   type contents_key = Contents_key.t [@@deriving brassaia]
 
   let contents_key_encoding = Contents_key.encoding
@@ -102,10 +84,6 @@ struct
 
   let step_encoding = Path.step_encoding
 
-  type metadata = Metadata.t [@@deriving brassaia ~equal]
-
-  let metadata_encoding = Metadata.encoding
-
   type hash = Hash.t [@@deriving brassaia]
 
   let hash_encoding = Hash.encoding
@@ -113,12 +91,17 @@ struct
   type 'key contents_entry = { name : Path.step; contents : 'key }
   [@@deriving brassaia]
 
-  type 'key contents_m_entry = {
-    metadata : Metadata.t;
-    name : Path.step;
-    contents : 'key;
-  }
-  [@@deriving brassaia]
+  type 'key contents_m_entry = { name : Path.step; contents : 'key }
+
+  (* Custom Repr encoding to be coherent with the previous binary
+     representation that included metadatas *)
+  let contents_m_entry_t key_t =
+    let open Type in
+    record "contents_m_entry" (fun () name contents -> { name; contents })
+    |+ field "metadata" unit (fun _ -> ())
+    |+ field "name" Path.step_t (fun cont -> cont.name)
+    |+ field "contents" key_t (fun cont -> cont.contents)
+    |> sealr
 
   module StepMap = struct
     include Map.Make (struct
@@ -156,7 +139,19 @@ struct
       (fun l -> List.to_seq l |> StepMap.of_seq)
       Data_encoding.(list (tup2 StepMap.key_encoding entry_encoding))
 
-  type value = [ `Node of node_key | `Contents of contents_key * metadata ]
+  type value = [ `Node of node_key | `Contents of contents_key ]
+
+  (* Custom Repr encoding to be coherent with the previous binary
+     representation that included metadatas *)
+  let value_t =
+    let open Type in
+    variant "value" (fun n c _ -> function
+      | `Node h -> n h | `Contents h -> c (h, ()))
+    |~ case1 "node" node_key_t (fun k -> `Node k)
+    |~ case1 "contents" (pair contents_key_t unit) (fun (h, ()) -> `Contents h)
+    |~ case1 "contents-x" (pair contents_key_t unit) (fun (h, ()) ->
+           `Contents h)
+    |> sealv
 
   let value_encoding =
     let open Data_encoding in
@@ -166,13 +161,12 @@ struct
           (function `Node k -> Some k | _ -> None)
           (fun k -> `Node k);
         case (Tag 2) ~title:"`Contents"
-          (tup2 contents_key_encoding metadata_encoding)
-          (function `Contents k -> Some k | _ -> None)
-          (fun k -> `Contents k);
+          (tup2 contents_key_encoding unit)
+          (function `Contents k -> Some (k, ()) | _ -> None)
+          (fun (k, ()) -> `Contents k);
       ]
 
-  type weak_value = [ `Contents of hash * metadata | `Node of hash ]
-  [@@deriving brassaia]
+  type weak_value = [ `Contents of hash | `Node of hash ]
 
   let weak_value_encoding =
     let open Data_encoding in
@@ -181,38 +175,20 @@ struct
         case (Tag 1) ~title:"`Node" hash_encoding
           (function `Node k -> Some k | _ -> None)
           (fun k -> `Node k);
-        case (Tag 2) ~title:"`Contents"
-          (tup2 hash_encoding metadata_encoding)
-          (function `Contents k -> Some k | _ -> None)
-          (fun k -> `Contents k);
+        case (Tag 2) ~title:"`Contents" (tup2 hash_encoding unit)
+          (function `Contents k -> Some (k, ()) | _ -> None)
+          (fun (k, ()) -> `Contents k);
       ]
-
-  (* FIXME:  special-case the default metadata in the default signature? *)
-  let value_t =
-    let open Type in
-    variant "value" (fun n c x -> function
-      | `Node h -> n h
-      | `Contents (h, m) ->
-          if equal_metadata m Metadata.default then c h else x (h, m))
-    |~ case1 "node" node_key_t (fun k -> `Node k)
-    |~ case1 "contents" contents_key_t (fun h ->
-           `Contents (h, Metadata.default))
-    |~ case1 "contents-x" (pair contents_key_t Metadata.t) (fun (h, m) ->
-           `Contents (h, m))
-    |> sealv
 
   let to_entry (k, (v : value)) =
     match v with
     | `Node h -> Node { name = k; node = h }
-    | `Contents (h, m) ->
-        if equal_metadata m Metadata.default then
-          Contents { name = k; contents = h }
-        else Contents_m { metadata = m; name = k; contents = h }
+    | `Contents h -> Contents { name = k; contents = h }
 
   let inspect_nonportable_entry_exn : entry -> step * value = function
     | Node n -> (n.name, `Node n.node)
-    | Contents c -> (c.name, `Contents (c.contents, Metadata.default))
-    | Contents_m c -> (c.name, `Contents (c.contents, c.metadata))
+    | Contents c -> (c.name, `Contents c.contents)
+    | Contents_m c -> (c.name, `Contents c.contents)
     | Node_hash _ | Contents_hash _ | Contents_m_hash _ ->
         (* Not reachable after [Portable.of_node]. See invariant on {!entry}. *)
         assert false
@@ -229,12 +205,10 @@ struct
   let weak_of_entry : entry -> step * weak_value = function
     | Node n -> (n.name, `Node (Node_key.to_hash n.node))
     | Node_hash n -> (n.name, `Node n.node)
-    | Contents c ->
-        (c.name, `Contents (Contents_key.to_hash c.contents, Metadata.default))
-    | Contents_m c ->
-        (c.name, `Contents (Contents_key.to_hash c.contents, c.metadata))
-    | Contents_hash c -> (c.name, `Contents (c.contents, Metadata.default))
-    | Contents_m_hash c -> (c.name, `Contents (c.contents, c.metadata))
+    | Contents c -> (c.name, `Contents (Contents_key.to_hash c.contents))
+    | Contents_m c -> (c.name, `Contents (Contents_key.to_hash c.contents))
+    | Contents_hash c -> (c.name, `Contents c.contents)
+    | Contents_m_hash c -> (c.name, `Contents c.contents)
 
   let of_seq l =
     Seq.fold_left
@@ -316,14 +290,14 @@ struct
              | Contents { name; contents } ->
                  Contents_hash
                    { name; contents = Contents_key.to_hash contents }
-             | Contents_m { metadata; name; contents } ->
+             | Contents_m { name; contents } ->
                  Contents_m_hash
-                   { metadata; name; contents = Contents_key.to_hash contents }
+                   { name; contents = Contents_key.to_hash contents }
              | Node_hash { name; node } -> Node_hash { name; node }
              | Contents_hash { name; contents } ->
                  Contents_hash { name; contents }
-             | Contents_m_hash { metadata; name; contents } ->
-                 Contents_m_hash { metadata; name; contents })
+             | Contents_m_hash { name; contents } ->
+                 Contents_m_hash { name; contents })
       |> Seq.fold_left (fun xs x -> x :: xs) []
     in
     pre_hash entries f
@@ -404,11 +378,10 @@ module Make_generic_key
 
       val step_encoding : step Data_encoding.t
     end)
-    (Metadata : Metadata.S)
     (Contents_key : Key.S with type hash = Hash.t)
     (Node_key : Key.S with type hash = Hash.t) =
 struct
-  module Core = Make_core (Hash) (Path) (Metadata) (Contents_key) (Node_key)
+  module Core = Make_core (Hash) (Path) (Contents_key) (Node_key)
   include Core
   include Of_core (Core)
 
@@ -424,16 +397,23 @@ struct
 
       let node_key_encoding = hash_encoding
 
-      type value = weak_value [@@deriving brassaia]
+      type value = weak_value
+
+      (* Custom Repr encoding to be coherent with the previous binary
+         representation that included metadatas *)
+      let value_t =
+        let open Type in
+        variant "Portable.value" (fun c n -> function
+          | `Contents h -> c (h, ()) | `Node h -> n h)
+        |~ case1 "contents" (pair hash_t unit) (fun (h, ()) -> `Contents h)
+        |~ case1 "node" hash_t (fun h -> `Node h)
+        |> sealv
 
       let value_encoding = weak_value_encoding
 
       let to_entry name = function
         | `Node node -> Node_hash { name; node }
-        | `Contents (contents, metadata) ->
-            if equal_metadata metadata Metadata.default then
-              Contents_hash { name; contents }
-            else Contents_m_hash { name; contents; metadata }
+        | `Contents contents -> Contents_hash { name; contents }
 
       let of_seq s =
         Seq.fold_left
@@ -483,11 +463,10 @@ module Make_generic_key_v2
 
       val step_encoding : step Data_encoding.t
     end)
-    (Metadata : Metadata.S)
     (Contents_key : Key.S with type hash = Hash.t)
     (Node_key : Key.S with type hash = Hash.t) =
 struct
-  include Make_generic_key (Hash) (Path) (Metadata) (Contents_key) (Node_key)
+  include Make_generic_key (Hash) (Path) (Contents_key) (Node_key)
 
   let t = t_not_prefixed
 
@@ -504,11 +483,10 @@ module Make
       type step [@@deriving brassaia]
 
       val step_encoding : step Data_encoding.t
-    end)
-    (Metadata : Metadata.S) =
+    end) =
 struct
   module Key = Key.Of_hash (Hash)
-  include Make_generic_key (Hash) (Path) (Metadata) (Key) (Key)
+  include Make_generic_key (Hash) (Path) (Key) (Key)
 end
 
 module Store_generic_key
@@ -519,7 +497,6 @@ module Store_generic_key
            with type t = S.value
             and type contents_key = C.Key.t
             and type node_key = S.Key.t)
-    (M : Metadata.S with type t = V.metadata)
     (P : Path.S with type step = V.step) =
 struct
   module Val = struct
@@ -532,7 +509,6 @@ struct
   module Key = S.Key
   module Hash = Hash.Typed (H) (Val)
   module Path = P
-  module Metadata = M
 
   type 'a t = 'a C.t * 'a S.t
   type value = S.value
@@ -582,25 +558,19 @@ module Store
     (S : Content_addressable.S with type key = C.key)
     (H : Hash.S with type t = S.key)
     (V : S with type t = S.value and type hash = S.key)
-    (M : Metadata.S with type t = V.metadata)
     (P : Path.S with type step = V.step) =
 struct
   module S = Indexable.Of_content_addressable (H) (S)
-  include Store_generic_key (C) (S) (H) (V) (M) (P)
+  include Store_generic_key (C) (S) (H) (V) (P)
 end
 
 module Graph (S : Store) = struct
   module Path = S.Path
   module Contents_key = S.Contents.Key
-  module Metadata = S.Metadata
 
   type step = Path.step [@@deriving brassaia]
 
   let _step_encoding = Path.step_encoding
-
-  type metadata = Metadata.t [@@deriving brassaia]
-
-  let _metadata_encoding = Metadata.encoding
 
   type contents_key = Contents_key.t [@@deriving brassaia]
 
@@ -612,7 +582,7 @@ module Graph (S : Store) = struct
 
   type path = Path.t [@@deriving brassaia]
   type 'a t = 'a S.t
-  type value = [ `Contents of contents_key * metadata | `Node of node_key ]
+  type value = [ `Contents of contents_key | `Node of node_key ]
 
   let empty t = S.add t (S.Val.empty ())
 
@@ -630,7 +600,7 @@ module Graph (S : Store) = struct
 
   let edges t =
     List.rev_map
-      (function _, `Node n -> `Node n | _, `Contents (c, _) -> `Contents c)
+      (function _, `Node n -> `Node n | _, `Contents c -> `Contents c)
       (S.Val.list t)
 
   let pp_key = Type.pp S.Key.t
@@ -788,8 +758,6 @@ module V1 (N : Generic_key.S with type step = string) = struct
     let encoding = N.contents_key_encoding
   end)
 
-  module Metadata = N.Metadata
-
   type step = N.step
 
   let step_encoding = N.step_encoding
@@ -801,10 +769,6 @@ module V1 (N : Generic_key.S with type step = string) = struct
   type contents_key = Contents_key.t [@@deriving brassaia]
 
   let contents_key_encoding = Contents_key.encoding
-
-  type metadata = N.metadata [@@deriving brassaia]
-
-  let metadata_encoding = N.metadata_encoding
 
   type hash = N.hash [@@deriving brassaia]
 
@@ -873,22 +837,17 @@ module V1 (N : Generic_key.S with type step = string) = struct
     in
     Type.(map (string_of `Int64)) of_string to_string
 
-  let is_default = Type.(unstage (equal N.metadata_t)) Metadata.default
-
   let value_t =
     let open Type in
-    record "node" (fun contents metadata node ->
-        match (contents, metadata, node) with
-        | Some c, None, None -> `Contents (c, Metadata.default)
-        | Some c, Some m, None -> `Contents (c, m)
-        | None, None, Some n -> `Node n
+    record "node" (fun contents _ node ->
+        match (contents, node) with
+        | Some c, None -> `Contents c
+        | None, Some n -> `Node n
         | _ -> failwith "invalid node")
     |+ field "contents" (option Contents_key.t) (function
-         | `Contents (x, _) -> Some x
+         | `Contents x -> Some x
          | _ -> None)
-    |+ field "metadata" (option metadata_t) (function
-         | `Contents (_, x) when not (is_default x) -> Some x
-         | _ -> None)
+    |+ field "metadata" (option unit) (fun _ -> None)
     |+ field "node" (option Node_key.t) (function
          | `Node n -> Some n
          | _ -> None)

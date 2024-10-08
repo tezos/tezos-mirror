@@ -36,10 +36,7 @@ module type S = sig
   type contents
   type hash
   type step
-  type metadata
-
-  type kinded_hash = [ `Contents of hash * metadata | `Node of hash ]
-  [@@deriving brassaia]
+  type kinded_hash = [ `Contents of hash | `Node of hash ] [@@deriving brassaia]
 
   type 'a inode = { length : int; proofs : (int * 'a) list }
   [@@deriving brassaia]
@@ -97,8 +94,8 @@ module type S = sig
 
       [Extender e] proves that an inode extender [e] exist in the store. *)
   type tree =
-    | Contents of contents * metadata
-    | Blinded_contents of hash * metadata
+    | Contents of contents
+    | Blinded_contents of hash
     | Node of (step * tree) list
     | Blinded_node of hash
     | Inode of inode_tree inode
@@ -333,14 +330,9 @@ module type Proof = sig
       (H : Hash.S)
       (P : sig
         type step [@@deriving brassaia]
-      end)
-      (M : Type.S) : sig
+      end) : sig
     include
-      S
-        with type contents := C.t
-         and type hash := H.t
-         and type step := P.step
-         and type metadata := M.t
+      S with type contents := C.t and type hash := H.t and type step := P.step
   end
 
   module Env
@@ -348,8 +340,7 @@ module type Proof = sig
       (P : S
              with type contents := B.Contents.Val.t
               and type hash := B.Hash.t
-              and type step := B.Node.Val.step
-              and type metadata := B.Node.Val.metadata) :
+              and type step := B.Node.Val.step) :
     Env
       with type hash := B.Hash.t
        and type contents := B.Contents.Val.t

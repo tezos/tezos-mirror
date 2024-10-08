@@ -38,10 +38,7 @@ struct
   module Key = Brassaia_pack_unix.Pack_key.Make (Schema.Hash)
 
   module Node =
-    Brassaia.Node.Generic_key.Make_v2 (Schema.Hash) (Schema.Path)
-      (Schema.Metadata)
-      (Key)
-      (Key)
+    Brassaia.Node.Generic_key.Make_v2 (Schema.Hash) (Schema.Path) (Key) (Key)
 
   module Index = Brassaia_pack_unix.Index.Make (Schema.Hash)
 
@@ -195,7 +192,7 @@ let pp_pred = Brassaia.Type.pp pred_t
 
 module H_contents = Brassaia.Hash.Typed (Hash) (Schema.Contents)
 
-let normal x = `Contents (x, Metadata.default)
+let normal x = `Contents x
 let node x = `Node x
 let check_hash = Alcotest.check_repr Inode.Val.hash_t
 let check_values = Alcotest.check_repr Inode.Val.t

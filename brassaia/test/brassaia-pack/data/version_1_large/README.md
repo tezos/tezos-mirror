@@ -16,7 +16,7 @@ let rm_dir () =
 module Conf = Irmin_tezos.Conf
 
 module Store =
-  Irmin_pack.V1 (Conf) (Irmin.Metadata.None) (Irmin.Contents.String)
+  Irmin_pack.V1 (Conf) (Irmin.Contents.String)
     (Irmin.Path.String_list)
     (Irmin.Branch.String)
     (Irmin.Hash.SHA1)

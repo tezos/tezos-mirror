@@ -26,12 +26,6 @@ module type Core = sig
   val encoding : t Data_encoding.t
   (** [encoding] is the data_encoding for {!type-t}. *)
 
-  type metadata [@@deriving brassaia]
-  (** The type for node metadata. *)
-
-  val metadata_encoding : metadata Data_encoding.t
-  (** [metadata_encoding] is the data_encoding for {!type-metadata}. *)
-
   type contents_key [@@deriving brassaia]
   (** The type for contents keys. *)
 
@@ -50,10 +44,9 @@ module type Core = sig
   val step_encoding : step Data_encoding.t
   (** [step_encoding] is the data_encoding for {!type-step}. *)
 
-  type value = [ `Node of node_key | `Contents of contents_key * metadata ]
+  type value = [ `Node of node_key | `Contents of contents_key ]
   [@@deriving brassaia]
-  (** The type for either (node) keys or (contents) keys combined with their
-      metadata. *)
+  (** The type for either (node) keys or (contents) keys combined *)
 
   val value_encoding : value Data_encoding.t
   (** [value_encoding] is the data_encoding for {!type-value}. *)
@@ -120,9 +113,6 @@ module type Core = sig
   val remove : t -> step -> t
   (** [remove t s] is the node where [find t s] is [None] but is similar to [t]
       otherwise. *)
-
-  module Metadata : Metadata.S with type t = metadata
-  (** Metadata functions. *)
 
   (** {2:caching caching}
 
@@ -241,24 +231,18 @@ module type Maker_generic_key = functor
 
      val step_encoding : step Data_encoding.t
    end)
-  (Metadata : Metadata.S)
   (Contents_key : Key.S with type hash = Hash.t)
   (Node_key : Key.S with type hash = Hash.t)
   -> sig
   include
     S_generic_key
-      with type metadata = Metadata.t
-       and type step = Path.step
+      with type step = Path.step
        and type hash = Hash.t
        and type contents_key = Contents_key.t
        and type node_key = Node_key.t
 
   module Portable :
-    Portable
-      with type node := t
-       and type step := step
-       and type metadata := metadata
-       and type hash := hash
+    Portable with type node := t and type step := step and type hash := hash
 end
 
 module type Store = sig
@@ -270,16 +254,12 @@ module type Store = sig
   val merge : [> read_write ] t -> key option Merge.t
   (** [merge] is the 3-way merge function for nodes keys. *)
 
-  module Metadata : Metadata.S
-  (** [Metadata] provides base functions for node metadata. *)
-
   (** [Val] provides base functions for node values. *)
   module Val :
     S_generic_key
       with type t = value
        and type hash = hash
        and type node_key = key
-       and type metadata = Metadata.t
        and type step = Path.step
 
   module Hash : Hash.Typed with type t = hash and type value = value
@@ -294,9 +274,6 @@ module type Graph = sig
   type 'a t
   (** The type for store handles. *)
 
-  type metadata [@@deriving brassaia]
-  (** The type for node metadata. *)
-
   type contents_key [@@deriving brassaia]
   (** The type of user-defined contents. *)
 
@@ -309,7 +286,7 @@ module type Graph = sig
   type path [@@deriving brassaia]
   (** The type of store paths. A path is composed of {{!step} steps}. *)
 
-  type value = [ `Node of node_key | `Contents of contents_key * metadata ]
+  type value = [ `Node of node_key | `Contents of contents_key ]
   [@@deriving brassaia]
   (** The type for store values. *)
 
@@ -370,8 +347,8 @@ end
 module type Sigs = sig
   module type S = S
 
-  (** [Make] provides a simple node implementation, parameterized by hash, path
-      and metadata implementations. The contents and node values are addressed
+  (** [Make] provides a simple node implementation, parameterized by hash and
+      path implementations. The contents and node values are addressed
       directly by their hash. *)
   module Make
       (Hash : Hash.S)
@@ -379,12 +356,7 @@ module type Sigs = sig
         type step [@@deriving brassaia]
 
         val step_encoding : step Data_encoding.t
-      end)
-      (Metadata : Metadata.S) :
-    S
-      with type hash = Hash.t
-       and type metadata = Metadata.t
-       and type step = Path.step
+      end) : S with type hash = Hash.t and type step = Path.step
 
   (** [Generic_key] generalises the concept of "node" to one that supports
       object keys that are not strictly equal to hashes. *)
@@ -408,7 +380,6 @@ module type Sigs = sig
                 and type hash = H.t
                 and type contents_key = C.key
                 and type node_key = S.key)
-        (M : Metadata.S with type t = V.metadata)
         (P : Path.S with type step = V.step) :
       Store
         with type 'a t = 'a C.t * 'a S.t
@@ -416,7 +387,6 @@ module type Sigs = sig
          and type hash = S.hash
          and type value = S.value
          and module Path = P
-         and module Metadata = M
          and module Val = V
   end
 
@@ -427,7 +397,6 @@ module type Sigs = sig
         with type contents_key = N.contents_key
          and type node_key = N.node_key
          and type step = N.step
-         and type metadata = N.metadata
 
     val import : N.t -> t
     val export : t -> N.t
@@ -461,7 +430,6 @@ module type Sigs = sig
         with type node := S.t
          and type t = S.t
          and type step = S.step
-         and type metadata = S.metadata
          and type hash = S.hash
 
     module type S = Portable
@@ -476,7 +444,6 @@ module type Sigs = sig
       (S : Content_addressable.S with type key = C.key)
       (H : Hash.S with type t = S.key)
       (V : S with type t = S.value and type hash = S.key)
-      (M : Metadata.S with type t = V.metadata)
       (P : Path.S with type step = V.step) :
     Store
       with type 'a t = 'a C.t * 'a S.t
@@ -484,7 +451,6 @@ module type Sigs = sig
        and type value = S.value
        and type hash = H.t
        and module Path = P
-       and module Metadata = M
        and module Val = V
 
   module type Graph = Graph
@@ -496,7 +462,6 @@ module type Sigs = sig
       with type 'a t = 'a N.t
        and type contents_key = N.Contents.key
        and type node_key = N.key
-       and type metadata = N.Metadata.t
        and type step = N.Path.step
        and type path = N.Path.t
 end

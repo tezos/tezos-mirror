@@ -17,37 +17,12 @@
 open Brassaia.Export_for_backends
 open Brassaia
 
-module Metadata = struct
-  type t = Default | Left | Right [@@deriving brassaia]
-
-  let encoding =
-    let open Data_encoding in
-    union
-      [
-        case (Tag 1) ~title:"Default" empty
-          (function Default -> Some () | _ -> None)
-          (fun () -> Default);
-        case (Tag 2) ~title:"Left" empty
-          (function Left -> Some () | _ -> None)
-          (fun () -> Left);
-        case (Tag 3) ~title:"Right" empty
-          (function Right -> Some () | _ -> None)
-          (fun () -> Right);
-      ]
-
-  let merge =
-    Merge.init t (fun ~old:_ _ _ -> Merge.conflict "Can't merge metadata")
-
-  let default = Default
-end
-
 module Schema = struct
-  module Metadata = Metadata
   module Contents = Contents.String
   module Path = Path.String_list
   module Branch = Branch.String
   module Hash = Hash.BLAKE2B
-  module Node = Node.Generic_key.Make (Hash) (Path) (Metadata)
+  module Node = Node.Generic_key.Make (Hash) (Path)
   module Commit = Commit.Make (Hash)
   module Info = Info.Default
 end
@@ -56,9 +31,7 @@ module Store = Brassaia_mem.Make (Schema)
 module Tree = Store.Tree
 open Schema
 
-type diffs = (string list * (Contents.t * Metadata.t) Diff.t) list
-[@@deriving brassaia]
-
+type diffs = (string list * Contents.t Diff.t) list [@@deriving brassaia]
 type kind = [ `Contents | `Node ] [@@deriving brassaia]
 
 module Alcotest = struct
@@ -105,7 +78,7 @@ let ( let&* ) x f = Lwt_list.iter_s f x
 and ( and&* ) l m = List.concat_map (fun a -> List.map (fun b -> (a, b)) m) l
 
 let ( >> ) f g x = g (f x)
-let c ?(info = Metadata.default) blob = `Contents (blob, info)
+let c blob = `Contents blob
 
 let invalid_tree () =
   let+ repo = Store.Repo.init (Brassaia_mem.config ()) in
@@ -173,22 +146,16 @@ let test_diff _ () =
     Tree.diff empty single
     >|= Alcotest.(check diffs)
           "Added [k \226\134\146 v]"
-          [ ([ "k" ], `Added ("v", Default)) ]
+          [ ([ "k" ], `Added "v") ]
   in
   (* Removing a single key *)
   let* () =
     Tree.diff single empty
     >|= Alcotest.(check diffs)
           "Removed [k \226\134\146 v]"
-          [ ([ "k" ], `Removed ("v", Default)) ]
+          [ ([ "k" ], `Removed "v") ]
   in
-  (* Changing metadata *)
-  Tree.diff
-    (tree [ ("k", c ~info:Left "v") ])
-    (tree [ ("k", c ~info:Right "v") ])
-  >|= Alcotest.(check diffs)
-        "Changed metadata"
-        [ ([ "k" ], `Updated (("v", Left), ("v", Right))) ]
+  Lwt.return_unit
 
 let test_empty _ () =
   let* () =
@@ -319,9 +286,8 @@ let transform_once : type a b. a Type.t -> a -> b -> a -> b =
 
 let test_update _ () =
   let unrelated_binding = ("a_unrelated", c "<>") in
-  let abc ?info v =
-    `Tree
-      [ ("a", `Tree [ ("b", `Tree [ ("c", c ?info v) ]) ]); unrelated_binding ]
+  let abc v =
+    `Tree [ ("a", `Tree [ ("b", `Tree [ ("c", c v) ]) ]); unrelated_binding ]
   in
   let abc1 = Tree.of_concrete (abc "1") in
   let ( --> ) = transform_once [%typ: string option] in
@@ -344,9 +310,9 @@ let test_update _ () =
   let* () =
     Alcotest.check_tree_lwt
       "Updating a root node to a contents value removes all bindings and sets \
-       the correct metadata."
-      ~expected:(c ~info:Metadata.Right "2")
-      (Tree.update ~metadata:Metadata.Right abc1 [] (None --> Some "2"))
+       the correct."
+      ~expected:(c "2")
+      (Tree.update abc1 [] (None --> Some "2"))
   in
 
   let* () =
@@ -386,14 +352,6 @@ let test_update _ () =
       "Replacing a subtree node with a physically-equal one preserves physical \
        equality"
       (abc1 == abc1')
-  in
-
-  let* () =
-    Alcotest.check_tree_lwt
-      "Changing the metadata of an existing contents value updates the tree."
-      ~expected:(abc ~info:Metadata.Left "1")
-      (Tree.update ~metadata:Metadata.Left abc1 [ "a"; "b"; "c" ]
-         (Some "1" --> Some "1"))
   in
 
   let* () =
@@ -678,7 +636,7 @@ module Broken = struct
 
   let random_contents () =
     let value = Tree.of_concrete (c (random_string32 ())) in
-    let value_ptr = `Contents (Tree.hash value, Metadata.default) in
+    let value_ptr = `Contents (Tree.hash value) in
     (value, value_ptr)
 
   let random_node () =

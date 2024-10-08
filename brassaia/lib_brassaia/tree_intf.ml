@@ -20,7 +20,6 @@ open! Import
 module type S = sig
   type path [@@deriving brassaia]
   type step [@@deriving brassaia]
-  type metadata [@@deriving brassaia]
   type contents [@@deriving brassaia]
   type contents_key [@@deriving brassaia]
   type node [@@deriving brassaia]
@@ -45,24 +44,23 @@ module type S = sig
       backend configuration values, as they can perform in-memory operation,
       independently of any given backend. *)
 
-  val singleton : path -> ?metadata:metadata -> contents -> t
+  val singleton : path -> contents -> t
   (** [singleton k c] is the tree with a single binding mapping the key [k] to
       the contents [c]. *)
 
-  val of_contents : ?metadata:metadata -> contents -> t
+  val of_contents : contents -> t
   (** [of_contents c] is the subtree built from the contents [c]. *)
 
   val of_node : node -> t
   (** [of_node n] is the subtree built from the node [n]. *)
 
-  type elt = [ `Node of node | `Contents of contents * metadata ]
+  type elt = [ `Node of node | `Contents of contents ]
   (** The type for tree elements. *)
 
   val init : elt -> t
   (** General-purpose constructor for trees. *)
 
-  type kinded_hash = [ `Contents of hash * metadata | `Node of hash ]
-  [@@deriving brassaia]
+  type kinded_hash = [ `Contents of hash | `Node of hash ] [@@deriving brassaia]
 
   val pruned : kinded_hash -> t
   (** [pruned h] is a purely in-memory tree with the hash [h]. Such trees can be
@@ -84,7 +82,7 @@ module type S = sig
 
   (** {1 Diffs} *)
 
-  val diff : t -> t -> (path * (contents * metadata) Diff.t) list Lwt.t
+  val diff : t -> t -> (path * contents Diff.t) list Lwt.t
   (** [diff x y] is the difference of contents between [x] and [y]. *)
 
   (** {1 Manipulating Contents} *)
@@ -146,9 +144,9 @@ module type S = sig
   val mem : t -> path -> bool Lwt.t
   (** [mem t k] is true iff [k] is associated to some contents in [t]. *)
 
-  val find_all : t -> path -> (contents * metadata) option Lwt.t
+  val find_all : t -> path -> contents option Lwt.t
   (** [find_all t k] is [Some (b, m)] if [k] is associated to the contents [b]
-      and metadata [m] in [t] and [None] if [k] is not present in [t]. *)
+      in [t] and [None] if [k] is not present in [t]. *)
 
   val length : t -> ?cache:bool -> path -> int Lwt.t
   (** [length t key] is the number of files and sub-nodes stored under [key] in
@@ -161,9 +159,9 @@ module type S = sig
       parameter.*)
 
   val find : t -> path -> contents option Lwt.t
-  (** [find] is similar to {!find_all} but it discards metadata. *)
+  (** [find] is similar to {!find_all} *)
 
-  val get_all : t -> path -> (contents * metadata) Lwt.t
+  val get_all : t -> path -> contents Lwt.t
   (** Same as {!find_all} but raise [Invalid_arg] if [k] is not present in [t]. *)
 
   val list :
@@ -191,18 +189,13 @@ module type S = sig
   (** [seq t key] follows the same behavior as {!list} but returns a sequence. *)
 
   val get : t -> path -> contents Lwt.t
-  (** Same as {!get_all} but ignore the metadata. *)
+  (** Same as {!get_all} *)
 
-  val add : t -> path -> ?metadata:metadata -> contents -> t Lwt.t
+  val add : t -> path -> contents -> t Lwt.t
   (** [add t k c] is the tree where the key [k] is bound to the contents [c] but
       is similar to [t] for other bindings. *)
 
-  val update :
-    t ->
-    path ->
-    ?metadata:metadata ->
-    (contents option -> contents option) ->
-    t Lwt.t
+  val update : t -> path -> (contents option -> contents option) -> t Lwt.t
   (** [update t k f] is the tree [t'] that is the same as [t] for all keys
       except [k], and whose binding for [k] is determined by [f (find t k)].
 
@@ -245,7 +238,7 @@ module type S = sig
 
   (** {1 Folds} *)
 
-  val destruct : t -> [ `Node of node | `Contents of Contents.t * metadata ]
+  val destruct : t -> [ `Node of node | `Contents of Contents.t ]
   (** General-purpose destructor for trees. *)
 
   type marks
@@ -344,8 +337,7 @@ module type S = sig
 
   (** {1 Concrete Trees} *)
 
-  type concrete =
-    [ `Tree of (step * concrete) list | `Contents of contents * metadata ]
+  type concrete = [ `Tree of (step * concrete) list | `Contents of contents ]
   [@@deriving brassaia]
   (** The type for concrete trees. *)
 
@@ -366,7 +358,6 @@ module type S = sig
         with type contents := contents
          and type hash := hash
          and type step := step
-         and type metadata := metadata
 
     type brassaia_tree
 
@@ -445,13 +436,11 @@ module type Sigs = sig
       S
         with type path = B.Node.Path.t
          and type step = B.Node.Path.step
-         and type metadata = B.Node.Metadata.t
          and type contents = B.Contents.value
          and type contents_key = B.Contents.Key.t
          and type hash = B.Hash.t
 
-    type kinded_key =
-      [ `Contents of B.Contents.Key.t * metadata | `Node of B.Node.Key.t ]
+    type kinded_key = [ `Contents of B.Contents.Key.t | `Node of B.Node.Key.t ]
     [@@deriving brassaia]
 
     val import : B.Repo.t -> kinded_key -> t option Lwt.t

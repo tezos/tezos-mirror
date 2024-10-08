@@ -46,7 +46,6 @@ module Maker (Config : Brassaia_pack.Conf.S) = struct
     module H = Schema.Hash
     module C = Schema.Contents
     module P = Schema.Path
-    module M = Schema.Metadata
     module B = Schema.Branch
     module Pack = Indexable.Maker (H)
 
@@ -85,7 +84,6 @@ module Maker (Config : Brassaia_pack.Conf.S) = struct
         include
           Brassaia.Node.Generic_key.Store (Contents) (Indexable) (H)
             (Indexable.Val)
-            (M)
             (P)
       end
 

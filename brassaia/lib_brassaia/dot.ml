@@ -182,7 +182,7 @@ module Make (S : Store.Generic_key.S) = struct
         List.iter
           (fun (l, v) ->
             match v with
-            | `Contents (v, _meta) ->
+            | `Contents v ->
                 let v = Contents.Key.to_hash v in
                 add_edge (`Node k)
                   [ `Style `Dotted; label_of_step l ]

@@ -451,7 +451,7 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
   let rec tree_to_raw_context tree =
     let open Lwt_syntax in
     match Store.Tree.destruct tree with
-    | `Contents (v, _) ->
+    | `Contents v ->
         let+ v = Store.Tree.Contents.force_exn v in
         Proof.Key v
     | `Node _ ->

@@ -113,13 +113,20 @@ end = struct
   module Schema = Brassaia.Schema.KV (Brassaia.Contents.String)
   module Hash = Schema.Hash
   module Key = Brassaia.Key.Of_hash (Hash)
-  module Node = Make_node (Hash) (Schema.Path) (Schema.Metadata) (Key) (Key)
+  module Node = Make_node (Hash) (Schema.Path) (Key) (Key)
 
   type key = Key.t [@@deriving brassaia]
 
   module Extras = struct
-    type data = [ `Node of Key.t | `Contents of Key.t * unit ]
-    [@@deriving brassaia]
+    type data = [ `Node of Key.t | `Contents of Key.t ]
+
+    let data_t =
+      let open Repr in
+      variant "weak_value" (fun node contents -> function
+        | `Node k -> node k | `Contents k -> contents (k, ()))
+      |~ case1 "node" key_t (fun k -> `Node k)
+      |~ case1 "contents" (pair key_t unit) (fun (k, ()) -> `Contents k)
+      |> sealv
 
     let random_data =
       let hash_of_string = Brassaia.Type.(unstage (of_bin_string Hash.t)) in
@@ -132,7 +139,7 @@ end = struct
         | Ok x -> (
             match Random.int 2 with
             | 0 -> `Node x
-            | 1 -> `Contents (x, ())
+            | 1 -> `Contents x
             | _ -> assert false)
   end
 

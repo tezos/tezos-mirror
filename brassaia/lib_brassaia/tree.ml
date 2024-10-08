@@ -146,9 +146,8 @@ module Make (P : Backend.S) = struct
       List.fold_right f steps init
   end
 
-  module Metadata = P.Node.Metadata
   module Brassaia_proof = Proof
-  module Tree_proof = Proof.Make (P.Contents.Val) (P.Hash) (Path) (Metadata)
+  module Tree_proof = Proof.Make (P.Contents.Val) (P.Hash) (Path)
   module Env = Proof.Env (P) (Tree_proof)
 
   let merge_env x y =
@@ -185,7 +184,6 @@ module Make (P : Backend.S) = struct
         arr
   end
 
-  type metadata = Metadata.t [@@deriving brassaia ~equal]
   type path = Path.t [@@deriving brassaia ~pp]
   type hash = P.Hash.t [@@deriving brassaia ~pp ~equal ~compare]
   type step = Path.step [@@deriving brassaia ~pp ~compare]
@@ -433,7 +431,7 @@ module Make (P : Backend.S) = struct
     type portable = Portable.t [@@deriving brassaia ~equal ~pp]
 
     (* [elt] is a tree *)
-    type elt = [ `Node of t | `Contents of Contents.t * Metadata.t ]
+    type elt = [ `Node of t | `Contents of Contents.t ]
     and update = Add of elt | Remove
     and updatemap = update StepMap.t
     and map = elt StepMap.t
@@ -459,16 +457,15 @@ module Make (P : Backend.S) = struct
 
         [t.info.map] is only populated during a call to [Node.to_map]. *)
 
+    (* Custom Repr encoding to be coherent with the previous binary
+       representation that included metadatas *)
     let elt_t (t : t Type.t) : elt Type.t =
       let open Type in
-      variant "Node.value" (fun node contents contents_m -> function
-        | `Node x -> node x
-        | `Contents (c, m) ->
-            if equal_metadata m Metadata.default then contents c
-            else contents_m (c, m))
+      variant "Node.elt" (fun node contents _ -> function
+        | `Node x -> node x | `Contents c -> contents c)
       |~ case1 "Node" t (fun x -> `Node x)
-      |~ case1 "Contents" Contents.t (fun x -> `Contents (x, Metadata.default))
-      |~ case1 "Contents-x" (pair Contents.t Metadata.t) (fun x -> `Contents x)
+      |~ case1 "Contents" Contents.t (fun x -> `Contents x)
+      |~ case1 "Contents-x" (pair Contents.t unit) (fun (x, ()) -> `Contents x)
       |> sealv
 
     let stepmap_t : 'a. 'a Type.t -> 'a StepMap.t Type.t =
@@ -544,7 +541,7 @@ module Make (P : Backend.S) = struct
 
     let rec clear_elt ~max_depth depth v =
       match v with
-      | `Contents (c, _) -> if depth + 1 > max_depth then Contents.clear c
+      | `Contents c -> if depth + 1 > max_depth then Contents.clear c
       | `Node t -> clear ~max_depth (depth + 1) t
 
     and clear_info ~max_depth ~v depth i =
@@ -585,10 +582,7 @@ module Make (P : Backend.S) = struct
           assert false
 
     module Core_value
-        (N : Node.Generic_key.Core
-               with type step := step
-                and type hash := hash
-                and type metadata := metadata)
+        (N : Node.Generic_key.Core with type step := step and type hash := hash)
         (To_elt : sig
           type repo
 
@@ -647,7 +641,7 @@ module Make (P : Backend.S) = struct
 
           let t ~env repo = function
             | `Node k -> `Node (of_key ~env repo k)
-            | `Contents (k, m) -> `Contents (Contents.of_key ~env repo k, m)
+            | `Contents k -> `Contents (Contents.of_key ~env repo k)
         end)
 
     module Portable_value =
@@ -658,7 +652,7 @@ module Make (P : Backend.S) = struct
 
           let t ~env () = function
             | `Node h -> `Node (pruned ~env h)
-            | `Contents (h, m) -> `Contents (Contents.pruned ~env h, m)
+            | `Contents h -> `Contents (Contents.pruned ~env h)
         end)
 
     (** This [Scan] module contains function that scan the content of [t.v] and
@@ -848,7 +842,7 @@ module Make (P : Backend.S) = struct
       | Pnode_value of pnode_value
 
     let weaken_value : node_value -> pnode_value = function
-      | `Contents (key, m) -> `Contents (P.Contents.Key.to_hash key, m)
+      | `Contents key -> `Contents (P.Contents.Key.to_hash key)
       | `Node key -> `Node (P.Node.Key.to_hash key)
 
     let rec hash : type a. cache:bool -> t -> (hash -> a) -> a =
@@ -889,14 +883,14 @@ module Make (P : Backend.S) = struct
         |> Seq.exists (fun (_, v) ->
                match v with
                | `Node n -> Option.is_none (cached_key n)
-               | `Contents (c, _) -> Option.is_none (Contents.cached_key c))
+               | `Contents c -> Option.is_none (Contents.cached_key c))
       in
       if must_build_portable_node then
         let pnode =
           bindings
           |> Seq.map (fun (step, v) ->
                  match v with
-                 | `Contents (c, m) -> (step, `Contents (Contents.hash c, m))
+                 | `Contents c -> (step, `Contents (Contents.hash c))
                  | `Node n -> hash ~cache n (fun k -> (step, `Node k)))
           |> Portable.of_seq
         in
@@ -906,9 +900,9 @@ module Make (P : Backend.S) = struct
           bindings
           |> Seq.map (fun (step, v) ->
                  match v with
-                 | `Contents (c, m) -> (
+                 | `Contents c -> (
                      match Contents.cached_key c with
-                     | Some k -> (step, `Contents (k, m))
+                     | Some k -> (step, `Contents k)
                      | None ->
                          (* We checked that all child keys are cached above *)
                          assert false)
@@ -927,10 +921,10 @@ module Make (P : Backend.S) = struct
         type r. cache:bool -> elt -> (hash_preimage_value, r) cont =
      fun ~cache e k ->
       match e with
-      | `Contents (c, m) -> (
+      | `Contents c -> (
           match Contents.key c with
-          | Some key -> k (Node_value (`Contents (key, m)))
-          | None -> k (Pnode_value (`Contents (Contents.hash c, m))))
+          | Some key -> k (Node_value (`Contents key))
+          | None -> k (Pnode_value (`Contents (Contents.hash c))))
       | `Node n -> (
           match key n with
           | Some key -> k (Node_value (`Node key))
@@ -1100,8 +1094,7 @@ module Make (P : Backend.S) = struct
       | Portable_dirty (p, um) -> ok (of_portable_value p (Some um))
       | Pruned h -> err_pruned_hash h |> Lwt.return
 
-    let contents_equal ((c1, m1) as x1) ((c2, m2) as x2) =
-      x1 == x2 || (Contents.equal c1 c2 && equal_metadata m1 m2)
+    let contents_equal c1 c2 = Contents.equal c1 c2
 
     let rec elt_equal (x : elt) (y : elt) =
       x == y
@@ -1457,7 +1450,7 @@ module Make (P : Backend.S) = struct
         | `Contents c -> (
             let apply () =
               let tree path = tree path (`Contents c) in
-              Contents.fold ~force ~cache ~path contents tree (fst c) acc >>= k
+              Contents.fold ~force ~cache ~path contents tree c acc >>= k
             in
             match depth with
             | None -> apply ()
@@ -1629,22 +1622,15 @@ module Make (P : Backend.S) = struct
       let f : elt Merge.f =
        fun ~old x y ->
         match (x, y) with
-        | `Contents (x, cx), `Contents (y, cy) ->
-            let mold =
-              Merge.bind_promise old (fun old () ->
-                  match old with
-                  | `Contents (_, m) -> ok (Some m)
-                  | `Node _ -> ok None)
-            in
-            Merge.(f Metadata.merge) ~old:mold cx cy >>=* fun m ->
+        | `Contents c1, `Contents c2 ->
             let old =
               Merge.bind_promise old (fun old () ->
                   match old with
-                  | `Contents (c, _) -> ok (Some c)
+                  | `Contents c -> ok (Some c)
                   | `Node _ -> ok None)
             in
-            Merge.(f Contents.merge) ~old x y >>=* fun c ->
-            Merge.ok (`Contents (c, m))
+            Merge.(f Contents.merge) ~old c1 c2 >>=* fun c ->
+            Merge.ok (`Contents c)
         | `Node x, `Node y ->
             (merge [@tailcall]) (fun m ->
                 let old =
@@ -1664,15 +1650,46 @@ module Make (P : Backend.S) = struct
   type node = Node.t [@@deriving brassaia ~pp]
   type node_key = Node.key [@@deriving brassaia ~pp]
   type contents_key = Contents.key [@@deriving brassaia ~pp]
+  type kinded_key = [ `Contents of Contents.key | `Node of Node.key ]
 
-  type kinded_key = [ `Contents of Contents.key * metadata | `Node of Node.key ]
-  [@@deriving brassaia]
+  (* Custom Repr encoding to be coherent with the previous binary
+     representation that included metadatas *)
+  let kinded_key_t : kinded_key Type.ty =
+    let open Type in
+    variant "kinded_key" (fun contents node -> function
+      | `Contents c -> contents (c, ()) | `Node x -> node x)
+    |~ case1 "Contents" (pair Contents.key_t unit) (fun (x, ()) -> `Contents x)
+    |~ case1 "Node" Node.key_t (fun x -> `Node x)
+    |> sealv
 
-  type kinded_hash = [ `Contents of hash * metadata | `Node of hash ]
-  [@@deriving brassaia ~equal]
+  type kinded_hash = [ `Contents of hash | `Node of hash ]
 
-  type t = [ `Node of node | `Contents of Contents.t * Metadata.t ]
-  [@@deriving brassaia]
+  (* Custom Repr encoding to be coherent with the previous binary
+     representation that included metadatas *)
+  let kinded_hash_t : kinded_hash Type.ty =
+    let open Type in
+    variant "kinded_hash" (fun contents node -> function
+      | `Contents h -> contents (h, ()) | `Node h -> node h)
+    |~ case1 "Contents" (pair hash_t unit) (fun (h, ()) -> `Contents h)
+    |~ case1 "Node" hash_t (fun h -> `Node h)
+    |> sealv
+
+  let equal_kinded_hash kh1 kh2 =
+    match (kh1, kh2) with
+    | `Node h1, `Node h2 | `Contents h1, `Contents h2 -> equal_hash h1 h2
+    | _ -> false
+
+  type t = [ `Node of node | `Contents of Contents.t ]
+
+  (* Custom Repr encoding to be coherent with the previous binary
+     representation that included metadatas *)
+  let t : t Type.ty =
+    let open Type in
+    variant "t" (fun node contents -> function
+      | `Node n -> node n | `Contents c -> contents (c, ()))
+    |~ case1 "Node" node_t (fun n -> `Node n)
+    |~ case1 "Contents" (pair Contents.t unit) (fun (x, ()) -> `Contents x)
+    |> sealv
 
   let to_backend_node n =
     Node.to_value ~cache:true n >|= get_ok "to_backend_node"
@@ -1687,12 +1704,9 @@ module Make (P : Backend.S) = struct
 
   let dump ppf = function
     | `Node n -> Fmt.pf ppf "node: %a" Node.dump n
-    | `Contents (c, _) -> Fmt.pf ppf "contents: %a" (Type.pp Contents.t) c
+    | `Contents c -> Fmt.pf ppf "contents: %a" (Type.pp Contents.t) c
 
-  let contents_equal ((c1, m1) as x1) ((c2, m2) as x2) =
-    x1 == x2
-    || (c1 == c2 && m1 == m2)
-    || (Contents.equal c1 c2 && equal_metadata m1 m2)
+  let contents_equal c1 c2 = Contents.equal c1 c2
 
   let equal (x : t) (y : t) =
     x == y
@@ -1706,21 +1720,21 @@ module Make (P : Backend.S) = struct
     | `Node n -> Node.is_empty ~cache:true n
     | `Contents _ -> false
 
-  type elt = [ `Node of node | `Contents of contents * metadata ]
+  type elt = [ `Node of node | `Contents of contents ]
 
   let of_node n = `Node n
 
-  let of_contents ?(metadata = Metadata.default) c =
+  let of_contents c =
     let env = Env.empty () in
     let c = Contents.of_value ~env c in
-    `Contents (c, metadata)
+    `Contents c
 
   let init : elt -> t = function
-    | `Contents (c, metadata) -> of_contents ~metadata c
+    | `Contents c -> of_contents c
     | `Node n -> `Node n
 
   let pruned_with_env ~env = function
-    | `Contents (h, meta) -> `Contents (Contents.pruned ~env h, meta)
+    | `Contents h -> `Contents (Contents.pruned ~env h)
     | `Node h -> `Node (Node.pruned ~env h)
 
   let pruned h =
@@ -1764,7 +1778,7 @@ module Make (P : Backend.S) = struct
   let fold ?(order = `Sorted) ?(force = `True) ?(cache = false) ?(uniq = `False)
       ?pre ?post ?depth ?(contents = id) ?(node = id) ?(tree = id) (t : t) acc =
     match t with
-    | `Contents (c, _) as c' ->
+    | `Contents c as c' ->
         let tree path = tree path c' in
         Contents.fold ~force ~cache ~path:Path.empty contents tree c acc
     | `Node n ->
@@ -1805,19 +1819,18 @@ module Make (P : Backend.S) = struct
   let find_all t k =
     find_tree t k >>= function
     | None | Some (`Node _) -> Lwt.return_none
-    | Some (`Contents (c, m)) ->
+    | Some (`Contents c) ->
         let+ c = Contents.to_value ~cache:true c in
-        Some (get_ok "find_all" c, m)
+        Some (get_ok "find_all" c)
 
-  let find t k =
-    find_all t k >|= function None -> None | Some (c, _) -> Some c
+  let find t k = find_all t k
 
   let get_all t k =
     find_all t k >>= function
     | None -> err_not_found "get" k
     | Some v -> Lwt.return v
 
-  let get t k = get_all t k >|= fun (c, _) -> c
+  let get t k = get_all t k
   let mem t k = find t k >|= function None -> false | _ -> true
   let mem_tree t k = find_tree t k >|= function None -> false | _ -> true
 
@@ -1862,11 +1875,11 @@ module Make (P : Backend.S) = struct
 
   let empty () = `Node (Node.empty ())
 
-  let singleton path ?(metadata = Metadata.default) c =
+  let singleton path c =
     Events.(emit__dont_wait__use_with_care tree_function)
       ("singleton", Logging.to_string_exn Path.encoding path);
     let env = Env.empty () in
-    let base_tree = `Contents (Contents.of_value ~env c, metadata) in
+    let base_tree = `Contents (Contents.of_value ~env c) in
     Path.fold_right path
       ~f:(fun step child -> `Node (Node.singleton ~env step child))
       ~init:base_tree
@@ -1885,7 +1898,7 @@ module Make (P : Backend.S) = struct
 
   let get_env = function
     | `Node n -> n.Node.info.env
-    | `Contents (c, _) -> c.Contents.info.env
+    | `Contents c -> c.Contents.info.env
 
   let update_tree ~cache ~f_might_return_empty_node ~f root_tree path =
     (* User-introduced empty nodes will be removed immediately if necessary. *)
@@ -1977,7 +1990,7 @@ module Make (P : Backend.S) = struct
             Env.copy ~into:node.info.env (get_env root_tree);
             Lwt.return (`Node node))
 
-  let update t k ?(metadata = Metadata.default) f =
+  let update t k f =
     let cache = true in
     let* () =
       Events.(emit tree_function)
@@ -1987,20 +2000,20 @@ module Make (P : Backend.S) = struct
         let+ old_contents =
           match t with
           | Some (`Node _) | None -> Lwt.return_none
-          | Some (`Contents (c, _)) ->
+          | Some (`Contents c) ->
               let+ c = Contents.to_value ~cache c in
               Some (get_ok "update" c)
         in
         match f old_contents with
         | None -> None
-        | Some c -> of_contents ~metadata c |> Option.some)
+        | Some c -> of_contents c |> Option.some)
 
-  let add t k ?(metadata = Metadata.default) c =
+  let add t k c =
     let* () =
       Events.(emit tree_function) ("add", Logging.to_string_exn Path.encoding k)
     in
     update_tree ~cache:true t k
-      ~f:(fun _ -> Lwt.return_some (of_contents ~metadata c))
+      ~f:(fun _ -> Lwt.return_some (of_contents c))
       ~f_might_return_empty_node:false
 
   let add_tree t k v =
@@ -2029,12 +2042,12 @@ module Make (P : Backend.S) = struct
     update_tree ~cache:true t k ~f:(Lwt.wrap1 f) ~f_might_return_empty_node:true
 
   let import repo = function
-    | `Contents (k, m) -> (
+    | `Contents k -> (
         cnt.contents_mem <- cnt.contents_mem + 1;
         P.Contents.mem (P.Repo.contents_t repo) k >|= function
         | true ->
             let env = Env.empty () in
-            Some (`Contents (Contents.of_key ~env repo k, m))
+            Some (`Contents (Contents.of_key ~env repo k))
         | false -> None)
     | `Node k -> (
         cnt.node_mem <- cnt.node_mem + 1;
@@ -2046,7 +2059,7 @@ module Make (P : Backend.S) = struct
 
   let import_with_env ~env repo = function
     | `Node k -> `Node (Node.of_key ~env repo k)
-    | `Contents (k, m) -> `Contents (Contents.of_key ~env repo k, m)
+    | `Contents k -> `Contents (Contents.of_key ~env repo k)
 
   let import_no_check repo f =
     let env = Env.empty () in
@@ -2110,9 +2123,9 @@ module Make (P : Backend.S) = struct
                          "Encountered child node value with uncached key \
                           during export:@,\
                           @ @[%a@]" dump v)
-               | `Contents (c, m) -> (
+               | `Contents c -> (
                    match Contents.cached_key c with
-                   | Some k -> (step, `Contents (k, m))
+                   | Some k -> (step, `Contents k)
                    | None ->
                        assertion_failure
                          "Encountered child contents value with uncached key \
@@ -2137,9 +2150,9 @@ module Make (P : Backend.S) = struct
                       "Encountered child node value with uncached key during \
                        export:@,\
                        @ @[%a@]" dump v)
-            | Add (`Contents (c, m) as v) -> (
+            | Add (`Contents c as v) -> (
                 match Contents.cached_key c with
-                | Some ptr -> P.Node.Val.add acc k (`Contents (ptr, m))
+                | Some ptr -> P.Node.Val.add acc k (`Contents ptr)
                 | None ->
                     assertion_failure
                       "Encountered child contents value with uncached key \
@@ -2268,9 +2281,8 @@ module Make (P : Backend.S) = struct
                       assert false)))
     and on_contents :
         type r.
-        [ `Contents of Contents.t * metadata ] ->
-        ([ `Content_exported ], r) cont_lwt =
-     fun (`Contents (c, _)) k ->
+        [ `Contents of Contents.t ] -> ([ `Content_exported ], r) cont_lwt =
+     fun (`Contents c) k ->
       match c.Contents.v with
       | Contents.Key (_, key) ->
           Contents.export ?clear repo c key;
@@ -2350,10 +2362,10 @@ module Make (P : Backend.S) = struct
   let diff_contents x y =
     if Node.contents_equal x y then Lwt.return_nil
     else
-      let* cx = Contents.to_value ~cache:true (fst x) in
-      let+ cy = Contents.to_value ~cache:true (fst y) in
+      let* cx = Contents.to_value ~cache:true x in
+      let+ cy = Contents.to_value ~cache:true y in
       diff_force_result cx cy ~empty:[] ~diff_ok:(fun (cx, cy) ->
-          [ `Updated ((cx, snd x), (cy, snd y)) ])
+          [ `Updated (cx, cy) ])
 
   let diff_node (x : node) (y : node) =
     let bindings n =
@@ -2361,13 +2373,13 @@ module Make (P : Backend.S) = struct
       | Ok m -> Ok (StepMap.bindings m)
       | Error _ as e -> e
     in
-    let removed acc (k, (c, m)) =
+    let removed acc (k, c) =
       let+ c = Contents.to_value ~cache:true c >|= get_ok "diff_node" in
-      (k, `Removed (c, m)) :: acc
+      (k, `Removed c) :: acc
     in
-    let added acc (k, (c, m)) =
+    let added acc (k, c) =
       let+ c = Contents.to_value ~cache:true c >|= get_ok "diff_node" in
-      (k, `Added (c, m)) :: acc
+      (k, `Added c) :: acc
     in
     let rec diff_bindings acc todo path x y =
       let acc = ref acc in
@@ -2430,26 +2442,36 @@ module Make (P : Backend.S) = struct
 
   let diff (x : t) (y : t) =
     match (x, y) with
-    | `Contents ((c1, m1) as x), `Contents ((c2, m2) as y) ->
-        if contents_equal x y then Lwt.return_nil
+    | `Contents c1, `Contents c2 ->
+        if Contents.equal c1 c2 then Lwt.return_nil
         else
           let* c1 = Contents.to_value ~cache:true c1 >|= get_ok "diff" in
           let* c2 = Contents.to_value ~cache:true c2 >|= get_ok "diff" in
-          Lwt.return [ (Path.empty, `Updated ((c1, m1), (c2, m2))) ]
+          Lwt.return [ (Path.empty, `Updated (c1, c2)) ]
     | `Node x, `Node y -> diff_node x y
-    | `Contents (x, m), `Node y ->
+    | `Contents x, `Node y ->
         let* diff = diff_node (Node.empty ()) y in
         let+ x = Contents.to_value ~cache:true x >|= get_ok "diff" in
-        (Path.empty, `Removed (x, m)) :: diff
-    | `Node x, `Contents (y, m) ->
+        (Path.empty, `Removed x) :: diff
+    | `Node x, `Contents y ->
         let* diff = diff_node x (Node.empty ()) in
         let+ y = Contents.to_value ~cache:true y >|= get_ok "diff" in
-        (Path.empty, `Added (y, m)) :: diff
+        (Path.empty, `Added y) :: diff
 
   type concrete =
-    [ `Tree of (Path.step * concrete) list
-    | `Contents of P.Contents.Val.t * Metadata.t ]
-  [@@deriving brassaia]
+    [ `Tree of (Path.step * concrete) list | `Contents of P.Contents.Val.t ]
+
+  (* Custom Repr encoding to be coherent with the previous binary
+     representation that included metadatas *)
+  let concrete_t : concrete Type.ty =
+    let open Type in
+    mu (fun concrete_t ->
+        variant "concrete" (fun tree contents -> function
+          | `Tree l -> tree l | `Contents c -> contents (c, ()))
+        |~ case1 "Tree" (list (pair Path.step_t concrete_t)) (fun t -> `Tree t)
+        |~ case1 "Contents" (pair P.Contents.Val.t unit) (fun (x, ()) ->
+               `Contents x)
+        |> sealv)
 
   type 'a or_empty = Empty | Non_empty of 'a
 
@@ -2457,7 +2479,7 @@ module Make (P : Backend.S) = struct
     let rec concrete : type r. concrete -> (t or_empty, r) cont =
      fun t k ->
       match t with
-      | `Contents (c, m) -> k (Non_empty (of_contents ~metadata:m c))
+      | `Contents c -> k (Non_empty (of_contents c))
       | `Tree childs ->
           tree StepMap.empty childs (function
             | Empty -> k Empty
@@ -2501,10 +2523,10 @@ module Make (P : Backend.S) = struct
           (node [@tailcall]) [] bindings (fun n ->
               let n = List.sort (fun (s, _) (s', _) -> compare_step s s') n in
               k (`Tree n))
-    and contents : type r. Contents.t * metadata -> (concrete, r) cont_lwt =
-     fun (c, m) k ->
+    and contents : type r. Contents.t -> (concrete, r) cont_lwt =
+     fun c k ->
       let* c = Contents.to_value ~cache:true c >|= get_ok "to_concrete" in
-      k (`Contents (c, m))
+      k (`Contents c)
     and node :
         type r.
         (step * concrete) list ->
@@ -2528,16 +2550,16 @@ module Make (P : Backend.S) = struct
     match t with
     | `Node n -> (
         match Node.key n with Some key -> Some (`Node key) | None -> None)
-    | `Contents (c, m) -> (
+    | `Contents c -> (
         match Contents.key c with
-        | Some key -> Some (`Contents (key, m))
+        | Some key -> Some (`Contents key)
         | None -> None)
 
   let hash ?(cache = true) (t : t) =
     Events.(emit__dont_wait__use_with_care tree_hash) ();
     match t with
     | `Node n -> `Node (Node.hash ~cache n)
-    | `Contents (c, m) -> `Contents (Contents.hash ~cache c, m)
+    | `Contents c -> `Contents (Contents.hash ~cache c)
 
   let stats ?(force = false) (t : t) =
     let cache = true in
@@ -2586,15 +2608,14 @@ module Make (P : Backend.S) = struct
     let rec proof_of_tree : type a. brassaia_tree -> (proof_tree -> a) -> a =
      fun tree k ->
       match tree with
-      | `Contents (c, h) -> proof_of_contents c h k
+      | `Contents c -> proof_of_contents c k
       | `Node node -> proof_of_node node k
 
-    and proof_of_contents :
-        type a. Contents.t -> metadata -> (proof_tree -> a) -> a =
-     fun c m k ->
+    and proof_of_contents : type a. Contents.t -> (proof_tree -> a) -> a =
+     fun c k ->
       match Contents.cached_value c with
-      | Some v -> k (Contents (v, m))
-      | None -> k (Blinded_contents (Contents.hash c, m))
+      | Some v -> k (Contents v)
+      | None -> k (Blinded_contents (Contents.hash c))
 
     and proof_of_node : type a. node -> (proof_tree -> a) -> a =
      fun node k ->
@@ -2703,11 +2724,11 @@ module Make (P : Backend.S) = struct
       | Blinded_node h -> k (`Node h)
       | Node n -> load_node_proof ~env n k
       | Inode { length; proofs } -> load_inode_proof ~env length proofs k
-      | Blinded_contents (h, m) -> k (`Contents (h, m))
-      | Contents (v, m) ->
+      | Blinded_contents h -> k (`Contents h)
+      | Contents v ->
           let h = P.Contents.Hash.hash v in
           Env.add_contents_from_proof env h v;
-          k (`Contents (h, m))
+          k (`Contents h)
       | Extender { length; segments; proof } ->
           load_extender_proof ~env length segments proof k
 

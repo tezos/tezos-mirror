@@ -33,7 +33,6 @@ module Schema :
      and type Path.t = string list
      and type Branch.t = string
      and type Contents.t = string
-     and type Metadata.t = unit
 
 module Filename : sig
   include module type of Filename

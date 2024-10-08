@@ -22,16 +22,22 @@ module Make
     (H : Type.S)
     (S : sig
       type step [@@deriving brassaia]
-    end)
-    (M : Type.S) =
+    end) =
 struct
   type contents = C.t [@@deriving brassaia]
   type hash = H.t [@@deriving brassaia]
   type step = S.step [@@deriving brassaia]
-  type metadata = M.t [@@deriving brassaia]
+  type kinded_hash = [ `Contents of hash | `Node of hash ]
 
-  type kinded_hash = [ `Contents of hash * metadata | `Node of hash ]
-  [@@deriving brassaia]
+  (* Custom Repr encoding to be coherent with the previous binary
+     representation that included metadatas *)
+  let kinded_hash_t =
+    let open Type in
+    variant "kinded_hash" (fun c n -> function
+      | `Contents h -> c ((), h) | `Node h -> n h)
+    |~ case1 "contents" (pair unit hash_t) (fun ((), h) -> `Contents h)
+    |~ case1 "node" hash_t (fun h -> `Node h)
+    |> sealv
 
   type 'a inode = { length : int; proofs : (int * 'a) list }
   [@@deriving brassaia]
@@ -40,13 +46,12 @@ struct
   [@@deriving brassaia]
 
   type tree =
-    | Contents of contents * metadata
-    | Blinded_contents of hash * metadata
+    | Contents of contents
+    | Blinded_contents of hash
     | Node of (step * tree) list
     | Blinded_node of hash
     | Inode of inode_tree inode
     | Extender of inode_tree inode_extender
-  [@@deriving brassaia]
 
   and inode_tree =
     | Blinded_inode of hash
@@ -54,6 +59,28 @@ struct
     | Inode_tree of inode_tree inode
     | Inode_extender of inode_tree inode_extender
   [@@deriving brassaia]
+
+  (* Custom Repr encoding to be coherent with the previous binary
+     representation that included metadatas *)
+  let tree_t =
+    let open Type in
+    variant "tree"
+      (fun contents blinded_contents node blinded_node inode extender ->
+        function
+      | Contents c -> contents (c, ())
+      | Blinded_contents h -> blinded_contents (h, ())
+      | Node l -> node l
+      | Blinded_node h -> blinded_node h
+      | Inode i -> inode i
+      | Extender e -> extender e)
+    |~ case1 "contents" (pair contents_t unit) (fun (c, ()) -> Contents c)
+    |~ case1 "blinded-contents" (pair hash_t unit) (fun (h, ()) ->
+           Blinded_contents h)
+    |~ case1 "node" (list (pair step_t tree_t)) (fun h -> Node h)
+    |~ case1 "blinded-node" hash_t (fun h -> Blinded_node h)
+    |~ case1 "inode" (inode_t inode_tree_t) (fun i -> Inode i)
+    |~ case1 "extender" (inode_extender_t inode_tree_t) (fun e -> Extender e)
+    |> sealv
 
   type elt =
     | Contents of contents
@@ -102,8 +129,7 @@ module Env
     (P : S
            with type contents := B.Contents.Val.t
             and type hash := B.Hash.t
-            and type step := B.Node.Val.step
-            and type metadata := B.Node.Val.metadata) =
+            and type step := B.Node.Val.step) =
 struct
   module H = B.Hash
 
@@ -345,8 +371,7 @@ struct
         let l =
           List.map
             (function
-              | step, `Contents (k, m) ->
-                  (step, `Contents (B.Contents.Key.to_hash k, m))
+              | step, `Contents k -> (step, `Contents (B.Contents.Key.to_hash k))
               | step, `Node k -> (step, `Node (B.Node.Key.to_hash k)))
             l
         in
