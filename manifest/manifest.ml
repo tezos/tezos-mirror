@@ -4382,7 +4382,9 @@ let generate_dependency_graph ?(source = []) ?(without = []) filename =
   let module Node = struct
     type t = Target.internal
 
-    let id (node : t) =
+    let id (node : t) = node.path ^ " " ^ Target.name_for_errors (Internal node)
+
+    let label (node : t) =
       node.path ^ "\n" ^ Target.name_for_errors (Internal node)
 
     let id_matches pattern node =
@@ -4402,9 +4404,11 @@ let generate_dependency_graph ?(source = []) ?(without = []) filename =
     let compare a b = String.compare (id a) (id b)
 
     let attributes (node : t) =
-      match node.kind with
+      ("label", label node)
+      ::
+      (match node.kind with
       | Public_library _ | Private_library _ -> [("shape", "box")]
-      | Public_executable _ | Private_executable _ | Test_executable _ -> []
+      | Public_executable _ | Private_executable _ | Test_executable _ -> [])
   end in
   let module G = Dgraph.Make (Node) in
   (* Make the direct dependency graph. *)
