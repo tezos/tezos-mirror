@@ -37,6 +37,9 @@ module type S = sig
   (** Sets of nodes. *)
   module Nodes : Set.S with type elt = node
 
+  (** Maps of nodes. *)
+  module Node_map : Map.S with type key = node
+
   (** Graphs. *)
   type t
 
@@ -48,6 +51,12 @@ module type S = sig
 
   (** Apply a function to modify the edges from each node. *)
   val map : t -> (node -> Nodes.t -> Nodes.t) -> t
+
+  (** Apply a function to all nodes of a graph to make a node map. *)
+  val map_nodes : t -> (node -> Nodes.t -> 'a) -> 'a Node_map.t
+
+  (** Fold over all nodes. *)
+  val fold : t -> 'a -> (node -> Nodes.t -> 'a -> 'a) -> 'a
 
   (** Remove nodes that do not match a predicate. *)
   val filter : t -> (node -> Nodes.t -> bool) -> t
@@ -62,6 +71,9 @@ module type S = sig
       The result can be compiled to e.g. an SVG using: [dot -O -Tsvg filename]
       where [dot] can be installed on Debian with [apt install graphviz]. *)
   val output_dot_file : Format.formatter -> t -> unit
+
+  (** Compute the transitive closure of a graph. *)
+  val transitive_closure : t -> t
 
   (** Remove redundant edges.
 

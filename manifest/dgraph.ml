@@ -20,6 +20,8 @@ module type S = sig
 
   module Nodes : Set.S with type elt = node
 
+  module Node_map : Map.S with type key = node
+
   type t
 
   val empty : t
@@ -28,11 +30,17 @@ module type S = sig
 
   val map : t -> (node -> Nodes.t -> Nodes.t) -> t
 
+  val map_nodes : t -> (node -> Nodes.t -> 'a) -> 'a Node_map.t
+
+  val fold : t -> 'a -> (node -> Nodes.t -> 'a -> 'a) -> 'a
+
   val filter : t -> (node -> Nodes.t -> bool) -> t
 
   val nodes : t -> Nodes.t
 
   val output_dot_file : Format.formatter -> t -> unit
+
+  val transitive_closure : t -> t
 
   val simplify : t -> t
 
@@ -74,6 +82,8 @@ module Make (Node : NODE) : S with type node = Node.t = struct
   let iter graph f = Node_map.iter f graph
 
   let map graph f = Node_map.mapi f graph
+
+  let map_nodes = map
 
   let fold graph acc f = Node_map.fold f graph acc
 
