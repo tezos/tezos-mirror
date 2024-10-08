@@ -27,6 +27,8 @@ open Protocol.Alpha_context
 module Events = Baking_events.Scheduling
 open Baking_state
 
+module Profiler = (val Profiler.wrap Baking_profiler.baker_profiler)
+
 type loop_state = {
   heads_stream : Baking_state.proposal Lwt_stream.t;
   get_valid_blocks_stream : Baking_state.proposal Lwt_stream.t Lwt.t;
@@ -816,6 +818,27 @@ let compute_bootstrap_event state =
     in
     return @@ Baking_state.Timeout (End_of_round {ending_round})
 
+let[@warning "-32"] may_reset_profiler =
+  let prev_head = ref None in
+  let () =
+    at_exit (fun () -> Option.iter (fun _ -> (() [@profiler.stop])) !prev_head)
+  in
+  function
+  | Baking_state.New_head_proposal proposal
+  | Baking_state.New_valid_proposal proposal -> (
+      let curr_head_hash = proposal.block.hash in
+      match !prev_head with
+      | None ->
+          () [@profiler.record Block_hash.to_b58check curr_head_hash] ;
+          prev_head := Some curr_head_hash
+      | Some prev_head_hash when prev_head_hash <> curr_head_hash ->
+          ()
+          [@profiler.stop]
+          [@profiler.record Block_hash.to_b58check curr_head_hash] ;
+          prev_head := Some curr_head_hash
+      | _ -> ())
+  | _ -> ()
+
 let rec automaton_loop ?(stop_on_event = fun _ -> false) ~config ~on_error
     loop_state state event =
   let open Lwt_result_syntax in
@@ -825,38 +848,63 @@ let rec automaton_loop ?(stop_on_event = fun _ -> false) ~config ~on_error
         Baking_state.may_record_new_state ~previous_state:state ~new_state
     | Baking_configuration.Memory -> return_unit
   in
-  let*! state', action = State_transitions.step state event in
-  let* state'' =
-    let*! state_res =
-      let* state'' = Baking_actions.perform_action state' action in
-      let* () = may_record_new_state ~previous_state:state ~new_state:state'' in
-      return state''
-    in
-    match state_res with
-    | Ok state'' -> return state''
-    | Error error ->
-        let* () = on_error error in
-        (* Still try to record the intermediate state; ignore potential
-           errors. *)
-        let*! _ = state_recorder ~new_state:state' in
-        return state'
-  in
-  let* next_timeout = compute_next_timeout state'' in
-  let* event_opt =
-    wait_next_event
-      ~timeout:
-        (let*! e = next_timeout in
-         Lwt.return (`Timeout e))
-      loop_state
-  in
-  match event_opt with
-  | None ->
-      (* Termination *)
-      return_none
-  | Some event ->
-      if stop_on_event event then return_some event
-      else
-        automaton_loop ~stop_on_event ~config ~on_error loop_state state'' event
+  () [@profiler.custom may_reset_profiler event] ;
+  (let*! state', action =
+     (State_transitions.step
+        state
+        event
+      [@profiler.record_s Format.asprintf "Step : %a" pp_short_event event])
+   in
+   let* state'' =
+     let*! state_res =
+       let* state'' =
+         (Baking_actions.perform_action
+            state'
+            action
+          [@profiler.record_s
+            Format.asprintf "Action : %a" Baking_actions.pp_action action])
+       in
+       let* () =
+         may_record_new_state ~previous_state:state ~new_state:state''
+       in
+       return state''
+     in
+     match state_res with
+     | Ok state'' -> return state''
+     | Error error ->
+         let* () = on_error error in
+         (* Still try to record the intermediate state; ignore potential
+            errors. *)
+         let*! _ = state_recorder ~new_state:state' in
+         return state'
+   in
+   let* next_timeout =
+     (compute_next_timeout
+        state'' [@profiler.record_s "Timeout : compute next timeout"])
+   in
+   let* event_opt =
+     (wait_next_event
+        ~timeout:
+          (let*! e = next_timeout in
+           Lwt.return (`Timeout e))
+        loop_state [@profiler.record_s "Wait : next event"])
+   in
+   () [@profiler.stop] ;
+   match event_opt with
+   | None ->
+       (* Termination *)
+       return_none
+   | Some event ->
+       if stop_on_event event then return_some event
+       else
+         automaton_loop
+           ~stop_on_event
+           ~config
+           ~on_error
+           loop_state
+           state''
+           event)
+  [@profiler.record_s "Scheduler loop"]
 
 let perform_sanity_check cctxt ~chain_id =
   let open Lwt_result_syntax in
@@ -1020,6 +1068,9 @@ let run cctxt ?canceler ?(stop_on_event = fun _ -> false)
     on_error err
   in
   let*? initial_event = compute_bootstrap_event initial_state in
+  ()
+  [@profiler.stop]
+  [@profiler.custom may_reset_profiler (New_valid_proposal current_proposal)] ;
   protect
     ~on_error:(fun err ->
       let*! _ = Option.iter_es Lwt_canceler.cancel canceler in
