@@ -126,10 +126,13 @@ module Internal_for_tests : sig
     new_cycle:Cycle_repr.t ->
     Q.t
 
+  val dyn_max : stake_ratio:Q.t -> Q.t
+
   val compute_max :
     issuance_ratio_min:Q.t ->
     reward_params:Constants_parametric_repr.adaptive_rewards_params ->
     launch_cycle:Cycle_repr.t option ->
     new_cycle:Cycle_repr.t ->
+    stake_ratio:Q.t ->
     Q.t
 end
