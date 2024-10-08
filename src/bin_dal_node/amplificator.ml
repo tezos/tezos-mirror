@@ -298,7 +298,7 @@ let reply_receiver_job {process; query_store; _} node_context =
     in
     let shards = List.to_seq shards in
     let* () =
-      Store.(Shards.write_all node_store.shards slot_id shards)
+      Store.Shards.write_all (Store.shards node_store) slot_id shards
       |> Errors.to_tzresult
     in
     let* () =
@@ -447,7 +447,7 @@ let amplify node_store commitment (slot_id : Types.slot_id)
           number_of_shards ))
   in
   let shards =
-    Store.(Shards.read_all node_store.shards slot_id ~number_of_shards)
+    Store.Shards.read_all (Store.shards node_store) slot_id ~number_of_shards
     |> Seq_s.filter_map (function
            | _, index, Ok share -> Some Cryptobox.{index; share}
            | _ -> None)
@@ -483,7 +483,7 @@ let try_amplification commitment (slot_id : Types.slot_id) amplificator =
   in
   let number_of_needed_shards = number_of_shards / redundancy_factor in
   let* number_of_already_stored_shards =
-    Store.Shards.count_values node_store.shards slot_id
+    Store.Shards.count_values (Store.shards node_store) slot_id
   in
   (* There are two situations where we don't want to reconstruct:
      if we don't have enough shards or if we already have all the
@@ -522,7 +522,7 @@ let try_amplification commitment (slot_id : Types.slot_id) amplificator =
     (* Count again the stored shards because we may have received
        more shards during the random delay. *)
     let* number_of_already_stored_shards =
-      Store.Shards.count_values node_store.shards slot_id
+      Store.Shards.count_values (Store.shards node_store) slot_id
     in
     (* If we have received all the shards while waiting the random
        delay, there is no point in reconstructing anymore *)

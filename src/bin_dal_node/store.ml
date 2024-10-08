@@ -453,6 +453,22 @@ type t = {
   first_seen_level : First_seen_level.t;
 }
 
+let cache {cache; _} = cache
+
+let first_seen_level {first_seen_level; _} = first_seen_level
+
+let finalized_commitments {finalized_commitments; _} = finalized_commitments
+
+let last_processed_level {last_processed_level; _} = last_processed_level
+
+let shards {shards; _} = shards
+
+let skip_list_cells {skip_list_cells; _} = skip_list_cells
+
+let slot_header_statuses {slot_header_statuses; _} = slot_header_statuses
+
+let slots {slots; _} = slots
+
 let cache_entry node_store commitment slot shares shard_proofs =
   Commitment_indexed_cache.replace
     node_store.cache

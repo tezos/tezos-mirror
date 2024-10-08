@@ -132,7 +132,7 @@ let get_slot_content_from_shards cryptobox store slot_id =
         (Errors.other
            [Missing_shards {provided; required = minimal_number_of_shards}])
     else
-      let*! res = Store.Shards.read store.Store.shards slot_id shard_id in
+      let*! res = Store.Shards.read (Store.shards store) slot_id shard_id in
       match res with
       | Ok res -> loop (Seq.cons res acc) (shard_id + 1) (remaining - 1)
       | Error _ -> loop acc (shard_id + 1) remaining
@@ -141,7 +141,7 @@ let get_slot_content_from_shards cryptobox store slot_id =
   let* polynomial = polynomial_from_shards cryptobox shards in
   let slot = Cryptobox.polynomial_to_slot cryptobox polynomial in
   (* Store the slot so that next calls don't require a reconstruction. *)
-  let* () = Store.Slots.add_slot store.Store.slots ~slot_size slot slot_id in
+  let* () = Store.Slots.add_slot (Store.slots store) ~slot_size slot slot_id in
   let*! () = Event.(emit fetched_slot (Bytes.length slot, Seq.length shards)) in
   return slot
 
@@ -152,7 +152,7 @@ let get_slot_content ~reconstruct_if_missing ctxt slot_id =
   let cryptobox = Node_context.get_cryptobox ctxt in
   let Cryptobox.{slot_size; _} = Cryptobox.parameters cryptobox in
   let*! res_slot_store =
-    Store.Slots.find_slot store.Store.slots ~slot_size slot_id
+    Store.Slots.find_slot (Store.slots store) ~slot_size slot_id
   in
   match res_slot_store with
   | Ok slot -> return slot
@@ -294,7 +294,8 @@ let publish_proved_shards (slot_id : Types.slot_id) ~level_committee
 let publish_slot_data ~level_committee (node_store : Store.t) ~slot_size
     gs_worker proto_parameters commitment slot_id =
   let open Lwt_result_syntax in
-  match Store.Commitment_indexed_cache.find_opt node_store.cache commitment with
+  let cache = Store.cache node_store in
+  match Store.Commitment_indexed_cache.find_opt cache commitment with
   | None ->
       (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5676
 
@@ -314,11 +315,11 @@ let publish_slot_data ~level_committee (node_store : Store.t) ~slot_size
         |> Seq.mapi (fun index share -> Cryptobox.{index; share})
       in
       let* () =
-        Store.(Shards.write_all node_store.shards slot_id shards)
+        Store.Shards.write_all (Store.shards node_store) slot_id shards
         |> Errors.to_tzresult
       in
       let* () =
-        Store.Slots.add_slot ~slot_size node_store.slots slot slot_id
+        Store.Slots.add_slot ~slot_size (Store.slots node_store) slot slot_id
         |> Errors.to_tzresult
       in
       publish_proved_shards
@@ -335,19 +336,20 @@ let store_slot_headers ~number_of_slots ~block_level slot_headers node_store =
 
 let update_selected_slot_headers_statuses ~block_level ~attestation_lag
     ~number_of_slots attested_slots node_store =
-  Store.(
-    Statuses.update_selected_slot_headers_statuses
-      ~block_level
-      ~attestation_lag
-      ~number_of_slots
-      attested_slots
-      node_store.slot_header_statuses)
+  let slot_header_statuses_store = Store.slot_header_statuses node_store in
+  Store.Statuses.update_selected_slot_headers_statuses
+    ~block_level
+    ~attestation_lag
+    ~number_of_slots
+    attested_slots
+    slot_header_statuses_store
 
 let get_slot_status ~slot_id node_store =
-  Store.(Statuses.get_slot_status ~slot_id node_store.slot_header_statuses)
+  let slot_header_statuses_store = Store.slot_header_statuses node_store in
+  Store.Statuses.get_slot_status ~slot_id slot_header_statuses_store
 
 let get_slot_shard (store : Store.t) (slot_id : Types.slot_id) shard_index =
-  Store.Shards.read store.shards slot_id shard_index
+  Store.Shards.read (Store.shards store) slot_id shard_index
 
 let get_slot_pages ~reconstruct_if_missing node_context slot_id =
   let open Lwt_result_syntax in

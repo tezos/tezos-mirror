@@ -275,10 +275,8 @@ module Profile_handlers = struct
           let slot_id : Types.slot_id =
             {slot_level = published_level; slot_index}
           in
-          Store.Shards.are_shards_available
-            store.Store.shards
-            slot_id
-            shard_indices
+          let shards_store = Store.shards store in
+          Store.Shards.are_shards_available shards_store slot_id shard_indices
           |> lwt_map_error (fun e -> `Other e)
         in
         let all_slot_indexes =
@@ -559,11 +557,12 @@ let register_plugin node_ctxt =
          previous protocol). A fix would be try answering the RPCs with the
          current protocol plugin, then with the previous one in case of
          failure. *)
+      let skip_list_cells_store = Store.skip_list_cells store in
       List.fold_left
         (fun dir (module Plugin : Dal_plugin.T) ->
           Tezos_rpc.Directory.merge
             dir
-            (Plugin.RPC.directory store.skip_list_cells))
+            (Plugin.RPC.directory skip_list_cells_store))
         Tezos_rpc.Directory.empty
         (Node_context.get_all_plugins node_ctxt)
       |> return)
