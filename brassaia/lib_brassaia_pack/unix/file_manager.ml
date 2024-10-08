@@ -101,21 +101,18 @@ module Events = struct
       ("chunk_num", Data_encoding.int64)
 end
 
-module Make
-    (Io : Io.S)
-    (Index : Pack_index.S with module Io = Io)
-    (Errs : Io_errors.S with module Io = Io) =
-struct
-  module Io = Errs.Io
+module Make (Index : Pack_index.S) = struct
+  module Io = Io.Unix
   module Index = Index
-  module Errs = Io_errors.Make (Io)
-  module Control = Control_file.Upper (Io)
-  module Dict = Append_only_file.Make (Io) (Errs)
-  module Suffix = Chunked_suffix.Make (Io) (Errs)
-  module Sparse = Sparse_file.Make (Io)
-  module Lower = Lower.Make (Io) (Errs)
+  module Control = Control_file.Upper
+  module Dict = Append_only_file
+  module Suffix = Chunked_suffix
+  module Sparse = Sparse_file
 
-  type after_reload_consumer = { after_reload : unit -> (unit, Errs.t) result }
+  type after_reload_consumer = {
+    after_reload : unit -> (unit, Io_errors.t) result;
+  }
+
   type after_flush_consumer = { after_flush : unit -> unit }
 
   type t = {
@@ -170,7 +167,7 @@ struct
     List.fold_left
       (fun acc { after_reload } -> Result.bind acc after_reload)
       (Ok ()) consumers
-    |> Result.map_error (fun err -> (err : Errs.t :> [> Errs.t ]))
+    |> Result.map_error (fun err -> (err : Io_errors.t :> [> Io_errors.t ]))
 
   (** Flush stages *************************************************************
 
@@ -259,20 +256,20 @@ struct
       that the file manager flushes. *)
   let dict_requires_a_flush_exn t =
     Stats.incr_fm_field Auto_dict;
-    flush_dict t |> Errs.raise_if_error
+    flush_dict t |> Io_errors.raise_if_error
 
   (** Is expected to be called by the suffix when its append buffer is full so
       that the file manager flushes. *)
   let suffix_requires_a_flush_exn t =
     Stats.incr_fm_field Auto_suffix;
-    flush_suffix_and_its_deps t |> Errs.raise_if_error
+    flush_suffix_and_its_deps t |> Io_errors.raise_if_error
 
   (** Is expected to be called by the index when its append buffer is full so
       that the dependendies of index are flushes. When the function returns,
       index will flush itself. *)
   let index_is_about_to_auto_flush_exn t =
     Stats.incr_fm_field Auto_index;
-    flush_suffix_and_its_deps t |> Errs.raise_if_error
+    flush_suffix_and_its_deps t |> Io_errors.raise_if_error
 
   (* Explicit flush ********************************************************* *)
 
@@ -551,7 +548,7 @@ struct
                   Please manually remove %s."
                  path)
         | `No_such_file_or_directory, _ -> Io.mkdir path
-        | (`File | `Other), _ -> Errs.raise_error (`Not_a_directory path))
+        | (`File | `Other), _ -> Io_errors.raise_error (`Not_a_directory path))
 
   let create_rw ~overwrite config =
     let open Result_syntax in
@@ -761,7 +758,7 @@ struct
     (* Bytes 0-7 contains the offset. Bytes 8-15 contain the version. *)
     let* io = Io.open_ ~path ~readonly:true in
     Errors.finalise (fun _ ->
-        Io.close io |> Errs.log_if_error "FM: read_offset_from_legacy_file")
+        Io.close io |> Io_errors.log_if_error "FM: read_offset_from_legacy_file")
     @@ fun () ->
     let* s = Io.read_to_string io ~off:Int63.zero ~len:8 in
     let x = Int63.decode ~off:0 s in
@@ -772,7 +769,8 @@ struct
     (* Bytes 0-7 contains the offset. Bytes 8-15 contain the version. *)
     let* io = Io.open_ ~path ~readonly:true in
     Errors.finalise (fun _ ->
-        Io.close io |> Errs.log_if_error "FM: read_version_from_legacy_file")
+        Io.close io
+        |> Io_errors.log_if_error "FM: read_version_from_legacy_file")
     @@ fun () ->
     let off = Int63.of_int 8 in
     let* s = Io.read_to_string io ~off ~len:8 in
@@ -1105,7 +1103,7 @@ struct
     let* () = Suffix.close suffix in
     (* Step 3. Create the control file and close it. *)
     let status = Payload.Gced gced in
-    let dict_end_poff = Io.size_of_path dst_dict |> Errs.raise_if_error in
+    let dict_end_poff = Io.size_of_path dst_dict |> Io_errors.raise_if_error in
     let pl =
       {
         Payload.dict_end_poff;

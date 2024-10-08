@@ -17,10 +17,9 @@
 open! Import
 
 module type S = sig
-  module File_manager : File_manager.S with module Io = Io.Unix
+  module File_manager : File_manager.S
   module Async : Async.S
   module Dict : Dict.S with module File_manager = File_manager
-  module Errs : Io_errors.S with module Io = File_manager.Io
   module Dispatcher : Dispatcher.S with module File_manager = File_manager
 
   type hash

@@ -15,11 +15,12 @@
  *)
 
 open Import
-include Pack_store_intf
 
 exception Invalid_read of string
 exception Corrupted_store of string
 exception Dangling_hash
+
+module type S = Pack_store_intf.S
 
 let invalid_read fmt = Fmt.kstr (fun s -> raise (Invalid_read s)) fmt
 let corrupted_store fmt = Fmt.kstr (fun s -> raise (Corrupted_store s)) fmt
@@ -54,8 +55,7 @@ module Make_without_close_checks
     (Hash : Brassaia.Hash.S with type t = File_manager.Index.key)
     (Val : Pack_value.Persistent
              with type hash := Hash.t
-              and type key := Hash.t Pack_key.t)
-    (Errs : Io_errors.S with module Io = File_manager.Io) =
+              and type key := Hash.t Pack_key.t) =
 struct
   module Tbl = Table (Hash)
   module Control = File_manager.Control
@@ -450,7 +450,7 @@ struct
       "[pack] calling batch directory on a store is not recommended. Use \
        repo.batch instead."];
     let on_success res =
-      File_manager.flush t.file_manager |> Errs.raise_if_error;
+      File_manager.flush t.file_manager |> Io_errors.raise_if_error;
       Lwt.return res
     in
     let on_fail exn =
@@ -462,7 +462,8 @@ struct
         | Error err ->
             [%log.err
               "[pack] batch failed and flush failed. Silencing flush fail. (%a)"
-                (Brassaia.Type.pp Errs.t) err]
+                (Brassaia.Type.pp Io_errors.t)
+                err]
       in
       raise exn
     in
@@ -545,12 +546,10 @@ module Make
     (Hash : Brassaia.Hash.S with type t = File_manager.Index.key)
     (Val : Pack_value.Persistent
              with type hash := Hash.t
-              and type key := Hash.t Pack_key.t)
-    (Errs : Io_errors.S with module Io = File_manager.Io) =
+              and type key := Hash.t Pack_key.t) =
 struct
   module Inner =
     Make_without_close_checks (File_manager) (Dict) (Dispatcher) (Hash) (Val)
-      (Errs)
 
   include Inner
   include Indexable.Closeable (Inner)

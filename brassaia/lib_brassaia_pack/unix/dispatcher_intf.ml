@@ -21,7 +21,7 @@ module type S = sig
 
   type t
 
-  val init : File_manager.t -> (t, [> File_manager.Errs.t ]) result
+  val init : File_manager.t -> (t, [> Io_errors.t ]) result
 
   val read_exn :
     t ->
@@ -100,6 +100,6 @@ end
 module type Sigs = sig
   module type S = S
 
-  module Make (File_manager : File_manager.S with module Io = Io.Unix) :
+  module Make (File_manager : File_manager.S) :
     S with module File_manager = File_manager
 end

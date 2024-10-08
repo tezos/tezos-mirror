@@ -94,8 +94,8 @@ module Context = Make_context (struct
   let root = test_dir
 end)
 
-let flush fm = File_manager.flush fm |> Errs.raise_if_error
-let reload fm = File_manager.reload fm |> Errs.raise_if_error
+let flush fm = File_manager.flush fm |> Io_errors.raise_if_error
+let reload fm = File_manager.reload fm |> Io_errors.raise_if_error
 
 module Dict = struct
   let test_dict () =
@@ -354,7 +354,7 @@ module Pack = struct
       let k2 =
         Pack.unsafe_append ~ensure_unique:true ~overcommit:false w h2 x2
       in
-      Index.flush t.index ~with_fsync:false |> Errs.raise_if_error;
+      Index.flush t.index ~with_fsync:false |> Io_errors.raise_if_error;
       let+ y2 = Pack.find t'.pack k2 in
       Alcotest.(check (option string)) "reload after flush" (Some x2) y2
     in
@@ -392,7 +392,7 @@ module Pack = struct
       let k3 =
         Pack.unsafe_append ~ensure_unique:true ~overcommit:false w h3 x3
       in
-      Index.flush t.index ~with_fsync:false |> Errs.raise_if_error;
+      Index.flush t.index ~with_fsync:false |> Io_errors.raise_if_error;
       check k2 x2 "find after flush" >>= fun () ->
       flush t.file_manager;
       reload t'.file_manager;
