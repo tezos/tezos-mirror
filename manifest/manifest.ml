@@ -4385,7 +4385,7 @@ let generate_dependency_graph ?(source = []) ?(without = []) filename =
     let id (node : t) = node.path ^ " " ^ Target.name_for_errors (Internal node)
 
     let label (node : t) =
-      node.path ^ "\n" ^ Target.name_for_errors (Internal node)
+      node.path ^ "\\n" ^ Target.name_for_errors (Internal node)
 
     let id_matches pattern node =
       let string_contains sub str =
