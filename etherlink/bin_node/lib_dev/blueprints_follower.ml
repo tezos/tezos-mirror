@@ -46,9 +46,7 @@ let local_head_too_old ?remote_head ~evm_node_endpoint
       when is_too_old ~remote:remote_head ~next:next_blueprint_number ->
         return (Qty remote_head)
     | None | Some _ ->
-        (* The observer is designed to be resilent to downtime from its EVM
-           node endpoint. It would not make sense to break this logic here, so
-           we force [keep_alive] to true. *)
+        (* See {Note keep_alive} *)
         Services.call
           (module Block_number)
           ~keep_alive:true
@@ -74,7 +72,9 @@ let[@tailrec] rec go ?remote_head ~next_blueprint_number ~first_connection
 
   if local_head_too_old then
     let* blueprint =
+      (* See {Note keep_alive} *)
       Evm_services.get_blueprint
+        ~keep_alive:true
         ~evm_node_endpoint:params.evm_node_endpoint
         next_blueprint_number
     in
@@ -139,3 +139,9 @@ let start ~time_between_blocks ~evm_node_endpoint ~next_blueprint_number
     ~next_blueprint_number
     ~first_connection:true
     {time_between_blocks; evm_node_endpoint; on_new_blueprint}
+
+(* {Note keep_alive}
+
+   The observer is designed to be resilent to downtime from its EVM node
+   endpoint. It would not make sense to break this logic here, so we force
+   [keep_alive] to true. *)

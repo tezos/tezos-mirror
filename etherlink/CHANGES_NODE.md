@@ -13,6 +13,11 @@
 
 ### Bug fixes
 
+- The node will no longer crash when catching-up if it cannot fetch a blueprint
+  from its upstream EVM node. Instead, it will retry as many time as necessary.
+  This is aligned with the behavior of the node when it is up-to-date with its
+  upstream node. (!15232)
+
 ### Internals
 
 ## Version 0.5 (2024-09-27)
