@@ -1131,7 +1131,7 @@ let test_staking =
 
   (* check slashed and rewarded amounts *)
   let global_limit_of_staking_over_baking =
-    if Protocol.(number protocol <= 021) then 5 else 9
+    if Protocol.(number protocol <= 020) then 5 else 9
   in
   (* It's critical that the rewarded amount cannot exceed the amount
      slashed from the baker's own deposits; otherwise, the baker may
