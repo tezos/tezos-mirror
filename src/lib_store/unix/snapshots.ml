@@ -481,15 +481,29 @@ let () =
     ~description:
       "The imported chain is inconsistent with the target data directory."
     ~pp:(fun ppf (expected, got) ->
+      let get_chain_name_info chain_name =
+        let chain_name =
+          Format.asprintf "%a" Distributed_db_version.Name.pp chain_name
+        in
+        (* We assume the chain_name to be formatted as "TEZOS_<CHAIN-NAME>_<TIMESTAMP>". *)
+        String.lowercase_ascii
+        @@
+        match String.split '_' chain_name with
+        | _ :: chain_name :: _ -> chain_name
+        | _ -> ""
+      in
+      let expected_chain_name = get_chain_name_info expected in
+      let chain_name = get_chain_name_info got in
       Format.fprintf
         ppf
-        "The chain name contained in the snapshot file (%a) is not consistent \
-         with the network configured in the targeted data directory (%a). \
-         Please check your configuration file."
-        Distributed_db_version.Name.pp
-        expected
-        Distributed_db_version.Name.pp
-        got)
+        "@[<v 2>The chain name contained in the snapshot file (%s) is not \
+         consistent with the network configured in the targeted data directory \
+         (%s). Please check your configuration file. If your configuration \
+         file is not set, you should use the following command first:@,\
+         'octez-node config init --network <NETWORK> --data-dir <DATA_DIR>'.@,\
+         See documentation for help.@."
+        expected_chain_name
+        chain_name)
     (obj2
        (req "expected" Distributed_db_version.Name.encoding)
        (req "got" Distributed_db_version.Name.encoding))
