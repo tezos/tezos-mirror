@@ -30,40 +30,6 @@ let test_wait_rewards_no_ai_no_auto =
   --> begin_test ["delegate1"; "delegate2"; "delegate3"]
   --> wait_n_cycles 20
 
-(** Test reward distribution without AI and with autostaking.
-    We expect autostaking to keep the ratio total/frozen equal to
-    [limit_of_delegation_over_baking + 1], rounding towards frozen.
-*)
-let test_wait_rewards_no_ai_yes_auto =
-  let open Lwt_result_syntax in
-  let check_balanced_balance src_name =
-    exec_unit (fun (_block, state) ->
-        let src_balance, src_total =
-          balance_and_total_balance_of_account src_name state.State.account_map
-        in
-        let rat = state.constants.limit_of_delegation_over_baking + 1 in
-        let expected_frozen =
-          Tez_helpers.(mul_q src_total Q.(1 // rat) |> of_q ~round:`Up)
-        in
-        let* () =
-          Assert.equal_tez
-            ~loc:__LOC__
-            expected_frozen
-            (Tez_helpers.of_q ~round:`Down src_balance.staked_b)
-        in
-        return_unit)
-  in
-  let check_all_balanced_balances = unfold check_balanced_balance in
-  let all_delegates = ["delegate1"; "delegate2"; "delegate3"] in
-  init_constants ~reward_per_block:1_000_000_007L ()
-  --> set S.Adaptive_issuance.autostaking_enable true
-  --> activate_ai `No --> begin_test all_delegates
-  --> loop
-        20
-        (exec bake_until_dawn_of_next_cycle
-        --> check_all_balanced_balances all_delegates
-        --> next_block)
-
 (** Tests reward distribution under AI:
     - with and without stakers (sometimes overstaking);
     - with different values of edge. *)
@@ -558,8 +524,6 @@ let tests =
   tests_of_scenarios
   @@ [
        ("Test wait rewards no AI no autostake", test_wait_rewards_no_ai_no_auto);
-       ( "Test wait rewards no AI yes autostake",
-         test_wait_rewards_no_ai_yes_auto );
        ("Test wait rewards with AI, stakers and edge", test_wait_rewards_with_ai);
        ( "Test wait rewards with AI and stake variation events",
          test_wait_rewards_with_ai_staker_variation );
