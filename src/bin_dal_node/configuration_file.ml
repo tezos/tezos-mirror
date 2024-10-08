@@ -32,6 +32,8 @@ type neighbor = {addr : string; port : int}
 
 type history_mode = Rolling of {blocks : [`Auto | `Some of int]} | Full
 
+type experimental_features = bool
+
 let history_mode_encoding =
   let open Data_encoding in
   union
@@ -77,6 +79,7 @@ type t = {
   version : int;
   service_name : string option;
   service_namespace : string option;
+  experimental_features : experimental_features;
 }
 
 let default_data_dir = Filename.concat (Sys.getenv "HOME") ".tezos-dal-node"
@@ -110,6 +113,8 @@ let default_metrics_addr =
 
 let default_history_mode = Rolling {blocks = `Auto}
 
+let default_experimental_features = false
+
 let default =
   {
     data_dir = default_data_dir;
@@ -127,6 +132,7 @@ let default =
     version = current_version;
     service_name = None;
     service_namespace = None;
+    experimental_features = default_experimental_features;
   }
 
 let neighbor_encoding : neighbor Data_encoding.t =
@@ -150,6 +156,10 @@ let endpoint_encoding : Uri.t Data_encoding.t =
         |> Result.error)
     string
 
+let experimental_features_encoding : experimental_features Data_encoding.t =
+  let open Data_encoding in
+  bool
+
 let encoding : t Data_encoding.t =
   let open Data_encoding in
   conv
@@ -169,6 +179,7 @@ let encoding : t Data_encoding.t =
            version;
            service_name;
            service_namespace;
+           experimental_features;
          } ->
       ( ( data_dir,
           rpc_addr,
@@ -180,7 +191,12 @@ let encoding : t Data_encoding.t =
           network_name,
           endpoint,
           metrics_addr ),
-        (history_mode, profile, version, service_name, service_namespace) ))
+        ( history_mode,
+          profile,
+          version,
+          service_name,
+          service_namespace,
+          experimental_features ) ))
     (fun ( ( data_dir,
              rpc_addr,
              listen_addr,
@@ -191,7 +207,12 @@ let encoding : t Data_encoding.t =
              network_name,
              endpoint,
              metrics_addr ),
-           (history_mode, profile, version, service_name, service_namespace) ) ->
+           ( history_mode,
+             profile,
+             version,
+             service_name,
+             service_namespace,
+             experimental_features ) ) ->
       {
         data_dir;
         rpc_addr;
@@ -208,6 +229,7 @@ let encoding : t Data_encoding.t =
         version;
         service_name;
         service_namespace;
+        experimental_features;
       })
     (merge_objs
        (obj10
@@ -261,7 +283,7 @@ let encoding : t Data_encoding.t =
              ~description:"The point for the DAL node metrics server"
              (Encoding.option P2p_point.Id.encoding)
              None))
-       (obj5
+       (obj6
           (dft
              "history_mode"
              ~description:"The history mode for the DAL node"
@@ -282,7 +304,12 @@ let encoding : t Data_encoding.t =
              "service_namespace"
              ~description:"Namespace for the service"
              (Data_encoding.option Data_encoding.string)
-             None)))
+             None)
+          (dft
+             "experimental_features"
+             ~description:"Experimental features"
+             experimental_features_encoding
+             default_experimental_features)))
 
 module V0 = struct
   type t = {
@@ -435,6 +462,7 @@ let from_v0 v0 =
     version = current_version;
     service_name = None;
     service_namespace = None;
+    experimental_features = default_experimental_features;
   }
 
 type error += DAL_node_unable_to_write_configuration_file of string
