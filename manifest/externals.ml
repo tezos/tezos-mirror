@@ -283,7 +283,7 @@ let dmap = external_lib "dmap" V.True
 (* The signature of the [Z] module has changed in 1.12. *)
 let zarith = external_lib "zarith" V.(at_least "1.13" && less_than "1.14")
 
-let ledgerwallet_tezos = external_lib "ledgerwallet-tezos" V.(at_least "0.4.0")
+let ledgerwallet_tezos = external_lib "ledgerwallet-tezos" V.(at_least "0.4.1")
 
 let crowbar = external_lib "crowbar" V.(at_least "0.2")
 
