@@ -245,6 +245,18 @@ let current_block_hash evm_state =
    `execute_and_inspect` to 3. *)
 let pool = Lwt_pool.create 3 (fun () -> Lwt.return_unit)
 
+(** Instruments the pool with a few metrics: when adding a callback to the 
+    waiting queue we instrument the callback to track how long it stays in the 
+    queue before being executed. *)
+let add_callback_to_queue pool callback =
+  let arrival_time = Tezos_base.Time.System.now () in
+  (* instrumenting callback and adding to queue *)
+  Lwt_pool.use pool @@ fun () ->
+  let exec_time = Tezos_base.Time.System.now () in
+  let time_waiting = Ptime.diff exec_time arrival_time in
+  Metrics.inc_time_waiting time_waiting ;
+  callback ()
+
 let execute_and_inspect ?wasm_pvm_fallback ~data_dir ?wasm_entrypoint ~config
     ~input:
       Simulation.Encodings.
@@ -262,7 +274,7 @@ let execute_and_inspect ?wasm_pvm_fallback ~data_dir ?wasm_entrypoint ~config
   (* Messages from simulation requests are already valid inputs. *)
   let messages = List.map (fun s -> `Input s) messages in
   let* evm_state =
-    Lwt_pool.use pool @@ fun () ->
+    add_callback_to_queue pool @@ fun () ->
     execute
       ?wasm_pvm_fallback
       ~kind:Simulation

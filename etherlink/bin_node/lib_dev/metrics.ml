@@ -204,7 +204,11 @@ module Tx_pool = struct
 end
 
 module Simulation = struct
-  type t = {inconsistent_da_fees : Counter.t; confirm_gas_needed : Counter.t}
+  type t = {
+    inconsistent_da_fees : Counter.t;
+    confirm_gas_needed : Counter.t;
+    time_waiting : Counter.t;
+  }
 
   let init name =
     let inconsistent_da_fees =
@@ -227,7 +231,17 @@ module Simulation = struct
         "confirm_gas_needed"
         name
     in
-    {inconsistent_da_fees; confirm_gas_needed}
+    let time_waiting =
+      Counter.v_label
+        ~registry
+        ~label_name:"time_waiting"
+        ~help:"Time spent by a request waiting for a worker (in picosecond)."
+        ~namespace
+        ~subsystem
+        "time_waiting"
+        name
+    in
+    {inconsistent_da_fees; confirm_gas_needed; time_waiting}
 end
 
 type t = {
@@ -283,6 +297,10 @@ let set_confirmed_level ~level =
 let start_bootstrapping () = Gauge.set metrics.health.bootstrapping 1.
 
 let stop_bootstrapping () = Gauge.set metrics.health.bootstrapping 0.
+
+let inc_time_waiting span =
+  let _, time = Ptime.Span.to_d_ps span in
+  Counter.inc metrics.simulation.time_waiting (Int64.to_float time)
 
 let is_bootstrapping () =
   (* [bootstrapping] is set to 1.0 when bootstrapping, and 0.0 otherwise. To
