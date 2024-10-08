@@ -4403,6 +4403,8 @@ let generate_dependency_graph ?(source = []) ?(without = []) filename =
     let id (node : t) =
       node.target.path ^ " " ^ Target.name_for_errors (Internal node.target)
 
+    let compare a b = String.compare (id a) (id b)
+
     let label (node : t) =
       node.target.path ^ "\\n"
       ^ Target.name_for_errors (Internal node.target)
@@ -4422,8 +4424,6 @@ let generate_dependency_graph ?(source = []) ?(without = []) filename =
         find 0
       in
       string_contains pattern (id node)
-
-    let compare a b = String.compare (id a) (id b)
 
     let attributes (node : t) =
       ("label", label node)
