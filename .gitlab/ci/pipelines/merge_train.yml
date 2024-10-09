@@ -1315,12 +1315,12 @@ opam:all_6:
       - tezos-protocol-021-PsQuebec
       - tezos-protocol-020-PsParisC
       - tezos-protocol-019-PtParisB
-      - tezos-dal-node-services
       - tezos-benchmark
       - octez-shell-libs
       - octez-riscv-pvm
       - octez-proto-libs
       - octez-l2-libs
+      - dal_node_migrations
 
 opam:exec_6:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
@@ -2015,6 +2015,7 @@ opam:all_7:
     - package:
       - tezt-tezos
       - tezos-openapi
+      - tezos-dal-node-services
       - octez-smart-rollup-wasm-debugger-plugin
       - octez-rust-deps
       - octez-riscv-api
