@@ -156,9 +156,10 @@ end
 (** Level at which context was last split. *)
 module Last_context_split : SINGLETON_STORE with type value := int32
 
+type history_mode = Archive | Full
+
 (** History mode of the rollup node. *)
-module History_mode :
-  SINGLETON_STORE with type value := Configuration.history_mode
+module History_mode : SINGLETON_STORE with type value := history_mode
 
 type +'a store = {
   l2_blocks : 'a L2_blocks.t;

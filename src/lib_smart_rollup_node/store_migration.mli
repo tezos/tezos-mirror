@@ -27,4 +27,5 @@
     needed. If there is no possible migration path registered to go from the
     current version to the last {!Store.version}, this function resolves with an
     error. *)
-val maybe_run_migration : Metadata.t -> data_dir:string -> unit tzresult Lwt.t
+val maybe_run_migration :
+  Metadata.t -> Store_version.t -> data_dir:string -> unit tzresult Lwt.t
