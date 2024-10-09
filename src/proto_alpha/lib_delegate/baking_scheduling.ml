@@ -815,18 +815,20 @@ let[@warning "-32"] may_reset_profiler =
   let () =
     at_exit (fun () -> Option.iter (fun _ -> (() [@profiler.stop])) !prev_head)
   in
+  let[@warning "-26"] metadata = [] in
   function
   | Baking_state.New_head_proposal proposal
   | Baking_state.New_valid_proposal proposal -> (
       let curr_head_hash = proposal.block.hash in
       match !prev_head with
       | None ->
-          () [@profiler.record Block_hash.to_b58check curr_head_hash] ;
+          ()
+          [@profiler.record {metadata} (Block_hash.to_b58check curr_head_hash)] ;
           prev_head := Some curr_head_hash
       | Some prev_head_hash when prev_head_hash <> curr_head_hash ->
           ()
           [@profiler.stop]
-          [@profiler.record Block_hash.to_b58check curr_head_hash] ;
+          [@profiler.record {metadata} (Block_hash.to_b58check curr_head_hash)] ;
           prev_head := Some curr_head_hash
       | _ -> ())
   | _ -> ()

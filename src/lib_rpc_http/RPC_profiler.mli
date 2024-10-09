@@ -12,4 +12,5 @@ val rpc_client_profiler : Profiler.profiler
 val init : (name:string -> Profiler.instance) -> unit
 
 (** Creates a function to reset the block section *)
-val create_reset_block_section : Profiler.profiler -> Block_hash.t -> unit
+val create_reset_block_section :
+  Profiler.profiler -> Block_hash.t * Profiler.metadata -> unit

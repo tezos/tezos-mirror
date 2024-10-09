@@ -23,7 +23,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module StringMap = Map.Make (String)
+type metadata = (string * string) list
+
+type id = string * metadata
+
+type ids = string list * metadata
+
+module IdMap = Map.Make (struct
+  type t = id
+
+  let compare = Stdlib.compare
+end)
 
 type time = {wall : float; cpu : float}
 
@@ -42,7 +52,7 @@ type verbosity = Notice | Info | Debug
 type aggregated_node = {
   count : int;
   total : span;
-  children : aggregated_node StringMap.t;
+  children : aggregated_node IdMap.t;
   node_verbosity : verbosity;
 }
 
@@ -54,8 +64,8 @@ type seq_item = {
 }
 
 and report = {
-  aggregated : aggregated_node StringMap.t;
-  recorded : (string * seq_item) list;
+  aggregated : aggregated_node IdMap.t;
+  recorded : (id * seq_item) list;
 }
 
 let time_encoding =
@@ -73,6 +83,10 @@ let verbosity_encoding =
   let open Data_encoding in
   string_enum [("notice", Notice); ("info", Info); ("debug", Debug)]
 
+let id_encoding =
+  let open Data_encoding in
+  tup2 string (list @@ tup2 string string)
+
 let aggregated_encoding =
   let open Data_encoding in
   mu
@@ -81,11 +95,11 @@ let aggregated_encoding =
     ~description:"Aggregated node"
     (fun aggregated_encoding ->
       conv
-        StringMap.bindings
-        (fun l -> StringMap.of_seq (List.to_seq l))
+        IdMap.bindings
+        (fun l -> IdMap.of_seq (List.to_seq l))
         (list
            (merge_objs
-              (obj1 (req "name" string))
+              (obj1 (req "name" id_encoding))
               (conv
                  (fun {count; total; children; node_verbosity} ->
                    (count, total, children, node_verbosity))
@@ -94,7 +108,7 @@ let aggregated_encoding =
                  (obj4
                     (req "count" int31)
                     (req "total" span_encoding)
-                    (dft "children" aggregated_encoding StringMap.empty)
+                    (dft "children" aggregated_encoding IdMap.empty)
                     (req "verbosity" verbosity_encoding))))))
 
 let recorded_encoding report_encoding =
@@ -106,7 +120,7 @@ let recorded_encoding report_encoding =
        (fun (n, start, duration, contents, item_verbosity) ->
          (n, {start; duration; contents; item_verbosity}))
        (obj5
-          (req "name" string)
+          (req "name" id_encoding)
           (req "start" time_encoding)
           (req "duration" span_encoding)
           (req "report" report_encoding)
@@ -135,17 +149,17 @@ module type DRIVER = sig
 
   val time : state -> time
 
-  val record : state -> verbosity -> string -> unit
+  val record : state -> verbosity -> id -> unit
 
-  val aggregate : state -> verbosity -> string -> unit
+  val aggregate : state -> verbosity -> id -> unit
 
   val stop : state -> unit
 
-  val stamp : state -> verbosity -> string -> unit
+  val stamp : state -> verbosity -> id -> unit
 
-  val mark : state -> verbosity -> string list -> unit
+  val mark : state -> verbosity -> ids -> unit
 
-  val span : state -> verbosity -> span -> string list -> unit
+  val span : state -> verbosity -> span -> ids -> unit
 
   val inc : state -> report -> unit
 
@@ -365,34 +379,31 @@ module type GLOBAL_PROFILER = sig
 
   val plugged : unit -> instance list
 
-  val record : ?verbosity:verbosity -> string -> unit
+  val record : ?verbosity:verbosity -> id -> unit
 
-  val aggregate : ?verbosity:verbosity -> string -> unit
+  val aggregate : ?verbosity:verbosity -> id -> unit
 
   val stop : unit -> unit
 
-  val stamp : ?verbosity:verbosity -> string -> unit
+  val stamp : ?verbosity:verbosity -> id -> unit
 
-  val mark : ?verbosity:verbosity -> string list -> unit
+  val mark : ?verbosity:verbosity -> ids -> unit
 
-  val span : ?verbosity:verbosity -> span -> string list -> unit
+  val span : ?verbosity:verbosity -> span -> ids -> unit
 
   val inc : report -> unit
 
-  val record_f : ?verbosity:verbosity -> string -> (unit -> 'a) -> 'a
+  val record_f : ?verbosity:verbosity -> id -> (unit -> 'a) -> 'a
 
-  val record_s :
-    ?verbosity:verbosity -> string -> (unit -> 'a Lwt.t) -> 'a Lwt.t
+  val record_s : ?verbosity:verbosity -> id -> (unit -> 'a Lwt.t) -> 'a Lwt.t
 
-  val aggregate_f : ?verbosity:verbosity -> string -> (unit -> 'a) -> 'a
+  val aggregate_f : ?verbosity:verbosity -> id -> (unit -> 'a) -> 'a
 
-  val aggregate_s :
-    ?verbosity:verbosity -> string -> (unit -> 'a Lwt.t) -> 'a Lwt.t
+  val aggregate_s : ?verbosity:verbosity -> id -> (unit -> 'a Lwt.t) -> 'a Lwt.t
 
-  val span_f : ?verbosity:verbosity -> string list -> (unit -> 'a) -> 'a
+  val span_f : ?verbosity:verbosity -> ids -> (unit -> 'a) -> 'a
 
-  val span_s :
-    ?verbosity:verbosity -> string list -> (unit -> 'a Lwt.t) -> 'a Lwt.t
+  val span_s : ?verbosity:verbosity -> ids -> (unit -> 'a Lwt.t) -> 'a Lwt.t
 end
 
 let wrap profiler =

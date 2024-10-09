@@ -28,22 +28,17 @@ open Profiler
 
 let time () = {wall = Unix.gettimeofday (); cpu = Sys.time ()}
 
-type stack_item = {
-  id : string;
-  time : time;
-  report : report;
-  verbosity : verbosity;
-}
+type stack_item = {id : id; time : time; report : report; verbosity : verbosity}
 
 type stack = Toplevel of report | Cons of stack_item * stack
 
-type scope = {id : string; verbosity : verbosity; time : time}
+type scope = {id : id; verbosity : verbosity; time : time}
 
 type state = {stack : stack; scopes : scope list; max_verbosity : verbosity}
 
 let empty max_verbosity =
   {
-    stack = Toplevel {aggregated = StringMap.empty; recorded = []};
+    stack = Toplevel {aggregated = IdMap.empty; recorded = []};
     scopes = [];
     max_verbosity;
   }
@@ -59,7 +54,7 @@ let record state verbosity id =
         ( {
             id;
             time = time ();
-            report = {recorded = []; aggregated = StringMap.empty};
+            report = {recorded = []; aggregated = IdMap.empty};
             verbosity;
           },
           state.stack )
@@ -87,7 +82,7 @@ let rec merge
   }
 
 and merge_maps amap bmap =
-  StringMap.merge
+  IdMap.merge
     (fun _ a b ->
       match (a, b) with
       | Some v, None | None, Some v -> Some v
@@ -97,14 +92,14 @@ and merge_maps amap bmap =
     bmap
 
 let rec filter_verbosity_to_aggregated verbosity aggregated =
-  StringMap.fold
+  IdMap.fold
     (fun id node acc ->
       let children = filter_verbosity_to_aggregated verbosity node.children in
       if node.node_verbosity <= verbosity then
-        StringMap.add id {node with children} acc
+        IdMap.add id {node with children} acc
       else merge_maps acc children)
     aggregated
-    StringMap.empty
+    IdMap.empty
 
 let rec aggregate_report {aggregated; recorded} =
   List.fold_left
@@ -113,7 +108,7 @@ let rec aggregate_report {aggregated; recorded} =
       let node =
         {count = 1; total = duration; node_verbosity = item_verbosity; children}
       in
-      StringMap.add id node acc)
+      IdMap.add id node acc)
     aggregated
     recorded
 
@@ -148,21 +143,21 @@ let inc state report =
   in
   {state with stack}
 
-let span state verbosity d ids =
+let span state verbosity d ((ids, metadata) : string list * metadata) =
   let tids =
     List.rev_append
       (List.map (fun {id; _} -> (id, zero_time)) state.scopes)
-      (List.map (fun id -> (id, d)) ids)
+      (List.map (fun id -> ((id, metadata), d)) ids)
   in
   match ids with
   | [] -> (* Shhh, everything will be alright. *) state
   | _ :: _ ->
       let rec build_node = function
-        | [] -> StringMap.empty
+        | [] -> IdMap.empty
         | (id, d) :: tids ->
             let children = build_node tids in
             let count, total = if tids = [] then (1, d) else (0, zero_time) in
-            StringMap.singleton
+            IdMap.singleton
               id
               {count; total; children; node_verbosity = verbosity}
       in
@@ -176,13 +171,11 @@ let stop_aggregate state verbosity d id scopes =
     List.rev ((id, d) :: s_scopes)
   in
   let rec build_node = function
-    | [] -> StringMap.empty
+    | [] -> IdMap.empty
     | (id, d) :: tids ->
         let children = build_node tids in
         let count, total = if tids = [] then (1, d) else (0, zero_time) in
-        StringMap.singleton
-          id
-          {count; total; children; node_verbosity = verbosity}
+        IdMap.singleton id {count; total; children; node_verbosity = verbosity}
   in
   inc state {recorded = []; aggregated = build_node tids}
 
@@ -243,7 +236,19 @@ let pp_delta_t ppf t =
   if s <> 0 || m <> 0 || h <> 0 then Format.fprintf ppf "%ds" s ;
   Format.fprintf ppf "%d.%03dms" ms mus
 
-let pp_line ?toplevel_timestamp nindent ppf id n t t0 =
+let pp_line ?toplevel_timestamp nindent ppf (id, metadata) n t t0 =
+  let id =
+    match metadata with
+    | [] -> (* format: id *) id
+    | _ ->
+        (* format: id(k1=v1;k2=v2) *)
+        let pp_sep fmt () = Format.pp_print_char fmt ';' in
+        let pp_kv fmt (k, v) = Format.fprintf fmt "%s=%s" k v in
+        let pp_metadata fmt metadata =
+          Format.pp_print_list ~pp_sep pp_kv fmt metadata
+        in
+        Format.asprintf "%s(%a)" id pp_metadata metadata
+  in
   let indent = Stdlib.List.init nindent (fun _ -> "  ") in
   let () =
     Option.iter
@@ -278,7 +283,7 @@ let pp_line ?toplevel_timestamp nindent ppf id n t t0 =
   | Some t0 -> Format.fprintf ppf " +%a@," pp_delta_t t0.wall
 
 let rec pp_report ?(toplevel_call = true) t0 nident ppf {aggregated; recorded} =
-  StringMap.iter
+  IdMap.iter
     (fun id {count = n; total = Span d; children; node_verbosity = _} ->
       pp_line nident ppf id n d None ;
       pp_report
@@ -337,7 +342,7 @@ struct
   let report t =
     match (P.get_state t).stack with
     | Toplevel {aggregated; recorded}
-      when StringMap.cardinal aggregated > 0 || recorded <> [] ->
+      when IdMap.cardinal aggregated > 0 || recorded <> [] ->
         P.set_state t @@ empty (P.get_state t).max_verbosity ;
         let report = {aggregated; recorded = List.rev recorded} in
         Some (filter_verbosity (P.get_state t).max_verbosity report)

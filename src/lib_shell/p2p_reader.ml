@@ -520,7 +520,7 @@ let rec worker_loop state =
 
 let run ~register ~unregister p2p disk protocol_db active_chains gid conn =
   if not !profiler_init then (
-    Profiler.record "start" ;
+    () [@profiler.record "start"] ;
     profiler_init := true) ;
   let canceler = Lwt_canceler.create () in
   let state =

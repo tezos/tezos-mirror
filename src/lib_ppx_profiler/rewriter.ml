@@ -381,20 +381,32 @@ end = struct
     let Ppxlib.{txt; _}, _ = field in
     txt = Ppxlib.Lident string
 
-  let extract_field_from_record loc record string =
+  let extract_field_from_record record string =
     match List.find (fun field -> exists_field field string) record with
+    | field -> Some field
+    | exception Not_found -> None
+
+  (** [extract_enum_from_record _ record field] checks that [field] exists
+      and that the associated value is an enum.
+      If [field] is not present, returns [None] *)
+  let extract_enum_from_record loc record string =
+    Option.bind (extract_field_from_record record string) @@ function
     | _, Ppxlib.{pexp_desc = Pexp_construct ({txt = Lident ident; _}, None); _}
       ->
         Some ident
     | field -> Error.error loc Error.(Improper_field field)
-    | exception Not_found -> None
 
   let extract_from_record loc record =
-    let verbosity = extract_field_from_record loc record "verbosity" in
+    let verbosity = extract_enum_from_record loc record "verbosity" in
     let profiler_module =
-      extract_field_from_record loc record "profiler_module"
+      extract_enum_from_record loc record "profiler_module"
     in
-    (verbosity, profiler_module)
+    let metadata =
+      (* Metadata can be any valid expression so we return the
+         expression associated to it as is *)
+      Option.map snd (extract_field_from_record record "metadata")
+    in
+    (verbosity, profiler_module, metadata)
 
   let extract_key_from_payload loc payload =
     match payload with
@@ -411,14 +423,17 @@ end = struct
               }]];
         ] ->
         (* [@ppx {<other infos>} ...] *)
-        let verbosity, profiler_module = extract_from_record loc record in
-        (match (verbosity, profiler_module) with
-        | None, None -> Error.error loc Error.(Improper_record record)
+        let verbosity, profiler_module, metadata =
+          extract_from_record loc record
+        in
+        (match (verbosity, profiler_module, metadata) with
+        | None, None, None -> Error.error loc Error.(Improper_record record)
         | _ -> ()) ;
         Key.
           {
             verbosity;
             profiler_module;
+            metadata;
             content = extract_content_from_structure loc structure;
           }
     | Ppxlib.PStr [[%stri [%e? structure]]] ->
@@ -427,11 +442,18 @@ end = struct
           {
             verbosity = None;
             profiler_module = None;
+            metadata = None;
             content = extract_content_from_structure loc structure;
           }
     | Ppxlib.PStr [] ->
         (* [@ppx] *)
-        Key.{verbosity = None; profiler_module = None; content = Key.Empty}
+        Key.
+          {
+            verbosity = None;
+            profiler_module = None;
+            metadata = None;
+            content = Key.Empty;
+          }
     | _ -> Error.error loc Invalid_payload
 
   let of_attribute ({Ppxlib.attr_payload; attr_loc; _} as attribute) =

@@ -53,12 +53,12 @@ let check_file_content file_path =
     Sys.remove file_path
 
 let noop profiler =
-  Profiler.record profiler "noop" ;
+  Profiler.record profiler ("noop", []) ;
   Profiler.stop profiler
 
 let sleep10ms profiler =
   let tag = "sleep10ms" in
-  Profiler.record profiler tag ;
+  Profiler.record profiler (tag, []) ;
   Log.info "%s" tag ;
   Unix.sleepf 0.01 ;
   noop profiler ;
@@ -66,20 +66,20 @@ let sleep10ms profiler =
 
 let sleep70ms profiler =
   let tag = "sleep70" in
-  Profiler.record profiler tag ;
+  Profiler.record profiler (tag, []) ;
   Log.info "%s" tag ;
   Unix.sleepf 0.07 ;
   Profiler.stop profiler
 
 let foo profiler =
-  Profiler.record profiler "foo" ;
+  Profiler.record profiler ("foo", []) ;
   sleep10ms profiler ;
   sleep70ms profiler ;
   sleep10ms profiler ;
   Profiler.stop profiler
 
 let bar profiler =
-  Profiler.record profiler "bar" ;
+  Profiler.record profiler ("bar", []) ;
   sleep70ms profiler ;
   sleep10ms profiler ;
   foo profiler ;
@@ -88,7 +88,7 @@ let bar profiler =
 
 let test70 profiler =
   Log.info "\nTEST: test 70\n" ;
-  Profiler.record profiler "test70" ;
+  Profiler.record profiler ("test70", []) ;
   bar profiler ;
   foo profiler ;
   Profiler.stop profiler
@@ -102,7 +102,10 @@ let sleep_until_next_second () =
 
 let slp tag profiler =
   let* () =
-    Profiler.record_s profiler ("slp " ^ tag) (fun () ->
+    Profiler.record_s
+      profiler
+      ("slp " ^ tag, [])
+      (fun () ->
         Log.info "sleep in %s" tag ;
         let* () = Lwt_unix.sleep 0.01 in
         Log.info "sleep done" ;
@@ -115,14 +118,18 @@ let sequences profiler =
   let b_seq = "b_seq" in
   let b_a_seq = "b_a_seq" in
   let b_b_seq = "b_b_seq" in
-  let* () = Profiler.record_s profiler a_seq (fun () -> slp a_seq profiler) in
   let* () =
-    Profiler.record_s profiler b_seq (fun () ->
+    Profiler.record_s profiler (a_seq, []) (fun () -> slp a_seq profiler)
+  in
+  let* () =
+    Profiler.record_s profiler (b_seq, []) (fun () ->
         let* () =
-          Profiler.record_s profiler b_a_seq (fun () -> slp b_a_seq profiler)
+          Profiler.record_s profiler (b_a_seq, []) (fun () ->
+              slp b_a_seq profiler)
         in
         let* () =
-          Profiler.record_s profiler b_b_seq (fun () -> slp b_b_seq profiler)
+          Profiler.record_s profiler (b_b_seq, []) (fun () ->
+              slp b_b_seq profiler)
         in
         slp b_seq profiler)
   in
@@ -136,32 +143,32 @@ let aggregates profiler =
   let a_c_aggr = "a_c_aggr" in
   let a_a_a_aggr = "a_a_a_aggr" in
   let* () =
-    Profiler.aggregate_s profiler a_aggr (fun () -> slp a_aggr profiler)
+    Profiler.aggregate_s profiler (a_aggr, []) (fun () -> slp a_aggr profiler)
   in
   let* () =
-    Profiler.aggregate_s profiler b_aggr (fun () -> slp b_aggr profiler)
+    Profiler.aggregate_s profiler (b_aggr, []) (fun () -> slp b_aggr profiler)
   in
   let* () =
-    Profiler.aggregate_s profiler a_aggr (fun () ->
+    Profiler.aggregate_s profiler (a_aggr, []) (fun () ->
         let* () =
-          Profiler.aggregate_s profiler a_a_aggr (fun () ->
+          Profiler.aggregate_s profiler (a_a_aggr, []) (fun () ->
               slp a_a_aggr profiler)
         in
         let* () =
-          Profiler.aggregate_s profiler a_b_aggr (fun () ->
+          Profiler.aggregate_s profiler (a_b_aggr, []) (fun () ->
               slp a_b_aggr profiler)
         in
         let* () =
-          Profiler.aggregate_s profiler a_c_aggr (fun () ->
+          Profiler.aggregate_s profiler (a_c_aggr, []) (fun () ->
               slp a_c_aggr profiler)
         in
         slp a_aggr profiler)
   in
   let* () =
-    Profiler.aggregate_s profiler a_aggr (fun () ->
+    Profiler.aggregate_s profiler (a_aggr, []) (fun () ->
         let* () =
-          Profiler.aggregate_s profiler a_a_aggr (fun () ->
-              Profiler.aggregate_s profiler a_a_a_aggr (fun () ->
+          Profiler.aggregate_s profiler (a_a_aggr, []) (fun () ->
+              Profiler.aggregate_s profiler (a_a_a_aggr, []) (fun () ->
                   slp a_a_a_aggr profiler))
         in
         slp a_aggr profiler)
@@ -175,10 +182,11 @@ let buggy_aggregates profiler =
   let bug_aggr_b_b = "bug_aggr_b_b" in
 
   let t1 =
-    Profiler.aggregate_s profiler bug_aggr_a (fun () -> slp bug_aggr_a profiler)
+    Profiler.aggregate_s profiler (bug_aggr_a, []) (fun () ->
+        slp bug_aggr_a profiler)
   in
   let t2 =
-    Profiler.aggregate_s profiler bug_aggr_b (fun () ->
+    Profiler.aggregate_s profiler (bug_aggr_b, []) (fun () ->
         let* () = slp bug_aggr_b_a profiler in
         slp bug_aggr_b_b profiler)
   in
@@ -193,14 +201,22 @@ let spans profiler =
   let inner12 = "inner1/2" in
   let inner21 = "inner2/1" in
   let inner22 = "inner2/2" in
-  let t1 = Profiler.span_s profiler [span1] (fun () -> slp span1 profiler) in
+  let t1 =
+    Profiler.span_s profiler ([span1], []) (fun () -> slp span1 profiler)
+  in
   let t2 =
-    Profiler.span_s profiler [span2; inner1] (fun () ->
+    Profiler.span_s
+      profiler
+      ([span2; inner1], [])
+      (fun () ->
         let* () = slp (span2 ^ ", " ^ inner11) profiler in
         slp (span2 ^ ", " ^ inner12) profiler)
   in
   let t3 =
-    Profiler.span_s profiler [span2; inner2] (fun () ->
+    Profiler.span_s
+      profiler
+      ([span2; inner2], [])
+      (fun () ->
         let* () = slp (span2 ^ ", " ^ inner21) profiler in
         slp (span2 ^ ", " ^ inner22) profiler)
   in
@@ -213,19 +229,27 @@ let sequences_with_mark_and_stamp profiler =
   let b_b_seq = "b_b_seq" in
   let mark = "mark" in
   let stamp = "stamp" in
-  let* () = Profiler.record_s profiler a_seq (fun () -> slp a_seq profiler) in
   let* () =
-    Profiler.record_s profiler b_seq (fun () ->
+    Profiler.record_s profiler (a_seq, []) (fun () -> slp a_seq profiler)
+  in
+  let* () =
+    Profiler.record_s profiler (b_seq, []) (fun () ->
         let* () =
-          Profiler.record_s profiler b_a_seq (fun () -> slp b_a_seq profiler)
+          Profiler.record_s profiler (b_a_seq, []) (fun () ->
+              slp b_a_seq profiler)
         in
-        let () = List.iter (fun _ -> Profiler.mark profiler [mark]) (1 -- 10) in
-        let () = Profiler.stamp profiler stamp in
+        let () =
+          List.iter (fun _ -> Profiler.mark profiler ([mark], [])) (1 -- 10)
+        in
+        let () = Profiler.stamp profiler (stamp, []) in
         let* () =
-          Profiler.record_s profiler b_b_seq (fun () -> slp b_b_seq profiler)
+          Profiler.record_s profiler (b_b_seq, []) (fun () ->
+              slp b_b_seq profiler)
         in
-        let () = List.iter (fun _ -> Profiler.mark profiler [mark]) (1 -- 10) in
-        let () = Profiler.stamp profiler stamp in
+        let () =
+          List.iter (fun _ -> Profiler.mark profiler ([mark], [])) (1 -- 10)
+        in
+        let () = Profiler.stamp profiler (stamp, []) in
         slp b_seq profiler)
   in
   return_unit
@@ -234,7 +258,7 @@ let test_profiler_actions profiler =
   Log.info "\nTEST: test_profiler_actions\n" ;
   let main () =
     let* () = sleep_until_next_second () in
-    Profiler.record_s profiler "main" (fun () ->
+    Profiler.record_s profiler ("main", []) (fun () ->
         let* () = sequences profiler in
         let* () = aggregates profiler in
         let* () = buggy_aggregates profiler in
