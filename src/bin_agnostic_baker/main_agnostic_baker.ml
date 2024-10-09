@@ -135,6 +135,7 @@ module Baker = struct
     protocol_hash : Protocol_hash.t;
     binary_path : string;
     process : Lwt_process.process_none;
+    ccid : Lwt_exit.clean_up_callback_id;
   }
 
   let baker_path ?(user_path = "./") proto_hash =
@@ -143,7 +144,7 @@ module Baker = struct
     in
     Format.sprintf "%soctez-baker-%s" user_path short_name
 
-  let shutdown {process; protocol_hash; _} =
+  let shutdown protocol_hash process =
     let open Lwt_syntax in
     let* () = Events.(emit stopping_baker) protocol_hash in
     process#terminate ;
@@ -170,13 +171,12 @@ module Baker = struct
         (binary_path, baker_args)
     in
     let*! () = Events.(emit baker_running) protocol_hash in
-    let t = {protocol_hash; binary_path; process} in
-    let _ccid =
+    let ccid =
       Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
-          let*! () = shutdown t in
+          let*! () = shutdown protocol_hash process in
           Lwt.return_unit)
     in
-    return t
+    return {protocol_hash; binary_path; process; ccid}
 end
 
 module RPC = struct
@@ -324,14 +324,53 @@ module Daemon = struct
     ignore (loop () : unit Lwt.t) ;
     return stream
 
-  let monitor_voting_periods ~node_addr head_stream =
+  let hot_swap_baker ~state ~next_protocol_hash =
     let open Lwt_result_syntax in
+    let next_proto_status =
+      Parameters.protocol_status (Protocol_hash.to_b58check next_protocol_hash)
+    in
+    let*! () =
+      Events.(emit protocol_encountered) (next_proto_status, next_protocol_hash)
+    in
+    let*! () =
+      match state.current_baker with
+      | None -> Lwt.return_unit (* Could be assert false*)
+      | Some b ->
+          let*! () = Baker.shutdown b.protocol_hash b.process in
+          let () = Lwt_exit.unregister_clean_up_callback b.ccid in
+          state.current_baker <- None ;
+          Lwt.return_unit
+    in
+    let* new_baker =
+      Baker.spawn_baker
+        next_protocol_hash
+        ~binaries_directory:state.binaries_directory
+        ~baker_args:state.baker_args
+    in
+    state.current_baker <- Some new_baker ;
+    return_unit
+
+  let monitor_voting_periods ~state head_stream =
+    let open Lwt_result_syntax in
+    let node_addr = state.node_endpoint in
     let rec loop () =
       let*! v = Lwt_stream.get head_stream in
       match v with
       | Some _tick ->
           let* period_kind, remaining = RPC.get_current_period ~node_addr in
           let*! () = Events.(emit period_status) (period_kind, remaining) in
+          let* next_protocol_hash = RPC.get_next_protocol_hash ~node_addr in
+          let current_protocol_hash =
+            match state.current_baker with
+            | None -> assert false
+            | Some v -> v.protocol_hash
+          in
+          let* () =
+            if
+              not (Protocol_hash.equal current_protocol_hash next_protocol_hash)
+            then hot_swap_baker ~state ~next_protocol_hash
+            else return_unit
+          in
           loop ()
       | None -> return_unit
     in
@@ -407,7 +446,7 @@ module Daemon = struct
     let* head_stream = monitor_heads ~node_addr in
     (* Monitoring voting periods through heads monitoring to avoid
        missing UAUs. *)
-    let* () = monitor_voting_periods ~node_addr head_stream in
+    let* () = monitor_voting_periods ~state head_stream in
     return_unit
 end
 
