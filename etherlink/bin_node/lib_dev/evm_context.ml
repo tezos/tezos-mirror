@@ -1217,7 +1217,7 @@ module State = struct
         block
     in
     let* messages = Store.Messages.find store block.header.inbox_witness in
-    let*? _level, messages =
+    let*? messages =
       Option.to_result
         ~none:[error_of_fmt "No messages found for block %a" Block_hash.pp hash]
         messages

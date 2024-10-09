@@ -147,7 +147,7 @@ module Messages : sig
     ?conn:Sqlite.conn ->
     _ t ->
     Merkelized_payload_hashes_hash.t ->
-    (int32 * string list) option tzresult Lwt.t
+    string list option tzresult Lwt.t
 end
 
 (** Storage for persisting outbox messages. *)
