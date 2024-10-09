@@ -39,7 +39,7 @@ type 'rpc service =
 let health :
     < meth : [`GET]
     ; input : unit
-    ; output : Types.Health.t
+    ; output : Health.t
     ; prefix : unit
     ; params : unit
     ; query : unit >
@@ -50,7 +50,7 @@ let health :
        the DAL node. Returns a health status indicating whether the DAL node \
        is 'Up', 'Down', or 'Degraded' based on the results of these checks."
     ~query:Tezos_rpc.Query.empty
-    ~output:Types.Health.encoding
+    ~output:Health.encoding
     Tezos_rpc.Path.(open_root / "health")
 
 let post_slot :
@@ -59,7 +59,7 @@ let post_slot :
     ; output : Cryptobox.commitment * Cryptobox.commitment_proof
     ; prefix : unit
     ; params : unit
-    ; query : < padding : char ; slot_index : Types.slot_index option > >
+    ; query : < padding : char ; slot_index : slot_index option > >
     service =
   Tezos_rpc.Service.post_service
     ~description:
@@ -70,7 +70,7 @@ let post_slot :
        the character provided as padding query parameter (defaults to \\000). \
        If the slot_index query parameter is provided, the DAL node checks that \
        its profile allows to publish data on the given slot index."
-    ~query:Types.slot_query
+    ~query:slot_query
       (* With [Data_encoding.string], the body of the HTTP request contains
          two length prefixes: one for the full body, and one for the string.
          Using [Variable.string] instead fixes this. *)
@@ -102,7 +102,7 @@ let get_slot_content :
     ; input : unit
     ; output : Cryptobox.slot
     ; prefix : unit
-    ; params : (unit * Types.level) * Types.slot_index
+    ; params : (unit * level) * slot_index
     ; query : unit >
     service =
   Tezos_rpc.Service.get_service
@@ -118,7 +118,7 @@ let get_slot_pages :
     ; input : unit
     ; output : Cryptobox.page list
     ; prefix : unit
-    ; params : (unit * Types.level) * Types.slot_index
+    ; params : (unit * level) * slot_index
     ; query : unit >
     service =
   Tezos_rpc.Service.get_service
@@ -134,7 +134,7 @@ let get_slot_page_proof :
     ; input : unit
     ; output : Cryptobox.page_proof
     ; prefix : unit
-    ; params : ((unit * Types.level) * Types.slot_index) * Types.page_index
+    ; params : ((unit * level) * slot_index) * page_index
     ; query : unit >
     service =
   Tezos_rpc.Service.get_service
@@ -208,7 +208,7 @@ let get_profiles :
   Tezos_rpc.Service.get_service
     ~description:"Return the list of current profiles tracked by the DAL node."
     ~query:Tezos_rpc.Query.empty
-    ~output:Types.profile_encoding
+    ~output:profile_encoding
     Tezos_rpc.Path.(open_root / "profiles")
 
 let get_assigned_shard_indices :
@@ -255,7 +255,7 @@ let get_slot_shard :
     ; input : unit
     ; output : Cryptobox.shard
     ; prefix : unit
-    ; params : ((unit * Types.level) * Types.slot_index) * int
+    ; params : ((unit * level) * slot_index) * int
     ; query : unit >
     service =
   Tezos_rpc.Service.get_service
@@ -269,7 +269,7 @@ let get_slot_shard :
 let version :
     < meth : [`GET]
     ; input : unit
-    ; output : Types.Version.t
+    ; output : Version.t
     ; prefix : unit
     ; params : unit
     ; query : unit >
@@ -277,7 +277,7 @@ let version :
   Tezos_rpc.Service.get_service
     ~description:"version"
     ~query:Tezos_rpc.Query.empty
-    ~output:Types.Version.encoding
+    ~output:Version.encoding
     Tezos_rpc.Path.(open_root / "version")
 
 module P2P = struct
@@ -433,7 +433,7 @@ module P2P = struct
     let get_peer_info :
         < meth : [`GET]
         ; input : unit
-        ; output : Types.P2P.Peer.Info.t
+        ; output : P2P.Peer.Info.t
         ; prefix : unit
         ; params : unit * P2p_peer.Id.t
         ; query : unit >
@@ -441,13 +441,13 @@ module P2P = struct
       Tezos_rpc.Service.get_service
         ~description:"Get info of the requested peer"
         ~query:Tezos_rpc.Query.empty
-        ~output:Data_encoding.(obj1 (req "info" Types.P2P.Peer.Info.encoding))
+        ~output:Data_encoding.(obj1 (req "info" P2P.Peer.Info.encoding))
         (open_root / "by-id" /: P2p_peer.Id.rpc_arg)
 
     let patch_peer :
         < meth : [`PATCH]
         ; input : [`Ban | `Trust | `Open] option
-        ; output : Types.P2P.Peer.Info.t
+        ; output : P2P.Peer.Info.t
         ; prefix : unit
         ; params : unit * P2p_peer.Id.t
         ; query : unit >
@@ -470,7 +470,7 @@ module P2P = struct
                  "acl"
                  (string_enum
                     [("ban", `Ban); ("trust", `Trust); ("open", `Open)])))
-        ~output:Data_encoding.(obj1 (req "info" Types.P2P.Peer.Info.encoding))
+        ~output:Data_encoding.(obj1 (req "info" P2P.Peer.Info.encoding))
         (open_root / "by-id" /: P2p_peer.Id.rpc_arg)
   end
 
@@ -494,7 +494,7 @@ module P2P = struct
     let get_topics_peers :
         < meth : [`GET]
         ; input : unit
-        ; output : (Types.Topic.t * Types.Peer.t list) list
+        ; output : (Topic.t * Peer.t list) list
         ; prefix : unit
         ; params : unit
         ; query : < all : bool > >
@@ -510,14 +510,14 @@ module P2P = struct
           Data_encoding.(
             list
               (obj2
-                 (req "topic" Types.Topic.encoding)
-                 (req "peers" (list Types.Peer.encoding))))
+                 (req "topic" Topic.encoding)
+                 (req "peers" (list Peer.encoding))))
         (open_root / "topics" / "peers")
 
     let get_slot_indexes_peers :
         < meth : [`GET]
         ; input : unit
-        ; output : (Types.slot_index * Types.Peer.t list) list
+        ; output : (slot_index * Peer.t list) list
         ; prefix : unit
         ; params : unit
         ; query : < all : bool > >
@@ -533,15 +533,13 @@ module P2P = struct
         ~output:
           Data_encoding.(
             list
-              (obj2
-                 (req "slot_index" uint8)
-                 (req "peers" (list Types.Peer.encoding))))
+              (obj2 (req "slot_index" uint8) (req "peers" (list Peer.encoding))))
         (open_root / "slot_indexes" / "peers")
 
     let get_pkhs_peers :
         < meth : [`GET]
         ; input : unit
-        ; output : (Signature.public_key_hash * Types.Peer.t list) list
+        ; output : (Signature.public_key_hash * Peer.t list) list
         ; prefix : unit
         ; params : unit
         ; query : < all : bool > >
@@ -558,7 +556,7 @@ module P2P = struct
             list
               (obj2
                  (req "pkh" Signature.Public_key_hash.encoding)
-                 (req "peers" (list Types.Peer.encoding))))
+                 (req "peers" (list Peer.encoding))))
         (open_root / "pkhs" / "peers")
 
     let get_connections :
@@ -623,7 +621,7 @@ module P2P = struct
     let get_message_cache :
         < meth : [`GET]
         ; input : unit
-        ; output : (int64 * (Types.Topic.t * int) list) list
+        ; output : (int64 * (Topic.t * int) list) list
         ; prefix : unit
         ; params : unit
         ; query : unit >
@@ -641,9 +639,7 @@ module P2P = struct
                  (req
                     "per_topic_cache_size"
                     (list
-                       (obj2
-                          (req "topic" Types.Topic.encoding)
-                          (req "num_ids" int31))))))
+                       (obj2 (req "topic" Topic.encoding) (req "num_ids" int31))))))
         (open_root / "message_cache")
   end
 end
