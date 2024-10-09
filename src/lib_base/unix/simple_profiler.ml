@@ -345,8 +345,13 @@ let make_driver ~file_format =
 
     let kind = Auto_write_to_file
 
-    let create (fn, lod) =
-      {profiler_state = empty lod; time = time (); output = Closed fn}
+    let create (file_name, lod) =
+      let file_name =
+        match file_format with
+        | Plain_text -> file_name ^ ".txt"
+        | Json -> file_name ^ ".js"
+      in
+      {profiler_state = empty lod; time = time (); output = Closed file_name}
 
     let time _ = time ()
 
@@ -373,7 +378,8 @@ let make_driver ~file_format =
           let encoded_report =
             Data_encoding.Json.construct Profiler.report_encoding report
           in
-          Data_encoding.Json.pp formatter encoded_report
+          Data_encoding.Json.pp formatter encoded_report ;
+          Format.pp_print_newline formatter ()
 
     let may_write ({time = t0; output; _} as state) =
       match report state with
@@ -412,8 +418,9 @@ let make_driver ~file_format =
 
     let close ({output; _} as state) =
       match output with
-      | Open (fn, fp, _) ->
+      | Open (fn, fp, ppf) ->
           close_out fp ;
+          Format.pp_print_newline ppf () ;
           state.output <- Closed fn
       | Closed _ -> ()
   end : DRIVER

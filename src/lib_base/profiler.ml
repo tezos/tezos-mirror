@@ -432,7 +432,7 @@ let wrap profiler =
   end in
   (module Wrapped : GLOBAL_PROFILER)
 
-let profiler_file_suffix = "_profiling.txt"
+let profiler_file_suffix = "_profiling"
 
 let parse_profiling_vars (default_dir : string) =
   let max_lod =
