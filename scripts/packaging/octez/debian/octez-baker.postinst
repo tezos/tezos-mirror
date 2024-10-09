@@ -38,13 +38,16 @@ configure)
     mkdir -p /var/tezos/.tezos-client
     chown tezos:tezos /var/tezos/.tezos-client
   else
+    echo "Upgrading octez-baker from version $2 ( postinst )"
     # the configure script is called with the version of the old
     # package in case of upgrade. We display a message to the user
-    # in this case
+    # in this case. See octez-node.postinst for a detailed explanation.
     case "$2" in
-    0.0*)
-      echo "Upgrading Octez baker from version $2"
-      echo "Setting defaults /etc/default/octez-baker-*"
+    1:*)
+      : noop
+      ;;
+    *)
+      echo "Setting new defaults in /etc/default/octez-baker-*"
 
       db_get octez-baker/liquidity-vote
       echo "LQVOTE=${RET}" > /etc/default/octez-baker-active
@@ -57,11 +60,6 @@ configure)
       db_input high octez-baker/upgrade_note_current || true
       #shellcheck disable=SC2119
       db_go || true
-
-      ;;
-    *)
-      echo "Upgrading octez-baker from version $2"
-      echo "DO NOTHING"
       ;;
     esac
   fi
