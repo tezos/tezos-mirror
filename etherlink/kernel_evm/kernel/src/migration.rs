@@ -12,6 +12,9 @@ use crate::storage::ENABLE_FA_BRIDGE;
 use crate::storage::{
     read_chain_id, read_storage_version, store_storage_version, StorageVersion,
 };
+use evm_execution::account_storage::account_path;
+use evm_execution::account_storage::init_account_storage;
+use evm_execution::precompiles::SYSTEM_ACCOUNT_ADDRESS;
 use evm_execution::NATIVE_TOKEN_TICKETER_PATH;
 use primitive_types::U256;
 use tezos_evm_logging::{log, Level::*};
@@ -120,6 +123,17 @@ fn migrate_to<Host: Runtime>(
                 let owned_path = OwnedPath::try_from(path)?;
                 host.store_delete(&owned_path)?;
             }
+            Ok(MigrationStatus::Done)
+        }
+        StorageVersion::V19 => {
+            // We do not support EIP161 yet. If we start doing it, we
+            // might clean the zero account by accident, and the account
+            // must always exist as the ticket table is stored in the
+            // zero address.
+            let account_storage = init_account_storage()?;
+            let account_path = account_path(&SYSTEM_ACCOUNT_ADDRESS)?;
+            let mut account = account_storage.get_or_create(host, &account_path)?;
+            account.increment_nonce(host)?;
             Ok(MigrationStatus::Done)
         }
     }

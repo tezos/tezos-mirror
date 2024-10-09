@@ -36,6 +36,8 @@ Beta and Testnet, and allows users to deposit and withdraw FA 2.1 tokens.
   hash. (!14369)
 - Enable LTO (Link Time Optimization) during compilation to reduce tick consumption
   and improve execution speed. (!14933)
+- The nonce of the zero account (0x00..00) is incremented, to avoid being cleaned
+  by EIP-161 empty account rule. (!15197)
 
 ### Bug fixes
 
