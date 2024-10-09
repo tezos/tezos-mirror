@@ -23,7 +23,10 @@ module Make (P : External_process_parameters.S) : sig
   (** [send_request p req] sends the request [req] to the external process [p],
       waits for the answer from the process and returns the result.  *)
   val send_request :
-    t -> 'a P.request -> ('a * Profiler.report option) tzresult Lwt.t
+    t ->
+    'a P.request ->
+    ('a * (Profiler.report option * Profiler.report option) option) tzresult
+    Lwt.t
 
   (** [reconfigure_event_logging p config] sends the request to the external
       process [p] to reconfigure the event logging system using the new

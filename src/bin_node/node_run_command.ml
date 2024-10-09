@@ -739,8 +739,16 @@ let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
         let profiler_maker =
           Tezos_shell.Profiler_directory.profiler_maker output_dir max_lod
         in
-        Shell_profiling.activate_all ~profiler_maker
-    | None, _ -> ()
+        Shell_profiling.activate_all ~profiler_maker ;
+        let context_instance =
+          Tezos_base.Profiler.instance
+            Tezos_base_unix.Simple_profiler.auto_write_to_txt_file
+            Filename.Infix.(output_dir // "context_profiling.txt", max_lod)
+        in
+        Tezos_protocol_environment.Environment_profiler.Context_ops_profiler
+        .plug
+          context_instance
+    | _ -> ()
   in
   let*! () =
     Lwt_list.iter_s (fun evt -> Internal_event.Simple.emit evt ()) cli_warnings

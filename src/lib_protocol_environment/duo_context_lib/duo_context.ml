@@ -7,6 +7,7 @@
 
 open Tezos_protocol_environment
 open Context
+module Profiler = Environment_profiler.Context_ops_profiler
 
 module C = struct
   include Context_wrapper.Context
@@ -22,12 +23,14 @@ let checkout : C.index -> Context_hash.t -> t option Lwt.t =
  fun index context_hash ->
   let open Lwt_syntax in
   let* irmin_context =
-    Tezos_context.Context.checkout index.C.irmin_index context_hash
+    (Tezos_context.Context.checkout
+       index.C.irmin_index
+       context_hash [@profiler.span_s ["irmin"; "checkout"]])
   in
   let+ brassaia_context =
-    Tezos_context_brassaia.Tezos_context.Context.checkout
-      index.brassaia_index
-      context_hash
+    (Tezos_context_brassaia.Tezos_context.Context.checkout
+       index.brassaia_index
+       context_hash [@profiler.span_s ["brassaia"; "checkout"]])
   in
   match (irmin_context, brassaia_context) with
   | Some irmin_context, Some brassaia_context ->
@@ -44,12 +47,14 @@ let checkout_exn : C.index -> Context_hash.t -> t Lwt.t =
  fun index context_hash ->
   let open Lwt_syntax in
   let* irmin_context =
-    Tezos_context.Context.checkout_exn index.C.irmin_index context_hash
+    (Tezos_context.Context.checkout_exn
+       index.C.irmin_index
+       context_hash [@profiler.span_s ["irmin"; "checkout_exn"]])
   in
   let+ brassaia_context =
-    Tezos_context_brassaia.Tezos_context.Context.checkout_exn
-      index.C.brassaia_index
-      context_hash
+    (Tezos_context_brassaia.Tezos_context.Context.checkout_exn
+       index.C.brassaia_index
+       context_hash [@profiler.span_s ["brassaia"; "checkout_exn"]])
   in
   Context.make
     ~ops

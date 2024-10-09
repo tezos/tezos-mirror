@@ -29,7 +29,11 @@ module type EXTERNAL_PROCESSING = sig
     parameters ->
     state ->
     'response request ->
-    [`Continue of ('response * Profiler.report option) tzresult * state | `Stop]
+    [ `Continue of
+      ('response * (Profiler.report option * Profiler.report option) option)
+      tzresult
+      * state
+    | `Stop ]
     Lwt.t
 end
 
