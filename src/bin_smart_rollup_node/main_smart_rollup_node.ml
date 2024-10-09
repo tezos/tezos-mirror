@@ -451,6 +451,32 @@ let patch_durable_storage =
            As a reminder, patching the state is an advanced and unsafe \
            procedure.")
 
+let migrate_store =
+  let open Tezos_clic in
+  command
+    ~group
+    ~desc:"Migrate the rollup node store to the latest supported version."
+    (args1 data_dir_arg)
+    (prefixes ["migrate"; "store"] @@ stop)
+    (fun data_dir _cctxt ->
+      let open Lwt_result_syntax in
+      let* metadata = Metadata.read_metadata_file ~dir:data_dir in
+      let*? metadata =
+        match metadata with
+        | None ->
+            error_with
+              "No metadata for the rollup node in %s. Is the rollup node \
+               initialized?"
+              data_dir
+        | Some m -> Ok m
+      in
+      let* _fd = Node_context_loader.lock ~data_dir in
+      let* () =
+        let open Octez_smart_rollup_node_store in
+        Store_migration.maybe_run_migration metadata Store.version ~data_dir
+      in
+      return_unit)
+
 let export_snapshot
     ( data_dir,
       dest,
@@ -620,6 +646,7 @@ let sc_rollup_commands () =
     dump_metrics;
     dump_durable_storage;
     patch_durable_storage;
+    migrate_store;
     export_snapshot_auto_name;
     export_snapshot_named;
     import_snapshot;
