@@ -26,6 +26,9 @@ module type NODE = sig
 
   (** Return the attributes to assign to a node in a [.dot] file. *)
   val attributes : t -> (string * string) list
+
+  (** Return which cluster to assign the node to in a [.dot] file. *)
+  val cluster : t -> string option
 end
 
 module type S = sig
