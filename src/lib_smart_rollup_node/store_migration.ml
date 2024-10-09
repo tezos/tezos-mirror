@@ -136,10 +136,34 @@ struct
          Store_version.pp
          S_dest.version
 
+  let migrate_between_stores metadata ~data_dir ~dest_data_dir source_store
+      dest_store =
+    let open Lwt_result_syntax in
+    let* () =
+      S_from.iter_l2_blocks
+        ~progress:
+          (Format.asprintf
+             "Migrating store from %a to %a"
+             Store_version.pp
+             S_from.version
+             Store_version.pp
+             S_dest.version)
+        metadata
+        source_store
+        (Actions.migrate_block_action source_store dest_store)
+    in
+    let* () =
+      Actions.final_actions
+        ~data_dir
+        ~tmp_dir:dest_data_dir
+        source_store
+        dest_store
+    in
+    Store_version.write_version_file ~dir:(storage_dir data_dir) S_dest.version
+
   let migrate metadata ~data_dir =
     let open Lwt_result_syntax in
     let* source_store = S_from.load Read_only ~data_dir in
-
     let tmp_dir = tmp_dir ~data_dir in
     let*! tmp_dir_exists = Lwt_utils_unix.dir_exists tmp_dir in
     let*? () =
@@ -165,25 +189,15 @@ struct
     in
     let run_migration () =
       let* () =
-        S_from.iter_l2_blocks
-          ~progress:
-            (Format.asprintf
-               "Migrating store from %a to %a"
-               Store_version.pp
-               S_from.version
-               Store_version.pp
-               S_dest.version)
+        migrate_between_stores
           metadata
+          ~data_dir
+          ~dest_data_dir:tmp_dir
           source_store
-          (Actions.migrate_block_action source_store dest_store)
-      in
-      let* () =
-        Actions.final_actions ~data_dir ~tmp_dir source_store dest_store
+          dest_store
       in
       let*! () = Lwt_utils_unix.remove_dir tmp_dir in
-      Store_version.write_version_file
-        ~dir:(storage_dir data_dir)
-        S_dest.version
+      return_unit
     in
     Lwt.finalize run_migration cleanup
 
