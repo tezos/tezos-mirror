@@ -3757,7 +3757,7 @@ let check_opam_with_test_consistency () =
 
 let usage_msg = "Usage: " ^ Sys.executable_name ^ " [OPTIONS]"
 
-let packages_dir, release, remove_extra_files, manifezt =
+let packages_dir, release, remove_extra_files, manifezt, dep_graph =
   let packages_dir = ref "packages" in
   let url = ref "" in
   let sha256 = ref "" in
@@ -3765,6 +3765,7 @@ let packages_dir, release, remove_extra_files, manifezt =
   let remove_extra_files = ref false in
   let version = ref "" in
   let manifezt = ref false in
+  let dep_graph = ref None in
   let anonymous_args = ref [] in
   let anon_fun arg = anonymous_args := arg :: !anonymous_args in
   let spec =
@@ -3788,6 +3789,10 @@ let packages_dir, release, remove_extra_files, manifezt =
           " Expect a list of modified files on the command-line. Output a TSL \
            expression to select Tezt tests that are impacted by those changes, \
            then exit without generating any file." );
+        ( "--dep-graph",
+          Arg.String (fun file -> dep_graph := Some file),
+          "<FILE> Output the dune library dependency graph in FILE using dot \
+           syntax." );
         ( "--",
           Arg.Rest anon_fun,
           " Assume the remaining arguments are anonymous arguments." );
@@ -3825,7 +3830,7 @@ let packages_dir, release, remove_extra_files, manifezt =
         exit 1
     | true, files -> Some files
   in
-  (!packages_dir, release, !remove_extra_files, manifezt)
+  (!packages_dir, release, !remove_extra_files, manifezt, !dep_graph)
 
 let generate_opam_ci_input opam_release_graph =
   (* We only need to test released packages, since those are the only one
@@ -4346,6 +4351,29 @@ let precheck () =
   check_opam_with_test_consistency () ;
   if !has_error then exit 1
 
+let generate_dependency_graph filename =
+  let module Node = struct
+    type t = Target.internal
+
+    let id (node : t) =
+      node.path ^ "\n" ^ Target.name_for_errors (Internal node)
+
+    let compare a b = String.compare (id a) (id b)
+  end in
+  let module G = Dgraph.Make (Node) in
+  (* Make the direct dependency graph. *)
+  let graph = ref G.empty in
+  ( Target.iter_internal_by_path @@ fun _ internals ->
+    Fun.flip List.iter internals @@ fun internal ->
+    Fun.flip List.iter (Target.all_internal_deps internal) @@ fun dep ->
+    match Target.get_internal dep with
+    | None ->
+        (* Not an internal dependency, exclude from the graph. *)
+        ()
+    | Some internal_dep -> graph := G.add internal internal_dep !graph ) ;
+  let graph = !graph in
+  write_raw filename @@ fun fmt -> G.output_dot_file fmt graph
+
 let generate ~make_tezt_exe ~tezt_exe_deps ~default_profile ~add_to_meta_package
     =
   Printexc.record_backtrace true ;
@@ -4357,6 +4385,7 @@ let generate ~make_tezt_exe ~tezt_exe_deps ~default_profile ~add_to_meta_package
     | Some changes ->
         list_tests_to_run_after_changes ~tezt_exe ~tezt_exe_deps changes ;
         exit 0) ;
+    Option.iter generate_dependency_graph dep_graph ;
     Target.can_register := false ;
     generate_dune_files () ;
     generate_opam_files () ;
