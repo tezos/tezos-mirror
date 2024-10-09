@@ -6,6 +6,7 @@
  (public_name octez-testnet-scenarios)
  (package octez-testnet-scenarios)
  (libraries
+  bls12-381.archive
   octez-libs.test-helpers
   octez-libs.tezt-wrapper
   tezt-tezos

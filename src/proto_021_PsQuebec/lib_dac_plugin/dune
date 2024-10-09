@@ -14,7 +14,11 @@
   octez-protocol-021-PsQuebec-libs.client
   tezos-protocol-021-PsQuebec.embedded-protocol
   tezos-protocol-021-PsQuebec.protocol)
- (inline_tests (flags -verbose) (modes native))
+ (inline_tests
+  (flags -verbose)
+  (modes native)
+  (executable (link_flags -linkall -cclib -lblst))
+  (libraries bls12-381.archive))
  (preprocess (pps ppx_expect))
  (library_flags (:standard -linkall))
  (flags

@@ -16,6 +16,7 @@ depends: [
   "tezt-tezos" { = version }
   "jingoo"
   "dmap"
+  "bls12-381" { = version }
   "yaml" { >= "3.1.0" }
 ]
 build: [

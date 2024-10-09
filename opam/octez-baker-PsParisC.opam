@@ -10,6 +10,7 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
+  "bls12-381" { = version }
   "octez-libs" { = version }
   "tezos-protocol-020-PsParisC" { = version }
   "octez-protocol-020-PsParisC-libs" { = version }

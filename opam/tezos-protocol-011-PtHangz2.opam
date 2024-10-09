@@ -13,6 +13,7 @@ depends: [
   "octez-proto-libs" { = version }
   "octez-shell-libs" { = version }
   "octez-libs" { = version }
+  "bls12-381" { = version }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

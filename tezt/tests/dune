@@ -8,6 +8,7 @@
   octez-libs.test-helpers
   octez-libs.tezt-wrapper
   str
+  bls12-381.archive
   bls12-381
   tezt-tezos
   tezt_riscv_sandbox

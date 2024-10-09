@@ -864,6 +864,8 @@ type 'a maker =
   ?implements:target ->
   ?inline_tests:inline_tests ->
   ?inline_tests_deps:Dune.s_expr list ->
+  ?inline_tests_link_flags:string list ->
+  ?inline_tests_libraries:target list ->
   ?wrapped:bool ->
   ?documentation:Dune.s_expr ->
   ?link_flags:Dune.s_expr list ->

@@ -4,6 +4,7 @@
 (executable
  (name afl)
  (libraries
+  bls12-381.archive
   octez-libs.plompiler
   octez-libs.plonk
   bls12-381)
@@ -12,6 +13,7 @@
 (executable
  (name main)
  (libraries
+  bls12-381.archive
   octez-libs.plonk.plonk-test)
  (modules
   bench_poseidon

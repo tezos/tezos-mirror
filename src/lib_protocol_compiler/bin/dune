@@ -5,6 +5,7 @@
  (name cmis_of_cma)
  (instrumentation (backend bisect_ppx))
  (libraries
+  bls12-381.archive
   compiler-libs.common)
  (modules cmis_of_cma))
 
@@ -15,6 +16,7 @@
  (instrumentation (backend bisect_ppx))
  (modes native)
  (libraries
+  bls12-381.archive
   octez-protocol-compiler.native
   octez-version.value)
  (link_flags
@@ -29,6 +31,7 @@
  (package octez-protocol-compiler)
  (instrumentation (backend bisect_ppx))
  (libraries
+  bls12-381.archive
   octez-libs.base
   octez-libs.stdlib-unix
   octez-protocol-compiler)
@@ -49,6 +52,7 @@
  (instrumentation (backend bisect_ppx))
  (modes native)
  (libraries
+  bls12-381.archive
   octez-libs.base
   octez-libs.base.unix
   octez-libs.stdlib-unix)

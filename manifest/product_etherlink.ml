@@ -19,6 +19,8 @@ include Product (struct
   let source = ["etherlink"; "src"]
 end)
 
+let tezt ?(deps = []) = tezt ~deps:(bls12_381_archive :: deps)
+
 let tezt_etherlink =
   private_lib
     "tezt_etherlink"
@@ -45,6 +47,7 @@ let _tezt_tests_cloud =
     ~bisect_ppx:No
     ~deps:
       [
+        bls12_381_archive;
         octez_test_helpers |> open_;
         tezt_wrapper |> open_ |> open_ ~m:"Base";
         tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
@@ -297,6 +300,7 @@ let _evm_node =
     ~with_macos_security_framework:true
     ~deps:
       [
+        bls12_381_archive;
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix;
         octez_stdlib_unix |> open_;
@@ -322,6 +326,7 @@ let _tezt_testnet_scenarios =
     ~static:false
     ~deps:
       [
+        bls12_381_archive;
         octez_test_helpers |> open_;
         tezt_wrapper |> open_ |> open_ ~m:"Base";
         tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";

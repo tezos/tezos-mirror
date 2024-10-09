@@ -20,7 +20,11 @@
   octez-libs.rpc
   octez-protocol-alpha-libs.smart-rollup
   uri)
- (inline_tests (flags -verbose) (modes native))
+ (inline_tests
+  (flags -verbose)
+  (modes native)
+  (executable (link_flags -linkall -cclib -lblst))
+  (libraries bls12-381.archive))
  (preprocess (pps ppx_expect))
  (library_flags (:standard -linkall))
  (flags

@@ -16,6 +16,7 @@ depends: [
   "ringo" { >= "1.1.0" }
   "aches" { >= "1.1.0" }
   "tezt" { >= "4.1.0" & < "5.0.0" }
+  "bls12-381" { with-test & = version }
   "tezt-tezos" { with-test & = version }
   "octez-alcotezt" { with-test & = version }
   "astring" {with-test}

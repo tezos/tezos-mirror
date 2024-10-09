@@ -5,6 +5,7 @@
  (name main)
  (instrumentation (backend bisect_ppx))
  (libraries
+  bls12-381.archive
   octez-libs.plonk.aggregation
   octez-libs.plonk.plonk-test)
  (modules main test_polynomial_commitment))

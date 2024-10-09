@@ -52,6 +52,7 @@ let _teztale_server =
       ]
     ~deps:
       [
+        bls12_381_archive;
         aches;
         caqti_postgresql;
         caqti_sqlite;
@@ -163,6 +164,7 @@ let _teztale_archiver =
       ]
     ~deps:
       ([
+         bls12_381_archive;
          octez_base |> open_ ~m:"TzPervasives";
          octez_stdlib_unix |> open_;
          octez_shell_services |> open_;

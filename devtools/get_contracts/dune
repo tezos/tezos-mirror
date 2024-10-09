@@ -23,6 +23,7 @@
 (executable
  (name get_contracts)
  (libraries
+  bls12-381.archive
   octez-libs.micheline
   octez-libs.base
   get_contracts_lib)

@@ -4,6 +4,7 @@
 (executable
  (name main)
  (libraries
+  bls12-381.archive
   octez-libs.test-helpers
   octez-libs.tezt-wrapper
   tezt-tezos

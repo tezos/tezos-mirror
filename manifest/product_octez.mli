@@ -9,6 +9,8 @@
 
 val alcotezt : Manifest.target
 
+val bls12_381_archive : Manifest.target
+
 val bls12_381 : Manifest.target
 
 val lazy_containers : Manifest.target

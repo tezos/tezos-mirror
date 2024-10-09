@@ -7,6 +7,7 @@
  (package RPC-toy)
  (instrumentation (backend bisect_ppx))
  (libraries
+  bls12-381.archive
   octez-libs.stdlib-unix
   octez-libs.base
   octez-libs.cohttp-lwt-unix)

@@ -5,6 +5,7 @@
  (name main)
  (instrumentation (backend bisect_ppx))
  (libraries
+  bls12-381.archive
   octez-libs.epoxy-tx
   octez-libs.plonk.plonk-test
   octez-libs.aplonk))

@@ -10,7 +10,11 @@
   tezos-protocol-018-Proxford.protocol
   octez-injector
   octez-l2-libs.smart-rollup)
- (inline_tests (flags -verbose) (modes native))
+ (inline_tests
+  (flags -verbose)
+  (modes native)
+  (executable (link_flags -linkall -cclib -lblst))
+  (libraries bls12-381.archive))
  (preprocess (pps ppx_expect))
  (library_flags (:standard -linkall))
  (flags
