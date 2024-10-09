@@ -27,6 +27,8 @@ open Store_version
 
 type version_result = Version_known | Unintialized_version
 
+let storage_dir data_dir = Filename.concat data_dir "storage"
+
 let messages_store_location ~storage_dir =
   let open Filename.Infix in
   storage_dir // "messages"
@@ -180,7 +182,7 @@ struct
       in
       let*! () = Lwt_utils_unix.remove_dir tmp_dir in
       Store_version.write_version_file
-        ~dir:(Configuration.default_storage_dir data_dir)
+        ~dir:(storage_dir data_dir)
         S_dest.version
     in
     Lwt.finalize run_migration cleanup
@@ -194,7 +196,7 @@ module Wrap_old (S : Store_sig.S) : STORE with type 'a t = 'a S.t = struct
   let load mode ~data_dir =
     load
       mode
-      (Configuration.default_storage_dir data_dir)
+      (storage_dir data_dir)
       ~index_buffer_size:100
       ~l2_blocks_cache_size:1
 end
@@ -227,11 +229,10 @@ let migration_path ~from ~dest =
   in
   path [] from dest
 
-let maybe_run_migration metadata ~data_dir =
+let maybe_run_migration metadata last_version ~data_dir =
   let open Lwt_result_syntax in
-  let storage_dir = Configuration.default_storage_dir data_dir in
+  let storage_dir = storage_dir data_dir in
   let* current_version = version_of_store ~storage_dir in
-  let last_version = Store.version in
   match (current_version, last_version) with
   | None, _ ->
       (* Store not initialized, write last version *)
@@ -264,7 +265,7 @@ let maybe_run_migration metadata ~data_dir =
 module V1_migrations = struct
   let messages_store_location ~data_dir =
     let open Filename.Infix in
-    Configuration.default_storage_dir data_dir // "messages"
+    storage_dir data_dir // "messages"
 
   let convert_store_messages
       (messages, (block_hash, timestamp, number_of_messages)) =
@@ -297,12 +298,7 @@ module V1_migrations = struct
         Tezos_base.Time.(
           System.now () |> System.to_protocol |> Protocol.to_seconds)
       in
-      let author =
-        Format.asprintf
-          "Rollup node %a"
-          Tezos_version_parser.pp
-          Tezos_version_value.Current_git_info.octez_version
-      in
+      let author = "Rollup node" in
       let message = "Migration store from v0 to v1" in
       Irmin_store.Raw_irmin.Info.v ~author ~message date
     in
@@ -344,15 +340,15 @@ end
 module V2_migrations = struct
   let messages_store_location ~data_dir =
     let open Filename.Infix in
-    Configuration.default_storage_dir data_dir // "messages"
+    storage_dir data_dir // "messages"
 
   let commitments_store_location ~data_dir =
     let open Filename.Infix in
-    Configuration.default_storage_dir data_dir // "commitments"
+    storage_dir data_dir // "commitments"
 
   let inboxes_store_location ~data_dir =
     let open Filename.Infix in
-    Configuration.default_storage_dir data_dir // "inboxes"
+    storage_dir data_dir // "inboxes"
 
   let migrate_messages read_messages (v2_store : _ Store_v2.t)
       (l2_block : Sc_rollup_block.t) =
@@ -475,7 +471,7 @@ end
 module V3_migrations = struct
   let levels_store_location ~data_dir =
     let open Filename.Infix in
-    Configuration.default_storage_dir data_dir // "levels_to_hashes"
+    storage_dir data_dir // "levels_to_hashes"
 
   let recompute_level (v3_store : _ Store_v3.t) (l2_block : Sc_rollup_block.t) =
     Store_v3.Levels_to_hashes.add
@@ -507,7 +503,7 @@ end
 module V4_migrations = struct
   let messages_store_location ~data_dir =
     let open Filename.Infix in
-    Configuration.default_storage_dir data_dir // "messages"
+    storage_dir data_dir // "messages"
 
   let migrate_messages (v3_store : _ Store_v3.t) (v4_store : _ Store_v4.t)
       (l2_block : Sc_rollup_block.t) =
@@ -784,7 +780,8 @@ module V5_sqlite_migrations = struct
     let* () =
       match history_mode with
       | None -> return_unit
-      | Some m -> Store_v5.State.History_mode.set v5_store m
+      | Some Archive -> Store_v5.State.History_mode.set v5_store Archive
+      | Some Full -> Store_v5.State.History_mode.set v5_store Full
     in
     return_unit
 
@@ -793,9 +790,7 @@ module V5_sqlite_migrations = struct
     let* () = migrate_outbox_messages v4_store v5_store in
     let* () = migrate_protocols v4_store v5_store in
     let* () = migrate_rollup_node_state v4_store v5_store in
-    let*! () =
-      Lwt_utils_unix.remove_dir (Configuration.default_storage_dir data_dir)
-    in
+    let*! () = Lwt_utils_unix.remove_dir (storage_dir data_dir) in
     let mv file =
       let src = Filename.concat tmp_dir file in
       let*! exists = Lwt_unix.file_exists src in

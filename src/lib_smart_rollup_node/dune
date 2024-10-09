@@ -21,7 +21,18 @@
   -open Tezos_layer2_store
   -open Octez_sqlite
   -open Octez_smart_rollup)
- (modules store_version sql_store store_v5 store))
+ (modules
+  store_version
+  sql_store
+  store_sig
+  store_v0
+  store_v1
+  store_v2
+  store_v3
+  store_v4
+  store_v5
+  store
+  store_migration))
 
 (library
  (name octez_smart_rollup_node)
@@ -66,4 +77,17 @@
   -open Octez_crawler
   -open Tezos_workers
   -open Octez_smart_rollup)
- (modules (:standard \ store_version sql_store store_v5 store)))
+ (modules
+  (:standard
+   \
+   store_version
+   sql_store
+   store_sig
+   store_v0
+   store_v1
+   store_v2
+   store_v3
+   store_v4
+   store_v5
+   store
+   store_migration)))
