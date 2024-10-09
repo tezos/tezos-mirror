@@ -39,9 +39,11 @@ type 'a store constraint 'a = [< `Read | `Write > `Read]
 
 (** Exposed functions to manipulate Node_context store outside of this module *)
 module Node_store : sig
-  (** [load mode ~data_dir] loads a store form the data persisted in [data_dir]
-      as described in. *)
-  val load : 'a Store_sigs.mode -> data_dir:string -> 'a store tzresult Lwt.t
+  val init_with_migration :
+    'a Store_sigs.mode ->
+    Metadata.t ->
+    data_dir:string ->
+    'a store tzresult Lwt.t
 
   (** [close store] closes the store *)
   val close : 'a store -> unit Lwt.t
