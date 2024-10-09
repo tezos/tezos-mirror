@@ -23,6 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let merge_experimental_features Cli.{sqlite3_backend} configuration =
+  Configuration_file.
+    {sqlite3_backend = sqlite3_backend || configuration.sqlite3_backend}
+
 let merge
     Cli.
       {
@@ -38,6 +42,7 @@ let merge
         history_mode;
         service_name;
         service_namespace;
+        experimental_features;
       } configuration =
   let profile =
     match profile with
@@ -67,6 +72,10 @@ let merge
     service_name = Option.either service_name configuration.service_name;
     service_namespace =
       Option.either service_namespace configuration.service_namespace;
+    experimental_features =
+      merge_experimental_features
+        experimental_features
+        configuration.experimental_features;
   }
 
 let wrap_with_error main_promise =

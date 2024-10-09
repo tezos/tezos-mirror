@@ -438,6 +438,93 @@ module First_seen_level = Single_value_store.Make (struct
   let encoding = Data_encoding.int32
 end)
 
+module Storage_backend = struct
+  (** The type [kind] represents the available storage backend types.
+      [Legacy] refers to the current implementation using KVS.
+      [SQLite3] corresponds to the new implementation integrating a
+      [Sqlite.t] database into the DAL node for storing skip list
+      cells and whose purpose is to replace the
+      [Skip_list_cells_store] module. *)
+  type kind = Legacy | SQLite3
+
+  let encoding =
+    let open Data_encoding in
+    union
+      [
+        case
+          ~title:"legacy"
+          (Tag 0)
+          (constant "legacy")
+          (function Legacy -> Some () | _ -> None)
+          (fun () -> Legacy);
+        case
+          ~title:"sqlite3"
+          (Tag 1)
+          (constant "sqlite3")
+          (function SQLite3 -> Some () | _ -> None)
+          (fun () -> SQLite3);
+      ]
+
+  include Single_value_store.Make (struct
+    type t = kind
+
+    let name = "storage_backend"
+
+    let encoding = encoding
+  end)
+
+  type error += Storage_backend_mismatch of {current : kind; specified : kind}
+
+  let pp ppf value =
+    let json = Data_encoding.Json.construct encoding value in
+    Data_encoding.Json.pp ppf json
+
+  let () =
+    register_error_kind
+      `Permanent
+      ~id:"dal.store.storage_backend.backend_mismatch"
+      ~title:"Storage backend mismatch"
+      ~description:"Cannot use the specified storage backend."
+      Data_encoding.(obj2 (req "current" encoding) (req "specified" encoding))
+      ~pp:(fun ppf (current, specified) ->
+        Format.fprintf
+          ppf
+          "Cannot use the specified storage backend %a because the store is \
+           already configured to use the %a backend. To use the specified \
+           backend, you need to start with an empty store."
+          pp
+          specified
+          pp
+          current)
+      (function
+        | Storage_backend_mismatch {current; specified} ->
+            Some (current, specified)
+        | _ -> None)
+      (fun (current, specified) ->
+        Storage_backend_mismatch {current; specified})
+
+  (** [set_store ~sqlite3_backend] configures the storage backend
+      based on the value of [sqlite3_backend]. If [sqlite3_backend] is
+      [true], it sets the [SQLite3] storage backend; otherwise, it sets
+      the [Legacy] backend. This function fails with
+      [Storage_backend_mismatch] if the previously used storage backend
+      does not match the one specified by [sqlite3_backend]. *)
+  let set store ~sqlite3_backend =
+    let open Lwt_result_syntax in
+    let* current_opt = load store in
+    let specified = if sqlite3_backend then SQLite3 else Legacy in
+    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7528
+       Update the following code according to the migration from KVS
+       to SQLite3 once it is done.*)
+    match (current_opt, specified) with
+    | Some current, specified ->
+        if current = specified then return current
+        else tzfail (Storage_backend_mismatch {current; specified})
+    | None, specified ->
+        let+ () = save store specified in
+        specified
+end
+
 (** Store context *)
 type t = {
   slot_header_statuses : Statuses.t;
@@ -451,6 +538,7 @@ type t = {
   finalized_commitments : Slot_id_cache.t;
   last_processed_level : Last_processed_level.t;
   first_seen_level : First_seen_level.t;
+  storage_backend : Storage_backend.kind;
 }
 
 let cache {cache; _} = cache
@@ -620,6 +708,11 @@ let init config =
   let* skip_list_cells = init_skip_list_cells_store base_dir in
   let* last_processed_level = Last_processed_level.init ~root_dir:base_dir in
   let* first_seen_level = First_seen_level.init ~root_dir:base_dir in
+  let* storage_backend =
+    let* store = Storage_backend.init ~root_dir:base_dir in
+    let sqlite3_backend = config.experimental_features.sqlite3_backend in
+    Storage_backend.set store ~sqlite3_backend
+  in
   let*! () = Event.(emit store_is_ready ()) in
   return
     {
@@ -632,6 +725,7 @@ let init config =
         Slot_id_cache.create ~capacity:Constants.slot_id_cache_size;
       last_processed_level;
       first_seen_level;
+      storage_backend;
     }
 
 let add_slot_headers ~number_of_slots ~block_level slot_headers t =
