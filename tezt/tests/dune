@@ -63,6 +63,7 @@
   src_lib_workers_test_tezt_lib
   src_lib_webassembly_tests_tezt_lib
   src_lib_wasmer_test_tezt_lib
+  src_lib_wasm_runtime_callbacks_test_tezt_lib
   src_lib_version_test_tezt_lib
   src_lib_tree_encoding_test_tezt_lib
   src_lib_store_unix_test_tezt_lib
@@ -120,7 +121,6 @@
   irmin_test_irmin_tezt_lib
   irmin_test_tezt_lib
   etherlink_tezt_tests_tezt_lib
-  etherlink_lib_wasm_runtime_callbacks_test_tezt_lib
   etherlink_bin_node_test_tezt_lib
   brassaia_test_brassaia_generic_key_tezt_lib
   brassaia_test_brassaia_data_tezt_lib

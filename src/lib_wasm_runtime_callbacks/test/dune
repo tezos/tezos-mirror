@@ -2,7 +2,7 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name etherlink_lib_wasm_runtime_callbacks_test_tezt_lib)
+ (name src_lib_wasm_runtime_callbacks_test_tezt_lib)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
@@ -36,7 +36,7 @@
  (name main)
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
-  etherlink_lib_wasm_runtime_callbacks_test_tezt_lib
+  src_lib_wasm_runtime_callbacks_test_tezt_lib
   tezt)
  (link_flags
   (:standard)

@@ -481,7 +481,7 @@ let changeset_ocaml_check_files =
 
 (** Set of files for checking the WASM Runtime bindings. *)
 let changeset_wasm_runtime_check_files =
-  Changeset.(changeset_base @ make ["etherlink/lib_wasm_runtime/**/*.rs"])
+  Changeset.(changeset_base @ make ["src/lib_wasm_runtime/**/*.rs"])
 
 let changeset_lift_limits_patch =
   Changeset.(
