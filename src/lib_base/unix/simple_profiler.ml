@@ -422,3 +422,11 @@ let make_driver ~file_format =
 let auto_write_to_txt_file = make_driver ~file_format:Plain_text
 
 let auto_write_to_json_file = make_driver ~file_format:Json
+
+let default_driver =
+  match Sys.getenv "PROFILING_BACKEND" |> String.lowercase_ascii with
+  | "json" -> auto_write_to_json_file
+  | "text" | "txt" -> auto_write_to_txt_file
+  | _ | (exception Not_found) -> auto_write_to_txt_file
+
+let instantiate_default_driver = Profiler.instance default_driver
