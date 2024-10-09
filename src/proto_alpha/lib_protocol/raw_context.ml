@@ -972,7 +972,7 @@ let update_cycle_eras ctxt level ~prev_blocks_per_cycle ~blocks_per_cycle
    encoding directly in a way which is compatible with the previous
    protocol. However, by doing so, you do not change the value of
    these constants inside the context. *)
-let prepare_first_block ~level ~timestamp _chain_id ctxt =
+let prepare_first_block ~level ~timestamp chain_id ctxt =
   let open Lwt_result_syntax in
   let* previous_proto, ctxt = check_and_update_protocol_version ctxt in
   let* ctxt, previous_proto_constants =
@@ -1557,27 +1557,40 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
             aggregate_attestation = false;
           }
         in
-        let* ctxt, constants =
+        let new_constants : Constants_parametric_repr.t option =
           (* This check is used to trigger the constants changes at migration on
              this protocol for mainnet *)
-          if Int32.(equal constants.blocks_per_cycle 30720l) then
-            let new_constants : Constants_parametric_repr.t =
+          if
+            Chain_id.(chain_id = Constants_repr.mainnet_id)
+            && Compare.Int32.(constants.blocks_per_cycle > 10800l)
+            && Compare.Int64.(Period_repr.to_seconds c.minimal_block_delay = 8L)
+          then
+            Some
               {
                 constants with
                 blocks_per_cycle = 10800l;
                 cycles_per_voting_period = 14l;
               }
-            in
-            let* ctxt =
-              update_cycle_eras
-                ctxt
-                level
-                ~prev_blocks_per_cycle:constants.blocks_per_cycle
-                ~blocks_per_cycle:new_constants.blocks_per_cycle
-                ~blocks_per_commitment:new_constants.blocks_per_commitment
-            in
-            return (ctxt, new_constants)
-          else return (ctxt, constants)
+          else if
+            (* for ghostnet with block_time = 4s *)
+            Compare.Int32.(constants.blocks_per_cycle > 10800l)
+            && Compare.Int64.(Period_repr.to_seconds c.minimal_block_delay = 4L)
+          then Some {constants with blocks_per_cycle = 10800l}
+          else None
+        in
+        let* ctxt, constants =
+          match new_constants with
+          | Some new_constants ->
+              let* ctxt =
+                update_cycle_eras
+                  ctxt
+                  level
+                  ~prev_blocks_per_cycle:constants.blocks_per_cycle
+                  ~blocks_per_cycle:new_constants.blocks_per_cycle
+                  ~blocks_per_commitment:new_constants.blocks_per_commitment
+              in
+              return (ctxt, new_constants)
+          | None -> return (ctxt, constants)
         in
         let*! ctxt = add_constants ctxt constants in
 
