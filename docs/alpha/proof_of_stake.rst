@@ -94,10 +94,10 @@ delegate cannot participate in the consensus algorithm.
 
 A delegate is marked as active at its registration.
 
-A delegate becomes passive at the end of cycle ``n`` when it has
-failed to participate in the consensus algorithm in
-the past ``CONSENSUS_RIGHTS_DELAY + 1`` cycles. That is, in cycles ``n``, ``n-1``,
-``n-2``, ..., ``n - CONSENSUS_RIGHTS_DELAY``.
+A delegate becomes inactive at the end of a cycle if it has failed to
+participate in the consensus algorithm at all during this whole cycle.
+This is specified by the ``TOLERATED_INACTIVITY_PERIOD`` protocol
+constant, which is currently equal to ``1`` cycle.
 
 Delegates' rights selection
 ---------------------------
@@ -168,6 +168,8 @@ Proof-of-stake parameters
      - 6,000 ꜩ
    * - ``MINIMAL_FROZEN_STAKE``
      - 600 ꜩ
+   * - ``TOLERATED_INACTIVITY_PERIOD``
+     - 1 cycle
 
 Further External Resources
 --------------------------
