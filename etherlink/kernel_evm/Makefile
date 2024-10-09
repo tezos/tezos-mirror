@@ -48,7 +48,7 @@ build-dev-deps: build-deps
 test:
 # Setting RUST_MIN_STACK is needed otherwise some tests will panic by reaching
 # Rust's max stack size.
-	@RUST_MIN_STACK=104857600 cargo test --features testing ${TESTNAME}
+	@RUST_MIN_STACK=104857600 RUST_TEST_THREADS=1 cargo test --features testing ${TESTNAME}
 
 .PHONY: check
 check:
