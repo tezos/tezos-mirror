@@ -972,6 +972,10 @@ val spawn_withdraw_delegate :
 (** Run [octez-client get balance for]. *)
 val get_balance_for : ?endpoint:endpoint -> account:string -> t -> Tez.t Lwt.t
 
+(** Run [octez-client get full balance for]. *)
+val get_full_balance_for :
+  ?endpoint:endpoint -> account:string -> t -> Tez.t Lwt.t
+
 (** Same as [get_balance_for], but do not wait for the process to exit. *)
 val spawn_get_balance_for :
   ?endpoint:endpoint -> account:string -> t -> Process.t
