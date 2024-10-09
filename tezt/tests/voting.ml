@@ -295,6 +295,14 @@ let test_voting ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols
       (["cycles_per_voting_period"], `Int 1);
     ]
   in
+  let parameters =
+    if Protocol.number from_protocol > Protocol.number Protocol.Quebec then
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/7576 use a
+         default value for [tolerated_inactivity_period] *)
+      (["tolerated_inactivity_period"], `Int 3) :: parameters
+    else parameters
+  in
+
   let* parameter_file =
     Protocol.write_parameter_file ~base:(Right (from_protocol, None)) parameters
   in
