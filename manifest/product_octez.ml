@@ -4485,7 +4485,7 @@ let octez_dal_node_services =
       ]
     ~linkall:true
 
-let _octez_dal_node_migrations =
+let octez_dal_node_migrations =
   public_lib
     "dal_node_migrations"
     ~path:"src/bin_dal_node/migrations"
@@ -4527,6 +4527,7 @@ let octez_dal_node_lib =
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix;
         octez_dal_node_services;
+        octez_dal_node_migrations;
         octez_client_base |> open_;
         octez_protocol_updater |> open_;
         octez_client_base_unix |> open_;
