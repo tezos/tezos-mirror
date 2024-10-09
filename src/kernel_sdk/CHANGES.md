@@ -24,6 +24,7 @@
 - Add `--keep-going` option to native cli, to control whether the kernel should exit once the inbox has been drained.
 - Implement the generic `reveal` host function in the `MockHost`, this allows in particular to use the DAL host functions in the mockup.
 - Bump `tezos_crypto_rs`/`tezos_data_encoding` to `0.6.0` release.
+- Allow overriding of the `debug_log` sink when using `MockHost`.
 
 ### Installer client/kernel
 
