@@ -249,6 +249,7 @@ let pool = Lwt_pool.create 3 (fun () -> Lwt.return_unit)
     waiting queue we instrument the callback to track how long it stays in the 
     queue before being executed. *)
 let add_callback_to_queue pool callback =
+  Metrics.set_simulation_queue_size (Lwt_pool.wait_queue_length pool) ;
   let arrival_time = Tezos_base.Time.System.now () in
   (* instrumenting callback and adding to queue *)
   Lwt_pool.use pool @@ fun () ->
