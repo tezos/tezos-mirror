@@ -24,6 +24,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Profiler = (val Profiler.wrap Shell_profiling.requester_profiler)
+
+let profiler_init = ref false
+
 module type REQUESTER = sig
   type t
 
@@ -191,6 +195,16 @@ module Make_request_scheduler
     (Request : REQUEST with type key := Hash.t) : sig
   include SCHEDULER with type key := Hash.t and type param := Request.param
 end = struct
+  module Request = struct
+    include Request
+
+    let send p peer keys =
+      List.iter
+        (fun _k -> (() [@profiler.aggregate_f "p2p requests sent"]))
+        keys ;
+      send p peer keys
+  end
+
   module Events = Requester_event.Make (Hash)
 
   type key = Hash.t
@@ -636,34 +650,68 @@ module Make
 
   let fetch s ?peer ?timeout k param =
     let open Lwt_syntax in
-    match Memory_table.find s.memory k with
+    match[@profiler.span_s ["fetch"]] Memory_table.find s.memory k with
     | None -> (
-        let* o = Disk_table.read_opt s.disk k in
-        match o with
-        | Some v -> return_ok v
-        | None -> (
-            (* It is necessary to check the memory-table again in case another
-               promise has altered it whilst this one was waiting for the
-               disk-table query. *)
-            match Memory_table.find s.memory k with
-            | None ->
-                let waiter, wakener = Lwt.wait () in
-                Memory_table.add
-                  s.memory
-                  k
-                  (Pending {waiter; wakener; waiters = 1; param}) ;
-                Scheduler.request s.scheduler peer k ;
-                wrap s k ?timeout waiter
-            | Some (Pending data) ->
-                Scheduler.request s.scheduler peer k ;
-                data.waiters <- data.waiters + 1 ;
-                wrap s k ?timeout data.waiter
-            | Some (Found v) -> return_ok v))
-    | Some (Pending data) ->
-        Scheduler.request s.scheduler peer k ;
-        data.waiters <- data.waiters + 1 ;
-        wrap s k ?timeout data.waiter
-    | Some (Found v) -> return_ok v
+        (let* o = Disk_table.read_opt s.disk k in
+         match o with
+         | Some v ->
+             return_ok v [@profiler.span_s ["fetch"; "cache miss"; "disk hit"]]
+         | None -> (
+             match(* It is necessary to check the memory-table again in case another
+                     promise has altered it whilst this one was waiting for the
+                     disk-table query. *)
+                  [@profiler.span_s ["fetch"; "cache miss"; "disk miss"]]
+               Memory_table.find s.memory k
+             with
+             | None ->
+                 (let waiter, wakener = Lwt.wait () in
+                  Memory_table.add
+                    s.memory
+                    k
+                    (Pending {waiter; wakener; waiters = 1; param}) ;
+                  Scheduler.request s.scheduler peer k ;
+                  wrap s k ?timeout waiter)
+                 [@profiler.span_s
+                   [
+                     "fetch";
+                     "cache miss";
+                     "disk miss";
+                     "cache miss : request creation";
+                   ]]
+             | Some status -> (
+                 match[@profiler.span_s
+                        ["fetch"; "cache miss"; "disk miss"; "cache hit"]]
+                   status
+                 with
+                 | Pending data ->
+                     (Scheduler.request s.scheduler peer k ;
+                      data.waiters <- data.waiters + 1 ;
+                      wrap s k ?timeout data.waiter)
+                     [@profiler.span_s
+                       [
+                         "fetch";
+                         "cache miss";
+                         "disk miss";
+                         "cache hit";
+                         "pending : add peer";
+                       ]]
+                 | Found v ->
+                     return_ok
+                       v
+                     [@profiler.span_s
+                       [
+                         "fetch"; "cache miss"; "disk miss"; "cache hit"; "found";
+                       ]])))
+        [@profiler.span_s ["fetch"; "cache miss"]])
+    | Some status -> (
+        match[@profiler.span_s ["fetch"; "cache hit"]] status with
+        | Pending data ->
+            (Scheduler.request s.scheduler peer k ;
+             data.waiters <- data.waiters + 1 ;
+             wrap s k ?timeout data.waiter)
+            [@profiler.span_s ["fetch"; "cache hit"; "pending : add peer"]]
+        | Found v ->
+            return_ok v [@profiler.span_s ["fetch"; "cache hit"; "found"]])
 
   let notify_when_pending s p k w param v =
     let open Lwt_syntax in
@@ -718,19 +766,36 @@ module Make
     | Some (Pending _) | Some (Found _) -> Lwt.return_false
 
   let clear_or_cancel s k =
-    match Memory_table.find s.memory k with
-    | None -> ()
+    match[@profiler.span_f ["clear_or_cancel"]]
+      Memory_table.find s.memory k
+    with
+    | None -> () [@profiler.span_f ["clear_or_cancel"; "no data"]]
     | Some (Pending status) ->
-        if status.waiters <= 1 then (
-          Scheduler.notify_cancellation s.scheduler k ;
-          Memory_table.remove s.memory k ;
-          Lwt.wakeup_later status.wakener (Result_syntax.tzfail (Canceled k)))
-        else status.waiters <- status.waiters - 1
-    | Some (Found _) -> Memory_table.remove s.memory k
+        (if status.waiters <= 1 then (
+           (Scheduler.notify_cancellation s.scheduler k ;
+            Memory_table.remove s.memory k ;
+            Lwt.wakeup_later status.wakener (Result_syntax.tzfail (Canceled k)))
+           [@profiler.span_f ["clear_or_cancel"; "pending"; "no more waiters"]])
+         else
+           status.waiters <-
+             (status.waiters - 1)
+             [@profiler.span_f
+               ["clear_or_cancel"; "pending"; "existing waiters"]])
+        [@profiler.span_f ["clear_or_cancel"; "pending"]]
+    | Some (Found _) ->
+        Memory_table.remove
+          s.memory
+          k [@profiler.span_f ["clear_or_cancel"; "completed"]]
 
   let watch s = Lwt_watcher.create_stream s.input
 
+  let[@warning "-32"] init_profiler () =
+    if not !profiler_init then (
+      () [@profiler.record "start"] ;
+      profiler_init := true)
+
   let create ?random_table:random ?global_input request_param disk =
+    () [@profiler.custom init_profiler ()] ;
     let scheduler = Scheduler.create request_param in
     let memory = Memory_table.create ~entry_type:"entries" ?random 17 in
     let input = Lwt_watcher.create_input () in
