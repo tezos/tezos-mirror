@@ -18,7 +18,7 @@
   octez-shell-libs.protocol-updater
   octez-shell-libs.p2p
   octez-libs.tezos-p2p-services
-  octez-libs.requester
+  octez-shell-libs.requester
   octez-shell-libs.shell
   octez-shell-libs.shell-services
   tezos-protocol-demo-noops.embedded-protocol

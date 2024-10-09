@@ -41,7 +41,6 @@ It contains the following libraries:
 - {{!page-tezos_lwt_result_stdlib}Tezos_lwt_result_stdlib}: error-aware stdlib replacement
 - {{!module-Tezos_micheline}Tezos_micheline}: Internal AST and parser for the Michelson language
 - {{!module-Tezos_p2p_services}Tezos_p2p_services}: Descriptions of RPCs exported by [tezos-p2p]
-- {{!module-Tezos_requester}Tezos_requester}
 - {{!module-Tezos_rpc}Tezos_rpc}: Library of auto-documented RPCs (service and hierarchy descriptions)
 - {{!module-Tezos_rpc_http}Tezos_rpc_http}: Library of auto-documented RPCs (http server and client)
 - {{!module-Tezos_rpc_http_client}Tezos_rpc_http_client}: Library of auto-documented RPCs (http client)
