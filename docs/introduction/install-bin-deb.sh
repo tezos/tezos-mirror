@@ -49,14 +49,38 @@ export DEBIAN_FRONTEND=noninteractive
 set -e
 set -x
 
-# [install prerequisites]
+# these two packages are needed here, but they don't need to appear in the doc
 apt-get update
-apt-get install -y sudo gpg curl debconf-utils apt-utils
-# [add repository]
-REPO="deb https://$bucket.storage.googleapis.com/$distribution $release main"
-curl "https://$bucket.storage.googleapis.com/$distribution/octez.asc" | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/octez.gpg
-echo "$REPO" | sudo tee /etc/apt/sources.list.d/octez.list
-sudo apt-get update
+apt-get install -y debconf-utils apt-utils
+
+if [ "$RELEASETYPE" = "Master" ]; then
+  if [ -z "$PREFIX" ]; then
+    # [add repository]
+    apt-get update
+    apt-get install -y sudo gpg curl
+
+    curl "https://packages.nomadic-labs.com/$distribution/octez.asc" |
+      sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/octez.gpg
+    echo "deb [arch=amd64] https://packages.nomadic-labs.com/$distribution $release main" |
+      sudo tee /etc/apt/sources.list.d/octez.list
+    # [end add repository]
+  else
+    # [add next repository]
+    apt-get update
+    apt-get install -y sudo gpg curl
+
+    curl "https://packages.nomadic-labs.com/next/$distribution/octez.asc" |
+      sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/octez.gpg
+    echo "deb [arch=amd64] https://packages.nomadic-labs.com/next/$distribution $release main" |
+      sudo tee /etc/apt/sources.list.d/octez.list
+    # [end add next repository]
+  fi
+else
+  REPO="deb https://$bucket.storage.googleapis.com/$distribution $release main"
+  curl "https://$bucket.storage.googleapis.com/$distribution/octez.asc" | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/octez.gpg
+  echo "$REPO" | sudo tee /etc/apt/sources.list.d/octez.list
+  sudo apt-get update
+fi
 
 # [ preeseed octez ]
 if [ -n "$PREFIX" ]; then
