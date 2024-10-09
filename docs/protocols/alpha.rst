@@ -59,3 +59,6 @@ Minor Changes
 
 Internal
 --------
+
+- Removed obsolete feature flags and code related to adaptive issuance
+  and autostaking. (MR :gl:`!15215`)
