@@ -1705,6 +1705,7 @@ let init_context_from_rollup_node ~data_dir ~rollup_node_data_dir =
   let* rollup_node_store =
     Store.init Read_only ~data_dir:rollup_node_data_dir
   in
+  let rollup_node_store = Store.Normal rollup_node_store in
   let* final_l2_block = Store.L2_blocks.find_finalized rollup_node_store in
   let* final_l2_block =
     match final_l2_block with
@@ -1842,6 +1843,7 @@ let reconstruct ~data_dir ~rollup_node_data_dir ~boot_sector =
   let* rollup_node_store =
     Store.init Read_only ~data_dir:rollup_node_data_dir
   in
+  let rollup_node_store = Store.Normal rollup_node_store in
   let* finalized = Store.State.Finalized_level.get rollup_node_store in
   let* finalized_level =
     match finalized with

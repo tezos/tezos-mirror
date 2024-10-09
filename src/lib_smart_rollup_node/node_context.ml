@@ -37,8 +37,7 @@ type 'a store = 'a Store.t constraint 'a = [< `Read | `Write > `Read]
 module Node_store = struct
   let close (s : 'a store) = Store.close s
 
-  let load : 'a Store_sigs.mode -> data_dir:string -> 'a store tzresult Lwt.t =
-    Store.init
+  let init_with_migration = Store.init_with_migration
 
   let check_and_set_history_mode (type a) (mode : a Store_sigs.mode)
       (store : a Store.t) (history_mode : Configuration.history_mode option) =
