@@ -1405,8 +1405,7 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
             {
               global_limit_of_staking_over_baking =
                 c.adaptive_issuance.global_limit_of_staking_over_baking;
-              edge_of_staking_over_delegation =
-                c.adaptive_issuance.edge_of_staking_over_delegation;
+              edge_of_staking_over_delegation = 3;
               launch_ema_threshold = 0l;
               adaptive_rewards_params;
               activation_vote_enable =
