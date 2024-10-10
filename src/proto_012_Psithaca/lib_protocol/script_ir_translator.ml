@@ -3021,7 +3021,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
         let aft = unparse_stack_uncarbonated aft in
         log loc stack_ty aft
   in
-  let typed_no_lwt ctxt loc instr aft =
+  let typed_no_lwt ctxt loc instr aft : ((a, s) judgement * context) tzresult =
     log_stack loc stack_ty aft ;
     let j = Typed {loc; instr; bef = stack_ty; aft} in
     Ok (j, ctxt)
