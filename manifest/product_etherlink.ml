@@ -91,6 +91,7 @@ let wasm_runtime_callbacks =
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix;
         octez_layer2_store |> open_;
+        Product_cohttp.cohttp_lwt_unix;
       ]
 
 let wasm_runtime_callbacks_tests =
