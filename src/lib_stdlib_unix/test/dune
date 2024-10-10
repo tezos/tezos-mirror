@@ -13,7 +13,7 @@
   qcheck-alcotest
   octez-alcotezt
   tezt-bam)
- (preprocess (pps bam-ppx))
+ (preprocess (pps ppx_hash bam-ppx))
  (library_flags (:standard -linkall))
  (flags
   (:standard)
