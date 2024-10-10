@@ -17,7 +17,11 @@ module Skip_list_handlers = struct
         Alpha_context.Dal.Slots_history.Pointer_hash.encoding
         cell_hash
     in
-    let* cell = Skip_list_cells_store.find rpc_context hash in
+    let* cell =
+      match rpc_context with
+      | `KVS store -> Skip_list_cells_store.find store hash
+      | `SQLite3 store -> Dal_store_sqlite3.Skip_list_cells.find store hash
+    in
     return
     @@ Dal_proto_types.Skip_list_cell.to_proto
          Alpha_context.Dal.Slots_history.encoding
@@ -36,5 +40,5 @@ let register_commitments_history ctxt directory =
        Skip_list_handlers.cell
   |> Tezos_rpc.Directory.map (fun _prefix -> Lwt.return ctxt)
 
-let directory (rpc_ctxt : Skip_list_cells_store.t) =
+let directory rpc_ctxt =
   register_commitments_history rpc_ctxt Tezos_rpc.Directory.empty

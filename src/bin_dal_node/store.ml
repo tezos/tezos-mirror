@@ -550,13 +550,31 @@ let last_processed_level {last_processed_level; _} = last_processed_level
 
 let shards {shards; _} = shards
 
-let skip_list_cells {skip_list_cells; _} = skip_list_cells
+let skip_list_cells t =
+  match t.storage_backend with
+  | Legacy -> `KVS t.skip_list_cells
+  | SQLite3 -> `SQLite3 t.sqlite3
 
 let slot_header_statuses {slot_header_statuses; _} = slot_header_statuses
 
 let slots {slots; _} = slots
 
-module Skip_list_cells = Skip_list_cells_store
+module Skip_list_cells = struct
+  let find t =
+    match t.storage_backend with
+    | Legacy -> Skip_list_cells_store.find t.skip_list_cells
+    | SQLite3 -> Dal_store_sqlite3.Skip_list_cells.find t.sqlite3
+
+  let insert t =
+    match t.storage_backend with
+    | Legacy -> Skip_list_cells_store.insert t.skip_list_cells
+    | SQLite3 -> Dal_store_sqlite3.Skip_list_cells.insert t.sqlite3
+
+  let remove t =
+    match t.storage_backend with
+    | Legacy -> Skip_list_cells_store.remove t.skip_list_cells
+    | SQLite3 -> Dal_store_sqlite3.Skip_list_cells.remove t.sqlite3
+end
 
 let cache_entry node_store commitment slot shares shard_proofs =
   Commitment_indexed_cache.replace

@@ -293,7 +293,6 @@ module Handler = struct
   let remove_old_level_stored_data proto_parameters ctxt current_level =
     let open Lwt_syntax in
     let store = Node_context.get_store ctxt in
-    let skip_list_cells_store = Store.skip_list_cells store in
     Node_context.level_to_gc ctxt proto_parameters ~current_level
     |> Option.iter_s (fun oldest_level ->
            let* () =
@@ -301,9 +300,7 @@ module Handler = struct
                 We may want to remove this check. *)
              if supports_refutations ctxt then
                let* res =
-                 Store.Skip_list_cells.remove
-                   skip_list_cells_store
-                   ~attested_level:oldest_level
+                 Store.Skip_list_cells.remove store ~attested_level:oldest_level
                in
                match res with
                | Ok () -> Event.(emit removed_skip_list_cells oldest_level)
@@ -425,7 +422,7 @@ module Handler = struct
     in
     let store = Node_context.get_store ctxt in
     Store.Skip_list_cells.insert
-      (Store.skip_list_cells store)
+      store
       ~attested_level:block_level
       cells_of_level
 
