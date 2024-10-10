@@ -406,8 +406,6 @@ module Statuses = struct
   let remove_level_status ~level t = KVS.remove_file t file_layout level
 end
 
-module Skip_list_cells = Skip_list_cells_store
-
 module Commitment_indexed_cache =
   (* The commitment-indexed cache is where slots, shards, and
      shard proofs are kept before being associated to some slot id. The
@@ -530,7 +528,7 @@ type t = {
   slot_header_statuses : Statuses.t;
   shards : Shards.t;
   slots : Slots.t;
-  skip_list_cells : Skip_list_cells.t;
+  skip_list_cells : Skip_list_cells_store.t;
   cache :
     (Cryptobox.slot * Cryptobox.share array * Cryptobox.shard_proof array)
     Commitment_indexed_cache.t;
@@ -557,6 +555,8 @@ let skip_list_cells {skip_list_cells; _} = skip_list_cells
 let slot_header_statuses {slot_header_statuses; _} = slot_header_statuses
 
 let slots {slots; _} = slots
+
+module Skip_list_cells = Skip_list_cells_store
 
 let cache_entry node_store commitment slot shares shard_proofs =
   Commitment_indexed_cache.replace
