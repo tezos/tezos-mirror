@@ -2815,7 +2815,7 @@ and parse_instr :
         let stack_ty_after = unparse_stack_uncarbonated aft in
         log loc ~stack_ty_before ~stack_ty_after
   in
-  let typed_no_lwt ctxt loc instr aft =
+  let typed_no_lwt ctxt loc instr aft : ((a, s) judgement * context) tzresult =
     log_stack loc stack_ty aft ;
     let j = Typed {loc; instr; bef = stack_ty; aft} in
     Ok (j, ctxt)
