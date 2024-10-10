@@ -120,7 +120,7 @@ This sequence of operations was run:
   "active_staking_parameters":
     { "limit_of_staking_over_baking_millionth": 0,
       "edge_of_baking_over_staking_billionth": 1000000000 },
-  "pending_staking_parameters": [], "baking_power": "499949999471",
+  "pending_staking_parameters": [], "baking_power": "499933332981",
   "total_staked": "499900000000", "total_delegated": "99998943",
   "min_delegated_in_current_cycle":
     { "amount": "99998943",
