@@ -74,6 +74,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
       ~block_storage_sqlite3:
         configuration.experimental_features.block_storage_sqlite3
       ?garbage_collector:configuration.experimental_features.garbage_collector
+      ~wasm_runtime:configuration.experimental_features.next_wasm_runtime
       ()
   in
   let smart_rollup_address_b58 = Address.to_string smart_rollup_address_typed in

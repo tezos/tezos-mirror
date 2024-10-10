@@ -5,6 +5,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type config = {config : Config.config; wasm_runtime : bool}
+
 type t = Irmin_context.PVMState.value
 
 (** Directory where the kernel logs are stored. The function {!execute} below
@@ -26,7 +28,7 @@ val execute :
   data_dir:string ->
   ?log_file:string ->
   ?wasm_entrypoint:string ->
-  config:Config.config ->
+  config:config ->
   t ->
   [< `Input of string] list ->
   t tzresult Lwt.t
@@ -36,7 +38,7 @@ val init : kernel:string -> t tzresult Lwt.t
 
 (** [modify ~key ~value evm_state] sets [value] at [key] in the local EVM
     state. *)
-val modify : key:string -> value:string -> t -> t Lwt.t
+val modify : ?edit_readonly:bool -> key:string -> value:string -> t -> t Lwt.t
 
 (** [delete ~kind evm_state key] delete the value/directory at [key] *)
 val delete : kind:Tezos_scoru_wasm.Durable.kind -> t -> string -> t Lwt.t
@@ -61,7 +63,7 @@ val execute_and_inspect :
   ?wasm_pvm_fallback:bool ->
   data_dir:string ->
   ?wasm_entrypoint:string ->
-  config:Config.config ->
+  config:config ->
   input:Simulation.Encodings.simulate_input ->
   t ->
   bytes option list tzresult Lwt.t
@@ -90,7 +92,7 @@ val apply_blueprint :
   ?log_file:string ->
   ?profile:bool ->
   data_dir:string ->
-  config:Config.config ->
+  config:config ->
   t ->
   Blueprint_types.payload ->
   apply_result tzresult Lwt.t

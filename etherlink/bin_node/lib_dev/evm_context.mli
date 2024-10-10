@@ -32,15 +32,44 @@ type store_info = {
 val export_store :
   data_dir:string -> output_db_file:string -> store_info tzresult Lwt.t
 
-(** [start ~data_dir ~preimages ~preimages_endpoint
-    ~smart_rollup_address ()] creates a new worker to
-    manage a local EVM context where it initializes the {!type-index},
-    and use a checkpoint mechanism to load the latest {!type-store} if
-    any.
+(** [start] creates a new worker to manage a local EVM context where it
+    initializes the {!type-index}, and use a checkpoint mechanism to load the
+    latest {!type-store} if any. Returns a value telling if the context was
+    loaded from disk ([Loaded]) or was initialized from scratch ([Created]).
+    Returns also the smart rollup address.
 
-    Returns a value telling if the context was loaded from disk
-    ([Loaded]) or was initialized from scratch ([Created]). Returns
-    also the smart rollup address. *)
+    [kernel_path] can be provided to cover the case where the context does not
+    exist yet, and is ignored otherwise.
+
+    [data_dir] is the path to the data-dir of the node, notably containing the
+    SQLite store and the Irmin context.
+
+    [preimages] is the path to the preimages directory, while a
+    [preimages_endponit] URI can be optionally provided to download missing
+    preimages when they are requested by the current kernel (during upgrades).
+
+    [smart_rollup_address] can be provided either when starting from a
+    non-existing data-dir, or when starting a sandbox.
+
+    [fail_on_missing_blueprint] will decide the behavior of the worker when a
+    blueprint is confirmed by a rollup node before it is applied by the EVM
+    node. A sequencer will typically set it to true, while observers set it to
+    [false] for now.
+
+    [store_perm] decides whether or not the worker can modify the Irmin context
+    (it is most certainly an artifact of the past, made outdated by the
+    [Evm_ro_context] module. Clearly, [~store_perm:`Read_only] menas you want
+    to use [Evm_ro_context] instead.
+
+    [block_storage_sqlite3] decides whether or not the blocks are stored in the
+    SQLite store or not.
+
+    [garbage_collector] can be optionally provided to enable the garbage
+    collector of the node with a given configuration.
+
+    [wasm_runtime] can be set to true to enable the use of the (experimental)
+    WASM Runtime instead of relying on the general-purpose Fast Execution
+    exposed by the WASM debugger. *)
 val start :
   ?kernel_path:string ->
   data_dir:string ->
@@ -51,6 +80,7 @@ val start :
   store_perm:[`Read_only | `Read_write] ->
   block_storage_sqlite3:bool ->
   ?garbage_collector:Configuration.garbage_collector ->
+  wasm_runtime:bool ->
   unit ->
   (init_status * Address.t) tzresult Lwt.t
 

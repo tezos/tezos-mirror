@@ -130,12 +130,12 @@ let write_bytes vector offset bytes =
   in
   let rec write_chunks vector next ofs already_written =
     let open Lwt_syntax in
-    let to_write_step = min (chunk_size - ofs) (to_write - already_written) in
-    let* vector =
-      store_write_chunk vector next already_written ofs to_write_step
-    in
-    let already_written = already_written + to_write_step in
     if already_written < to_write then
+      let to_write_step = min (chunk_size - ofs) (to_write - already_written) in
+      let* vector =
+        store_write_chunk vector next already_written ofs to_write_step
+      in
+      let already_written = already_written + to_write_step in
       write_chunks vector (next + 1) 0 already_written
     else return vector
   in

@@ -15,7 +15,8 @@
     "enable_send_raw_transaction": true,
     "node_transaction_validation": true,
     "block_storage_sqlite3": true,
-    "overwrite_simulation_tick_limit": false
+    "overwrite_simulation_tick_limit": false,
+    "next_wasm_runtime": false
   },
   "proxy": {
     "ignore_block_param": false
@@ -63,7 +64,8 @@
     "enable_send_raw_transaction": true,
     "node_transaction_validation": true,
     "block_storage_sqlite3": true,
-    "overwrite_simulation_tick_limit": false
+    "overwrite_simulation_tick_limit": false,
+    "next_wasm_runtime": false
   },
   "proxy": {
     "ignore_block_param": false
@@ -104,7 +106,8 @@
     "enable_send_raw_transaction": true,
     "node_transaction_validation": true,
     "block_storage_sqlite3": true,
-    "overwrite_simulation_tick_limit": false
+    "overwrite_simulation_tick_limit": false,
+    "next_wasm_runtime": false
   },
   "proxy": {
     "evm_node_endpoint": "hidden",

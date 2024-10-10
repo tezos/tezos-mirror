@@ -138,7 +138,11 @@
         { /* Enables garbage collector in the node. */
           "split_frequency_in_seconds":
             integer ∈ [-2^30, 2^30]
-            /* Frequency of irmin context split in seconds */ } },
+            /* Frequency of irmin context split in seconds */ },
+      "next_wasm_runtime"?:
+        boolean
+        /* Enable or disable the experimental WASM runtime that is expected
+           to replace the Smart Rollup’s Fast Exec runtime */ },
   "proxy"?:
     { "finalized_view"?:
         boolean
