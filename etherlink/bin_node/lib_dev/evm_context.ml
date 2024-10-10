@@ -908,7 +908,9 @@ module State = struct
     | Some hash ->
         let*! context = Irmin_context.checkout_exn ctxt.index hash in
         let*! evm_state = Irmin_context.PVMState.get context in
-        let*! () = Evm_state.preload_kernel evm_state in
+        let*! () =
+          Evm_state.preload_kernel ~wasm_runtime:ctxt.wasm_runtime evm_state
+        in
         return_unit
 
   let preload_known_kernels ctxt =

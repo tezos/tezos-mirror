@@ -51,3 +51,9 @@ let run ~preimages_dir ?preimages_endpoint ~entrypoint tree rollup_address inbox
         0l
         Shared_inbox.(wrap inbox))
     ()
+
+let preload_kernel tree =
+  Lwt_preemptive.detach
+    (fun () ->
+      Evm_node_wasm_runtime.wasm_runtime_preload_kernel static_context tree)
+    ()

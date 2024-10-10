@@ -468,7 +468,9 @@ let preload_kernel_from_level ctxt level =
   let open Lwt_result_syntax in
   let* hash = find_irmin_hash_from_number ctxt level in
   let* evm_state = get_evm_state ctxt hash in
-  let*! () = Evm_state.preload_kernel evm_state in
+  let*! () =
+    Evm_state.preload_kernel ~wasm_runtime:ctxt.wasm_runtime evm_state
+  in
   return_unit
 
 let preload_known_kernels ctxt =

@@ -334,18 +334,21 @@ let wasm_pvm_version state = Wasm_utils.Wasm.get_wasm_version state
 
 let irmin_store_path ~data_dir = Filename.Infix.(data_dir // "store")
 
-let preload_kernel evm_state =
+let preload_kernel ~wasm_runtime evm_state =
   let open Lwt_syntax in
-  let* pvm_state =
-    Wasm_utils.Ctx.Tree_encoding_runner.decode
-      Tezos_scoru_wasm.Wasm_pvm.pvm_state_encoding
-      evm_state
-  in
-  let hooks =
-    Tezos_scoru_wasm.Hooks.(no_hooks |> disable_fast_exec_invalid_kernel_check)
-  in
   let* () =
-    Tezos_scoru_wasm_fast.Exec.preload_kernel ~hooks pvm_state.durable
+    if wasm_runtime then Wasm_runtime.preload_kernel evm_state
+    else
+      let* pvm_state =
+        Wasm_utils.Ctx.Tree_encoding_runner.decode
+          Tezos_scoru_wasm.Wasm_pvm.pvm_state_encoding
+          evm_state
+      in
+      let hooks =
+        Tezos_scoru_wasm.Hooks.(
+          no_hooks |> disable_fast_exec_invalid_kernel_check)
+      in
+      Tezos_scoru_wasm_fast.Exec.preload_kernel ~hooks pvm_state.durable
   in
   let* version = kernel_version evm_state in
   Events.preload_kernel version

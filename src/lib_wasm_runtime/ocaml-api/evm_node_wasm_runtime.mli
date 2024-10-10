@@ -19,3 +19,5 @@ val wasm_runtime_run :
   int32 ->
   string list ->
   Irmin_context.tree
+
+val wasm_runtime_preload_kernel : context -> Irmin_context.tree -> unit

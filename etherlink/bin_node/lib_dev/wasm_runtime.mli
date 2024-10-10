@@ -16,3 +16,5 @@ val run :
   Address.t ->
   string list ->
   Irmin_context.tree Lwt.t
+
+val preload_kernel : Irmin_context.tree -> unit Lwt.t
