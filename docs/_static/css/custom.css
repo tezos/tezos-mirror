@@ -89,8 +89,17 @@ a:hover {
     border-radius: 4px;
 }
 
+[data-theme='dark'] .bd-content :not(pre) > code {
+    color: var(--pst-color-text-base);
+    background-color: var(--pst-color-surface);
+}
+
 .bd-content tt.literal, .bd-content tt.literal, .bd-content code.literal {
     color: rgb(151, 32, 18);
+}
+
+[data-theme='dark'] .bd-content tt.literal, .bd-content tt.literal, .bd-content code.literal {
+    color: var(--pst-color-text-base);
 }
 
 .bd-content a:visited {
@@ -101,6 +110,12 @@ a:hover {
 .bd-content a:link {
     color: rgb(13, 50, 255);
     text-decoration:none;
+}
+
+[data-theme='dark'] .bd-content a:link,
+[data-theme='dark'] .bd-content .nav-link,
+[data-theme='dark'] .bd-content a:visited {
+    color: rgb(82, 143, 228);
 }
 
 .btn.btn-default {
@@ -150,10 +165,11 @@ footer {
     margin-top:0.4em;
 }
 
-button.theme-switch-button {
-    display: none !important;
-}
-
 nav[class='contents'] {
     background-color: #f9f9f9;
+}
+
+/* Fix for text in tabs showing up as white on white */
+[data-theme='dark'] button.tablinks {
+    color: rgb(0, 0, 0);
 }
