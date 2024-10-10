@@ -119,6 +119,7 @@ let execute ?(wasm_pvm_fallback = false) ?(profile = false)
       let*! evm_state =
         Wasm_runtime.run
           ~preimages_dir:config.config.preimage_directory
+          ?preimages_endpoint:config.config.preimage_endpoint
           ~entrypoint:wasm_entrypoint
           evm_state
           config.config.destination

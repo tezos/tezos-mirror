@@ -99,11 +99,12 @@ pub fn wasm_runtime_new_context() -> Pointer<Context> {
 
 #[ocaml::func]
 #[ocaml::sig(
-    "context -> string -> string -> Irmin_context.tree -> bytes -> int32 -> string list ->  Irmin_context.tree"
+    "context -> string -> string option -> string -> Irmin_context.tree -> bytes -> int32 -> string list ->  Irmin_context.tree"
 )]
 pub fn wasm_runtime_run(
     mut ctxt: Pointer<Context>,
     preimages_dir: OCamlString,
+    preimages_endpoint: Option<OCamlString>,
     entrypoint: OCamlString,
     mut tree: EvmTree,
     rollup_address: SmartRollupAddress,
@@ -114,7 +115,13 @@ pub fn wasm_runtime_run(
     let mut inputs_buffer = InputsBuffer::new(level, inputs.into_vec());
 
     loop {
-        let host = Host::new(&tree, rollup_address, inputs_buffer, preimages_dir.clone());
+        let host = Host::new(
+            &tree,
+            rollup_address,
+            inputs_buffer,
+            preimages_dir.clone(),
+            preimages_endpoint.clone(),
+        );
         let mut runtime = runtime::load_runtime(
             &ctxt.engine,
             &mut ctxt.kernels_cache,
