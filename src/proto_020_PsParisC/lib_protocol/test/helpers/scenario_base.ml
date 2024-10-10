@@ -205,7 +205,11 @@ let assert_success ?(loc = __LOC__) : ('a, 'b) scenarios -> ('a, 'a) scenarios =
       exec
         (let open Lwt_result_syntax in
          fun input ->
+           Log.info ~color:assert_block_color "Entering temporary scenario..." ;
            let* _ = run_scenario sc input in
+           Log.info
+             ~color:assert_block_color
+             "Temporary scenario succeeded. Rollback." ;
            return input)
   | _ ->
       exec (fun _ ->

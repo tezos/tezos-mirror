@@ -198,16 +198,40 @@ let check_issuance_rpc block : unit tzresult Lwt.t =
 let attest_all_ =
   let open Lwt_result_syntax in
   fun (block, state) ->
-    let dlgs =
-      String.Map.bindings state.State.account_map
-      |> List.filter (fun (name, acc) ->
-             match acc.delegate with
-             | Some x -> String.equal x name
-             | None -> false)
-      |> List.map snd
+    let* rights = Plugin.RPC.Attestation_rights.get Block.rpc_ctxt block in
+    let delegates_rights =
+      match rights with
+      | [{level = _; delegates_rights; estimated_time = _}] -> delegates_rights
+      | _ ->
+          (* Cannot happen: RPC called to return only current level,
+             so the returned list should only contain one element. *)
+          assert false
+    in
+    let* dlgs =
+      List.map
+        (fun {
+               Plugin.RPC.Attestation_rights.delegate;
+               consensus_key = _;
+               first_slot;
+               attestation_power;
+             } ->
+          Tezt.Check.(
+            (attestation_power > 0)
+              int
+              ~__LOC__
+              ~error_msg:"Attestation power should be greater than 0, got %L") ;
+          (delegate, first_slot))
+        delegates_rights
+      |> List.filter_es (fun (delegate, _slot) ->
+             let* is_forbidden =
+               Context.Delegate.is_forbidden (B block) delegate
+             in
+             return (not is_forbidden))
     in
     let* ops =
-      List.map_es (fun dlg -> Op.attestation ~delegate:dlg.pkh block) dlgs
+      List.map_es
+        (fun (delegate, slot) -> Op.attestation ~delegate ~slot block)
+        dlgs
     in
     let state = State.add_pending_operations ops state in
     return (block, state)
