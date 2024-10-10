@@ -8445,3 +8445,16 @@ let register_migration ~migrate_from ~migrate_to =
     ~migrate_from
     ~migrate_to ;
   tests_start_dal_node_around_migration ~migrate_from ~migrate_to
+
+let () =
+  Regression.register
+    ~__FILE__
+    ~title:"DAL Node: debug print store schemas"
+    ~tags:["dal"; "store"; "schemas"]
+    ~uses:[Constant.octez_dal_node]
+    ~uses_node:false
+    ~uses_client:false
+    ~uses_admin_client:false
+  @@ fun () ->
+  let hooks = Tezos_regression.hooks in
+  Dal_node.debug_print_store_schemas ~hooks ()
