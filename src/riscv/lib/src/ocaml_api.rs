@@ -37,13 +37,56 @@ pub struct Id(storage::Hash);
 ocaml::custom!(Repo);
 ocaml::custom!(Id);
 
-#[derive(ocaml::FromValue, ocaml::ToValue, IntoPrimitive, TryFromPrimitive)]
+#[derive(ocaml::FromValue, ocaml::ToValue, IntoPrimitive, TryFromPrimitive, strum::EnumCount)]
 #[ocaml::sig("Evaluating | WaitingForInput | WaitingForMetadata")]
 #[repr(u8)]
 pub enum Status {
     Evaluating,
     WaitingForInput,
     WaitingForMetadata,
+}
+
+// Check that [`PvmStatus`] and [`Status`] can be coerced into each other.
+const STATUS_ENUM_COERCIBLE: bool = {
+    if <PvmStatus as strum::EnumCount>::COUNT != <Status as strum::EnumCount>::COUNT
+        || <Status as strum::EnumCount>::COUNT != 3
+    {
+        panic!("Not coercible!");
+    }
+
+    if PvmStatus::Evaluating as u8 != Status::Evaluating as u8 {
+        panic!("Not coercible!");
+    }
+
+    if PvmStatus::WaitingForInput as u8 != Status::WaitingForInput as u8 {
+        panic!("Not coercible!");
+    }
+
+    if PvmStatus::WaitingForMetadata as u8 != Status::WaitingForMetadata as u8 {
+        panic!("Not coercible!");
+    }
+
+    true
+};
+
+impl From<PvmStatus> for Status {
+    fn from(item: PvmStatus) -> Self {
+        if STATUS_ENUM_COERCIBLE {
+            unsafe { std::mem::transmute(item) }
+        } else {
+            unreachable!()
+        }
+    }
+}
+
+impl From<Status> for PvmStatus {
+    fn from(item: Status) -> Self {
+        if STATUS_ENUM_COERCIBLE {
+            unsafe { std::mem::transmute(item) }
+        } else {
+            unreachable!()
+        }
+    }
 }
 
 #[derive(ocaml::FromValue, ocaml::ToValue)]
@@ -66,18 +109,6 @@ pub enum Input<'a> {
 pub struct InputRequest;
 
 ocaml::custom!(InputRequest);
-
-impl From<PvmStatus> for Status {
-    fn from(item: PvmStatus) -> Self {
-        Status::try_from(item as u8).expect("Invalid conversion")
-    }
-}
-
-impl From<Status> for PvmStatus {
-    fn from(item: Status) -> Self {
-        PvmStatus::from(item as u8)
-    }
-}
 
 impl<'a> PvmHooks<'a> {
     fn from_printer(printer: ocaml::Value, gc: &'a ocaml::Runtime) -> PvmHooks<'a> {

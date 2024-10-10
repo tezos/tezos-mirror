@@ -5,7 +5,7 @@
 use crate::{
     machine_state::{self, bus::main_memory},
     pvm::sbi,
-    state_backend::{self, EnumCell, EnumCellLayout},
+    state_backend::{self, Atom, Cell},
     traps::EnvironException,
 };
 use std::{
@@ -54,11 +54,22 @@ impl<'a> Default for PvmHooks<'a> {
 pub type PvmLayout<ML, CL> = (
     state_backend::Atom<u64>,
     machine_state::MachineStateLayout<ML, CL>,
-    EnumCellLayout<u8>,
+    Atom<PvmStatus>,
 );
 
 /// PVM status
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    serde::Serialize,
+    serde::Deserialize,
+    strum::EnumCount,
+)]
 #[repr(u8)]
 pub enum PvmStatus {
     Evaluating,
@@ -84,29 +95,6 @@ impl fmt::Display for PvmStatus {
     }
 }
 
-impl From<u8> for PvmStatus {
-    #[inline(always)]
-    fn from(value: u8) -> Self {
-        const EVALUATING: u8 = PvmStatus::Evaluating as u8;
-        const WAITING_FOR_INPUT: u8 = PvmStatus::WaitingForInput as u8;
-        const WAITING_FOR_METADATA: u8 = PvmStatus::WaitingForMetadata as u8;
-
-        match value {
-            EVALUATING => Self::Evaluating,
-            WAITING_FOR_INPUT => Self::WaitingForInput,
-            WAITING_FOR_METADATA => Self::WaitingForMetadata,
-            _ => Self::default(),
-        }
-    }
-}
-
-impl From<PvmStatus> for u8 {
-    #[inline(always)]
-    fn from(value: PvmStatus) -> Self {
-        value as u8
-    }
-}
-
 /// Value for the initial version
 const INITIAL_VERSION: u64 = 0;
 
@@ -118,7 +106,7 @@ pub struct Pvm<
 > {
     version: state_backend::Cell<u64, M>,
     pub(crate) machine_state: machine_state::MachineState<ML, CL, M>,
-    status: EnumCell<PvmStatus, u8, M>,
+    status: Cell<PvmStatus, M>,
 }
 
 impl<
@@ -132,7 +120,7 @@ impl<
         Self {
             version: space.0,
             machine_state: machine_state::MachineState::bind(space.1),
-            status: EnumCell::bind(space.2),
+            status: space.2,
         }
     }
 
@@ -154,7 +142,7 @@ impl<
     {
         self.version.write(INITIAL_VERSION);
         self.machine_state.reset();
-        self.status.reset();
+        self.status.write(PvmStatus::default());
     }
 
     /// Handle an exception using the defined Execution Environment.
