@@ -18,17 +18,6 @@ open State_account
 open Tez_helpers.Ez_tez
 open Scenario
 
-(** Test reward distribution without AI and without autostaking.
-    [State_account.add_*_rewards] ensures the rewards are distributed
-    correctly, and it is checked at the end of every block.
-*)
-let test_wait_rewards_no_ai_no_auto =
-  (* Prime number to always trigger roundings *)
-  init_constants ~reward_per_block:1_000_000_007L ()
-  --> activate_ai `No
-  --> begin_test ["delegate1"; "delegate2"; "delegate3"]
-  --> wait_n_cycles 20
-
 (** Tests reward distribution under AI:
     - with and without stakers (sometimes overstaking);
     - with different values of edge. *)
@@ -522,7 +511,6 @@ let test_overstake =
 let tests =
   tests_of_scenarios
   @@ [
-       ("Test wait rewards no AI no autostake", test_wait_rewards_no_ai_no_auto);
        ("Test wait rewards with AI, stakers and edge", test_wait_rewards_with_ai);
        ( "Test wait rewards with AI and stake variation events",
          test_wait_rewards_with_ai_staker_variation );
