@@ -476,6 +476,9 @@ let with_layer1 ?custom_constants ?additional_bootstrap_accounts
     @ make_int_parameter
         ["smart_rollup_timeout_period_in_blocks"]
         smart_rollup_timeout_period_in_blocks
+    (* AI is already active on mainnet, so it should be active
+       immediately in tests *)
+    @ make_bool_parameter ["adaptive_issuance_force_activation"] (Some true)
     @ parameters
   in
 
@@ -1391,12 +1394,13 @@ let test_slots_attestation_operation_dal_committee_membership_check _protocol
      shards on average. We should encounter relatively quickly a level where it
      is assigned to no shard. *)
   let stake = Tez.of_mutez_int (Protocol.default_bootstrap_balance / 64) in
+  let amount = Tez.(stake + of_int 10) in
   let* new_account = Client.gen_and_show_keys client in
   let* () =
     Client.transfer
       ~giver:Constant.bootstrap1.alias
       ~receiver:new_account.alias
-      ~amount:Tez.(stake + of_int 10)
+      ~amount
       ~burn_cap:Tez.one
       client
   in
@@ -1405,6 +1409,7 @@ let test_slots_attestation_operation_dal_committee_membership_check _protocol
   let* () = bake_for client in
   let* () = Client.register_key new_account.alias client in
   let* () = bake_for client in
+  let* () = Client.stake ~staker:new_account.alias Tez.(amount /! 2L) client in
   let num_cycles = 2 + consensus_rights_delay in
   Log.info
     "Bake for %d cycles for %s to be a baker"
@@ -7832,12 +7837,13 @@ let test_new_attester_attests _protocol dal_parameters _cryptobox node client
   let* balance =
     Client.get_balance_for ~account:Constant.bootstrap1.alias client
   in
+  let amount = Tez.(balance - one) in
   let* new_account = Client.gen_and_show_keys client in
   let* () =
     Client.transfer
       ~giver:Constant.bootstrap1.alias
       ~receiver:new_account.alias
-      ~amount:Tez.(balance - one)
+      ~amount
       ~burn_cap:Tez.one
       client
   in
@@ -7846,6 +7852,7 @@ let test_new_attester_attests _protocol dal_parameters _cryptobox node client
   let* () = bake_for client in
   let* () = Client.register_key new_account.alias client in
   let* () = bake_for client in
+  let* () = Client.stake ~staker:new_account.alias Tez.(amount /! 2L) client in
 
   let attester = Dal_node.create ~name:"attester" ~node () in
   let* () =
