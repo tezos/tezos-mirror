@@ -14,6 +14,8 @@ use crate::account_storage::{
     account_path, AccountStorageError, EthereumAccount, EthereumAccountStorage,
     CODE_HASH_DEFAULT,
 };
+use crate::precompiles::reentrancy_guard::ReentrancyGuard;
+use crate::precompiles::{FA_BRIDGE_PRECOMPILE_ADDRESS, WITHDRAWAL_ADDRESS};
 use crate::storage::blocks::{get_block_hash, BLOCKS_STORED};
 use crate::storage::tracer;
 use crate::tick_model_opcodes;
@@ -326,6 +328,8 @@ pub struct EvmHandler<'a, Host: Runtime> {
     /// used for caching and optimise the VM's execution in terms
     /// of speed.
     storage_state: Vec<StorageMapItem>,
+    /// Reentrancy guard prevents circular calls to impure precompiles
+    reentrancy_guard: ReentrancyGuard,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -424,6 +428,10 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             enable_warm_cold_access,
             tracer,
             storage_state: vec![],
+            reentrancy_guard: ReentrancyGuard::new(vec![
+                WITHDRAWAL_ADDRESS,
+                FA_BRIDGE_PRECOMPILE_ADDRESS,
+            ]),
         }
     }
 
@@ -1181,6 +1189,14 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         #[cfg(feature = "benchmark-opcodes")]
         benchmarks::start_precompile_section(self.host, address, &input);
 
+        if let Err(err) = self.reentrancy_guard.begin_precompile_call(&address) {
+            return Ok((
+                ExitReason::Fatal(evm::ExitFatal::CallErrorAsFatal(err)),
+                None,
+                vec![],
+            ));
+        }
+
         let precompile_execution_result = self.precompiles.execute(
             self,
             address,
@@ -1189,6 +1205,8 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             self.is_static(),
             transfer,
         );
+
+        self.reentrancy_guard.end_precompile_call();
 
         #[cfg(feature = "benchmark-opcodes")]
         benchmarks::end_precompile_section(self.host);
@@ -2001,6 +2019,12 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             ExitReason::Error(_) | ExitReason::Revert(_) | ExitReason::Fatal(_) => output,
             ExitReason::Succeed(_) => vec![],
         }
+    }
+
+    /// Test helper used to demonstrate that reentrancy guard is actually the exit reason.
+    #[cfg(test)]
+    pub(crate) fn disable_reentrancy_guard(&mut self) {
+        self.reentrancy_guard.disable();
     }
 }
 
