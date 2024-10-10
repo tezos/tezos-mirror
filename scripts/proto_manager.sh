@@ -93,16 +93,26 @@ function commit() {
     .git/hooks/pre-commit || true
     git add "${script_dir}/../" || true
   fi
-  if ! git commit -m "${capitalized_label}/$1"; then
-    git add "${script_dir}/../"
+  if [[ -z "$AUTHOR" ]]; then
     if ! git commit -m "${capitalized_label}/$1"; then
-      error "Failed to create commit" 1>&2
-      print_and_exit 1 "${LINENO}"
+      git add "${script_dir}/../"
+      if ! git commit -m "${capitalized_label}/$1"; then
+        error "Failed to create commit" 1>&2
+        print_and_exit 1 "${LINENO}"
+      fi
+    fi
+  else
+    if ! git commit -m "${capitalized_label}/$1" --author="${AUTHOR}"; then
+      git add "${script_dir}/../"
+      if ! git commit -m "${capitalized_label}/$1" --author="${AUTHOR}"; then
+        error "Failed to create commit" 1>&2
+        print_and_exit 1 "${LINENO}"
+      fi
     fi
   fi
+
   echo -e "${blue}Created commit:${cyan} ${capitalized_label}/$1${reset}"
   commits=$((commits + 1))
-
 }
 
 function commit_if_changes() {
@@ -115,7 +125,11 @@ function commit_if_changes() {
 function commit_no_hooks() {
   git add "${script_dir}/../"
   # if pre-commit hooks are enabled, run them
-  git commit -m "${capitalized_label}/$1" --no-verify
+  if [[ -z "$AUTHOR" ]]; then
+    git commit -m "${capitalized_label}/$1" --no-verify
+  else
+    git commit -m "${capitalized_label}/$1" --no-verify --author="${AUTHOR}"
+  fi
   echo -e "${blue}Created commit:${cyan} ${capitalized_label}/$1${reset}"
   commits=$((commits + 1))
 }
