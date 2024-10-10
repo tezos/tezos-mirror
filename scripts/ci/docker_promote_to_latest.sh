@@ -16,6 +16,8 @@ current_dir=$(cd "$(dirname "${0}")" && pwd)
 ## The goal of this script is to retag existing Docker images (do not rebuild them)
 target_tag='latest'
 
+gitlab_release=$(git tag --points-at HEAD | grep -oE '^octez-v[0-9]{1,4}\.[0-9]{1,4}$' || :)
+
 if [ -z "${gitlab_release}" ]; then
   echo "Error: could not find valid tag like octez-vX.Y at branch HEAD"
   exit 1
