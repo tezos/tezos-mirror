@@ -44,8 +44,12 @@ No changes.
 Adaptive Issuance
 -----------------
 
+- Added the :ref:`Adaptive Maximum<adaptive_maximum_quebec>` system,
+  that imposes a new bound on the issuance as a function of the staked
+  ratio. (MRs :gl:`!13519`, :gl:`!14635`)
+
 - Changed the semantics of the
-  :ref:`min-delegated-in-current-cycle<min_delegated_qena>` used to
+  :ref:`min-delegated-in-current-cycle<min_delegated_quebec>` used to
   compute baking rights. It now only considers the minimum in between
   blocks. (MR :gl:`!13945`)
 
@@ -85,7 +89,7 @@ RPC Changes
 
 - In the following paths, ``../`` is short for
   ``/chains/<chain_id>/blocks/<block_id>/context/delegates/<baker_pkh>/``.
-  See https://tezos.gitlab.io/qena/baking_power.html for more
+  See https://tezos.gitlab.io/quebec/baking_power.html for more
   details on the renamed and new RPCs.
 
   * Renamed RPC ``GET ../current_frozen_deposits`` to ``GET

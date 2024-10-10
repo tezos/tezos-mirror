@@ -153,7 +153,7 @@ formula<baking_power_overview_quebec>`.
 
 The baking rights are determined
 :ref:`CONSENSUS_RIGHTS_DELAY<cs_constants_quebec>` in advance, which is
-``2`` :ref:`cycles<def_cycle_quebec>` for the Qena protocol. More
+``2`` :ref:`cycles<def_cycle_quebec>` for the Quebec protocol. More
 precisely, at the end of cycle ``n`` and beginning of cycle ``n+1``,
 the baking rights for cycle ``n+1+CONSENSUS_RIGHTS_DELAY=n+3`` are
 :doc:`randomly generated<randomness_generation>` based on the current
@@ -289,10 +289,9 @@ for double baking is a fixed percentage of the frozen deposit
 double (pre)attestations, the formula is more complex, as it depends
 on the number of attestation slots that participated in the
 misbehavior; see :doc:`adaptive_slashing` for more details.
-The payload producer that includes the misbehavior evidence is rewarded a
-seventh of the slashed amount, which corresponds to ``1 /
-(GLOBAL_LIMIT_OF_STAKING_OVER_BAKING + 2)``; the rest of the slashed
-amount is burned.
+The payload producer that includes the misbehavior evidence is
+rewarded ``1 / (GLOBAL_LIMIT_OF_STAKING_OVER_BAKING + 2)`` of the
+slashed amount; the rest of the slashed amount is burned.
 
 If a delegate's deposit is smaller than the slashed amount, the deposit is
 simply emptied.

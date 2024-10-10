@@ -65,7 +65,7 @@ the new safety net.
 
 Not applying round 1 -- 2 block proposals by default while creating
 them will allow for faster propagation and earlier consensus
-agreement. See :ref:`here <baker_manual_qena>`
+agreement. See :ref:`here <baker_manual_quebec>`
 for further details on how bakers can fine-tune this parameter.
 
 DAL node

@@ -27,7 +27,7 @@ is computed in a similar but simpler way.
   ``/chain/<chain_id>/blocks/<block_id>/context/``
 
   Besides, many RPCs presented here used to be known under different
-  names. They have been renamed in the Alpha protocol in order to
+  names. They have been renamed in the Quebec protocol in order to
   disambiguate and normalize the baking power lexicon; the old names
   have been deprecated. See the
   :ref:`changelog<delegates_RPCs_normalization>` for more information.
@@ -257,10 +257,10 @@ operations, the context for this minimum is not directly accessible
 via RPC. In that case, in order to retrieve this exact context, one
 needs to replay the block's balance updates on their own.
 
-In the Alpha protocol, to solve these problems, only the total
+In the Quebec protocol, to solve these problems, only the total
 delegated amounts **at the end of blocks** count when determining this
 minimum. This is known as the **per-block min-delegated
-feature**. This solution no longer penalizes baking rights when 
+feature**. This solution no longer penalizes baking rights when
 funds are transferred between two accounts delegated to the same
 baker. Moreover, it lets users easily retrieve via RPC the exact
 context that the minimum comes from, since it is guaranteed to
@@ -317,14 +317,14 @@ first level of the current cycle is ``129``, and let's say that
      - 900
      - 1050
      - 980
-   * - Alpha RPC
+   * - Quebec RPC
      - Returned min (tez)
      - 1000
      - 1000
      -
      - 1000
      - 980
-   * - Alpha RPC
+   * - Quebec RPC
      - Returned level
      - 129
      - 129
@@ -351,7 +351,7 @@ the middle of the block application. Also, the
 ``min_delegated_in_current_cycle`` RPC returns the value in mutez, but
 here we use tez for simplicity.
 
-* In Alpha:
+* In Quebec:
 
   - At levels ``129`` and ``150``, the earliest level at the end of
     which the ``total_delegated`` is equal to the minimum ``1000`` is
