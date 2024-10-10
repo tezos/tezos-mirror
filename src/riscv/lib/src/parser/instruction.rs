@@ -502,6 +502,7 @@ pub enum Instr {
 
 impl InstrCacheable {
     /// Return the width of the instruction in bytes.
+    #[inline(always)]
     pub const fn width(&self) -> u64 {
         use InstrCacheable::*;
         match self {
@@ -704,6 +705,7 @@ impl InstrCacheable {
 
 impl InstrUncacheable {
     /// Return the width of the instruction in bytes.
+    #[inline(always)]
     pub const fn width(&self) -> u64 {
         use InstrUncacheable::*;
         match self {
@@ -725,6 +727,7 @@ impl InstrUncacheable {
 
 impl Instr {
     /// Return the width of the instruction in bytes.
+    #[inline(always)]
     pub const fn width(&self) -> u64 {
         use Instr::*;
         match self {
