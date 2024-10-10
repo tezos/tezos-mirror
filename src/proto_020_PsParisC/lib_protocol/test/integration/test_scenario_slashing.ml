@@ -126,6 +126,60 @@ let check_is_not_forbidden baker =
       let* _ = Block.bake ~policy:(By_account baker.pkh) block in
       return input)
 
+let check_has_no_slots ~loc baker_name =
+  let open Lwt_result_syntax in
+  exec (fun ((block, state) as input) ->
+      let baker = State.find_account baker_name state in
+      let* rights =
+        Plugin.RPC.Attestation_rights.get
+          Block.rpc_ctxt
+          ~delegates:[baker.pkh]
+          block
+      in
+      match rights with
+      | [] -> return input
+      | [{level = _; delegates_rights; estimated_time = _}] -> (
+          match delegates_rights with
+          | [{delegate; consensus_key = _; first_slot = _; attestation_power}]
+            ->
+              Test.fail
+                ~__LOC__
+                "%s: delegate '%s'(%a) expected to have no attestation power, \
+                 has %i slots."
+                loc
+                baker_name
+                Signature.Public_key_hash.pp
+                delegate
+                attestation_power
+          | _ ->
+              (* Cannot happen: RPC called for only one delegate *) assert false
+          )
+      | _ ->
+          (* Cannot happen: only one level is prompted for the RPC *)
+          assert false)
+
+let check_has_slots ~loc baker_name =
+  let open Lwt_result_syntax in
+  exec (fun ((block, state) as input) ->
+      let baker = State.find_account baker_name state in
+      let* rights =
+        Plugin.RPC.Attestation_rights.get
+          Block.rpc_ctxt
+          ~delegates:[baker.pkh]
+          block
+      in
+      match rights with
+      | [] ->
+          Test.fail
+            ~__LOC__
+            "%s: delegate '%s'(%a) expected to have some attestation power, \
+             has none."
+            loc
+            baker_name
+            Signature.Public_key_hash.pp
+            baker.pkh
+      | _ -> return input)
+
 (** Tests forbidding delegates ensuring:
   - delegates are not forbidden until a denunciation is made (allowing for
     multiple misbehaviours)
@@ -363,6 +417,144 @@ let test_slash_rounding =
   --> make_denunciations () --> wait_n_cycles 7
   --> finalize_unstake "delegate"
 
+let test_mega_slash =
+  init_constants ()
+  (* Setting constants and flags so that
+     - Adaptive Issuance is activated
+     - Adaptive Slashing is activated
+     - Every double attestation slashes 99% of the stake
+     - We have 8 blocks per cycle (faster tests) *)
+  --> set
+        S.max_slashing_per_block
+        (Protocol.Percentage.of_q_bounded ~round:`Down Q.(99 // 100))
+  --> set S.max_slashing_threshold 0
+  --> set S.Adaptive_issuance.ns_enable true
+  --> activate_ai `Force --> set S.blocks_per_cycle 8l
+  -->
+  let delegates = ["delegate"; "baker"; "faucet"; "big_spender"] in
+  begin_test delegates ~force_attest_all:true
+  (* Unstake for all delegates, to have roughly equal rights *)
+  --> List.fold_left
+        (fun acc name ->
+          acc --> unstake name (Amount (Tez.of_mutez 190_000_000_000L)))
+        Empty
+        ("__bootstrap__" :: delegates)
+  --> set_baker "baker"
+  (* Activate staking for delegate *)
+  --> set_delegate_params
+        "delegate"
+        {
+          limit_of_staking_over_baking = Q.one;
+          edge_of_baking_over_staking = Q.zero;
+        }
+  (* Will be useful later... *)
+  --> set_delegate_params
+        "baker"
+        {
+          limit_of_staking_over_baking = Q.one;
+          edge_of_baking_over_staking = Q.zero;
+        }
+  --> wait_delegate_parameters_activation
+  (* Many (small) stakers for the delegate *)
+  -->
+  let init_costaking_amount = 500_000_000L in
+  let stakers_list = ["staker1"; "staker2"; "staker3"; "staker4"] in
+  List.fold_left
+    (fun acc name ->
+      acc
+      --> add_account_with_funds
+            name
+            ~funder:"faucet"
+            (Amount (Tez.of_mutez (Int64.mul 2L init_costaking_amount)))
+      --> set_delegate name (Some "delegate")
+      --> stake name (Amount (Tez.of_mutez init_costaking_amount)))
+    Empty
+    stakers_list
+  (* One big delegator, it will stake for the following amount later *)
+  -->
+  let big_staking_amount = 3_000_000_000_000L in
+  add_account_with_funds
+    "big_staker"
+    ~funder:"big_spender"
+    (Amount (Tez.of_mutez (Int64.succ big_staking_amount)))
+  --> set_delegate "big_staker" (Some "delegate")
+  --> next_cycle
+  -->
+  (* The "incident" *)
+  let incident =
+    double_attest "delegate" --> make_denunciations () --> wait_n_cycles 2
+    (* We check stakers can still unstake *)
+    --> assert_success (unstake "staker1" Half)
+    (* We check staking is still possible, with a risk of overflow *)
+    --> assert_success
+          (stake "big_staker" (Amount (Tez.of_mutez big_staking_amount)))
+    (* We wait for the delegate to have rights again *)
+    --> stake "delegate" (Amount (Tez.of_mutez 10_000_000_000L))
+    (* In consensus_rights_delay + 2 cycles, the delegate has 0 rights
+       because of the slash that happens before rights computation, which
+       puts it under the minimal frozen threshold required to bake. *)
+    --> wait_n_cycles_f (fun (_, state) ->
+            state.State.constants.consensus_rights_delay + 2)
+    --> check_has_no_slots ~loc:__LOC__ "delegate"
+    --> next_cycle
+    --> check_has_slots ~loc:__LOC__ "delegate"
+    --> check_is_not_forbidden "delegate"
+  in
+  (* Since Int64.max_int / 3Mtz ~= 3_074_457, and that each slash multiplies by 100 the
+     value of the pseudotokens, then 3 slashings won't trigger an overflow... *)
+  loop 3 incident
+  (*  but 4 will. *)
+  --> double_attest "delegate"
+  --> make_denunciations () --> wait_n_cycles 2
+  (* We check stakers can still unstake and finalize, despite everything *)
+  --> assert_success
+        (unstake "staker1" Half
+        --> wait_n_cycles_f Test_scenario_stake.unstake_wait
+        --> finalize_unstake "staker1")
+  (* We check the baker itself can still unstake,... *)
+  --> assert_success
+        (unstake "delegate" Half
+        --> wait_n_cycles_f Test_scenario_stake.unstake_wait
+        --> finalize_unstake "delegate")
+  (*  ... stake,... *)
+  --> assert_success (stake "delegate" Half)
+  (* ... change delegate parameters. *)
+  --> assert_success
+        (set_delegate_params
+           "delegate"
+           {
+             limit_of_staking_over_baking = Q.zero;
+             edge_of_baking_over_staking = Q.one;
+           }
+        --> wait_delegate_parameters_activation
+        (* Although it should overflow, the limit=0 check is done first *)
+        --> assert_failure
+              (stake "big_staker" (Amount (Tez.of_mutez big_staking_amount))))
+  (* We check stakers can still change delegate, and stake thereafter *)
+  --> assert_success
+        (set_delegate "staker1" (Some "baker")
+        --> wait_n_cycles_f Test_scenario_stake.unstake_wait
+        --> finalize_unstake "staker1" --> stake "staker1" Half)
+  (* We check for overflow *)
+  --> assert_failure
+        (stake "big_staker" (Amount (Tez.of_mutez big_staking_amount)))
+  (* Check that if everyone unstakes from delegate, then it's back to normal *)
+  --> List.fold_left
+        (fun acc name -> acc --> unstake name All)
+        Empty
+        stakers_list
+  --> assert_success
+        (stake "big_staker" (Amount (Tez.of_mutez big_staking_amount)))
+  (* Check that funds can be finalized, just in case *)
+  --> wait_n_cycles_f Test_scenario_stake.unstake_wait
+  --> List.fold_left
+        (fun acc name -> acc --> finalize_unstake name)
+        Empty
+        stakers_list
+  (* One last time, for good measure *)
+  --> assert_success
+        (stake "big_staker" (Amount (Tez.of_mutez big_staking_amount)))
+
 (* TODO #6645: reactivate tests *)
 let tests =
   tests_of_scenarios
@@ -380,6 +572,7 @@ let tests =
          test_slash_correct_amount_after_stake_from_unstake );
        ("Test unstake 1 mutez then slash", test_mini_slash);
        ("Test slash rounding", test_slash_rounding);
+       ("Test slash 99.999999%", test_mega_slash);
      ]
 
 let () =
