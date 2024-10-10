@@ -469,18 +469,22 @@ let test_mega_slash =
   (* Many (small) stakers for the delegate *)
   -->
   let init_costaking_amount = 500_000_000L in
+  let init_funds = Amount (Tez.of_mutez (Int64.mul 2L init_costaking_amount)) in
   let stakers_list = ["staker1"; "staker2"; "staker3"; "staker4"] in
   List.fold_left
     (fun acc name ->
       acc
-      --> add_account_with_funds
-            name
-            ~funder:"faucet"
-            (Amount (Tez.of_mutez (Int64.mul 2L init_costaking_amount)))
+      --> add_account_with_funds name ~funder:"faucet" init_funds
       --> set_delegate name (Some "delegate")
       --> stake name (Amount (Tez.of_mutez init_costaking_amount)))
     Empty
     stakers_list
+  -->
+  (* 1-mutez staker *)
+  let tiny_staker = "tiny_staker" in
+  add_account_with_funds tiny_staker ~funder:"faucet" init_funds
+  --> set_delegate tiny_staker (Some "delegate")
+  --> stake tiny_staker (Amount Tez.one_mutez)
   (* One big delegator, it will stake for the following amount later *)
   -->
   let big_staking_amount = 3_000_000_000_000L in
@@ -494,8 +498,37 @@ let test_mega_slash =
   (* The "incident" *)
   let incident =
     double_attest "delegate" --> make_denunciations () --> wait_n_cycles 2
-    (* We check stakers can still unstake *)
+    (* We check stakers can still unstake and change delegates *)
     --> assert_success (unstake "staker1" Half)
+    --> assert_success (unstake "staker1" All)
+    --> assert_success
+          (unstake "staker1" (Amount (Tez.of_mutez init_costaking_amount)))
+    --> assert_success (unstake "staker1" Max_tez)
+    --> assert_success
+          (set_delegate "staker1" (Some "baker")
+          --> assert_failure
+                ~expected_error:(fun _ errs ->
+                  Error_helpers.check_error_constructor_name
+                    ~loc:__LOC__
+                    ~expected:
+                      Protocol.Staking
+                      .Cannot_stake_with_unfinalizable_unstake_requests_to_another_delegate
+                    errs)
+                (stake "staker1" (Amount (Tez.of_mutez init_costaking_amount)))
+          --> wait_n_cycles_f Test_scenario_stake.unstake_wait
+          --> stake "staker1" (Amount (Tez.of_mutez init_costaking_amount))
+          --> set_delegate "staker1" (Some "delegate"))
+    --> assert_success (unstake tiny_staker Half)
+    --> assert_success (unstake tiny_staker All)
+    --> assert_success (unstake tiny_staker (Amount Tez.one_mutez))
+    --> assert_success (unstake tiny_staker Max_tez)
+    --> assert_success
+          (set_delegate tiny_staker (Some "baker")
+           (* [tiny_staker] can immediately stake for its new delegate
+              because it had zero staked tez left before changing
+              delegates *)
+          --> stake tiny_staker (Amount (Tez.of_mutez init_costaking_amount))
+          --> set_delegate tiny_staker (Some "delegate"))
     (* We check staking is still possible, with a risk of overflow *)
     --> assert_success
           (stake "big_staker" (Amount (Tez.of_mutez big_staking_amount)))
@@ -557,7 +590,8 @@ let test_mega_slash =
   --> assert_failure
         ~expected_error:(fun _ errs ->
           let init_full_costaking =
-            Int64.mul 4L init_costaking_amount |> Protocol.Tez_repr.of_mutez_exn
+            Int64.(succ (mul 4L init_costaking_amount))
+            |> Protocol.Tez_repr.of_mutez_exn
           in
           let check_error = function
             | [
