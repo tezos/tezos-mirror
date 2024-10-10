@@ -16,7 +16,7 @@ type error =
   | Invalid_stop of Key.t
   | Improper_field of (Longident.t Location.loc * Ppxlib.expression)
   | Improper_let_binding of Ppxlib.expression
-  | Improper_record of (Ppxlib.Ast.longident_loc * Parsetree.expression) list
+  | Improper_record of (Ppxlib.Ast.longident_loc * Ppxlib.expression) list
   | Malformed_attribute of Ppxlib.expression
 
 (** Raise a located error *)
