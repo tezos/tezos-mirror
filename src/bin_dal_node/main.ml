@@ -104,6 +104,16 @@ let run subcommand cli_options =
       Lwt.Exception_filter.(set handle_all_except_runtime) ;
       Lwt_main.run @@ wrap_with_error
       @@ Configuration_file.save (merge cli_options Configuration_file.default)
+  | Debug_print_store_schemas ->
+      let open Lwt_result_syntax in
+      Lwt_main.run @@ wrap_with_error
+      @@ Lwt_utils_unix.with_tempdir "store"
+      @@ fun data_dir ->
+      let* store = Dal_store_sqlite3.init ~data_dir ~perm:`Read_write () in
+      let* schemas = Dal_store_sqlite3.(use store Schemas.get_all) in
+      let output = String.concat ";\n\n" schemas in
+      Format.printf "%s\n" output ;
+      return_unit
 
 let _ =
   (* Memtrace can be activated via the environment variable MEMTRACE

@@ -387,6 +387,68 @@ module Config = struct
     Cmdliner.Cmd.group ~default info [Init.cmd run]
 end
 
+module Debug = struct
+  let man = [`S "DEBUG DESCRIPTION"; `P "Entrypoint for the debug commands."]
+
+  module Print = struct
+    let man =
+      [`S "PRINT DESCRIPTION"; `P "Entrypoint for printing debug information."]
+
+    module Store = struct
+      let man =
+        [
+          `S "STORE DESCRIPTION";
+          `P
+            "Entrypoint for printing debug information related to the DAL node \
+             store.";
+        ]
+
+      module Schemas = struct
+        let man =
+          [
+            `S "DESCRIPTION";
+            `P
+              "Print SQL statements describing the tables created in the store.";
+          ]
+
+        let info =
+          let version = Tezos_version_value.Bin_version.octez_version_string in
+          Cmdliner.Cmd.info ~doc:"Print SQL statements" ~man ~version "schemas"
+
+        let cmd run = Cmdliner.Cmd.v info (Term.term run)
+      end
+
+      let cmd run =
+        let default = Cmdliner.Term.(ret (const (`Help (`Pager, None)))) in
+        let info =
+          let version = Tezos_version_value.Bin_version.octez_version_string in
+          Cmdliner.Cmd.info
+            ~doc:"Print DAL node store debug information"
+            ~man
+            ~version
+            "store"
+        in
+        Cmdliner.Cmd.group ~default info [Schemas.cmd run]
+    end
+
+    let cmd run =
+      let default = Cmdliner.Term.(ret (const (`Help (`Pager, None)))) in
+      let info =
+        let version = Tezos_version_value.Bin_version.octez_version_string in
+        Cmdliner.Cmd.info ~doc:"Print debug information" ~man ~version "print"
+      in
+      Cmdliner.Cmd.group ~default info [Store.cmd run]
+  end
+
+  let cmd run =
+    let default = Cmdliner.Term.(ret (const (`Help (`Pager, None)))) in
+    let info =
+      let version = Tezos_version_value.Bin_version.octez_version_string in
+      Cmdliner.Cmd.info ~doc:"Debug commands" ~man ~version "debug"
+    in
+    Cmdliner.Cmd.group ~default info [Print.cmd run]
+end
+
 type experimental_features = {sqlite3_backend : bool}
 
 type options = {
@@ -405,7 +467,7 @@ type options = {
   experimental_features : experimental_features;
 }
 
-type t = Run | Config_init
+type t = Run | Config_init | Debug_print_store_schemas
 
 let make ~run =
   let run subcommand data_dir rpc_addr expected_pow listen_addr public_addr
@@ -456,4 +518,8 @@ let make ~run =
   Cmdliner.Cmd.group
     ~default
     info
-    [Run.cmd (run Run); Config.cmd (run Config_init)]
+    [
+      Run.cmd (run Run);
+      Config.cmd (run Config_init);
+      Debug.cmd (run Debug_print_store_schemas);
+    ]
