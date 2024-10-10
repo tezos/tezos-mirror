@@ -125,7 +125,7 @@ let default_experimental_features =
   {
     enable_send_raw_transaction = default_enable_send_raw_transaction;
     drop_duplicate_on_injection = false;
-    node_transaction_validation = false;
+    node_transaction_validation = true;
     block_storage_sqlite3 = false;
     overwrite_simulation_tick_limit = false;
     garbage_collector = None;
