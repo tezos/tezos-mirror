@@ -11,6 +11,7 @@ external wasm_runtime_new_context : unit -> context = "wasm_runtime_new_context"
 
 val wasm_runtime_run :
   preimages_dir:string ->
+  ?preimages_endpoint:string ->
   entrypoint:string ->
   context ->
   Irmin_context.tree ->

@@ -3,7 +3,7 @@
 //! Collections of functions exposed from OCaml and allowing Rust functions to interact with the
 //! state manipulated by the kernel.
 
-use crate::types::{ContextHash, EvmTree, OCamlBytes};
+use crate::types::{ContextHash, EvmTree, OCamlBytes, OCamlString};
 use std::{
     error::Error,
     fmt::{Display, Formatter},
@@ -41,9 +41,11 @@ impl Error for BindingsError {}
 
 #[allow(non_snake_case)]
 mod ocaml_imports {
-    use crate::types::{ContextHash, EvmTree, OCamlBytes};
+    use crate::types::{ContextHash, EvmTree, OCamlBytes, OCamlString};
 
     ocaml::import! {
+        pub fn fetch_preimage_from_remote(preimages_endpoint: &str, hash_hex: &str) -> OCamlString;
+
         pub fn layer2_store__read_durable_value(evm_tree: EvmTree, key: &str) -> Result<OCamlBytes, isize>;
         pub fn layer2_store__mem_tree(evm_tree: EvmTree, key: &str) -> Result<bool, isize>;
         pub fn layer2_store__check_reboot_flag(evm_tree: EvmTree) -> (bool, EvmTree);
@@ -62,6 +64,16 @@ mod ocaml_imports {
 
 fn gc() -> ocaml::Runtime {
     ocaml::Runtime::init()
+}
+
+pub fn fetch_preimage_from_remote(
+    preimages_endpoint: &str,
+    hash_hex: &str,
+) -> Result<OCamlString, BindingsError> {
+    unsafe {
+        ocaml_imports::fetch_preimage_from_remote(&gc(), preimages_endpoint, hash_hex)
+            .map_err(BindingsError::OCamlError)
+    }
 }
 
 pub fn store_get_hash<K>(evm_tree: &EvmTree, key: K) -> Result<ContextHash, BindingsError>

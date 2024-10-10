@@ -56,6 +56,7 @@ pub struct Host {
     rollup_address: SmartRollupAddress,
     needs_kernel_reload: bool,
     preimages_dir: OCamlString,
+    preimages_endpoint: Option<OCamlString>,
 }
 
 impl Host {
@@ -64,6 +65,7 @@ impl Host {
         rollup_address: SmartRollupAddress,
         inputs_buffer: InputsBuffer,
         preimages_dir: OCamlString,
+        preimages_endpoint: Option<OCamlString>,
     ) -> Self {
         Host {
             inputs_buffer,
@@ -71,11 +73,16 @@ impl Host {
             rollup_address,
             needs_kernel_reload: false,
             preimages_dir,
+            preimages_endpoint,
         }
     }
 
     pub fn preimages_dir(&self) -> &str {
         self.preimages_dir.as_str()
+    }
+
+    pub fn preimages_endpoint(&self) -> Option<&str> {
+        self.preimages_endpoint.as_ref().map(|s| s.as_str())
     }
 
     pub fn request_kernel_reload(&mut self) {

@@ -998,7 +998,8 @@ let endpoint = rpc_endpoint ?local:None
 
 let patch_config_with_experimental_feature
     ?(drop_duplicate_when_injection = false)
-    ?(node_transaction_validation = false) ?(block_storage_sqlite3 = true) () =
+    ?(node_transaction_validation = false) ?(block_storage_sqlite3 = true)
+    ?(next_wasm_runtime = true) () =
   let conditional_json_put ~name cond value_json json =
     if cond then
       JSON.put
@@ -1022,6 +1023,10 @@ let patch_config_with_experimental_feature
   |> conditional_json_put
        block_storage_sqlite3
        ~name:"block_storage_sqlite3"
+       (`Bool true)
+  |> conditional_json_put
+       next_wasm_runtime
+       ~name:"next_wasm_runtime"
        (`Bool true)
 
 let init ?patch_config ?name ?runner ?mode ?data_dir ?rpc_addr ?rpc_port

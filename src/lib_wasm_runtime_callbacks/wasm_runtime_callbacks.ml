@@ -157,11 +157,29 @@ module Impl = struct
         let* exists = Irmin_context.Tree.mem_tree tree reboot_flag in
         let+ tree = Irmin_context.Tree.remove tree reboot_flag in
         (exists, tree))
+
+  let fetch_preimage_from_remote preimages_endpoint hash_hex =
+    Lwt_preemptive.run_in_main (fun () ->
+        let open Lwt_syntax in
+        let preimages_endpoint = Uri.of_string preimages_endpoint in
+        let url =
+          Uri.with_path
+            preimages_endpoint
+            String.(concat "/" [Uri.path preimages_endpoint; hash_hex])
+        in
+        let* resp, body = Cohttp_lwt_unix.Client.get url in
+        let* body_str = Cohttp_lwt.Body.to_string body in
+        match resp.status with
+        | `OK -> return body_str
+        | #Cohttp.Code.status_code -> raise Not_found)
 end
 
 include Impl
 
 let register () =
+  (* Preimage download helper. *)
+  Callback.register "fetch_preimage_from_remote" fetch_preimage_from_remote ;
+
   (* General-purpose helpers *)
   Callback.register "layer2_store__read_durable_value" read_durable_value ;
   Callback.register "layer2_store__mem_tree" mem_tree ;

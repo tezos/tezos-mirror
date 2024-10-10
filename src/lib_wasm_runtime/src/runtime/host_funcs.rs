@@ -390,15 +390,44 @@ fn reveal_preimage(
         )));
     }
 
-    let mut path = PathBuf::from(runtime_env.host().preimages_dir());
+    let preimages_dir = runtime_env.host().preimages_dir();
+    let mut path = PathBuf::from(preimages_dir);
     path.push(&hash_hex);
 
-    let res = fs::read(path).map_err(|io_err| {
-        RuntimeError::new(format!(
-            "error when trying to load preimage {}: {}",
-            hash_hex, io_err
-        ))
-    })?;
+    let res = if path.exists() {
+        fs::read(path).map_err(|io_err| {
+            RuntimeError::new(format!(
+                "error when trying to load preimage {}: {}",
+                hash_hex, io_err
+            ))
+        })?
+    } else {
+        if let Some(preimages_endpoint) = runtime_env.host().preimages_endpoint() {
+            match bindings::fetch_preimage_from_remote(&preimages_endpoint, &hash_hex) {
+                Ok(buffer) => {
+                    let buffer = buffer.as_bytes();
+                    fs::write(path, &buffer).map_err(|io_err| {
+                        RuntimeError::new(format!("Failed to write the preimage {}", io_err))
+                    })?;
+                    Ok(buffer.to_vec())
+                }
+                Err(BindingsError::HostFuncError(_)) => {
+                    // It's not an host function, but this binding does not make
+                    // the distinction.
+                    panic!()
+                }
+                Err(BindingsError::OCamlError(err)) => Err(RuntimeError::new(format!(
+                    "Failed to download the preimage: {:?}",
+                    err
+                ))),
+            }?
+        } else {
+            return Err(RuntimeError::new(format!(
+                "Preimage {} was not found in {} and preimages endpoint is not provided",
+                hash_hex, preimages_dir
+            )));
+        }
+    };
 
     if !blake2b::digest_256(&res).eq(&hash_bytes[1..]) {
         return Err(RuntimeError::new(format!(

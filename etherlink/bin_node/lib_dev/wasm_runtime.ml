@@ -37,12 +37,13 @@ end = struct
   let wrap inbox = (sol :: ipl :: inbox) @ [eol]
 end
 
-let run ~preimages_dir ~entrypoint tree rollup_address inbox :
-    Irmin_context.tree Lwt.t =
+let run ~preimages_dir ?preimages_endpoint ~entrypoint tree rollup_address inbox
+    : Irmin_context.tree Lwt.t =
   Lwt_preemptive.detach
     (fun () ->
       Evm_node_wasm_runtime.wasm_runtime_run
         ~preimages_dir
+        ?preimages_endpoint:(Option.map Uri.to_string preimages_endpoint)
         ~entrypoint
         static_context
         tree

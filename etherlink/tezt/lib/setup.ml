@@ -161,12 +161,12 @@ let run_new_observer_node ?(patch_config = Fun.id) ~sc_rollup_node evm_node =
   in
   return observer
 
-let setup_sequencer ?block_storage_sqlite3 ?sequencer_rpc_port
-    ?sequencer_private_rpc_port ~mainnet_compat ?genesis_timestamp
-    ?time_between_blocks ?max_blueprints_lag ?max_blueprints_ahead
-    ?max_blueprints_catchup ?catchup_cooldown ?delayed_inbox_timeout
-    ?delayed_inbox_min_levels ?max_number_of_chunks ?commitment_period
-    ?challenge_window
+let setup_sequencer ?next_wasm_runtime ?block_storage_sqlite3
+    ?sequencer_rpc_port ?sequencer_private_rpc_port ~mainnet_compat
+    ?genesis_timestamp ?time_between_blocks ?max_blueprints_lag
+    ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
+    ?delayed_inbox_timeout ?delayed_inbox_min_levels ?max_number_of_chunks
+    ?commitment_period ?challenge_window
     ?(bootstrap_accounts =
       List.map
         (fun account -> account.Eth_account.address)
@@ -255,6 +255,7 @@ let setup_sequencer ?block_storage_sqlite3 ?sequencer_rpc_port
     Evm_node.patch_config_with_experimental_feature
       ~drop_duplicate_when_injection
       ~node_transaction_validation:true
+      ?next_wasm_runtime
       ?block_storage_sqlite3
       (* When adding new experimental feature please make sure it's a
          good idea to activate it for all test or not. *)

@@ -132,6 +132,7 @@ val register_test_for_kernels :
   unit
 
 val setup_sequencer :
+  ?next_wasm_runtime:bool ->
   ?block_storage_sqlite3:bool ->
   ?sequencer_rpc_port:int ->
   ?sequencer_private_rpc_port:int ->

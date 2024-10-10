@@ -6,4 +6,4 @@ open! Bigarray
 
 type context
 external wasm_runtime_new_context: unit -> context = "wasm_runtime_new_context"
-external wasm_runtime_run: context -> string -> string -> Irmin_context.tree -> bytes -> int32 -> string list ->  Irmin_context.tree = "wasm_runtime_run_bytecode" "wasm_runtime_run"
+external wasm_runtime_run: context -> string -> string option -> string -> Irmin_context.tree -> bytes -> int32 -> string list ->  Irmin_context.tree = "wasm_runtime_run_bytecode" "wasm_runtime_run"

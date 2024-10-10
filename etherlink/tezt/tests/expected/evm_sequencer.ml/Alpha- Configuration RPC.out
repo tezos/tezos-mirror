@@ -16,7 +16,7 @@
     "node_transaction_validation": true,
     "block_storage_sqlite3": true,
     "overwrite_simulation_tick_limit": false,
-    "next_wasm_runtime": false
+    "next_wasm_runtime": true
   },
   "proxy": {
     "ignore_block_param": false
@@ -65,7 +65,7 @@
     "node_transaction_validation": true,
     "block_storage_sqlite3": true,
     "overwrite_simulation_tick_limit": false,
-    "next_wasm_runtime": false
+    "next_wasm_runtime": true
   },
   "proxy": {
     "ignore_block_param": false
@@ -107,7 +107,7 @@
     "node_transaction_validation": true,
     "block_storage_sqlite3": true,
     "overwrite_simulation_tick_limit": false,
-    "next_wasm_runtime": false
+    "next_wasm_runtime": true
   },
   "proxy": {
     "evm_node_endpoint": "hidden",
