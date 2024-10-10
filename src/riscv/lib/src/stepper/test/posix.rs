@@ -5,7 +5,7 @@
 use crate::{
     machine_state::{
         bus::main_memory::MainMemoryLayout,
-        mode::{Mode, ModeCell, ModeLayout},
+        mode::Mode,
         registers::{a0, a7},
         CacheLayouts, MachineState,
     },
@@ -16,13 +16,13 @@ use crate::{
 };
 
 /// Layout for [`PosixState`]
-pub type PosixStateLayout = (Atom<u64>, Atom<u8>, ModeLayout);
+pub type PosixStateLayout = (Atom<u64>, Atom<u8>, Atom<Mode>);
 
 /// Posix execution environment state
 pub struct PosixState<M: ManagerBase> {
     code: Cell<u64, M>,
     exited: Cell<u8, M>,
-    exit_mode: ModeCell<M>,
+    exit_mode: Cell<Mode, M>,
 }
 
 impl<M: ManagerBase> PosixState<M> {
@@ -31,7 +31,7 @@ impl<M: ManagerBase> PosixState<M> {
         Self {
             code: space.0,
             exited: space.1,
-            exit_mode: ModeCell::bind(space.2),
+            exit_mode: space.2,
         }
     }
 

@@ -9,7 +9,7 @@ use crate::{
     machine_state::{
         bus::Address,
         csregisters::{self, xstatus, CSRegister},
-        mode::{self, Mode, TrapMode},
+        mode::{Mode, TrapMode},
         registers,
         reservation_set::{self, ReservationSet},
     },
@@ -29,7 +29,7 @@ pub struct HartState<M: backend::ManagerBase> {
     pub csregisters: csregisters::CSRegisters<M>,
 
     /// Current running mode of hart
-    pub mode: mode::ModeCell<M>,
+    pub mode: Cell<Mode, M>,
 
     /// Program counter
     pub pc: Cell<Address, M>,
@@ -43,7 +43,7 @@ pub type HartStateLayout = (
     registers::XRegistersLayout,
     registers::FRegistersLayout,
     csregisters::CSRegistersLayout,
-    mode::ModeLayout,
+    Atom<Mode>,
     Atom<Address>,                         // Program counter layout
     reservation_set::ReservationSetLayout, // Reservation set layout
 );
@@ -55,7 +55,7 @@ impl<M: backend::ManagerBase> HartState<M> {
             xregisters: registers::XRegisters::bind(space.0),
             fregisters: registers::FRegisters::bind(space.1),
             csregisters: csregisters::CSRegisters::bind(space.2),
-            mode: mode::ModeCell::bind(space.3),
+            mode: space.3,
             pc: space.4,
             reservation_set: ReservationSet::bind(space.5),
         }
@@ -81,7 +81,7 @@ impl<M: backend::ManagerBase> HartState<M> {
         self.xregisters.reset();
         self.fregisters.reset();
         self.csregisters.reset();
-        self.mode.reset();
+        self.mode.write(Mode::default());
         self.pc.write(pc);
         self.reservation_set.reset();
     }
