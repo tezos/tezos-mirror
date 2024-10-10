@@ -27,7 +27,7 @@ use tezos_smart_rollup_host::metadata::RollupMetadata;
 
 use state::HostState;
 use std::cell::RefCell;
-use std::{fmt, io};
+use std::fmt;
 
 const MAXIMUM_REBOOTS_PER_INPUT: i32 = 1000;
 
@@ -52,7 +52,7 @@ pub use state::InMemoryStore;
 pub struct MockHost {
     state: RefCell<HostState>,
     info: inbox::InfoPerLevel,
-    debug_log: Box<RefCell<dyn io::Write>>,
+    debug_log: Box<RefCell<dyn DebugSink>>,
     keep_going: bool,
 }
 
@@ -74,6 +74,31 @@ impl Default for MockHost {
         );
 
         Self::with_address(&address)
+    }
+}
+
+/// Trait covering different types that may be used as the
+/// `MockHost` debug sink.
+pub trait DebugSink {
+    /// Write all bytes to the sink
+    fn write_all(&mut self, buffer: &[u8]) -> std::io::Result<()>;
+}
+
+impl<Sink: std::io::Write> DebugSink for Sink {
+    fn write_all(&mut self, buffer: &[u8]) -> std::io::Result<()> {
+        <Self as std::io::Write>::write_all(self, buffer)
+    }
+}
+
+/// The default sink writes all debug logs with `eprint`, assuming
+/// UTF-8 encoded characters.
+pub struct DefaultSink;
+
+impl DebugSink for DefaultSink {
+    fn write_all(&mut self, buffer: &[u8]) -> std::io::Result<()> {
+        let output = String::from_utf8_lossy(buffer);
+        eprint!("{}", output);
+        Ok(())
     }
 }
 
@@ -134,7 +159,7 @@ impl MockHost {
         let mut host = Self {
             state: state.into(),
             info,
-            debug_log: Box::new(RefCell::new(io::stderr())),
+            debug_log: Box::new(RefCell::new(DefaultSink)),
             keep_going: true,
         };
 
@@ -145,7 +170,7 @@ impl MockHost {
     }
 
     /// Override debug log handler.
-    pub fn set_debug_handler(&mut self, sink: impl io::Write + 'static) {
+    pub fn set_debug_handler(&mut self, sink: impl DebugSink + 'static) {
         self.debug_log = Box::new(RefCell::new(sink));
     }
 
