@@ -467,6 +467,7 @@ let jobs pipeline_type =
            "scripts/check_wasm_pvm_regressions.sh check";
            "etherlink/scripts/check_evm_store_migrations.sh check";
            "./scripts/check_rollup_node_sql_migrations.sh check";
+           "./src/bin_dal_node/scripts/check_dal_store_migrations.sh check";
          ]
         @
         (* The license check only applies to new files (in the sense
