@@ -154,6 +154,25 @@ repository, but is part of [`etherlink-mainnet-launch`][mainnet-branch] instead.
 - Rework the semantics of migrations in order to allow a network to skip frozen
   versions. (!13895)
 
+### Security Upgrades
+
+#### Version ffb8a65697b6bf4fc4231667f4680c71acc32a9b
+
+**Note:** This commit is not part of the `master` branch of the Octez
+repository, but is part of [`etherlink-security-upgrades`][su-2] instead.
+
+[su-2]: https://gitlab.com/tezos/tezos/-/tree/etherlink-security-upgrade-2
+
+This security upgrade addresses security vulnerabilities found in the underlying
+implementation of a double linked list used for the delayed inbox. The security
+vulnerability was not exploited on Mainnet before the activation of the kernel
+on block 3,400,942.
+
+The internal pointers of the double linked list were not updated correctly, which
+could lead in weird scenarios to the application of a deposit without being
+actually removed from the delayed inbox.
+
+
 ## Version ec7c3b349624896b269e179384d0a45cf39e1145
 
 This kernel has been deployed on Etherlink Testnet on block
