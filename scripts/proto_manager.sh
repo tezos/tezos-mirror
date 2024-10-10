@@ -1018,6 +1018,15 @@ function update_tezt_tests() {
   # TODO: fix and reintroduce this test
   #generate_regression_test
 
+  #fix testnets_scenarios:
+  if [[ ${is_snapshot} == true ]]; then
+    sed -e "s/Protocol.${capitalized_source}/Protocol.${capitalized_label}/g" -i src/bin_testnet_scenarios/*.ml
+  else
+    sed -r "s/(.*) Protocol.${capitalized_source} -> (.*)/ \1 Protocol.${capitalized_source} -> \2 | Protocol.${capitalized_label} -> \2/g" -i src/bin_testnet_scenarios/*.ml
+  fi
+  ocamlformat -i src/bin_testnet_scenarios/*.ml
+  commit_if_changes "tezt: fix testnets_scenarios"
+
   #fix other tests:
   if [[ ${is_snapshot} == true ]]; then
     sed -e "s/Protocol.${capitalized_source}/Protocol.${capitalized_label}/g" -i tezt/tests/*.ml
@@ -1457,8 +1466,10 @@ function remove_from_tezt_tests() {
     commit_if_changes "tezt: adapt protocol_migration.ml"
   fi
 
+  sed -i.old -e "/| Protocol.${capitalized_label} -> */d" src/bin_testnet_scenarios/upgrade_etherlink.ml
   sed -i.old -e "/| Protocol.${capitalized_label} -> */d" tezt/tests/sc_rollup_migration.ml
   sed -i.old -e "/| Protocol.${capitalized_label} -> */d" tezt/tests/sc_rollup.ml
+  ocamlformat -i src/bin_testnet_scenarios/upgrade_etherlink.ml
   ocamlformat -i tezt/tests/sc_rollup_migration.ml
   ocamlformat -i tezt/tests/sc_rollup.ml
   commit "test: fix other tests"
@@ -1870,6 +1881,12 @@ function hash() {
   ocamlformat -i tezt/lib_tezos/protocol.ml
   ocamlformat -i tezt/lib_tezos/protocol.mli
   commit_if_changes "tezt: adapt lib_tezos/protocol.ml"
+
+  #fix testnets_scenarios:
+  sed -e "s/Protocol.${capitalized_source}/Protocol.${capitalized_label}/g" \
+    -e "s/${previous_tag}/${new_tag}/g" -i src/bin_testnet_scenarios/*.ml
+  ocamlformat -i src/bin_testnet_scenarios/*.ml
+  commit_if_changes "tezt: fix testnets_scenarios"
 
   #fix other tests:
   sed -e "s/Protocol.${capitalized_source}/Protocol.${capitalized_label}/g" \
