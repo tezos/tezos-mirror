@@ -189,8 +189,8 @@ For example using ``yum``::
 
 .. _using_docker_images:
 
-Using Docker images and docker-compose
---------------------------------------
+Using Docker images
+-------------------
 
 For every change committed in the GitLab repository, Docker images are
 automatically generated and published on `DockerHub
@@ -205,31 +205,112 @@ You can verify if the images are correctly signed using the Cosign utility, as e
 
    cosign-verify
 
-One way to run those Docker images is with `docker-compose <https://docs.docker.com/compose>`_.
-We provide ``docker-compose`` files for all active
-protocols in directory :src:`scripts/docker`. You can pick one and start with the following command (where ``$PROTO`` is the protocol of your choice):
+You can use the Docker images either directly or using Docker compose files, as explained next.
+In both cases, you need to have `Docker <https://www.docker.com>`__ installed and started (`Docker Desktop <https://www.docker.com/products/docker-desktop/>`__ would suffice for the instructions below).
 
-::
+Plain Docker images
+~~~~~~~~~~~~~~~~~~~
 
-    cd scripts/docker
-    export LIQUIDITY_BAKING_VOTE=pass # You can choose between 'on', 'pass' or 'off'.
-    docker-compose -f $PROTO.yml up
+The Docker images can be directly used to run the different Octez binaries.
+To make sure you use the most recent version of Octez, run::
 
-The above command will launch a node, a client, a baker, and an accuser for
-the given protocol.
+    docker pull tezos/tezos-bare:latest
 
-You can open a new shell session and run ``docker ps`` in it, to display all the available containers, e.g.::
+For instance, to run a node on the Ghostnet :doc:`test network <../user/multinetwork>`, starting :doc:`from a snapshot <../user/snapshots>`, in Rolling :doc:`history mode <../user/history_modes>`, start with a fresh directory and configure the node::
 
-    8f3638fae48c  docker.io/tezos/tezos:latest  octez-node            3 minutes ago  Up 3 minutes ago   0.0.0.0:8732->8732/tcp, 0.0.0.0:9732->9732/tcp  node-alpha
-    8ba4d6077e2d  docker.io/tezos/tezos:latest  octez-baker --liq...  3 minutes ago  Up 31 seconds ago                                                  baker-alpha
-    3ee7fcbc2158  docker.io/tezos/tezos:latest  octez-accuser         3 minutes ago  Up 35 seconds ago                                                  accuser-alpha
+    mkdir $HOME/rolling-data-directory
+    docker run -it --rm \
+      --volume "$HOME/rolling-data-directory:/home/tezos/.tezos-node" \
+      tezos/tezos-bare:latest \
+      octez-node config init --network ghostnet --rpc-addr 127.0.0.1 \
+        --history-mode rolling
 
+(You may use another location than ``$HOME``, but note that option ``--volume`` requires absolute paths.)
 
-The node's RPC interface will be available on localhost and can be queried with ``octez-client``.
+Then, download and import a snapshot, and finally run the node::
 
-::
+    wget -O $HOME/rolling <snapshot-url>
+    docker run -it --rm \
+      --volume "$HOME/rolling-data-directory:/home/tezos/.tezos-node" \
+      --volume "$HOME/rolling:/rolling:ro" \
+      tezos/tezos-bare:latest \
+      octez-node snapshot import /rolling
+    docker run --name octez-local-node -d \
+      --volume "$HOME/rolling-data-directory:/home/tezos/.tezos-node" \
+      tezos/tezos-bare:latest \
+      octez-node run
 
-    docker exec octez-node-$PROTO octez-client rpc list
+You may check when your node is bootstrapped by executing in another terminal::
+
+    docker exec -it octez-local-node octez-client bootstrapped
+
+You may stop and restart the node as needed, for instance if you need to upgrade the version of the storage::
+
+    docker stop octez-local-node
+    docker run --rm --volumes-from octez-local-node tezos/tezos-bare:latest \
+      octez-node upgrade storage
+    docker start octez-local-node
+
+Docker compose files
+~~~~~~~~~~~~~~~~~~~~
+
+Another way to run those Docker images is with `docker-compose <https://docs.docker.com/compose>`_.
+``docker-compose`` files are available for all active
+protocols in directory :src:`scripts/docker`.
+Each compose file is able to launch services for a node, a baker, and an accuser for the given protocol.
+
+First, you have to make some choices:
+
+- choose one of the above protocols and download its compose file
+- choose a :doc:`network <../user/multinetwork>` to connect to (a testnet name, ``sandbox``,  or ``mainnet``); that network must currently run your protocol
+- choosing the desired :doc:`history mode <../user/history_modes>` (``rolling``, ``full``, or ``archive``)
+- specify a vote for the :doc:`liquidity baking <../active/liquidity_baking>` feature (``on``, ``pass``, or ``off``)
+
+For instance, to configure and run the node on the active protocol on Ghostnet, in Rolling history mode::
+
+    export PROTO=parisC
+    wget https://gitlab.com/tezos/tezos/-/raw/master/scripts/docker/$PROTO.yml
+    export LIQUIDITY_BAKING_VOTE=pass
+    docker compose -f $PROTO.yml run --rm -it \
+      octez-node octez-node --network ghostnet --history-mode rolling
+
+(Note in the command above that ``octez-node`` is the name of both the container and executable.)
+
+.. note::
+
+    If the node complains that it is configured for another network, you'll have to remove the node configuration file before running it:
+
+    ::
+
+        docker compose -f $PROTO.yml run --rm \
+          --entrypoint='sh -c "rm /var/run/tezos/node/data/config.json"' \
+          octez-node
+
+The node is now configured and started correctly, but may take a very long time to bootstrap.
+In most practical cases, you have to restart it from a :doc:`snapshot file <../user/snapshots>`. For that, you have to stop the node by hitting ^C (or executing in another terminal ``docker compose -f $PROTO.yml stop octez-node``), then clean up its data directory and import a snapshot that you previously downloaded::
+
+    docker compose -f $PROTO.yml run --rm \
+      --entrypoint='sh -c "cd /var/run/tezos/node/data/; \
+        rm -fr lock store context daily_logs"' \
+      octez-node
+    wget -O $HOME/rolling <snapshot-url>
+    docker compose -f $PROTO.yml run --rm -it -v "$HOME/rolling:/snapshot:ro" \
+      octez-node octez-snapshot-import
+
+Now you can start all the services::
+
+    docker compose -f $PROTO.yml up
+
+You may check when your node is bootstrapped by running ``octez-client`` inside the node's container::
+
+    docker compose -f $PROTO.yml exec octez-node octez-client bootstrapped
+
+You may stop and restart the node as needed. For instance if the Octez version you are using requires to upgrade the version of the storage, you can restart the node after upgrading the storage::
+
+    docker compose -f $PROTO.yml stop octez-node
+    docker compose -f $PROTO.yml run octez-node octez-upgrade-storage
+    docker compose -f $PROTO.yml up octez-node
+
 
 Building Docker Images Locally
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
