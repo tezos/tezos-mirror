@@ -59,6 +59,14 @@ let shutdown_node =
     ~level:Notice
     ("exit_status", Data_encoding.int8)
 
+let dal_node_sqlite3_store_init =
+  declare_0
+    ~section
+    ~name:"dal_node_sqlite3_store_init"
+    ~msg:"initializing the SQLite3 store"
+    ~level:Notice
+    ()
+
 let store_is_ready =
   declare_0
     ~section

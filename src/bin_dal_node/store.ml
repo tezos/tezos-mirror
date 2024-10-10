@@ -539,6 +539,7 @@ type t = {
   last_processed_level : Last_processed_level.t;
   first_seen_level : First_seen_level.t;
   storage_backend : Storage_backend.kind;
+  sqlite3 : Dal_store_sqlite3.t;
 }
 
 let cache {cache; _} = cache
@@ -713,6 +714,10 @@ let init config =
     let sqlite3_backend = config.experimental_features.sqlite3_backend in
     Storage_backend.set store ~sqlite3_backend
   in
+  let* sqlite3 =
+    let*! () = Event.(emit dal_node_sqlite3_store_init ()) in
+    Dal_store_sqlite3.init ~data_dir:base_dir ~perm:`Read_write ()
+  in
   let*! () = Event.(emit store_is_ready ()) in
   return
     {
@@ -726,6 +731,7 @@ let init config =
       last_processed_level;
       first_seen_level;
       storage_backend;
+      sqlite3;
     }
 
 let add_slot_headers ~number_of_slots ~block_level slot_headers t =
