@@ -47,7 +47,7 @@ enum Commands {
         #[arg(long)]
         inbox_file: Box<Path>,
         #[arg(long)]
-        log_file: Box<Path>,
+        log_file: Vec<Box<Path>>,
         #[arg(long)]
         expected_transfers: usize,
     },
