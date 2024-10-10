@@ -5,9 +5,10 @@
 
 use std::{fs, path::PathBuf};
 
-use crate::bindings::{self, BindingsError};
+use crate::bindings::{self, BindingsError, Key};
 
 use super::env::Env;
+use log::trace;
 use tezos_crypto_rs::blake2b;
 use wasmer::{
     imports, AsStoreRef, Function, FunctionEnv, FunctionEnvMut, Imports, MemoryView, RuntimeError,
@@ -85,6 +86,7 @@ fn write_output(_env: FunctionEnvMut<Env>, _ptr: u32, length: u32) -> i32 {
 }
 
 fn read_input(mut env: FunctionEnvMut<Env>, info_addr: u32, dst: u32, max_bytes: u32) -> i32 {
+    trace!("read_input");
     let (runtime_env, store) = env.data_and_store_mut();
 
     match runtime_env.mut_host().next_input() {
@@ -117,6 +119,7 @@ fn store_exists(env: FunctionEnvMut<Env>, key_ptr: u32, key_len: u32) -> Result<
     let memory_view = memory.view(&store);
 
     let key = read_from_memory(&memory_view, key_ptr, key_len)?;
+    trace!("store_exists({})", key.as_str());
 
     match bindings::mem_tree(&runtime_env.host().tree(), key) {
         Ok(true) => Ok(1),
@@ -132,6 +135,7 @@ fn store_has(env: FunctionEnvMut<Env>, key_ptr: u32, key_len: u32) -> Result<i32
     let memory_view = memory.view(&store);
 
     let key = read_from_memory(&memory_view, key_ptr, key_len)?;
+    trace!("store_has({})", key.as_str());
 
     match bindings::store_has(&runtime_env.host().tree(), key) {
         Ok(i) => Ok(i as i32),
@@ -149,6 +153,7 @@ fn store_delete(
     let memory_view = memory.view(&store);
 
     let key = read_from_memory(&memory_view, key_ptr, key_len)?;
+    trace!("store_delete({})", key.as_str());
 
     match bindings::store_delete(&runtime_env.host().tree(), key, false) {
         Ok(evm_tree) => {
@@ -169,6 +174,7 @@ fn store_delete_value(
     let memory_view = memory.view(&store);
 
     let key = read_from_memory(&memory_view, key_ptr, key_len)?;
+    trace!("store_delete_value({})", key.as_str());
 
     match bindings::store_delete(&runtime_env.host().tree(), key, true) {
         Ok(evm_tree) => {
@@ -192,6 +198,7 @@ fn store_copy(
 
     let from = read_from_memory(&memory_view, from_ptr, from_len)?;
     let to = read_from_memory(&memory_view, to_ptr, to_len)?;
+    trace!("store_copy(from: {}, to: {})", from.as_str(), to.as_str());
 
     match bindings::store_copy(&runtime_env.host().tree(), from, to) {
         Ok(evm_tree) => {
@@ -215,6 +222,7 @@ fn store_move(
 
     let from = read_from_memory(&memory_view, from_ptr, from_len)?;
     let to = read_from_memory(&memory_view, to_ptr, to_len)?;
+    trace!("store_move(from: {}, to: {})", from.as_str(), to.as_str());
 
     match bindings::store_move(&runtime_env.host().tree(), from, to) {
         Ok(evm_tree) => {
@@ -238,6 +246,7 @@ fn store_get_hash(
     let memory_view = memory.view(&store);
 
     let key = read_from_memory(&memory_view, key_ptr, key_len)?;
+    trace!("store_get_hash({})", key.as_str());
 
     match bindings::store_get_hash(&runtime_env.host().tree(), &key) {
         Ok(hash) => {
@@ -261,6 +270,7 @@ fn store_list_size(
     let memory_view = memory.view(&store);
 
     let key = read_from_memory(&memory_view, key_ptr, key_len)?;
+    trace!("store_list_size({})", key.as_str());
 
     match bindings::store_list_size(&runtime_env.host().tree(), key) {
         Ok(res) => Ok(res as i64),
@@ -279,6 +289,7 @@ fn store_value_size(
     let memory_view = memory.view(&store);
 
     let key = read_from_memory(&memory_view, key_ptr, key_len)?;
+    trace!("store_value_size({})", key.as_str());
 
     match bindings::store_value_size(&runtime_env.host().tree(), key) {
         Ok(res) => Ok(res as i32),
@@ -299,6 +310,7 @@ fn store_read(
     let memory_view = memory.view(&store);
 
     let key = read_from_memory(&memory_view, key_ptr, key_len)?;
+    trace!("store_read({})", key.as_str());
 
     match bindings::store_read(
         runtime_env.host().tree(),
@@ -327,6 +339,7 @@ fn store_write(
     let memory_view = memory.view(&store);
 
     let key = read_from_memory(&memory_view, key_ptr, key_len)?;
+    trace!("store_write({})", key.as_str());
     let buffer = read_from_memory(&memory_view, src_ptr, src_len)?;
 
     match bindings::store_write(runtime_env.host().tree(), key, offset as usize, &buffer) {
@@ -343,6 +356,7 @@ fn reveal_metadata(
     dst_ptr: u32,
     max_bytes: u32,
 ) -> Result<i32, RuntimeError> {
+    trace!("reveal_metadata");
     let (runtime_env, store) = env.data_and_store_mut();
     let memory = runtime_env.memory();
     let memory_view = memory.view(&store);
@@ -382,6 +396,7 @@ fn reveal_preimage(
 
     let hash_bytes = read_from_memory(&memory_view, hash_ptr, hash_len)?;
     let hash_hex = hex::encode(&hash_bytes);
+    trace!("reveal_preimage({hash_hex})");
 
     if hash_bytes[0] != 0u8 {
         return Err(RuntimeError::new(format!(

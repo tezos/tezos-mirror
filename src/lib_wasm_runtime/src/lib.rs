@@ -5,3 +5,4 @@ mod bindings;
 mod host;
 mod runtime;
 mod types;
+mod write_debug;

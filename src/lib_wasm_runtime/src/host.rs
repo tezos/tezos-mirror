@@ -5,11 +5,13 @@
 
 use std::collections::VecDeque;
 
+use log::{debug, error, info, warn};
 use ocaml::Error;
 
 use crate::{
     bindings,
     types::{EvmTree, OCamlString, SmartRollupAddress},
+    write_debug::write_debug,
 };
 
 #[derive(Clone)]
@@ -106,7 +108,7 @@ impl Host {
     }
 
     pub fn write_debug(&self, msg: &[u8]) {
-        print!("{}", String::from_utf8_lossy(msg))
+        write_debug(msg)
     }
 
     pub fn next_input(&mut self) -> Option<Input> {

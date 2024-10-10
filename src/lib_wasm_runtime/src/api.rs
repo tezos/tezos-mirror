@@ -8,6 +8,7 @@ use crate::{
     runtime::{self, InputsBuffer, RunStatus},
     types::{ContextHash, EvmTree, OCamlString, SmartRollupAddress},
 };
+use log::trace;
 use ocaml::{Error, List, Pointer, Value};
 use std::collections::BTreeMap;
 use wasmer::{Engine, Features, Module, NativeEngineExt, Store, Target};
@@ -50,6 +51,7 @@ impl KernelsCache {
         let hash = bindings::store_get_hash(evm_tree, &KERNEL_PATH)?;
 
         if self.miss(&hash) {
+            trace!("KernelsCache::load cache miss");
             let code = bindings::read_value(&evm_tree, KERNEL_PATH)?;
             let kernel = Kernel::new(engine, code.as_bytes())?;
             let _previous = self.insert(&hash, kernel);
@@ -89,6 +91,12 @@ impl Context {
             kernels_cache: KernelsCache::new(),
         }
     }
+}
+
+#[ocaml::func]
+#[ocaml::sig("unit -> unit")]
+pub fn wasm_runtime_logger_init() {
+    env_logger::init();
 }
 
 #[ocaml::func]

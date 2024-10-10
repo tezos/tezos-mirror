@@ -5,7 +5,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let static_context = Evm_node_wasm_runtime.wasm_runtime_new_context ()
+open Evm_node_wasm_runtime
+
+let () = wasm_runtime_logger_init ()
+
+let static_context = wasm_runtime_new_context ()
 
 module Shared_inbox : sig
   (** [wrap inbox] encapsulates [inbox] between [sol; ipl] and [eol]. These
@@ -41,7 +45,7 @@ let run ~preimages_dir ?preimages_endpoint ~entrypoint tree rollup_address inbox
     : Irmin_context.tree Lwt.t =
   Lwt_preemptive.detach
     (fun () ->
-      Evm_node_wasm_runtime.wasm_runtime_run
+      wasm_runtime_run
         ~preimages_dir
         ?preimages_endpoint:(Option.map Uri.to_string preimages_endpoint)
         ~entrypoint

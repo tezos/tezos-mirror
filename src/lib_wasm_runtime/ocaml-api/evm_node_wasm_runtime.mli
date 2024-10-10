@@ -21,3 +21,5 @@ val wasm_runtime_run :
   Irmin_context.tree
 
 val wasm_runtime_preload_kernel : context -> Irmin_context.tree -> unit
+
+val wasm_runtime_logger_init : unit -> unit
