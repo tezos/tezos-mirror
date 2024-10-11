@@ -1,7 +1,7 @@
 let
   default-opam-nix-integration-src = fetchTarball {
-    url = "https://github.com/vapourismo/opam-nix-integration/archive/0f98236c75cdb436be7669ccaa249264456baa37.tar.gz";
-    sha256 = "0m9v7s8zgkr280f7l8qy12dnjmi7pf0mza16b5xral9fsqi9j1sa";
+    url = "https://github.com/vapourismo/opam-nix-integration/archive/995ba05cfc5bc2c98ea6429b814625623cf64239.tar.gz";
+    sha256 = "131ckc6qfgik46dqpf7rj9hsrj9j0nk44nhbsjnjcc3h0c5k44j3";
   };
 
   default-rust-overlay-src = fetchTarball {

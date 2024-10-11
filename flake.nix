@@ -5,7 +5,10 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/24.05";
     flake-utils.url = "github:numtide/flake-utils";
-    opam-nix-integration.url = "github:vapourismo/opam-nix-integration";
+    opam-nix-integration = {
+      url = "github:vapourismo/opam-nix-integration";
+      inputs.opam-repository.follows = "opam-repository";
+    };
     opam-repository = {
       flake = false;
       url = "github:ocaml/opam-repository";
