@@ -2069,6 +2069,19 @@ function hash() {
   commit_if_changes "docs: generate openapi"
 
   echo "Rehashing done"
+
+  log_cyan "Checking potential leftovers"
+  total_occurences=0
+  while read -r file; do
+    if grep -q -i "${previous_tag}" "${file}"; then
+      occurences=$(grep -c -i "${previous_tag}" "${file}")
+      total_occurences=$((total_occurences + occurences))
+      warning "${file} contains ${occurences} occurences of ${previous_tag}"
+    fi
+  done <<< "$(git ls-files)"
+  warning "Total occurences of ${previous_tag}: ${total_occurences}"
+  log_blue "Please review the leftovers and update them manually if needed"
+
 }
 
 #run command
