@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Local context storages by functors
-    Invocation:   dune exec src/proto_021_PtQenaB1/lib_protocol/test/unit/main.exe \
+    Invocation:   dune exec src/proto_021_PsQuebec/lib_protocol/test/unit/main.exe \
                   -- --file test_local_contexts.ml
     Dependencies: helpers/block.ml
     Subject:      Tests for local contexts

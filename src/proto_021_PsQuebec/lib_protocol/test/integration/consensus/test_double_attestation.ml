@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Protocol (double attestation)
-    Invocation:   dune exec src/proto_021_PtQenaB1/lib_protocol/test/integration/consensus/main.exe \
+    Invocation:   dune exec src/proto_021_PsQuebec/lib_protocol/test/integration/consensus/main.exe \
                   -- --file test_double_attestation.ml
     Subject:      Double attestation evidence operation may happen when an
                   attester attested two different blocks on the same level.

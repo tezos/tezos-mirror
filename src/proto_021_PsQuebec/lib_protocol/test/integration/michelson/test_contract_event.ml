@@ -29,7 +29,7 @@ open Alpha_context
 (** Testing
     -------
     Component:  Protocol (event logging)
-    Invocation: dune exec src/proto_021_PtQenaB1/lib_protocol/test/integration/michelson/main.exe \
+    Invocation: dune exec src/proto_021_PsQuebec/lib_protocol/test/integration/michelson/main.exe \
                   -- --file test_contract_event.ml
     Subject:  This module tests that the event logs can be written to the receipt
               in correct order and expected format.
