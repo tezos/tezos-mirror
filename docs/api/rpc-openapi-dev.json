@@ -3,7 +3,7 @@
   "info": {
     "title": "Octez RPC",
     "description": "The RPC API served by the Octez node.",
-    "version": "Octez 21.0~beta11+dev (39e8de63)"
+    "version": "Octez 21.0~rc3+dev (2cd0ffe3)"
   },
   "paths": {
     "/chains/{chain_id}": {
@@ -2167,6 +2167,52 @@
                     {
                       "$ref": "#/components/schemas/unistring"
                     }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/monitor/received_blocks/{chain_id}": {
+      "get": {
+        "description": "Monitor all newly received blocks that are not yet known by the store.",
+        "parameters": [
+          {
+            "name": "chain_id",
+            "in": "path",
+            "description": "A chain identifier. This is either a chain hash in Base58Check notation or a one the predefined aliases: 'main', 'test'.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "hash": {
+                      "$ref": "#/components/schemas/block_hash"
+                    }
+                  },
+                  "required": [
+                    "hash"
                   ]
                 }
               }
