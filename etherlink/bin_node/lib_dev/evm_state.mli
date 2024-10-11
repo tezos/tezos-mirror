@@ -111,7 +111,11 @@ val wasm_pvm_version : t -> Tezos_scoru_wasm.Wasm_pvm_state.version Lwt.t
     expected to be located, relatively to the data directory. *)
 val irmin_store_path : data_dir:string -> string
 
-val preload_kernel : t -> unit Lwt.t
+(** [preload_kernel ~wasm_runtime evm_state] ensures the kernel of [evm_state]
+    is added to the kernel cache of the execution runtime in use (the WASM
+    Runtime otherwise). This will speed-up the execution time for the first
+    call of this kernel (typically in the context of a RPC call). *)
+val preload_kernel : wasm_runtime:bool -> t -> unit Lwt.t
 
 (** [get_delayed_inbox_item state hash] returns the delayed inbox content behind
     the hash [hash]. It fails if the hash does not exist or if the value

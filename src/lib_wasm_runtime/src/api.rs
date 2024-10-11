@@ -138,3 +138,11 @@ pub fn wasm_runtime_run(
         }
     }
 }
+
+#[ocaml::func]
+#[ocaml::sig("context -> Irmin_context.tree -> unit")]
+pub fn wasm_runtime_preload_kernel(mut ctxt: Pointer<Context>, tree: EvmTree) -> Result<(), Error> {
+    let ctxt = ctxt.as_mut();
+    let _kernel = ctxt.kernels_cache.load(&ctxt.engine, &tree)?;
+    Ok(())
+}
