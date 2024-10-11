@@ -72,6 +72,8 @@ let is_empty {active_sinks} = active_sinks = []
 
 let make_custom active_sinks = {active_sinks}
 
+let add_uri_to_config uri {active_sinks} = {active_sinks = uri :: active_sinks}
+
 let encoding =
   let open Data_encoding in
   let object_1 key_name =
