@@ -883,8 +883,8 @@ let prepare ~level ~predecessor_timestamp ~timestamp ~adaptive_issuance_enable
 
 type previous_protocol =
   | Genesis of Parameters_repr.t
-  | Qena
-  | (* Qena predecessor *) ParisC_020 (* Qena predecessor *)
+  | Quebec
+  | (* Quebec predecessor *) ParisC_020 (* Quebec predecessor *)
 
 let check_and_update_protocol_version ctxt =
   let open Lwt_result_syntax in
@@ -900,9 +900,9 @@ let check_and_update_protocol_version ctxt =
         else if Compare.String.(s = "genesis") then
           let+ param, ctxt = get_proto_param ctxt in
           (Genesis param, ctxt)
-        else if Compare.String.(s = "qena") then return (Qena, ctxt)
-        else if (* Qena predecessor *) Compare.String.(s = "paris_020") then
-          return (ParisC_020, ctxt) (* Qena predecessor *)
+        else if Compare.String.(s = "quebec") then return (Quebec, ctxt)
+        else if (* Quebec predecessor *) Compare.String.(s = "paris_020") then
+          return (ParisC_020, ctxt) (* Quebec predecessor *)
         else Lwt.return @@ storage_error (Incompatible_protocol_version s)
   in
   let*! ctxt =
@@ -1023,8 +1023,8 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
         let* ctxt = set_cycle_eras ctxt cycle_eras in
         let*! result = add_constants ctxt param.constants in
         return (result, None)
-    (* Start of Qena stitching. Comment used for automatic snapshot *)
-    | Qena ->
+    (* Start of Quebec stitching. Comment used for automatic snapshot *)
+    | Quebec ->
         let module Previous = Constants_parametric_repr in
         let* c = get_constants ctxt in
         let dal =
@@ -1307,7 +1307,7 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
            it should be removed in beta when stabilising *)
         let*! c = get_previous_protocol_constants ctxt in
         return (ctxt, Some c)
-    (* End of Qena stitching. Comment used for automatic snapshot *)
+    (* End of Quebec stitching. Comment used for automatic snapshot *)
     (* Start of beta predecessor stitching. Comment used for automatic snapshot *)
     | ParisC_020 ->
         let*! c = get_previous_protocol_constants ctxt in
