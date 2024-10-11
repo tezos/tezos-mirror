@@ -95,8 +95,8 @@ val prepare :
 
 type previous_protocol =
   | Genesis of Parameters_repr.t
-  | Qena
-  | (* Qena predecessor *) ParisC_020 (* Qena predecessor *)
+  | Quebec
+  | (* Quebec predecessor *) ParisC_020 (* Quebec predecessor *)
 
 val prepare_first_block :
   level:int32 ->
