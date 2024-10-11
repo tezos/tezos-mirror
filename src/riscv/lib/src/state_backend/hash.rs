@@ -88,13 +88,19 @@ pub trait RootHashable {
     fn hash(&self) -> Result<Hash, HashError>;
 }
 
+impl<T: RootHashable> RootHashable for &T {
+    fn hash(&self) -> Result<Hash, HashError> {
+        T::hash(self)
+    }
+}
+
 impl RootHashable for Hash {
     fn hash(&self) -> Result<Hash, HashError> {
         Ok(*self)
     }
 }
 
-impl<T: RootHashable> RootHashable for &[T] {
+impl<T: RootHashable> RootHashable for [T] {
     fn hash(&self) -> Result<Hash, HashError> {
         let mut hashes: Vec<u8> = Vec::new();
 
