@@ -10,11 +10,16 @@ use tezos_evm_runtime::runtime::MockKernelHost;
 
 use crate::{
     account_storage::{account_path, init_account_storage},
-    fa_bridge::test_utils::{
-        convert_h160, convert_log, convert_u256, deploy_mock_wrapper, dummy_fa_deposit,
-        dummy_fa_withdrawal, dummy_ticket, fa_bridge_precompile_call_withdraw,
-        get_storage_flag, kernel_wrapper, run_fa_deposit, ticket_balance_add,
-        ticket_balance_get, token_wrapper, withdrawal_counter_next,
+    fa_bridge::{
+        deposit::ticket_hash,
+        test_utils::{
+            convert_h160, convert_log, convert_u256, deploy_mock_wrapper,
+            deploy_reentrancy_tester, dummy_fa_deposit, dummy_fa_withdrawal,
+            dummy_ticket, fa_bridge_precompile_call_withdraw, get_storage_flag,
+            kernel_wrapper, run_fa_deposit, ticket_balance_add, ticket_balance_get,
+            token_wrapper, withdrawal_counter_next,
+        },
+        FA_DEPOSIT_PROXY_GAS_LIMIT,
     },
     handler::ExecutionResult,
 };
@@ -43,6 +48,8 @@ fn fa_deposit_reached_wrapper_contract() {
         &mut evm_account_storage,
         &deposit,
         &caller,
+        FA_DEPOSIT_PROXY_GAS_LIMIT,
+        false,
     );
     assert!(res.is_success());
     assert_eq!(2, res.logs.len());
@@ -113,6 +120,8 @@ fn fa_deposit_refused_due_non_existing_contract() {
         &mut evm_account_storage,
         &deposit,
         &caller,
+        FA_DEPOSIT_PROXY_GAS_LIMIT,
+        false,
     );
     assert_eq!(1, res.logs.len());
 
@@ -177,6 +186,8 @@ fn fa_deposit_refused_non_compatible_interface() {
         &mut evm_account_storage,
         &deposit,
         &caller,
+        FA_DEPOSIT_PROXY_GAS_LIMIT,
+        false,
     );
     assert_eq!(1, res.logs.len());
 
@@ -254,6 +265,8 @@ fn fa_deposit_proxy_state_reverted_if_ticket_balance_overflows() {
         &mut evm_account_storage,
         &deposit,
         &caller,
+        FA_DEPOSIT_PROXY_GAS_LIMIT,
+        false,
     );
     assert!(!res.is_success());
     assert!(res.logs.is_empty());
@@ -452,4 +465,58 @@ fn fa_withdrawal_fails_due_to_insufficient_balance() {
     assert!(
         matches!(res.result, ExecutionResult::Error(ExitError::Other(err)) if err.contains("Insufficient ticket balance"))
     );
+}
+
+#[test]
+fn fa_deposit_cannot_call_fa_withdrawal_precompile() {
+    let mut mock_runtime = MockKernelHost::default();
+    let mut evm_account_storage = init_account_storage().unwrap();
+
+    let caller = H160::zero();
+    let ticket = dummy_ticket();
+
+    let proxy = deploy_reentrancy_tester(
+        &mut mock_runtime,
+        &mut evm_account_storage,
+        &ticket,
+        &caller,
+        U256::one(),
+        U256::one(),
+    )
+    .new_address()
+    .expect("Failed to deploy reentrancy tester");
+
+    ticket_balance_add(
+        &mut mock_runtime,
+        &mut evm_account_storage,
+        &ticket_hash(&ticket).unwrap(),
+        &proxy,
+        U256::one(),
+    );
+
+    let deposit = dummy_fa_deposit(ticket, Some(proxy));
+
+    // First let's show that it's possible to withdraw from the inner call
+    let res = run_fa_deposit(
+        &mut mock_runtime,
+        &mut evm_account_storage,
+        &deposit,
+        &caller,
+        100_000_000,
+        true,
+    );
+    assert!(res.is_success());
+    assert!(!res.withdrawals.is_empty());
+
+    // Now let's do the same but without enabling the withdrawal precompile
+    let res = run_fa_deposit(
+        &mut mock_runtime,
+        &mut evm_account_storage,
+        &deposit,
+        &caller,
+        100_000_000,
+        false,
+    );
+    assert!(res.is_success());
+    assert!(res.withdrawals.is_empty());
 }

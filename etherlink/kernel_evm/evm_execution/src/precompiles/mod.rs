@@ -160,11 +160,10 @@ pub const WITHDRAWAL_ADDRESS: H160 = H160([
     0xff, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
 ]);
 
-/// Factory function for generating the precompileset that the EVM kernel uses.
-pub fn precompile_set<Host: Runtime>(
-    enable_fa_withdrawals: bool,
-) -> PrecompileBTreeMap<Host> {
-    let mut precompiles = BTreeMap::from([
+/// Factory function for generating the pure precompile set that does not mutate kernel state.
+/// This does not include XTZ/FA withdrawal precompiles (for reentrancy protection).
+pub fn pure_precompile_set<Host: Runtime>() -> PrecompileBTreeMap<Host> {
+    BTreeMap::from([
         (
             H160::from_low_u64_be(1u64),
             ecrecover_precompile as PrecompileFn<Host>,
@@ -201,11 +200,19 @@ pub fn precompile_set<Host: Runtime>(
             H160::from_low_u64_be(9u64),
             blake2f_precompile as PrecompileFn<Host>,
         ),
-        (
-            WITHDRAWAL_ADDRESS,
-            withdrawal_precompile as PrecompileFn<Host>,
-        ),
-    ]);
+    ])
+}
+
+/// Factory function for generating the precompileset that the EVM kernel uses.
+pub fn precompile_set<Host: Runtime>(
+    enable_fa_withdrawals: bool,
+) -> PrecompileBTreeMap<Host> {
+    let mut precompiles = pure_precompile_set();
+
+    precompiles.insert(
+        WITHDRAWAL_ADDRESS,
+        withdrawal_precompile as PrecompileFn<Host>,
+    );
 
     if enable_fa_withdrawals {
         precompiles.insert(
@@ -213,7 +220,6 @@ pub fn precompile_set<Host: Runtime>(
             fa_bridge_precompile as PrecompileFn<Host>,
         );
     }
-
     precompiles
 }
 

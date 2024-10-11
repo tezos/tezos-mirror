@@ -9,11 +9,11 @@
 use ethereum::Log;
 use evm_execution::account_storage::{EthereumAccount, EthereumAccountStorage};
 use evm_execution::fa_bridge::deposit::FaDeposit;
-use evm_execution::fa_bridge::execute_fa_deposit;
+use evm_execution::fa_bridge::{execute_fa_deposit, FA_DEPOSIT_PROXY_GAS_LIMIT};
 use evm_execution::handler::{
     ExecutionOutcome, ExecutionResult as ExecutionOutcomeResult, RouterInterface,
 };
-use evm_execution::precompiles::PrecompileBTreeMap;
+use evm_execution::precompiles::{self, PrecompileBTreeMap};
 use evm_execution::run_transaction;
 use evm_execution::storage::tracer;
 use evm_execution::trace::TracerInput::CallTracer;
@@ -463,22 +463,24 @@ fn apply_fa_deposit<Host: Runtime>(
     evm_account_storage: &mut EthereumAccountStorage,
     fa_deposit: &FaDeposit,
     block_constants: &BlockConstants,
-    precompiles: &PrecompileBTreeMap<Host>,
     allocated_ticks: u64,
     transaction: &Transaction,
     tracer_input: Option<TracerInput>,
 ) -> Result<ExecutionResult<TransactionResult>, Error> {
     let caller = H160::zero();
+    // Prevent inner calls to XTZ/FA withdrawal precompiles
+    let precompiles = precompiles::pure_precompile_set();
     let outcome = execute_fa_deposit(
         host,
         block_constants,
         evm_account_storage,
-        precompiles,
+        &precompiles,
         CONFIG,
         caller,
         fa_deposit,
         allocated_ticks,
         tracer_input,
+        FA_DEPOSIT_PROXY_GAS_LIMIT,
     )
     .map_err(Error::InvalidRunTransaction)?;
 
@@ -648,7 +650,6 @@ pub fn apply_transaction<Host: Runtime>(
                 evm_account_storage,
                 fa_deposit,
                 block_constants,
-                precompiles,
                 allocated_ticks,
                 transaction,
                 tracer_input,

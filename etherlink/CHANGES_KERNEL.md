@@ -98,6 +98,7 @@ L1 blocks, without sacrificing decentralization, and with reduced costs.
   account. Execution forbid this. (!14317)
 - Tick model is updated with regards to FA deposits and withdrawals. (!14016)
 - Gas cost of XTZ/FA withdrawals is increased to prevent abuses. (!14016)
+- FA deposits disallowed to invoke XTZ/FA withdrawal precompiles. (!14545)
 
 ## Version 4f4457e2527cb227a90bb1c56d3a83f39c0f78fd
 
