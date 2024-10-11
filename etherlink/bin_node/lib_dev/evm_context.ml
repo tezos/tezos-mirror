@@ -1172,22 +1172,6 @@ module State = struct
     let block = Option.map Ethereum_types.block_from_rlp bytes in
     return (Option.map (fun block -> block.Ethereum_types.number) block)
 
-  let blueprint_with_events ctxt level =
-    let open Lwt_result_syntax in
-    Evm_store.use ctxt.store @@ fun conn ->
-    let* blueprint = Evm_store.Blueprints.find conn level in
-    let* kernel_upgrade =
-      Evm_store.Kernel_upgrades.find_applied_before conn level
-    in
-    match blueprint with
-    | None -> return None
-    | Some blueprint ->
-        let* delayed_transactions =
-          Evm_store.Delayed_transactions.at_level conn level
-        in
-        return_some
-          Blueprint_types.{delayed_transactions; kernel_upgrade; blueprint}
-
   let messages_of_level store level =
     let open Lwt_result_syntax in
     let open Octez_smart_rollup_node_store in
@@ -1470,7 +1454,8 @@ module Handlers = struct
     | Blueprint {level} ->
         protect @@ fun () ->
         let ctxt = Worker.state self in
-        State.blueprint_with_events ctxt level
+        Evm_store.use ctxt.store @@ fun conn ->
+        Evm_store.Blueprints.find_with_events conn level
     | Blueprints_range {from; to_} ->
         protect @@ fun () ->
         let ctxt = Worker.state self in
