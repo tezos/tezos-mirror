@@ -2000,6 +2000,9 @@ function hash() {
 
   log_blue "docs: update docs/protocols/${new_versioned_name}.rst"
   sed -e "s,src/proto_${protocol_source},src/proto_${new_protocol_name},g" \
+    -e "s/${previous_variant}/${new_variant}/g" \
+    -e "s/${capitalized_source}/${capitalized_label}/g" \
+    -e "s/${protocol_source}/${label}/g" \
     -i "docs/protocols/${new_versioned_name}.rst"
   commit_if_changes "docs: fix docs/protocols/${new_versioned_name}.rst"
 
