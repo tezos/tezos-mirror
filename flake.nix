@@ -14,6 +14,7 @@
       url = "github:ocaml/opam-repository";
     };
     rust-overlay.url = "github:oxalica/rust-overlay/38c2f156fca1868c8be7195ddac150522752f6ab";
+    flake-compat.url = "https://flakehub.com/f/edolstra/flake-compat/1.tar.gz";
   };
 
   outputs = {
@@ -23,6 +24,7 @@
     opam-nix-integration,
     opam-repository,
     rust-overlay,
+    ...
   }:
     flake-utils.lib.eachDefaultSystem (
       system: let
