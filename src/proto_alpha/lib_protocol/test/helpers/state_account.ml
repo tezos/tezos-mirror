@@ -243,13 +243,19 @@ let apply_unstake cycle amount staker_name account_map =
                   {delegate with frozen_deposits; unstaked_frozen}
                 in
                 update_account ~f:(fun _ -> delegate) delegate_name account_map
+              else if Tez.(amount = zero) then
+                (* Don't do anything *)
+                account_map
               else
-                (* Case external stake *)
+                (* Case (non-trivial) external stake *)
                 let staked_amount =
                   Frozen_tez.get staker_name delegate.frozen_deposits
                 in
                 let pseudotokens, amount_q =
-                  if Partial_tez.(staked_amount <= of_tez amount) then
+                  let staked_tez =
+                    Partial_tez.to_tez ~round:`Down staked_amount
+                  in
+                  if Tez.(staked_tez <= amount) then
                     (* Unstake all case *)
                     (staker.staking_delegator_numerator, staked_amount)
                   else

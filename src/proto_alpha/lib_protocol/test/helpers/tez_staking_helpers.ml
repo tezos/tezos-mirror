@@ -228,11 +228,11 @@ module Frozen_tez = struct
       | None -> (a, Tez.zero)
       | Some frozen ->
           let amount_q = Partial_tez.of_tez amount in
-          if Q.(geq amount_q frozen) then
-            let removed, remainder = Partial_tez.to_tez_rem frozen in
+          let currently_staked, remainder = Partial_tez.to_tez_rem frozen in
+          if Tez.(amount >= currently_staked) then
             let co_current = String.Map.remove account a.co_current in
             let co_current = add_q_to_all_co_current remainder co_current in
-            ({a with co_current}, removed)
+            ({a with co_current}, currently_staked)
           else
             let co_current =
               String.Map.add account Q.(frozen - amount_q) a.co_current
