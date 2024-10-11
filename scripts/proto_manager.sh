@@ -93,16 +93,26 @@ function commit() {
     .git/hooks/pre-commit || true
     git add "${script_dir}/../" || true
   fi
-  if ! git commit -m "${capitalized_label}/$1"; then
-    git add "${script_dir}/../"
+  if [[ -z "$AUTHOR" ]]; then
     if ! git commit -m "${capitalized_label}/$1"; then
-      error "Failed to create commit" 1>&2
-      print_and_exit 1 "${LINENO}"
+      git add "${script_dir}/../"
+      if ! git commit -m "${capitalized_label}/$1"; then
+        error "Failed to create commit" 1>&2
+        print_and_exit 1 "${LINENO}"
+      fi
+    fi
+  else
+    if ! git commit -m "${capitalized_label}/$1" --author="${AUTHOR}"; then
+      git add "${script_dir}/../"
+      if ! git commit -m "${capitalized_label}/$1" --author="${AUTHOR}"; then
+        error "Failed to create commit" 1>&2
+        print_and_exit 1 "${LINENO}"
+      fi
     fi
   fi
+
   echo -e "${blue}Created commit:${cyan} ${capitalized_label}/$1${reset}"
   commits=$((commits + 1))
-
 }
 
 function commit_if_changes() {
@@ -115,7 +125,11 @@ function commit_if_changes() {
 function commit_no_hooks() {
   git add "${script_dir}/../"
   # if pre-commit hooks are enabled, run them
-  git commit -m "${capitalized_label}/$1" --no-verify
+  if [[ -z "$AUTHOR" ]]; then
+    git commit -m "${capitalized_label}/$1" --no-verify
+  else
+    git commit -m "${capitalized_label}/$1" --no-verify --author="${AUTHOR}"
+  fi
   echo -e "${blue}Created commit:${cyan} ${capitalized_label}/$1${reset}"
   commits=$((commits + 1))
 }
@@ -1018,6 +1032,15 @@ function update_tezt_tests() {
   # TODO: fix and reintroduce this test
   #generate_regression_test
 
+  #fix testnets_scenarios:
+  if [[ ${is_snapshot} == true ]]; then
+    sed -e "s/Protocol.${capitalized_source}/Protocol.${capitalized_label}/g" -i src/bin_testnet_scenarios/*.ml
+  else
+    sed -r "s/(.*) Protocol.${capitalized_source} -> (.*)/ \1 Protocol.${capitalized_source} -> \2 | Protocol.${capitalized_label} -> \2/g" -i src/bin_testnet_scenarios/*.ml
+  fi
+  ocamlformat -i src/bin_testnet_scenarios/*.ml
+  commit_if_changes "tezt: fix testnets_scenarios"
+
   #fix other tests:
   if [[ ${is_snapshot} == true ]]; then
     sed -e "s/Protocol.${capitalized_source}/Protocol.${capitalized_label}/g" -i tezt/tests/*.ml
@@ -1457,8 +1480,10 @@ function remove_from_tezt_tests() {
     commit_if_changes "tezt: adapt protocol_migration.ml"
   fi
 
+  sed -i.old -e "/| Protocol.${capitalized_label} -> */d" src/bin_testnet_scenarios/upgrade_etherlink.ml
   sed -i.old -e "/| Protocol.${capitalized_label} -> */d" tezt/tests/sc_rollup_migration.ml
   sed -i.old -e "/| Protocol.${capitalized_label} -> */d" tezt/tests/sc_rollup.ml
+  ocamlformat -i src/bin_testnet_scenarios/upgrade_etherlink.ml
   ocamlformat -i tezt/tests/sc_rollup_migration.ml
   ocamlformat -i tezt/tests/sc_rollup.ml
   commit "test: fix other tests"
@@ -1871,6 +1896,12 @@ function hash() {
   ocamlformat -i tezt/lib_tezos/protocol.mli
   commit_if_changes "tezt: adapt lib_tezos/protocol.ml"
 
+  #fix testnets_scenarios:
+  sed -e "s/Protocol.${capitalized_source}/Protocol.${capitalized_label}/g" \
+    -e "s/${previous_tag}/${new_tag}/g" -i src/bin_testnet_scenarios/*.ml
+  ocamlformat -i src/bin_testnet_scenarios/*.ml
+  commit_if_changes "tezt: fix testnets_scenarios"
+
   #fix other tests:
   sed -e "s/Protocol.${capitalized_source}/Protocol.${capitalized_label}/g" \
     -e "s/${previous_variant}/${new_variant}/g" -i tezt/tests/*.ml
@@ -1989,6 +2020,16 @@ function hash() {
 
   cd ../..
 
+  cd "docs/alpha"
+  find . -name \*.rst -exec \
+    sed -i.old \
+    -e "s/_${previous_tag}>/_${label}>/g" \
+    -e "s@https://tezos.gitlab.io/${previous_tag}/@https://tezos.gitlab.io/${label}/@g" \
+    \{\} \;
+  commit_if_changes "alpha docs: fix versioned links"
+
+  cd ../..
+
   log_blue "docs: update docs/protocols/${new_versioned_name}.rst"
   if [[ ${is_snapshot} == true ]]; then
     versioned_name="${version}_${source_label}"
@@ -2028,6 +2069,19 @@ function hash() {
   commit_if_changes "docs: generate openapi"
 
   echo "Rehashing done"
+
+  log_cyan "Checking potential leftovers"
+  total_occurences=0
+  while read -r file; do
+    if grep -q -i "${previous_tag}" "${file}"; then
+      occurences=$(grep -c -i "${previous_tag}" "${file}")
+      total_occurences=$((total_occurences + occurences))
+      warning "${file} contains ${occurences} occurences of ${previous_tag}"
+    fi
+  done <<< "$(git ls-files)"
+  warning "Total occurences of ${previous_tag}: ${total_occurences}"
+  log_blue "Please review the leftovers and update them manually if needed"
+
 }
 
 #run command
