@@ -23,7 +23,7 @@ module Misbehaviour_repr : sig
       event involving [duplicate_op]. *)
   val check_from_duplicate_operation :
     loc:string ->
-    Tezos_raw_protocol_021_PtQenaB1.Misbehaviour_repr.t ->
+    Tezos_raw_protocol_021_PsQuebec.Misbehaviour_repr.t ->
     'kind Protocol.Alpha_context.Kind.consensus Protocol.Alpha_context.operation ->
     unit tzresult Lwt.t
 

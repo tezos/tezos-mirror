@@ -8,8 +8,8 @@
   tezt.core
   octez-alcotezt
   octez-libs.base
-  tezos-protocol-021-PtQenaB1.protocol
-  octez-protocol-021-PtQenaB1-libs.test-helpers
+  tezos-protocol-021-PsQuebec.protocol
+  octez-protocol-021-PsQuebec-libs.test-helpers
   octez-libs.base-test-helpers)
  (library_flags (:standard -linkall))
  (flags
@@ -18,7 +18,7 @@
   -open Tezt_core.Base
   -open Octez_alcotezt
   -open Tezos_base.TzPervasives
-  -open Tezos_protocol_021_PtQenaB1
+  -open Tezos_protocol_021_PsQuebec
   -open Tezos_021_PtQenaB1_test_helpers
   -open Tezos_base_test_helpers)
  (modules test_gas_costs test_gas_levels))
@@ -36,7 +36,7 @@
 
 (rule
  (alias runtest)
- (package tezos-protocol-021-PtQenaB1-tests)
+ (package tezos-protocol-021-PsQuebec-tests)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe} /flaky /ci_disabled)))
 
