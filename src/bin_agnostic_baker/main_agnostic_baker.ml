@@ -320,20 +320,23 @@ module Args = struct
 
   let help_arg = "--help"
 
+  let print_help () =
+    Format.printf
+      "Usage:\n\
+      \  octez-agnostic-baker [OCTEZ-AGNOSTIC-BAKER-COMMANDS] -- \
+       [OCTEZ-BAKER-COMMANDS]@.@." ;
+    Format.printf
+      "OCTEZ-AGNOSTIC-BAKER-COMMANDS:\n\
+      \  %s: display help\n\
+      \  %s: path to the octez-baker binaries@.@."
+      help_arg
+      binaries_directory_arg ;
+    Format.printf
+      "OCTEZ-BAKER-COMMANDS:\n Run ./octez-baker-<PROTOCOL_HASH> --help@."
+
   let help_cmd args =
     if List.mem ~equal:String.equal help_arg args then (
-      Format.printf
-        "Usage:\n\
-        \  octez-agnostic-baker [OCTEZ-AGNOSTIC-BAKER-COMMANDS] -- \
-         [OCTEZ-BAKER-COMMANDS]@.@." ;
-      Format.printf
-        "OCTEZ-AGNOSTIC-BAKER-COMMANDS:\n\
-        \  %s: display help\n\
-        \  %s: path to the octez-baker binaries@.@."
-        help_arg
-        binaries_directory_arg ;
-      Format.printf
-        "OCTEZ-BAKER-COMMANDS:\n Run ./octez-baker-<PROTOCOL_HASH> --help@." ;
+      print_help () ;
       exit 0)
     else ()
 
@@ -364,6 +367,14 @@ module Args = struct
 
   let get_binaries_directory = get_arg_value ~arg:binaries_directory_arg
 
+  let fail_on_empty_baker_args baker_args =
+    if List.is_empty baker_args then (
+      Format.eprintf
+        "Cannot run agnostic baker without any baker arguments. Please refer \
+         to the following help:@." ;
+      print_help () ;
+      exit 1)
+
   let parse_args all_args =
     let all_args = Array.to_list all_args in
     (* Specific vesrion case *)
@@ -372,6 +383,7 @@ module Args = struct
     let all_args = Option.value ~default:[] (List.tl all_args) in
     (* Split agnostic baker and baker arguments, that aims to be delimited by -- *)
     let agnostic_baker_args, baker_args = split_args all_args in
+    let () = fail_on_empty_baker_args baker_args in
     let () = help_cmd agnostic_baker_args in
     let endpoint =
       Option.value
