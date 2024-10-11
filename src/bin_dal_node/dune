@@ -33,6 +33,8 @@
   octez-libs.crypto
   octez-libs.base.p2p-identity-file
   octez-shell-libs.shell-services
+  opentelemetry
+  octez-libs.opentelemetry-client-cohttp-lwt
   octez-libs.prometheus-app
   octez-libs.prometheus
   octez-crawler

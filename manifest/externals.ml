@@ -156,6 +156,8 @@ let lwt_canceler =
 
 let lwt_exit = external_lib "lwt-exit" V.True
 
+let lwt_ppx = external_lib "lwt_ppx" V.True
+
 let lwt_unix = external_sublib lwt "lwt.unix"
 
 let lwt_watcher = external_lib "lwt-watcher" V.(exactly "0.2")
@@ -182,6 +184,10 @@ let ocplib_endian_bigstring =
 
 let ocplib_ocamlres =
   external_lib ~opam:"ocp-ocamlres" "ocplib-ocamlres" V.(at_least "0.4")
+
+let opentelemetry = external_lib "opentelemetry" V.True
+
+let opentelemetry_lwt = external_lib "opentelemetry-lwt" V.True
 
 let optint = external_lib "optint" V.True
 
@@ -259,6 +265,8 @@ let tezos_sapling_parameters =
   opam_only ~can_vendor:false "tezos-sapling-parameters" V.(at_least "1.1.0")
 
 let tls_lwt = external_lib "tls-lwt" V.(at_least "0.16.0")
+
+let trace = external_lib "trace" V.True
 
 let unix = external_lib ~opam:"base-unix" "unix" V.True
 

@@ -57,5 +57,6 @@ It contains the following libraries:
 - {{!module-Tezt_wrapper}Tezt_wrapper}
 - {{!module-Cohttp}Cohttp}
 - {{!module-Data_encoding}Data_encoding}
+- {{!module-OpenTelemetry_client_cohttp_lwt}Opentelemetry_client_cohttp_lwt}
 - {{!module-Prometheus}Prometheus}
 - {{!module-Resto}Resto}
