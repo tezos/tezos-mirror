@@ -56,7 +56,7 @@ export cargo_version='1.78.0'
 export opam_version='2.2.1'
 
 # Installed via apk python3-dev
-export python_version='3.12.6'
+export python_version='3.12'
 
 # Installed via apk
 export poetry_version='1.8.3'
