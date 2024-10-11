@@ -160,10 +160,27 @@ module Make (SimulationBackend : SimulationBackend) = struct
          and previous gas call. *)
       return (Z.sub total_gas execution_gas)
     in
+
     unless (node_da_fees = kernel_da_fees) (fun () ->
         Prometheus.Counter.inc_one
           Metrics.metrics.simulation.inconsistent_da_fees ;
-        let*! () = Events.invalid_node_da_fees ~node_da_fees ~kernel_da_fees in
+        let read_qty path =
+          let+ bytes = SimulationBackend.read simulation_state path in
+          Option.map Ethereum_types.decode_number_le bytes
+        in
+        let* block_number =
+          read_qty Durable_storage_path.Block.current_number
+        in
+        let call =
+          Data_encoding.Json.construct Ethereum_types.call_encoding call
+        in
+        let*! () =
+          Events.invalid_node_da_fees
+            ~node_da_fees
+            ~kernel_da_fees
+            ~call
+            ~block_number
+        in
         return_unit)
 
   let rec confirm_gas ~simulation_version (call : Ethereum_types.call) gas

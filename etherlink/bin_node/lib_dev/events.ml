@@ -208,15 +208,21 @@ let cannot_fetch_time_between_blocks =
     ("trace", Error_monad.trace_encoding)
 
 let invalid_node_da_fees =
-  Internal_event.Simple.declare_2
+  Internal_event.Simple.declare_4
     ~level:Fatal
     ~section
     ~name:"node_da_fees"
     ~msg:
       "Internal: node gives {node_da_fees} DA fees, whereas kernel gives \
-       {kernel_da_fees}"
+       {kernel_da_fees} on block {block_number} with {call}"
+    ~pp1:Z.pp_print
+    ~pp2:Z.pp_print
+    ~pp3:(Format.pp_print_option Ethereum_types.pp_quantity)
+    ~pp4:Data_encoding.Json.pp
     ("node_da_fees", Data_encoding.z)
     ("kernel_da_fees", Data_encoding.z)
+    ("block_number", Data_encoding.option Ethereum_types.quantity_encoding)
+    ("call", Data_encoding.Json.encoding)
 
 let received_upgrade payload = emit received_upgrade payload
 
@@ -270,7 +276,7 @@ let sandbox_started level = emit sandbox_started level
 let cannot_fetch_time_between_blocks fallback trace =
   emit cannot_fetch_time_between_blocks (fallback, trace)
 
-let invalid_node_da_fees ~node_da_fees ~kernel_da_fees =
-  emit invalid_node_da_fees (node_da_fees, kernel_da_fees)
+let invalid_node_da_fees ~node_da_fees ~kernel_da_fees ~block_number ~call =
+  emit invalid_node_da_fees (node_da_fees, kernel_da_fees, block_number, call)
 
 let deprecation_note msg = emit event_deprecation_note msg
