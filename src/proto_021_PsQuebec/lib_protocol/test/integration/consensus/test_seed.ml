@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Protocol (seed)
-    Invocation:   dune exec src/proto_021_PtQenaB1/lib_protocol/test/integration/consensus/main.exe \
+    Invocation:   dune exec src/proto_021_PsQuebec/lib_protocol/test/integration/consensus/main.exe \
                   -- --file test_seed.ml
     Subject:      - seed_nonce_hash included in some blocks
                   - revelation operation of seed_nonce that should correspond

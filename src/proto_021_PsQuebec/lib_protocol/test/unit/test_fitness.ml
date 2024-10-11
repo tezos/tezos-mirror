@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (committee selection)
-    Invocation: dune exec src/proto_021_PtQenaB1/lib_protocol/test/unit/main.exe \
+    Invocation: dune exec src/proto_021_PsQuebec/lib_protocol/test/unit/main.exe \
                   -- --file test_fitness.ml
     Subject:    test the fitness module
 *)
