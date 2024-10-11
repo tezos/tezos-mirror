@@ -4475,6 +4475,37 @@ let octez_dal_node_services =
       ]
     ~linkall:true
 
+let _octez_dal_node_migrations =
+  public_lib
+    "dal_node_migrations"
+    ~path:"src/bin_dal_node/migrations"
+    ~synopsis:"Tezos: SQL migrations for the DAL node store"
+    ~deps:[octez_base |> open_ ~m:"TzPervasives"; caqti_lwt; crunch; re]
+    ~dune:
+      Dune.
+        [
+          [
+            S "rule";
+            [S "target"; S "migrations.ml"];
+            [S "deps"; [S "glob_files"; S "*.sql"]];
+            [
+              S "action";
+              [
+                S "run";
+                S "ocaml-crunch";
+                S "-e";
+                S "sql";
+                S "-m";
+                S "plain";
+                S "-o";
+                S "%{target}";
+                S "-s";
+                S ".";
+              ];
+            ];
+          ];
+        ]
+
 let octez_dal_node_lib =
   public_lib
     "tezos-dal-node-lib"
