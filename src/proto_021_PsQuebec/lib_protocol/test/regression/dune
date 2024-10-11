@@ -8,10 +8,10 @@
   tezt.core
   octez-libs.base
   tezt-tezos
-  tezos-protocol-021-PtQenaB1.protocol
-  octez-protocol-021-PtQenaB1-libs.client
-  octez-protocol-021-PtQenaB1-libs.plugin
-  octez-protocol-021-PtQenaB1-libs.test-helpers
+  tezos-protocol-021-PsQuebec.protocol
+  octez-protocol-021-PsQuebec-libs.client
+  octez-protocol-021-PsQuebec-libs.plugin
+  octez-protocol-021-PsQuebec-libs.test-helpers
   octez-libs.micheline)
  (library_flags (:standard -linkall))
  (flags
@@ -20,7 +20,7 @@
   -open Tezt_core.Base
   -open Tezos_base.TzPervasives
   -open Tezt_tezos
-  -open Tezos_protocol_021_PtQenaB1
+  -open Tezos_protocol_021_PsQuebec
   -open Tezos_client_021_PtQenaB1
   -open Tezos_protocol_plugin_021_PtQenaB1
   -open Tezos_021_PtQenaB1_test_helpers
@@ -40,7 +40,7 @@
 
 (rule
  (alias runtest)
- (package tezos-protocol-021-PtQenaB1-tests)
+ (package tezos-protocol-021-PsQuebec-tests)
  (deps
   (glob_files contracts/*.tz)
   (glob_files expected/test_logging.ml/*.out))
