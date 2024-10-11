@@ -574,6 +574,231 @@ let test_deactivation =
           let total = Frozen_tez.total_current dlgt.frozen_deposits in
           Assert.equal_tez ~loc:__LOC__ total (Tez.of_mutez 2_200_000_000_000L))
 
+let test_pseudotokens_roundings =
+  let init_params =
+    {
+      limit_of_staking_over_baking = Q.of_int 5;
+      edge_of_baking_over_staking = Q.zero;
+    }
+  in
+  (* Any number works, we'll be in AI later anyways *)
+  init_constants ~reward_per_block:1_000_000_007L ()
+  --> set S.Adaptive_issuance.autostaking_enable false
+  --> activate_ai `Force
+  --> begin_test ["delegate"; "faucet"] ~force_attest_all:true
+  --> set_baker "faucet"
+  --> set_delegate_params "delegate" init_params
+  (* delegate stake = 10_000 tz *)
+  --> unstake "delegate" (Amount (Tez.of_mutez 190_000_000_000L))
+  (* Set other's stake to avoid lack of attestation slots *)
+  --> unstake "faucet" (Amount (Tez.of_mutez 190_000_000_000L))
+  --> unstake "__bootstrap__" (Amount (Tez.of_mutez 190_000_000_000L))
+  --> check_balance_field "delegate" `Staked (Tez.of_mutez 10_000_000_000L)
+  --> add_account_with_funds
+        "staker"
+        ~funder:"faucet"
+        (Amount (Tez.of_mutez 200_000_000_000L))
+  --> add_account_with_funds
+        "other_staker"
+        ~funder:"faucet"
+        (Amount (Tez.of_mutez 200_000_000_000L))
+  --> wait_delegate_parameters_activation
+  --> set_delegate "staker" (Some "delegate")
+  --> set_delegate "other_staker" (Some "delegate")
+  --> stake "staker" (Amount (Tez.of_mutez 10_000_000_001L))
+  --> stake "other_staker" (Amount (Tez.of_mutez 10_000_000_000L))
+  (* The delegate and the staker have the same stake: the rewards are distributed equally *)
+  --> check_balance_field "staker" `Staked (Tez.of_mutez 10_000_000_001L)
+  --> next_block_with_baker "delegate"
+  (* Each receive a third of the frozen block rewards, which should be a third of 2/21th of 1.258114ꜩ.
+     Indeed, reminder that limit of delegation is 19 times the stake with the test constants,
+     not 9 times.
+  *)
+  --> check_balance_field "delegate" `Staked (Tez.of_mutez 10_000_039_941L)
+  --> check_balance_field "staker" `Staked (Tez.of_mutez 10_000_039_941L)
+  --> check_balance_field "other_staker" `Staked (Tez.of_mutez 10_000_039_939L)
+  (* Because a staker cannot own a portion of a mutez, it might be the case that the sum
+     of all external stake is lesser than the actual total. As it turns out, it is the case here *)
+  --> exec_unit (fun (_block, state) ->
+          let open Lwt_result_syntax in
+          let delegate = State.find_account "delegate" state in
+          let external_staked =
+            Frozen_tez.total_co_current delegate.frozen_deposits
+          in
+          let* () =
+            Assert.equal_tez
+              ~loc:__LOC__
+              external_staked
+              (* 10_000_039_939 + 10_000_039_941 + 1 = *)
+              (Tez.of_mutez 20_000_079_881L)
+          in
+          return_unit)
+  (* The staker has still as many pseudotokens as it staked at first, so the ratio is not an integer *)
+  --> check_balance_field "staker" `Pseudotokens (Tez.of_mutez 10_000_000_001L)
+  (* We can check for other_staker too *)
+  --> check_balance_field
+        "other_staker"
+        `Pseudotokens
+        (Tez.of_mutez 10_000_000_000L)
+  (* Now for the roundings *)
+  -->
+  let check_staker_issued_pseudotokens ~loc amount =
+    check_balance_field
+      ~loc
+      "staker"
+      `Pseudotokens
+      (Tez.of_mutez (Int64.add amount 10_000_000_001L))
+  in
+  let check_staker_unstaked_tokens ~loc amount =
+    check_balance_field
+      ~loc
+      "staker"
+      `Unstaked_frozen_total
+      (Tez.of_mutez amount)
+  in
+  let check_staker_staked_tokens_increase ~loc amount =
+    check_balance_field
+      ~loc
+      "staker"
+      `Staked
+      (Tez.of_mutez (Int64.add amount 10_000_039_941L))
+  in
+  (* Note that the amount can never be negative when someone else's un/stake operation
+     is applied. It can be non-zero though :) *)
+  let check_other_staker_staked_tokens_increase ~loc amount =
+    assert (Compare.Int64.(amount >= 0L)) ;
+    check_balance_field
+      ~loc
+      "other_staker"
+      `Staked
+      (Tez.of_mutez (Int64.add amount 10_000_039_939L))
+  in
+  (assert_success ~loc:__LOC__
+  @@ stake "staker" (Amount Tez.one_mutez)
+     (* All computations for stakes are rounded down *)
+     (* Formula : amount_staked * total_pseudotokens / total_staked_tez *)
+     (* 1 * 20_000_000_001 / 20_000_079_881 = 0 pseudotokens issued *)
+     --> check_staker_issued_pseudotokens ~loc:__LOC__ 0L
+     (* Stake formula = total_staked_tez * pseudotokens / total_pseudotokens *)
+     (* Stake before = 20_000_079_881 * 10_000_000_001 / 20_000_000_001 = 10_000_039_941 *)
+     (* Stake after = (20_000_079_881 + 1) * (10_000_000_001 + 0) / (20_000_000_001 + 0) = 10_000_039_941 *)
+     (* Difference = 10_000_039_941 - 10_000_039_941 = 0 *)
+     --> check_staker_staked_tokens_increase ~loc:__LOC__ 0L
+     (* Stake before = 20_000_079_881 * 10_000_000_000 / 20_000_000_001 = 10_000_039_939 *)
+     (* Stake after = (20_000_079_881 + 1) * 10_000_000_000 / (20_000_000_001 + 0) = 10_000_039_940 *)
+     (* Difference = 10_000_039_940 - 10_000_039_939 = 1 *)
+     --> check_other_staker_staked_tokens_increase ~loc:__LOC__ 1L)
+  --> (assert_success ~loc:__LOC__
+      @@ stake "staker" (Amount (Tez.of_mutez 2L))
+         (* 2 * 20_000_000_001 / 20_000_079_881 = 1 pseudotoken issued *)
+         --> check_staker_issued_pseudotokens ~loc:__LOC__ 1L
+         (* Stake after = (20_000_079_881 + 2) * (10_000_000_001 + 1) / (20_000_000_001 + 1)
+            = 10_000_039_942 *)
+         (* Difference = 10_000_039_942 - 10_000_039_941 = 1 *)
+         --> check_staker_staked_tokens_increase ~loc:__LOC__ 1L
+         (* Stake after = (20_000_079_881 + 2) * 10_000_000_000 / (20_000_000_001 + 1)
+            = 10_000_039_940 *)
+         (* Difference = 10_000_039_940 - 10_000_039_939 = 1 *)
+         --> check_other_staker_staked_tokens_increase ~loc:__LOC__ 1L)
+  --> (assert_success ~loc:__LOC__
+      @@ stake "staker" (Amount (Tez.of_mutez 20_000_079_880L))
+         (* 20_000_079_880 * 20_000_000_001 / 20_000_079_881 = 20_000_000_000 pseudotoken issued *)
+         --> check_staker_issued_pseudotokens ~loc:__LOC__ 20_000_000_000L
+         (* Stake after =
+            (20_000_079_881 + 20_000_079_880) * (10_000_000_001 + 20_000_000_000)
+            / (20_000_000_001 + 20_000_000_000)
+            = 30_000_119_821 *)
+         (* Difference = 30_000_119_821 - 10_000_039_941 = 20_000_079_880 *)
+         --> check_staker_staked_tokens_increase ~loc:__LOC__ 20_000_079_880L
+         (* Stake after =
+            (20_000_079_881 + 20_000_079_880) * 10_000_000_000
+            / (20_000_000_001 + 20_000_000_000)
+            = 10_000_039_939 *)
+         (* Difference = 10_000_039_939 - 10_000_039_939 = 0 *)
+         --> check_other_staker_staked_tokens_increase ~loc:__LOC__ 0L)
+  --> (assert_success ~loc:__LOC__
+      @@ stake "staker" (Amount (Tez.of_mutez 20_000_079_881L))
+         (* 20_000_079_881 * 20_000_000_001 / 20_000_079_881 = 20_000_000_001 pseudotoken issued *)
+         --> check_staker_issued_pseudotokens ~loc:__LOC__ 20_000_000_001L
+         (* Stake after =
+            (20_000_079_881 + 20_000_079_881) * (10_000_000_001 + 20_000_000_001)
+            / (20_000_000_001 + 20_000_000_001)
+            = 30_000_119_822 *)
+         (* Difference = 30_000_119_822 - 10_000_039_941 = 20_000_079_881 *)
+         --> check_staker_staked_tokens_increase ~loc:__LOC__ 20_000_079_881L
+         (* Stake after =
+            (20_000_079_881 + 20_000_079_881) * 10_000_000_000
+            / (20_000_000_001 + 20_000_000_001)
+            = 10_000_039_939 *)
+         (* Difference = 10_000_039_939 - 10_000_039_939 = 0 *)
+         --> check_other_staker_staked_tokens_increase ~loc:__LOC__ 0L)
+  --> (assert_success ~loc:__LOC__
+      @@ stake "staker" (Amount (Tez.of_mutez 20_000_079_882L))
+         (* 20_000_079_882 * 20_000_000_001 / 20_000_079_881 = 20_000_000_001 pseudotoken issued *)
+         --> check_staker_issued_pseudotokens ~loc:__LOC__ 20_000_000_001L
+         (* Stake after =
+            (20_000_079_881 + 20_000_079_882) * (10_000_000_001 + 20_000_000_001)
+            / (20_000_000_001 + 20_000_000_001)
+            = 30_000_119_822 *)
+         (* Difference = 30_000_119_822 - 10_000_039_941 = 20_000_079_881 *)
+         --> check_staker_staked_tokens_increase ~loc:__LOC__ 20_000_079_881L
+         (* Stake after =
+            (20_000_079_881 + 20_000_079_882) * 10_000_000_000
+            / (20_000_000_001 + 20_000_000_001)
+            = 10_000_039_940 *)
+         (* Difference = 10_000_039_940 - 10_000_039_939 = 1 *)
+         --> check_other_staker_staked_tokens_increase ~loc:__LOC__ 1L)
+  (* Unstakes, for pseudotoken burns and unstakes, amounts are rounded up *)
+  --> (assert_success ~loc:__LOC__
+      @@ unstake "staker" (Amount Tez.one_mutez)
+         (* 1 * 20_000_000_001 / 20_000_079_881 = 1 pseudotoken removed *)
+         --> check_staker_issued_pseudotokens ~loc:__LOC__ (-1L)
+         (* Unstake amount = 1 * 20_000_079_881 / 20_000_000_001 = 1 *)
+         --> check_staker_unstaked_tokens ~loc:__LOC__ 1L
+         (* Stake after = 20_000_079_880 * 10_000_000_000 / 20_000_000_000 = 10_000_039_940 *)
+         (* Difference = 1 *)
+         --> check_staker_staked_tokens_increase ~loc:__LOC__ (-1L)
+         (* Stake after = 20_000_079_880 * 10_000_000_000 / 20_000_000_000 = 10_000_039_940 *)
+         (* Difference = 1 *)
+         --> check_other_staker_staked_tokens_increase ~loc:__LOC__ 1L)
+  --> (assert_success ~loc:__LOC__
+      @@ unstake "staker" (Amount (Tez.of_mutez 2L))
+         (* 2 * 20_000_000_001 / 20_000_079_881 = 2 pseudotokens removed *)
+         --> check_staker_issued_pseudotokens ~loc:__LOC__ (-2L)
+         (* Unstake amount = 2 * 20_000_079_881 / 20_000_000_001 = 2 *)
+         --> check_staker_unstaked_tokens ~loc:__LOC__ 2L
+         (* Stake after = 20_000_079_879 * 9_999_999_999 / 19_999_999_999 = 10_000_039_938 *)
+         (* Difference = 3 *)
+         --> check_staker_staked_tokens_increase ~loc:__LOC__ (-3L)
+         (* Stake after = 20_000_079_879 * 10_000_000_000 / 19_999_999_999 = 10_000_039_940 *)
+         (* Difference = 1 *)
+         --> check_other_staker_staked_tokens_increase ~loc:__LOC__ 1L)
+  --> (assert_success ~loc:__LOC__
+      @@ (* All but one *)
+      unstake "staker" (Amount (Tez.of_mutez 10_000_039_940L))
+      (* 10_000_039_940 * 20_000_000_001 / 20_000_079_881 = 10_000_000_000 pseudotokens removed *)
+      --> check_staker_issued_pseudotokens ~loc:__LOC__ (-10_000_000_000L)
+      (* Unstake amount = 10_000_000_000 * 20_000_079_881 / 20_000_000_001 = 10_000_039_939 *)
+      --> check_staker_unstaked_tokens ~loc:__LOC__ 10_000_039_939L
+      (* Stake after = 10_000_039_942 * 1 / 10_000_000_001 = 1 *)
+      (* Difference = 10_000_039_940 *)
+      --> check_staker_staked_tokens_increase ~loc:__LOC__ (-10_000_039_940L)
+      (* Stake after = 10_000_039_942 * 10_000_000_000 / 10_000_000_001 = 10_000_039_940 *)
+      (* Difference = 1 *)
+      --> check_other_staker_staked_tokens_increase ~loc:__LOC__ 1L)
+  --> (assert_success ~loc:__LOC__
+      @@ (* All *)
+      unstake "staker" (Amount (Tez.of_mutez 10_000_039_941L))
+      (* Should unconditionally remove all pseudotokens *)
+      --> check_staker_issued_pseudotokens ~loc:__LOC__ (-10_000_000_001L)
+      (* Unstake amount = 10_000_000_001 * 20_000_079_881 / 20_000_000_001 = 10_000_039_941 *)
+      (* This is also the amount returned by the balance RPC *)
+      --> check_staker_unstaked_tokens ~loc:__LOC__ 10_000_039_941L
+      --> check_staker_staked_tokens_increase ~loc:__LOC__ (-10_000_039_941L)
+      (* Stake after = 10_000_039_940 * 10_000_000_000 / 10_000_000_000 = 10_000_039_940 *)
+      (* Difference = 1 *)
+      --> check_other_staker_staked_tokens_increase ~loc:__LOC__ 1L)
+
 let tests =
   tests_of_scenarios
   @@ [
