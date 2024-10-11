@@ -2,32 +2,32 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_021_PtQenaB1_mockup_simulator)
- (public_name octez-protocol-021-PtQenaB1-libs.bakings.mockup-simulator)
+ (name tezos_021_PsQuebec_mockup_simulator)
+ (public_name octez-protocol-021-PsQuebec-libs.bakings.mockup-simulator)
  (libraries
   octez-libs.base
-  tezos-protocol-021-PtQenaB1.protocol
-  octez-protocol-021-PtQenaB1-libs.client
+  tezos-protocol-021-PsQuebec.protocol
+  octez-protocol-021-PsQuebec-libs.client
   octez-shell-libs.client-commands
-  octez-protocol-021-PtQenaB1-libs.baking
+  octez-protocol-021-PsQuebec-libs.baking
   octez-libs.stdlib-unix
   octez-shell-libs.client-base-unix
-  tezos-protocol-021-PtQenaB1.parameters
+  tezos-protocol-021-PsQuebec.parameters
   octez-shell-libs.mockup
   octez-shell-libs.mockup-proxy
   octez-shell-libs.mockup-commands
-  octez-protocol-021-PtQenaB1-libs.baking.tenderbrute
+  octez-protocol-021-PsQuebec-libs.baking.tenderbrute
   tezt.core)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_protocol_021_PtQenaB1
-  -open Tezos_protocol_021_PtQenaB1.Protocol
-  -open Tezos_client_021_PtQenaB1
+  -open Tezos_protocol_021_PsQuebec
+  -open Tezos_protocol_021_PsQuebec.Protocol
+  -open Tezos_client_021_PsQuebec
   -open Tezos_client_commands
-  -open Tezos_baking_021_PtQenaB1
+  -open Tezos_baking_021_PsQuebec
   -open Tezos_stdlib_unix
   -open Tezos_client_base_unix
-  -open Tezos_protocol_021_PtQenaB1_parameters
-  -open Tenderbrute_021_PtQenaB1
+  -open Tezos_protocol_021_PsQuebec_parameters
+  -open Tenderbrute_021_PsQuebec
   -open Tezt_core))

@@ -2,7 +2,7 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_021_PtQenaB1_test_helpers)
+ (name tezos_021_PsQuebec_test_helpers)
  (public_name octez-protocol-021-PsQuebec-libs.test-helpers)
  (instrumentation (backend bisect_ppx))
  (libraries
@@ -31,9 +31,9 @@
   -open Tezos_micheline
   -open Tezos_stdlib_unix
   -open Tezos_protocol_021_PsQuebec
-  -open Tezos_client_021_PtQenaB1
+  -open Tezos_client_021_PsQuebec
   -open Tezos_protocol_021_PsQuebec_parameters
-  -open Tezos_protocol_plugin_021_PtQenaB1
+  -open Tezos_protocol_plugin_021_PsQuebec
   -open Tezos_shell_services
   -open Tezos_crypto_dal
-  -open Tezos_smart_rollup_021_PtQenaB1))
+  -open Tezos_smart_rollup_021_PsQuebec))

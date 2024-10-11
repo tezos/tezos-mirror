@@ -11,11 +11,11 @@
   octez-libs.base
   octez-libs.micheline
   tezos-micheline-rewriting
-  tezos-protocol-021-PtQenaB1.protocol
+  tezos-protocol-021-PsQuebec.protocol
   tezos-benchmark
-  tezos-benchmark-type-inference-021-PtQenaB1
-  tezos-benchmark-021-PtQenaB1
-  octez-protocol-021-PtQenaB1-libs.test-helpers
+  tezos-benchmark-type-inference-021-PsQuebec
+  tezos-benchmark-021-PsQuebec
+  octez-protocol-021-PsQuebec-libs.test-helpers
   octez-libs.error-monad
   prbnmcn-stats)
  (link_flags
@@ -24,11 +24,11 @@
  (flags
   (:standard)
   -open Tezos_micheline
-  -open Tezos_protocol_021_PtQenaB1
+  -open Tezos_protocol_021_PsQuebec
   -open Tezos_benchmark
-  -open Tezos_benchmark_type_inference_021_PtQenaB1
-  -open Tezos_benchmark_021_PtQenaB1
-  -open Tezos_021_PtQenaB1_test_helpers))
+  -open Tezos_benchmark_type_inference_021_PsQuebec
+  -open Tezos_benchmark_021_PsQuebec
+  -open Tezos_021_PsQuebec_test_helpers))
 
 (rule
  (alias runtest_micheline_rewriting_data)

@@ -2,8 +2,8 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_client_sapling_021_PtQenaB1)
- (public_name octez-protocol-021-PtQenaB1-libs.client.sapling)
+ (name tezos_client_sapling_021_PsQuebec)
+ (public_name octez-protocol-021-PsQuebec-libs.client.sapling)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.base
@@ -12,17 +12,17 @@
   octez-libs.stdlib-unix
   octez-shell-libs.client-base
   octez-shell-libs.signer-backends
-  octez-protocol-021-PtQenaB1-libs.client
-  octez-protocol-021-PtQenaB1-libs.client.commands
-  tezos-protocol-021-PtQenaB1.protocol
-  octez-protocol-021-PtQenaB1-libs.plugin)
+  octez-protocol-021-PsQuebec-libs.client
+  octez-protocol-021-PsQuebec-libs.client.commands
+  tezos-protocol-021-PsQuebec.protocol
+  octez-protocol-021-PsQuebec-libs.plugin)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
   -open Tezos_stdlib_unix
   -open Tezos_client_base
-  -open Tezos_client_021_PtQenaB1
-  -open Tezos_client_021_PtQenaB1_commands
-  -open Tezos_protocol_021_PtQenaB1
-  -open Tezos_protocol_plugin_021_PtQenaB1))
+  -open Tezos_client_021_PsQuebec
+  -open Tezos_client_021_PsQuebec_commands
+  -open Tezos_protocol_021_PsQuebec
+  -open Tezos_protocol_plugin_021_PsQuebec))
