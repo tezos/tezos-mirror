@@ -35,7 +35,7 @@ sent to the CPMM contract is 0.83 tez per block.
 
 So the credits to the CPMM contract can be accounted for by indexers, they are included in block metadata as a balance update with a new constructor for ``update_origin``, ``Subsidy``.
 
-.. _toggle_qena:
+.. _toggle_quebec:
 
 Toggle vote
 ~~~~~~~~~~~
@@ -90,4 +90,4 @@ file is deleted or becomes malformed while the baker is running, the
 last valid value read is used. If neither a valid vote file is
 provided nor a CLI value given, the baker will fail on the first block
 after it was started. See also the :ref:`baker man
-page<baker_manual_qena>`.
+page<baker_manual_quebec>`.

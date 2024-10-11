@@ -50,12 +50,12 @@ length in the `technical report <https://arxiv.org/abs/2001.11965>`_ and in a
 post <https://research-development.nomadic-labs.com/a-look-ahead-to-tenderbake.html>`_. Here we
 only provide a user/developer perspective.
 
-.. _tb_validator_qena:
+.. _tb_validator_quebec:
 
 Tenderbake is executed for each new block level by a "committee" whose members
 are called *validators*, which are delegates selected at random based on their
 stake, in the same way as endorsers were selected in Emmy*. We let
-``CONSENSUS_COMMITTEE_SIZE`` be the number of validator :ref:`slots<rights_qena>` per level.
+``CONSENSUS_COMMITTEE_SIZE`` be the number of validator :ref:`slots<rights_quebec>` per level.
 Furthermore, we use ``CONSENSUS_THRESHOLD`` to denote two thirds of ``CONSENSUS_COMMITTEE_SIZE``.
 
 For each level, Tenderbake proceeds in rounds. Each *round* represents an
@@ -79,13 +79,13 @@ Round durations thus increase linearly with ``DELAY_INCREMENT_PER_ROUND``.
 
 Schematically, a round consists in the following steps:
 
-.. _candidate_block_qena:
+.. _candidate_block_quebec:
 
 * a validator designated for that round injects a *candidate block* (representing a proposal) and consensus operations (representing votes) into the node to which it is attached, which then
 * diffuses those blocks and consensus operations to other nodes of the network, and thus
 * communicates them to the validators attached to those nodes, to carry out voting on which block to accept.
 
-.. _quorum_qena:
+.. _quorum_quebec:
 
 Unlike Emmy*, Tenderbake has `two types of
 votes <https://research-development.nomadic-labs.com/a-look-ahead-to-tenderbake.html#why-do-we-need-preendorsements>`_:
@@ -105,7 +105,7 @@ the same *payload* as
 the initial block. We talk about a *re-proposal* in this case.
 
 
-.. _finality_qena:
+.. _finality_quebec:
 
 Transaction and block finality
 ------------------------------
@@ -138,7 +138,7 @@ should be taken at round 0, meaning that the time between blocks would be
 :math:`round\_duration(0)` seconds i.e., parameter ``MINIMAL_BLOCK_DELAY``.
 
 
-.. _active_stake_qena:
+.. _active_stake_quebec:
 
 Validator selection
 -------------------
@@ -149,17 +149,17 @@ power is a function of all tez owned by the delegate and its
 delegators, with :doc:`staked<staking>` tez weighted more than
 non-staked tez, and there are additional considerations such as
 overstaking and overdelegation; see the :ref:`baking power
-formula<baking_power_overview_qena>`.
+formula<baking_power_overview_quebec>`.
 
 The baking rights are determined
-:ref:`CONSENSUS_RIGHTS_DELAY<cs_constants_qena>` in advance, which is
-``2`` :ref:`cycles<def_cycle_qena>` for the Qena protocol. More
+:ref:`CONSENSUS_RIGHTS_DELAY<cs_constants_quebec>` in advance, which is
+``2`` :ref:`cycles<def_cycle_quebec>` for the Qena protocol. More
 precisely, at the end of cycle ``n`` and beginning of cycle ``n+1``,
 the baking rights for cycle ``n+1+CONSENSUS_RIGHTS_DELAY=n+3`` are
 :doc:`randomly generated<randomness_generation>` based on the current
 :doc:`baking power<baking_power>` of each delegate that meets the
 :ref:`minimal power and own staked
-requirements<minimal_baking_power_qena>`.
+requirements<minimal_baking_power_quebec>`.
 
 
 Economic Incentives
@@ -222,7 +222,7 @@ However, two conditions must be met:
 - the validator has revealed its nonce, and
 - the validator has been present during the cycle.
 
-Not giving rewards in case of missing revelations is not new as it is :ref:`adapted<random_seed_qena>`
+Not giving rewards in case of missing revelations is not new as it is :ref:`adapted<random_seed_quebec>`
 from Emmy*.
 The second condition is new. We say that a delegate is *present* during a cycle
 if the attesting power (that is, the number of validator slots at the
@@ -273,7 +273,7 @@ included during that cycle has been ``1,987,456`` slots. Given that this number 
 bigger than the minimum required (``2,150,400 * 2 / 3``), it receives an attesting
 reward of ``2,150,400 * 0.000761 = 1636.4544`` tez for that cycle.
 
-.. _slashing_qena:
+.. _slashing_quebec:
 
 Slashing
 ^^^^^^^^
@@ -298,11 +298,11 @@ If a delegate's deposit is smaller than the slashed amount, the deposit is
 simply emptied.
 
 The evidence for double signing at a given level can be collected by any
-:ref:`accuser<def_accuser_qena>` and included as an *accusation* operation in a block
+:ref:`accuser<def_accuser_quebec>` and included as an *accusation* operation in a block
 for a period of ``MAX_SLASHING_PERIOD``.
 
 As soon as a delegate is denounced for any double signing, it is
-immediately :ref:`forbidden<new_forbidden_period_qena>` from both baking
+immediately :ref:`forbidden<new_forbidden_period_quebec>` from both baking
 and attesting for at least 2 cycles.
 
 The actual slashing and denunciation rewarding happen at the end of
@@ -316,21 +316,21 @@ correct validators have more than two thirds of the total stake, these correct
 validators have sufficient power for agreement to be reached, thus the lack of
 participation of a selfish baker does not have an impact.
 
-.. _fitness_qena:
+.. _fitness_quebec:
 
 Fitness
 -------
 
 The fitness is given by the tuple ``(version, level, locked_round, - predecessor_round - 1, round)``.
 The current version of the fitness is 2 (version 0 was used by Emmy, and version 1 by Emmy+ and Emmy*).
-The fitness encapsulates more information than in Emmy* because Tenderbake is more complex: recall that blocks at the last level only represent :ref:`candidate blocks<finality_qena>`.
+The fitness encapsulates more information than in Emmy* because Tenderbake is more complex: recall that blocks at the last level only represent :ref:`candidate blocks<finality_quebec>`.
 In Emmy*, only the level mattered.
 But in Tenderbake, we need to, for instance, allow for new blocks at the same level to be accepted by nodes.
 Therefore the fitness also includes the block's round (as the fifth component).
-Furthermore, we also allow to change the predecessor block when it has a :ref:`smaller round<finality_qena>`.
+Furthermore, we also allow to change the predecessor block when it has a :ref:`smaller round<finality_quebec>`.
 Therefore the fitness also includes the opposite of predecessor block's round as the forth component (the predecessor is taken for technical reasons).
 Finally, to (partially) enforce :ref:`the rule on
-re-proposals<quorum_qena>`, the fitness also includes, as the third
+re-proposals<quorum_quebec>`, the fitness also includes, as the third
 component, the round at which a preattestation quorum was observed by
 the baker, if any (this component can therefore be empty). By the way,
 preattestations are present in a block if and only if the locked round
@@ -357,7 +357,7 @@ inner sequences). So the first fitness is smaller than the second one,
 because of the third component, the empty bitstring being smaller than
 any other bitstring.
 
-.. _cs_constants_qena:
+.. _cs_constants_quebec:
 
 Consensus related protocol parameters
 -------------------------------------
@@ -401,7 +401,7 @@ Consensus related protocol parameters
    * - ``ATTESTING_REWARD_PER_SLOT``
      - ``attesting_reward / CONSENSUS_COMMITTEE_SIZE`` = 0.000761 tez
 
-The above list of protocol parameters is a subset of the :ref:`protocol constants <protocol_constants_qena>`.
+The above list of protocol parameters is a subset of the :ref:`protocol constants <protocol_constants_quebec>`.
 
 Further External Resources
 --------------------------

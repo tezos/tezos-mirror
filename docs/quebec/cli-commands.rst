@@ -14,7 +14,7 @@ The rest of this page documents the protocol-dependent tools.
 The protocol-independent tools are documented :doc:`here <../shell/cli-commands>`.
 
 
-.. _client_manual_qena:
+.. _client_manual_quebec:
 
 Client manual
 =============
@@ -23,7 +23,7 @@ Client manual
          :file: octez-client.html
 
 
-.. _baker_manual_qena:
+.. _baker_manual_quebec:
 
 Baker manual
 ============
@@ -32,7 +32,7 @@ Baker manual
          :file: octez-baker.html
 
 
-.. _accuser_manual_qena:
+.. _accuser_manual_quebec:
 
 Accuser manual
 ==============
