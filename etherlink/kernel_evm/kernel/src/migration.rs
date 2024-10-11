@@ -15,6 +15,7 @@ use crate::storage::{
 use evm_execution::account_storage::account_path;
 use evm_execution::account_storage::init_account_storage;
 use evm_execution::precompiles::SYSTEM_ACCOUNT_ADDRESS;
+use evm_execution::precompiles::WITHDRAWAL_ADDRESS;
 use evm_execution::NATIVE_TOKEN_TICKETER_PATH;
 use primitive_types::U256;
 use tezos_evm_logging::{log, Level::*};
@@ -134,6 +135,16 @@ fn migrate_to<Host: Runtime>(
             let account_path = account_path(&SYSTEM_ACCOUNT_ADDRESS)?;
             let mut account = account_storage.get_or_create(host, &account_path)?;
             account.increment_nonce(host)?;
+            Ok(MigrationStatus::Done)
+        }
+        StorageVersion::V20 => {
+            let account_storage = init_account_storage()?;
+            let mut withdrawal_precompiled = account_storage
+                .get_or_create(host, &account_path(&WITHDRAWAL_ADDRESS)?)?;
+            let balance = withdrawal_precompiled.balance(host)?;
+            if !balance.is_zero() {
+                withdrawal_precompiled.balance_remove(host, balance)?;
+            }
             Ok(MigrationStatus::Done)
         }
     }
