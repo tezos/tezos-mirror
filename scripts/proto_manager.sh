@@ -2020,6 +2020,16 @@ function hash() {
 
   cd ../..
 
+  cd "docs/alpha"
+  find . -name \*.rst -exec \
+    sed -i.old \
+    -e "s/_${previous_tag}>/_${label}>/g" \
+    -e "s@https://tezos.gitlab.io/${previous_tag}/@https://tezos.gitlab.io/${label}/@g" \
+    \{\} \;
+  commit_if_changes "alpha docs: fix versioned links"
+
+  cd ../..
+
   log_blue "docs: update docs/protocols/${new_versioned_name}.rst"
   if [[ ${is_snapshot} == true ]]; then
     versioned_name="${version}_${source_label}"
