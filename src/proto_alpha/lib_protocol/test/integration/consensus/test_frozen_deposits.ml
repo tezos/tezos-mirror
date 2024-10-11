@@ -742,6 +742,24 @@ let test_error_is_thrown_when_smaller_upper_bound_for_frozen_window () =
   *)
   return_unit
 
+let test_set_frozen_deposits_limit_fails () =
+  let open Lwt_result_syntax in
+  let* b, contract = Context.init_with_constants1 constants in
+  let* i = Incremental.begin_construction b in
+  let expect_apply_failure =
+    Error_helpers.check_error_constructor_name
+      ~loc:__LOC__
+      ~expected:Protocol.Apply.Set_deposits_limit_when_automated_staking_off
+  in
+  let check target_limit =
+    let* op = Op.set_deposits_limit (I i) contract target_limit in
+    let* _i = Incremental.add_operation i op ~expect_apply_failure in
+    return_unit
+  in
+  let* () = check None in
+  let* () = check (Some Tez.zero) in
+  check (Some (Tez_helpers.of_int 1_000_000_000))
+
 let tests =
   Tztest.
     [
@@ -778,6 +796,10 @@ let tests =
         "error is thrown when the frozen window is smaller"
         `Quick
         test_error_is_thrown_when_smaller_upper_bound_for_frozen_window;
+      tztest
+        "set_deposits_limit operation always fails"
+        `Quick
+        test_set_frozen_deposits_limit_fails;
     ]
 
 let () =
