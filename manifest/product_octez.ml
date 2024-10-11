@@ -7050,7 +7050,7 @@ let hash = Protocol.hash
 
   let _020_PsParisC = active (Name.v "PsParisC" 020)
 
-  let _021_PtQenaB1 = active (Name.v "PtQenaB1" 021)
+  let _021_PsQuebec = active (Name.v "PsQuebec" 021)
 
   let alpha = active (Name.dev "alpha")
 
