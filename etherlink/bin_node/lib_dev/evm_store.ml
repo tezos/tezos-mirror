@@ -15,6 +15,11 @@ type levels = {
   finalized : Ethereum_types.quantity;
 }
 
+type pending_kernel_upgrade = {
+  kernel_upgrade : Evm_events.Upgrade.t;
+  injected_before : Ethereum_types.quantity;
+}
+
 module Q = struct
   open Caqti_request.Infix
   open Caqti_type.Std
@@ -157,6 +162,14 @@ module Q = struct
         Ok {current_number; l1_level; finalized})
       (t3 level l1_level level)
 
+  let pending_kernel_upgrade =
+    product (fun injected_before hash timestamp ->
+        {injected_before; kernel_upgrade = Evm_events.Upgrade.{hash; timestamp}})
+    @@ proj level (fun k -> k.injected_before)
+    @@ proj root_hash (fun k -> k.kernel_upgrade.hash)
+    @@ proj timestamp (fun k -> k.kernel_upgrade.timestamp)
+    @@ proj_end
+
   let table_exists =
     (string ->! bool)
     @@ {|
@@ -277,17 +290,17 @@ module Q = struct
     |}
 
     let get_latest_unapplied =
-      (unit ->? upgrade)
-      @@ {|SELECT root_hash, activation_timestamp
+      (unit ->? pending_kernel_upgrade)
+      @@ {|SELECT injected_before, root_hash, activation_timestamp
            FROM kernel_upgrades WHERE applied_before IS NULL
            ORDER BY applied_before DESC
            LIMIT 1
     |}
 
-    let find_applied_before =
+    let find_injected_before =
       (level ->? upgrade)
       @@ {|SELECT root_hash, activation_timestamp
-           FROM kernel_upgrades WHERE applied_before = ?|}
+           FROM kernel_upgrades WHERE injected_before = ?|}
 
     let record_apply =
       (level ->. unit)
@@ -604,9 +617,9 @@ module Kernel_upgrades = struct
     with_connection store @@ fun conn ->
     Db.find_opt conn Q.Kernel_upgrades.get_latest_unapplied ()
 
-  let find_applied_before store level =
+  let find_injected_before store level =
     with_connection store @@ fun conn ->
-    Db.find_opt conn Q.Kernel_upgrades.find_applied_before level
+    Db.find_opt conn Q.Kernel_upgrades.find_injected_before level
 
   let record_apply store level =
     with_connection store @@ fun conn ->
@@ -663,7 +676,7 @@ module Blueprints = struct
   let find_with_events conn level =
     let open Lwt_result_syntax in
     let* blueprint = find conn level in
-    let* kernel_upgrade = Kernel_upgrades.find_applied_before conn level in
+    let* kernel_upgrade = Kernel_upgrades.find_injected_before conn level in
     match blueprint with
     | None -> return None
     | Some blueprint ->
