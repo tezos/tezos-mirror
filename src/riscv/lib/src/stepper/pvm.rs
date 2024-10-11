@@ -13,8 +13,10 @@ use crate::{
     program::Program,
     pvm::{Pvm, PvmHooks, PvmLayout, PvmStatus},
     range_utils::bound_saturating_sub,
-    state_backend::owned_backend::Owned,
+    state_backend::{hash::RootHashable, owned_backend::Owned, AllocatedOf, Ref},
+    storage::binary,
 };
+use serde::{de::DeserializeOwned, Serialize};
 use std::ops::Bound;
 use tezos_smart_rollup_utils::inbox::Inbox;
 
@@ -121,12 +123,31 @@ impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts> PvmStepper<'hooks, ML, CL> 
     /// Obtain the root hash for the PVM state.
     pub fn hash(&self) -> crate::state_backend::hash::Hash
     where
-        for<'a> crate::state_backend::AllocatedOf<PvmLayout<ML, CL>, crate::state_backend::Ref<'a, Owned>>:
-            crate::state_backend::hash::RootHashable,
+        for<'a> AllocatedOf<PvmLayout<ML, CL>, Ref<'a, Owned>>: RootHashable,
     {
-        use crate::state_backend::hash::RootHashable;
         let refs = self.pvm.struct_ref();
         RootHashable::hash(&refs).unwrap()
+    }
+
+    /// Obtain a structure with references to the bound regions of the PVM.
+    pub fn struct_ref(&self) -> AllocatedOf<PvmLayout<ML, CL>, Ref<'_, Owned>> {
+        self.pvm.struct_ref()
+    }
+
+    /// Re-bind the PVM type by serialising and deserialising its state in order to eliminate
+    /// ephemeral state that doesn't make it into the serialised output.
+    pub fn rebind_via_serde(&mut self)
+    where
+        for<'a> AllocatedOf<PvmLayout<ML, CL>, Ref<'a, Owned>>: Serialize,
+        AllocatedOf<PvmLayout<ML, CL>, Owned>: DeserializeOwned,
+    {
+        let space = {
+            let refs = self.pvm.struct_ref();
+            let data = binary::serialise(&refs).unwrap();
+            binary::deserialise(&data).unwrap()
+        };
+
+        self.pvm = Pvm::bind(space);
     }
 }
 

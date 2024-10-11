@@ -29,6 +29,15 @@ impl<'a> PvmHooks<'a> {
     }
 }
 
+impl PvmHooks<'static> {
+    /// Hook that does nothing.
+    pub fn none() -> Self {
+        Self {
+            putchar_hook: Box::new(|_| {}),
+        }
+    }
+}
+
 /// The default PVM configuration prints all debug information from the kernel
 /// to the standard output.
 impl<'a> Default for PvmHooks<'a> {
