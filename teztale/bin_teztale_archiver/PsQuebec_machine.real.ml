@@ -6,19 +6,19 @@
 (*****************************************************************************)
 
 module Block_services =
-  Tezos_client_021_PtQenaB1.Protocol_client_context.Alpha_block_services
+  Tezos_client_021_PsQuebec.Protocol_client_context.Alpha_block_services
 
 open Lwt_result_syntax
-open Tezos_protocol_021_PtQenaB1
-open Tezos_protocol_plugin_021_PtQenaB1
+open Tezos_protocol_021_PsQuebec
+open Tezos_protocol_plugin_021_PsQuebec
 
 module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
   let hash = Protocol.hash
 
-  type wrap_full = Tezos_client_021_PtQenaB1.Protocol_client_context.wrap_full
+  type wrap_full = Tezos_client_021_PsQuebec.Protocol_client_context.wrap_full
 
   let wrap_full cctxt =
-    new Tezos_client_021_PtQenaB1.Protocol_client_context.wrap_full cctxt
+    new Tezos_client_021_PsQuebec.Protocol_client_context.wrap_full cctxt
 
   let slot_to_int x =
     (* YES this is Fun.x ! *)
