@@ -37,7 +37,11 @@ let test_set_deposits_limit =
   @@ fun protocol ->
   let* _, client = Client.init_with_protocol ~protocol `Client () in
   let src = Constant.bootstrap1.alias in
-  let* result = Client.set_deposits_limit ~src ~limit:"1000" client in
+  let process = Client.spawn_set_deposits_limit ~src ~limit:"1000" client in
+  (* From protocol R on, autostaking is immediately off so the
+     set_deposits_limit operation fails. *)
+  let expect_failure = Protocol.(number protocol > 021 (* Q *)) in
+  let* result = Process.check_and_read_stdout ~expect_failure process in
   Regression.capture result ;
   unit
 
@@ -49,7 +53,11 @@ let test_unset_deposits_limit =
   @@ fun protocol ->
   let* _, client = Client.init_with_protocol ~protocol `Client () in
   let src = Constant.bootstrap1.alias in
-  let* result = Client.unset_deposits_limit ~src client in
+  let process = Client.spawn_unset_deposits_limit ~src client in
+  (* From protocol R on, autostaking is immediately off so the
+     set_deposits_limit operation fails. *)
+  let expect_failure = Protocol.(number protocol > 021 (* Q *)) in
+  let* result = Process.check_and_read_stdout ~expect_failure process in
   Regression.capture result ;
   unit
 
