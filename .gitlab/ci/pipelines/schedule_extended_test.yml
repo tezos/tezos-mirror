@@ -856,7 +856,7 @@ opam:all_6:
       - tezos-protocol-demo-noops
       - tezos-protocol-demo-counter
       - tezos-protocol-alpha
-      - tezos-protocol-021-PtQenaB1
+      - tezos-protocol-021-PsQuebec
       - tezos-protocol-020-PsParisC
       - tezos-protocol-019-PtParisB
       - tezos-dal-node-services
@@ -977,10 +977,10 @@ opam:all_2:
       - octez-smart-rollup-wasm-debugger-lib
       - octez-smart-rollup-node-lib
       - octez-smart-rollup-node-alpha
-      - octez-smart-rollup-node-PtQenaB1
       - octez-smart-rollup-node-PtParisB
+      - octez-smart-rollup-node-PtNairob
       - octez-protocol-alpha-libs
-      - octez-protocol-021-PtQenaB1-libs
+      - octez-protocol-021-PsQuebec-libs
       - octez-protocol-020-PsParisC-libs
       - octez-protocol-019-PtParisB-libs
       - octez-protocol-018-Proxford-libs
@@ -1041,7 +1041,7 @@ opam:all_1:
   parallel:
     matrix:
     - package:
-      - octez-smart-rollup-node-PtNairob
+      - octez-smart-rollup-node-PsQuebec
       - octez-smart-rollup-node-PsParisC
       - octez-smart-rollup-node-Proxford
 
@@ -1294,9 +1294,9 @@ opam:exec_1:
       - octez-dac-client
       - octez-codec
       - octez-client
-      - octez-baker-PtQenaB1
+      - octez-baker-PsQuebec
       - octez-baker-PsParisC
-      - octez-accuser-PtQenaB1
+      - octez-accuser-PsQuebec
       - octez-accuser-PsParisC
 
 opam:all_5:
