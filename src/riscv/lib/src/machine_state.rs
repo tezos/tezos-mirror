@@ -6,6 +6,7 @@
 #![deny(rustdoc::broken_intra_doc_links)]
 
 pub mod address_translation;
+pub mod block_cache;
 pub mod bus;
 mod cache_layouts;
 pub mod csregisters;
@@ -18,6 +19,9 @@ pub mod reservation_set;
 #[cfg(test)]
 extern crate proptest;
 
+use self::block_cache::BlockCache;
+pub use self::cache_layouts::{CacheLayouts, DefaultCacheLayouts, TestCacheLayouts};
+use self::instruction_cache::InstructionCache;
 use crate::{
     bits::u64,
     devicetree,
@@ -32,17 +36,15 @@ use crate::{
     },
     program::Program,
     range_utils::{bound_saturating_sub, less_than_bound, unwrap_bound},
-    state_backend as backend,
-    traps::{EnvironException, Exception, Interrupt, TrapContext},
+    state_backend::{self as backend, ManagerReadWrite},
+    traps::{EnvironException, Exception},
 };
 pub use address_translation::AccessType;
 use address_translation::{
     translation_cache::{TranslationCache, TranslationCacheLayout},
     PAGE_SIZE,
 };
-pub use cache_layouts::{CacheLayouts, DefaultCacheLayouts, TestCacheLayouts};
 use csregisters::{values::CSRValue, CSRRepr};
-use instruction_cache::InstructionCache;
 use mode::Mode;
 use std::ops::Bound;
 
@@ -79,6 +81,7 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::ManagerClone> Clone
 pub type MachineStateLayout<ML, CL> = (
     MachineCoreStateLayout<ML>,
     <CL as CacheLayouts>::InstructionCacheLayout,
+    <CL as CacheLayouts>::BlockCacheLayout,
 );
 
 /// The machine state contains everything required to fetch & run instructions.
@@ -89,6 +92,7 @@ pub struct MachineState<
 > {
     pub core: MachineCoreState<ML, M>,
     pub instruction_cache: InstructionCache<CL::InstructionCacheLayout, M>,
+    pub block_cache: BlockCache<CL::BlockCacheLayout, M>,
 }
 
 impl<ML: main_memory::MainMemoryLayout, CL: CacheLayouts, M: backend::ManagerClone> Clone
@@ -98,6 +102,7 @@ impl<ML: main_memory::MainMemoryLayout, CL: CacheLayouts, M: backend::ManagerClo
         Self {
             core: self.core.clone(),
             instruction_cache: self.instruction_cache.clone(),
+            block_cache: self.block_cache.clone(),
         }
     }
 }
@@ -294,6 +299,55 @@ macro_rules! run_cb_type_instr {
 }
 
 impl<ML: main_memory::MainMemoryLayout, M: backend::ManagerBase> MachineCoreState<ML, M> {
+    /// Handle an [`Exception`] if one was risen during execution
+    /// of an instruction (also known as synchronous exception) by taking a trap.
+    ///
+    /// Return the new address of the program counter, becoming the address of a trap handler.
+    /// Throw [`EnvironException`] if the exception needs to be treated by the execution enviroment.
+    fn address_on_exception(
+        &mut self,
+        exception: Exception,
+        current_pc: Address,
+    ) -> Result<Address, EnvironException>
+    where
+        M: backend::ManagerReadWrite,
+    {
+        if let Ok(exc) = EnvironException::try_from(&exception) {
+            // We need to commit the PC before returning because the caller (e.g.
+            // [step]) doesn't commit it eagerly.
+            self.hart.pc.write(current_pc);
+
+            return Err(exc);
+        }
+
+        Ok(self.hart.take_trap(exception, current_pc))
+    }
+
+    #[inline]
+    fn handle_step_result(
+        &mut self,
+        instr_pc: Address,
+        result: Result<ProgramCounterUpdate, Exception>,
+    ) -> Result<Address, EnvironException>
+    where
+        M: backend::ManagerReadWrite,
+    {
+        let pc_update = match result {
+            Err(exc) => ProgramCounterUpdate::Set(self.address_on_exception(exc, instr_pc)?),
+            Ok(upd) => upd,
+        };
+
+        // Update program couter
+        let pc = match pc_update {
+            ProgramCounterUpdate::Set(address) => address,
+            ProgramCounterUpdate::Add(width) => instr_pc + width,
+        };
+
+        self.hart.pc.write(pc);
+
+        Ok(pc)
+    }
+
     /// Bind the machine state to the given allocated space.
     pub fn bind(space: backend::AllocatedOf<MachineCoreStateLayout<ML>, M>) -> Self {
         Self {
@@ -587,6 +641,7 @@ impl<ML: main_memory::MainMemoryLayout, CL: CacheLayouts, M: backend::ManagerBas
         Self {
             core: MachineCoreState::bind(space.0),
             instruction_cache: InstructionCache::bind(space.1),
+            block_cache: BlockCache::bind(space.2),
         }
     }
 
@@ -594,7 +649,11 @@ impl<ML: main_memory::MainMemoryLayout, CL: CacheLayouts, M: backend::ManagerBas
     pub fn struct_ref(
         &self,
     ) -> backend::AllocatedOf<MachineStateLayout<ML, CL>, backend::Ref<'_, M>> {
-        (self.core.struct_ref(), self.instruction_cache.struct_ref())
+        (
+            self.core.struct_ref(),
+            self.instruction_cache.struct_ref(),
+            self.block_cache.struct_ref(),
+        )
     }
 
     /// Reset the machine state.
@@ -604,6 +663,7 @@ impl<ML: main_memory::MainMemoryLayout, CL: CacheLayouts, M: backend::ManagerBas
     {
         self.core.reset();
         self.instruction_cache.reset();
+        self.block_cache.reset();
     }
 
     /// Translate an instruction address.
@@ -684,8 +744,11 @@ impl<ML: main_memory::MainMemoryLayout, CL: CacheLayouts, M: backend::ManagerBas
         // because those bytes may be inaccessible or may trigger an exception when read.
         // Hence we can't read all 4 bytes eagerly.
         let instr = if is_compressed(first_halfword) {
-            self.instruction_cache
-                .cache_compressed(phys_addr, first_halfword)
+            self.instruction_cache.cache_compressed(
+                |cache_entry| self.block_cache.push_instr::<2>(cache_entry),
+                phys_addr,
+                first_halfword,
+            )
         } else {
             let upper = {
                 let next_addr = phys_addr + 2;
@@ -703,8 +766,11 @@ impl<ML: main_memory::MainMemoryLayout, CL: CacheLayouts, M: backend::ManagerBas
             };
 
             let combined = (upper as u32) << 16 | (first_halfword as u32);
-            self.instruction_cache
-                .cache_uncompressed(phys_addr, combined)
+            self.instruction_cache.cache_uncompressed(
+                |cache_entry| self.block_cache.push_instr::<4>(cache_entry),
+                phys_addr,
+                combined,
+            )
         };
 
         Ok(instr)
@@ -783,54 +849,6 @@ impl<ML: main_memory::MainMemoryLayout, CL: CacheLayouts, M: backend::ManagerBas
         }
     }
 
-    /// Handle interrupts (also known as asynchronous exceptions)
-    /// by taking a trap for the given interrupt.
-    ///
-    /// If trap is taken, return new address of program counter.
-    /// Throw [`EnvironException`] if the interrupt has to be treated by the execution enviroment.
-    fn address_on_interrupt(&mut self, interrupt: Interrupt) -> Result<Address, EnvironException>
-    where
-        M: backend::ManagerReadWrite,
-    {
-        let current_pc = self.core.hart.pc.read();
-        let mip: CSRRepr = self.core.hart.csregisters.read(CSRegister::mip);
-
-        // Clear the bit in the set of pending interrupt, marking it as handled
-        self.core.hart.csregisters.write(
-            CSRegister::mip,
-            u64::set_bit(mip, interrupt.exception_code() as usize, false),
-        );
-
-        let new_pc = self.core.hart.take_trap(interrupt, current_pc);
-        // Commit pc, it may be read by other instructions in this step
-        self.core.hart.pc.write(new_pc);
-        Ok(new_pc)
-    }
-
-    /// Handle an [`Exception`] if one was risen during execution
-    /// of an instruction (also known as synchronous exception) by taking a trap.
-    ///
-    /// Return the new address of the program counter, becoming the address of a trap handler.
-    /// Throw [`EnvironException`] if the exception needs to be treated by the execution enviroment.
-    fn address_on_exception(
-        &mut self,
-        exception: Exception,
-        current_pc: Address,
-    ) -> Result<Address, EnvironException>
-    where
-        M: backend::ManagerReadWrite,
-    {
-        if let Ok(exc) = EnvironException::try_from(&exception) {
-            // We need to commit the PC before returning because the caller (e.g.
-            // [step]) doesn't commit it eagerly.
-            self.core.hart.pc.write(current_pc);
-
-            return Err(exc);
-        }
-
-        Ok(self.core.hart.take_trap(exception, current_pc))
-    }
-
     /// Take an interrupt if available, and then
     /// perform precisely one [`Instr`] and handle the traps that may rise as a side-effect.
     ///
@@ -839,32 +857,9 @@ impl<ML: main_memory::MainMemoryLayout, CL: CacheLayouts, M: backend::ManagerBas
     #[inline]
     pub fn step(&mut self) -> Result<(), EnvironException>
     where
-        M: backend::ManagerReadWrite,
+        M: ManagerReadWrite,
     {
         self.step_max_inner(&mut 0, 1)
-    }
-
-    #[inline]
-    fn handle_step_result(
-        &mut self,
-        instr_pc: Address,
-        result: Result<ProgramCounterUpdate, Exception>,
-    ) -> Result<(), EnvironException>
-    where
-        M: backend::ManagerReadWrite,
-    {
-        let pc_update = match result {
-            Err(exc) => ProgramCounterUpdate::Set(self.address_on_exception(exc, instr_pc)?),
-            Ok(upd) => upd,
-        };
-
-        // Update program couter
-        match pc_update {
-            ProgramCounterUpdate::Set(address) => self.core.hart.pc.write(address),
-            ProgramCounterUpdate::Add(width) => self.core.hart.pc.write(instr_pc + width),
-        };
-
-        Ok(())
     }
 
     fn step_max_inner(
@@ -880,17 +875,21 @@ impl<ML: main_memory::MainMemoryLayout, CL: CacheLayouts, M: backend::ManagerBas
 
             // Try to take an interrupt if available, and then
             // obtain the pc for the next instruction to be executed
-            let instr_pc = match self.core.hart.get_pending_interrupt(current_mode) {
-                None => self.core.hart.pc.read(),
-                Some(interrupt) => self.address_on_interrupt(interrupt)?,
+            let instr_pc = self.core.hart.pc.read();
+            let satp: CSRRepr = self.core.hart.csregisters.read(CSRegister::satp);
+
+            let res = match self.translate_instr_address(current_mode, satp, instr_pc) {
+                Ok(phys_addr) => match self.block_cache.get_block(phys_addr).as_mut() {
+                    Some(block) if block.num_instr() <= max_steps - *steps => {
+                        block.run_block(&mut self.core, instr_pc, steps)?;
+                        continue;
+                    }
+                    _ => self.run_instr_at(current_mode, satp, instr_pc, phys_addr),
+                },
+                Err(e) => Err(e),
             };
 
-            let satp: CSRRepr = self.core.hart.csregisters.read(CSRegister::satp);
-            let instr_result = self
-                .translate_instr_address(current_mode, satp, instr_pc)
-                .and_then(|phys_addr| self.run_instr_at(current_mode, satp, instr_pc, phys_addr));
-
-            self.handle_step_result(instr_pc, instr_result)?;
+            self.core.handle_step_result(instr_pc, res)?;
             *steps += 1;
         }
 
@@ -1045,28 +1044,40 @@ pub enum MachineError {
 
 #[cfg(test)]
 mod tests {
+    use std::ops::Bound;
+
     use super::{
         backend::tests::test_determinism, bus, bus::main_memory::tests::T1K, MachineState,
         MachineStateLayout,
     };
     use crate::{
         backend_test,
-        bits::{Bits64, FixedWidthBits},
+        bits::{u16, Bits64, FixedWidthBits},
         create_state,
         machine_state::{
-            address_translation::pte::{PPNField, PageTableEntry},
-            bus::{main_memory::M1M, start_of_main_memory, AddressableWrite},
+            address_translation::{
+                pte::{PPNField, PageTableEntry},
+                PAGE_SIZE,
+            },
+            bus::{
+                main_memory::{M1M, M8K},
+                start_of_main_memory, AddressableWrite,
+            },
+            cache_layouts,
             csregisters::{
                 satp::{Satp, TranslationAlgorithm},
                 xstatus::{self, MStatus},
                 CSRRepr, CSRegister,
             },
             mode::Mode,
-            registers::{a0, a1, a2, t0, t1, t2, zero},
+            registers::{a0, a1, a2, a5, t0, t1, t2, zero},
             DefaultCacheLayouts, TestCacheLayouts,
         },
         parser::{
-            instruction::{CIBTypeArgs, ITypeArgs, Instr, InstrCacheable, SBTypeArgs},
+            instruction::{
+                CIBTypeArgs, CJTypeArgs, ITypeArgs, Instr, InstrCacheable, RTypeArgs, SBTypeArgs,
+                UJTypeArgs,
+            },
             parse_block,
         },
         state_backend::test_helpers::{assert_eq_struct, copy_via_serde, TestBackendFactory},
@@ -1606,5 +1617,192 @@ mod tests {
         let second = state.clone();
 
         assert_eq_struct(&state.struct_ref(), &second.struct_ref());
+    });
+
+    backend_test!(test_block_cache_crossing_pages_creates_new_block, F, {
+        let mut state = create_state!(MachineState, MachineStateLayout<M8K, TestCacheLayouts>, F, M8K, TestCacheLayouts);
+
+        let uncompressed_bytes = 0x5307b3;
+        let uncompressed = InstrCacheable::Add(RTypeArgs {
+            rd: a5,
+            rs1: t1,
+            rs2: t0,
+        });
+
+        let start_ram = start_of_main_memory::<M8K>();
+
+        // Write the instructions to the beginning of the main memory and point the program
+        // counter at the first instruction.
+        let phys_addr = start_ram + PAGE_SIZE - 6;
+
+        state.core.hart.pc.write(phys_addr);
+        state.core.hart.mode.write(Mode::Machine);
+
+        for offset in 0..3 {
+            state
+                .core
+                .bus
+                .write(phys_addr + offset * 4, uncompressed_bytes)
+                .unwrap();
+        }
+
+        state.step_max(Bound::Included(3));
+
+        let block = state.block_cache.get_block(phys_addr);
+        assert!(block.is_some());
+        assert_eq!(vec![uncompressed], block.unwrap().to_vec());
+
+        let block = state.block_cache.get_block(phys_addr + 4);
+        assert!(block.is_none());
+
+        let block = state.block_cache.get_block(phys_addr + 8);
+        assert!(block.is_some());
+        assert_eq!(vec![uncompressed], block.unwrap().to_vec());
+    });
+
+    // The block cache & instruction cache have separate cache invalidation/overwriting.
+    // While running with an unbounded number of steps this is fine, there is a potential for
+    // divergence when the number of steps to be run is less than the block size of the next block.
+    //
+    // Namely:
+    // - we create a block at A, which jumps to address B
+    // - fetch instructions at B overwrites some of the _instruction cache_ entries of Block(A),
+    //   without affecting the block itself, and then jumps back to A
+    // - we don't have enough steps to execute Block(A) directly, so fall back to fetch/parse/run
+    // - A different set of instructions is executed than would be if there were enough steps
+    //   remaining to run Block(A).
+    backend_test!(test_block_cache_instruction_cache_determinism, F, {
+        // We make the wrap-around of the instruction cache much smaller than the wrap-around
+        // of the block-cache, allowing instruction cache entries to be overwritten without
+        // overwriting the related block-cache entries.
+        //
+        // Note that we are jumping 2 * CACHE_SIZE to achieve the wrap-around, as non u16-aligned
+        // addresses cannot be cached, so CACHE_SIZE corresponds to 2*CACHE_SIZE addresses.
+        type CacheLayout = cache_layouts::Sizes<6, 64, 12, 4096>;
+
+        let auipc_bytes: u32 = 0x517;
+        let cj_bytes: u16 = 0xa8b5;
+
+        let block_a = [
+            // Store current instruction counter
+            InstrCacheable::Auipc(UJTypeArgs { rd: a0, imm: 0 }),
+            InstrCacheable::CJ(CJTypeArgs { imm: 128 - 4 }),
+        ];
+
+        let overwrite = InstrCacheable::CJ(CJTypeArgs { imm: 1024 });
+        let overwrite_bytes = 0xa101;
+
+        let clui_bytes: u16 = 0x65a9;
+        let addiw_bytes: u32 = 0x1015859b;
+        let csw_bytes: u16 = 0xc10c;
+        let jalr_bytes: u32 = 0x50067;
+        let block_b = [
+            InstrCacheable::CLui(CIBTypeArgs {
+                rd_rs1: a1,
+                imm: (u16::bits_subset(overwrite_bytes, 15, 12) as i64) << 12,
+            }),
+            InstrCacheable::Addiw(ITypeArgs {
+                rd: a1,
+                rs1: a1,
+                imm: u16::bits_subset(overwrite_bytes, 11, 0) as i64,
+            }),
+            InstrCacheable::CSw(SBTypeArgs {
+                rs1: a0,
+                rs2: a1,
+                imm: 0,
+            }),
+            InstrCacheable::Jalr(ITypeArgs {
+                rd: zero,
+                rs1: a0,
+                imm: 0,
+            }),
+        ];
+
+        let phys_addr = start_of_main_memory::<M8K>();
+
+        let block_b_addr = phys_addr + 128;
+
+        let mut state =
+            create_state!(MachineState, MachineStateLayout<M8K, CacheLayout>, F, M8K, CacheLayout);
+        // Write the instructions to the beginning of the main memory and point the program
+        // counter at the first instruction.
+        state.core.hart.pc.write(phys_addr);
+        state.core.hart.mode.write(Mode::Machine);
+
+        // block A
+        state.core.bus.write(phys_addr, auipc_bytes).unwrap();
+        state.core.bus.write(phys_addr + 4, cj_bytes).unwrap();
+
+        // block B
+        state.core.bus.write(block_b_addr, clui_bytes).unwrap();
+        state.core.bus.write(block_b_addr + 2, addiw_bytes).unwrap();
+        state.core.bus.write(block_b_addr + 6, csw_bytes).unwrap();
+        state.core.bus.write(block_b_addr + 8, jalr_bytes).unwrap();
+
+        // Overwritten jump dest
+        state
+            .core
+            .bus
+            .write(phys_addr + 1024, overwrite_bytes)
+            .unwrap();
+
+        state.step_max(Bound::Included(block_a.len()));
+        assert_eq!(block_b_addr, state.core.hart.pc.read());
+
+        state.step_max(Bound::Included(block_b.len()));
+        assert_eq!(phys_addr, state.core.hart.pc.read());
+
+        assert_eq!(
+            block_a.as_slice(),
+            state
+                .block_cache
+                .get_block(phys_addr)
+                .unwrap()
+                .to_vec()
+                .as_slice()
+        );
+        assert_eq!(
+            block_b.as_slice(),
+            state
+                .block_cache
+                .get_block(block_b_addr)
+                .unwrap()
+                .to_vec()
+                .as_slice()
+        );
+
+        let mut state_step = state.clone();
+
+        state.step_max(Bound::Included(block_a.len()));
+
+        state_step.step_max(Bound::Included(1));
+        assert_eq!(
+            Some(&overwrite),
+            state_step.instruction_cache.fetch_instr(phys_addr)
+        );
+
+        state_step.step_max(Bound::Included(1));
+        assert_eq!(
+            Some(&overwrite),
+            state_step.instruction_cache.fetch_instr(phys_addr + 1024)
+        );
+
+        // TODO RV-229 - there is an inconsistency between stepping 'through' the block here
+        // vs across the block. As stepwise we fall back to fetching from memory, which is a
+        // different instruction!
+        //
+        // The states should agree here (step is the one to aim for)
+        assert_eq!(
+            block_b_addr,
+            state.core.hart.pc.read(),
+            "Execution ran the block"
+        );
+        assert_eq!(
+            phys_addr + 1024 * 2,
+            state_step.core.hart.pc.read(),
+            "Divergence: instr re-fetched"
+        );
+
+        // assert_eq_struct!(state.struct_ref(), stepwise.struct_ref());
     });
 }
