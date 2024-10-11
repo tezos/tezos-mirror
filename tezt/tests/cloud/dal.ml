@@ -565,12 +565,40 @@ module Cli = struct
       stake_machine_type_typ
       ()
 
+  let dal_producers_slot_indices =
+    let producers_typ =
+      let parse string =
+        try
+          string |> String.split_on_char ',' |> List.map int_of_string
+          |> Option.some
+        with _ -> None
+      in
+      let show l = l |> List.map string_of_int |> String.concat "," in
+      Clap.typ ~name:"stake" ~dummy:[100] ~parse ~show
+    in
+    Clap.default
+      ~section
+      ~long:"producer-slot-indices"
+      ~description:
+        "Specify the slot indices for DAL producers to run. The number of DAL \
+         producers run is the size of the list unless `--producers` is also \
+         specified, in that case it takes precedence over this argument."
+      producers_typ
+      []
+
   let producers =
     Clap.default_int
       ~section
       ~long:"producers"
-      ~description:"Specify the number of DAL producers for this test"
-      0
+      ~description:
+        "Specify the number of DAL producers for this test. Slot indices are \
+         incremented by one, starting from `0`, unless \
+         `--producer-slot-indices` is provided. In that case, producers use \
+         the specified indices, and if the list is exhausted, the indices \
+         continue incrementing from the last specified index. For example, to \
+         start 5 producers from index 5, use `--producers 5 \
+         --producer-slot-indices 5`."
+      (List.length dal_producers_slot_indices)
 
   let producer_machine_type =
     Clap.optional_string
@@ -687,7 +715,7 @@ end
 type configuration = {
   stake : int list;
   stake_machine_type : string list option;
-  dal_node_producers : int;
+  dal_node_producers : int list; (* slot indices *)
   observer_slot_indices : int list;
   protocol : Protocol.t;
   producer_machine_type : string option;
@@ -726,6 +754,7 @@ type producer = {
   client : Client.t;
   account : Account.key;
   is_ready : unit Lwt.t;
+  slot_index : int;
 }
 
 type observer = {node : Node.t; dal_node : Dal_node.t; slot_index : int}
@@ -967,7 +996,9 @@ let update_expected_published_commitments t metrics =
       (* -1 since we are looking at level n operation submitted at the previous
          level. *)
       let producers =
-        min t.configuration.dal_node_producers t.parameters.number_of_slots
+        min
+          (List.length t.configuration.dal_node_producers)
+          t.parameters.number_of_slots
       in
       metrics.expected_published_commitments + producers
 
@@ -987,7 +1018,9 @@ let update_ratio_published_commitments_last_level t per_level_info metrics =
   | None -> 0.
   | Some _ ->
       let producers =
-        min t.configuration.dal_node_producers t.parameters.number_of_slots
+        min
+          (List.length t.configuration.dal_node_producers)
+          t.parameters.number_of_slots
       in
       if producers = 0 then 100.
       else
@@ -1407,7 +1440,7 @@ let init_testnet cloud (configuration : configuration) teztale agent
   let* producer_accounts =
     Client.stresstest_gen_keys
       ~alias_prefix:"dal_producer"
-      configuration.dal_node_producers
+      (List.length configuration.dal_node_producers)
       bootstrap.client
   in
   let () = toplog "Funding the producer accounts" in
@@ -1517,7 +1550,7 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
   let* producer_accounts =
     Client.stresstest_gen_keys
       ~alias_prefix:"dal_producer"
-      configuration.dal_node_producers
+      (List.length configuration.dal_node_producers)
       client
   in
   let* etherlink_rollup_operator_key =
@@ -1677,8 +1710,8 @@ let init_baker cloud (configuration : configuration) ~bootstrap teztale account
   in
   Lwt.return {node; dal_node; baker; account; stake}
 
-let init_producer cloud configuration ~bootstrap teztale ~number_of_slots
-    account i agent =
+let init_producer cloud configuration ~bootstrap teztale account i slot_index
+    agent =
   let () = toplog "Initializing a DAL producer" in
   let name = Format.asprintf "producer-node-%i" i in
   let data_dir =
@@ -1717,8 +1750,8 @@ let init_producer cloud configuration ~bootstrap teztale ~number_of_slots
   let () = toplog "Init producer: init DAL node config" in
   let* () =
     Dal_node.init_config
-      ~expected_pow:(Network.expected_pow Cli.network)
-      ~observer_profiles:[i mod number_of_slots]
+      ~expected_pow:(Network.expected_pow configuration.network)
+      ~observer_profiles:[slot_index]
       ~peers:[bootstrap.dal_node_p2p_endpoint]
       dal_node
   in
@@ -1757,7 +1790,7 @@ let init_producer cloud configuration ~bootstrap teztale ~number_of_slots
           ~node_name:(Node.name node)
           ~node_port:(Node.rpc_port node)
   in
-  Lwt.return {client; node; dal_node; account; is_ready}
+  Lwt.return {client; node; dal_node; account; is_ready; slot_index}
 
 let init_observer cloud configuration ~bootstrap teztale ~slot_index i agent =
   let name = Format.asprintf "observer-node-%i" i in
@@ -2209,9 +2242,11 @@ let init ~(configuration : configuration) cloud next_agent =
     |> Lwt.all
   in
   let* producers_agents =
-    List.init configuration.dal_node_producers (fun i ->
-        let name = Format.asprintf "producer-%d" i in
-        next_agent ~name)
+    configuration.dal_node_producers
+    |> List.mapi (fun i slot_index ->
+           let name = Format.asprintf "producer-%d" i in
+           let* name = next_agent ~name in
+           return (name, slot_index))
     |> Lwt.all
   in
   let* observers_agents =
@@ -2250,15 +2285,15 @@ let init ~(configuration : configuration) cloud next_agent =
   let () = toplog "Init: initializting producers and observers" in
   let* producers =
     Lwt_list.mapi_p
-      (fun i (agent, account) ->
+      (fun i ((agent, slot_index), account) ->
         init_producer
           cloud
           configuration
           ~bootstrap
           teztale
-          ~number_of_slots:parameters.number_of_slots
           account
           i
+          slot_index
           agent)
       (List.combine producers_agents producer_accounts)
   and* observers =
@@ -2433,7 +2468,7 @@ let ensure_enough_funds t i =
 let produce_slot t level i =
   let* () = ensure_enough_funds t i in
   let producer = List.nth t.producers i in
-  let index = i mod t.parameters.number_of_slots in
+  let index = producer.slot_index in
   let content =
     Format.asprintf "%d:%d" level index
     |> Helpers.make_slot
@@ -2470,7 +2505,7 @@ let rec loop t level =
     if producers_not_ready t then Lwt.return_unit
     else
       Seq.ints 0
-      |> Seq.take t.configuration.dal_node_producers
+      |> Seq.take (List.length t.configuration.dal_node_producers)
       |> Seq.map (fun i -> produce_slot t level i)
       |> List.of_seq |> Lwt.join
   in
@@ -2513,7 +2548,17 @@ let etherlink_loop (etherlink : etherlink) =
 let configuration =
   let stake = Cli.stake in
   let stake_machine_type = Cli.stake_machine_type in
-  let dal_node_producers = Cli.producers in
+  let dal_node_producers =
+    let last_index = ref 0 in
+    List.init Cli.producers (fun i ->
+        match List.nth_opt Cli.dal_producers_slot_indices i with
+        | None ->
+            incr last_index ;
+            !last_index
+        | Some index ->
+            last_index := index ;
+            index)
+  in
   let observer_slot_indices = Cli.observer_slot_indices in
   let protocol = Cli.protocol in
   let producer_machine_type = Cli.producer_machine_type in
@@ -2546,7 +2591,7 @@ let benchmark () =
     [
       (if configuration.bootstrap then [`Bootstrap] else []);
       List.map (fun i -> `Baker i) configuration.stake;
-      List.init configuration.dal_node_producers (fun _ -> `Producer);
+      List.map (fun _ -> `Producer) configuration.dal_node_producers;
       List.map (fun _ -> `Observer) configuration.observer_slot_indices;
       (if configuration.etherlink then [`Etherlink_operator] else []);
       (if configuration.etherlink then
