@@ -2166,7 +2166,7 @@ let test_get_balance_block_param =
         (Observer
            {
              initial_kernel = "evm_kernel.wasm";
-             preimages_dir = "/tmp";
+             preimages_dir = Some "/tmp";
              private_rpc_port = None;
              rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
            })
@@ -2240,7 +2240,7 @@ let test_get_block_by_number_block_param =
         (Observer
            {
              initial_kernel = "evm_kernel.wasm";
-             preimages_dir = "/tmp";
+             preimages_dir = Some "/tmp";
              private_rpc_port = None;
              rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
            })
@@ -4525,6 +4525,7 @@ let test_preimages_endpoint =
            sc_rollup_address;
            client;
            sequencer;
+           observer;
            proxy;
            _;
          }
@@ -4547,13 +4548,37 @@ let test_preimages_endpoint =
       (Sc_rollup_node.endpoint sc_rollup_node)
   in
   let* () = Process.check @@ Evm_node.spawn_init_config new_sequencer in
+  (* Prepares the observer without [preimages-dir], to force the use of
+     preimages endpoint. *)
+  let observer_mode_without_preimages_dir =
+    match Evm_node.mode observer with
+    | Evm_node.Observer mode ->
+        Evm_node.Observer {mode with preimages_dir = None}
+    | _ -> assert false
+  in
+  let new_observer =
+    Evm_node.create
+      ~mode:observer_mode_without_preimages_dir
+      (Evm_node.endpoint new_sequencer)
+  in
+  let new_observer2 =
+    Evm_node.create
+      ~mode:observer_mode_without_preimages_dir
+      (Evm_node.endpoint new_observer)
+  in
+
+  let* () = Process.check @@ Evm_node.spawn_init_config new_observer in
+  let* () = Process.check @@ Evm_node.spawn_init_config new_observer2 in
+
   let* () =
     repeat 2 (fun () ->
         let* _ = next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
-  let* () =
-    Evm_node.init_from_rollup_node_data_dir new_sequencer sc_rollup_node
+  let* () = Evm_node.init_from_rollup_node_data_dir new_sequencer sc_rollup_node
+  and* () = Evm_node.init_from_rollup_node_data_dir new_observer sc_rollup_node
+  and* () =
+    Evm_node.init_from_rollup_node_data_dir new_observer2 sc_rollup_node
   in
   (* Sends an upgrade with new preimages. *)
   let* root_hash =
@@ -4583,17 +4608,34 @@ let test_preimages_endpoint =
   let preimages_endpoint =
     sf "http://%s:%d" Constant.default_host provider_port
   in
+  let kernel_downloaded =
+    Lwt.join
+      [
+        Evm_node.wait_for_predownload_kernel new_sequencer ~root_hash;
+        Evm_node.wait_for_predownload_kernel new_observer ~root_hash;
+        Evm_node.wait_for_predownload_kernel new_observer2 ~root_hash;
+      ]
+  in
   let* () =
     Evm_node.run
       ~extra_arguments:["--preimages-endpoint"; preimages_endpoint]
       new_sequencer
   in
-  (* Produce a block so the sequencer sees the event. *)
-  let kernel_downloaded =
-    Evm_node.wait_for_predownload_kernel new_sequencer ~root_hash
+  let* () =
+    Evm_node.run
+      ~extra_arguments:["--preimages-endpoint"; preimages_endpoint]
+      new_observer
   in
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client
-  and* () = kernel_downloaded in
+  let* () =
+    Evm_node.run
+      ~extra_arguments:["--preimages-endpoint"; preimages_endpoint]
+      new_observer2
+  in
+
+  (* It won't upgrade, but both will download the preimages. *)
+  let*@ _ = produce_block ~timestamp:"2020-01-01T00:00:09Z" new_sequencer in
+  let* () = kernel_downloaded in
+  (* Finally, do the upgrade. *)
   let*@ _ = produce_block ~timestamp:"2020-01-01T00:00:15Z" new_sequencer in
   Check.is_true
     !served

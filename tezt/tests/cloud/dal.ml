@@ -2148,7 +2148,7 @@ let init_etherlink_producer_setup cloud operator name account ~bootstrap agent =
       {
         private_rpc_port = None;
         initial_kernel = output;
-        preimages_dir;
+        preimages_dir = Some preimages_dir;
         rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
       }
   in

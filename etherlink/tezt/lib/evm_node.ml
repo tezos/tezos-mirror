@@ -31,7 +31,7 @@ type time_between_blocks = Nothing | Time_between_blocks of float
 type mode =
   | Observer of {
       initial_kernel : string;
-      preimages_dir : string;
+      preimages_dir : string option;
       private_rpc_port : int option;
       rollup_node_endpoint : string;
     }
@@ -938,9 +938,8 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
           evm_node.persistent_state.endpoint;
           "--rollup-node-endpoint";
           rollup_node_endpoint;
-          "--preimages-dir";
-          preimages_dir;
         ]
+        @ Cli_arg.optional_arg "preimages-dir" Fun.id preimages_dir
         @ Cli_arg.optional_arg "private-rpc-port" string_of_int private_rpc_port
     | Threshold_encryption_observer
         {
@@ -1396,12 +1395,11 @@ let preimages_dir evm_node =
   let rec from_node ~data_dir = function
     | Sandbox {preimage_dir; _}
     | Sequencer {preimage_dir; _}
-    | Threshold_encryption_sequencer {preimage_dir; _} ->
+    | Threshold_encryption_sequencer {preimage_dir; _}
+    | Observer {preimages_dir = preimage_dir; _} ->
         Option.value ~default:(data_dir // "wasm_2_0_0") preimage_dir
     | Rpc mode -> from_node ~data_dir mode
-    | Observer {preimages_dir; _}
-    | Threshold_encryption_observer {preimages_dir; _} ->
-        preimages_dir
+    | Threshold_encryption_observer {preimages_dir; _} -> preimages_dir
     | Proxy -> Test.fail "cannot start a RPC node from a proxy node"
   in
   from_node ~data_dir:(data_dir evm_node) evm_node.persistent_state.mode
