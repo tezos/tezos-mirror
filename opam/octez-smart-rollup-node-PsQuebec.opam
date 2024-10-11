@@ -12,20 +12,28 @@ depends: [
   "ocaml" { >= "4.14" }
   "octez-libs" { = version }
   "octez-shell-libs" { = version }
+  "octez-protocol-021-PsQuebec-libs" { = version }
+  "tezos-protocol-021-PsQuebec" { = version }
+  "tezos-dal-node-services" { = version }
+  "tezos-dal-node-lib" { = version }
   "tezos-dac-lib" { = version }
   "tezos-dac-client-lib" { = version }
-  "octez-protocol-020-PsParisC-libs" { = version }
-  "octez-protocol-021-PsQuebec-libs" { = version }
-]
-depopts: [
-  "octez-protocol-alpha-libs"
+  "octez-l2-libs" { = version }
+  "octez-crawler" { = version }
+  "octez-internal-libs" { = version }
+  "aches" { >= "1.1.0" }
+  "aches-lwt" { >= "1.1.0" }
+  "octez-injector" { = version }
+  "octez-smart-rollup-node-lib" { = version }
+  "octez-riscv-pvm" { = version }
+  "octez-version" { = version }
 ]
 conflicts: [
-  "octez-protocol-alpha-libs" { != version }
+  "checkseum" { = "0.5.0" }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tezos: `octez-dac-client` binary"
+synopsis: "Protocol specific (for 021-PsQuebec) library for smart rollup node"

@@ -10,13 +10,14 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
-  "octez-proto-libs" { = version }
-  "octez-shell-libs" { = version }
   "octez-libs" { = version }
+  "tezos-protocol-021-PsQuebec" { = version }
+  "octez-protocol-021-PsQuebec-libs" { = version }
+  "octez-shell-libs" { = version }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tezos protocol 021-PtQenaB1 package"
+synopsis: "Tezos/Protocol: accuser binary"

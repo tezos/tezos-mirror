@@ -2,8 +2,8 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_dac_021_PtQenaB1)
- (public_name octez-protocol-021-PtQenaB1-libs.dac)
+ (name tezos_dac_021_PsQuebec)
+ (public_name octez-protocol-021-PsQuebec-libs.dac)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.base
@@ -11,9 +11,9 @@
   octez-libs.stdlib-unix
   tezos-dac-lib
   tezos-dac-client-lib
-  octez-protocol-021-PtQenaB1-libs.client
-  tezos-protocol-021-PtQenaB1.embedded-protocol
-  tezos-protocol-021-PtQenaB1.protocol)
+  octez-protocol-021-PsQuebec-libs.client
+  tezos-protocol-021-PsQuebec.embedded-protocol
+  tezos-protocol-021-PsQuebec.protocol)
  (inline_tests (flags -verbose) (modes native))
  (preprocess (pps ppx_expect))
  (library_flags (:standard -linkall))
@@ -24,6 +24,6 @@
   -open Tezos_stdlib_unix
   -open Tezos_dac_lib
   -open Tezos_dac_client_lib
-  -open Tezos_client_021_PtQenaB1
-  -open Tezos_embedded_protocol_021_PtQenaB1
-  -open Tezos_protocol_021_PtQenaB1))
+  -open Tezos_client_021_PsQuebec
+  -open Tezos_embedded_protocol_021_PsQuebec
+  -open Tezos_protocol_021_PsQuebec))

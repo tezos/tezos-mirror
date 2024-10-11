@@ -11,13 +11,17 @@ depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
   "octez-libs" { = version }
-  "tezos-protocol-021-PtQenaB1" { = version }
-  "octez-protocol-021-PtQenaB1-libs" { = version }
-  "octez-shell-libs" { = version }
+  "tezos-micheline-rewriting" { = version }
+  "tezos-benchmark" { = version }
+  "tezos-benchmark-type-inference-021-PsQuebec" { = version }
+  "tezos-protocol-021-PsQuebec" { = version }
+  "hashcons"
+  "octez-protocol-021-PsQuebec-libs" { = version }
+  "prbnmcn-stats" { = "0.0.6" }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tezos/Protocol: baker binary"
+synopsis: "Tezos/Protocol: library for writing benchmarks (protocol-specific part)"

@@ -2,16 +2,16 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_smart_rollup_021_PtQenaB1)
- (public_name octez-protocol-021-PtQenaB1-libs.smart-rollup)
+ (name tezos_smart_rollup_021_PsQuebec)
+ (public_name octez-protocol-021-PsQuebec-libs.smart-rollup)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.base
-  tezos-protocol-021-PtQenaB1.protocol)
+  tezos-protocol-021-PsQuebec.protocol)
  (inline_tests (flags -verbose) (modes native))
  (preprocess (pps ppx_expect))
  (library_flags (:standard -linkall))
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_protocol_021_PtQenaB1))
+  -open Tezos_protocol_021_PsQuebec))

@@ -10,30 +10,18 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
-  "ppx_expect"
   "octez-libs" { = version }
-  "tezos-protocol-021-PtQenaB1" { = version }
+  "tezos-protocol-021-PsQuebec" { = version }
+  "tezos-benchmark" { = version }
+  "tezos-benchmark-021-PsQuebec" { = version }
+  "tezos-benchmark-type-inference-021-PsQuebec" { = version }
   "octez-shell-libs" { = version }
-  "uri" { >= "3.1.0" }
-  "tezt" { >= "4.1.0" & < "5.0.0" }
-  "tezt-tezos" { = version }
-  "qcheck-alcotest" { >= "0.20" }
+  "octez-protocol-021-PsQuebec-libs" { = version }
   "octez-proto-libs" { = version }
-  "octez-version" { = version }
-  "tezos-dal-node-services" { = version }
-  "lwt-canceler" { >= "0.3" & < "0.4" }
-  "lwt-exit"
-  "octez-protocol-compiler" { = version }
-  "tezos-dal-node-lib" { = version }
-  "tezos-dac-lib" { = version }
-  "tezos-dac-client-lib" { = version }
-  "octez-injector" { = version }
-  "octez-l2-libs" { = version }
-  "octez-alcotezt" { with-test & = version }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Octez protocol 021-PtQenaB1 libraries"
+synopsis: "Tezos/Protocol: protocol benchmarks"

@@ -2,7 +2,7 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name src_proto_021_PtQenaB1_lib_protocol_test_integration_validate_tezt_lib)
+ (name src_proto_021_PsQuebec_lib_protocol_test_integration_validate_tezt_lib)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
@@ -22,12 +22,12 @@
   -open Tezt_core.Base
   -open Tezos_base.TzPervasives
   -open Tezos_protocol_021_PsQuebec
-  -open Tezos_client_021_PtQenaB1
+  -open Tezos_client_021_PsQuebec
   -open Tezos_test_helpers
-  -open Tezos_021_PtQenaB1_test_helpers
+  -open Tezos_021_PsQuebec_test_helpers
   -open Tezos_base_test_helpers
   -open Tezos_protocol_021_PsQuebec_parameters
-  -open Tezos_protocol_plugin_021_PtQenaB1)
+  -open Tezos_protocol_plugin_021_PsQuebec)
  (modules
   generator_descriptors
   generators
@@ -45,7 +45,7 @@
  (name main)
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
-  src_proto_021_PtQenaB1_lib_protocol_test_integration_validate_tezt_lib
+  src_proto_021_PsQuebec_lib_protocol_test_integration_validate_tezt_lib
   tezt)
  (link_flags
   (:standard)
