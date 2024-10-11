@@ -1058,9 +1058,9 @@ let test_forked_migration_bakers ~migrate_from ~migrate_to =
   check_blocks ~level_from ~level_to
 
 let test_migration_min_delegated_in_cycle =
-  (* Paris -> Qena *)
+  (* Paris -> Quebec *)
   let _migrate_from = Protocol.ParisC in
-  let migrate_to = Protocol.Qena in
+  let migrate_to = Protocol.Quebec in
 
   Protocol.register_regression_test
     ~__FILE__
