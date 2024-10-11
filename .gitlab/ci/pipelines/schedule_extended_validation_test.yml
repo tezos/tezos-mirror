@@ -395,6 +395,7 @@ oc.build_x86_64-released:
     EXECUTABLE_FILES: script-inputs/released-executables
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
     COVERAGE_OPTIONS: --instrument-with bisect_ppx
   artifacts:
     name: build-$ARCH-$CI_COMMIT_REF_SLUG
@@ -442,6 +443,7 @@ oc.build_x86_64-exp-dev-extra:
       tezt/tests/main.exe contrib/octez_injector_server/octez_injector_server.exe
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
     COVERAGE_OPTIONS: --instrument-with bisect_ppx
   artifacts:
     name: build-$ARCH-$CI_COMMIT_REF_SLUG
@@ -486,6 +488,7 @@ oc.build_kernels:
     CC: clang
     NATIVE_TARGET: x86_64-unknown-linux-musl
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
     CARGO_NET_OFFLINE: "false"
   artifacts:
     name: build-kernels-$CI_COMMIT_REF_SLUG

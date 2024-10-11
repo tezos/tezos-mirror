@@ -412,6 +412,7 @@ oc.build_arm64-released:
     EXECUTABLE_FILES: script-inputs/released-executables
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
   artifacts:
     name: build-$ARCH-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
@@ -462,6 +463,7 @@ oc.build_arm64-exp-dev-extra:
       tezt/tests/main.exe
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
   artifacts:
     name: build-$ARCH-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
@@ -556,6 +558,7 @@ oc.build:static-x86_64-linux-binaries:
     EXECUTABLE_FILES: script-inputs/released-executables script-inputs/experimental-executables
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
   artifacts:
     paths:
     - octez-binaries/$ARCH/*
@@ -643,6 +646,7 @@ oc.build_x86_64-released:
     EXECUTABLE_FILES: script-inputs/released-executables
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
     COVERAGE_OPTIONS: --instrument-with bisect_ppx
   artifacts:
     name: build-$ARCH-$CI_COMMIT_REF_SLUG
@@ -745,6 +749,7 @@ oc.build_x86_64-exp-dev-extra:
       tezt/tests/main.exe contrib/octez_injector_server/octez_injector_server.exe
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
     COVERAGE_OPTIONS: --instrument-with bisect_ppx
     DUNE_CACHE: enabled
     DUNE_CACHE_STORAGE_MODE: hardlink
@@ -821,6 +826,7 @@ wasm-runtime-check:
   variables:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
 
 ocaml-check:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -890,6 +896,7 @@ ocaml-check:
   variables:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
     DUNE_CACHE: enabled
     DUNE_CACHE_STORAGE_MODE: hardlink
     DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
@@ -955,6 +962,7 @@ oc.build_kernels:
     CC: clang
     NATIVE_TARGET: x86_64-unknown-linux-musl
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
     CARGO_NET_OFFLINE: "false"
   artifacts:
     name: build-kernels-$CI_COMMIT_REF_SLUG
@@ -1029,6 +1037,7 @@ oc.build_dsn_node:
     CC: clang
     NATIVE_TARGET: x86_64-unknown-linux-musl
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
     CARGO_NET_OFFLINE: "false"
   artifacts:
     name: build-dsn-node-$CI_COMMIT_REF_SLUG
@@ -1129,6 +1138,7 @@ build_octez_source:
   variables:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
 
 select_tezts:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
@@ -1296,6 +1306,7 @@ opam:all_6:
   variables:
     RUNTEZTALIAS: "true"
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    SCCACHE_CACHE_SIZE: 5G
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -1376,6 +1387,7 @@ opam:exec_6:
   variables:
     RUNTEZTALIAS: "true"
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    SCCACHE_CACHE_SIZE: 5G
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -1447,6 +1459,7 @@ opam:all_2:
   variables:
     RUNTEZTALIAS: "true"
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    SCCACHE_CACHE_SIZE: 5G
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -1531,6 +1544,7 @@ opam:all_1:
   variables:
     RUNTEZTALIAS: "true"
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    SCCACHE_CACHE_SIZE: 5G
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -1603,6 +1617,7 @@ opam:all_3:
   variables:
     RUNTEZTALIAS: "true"
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    SCCACHE_CACHE_SIZE: 5G
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -1685,6 +1700,7 @@ opam:exec_4:
   variables:
     RUNTEZTALIAS: "true"
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    SCCACHE_CACHE_SIZE: 5G
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -1755,6 +1771,7 @@ opam:all_4:
   variables:
     RUNTEZTALIAS: "true"
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    SCCACHE_CACHE_SIZE: 5G
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -1836,6 +1853,7 @@ opam:exec_1:
   variables:
     RUNTEZTALIAS: "true"
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    SCCACHE_CACHE_SIZE: 5G
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -1917,6 +1935,7 @@ opam:all_5:
   variables:
     RUNTEZTALIAS: "true"
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    SCCACHE_CACHE_SIZE: 5G
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -2001,6 +2020,7 @@ opam:all_7:
   variables:
     RUNTEZTALIAS: "true"
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    SCCACHE_CACHE_SIZE: 5G
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -2127,6 +2147,7 @@ kaitai_checks:
   variables:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
   artifacts:
     expire_in: 1 hour
     paths:
@@ -2224,6 +2245,7 @@ oc.check_lift_limits_patch:
   variables:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
 
 oc.python_check:
   image: ${ci_image_name}/test:${ci_image_tag}
@@ -2332,6 +2354,7 @@ oc.integration:compiler-rejections:
   variables:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
 
 oc.script:test-gen-genesis:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -2448,6 +2471,7 @@ oc.script:snapshot_alpha_and_link:
   variables:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
     DUNE_CACHE: enabled
     DUNE_CACHE_STORAGE_MODE: hardlink
     DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
@@ -2650,6 +2674,7 @@ test_kernels:
     NATIVE_TARGET: x86_64-unknown-linux-musl
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
 
 test_etherlink_kernel:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
@@ -2692,6 +2717,7 @@ test_etherlink_kernel:
     NATIVE_TARGET: x86_64-unknown-linux-musl
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
 
 test_etherlink_firehose:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
@@ -2732,6 +2758,7 @@ test_etherlink_firehose:
     NATIVE_TARGET: x86_64-unknown-linux-musl
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
 
 check_riscv_kernels:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
@@ -2769,6 +2796,7 @@ check_riscv_kernels:
     NATIVE_TARGET: x86_64-unknown-linux-musl
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
 
 test_riscv_kernels:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
@@ -2810,6 +2838,7 @@ test_riscv_kernels:
     NATIVE_TARGET: x86_64-unknown-linux-musl
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
 
 test_evm_compatibility:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
@@ -2854,6 +2883,7 @@ test_evm_compatibility:
     NATIVE_TARGET: x86_64-unknown-linux-musl
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
 
 oc.unit:non-proto-x86_64:
   image: ${ci_image_name}/test:${ci_image_tag}
@@ -2921,6 +2951,7 @@ oc.unit:non-proto-x86_64:
     MAKE_TARGETS: test-nonproto-unit
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
     DUNE_CACHE: enabled
     DUNE_CACHE_STORAGE_MODE: hardlink
     DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
@@ -3003,6 +3034,7 @@ oc.unit:other-x86_64:
     MAKE_TARGETS: test-other-unit
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
     DUNE_CACHE: enabled
     DUNE_CACHE_STORAGE_MODE: hardlink
     DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
@@ -3085,6 +3117,7 @@ oc.unit:proto-x86_64:
     MAKE_TARGETS: test-proto-unit
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
     DUNE_CACHE: enabled
     DUNE_CACHE_STORAGE_MODE: hardlink
     DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
@@ -3163,6 +3196,7 @@ oc.unit:non-proto-arm64:
     DISTRIBUTE_TESTS_TO_PARALLELS: "true"
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
   artifacts:
     name: $CI_JOB_NAME-$CI_COMMIT_SHA-${ARCH}
     expire_in: 1 day
@@ -3278,6 +3312,7 @@ oc.unit:protocol_compiles:
   variables:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
 
 de.unit:x86_64:
   image: ${ci_image_name}/test:${ci_image_tag}
@@ -4235,6 +4270,7 @@ documentation:odoc:
   variables:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
   artifacts:
     expire_in: 1 hour
     paths:
@@ -4315,6 +4351,7 @@ documentation:manuals:
   variables:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
   artifacts:
     expire_in: 1 week
     paths:
@@ -4396,6 +4433,7 @@ documentation:docgen:
   variables:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
   artifacts:
     expire_in: 1 week
     paths:

@@ -101,6 +101,7 @@ oc.build-debian:
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: debian
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
     SCCACHE_IDLE_TIMEOUT: "0"
   artifacts:
     paths:
@@ -144,6 +145,7 @@ oc.build-debian-current_a:
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: debian
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
     SCCACHE_IDLE_TIMEOUT: "0"
   artifacts:
     paths:
@@ -187,6 +189,7 @@ oc.build-debian-current_b:
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: debian
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
     SCCACHE_IDLE_TIMEOUT: "0"
   artifacts:
     paths:
@@ -322,6 +325,7 @@ oc.build-ubuntu:
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: ubuntu
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
     SCCACHE_IDLE_TIMEOUT: "0"
   artifacts:
     paths:
@@ -365,6 +369,7 @@ oc.build-ubuntu-current_a:
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: ubuntu
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
     SCCACHE_IDLE_TIMEOUT: "0"
   artifacts:
     paths:
@@ -408,6 +413,7 @@ oc.build-ubuntu-current_b:
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: ubuntu
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
     SCCACHE_IDLE_TIMEOUT: "0"
   artifacts:
     paths:
