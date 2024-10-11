@@ -13,6 +13,7 @@ depends: [
   "zarith" { >= "1.13" & < "1.14" }
   "octez-libs" { = version }
   "tezt" { with-test & >= "4.1.0" & < "5.0.0" }
+  "octez-rust-deps" { with-test & = version }
   "bls12-381" { with-test & = version }
   "tezos-protocol-alpha" { with-test & = version }
   "octez-protocol-alpha-libs" { with-test & = version }

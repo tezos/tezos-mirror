@@ -7,6 +7,7 @@
  (package octez-smart-rollup-wasm-debugger)
  (instrumentation (backend bisect_ppx))
  (libraries
+  octez-rust-deps
   bls12-381.archive
   octez-smart-rollup-wasm-debugger-lib)
  (link_flags

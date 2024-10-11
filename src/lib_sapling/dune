@@ -12,8 +12,7 @@
   octez-libs.stdlib
   octez-libs.crypto
   octez-libs.error-monad
-  octez-libs.lwt-result-stdlib
-  octez-rust-deps)
+  octez-libs.lwt-result-stdlib)
  (flags
   (:standard)
   -open Tezos_stdlib

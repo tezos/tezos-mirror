@@ -18,6 +18,7 @@ depends: [
   "hashcons"
   "octez-protocol-alpha-libs" { = version }
   "prbnmcn-stats" { = "0.0.6" }
+  "octez-rust-deps" { with-test & = version }
   "bls12-381" { with-test & = version }
 ]
 build: [

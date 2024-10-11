@@ -23,6 +23,7 @@ depends: [
   "tezos-dal-node-services" { = version }
   "lwt-canceler" { >= "0.3" & < "0.4" }
   "lwt-exit"
+  "octez-rust-deps" { with-test & = version }
   "bls12-381" { with-test & = version }
   "octez-protocol-compiler" { = version }
   "tezos-dal-node-lib" { = version }

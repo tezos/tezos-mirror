@@ -10,7 +10,6 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
-  "octez-rust-deps" { = version }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

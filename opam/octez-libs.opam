@@ -81,8 +81,8 @@ depends: [
   "integers"
   "ctypes" { >= "0.18.0" }
   "tezos-sapling-parameters" { >= "1.1.0" }
-  "octez-rust-deps" { = version }
   "lwt-watcher" { = "0.2" }
+  "octez-rust-deps" { with-test & = version }
   "bigstring" {with-test}
   "bam-ppx" {with-test}
   "tezt-bam" {with-test}

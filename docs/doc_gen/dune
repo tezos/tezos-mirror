@@ -4,6 +4,7 @@
 (executables
  (names rpc_doc p2p_doc)
  (libraries
+  octez-rust-deps
   bls12-381.archive
   octez-libs.base
   octez-libs.rpc

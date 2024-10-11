@@ -9,8 +9,7 @@
   ctypes
   ctypes.foreign
   lwt
-  lwt.unix
-  octez-rust-deps)
+  lwt.unix)
  (preprocess (pps ppx_deriving.show))
  (flags
   (:standard)

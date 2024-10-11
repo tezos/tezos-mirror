@@ -21,6 +21,7 @@ depends: [
   "octez-version"
   "lwt" { >= "5.7.0" }
   "cmdliner" { >= "1.1.0" }
+  "octez-rust-deps"
   "octez-shell-libs"
   "tls-lwt" { >= "0.16.0" }
   "conduit-lwt-unix" { = "6.2.2" }

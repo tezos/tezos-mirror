@@ -4,6 +4,7 @@
 (executable
  (name main)
  (libraries
+  octez-rust-deps
   bls12-381.archive
   tezt
   tezt-tezos
