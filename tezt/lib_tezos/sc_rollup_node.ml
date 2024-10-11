@@ -514,8 +514,8 @@ let wait_for_level ?timeout sc_node level =
       check_event
         ?timeout
         sc_node
-        "smart_rollup_node_daemon_new_head_processed.v0"
-        ~where:("level >= " ^ string_of_int level)
+        "smart_rollup_node_daemon_new_heads_processed.v0"
+        ~where:("to >= " ^ string_of_int level)
         promise
 
 let wait_for ?where ?(timeout = 60.) daemon name filter =
@@ -552,11 +552,11 @@ let unsafe_wait_sync ?timeout sc_node =
 let wait_sync sc_node ~timeout = unsafe_wait_sync sc_node ~timeout
 
 let handle_event sc_node {name; value; timestamp = _} =
+  (* Note: smart_rollup_node_daemon_new_head_processed.v0 also
+     contains the level, but it can occur too soon and as a result
+     makes some tests flaky when used to update the level here. *)
   match name with
   | "smart_rollup_node_is_ready.v0" -> set_ready sc_node
-  | "smart_rollup_node_daemon_new_head_processed.v0" ->
-      let level = JSON.(value |-> "level" |> as_int) in
-      update_level sc_node level
   | "smart_rollup_node_daemon_new_heads_processed.v0" ->
       let level = JSON.(value |-> "to" |> as_int) in
       update_level sc_node level
