@@ -131,9 +131,10 @@ let get_time_between_blocks ?fallback ~evm_node_endpoint () =
       return res
   | Error trace, None -> fail trace
 
-let get_blueprint ~evm_node_endpoint Ethereum_types.(Qty level) =
-  Tezos_rpc_http_client_unix.RPC_client_unix.call_service
-    [Media_type.octet_stream]
+let get_blueprint ~keep_alive ~evm_node_endpoint Ethereum_types.(Qty level) =
+  Rollup_services.call_service
+    ~keep_alive
+    ~media_types:[Media_type.octet_stream]
     ~base:evm_node_endpoint
     get_blueprint_service
     ((), Z.to_int64 level)

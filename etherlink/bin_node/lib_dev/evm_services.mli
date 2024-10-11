@@ -18,6 +18,7 @@ val get_time_between_blocks :
   Configuration.time_between_blocks tzresult Lwt.t
 
 val get_blueprint :
+  keep_alive:bool ->
   evm_node_endpoint:Uri.t ->
   Ethereum_types.quantity ->
   Blueprint_types.with_events tzresult Lwt.t
