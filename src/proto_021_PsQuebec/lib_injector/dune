@@ -1,0 +1,23 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name octez_injector_PsQuebec)
+ (package tezos-injector-021-PsQuebec)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.base
+  tezos-protocol-021-PsQuebec.protocol
+  octez-injector
+  octez-protocol-021-PsQuebec-libs.client
+  octez-shell-libs.client-base
+  octez-protocol-021-PsQuebec-libs.plugin)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_protocol_021_PsQuebec
+  -open Octez_injector
+  -open Tezos_client_021_PsQuebec
+  -open Tezos_client_base
+  -open Tezos_protocol_plugin_021_PsQuebec))

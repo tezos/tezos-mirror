@@ -1,0 +1,33 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_benchmark_021_PsQuebec)
+ (public_name tezos-benchmark-021-PsQuebec)
+ (libraries
+  octez-libs.stdlib
+  octez-libs.base
+  octez-libs.error-monad
+  octez-libs.micheline
+  tezos-micheline-rewriting
+  tezos-benchmark
+  tezos-benchmark-type-inference-021-PsQuebec
+  tezos-protocol-021-PsQuebec.protocol
+  octez-libs.crypto
+  tezos-protocol-021-PsQuebec.parameters
+  hashcons
+  octez-protocol-021-PsQuebec-libs.test-helpers
+  prbnmcn-stats)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezos_stdlib
+  -open Tezos_base
+  -open Tezos_error_monad
+  -open Tezos_micheline
+  -open Tezos_micheline_rewriting
+  -open Tezos_benchmark
+  -open Tezos_benchmark_type_inference_021_PsQuebec
+  -open Tezos_protocol_021_PsQuebec
+  -open Tezos_021_PsQuebec_test_helpers)
+ (private_modules kernel rules state_space))

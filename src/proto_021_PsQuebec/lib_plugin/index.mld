@@ -1,0 +1,17 @@
+{0 Octez-protocol-021-PsQuebec-libs: octez protocol 021-PsQuebec libraries}
+
+This is a package containing some libraries related to the Tezos 021-PsQuebec protocol.
+
+It contains the following libraries:
+
+- {{!module-Tezos_021_PsQuebec_test_helpers}Tezos_021_PsQuebec_test_helpers}: Protocol testing framework
+- {{!module-Tezos_baking_021_PsQuebec}Tezos_baking_021_PsQuebec}: Base library for `tezos-baker/accuser`
+- {{!module-Tezos_baking_021_PsQuebec_commands}Tezos_baking_021_PsQuebec_commands}: Protocol-specific commands for baking
+- {{!module-Tezos_client_021_PsQuebec}Tezos_client_021_PsQuebec}: Protocol specific library for `octez-client`
+- {{!module-Tezos_dac_021_PsQuebec}Tezos_dac_021_PsQuebec}: Protocol specific library for the Data availability Committee
+- {{!module-Tezos_dal_021_PsQuebec}Tezos_dal_021_PsQuebec}: Protocol specific library for the Data availability Layer
+- {{!module-Tezos_layer2_utils_021_PsQuebec}Tezos_layer2_utils_021_PsQuebec}: Protocol specific library for Layer 2 utils
+- {{!module-Tezos_protocol_plugin_021_PsQuebec}Tezos_protocol_plugin_021_PsQuebec}: Protocol plugin
+- {{!module-Tezos_protocol_plugin_021_PsQuebec_registerer}Tezos_protocol_plugin_021_PsQuebec_registerer}: Protocol plugin registerer
+- {{!module-Tezos_smart_rollup_021_PsQuebec}Tezos_smart_rollup_021_PsQuebec}: Protocol specific library of helpers for `tezos-smart-rollup`
+- {{!module-Tezos_smart_rollup_layer2_021_PsQuebec}Tezos_smart_rollup_layer2_021_PsQuebec}: Protocol specific library for `tezos-smart-rollup`

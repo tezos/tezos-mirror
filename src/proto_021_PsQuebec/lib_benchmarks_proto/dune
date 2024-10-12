@@ -1,0 +1,44 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_benchmarks_proto_021_PsQuebec)
+ (public_name tezos-benchmarks-proto-021-PsQuebec)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  str
+  octez-libs.stdlib
+  octez-libs.base
+  octez-libs.error-monad
+  tezos-protocol-021-PsQuebec.parameters
+  octez-libs.lazy-containers
+  tezos-benchmark
+  tezos-benchmark-021-PsQuebec
+  tezos-benchmark-type-inference-021-PsQuebec
+  tezos-protocol-021-PsQuebec.protocol
+  octez-libs.crypto
+  octez-shell-libs.shell-benchmarks
+  octez-libs.micheline
+  octez-protocol-021-PsQuebec-libs.test-helpers
+  octez-libs.tezos-sapling
+  octez-protocol-021-PsQuebec-libs.client
+  octez-protocol-021-PsQuebec-libs.plugin
+  octez-proto-libs.protocol-environment)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezos_stdlib
+  -open Tezos_base
+  -open Tezos_base.TzPervasives
+  -open Tezos_error_monad
+  -open Tezos_protocol_021_PsQuebec_parameters
+  -open Tezos_lazy_containers
+  -open Tezos_benchmark
+  -open Tezos_benchmark_021_PsQuebec
+  -open Tezos_benchmark_type_inference_021_PsQuebec
+  -open Tezos_protocol_021_PsQuebec
+  -open Tezos_protocol_021_PsQuebec.Protocol
+  -open Tezos_micheline
+  -open Tezos_021_PsQuebec_test_helpers
+  -open Tezos_client_021_PsQuebec
+  -open Tezos_protocol_plugin_021_PsQuebec))

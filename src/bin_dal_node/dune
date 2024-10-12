@@ -40,7 +40,7 @@
   octez-crawler
   memtrace
   octez-protocol-020-PsParisC-libs.dal
-  octez-protocol-021-PtQenaB1-libs.dal
+  octez-protocol-021-PsQuebec-libs.dal
   (select void_for_linking-octez-protocol-alpha-libs-dal from
    (octez-protocol-alpha-libs.dal -> void_for_linking-octez-protocol-alpha-libs-dal.empty)
    (-> void_for_linking-octez-protocol-alpha-libs-dal.empty)))
