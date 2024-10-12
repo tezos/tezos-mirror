@@ -45,4 +45,4 @@ module Riscv :
   S
     with type repo = Riscv_context.repo
      and type tree = Riscv_context.tree
-     and type mut_state = Riscv_context.mut_state
+     and type mut_state = Riscv_context.Mutable_state.t
