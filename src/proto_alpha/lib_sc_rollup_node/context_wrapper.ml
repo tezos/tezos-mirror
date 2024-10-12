@@ -111,7 +111,7 @@ module Riscv = struct
 
   type tree = R.tree
 
-  type mut_state = R.mut_state
+  type mut_state = R.Mutable_state.t
 
   let of_node_context : 'a Context.t -> ('a, repo, tree) Context_sigs.t =
    fun ctxt -> of_node_context R.equality_witness ctxt
@@ -124,7 +124,7 @@ module Riscv = struct
 
   let to_node_pvmstate : tree -> Context.pvmstate = to_node_pvmstate (module R)
 
-  let from_imm : tree -> mut_state = R.from_imm
+  let from_imm : tree -> mut_state = R.Mutable_state.from_imm
 
-  let to_imm : mut_state -> tree = R.to_imm
+  let to_imm : mut_state -> tree = R.Mutable_state.to_imm
 end

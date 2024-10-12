@@ -6,11 +6,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Api = Octez_riscv_api
+
 type reveals
 
 type write_debug = string -> unit Lwt.t
 
-type state = Storage.State.t
+type state = Api.state
 
 type status = Octez_riscv_api.status
 
@@ -21,6 +23,34 @@ type input = Octez_riscv_api.input
 type input_request = Octez_riscv_api.input_request
 
 type proof = Octez_riscv_api.proof
+
+module Mutable_state : sig
+  type t = Api.mut_state
+
+  val from_imm : state -> t
+
+  val to_imm : t -> state
+
+  val compute_step_many :
+    ?reveal_builtins:reveals ->
+    ?write_debug:write_debug ->
+    ?stop_at_snapshot:bool ->
+    max_steps:int64 ->
+    t ->
+    int64 Lwt.t
+
+  val get_tick : t -> Z.t Lwt.t
+
+  val get_status : t -> status Lwt.t
+
+  val get_message_counter : t -> int64 Lwt.t
+
+  val get_current_level : t -> int32 option Lwt.t
+
+  val state_hash : t -> bytes
+
+  val set_input : t -> input -> unit Lwt.t
+end
 
 val compute_step_many :
   ?reveal_builtins:reveals ->

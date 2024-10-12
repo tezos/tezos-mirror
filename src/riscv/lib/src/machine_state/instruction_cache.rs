@@ -33,45 +33,18 @@
 //! translation changes - as the upper address may no longer point
 //! to the same relative physical address.
 
-use crate::cache_utils::{FenceCounter, Sizes, Unparsed};
-use crate::machine_state::address_translation::PAGE_SIZE;
-use crate::machine_state::bus::Address;
-use crate::parser::instruction::{Instr, InstrCacheable};
-use crate::parser::{parse_compressed_instruction, parse_uncompressed_instruction};
-use crate::state_backend::{
-    self, AllocatedOf, Atom, Cell, CellWrite, LazyCell, ManagerBase, ManagerClone, ManagerRead,
-    ManagerReadWrite, ManagerWrite, Ref,
+use crate::{
+    cache_utils::{FenceCounter, Sizes, Unparsed},
+    machine_state::{address_translation::PAGE_SIZE, bus::Address},
+    parser::{
+        instruction::{Instr, InstrCacheable},
+        parse_compressed_instruction, parse_uncompressed_instruction,
+    },
+    state_backend::{
+        self, AllocatedOf, Atom, Cell, CellWrite, LazyCell, ManagerBase, ManagerClone, ManagerRead,
+        ManagerReadWrite, ManagerWrite, Ref,
+    },
 };
-
-/// A wrapper for a cacheable instruction entry.
-///
-/// Namely:
-/// - the parsed instruction corresponds to the unparsed bytes
-/// - the instruction does not cross a page boundary (only possible for an uncompressed
-///   instruction).
-pub struct ValidatedCacheEntry(Address, InstrCacheable, Unparsed);
-
-impl ValidatedCacheEntry {
-    /// Access the address & instruction (both parsed & unparsed).
-    pub fn to_inner(self) -> (Address, InstrCacheable, Unparsed) {
-        (self.0, self.1, self.2)
-    }
-
-    /// Construct a `ValidatedCacheEntry` directly from the raw parts.
-    ///
-    /// # Panics
-    /// Panics if the validity checks fail. See [`ValidatedCacheEntry`].
-    #[cfg(test)]
-    pub fn from_raw(phys_addr: Address, instr: InstrCacheable, unparsed: Unparsed) -> Self {
-        assert!(
-            instr.width() == 2 || cacheable_uncompressed(phys_addr),
-            "Cache entry would cross page boundaries"
-        );
-        assert_eq!((instr, unparsed), unparsed.into());
-
-        Self(phys_addr, instr, unparsed)
-    }
-}
 
 /// The layout of an entry in the instruction cache.
 pub type CachedLayout = (Atom<FenceCounter>, Atom<u64>, Atom<Unparsed>);
@@ -300,22 +273,13 @@ impl<ICL: InstructionCacheLayout, M: ManagerBase> InstructionCache<ICL, M> {
 
     /// Cache a compressed instruction at the physical address, returning the parsed instruction.
     #[inline]
-    pub fn cache_compressed(
-        &mut self,
-        push_to_block: impl FnOnce(ValidatedCacheEntry),
-        phys_addr: Address,
-        raw: u16,
-    ) -> Instr
+    pub fn cache_compressed(&mut self, phys_addr: Address, raw: u16) -> Instr
     where
         M: ManagerReadWrite,
     {
         let instr = parse_compressed_instruction(raw);
 
-        if let Instr::Cacheable(instr) = instr {
-            let unparsed = Unparsed(raw as u32);
-            self.cache_inner(phys_addr, unparsed, instr);
-            push_to_block(ValidatedCacheEntry(phys_addr, instr, unparsed));
-        };
+        self.cache_inner(phys_addr, Unparsed(raw as u32), instr);
 
         instr
     }
@@ -324,37 +288,30 @@ impl<ICL: InstructionCacheLayout, M: ManagerBase> InstructionCache<ICL, M> {
     ///
     /// If the instruction crossed page boundaries, it will still be returned, but not cached.
     #[inline(never)]
-    pub fn cache_uncompressed(
-        &mut self,
-        push_to_block: impl FnOnce(ValidatedCacheEntry),
-        phys_addr: Address,
-        raw: u32,
-    ) -> Instr
+    pub fn cache_uncompressed(&mut self, phys_addr: Address, raw: u32) -> Instr
     where
         M: ManagerReadWrite,
     {
         let instr = parse_uncompressed_instruction(raw);
-        match instr {
-            Instr::Cacheable(instr) if cacheable_uncompressed(phys_addr) => {
-                let unparsed = Unparsed(raw);
-                self.cache_inner(phys_addr, unparsed, instr);
-                push_to_block(ValidatedCacheEntry(phys_addr, instr, unparsed));
-            }
-            _ => (),
-        };
+
+        if cacheable_uncompressed(phys_addr) {
+            self.cache_inner(phys_addr, Unparsed(raw), instr);
+        }
 
         instr
     }
 
     #[inline]
-    fn cache_inner(&mut self, phys_addr: Address, unparsed: Unparsed, instr: InstrCacheable)
+    fn cache_inner(&mut self, phys_addr: Address, unparsed: Unparsed, instr: Instr)
     where
         M: ManagerReadWrite,
     {
+        let Instr::Cacheable(instr) = instr else {
+            return;
+        };
         let fence_counter = self.fence_counter.read();
 
         let cached = ICL::entry_mut(&mut self.entries, phys_addr);
-
         cached.instr.write((instr, unparsed));
         cached.phys_addr.write(phys_addr);
         cached.fence_counter.write(fence_counter);
@@ -390,8 +347,6 @@ mod tests {
     };
 
     pub type TestInstructionCacheLayout = Layout<TEST_CACHE_BITS, TEST_CACHE_SIZE>;
-
-    fn dummy_block_cache(_entry: ValidatedCacheEntry) {}
 
     // Ensure that the initialised values for the instruction cache (ie phys_addr = 0)
     // are not actually returned from the cache. This would result in an incorrect
@@ -432,12 +387,12 @@ mod tests {
         let phys_addr = PAGE_SIZE - 2;
 
         // Compressed instruction can be cached
-        state.cache_compressed(dummy_block_cache, phys_addr, compressed_bytes);
+        state.cache_compressed(phys_addr, compressed_bytes);
         assert_eq!(Some(&compressed), state.fetch_instr(phys_addr));
 
         // Caching an uncompressed instruction across page boundary should fail - the old
         // uncompressed instruction is still there.
-        state.cache_uncompressed(dummy_block_cache, phys_addr, uncompressed_bytes);
+        state.cache_uncompressed(phys_addr, uncompressed_bytes);
         assert_eq!(Some(&compressed), state.fetch_instr(phys_addr));
     });
 
@@ -466,14 +421,10 @@ mod tests {
                 TestInstructionCacheLayout
             );
 
-            state.cache_compressed(dummy_block_cache, phys_addr_compressed, compressed_bytes);
+            state.cache_compressed(phys_addr_compressed, compressed_bytes);
             assert_eq!(Some(&compressed), state.fetch_instr(phys_addr_compressed));
 
-            state.cache_uncompressed(
-                dummy_block_cache,
-                phys_addr_uncompressed,
-                uncompressed_bytes,
-            );
+            state.cache_uncompressed(phys_addr_uncompressed, uncompressed_bytes);
             assert_eq!(
                 Some(&uncompressed),
                 state.fetch_instr(phys_addr_uncompressed)

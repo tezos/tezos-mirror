@@ -12,7 +12,7 @@ type reveals = unit
 
 type write_debug = string -> unit Lwt.t
 
-type state = Storage.State.t
+type state = Api.state
 
 type status = Api.status
 
@@ -39,6 +39,38 @@ let with_hooks printer f =
   let res = f (fun c -> Buffer.add_char debug_log (Char.chr c)) in
   let* () = printer (Buffer.contents debug_log) in
   return res
+
+module Mutable_state = struct
+  type t = Api.mut_state
+
+  let from_imm = Api.octez_riscv_from_imm
+
+  let to_imm = Api.octez_riscv_to_imm
+
+  let compute_step_many ?reveal_builtins:_ ?write_debug ?stop_at_snapshot:_
+      ~max_steps state =
+    match write_debug with
+    | None -> Lwt.return (Api.octez_riscv_mut_compute_step_many max_steps state)
+    | Some printer ->
+        with_hooks
+          printer
+          (Api.octez_riscv_mut_compute_step_many_with_debug max_steps state)
+
+  let get_tick state =
+    Lwt.return (Z.of_int64 (Api.octez_riscv_mut_get_tick state))
+
+  let get_status state = Lwt.return (Api.octez_riscv_mut_get_status state)
+
+  let get_message_counter state =
+    Lwt.return (Api.octez_riscv_mut_get_message_counter state)
+
+  let get_current_level state = Lwt.return (Api.octez_riscv_mut_get_level state)
+
+  let state_hash state = Api.octez_riscv_mut_state_hash state
+
+  let set_input state input =
+    Lwt.return (Api.octez_riscv_mut_set_input state input)
+end
 
 let compute_step_many ?reveal_builtins:_ ?write_debug ?stop_at_snapshot:_
     ~max_steps state =

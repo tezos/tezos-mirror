@@ -29,10 +29,13 @@ impl<T> From<MutableState<T>> for ImmutableState<T> {
 }
 
 /// Simple [`ImmutableState`]. Functions that modify state can have signature `ImmutableState -> ImmutableState`
-impl<T> ImmutableState<T>
-where
-    T: Clone,
-{
+impl<T> ImmutableState<T> {
+    /// Create a mutable state from an immutable state
+    #[inline]
+    pub fn to_mut_state(&self) -> MutableState<T> {
+        MutableState::Borrowed(self.0.clone())
+    }
+
     /// Apply a read-only function `f` over the underlying state. Never clones data.
     #[inline]
     pub fn apply_ro<R>(&self, f: impl FnOnce(&T) -> R) -> R {
@@ -78,6 +81,18 @@ impl<T> From<ImmutableState<T>> for MutableState<T> {
 }
 
 impl<T> MutableState<T> {
+    /// Create an immutable state from a mutable state
+    #[inline]
+    pub fn to_imm_state(&self) -> ImmutableState<T>
+    where
+        T: Clone,
+    {
+        match self {
+            MutableState::Owned(state) => ImmutableState::new(state.clone()),
+            MutableState::Borrowed(arc_state) => ImmutableState(arc_state.clone()),
+        }
+    }
+
     /// Apply a read-only function `f` over the underlying state. Never clones data.
     #[inline]
     pub fn apply_ro<R>(&self, f: impl FnOnce(&T) -> R) -> R {
