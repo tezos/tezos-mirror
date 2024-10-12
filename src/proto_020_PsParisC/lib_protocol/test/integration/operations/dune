@@ -7,8 +7,8 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  octez-rust-deps
   bls12-381.archive
+  octez-rustzcash-deps
   octez-alcotezt
   octez-libs.base
   tezos-protocol-020-PsParisC.protocol

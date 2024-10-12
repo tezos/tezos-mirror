@@ -11,7 +11,6 @@ depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
   "tezt" { with-test & >= "4.1.0" & < "5.0.0" }
-  "octez-rust-deps" {with-test}
   "bls12-381" {with-test}
   "octez-libs" {with-test}
   "octez-internal-libs" {with-test}

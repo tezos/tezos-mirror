@@ -6,8 +6,8 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  octez-rust-deps
   bls12-381.archive
+  octez-rust-deps
   octez-l2-libs.wasmer
   octez-alcotezt)
  (library_flags (:standard -linkall))

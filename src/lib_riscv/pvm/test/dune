@@ -6,8 +6,8 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  octez-rust-deps
   bls12-381.archive
+  octez-rust-deps
   octez-libs.base
   octez-libs.stdlib-unix
   octez-libs.base-test-helpers

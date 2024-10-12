@@ -4,7 +4,7 @@
 (executable
  (name main)
  (libraries
-  octez-rust-deps
+  octez-rustzcash-deps
   bls12-381.archive
   octez-libs.test-helpers
   octez-libs.tezt-wrapper

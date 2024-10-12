@@ -4,7 +4,7 @@
 (executable
  (name testnet_experiment_tools)
  (libraries
-  octez-rust-deps
+  octez-rustzcash-deps
   bls12-381.archive
   tezt
   tezt-tezos
@@ -68,7 +68,7 @@
 (executable
  (name simulation_scenario)
  (libraries
-  octez-rust-deps
+  octez-rustzcash-deps
   bls12-381.archive
   octez-libs.stdlib-unix
   octez-libs.base
@@ -102,7 +102,7 @@
 (executable
  (name extract_data)
  (libraries
-  octez-rust-deps
+  octez-rustzcash-deps
   bls12-381.archive
   octez-libs.base
   octez-libs.base.unix
@@ -124,7 +124,7 @@
 (executable
  (name safety_checker)
  (libraries
-  octez-rust-deps
+  octez-rustzcash-deps
   bls12-381.archive
   octez-libs.base
   octez-shell-libs.store
@@ -149,7 +149,7 @@
 (executable
  (name get_teztale_data)
  (libraries
-  octez-rust-deps
+  octez-rustzcash-deps
   bls12-381.archive
   octez-libs.base
   octez-libs.clic

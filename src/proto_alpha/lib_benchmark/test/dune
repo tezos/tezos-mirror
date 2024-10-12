@@ -8,7 +8,7 @@
   test_autocompletion
   test_distribution)
  (libraries
-  octez-rust-deps
+  octez-rustzcash-deps
   bls12-381.archive
   octez-libs.base
   octez-libs.micheline

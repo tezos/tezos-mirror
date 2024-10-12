@@ -17,6 +17,7 @@ depends: [
   "octez-rust-deps" { with-test & = version }
   "octez-shell-libs" { = version }
   "uri" { >= "3.1.0" }
+  "octez-rustzcash-deps" { with-test & = version }
   "octez-proto-libs" { = version }
   "octez-injector" { = version }
   "octez-l2-libs" { = version }

@@ -11,7 +11,7 @@ depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
   "octez-libs" { = version }
-  "octez-rust-deps" { = version }
+  "octez-rustzcash-deps" { = version }
   "bls12-381" { = version }
   "octez-version" { = version }
   "octez-node-config" { = version }

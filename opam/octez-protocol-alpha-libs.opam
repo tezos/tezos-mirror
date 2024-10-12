@@ -17,6 +17,7 @@ depends: [
   "octez-rust-deps" { with-test & = version }
   "octez-shell-libs" { = version }
   "uri" { >= "3.1.0" }
+  "octez-rustzcash-deps" { with-test & = version }
   "tezt" { >= "4.1.0" & < "5.0.0" }
   "tezt-tezos" { = version }
   "qcheck-alcotest" { >= "0.20" }

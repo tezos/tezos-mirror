@@ -1443,6 +1443,7 @@ opam:all_7:
       - tezos-openapi
       - tezos-dal-node-services
       - octez-smart-rollup-wasm-debugger-plugin
+      - octez-rustzcash-deps
       - octez-rust-deps
       - octez-riscv-api
       - octez-libs

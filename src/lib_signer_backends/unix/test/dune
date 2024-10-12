@@ -6,8 +6,8 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  octez-rust-deps
   bls12-381.archive
+  octez-rustzcash-deps
   octez-libs.error-monad
   octez-libs.stdlib
   octez-libs.crypto

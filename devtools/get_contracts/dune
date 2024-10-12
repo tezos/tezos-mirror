@@ -23,7 +23,7 @@
 (executable
  (name get_contracts)
  (libraries
-  octez-rust-deps
+  octez-rustzcash-deps
   bls12-381.archive
   octez-libs.micheline
   octez-libs.base

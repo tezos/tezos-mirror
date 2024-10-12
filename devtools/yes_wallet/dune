@@ -22,7 +22,7 @@
 (executable
  (name yes_wallet)
  (libraries
-  octez-rust-deps
+  octez-rustzcash-deps
   bls12-381.archive
   yes_wallet_lib)
  (link_flags

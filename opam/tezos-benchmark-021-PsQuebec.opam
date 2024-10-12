@@ -18,7 +18,7 @@ depends: [
   "hashcons"
   "octez-protocol-021-PsQuebec-libs" { = version }
   "prbnmcn-stats" { = "0.0.6" }
-  "octez-rust-deps" { with-test & = version }
+  "octez-rustzcash-deps" { with-test & = version }
   "bls12-381" { with-test & = version }
 ]
 build: [

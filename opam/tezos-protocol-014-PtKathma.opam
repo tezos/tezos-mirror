@@ -13,7 +13,7 @@ depends: [
   "octez-proto-libs" { = version }
   "octez-shell-libs" { = version }
   "octez-libs" { = version }
-  "octez-rust-deps" { = version }
+  "octez-rustzcash-deps" { = version }
   "bls12-381" { = version }
 ]
 build: [
