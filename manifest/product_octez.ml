@@ -2136,7 +2136,7 @@ let _lazy_containers_tests =
       ]
 
 let octez_webassembly_interpreter =
-  octez_l2_lib
+  octez_lib
     "webassembly-interpreter"
     ~internal_name:"tezos_webassembly_interpreter"
     ~path:"src/lib_webassembly"
@@ -2623,7 +2623,7 @@ let octez_context_brassaia_memory =
     ~conflicts:[Conflicts.checkseum]
 
 let octez_scoru_wasm =
-  octez_l2_lib
+  octez_lib
     "scoru-wasm"
     ~internal_name:"tezos_scoru_wasm"
     ~path:"src/lib_scoru_wasm"

@@ -6,7 +6,7 @@
  (public_name octez-l2-libs.webassembly-interpreter-extra)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-l2-libs.webassembly-interpreter
+  octez-libs.webassembly-interpreter
   lwt.unix
   octez-libs.lazy-containers)
  (flags

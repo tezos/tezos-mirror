@@ -11,7 +11,6 @@ depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
   "octez-libs" { = version }
-  "octez-l2-libs" { = version }
   "bls12-381" { = version }
   "zarith" { >= "1.13" & < "1.14" }
   "class_group_vdf" { >= "0.0.4" }

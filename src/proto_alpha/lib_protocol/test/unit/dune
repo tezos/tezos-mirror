@@ -23,7 +23,7 @@
   octez-l2-libs.scoru-wasm-helpers
   octez-libs.stdlib
   octez-libs.crypto-dal
-  octez-l2-libs.scoru-wasm
+  octez-libs.scoru-wasm
   octez-l2-libs.webassembly-interpreter-extra)
  (library_flags (:standard -linkall))
  (flags

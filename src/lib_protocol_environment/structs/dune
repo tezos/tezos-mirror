@@ -9,7 +9,7 @@
   octez-libs.stdlib
   octez-libs.crypto
   octez-libs.lwt-result-stdlib
-  octez-l2-libs.scoru-wasm
+  octez-libs.scoru-wasm
   octez-libs.data-encoding
   bls12-381
   octez-libs.plonk)

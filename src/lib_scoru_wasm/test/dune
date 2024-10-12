@@ -13,7 +13,7 @@
   octez-libs.base.unix
   octez-libs.base-test-helpers
   octez-libs.test-helpers
-  octez-l2-libs.scoru-wasm
+  octez-libs.scoru-wasm
   qcheck-alcotest
   octez-alcotezt
   octez-l2-libs.scoru-wasm-helpers

@@ -22,7 +22,7 @@
   octez-libs.context.sigs
   octez-libs.tezos-context.disk
   octez-libs.tezos-context.encoding
-  octez-l2-libs.scoru-wasm
+  octez-libs.scoru-wasm
   octez-l2-libs.scoru-wasm-helpers
   octez-smart-rollup-wasm-debugger-lib
   octez-l2-libs.layer2_store

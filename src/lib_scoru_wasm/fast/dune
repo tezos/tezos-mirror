@@ -8,9 +8,9 @@
  (libraries
   octez-libs.base
   octez-libs.tree-encoding
-  octez-l2-libs.webassembly-interpreter
+  octez-libs.webassembly-interpreter
   octez-libs.lazy-containers
-  octez-l2-libs.scoru-wasm
+  octez-libs.scoru-wasm
   octez-l2-libs.wasmer)
  (flags
   (:standard)
