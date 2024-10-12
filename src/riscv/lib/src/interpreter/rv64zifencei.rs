@@ -22,6 +22,5 @@ where
             .translation_cache
             .invalidate([AccessType::Instruction]);
         self.instruction_cache.invalidate();
-        self.block_cache.invalidate();
     }
 }
