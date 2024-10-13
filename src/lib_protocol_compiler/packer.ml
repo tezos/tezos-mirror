@@ -104,7 +104,7 @@ let include_ml oc file =
   check_syntax `Implementation file ;
   dump_file oc file ;
   Printf.fprintf oc "end end\n" ;
-  Printf.fprintf oc "module %s = %s ()\n" unit unit
+  Printf.fprintf oc "module %s = %s (struct end)\n" unit unit
 
 let opened_modules = ["Tezos_protocol_environment"; "Pervasives"; "Error_monad"]
 
