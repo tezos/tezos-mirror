@@ -170,23 +170,10 @@ impl<const BYTES: usize> MainMemoryLayout for Sizes<BYTES> {
 }
 
 impl<const BYTES: usize> backend::Layout for Sizes<BYTES> {
-    type Placed = backend::Location<[u8; BYTES]>;
-
-    fn place_with(alloc: &mut backend::Choreographer) -> Self::Placed {
-        // Most architectures have a 4 KiB minimum page size. We use it to
-        // ensure our main memory is not only well-aligned with respect to the
-        // values you might access in it, but also with respect to host's page
-        // layout where our main memory lies.
-        alloc.alloc_min_align(4096)
-    }
-
     type Allocated<M: backend::ManagerBase> = MainMemory<Self, M>;
 
-    fn allocate<M: backend::ManagerAlloc>(
-        backend: &mut M,
-        placed: Self::Placed,
-    ) -> Self::Allocated<M> {
-        let data = backend.allocate_dyn_region(placed);
+    fn allocate<M: backend::ManagerAlloc>(backend: &mut M) -> Self::Allocated<M> {
+        let data = backend.allocate_dyn_region();
         let data = backend::DynCells::bind(data);
         MainMemory { data }
     }

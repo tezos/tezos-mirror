@@ -55,7 +55,6 @@
 //! [Layouts]: Layout
 //! [Locations]: Location
 
-mod alloc;
 mod effects;
 mod elems;
 mod enums;
@@ -67,7 +66,6 @@ mod region;
 #[cfg(test)]
 pub(crate) mod random_backend;
 
-pub use alloc::*;
 pub use effects::*;
 pub use elems::*;
 pub use enums::*;
@@ -86,16 +84,10 @@ pub trait ManagerBase {
 /// Manager with allocation capabilities
 pub trait ManagerAlloc: ManagerBase {
     /// Allocate a region in the state storage.
-    fn allocate_region<E, const LEN: usize>(
-        &mut self,
-        loc: Location<[E; LEN]>,
-    ) -> Self::Region<E, LEN>;
+    fn allocate_region<E, const LEN: usize>(&mut self) -> Self::Region<E, LEN>;
 
     /// Allocate a dynamic region in the state storage.
-    fn allocate_dyn_region<const LEN: usize>(
-        &mut self,
-        loc: Location<[u8; LEN]>,
-    ) -> Self::DynRegion<LEN>;
+    fn allocate_dyn_region<const LEN: usize>(&mut self) -> Self::DynRegion<LEN>;
 }
 
 /// Manager with read capabilities
@@ -423,15 +415,6 @@ pub mod tests {
                 }
             }
         }
-
-        let (first_loc, second_loc) = ExampleLayout::placed().into_location();
-        let first_loc = first_loc.as_array();
-
-        let first_offset = first_loc.offset();
-        assert_eq!(first_offset, 0);
-
-        let second_offset = second_loc.offset();
-        assert_eq!(second_offset, 8);
 
         let first_value: u64 = rand::random();
         let second_value: [u32; 4] = rand::random();

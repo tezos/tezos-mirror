@@ -528,8 +528,8 @@ pub(crate) mod tests {
         state_backend::{
             layout::{Atom, Layout},
             test_helpers::copy_via_serde,
-            Array, CellRead, CellReadWrite, CellWrite, Choreographer, DynCells, Elem, LazyCell,
-            Location, ManagerAlloc, ManagerBase, Ref,
+            Array, CellRead, CellReadWrite, CellWrite, DynCells, Elem, LazyCell, ManagerAlloc,
+            ManagerBase, Ref,
         },
     };
     use serde::ser::SerializeTuple;
@@ -704,19 +704,10 @@ pub(crate) mod tests {
             struct FlipperLayout;
 
             impl Layout for FlipperLayout {
-                type Placed = Location<[u8; LEN]>;
-
-                fn place_with(alloc: &mut Choreographer) -> Self::Placed {
-                    alloc.alloc()
-                }
-
                 type Allocated<M: ManagerBase> = DynCells<LEN, M>;
 
-                fn allocate<M: ManagerAlloc>(
-                    backend: &mut M,
-                    placed: Self::Placed,
-                ) -> Self::Allocated<M> {
-                    DynCells::bind(backend.allocate_dyn_region(placed))
+                fn allocate<M: ManagerAlloc>(backend: &mut M) -> Self::Allocated<M> {
+                    DynCells::bind(backend.allocate_dyn_region())
                 }
             }
 
@@ -732,19 +723,10 @@ pub(crate) mod tests {
         struct FlipperLayout;
 
         impl Layout for FlipperLayout {
-            type Placed = Location<[u8; 1024]>;
-
-            fn place_with(alloc: &mut Choreographer) -> Self::Placed {
-                alloc.alloc()
-            }
-
             type Allocated<B: ManagerBase> = DynCells<1024, B>;
 
-            fn allocate<B: ManagerAlloc>(
-                backend: &mut B,
-                placed: Self::Placed,
-            ) -> Self::Allocated<B> {
-                DynCells::bind(backend.allocate_dyn_region(placed))
+            fn allocate<B: ManagerAlloc>(backend: &mut B) -> Self::Allocated<B> {
+                DynCells::bind(backend.allocate_dyn_region())
             }
         }
 

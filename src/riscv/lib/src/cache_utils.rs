@@ -8,7 +8,7 @@ use crate::{
         instruction::{Instr, InstrCacheable},
         parse,
     },
-    state_backend::{Choreographer, Layout, ManagerAlloc, ManagerBase, Many, Placed},
+    state_backend::{Layout, ManagerAlloc, ManagerBase, Many},
 };
 use std::{convert::Infallible, marker::PhantomData};
 
@@ -117,19 +117,9 @@ type SizesLayout<const SIZE: usize, CachedLayout> = Many<CachedLayout, SIZE>;
 impl<const BITS: usize, const SIZE: usize, CachedLayout: Layout> Layout
     for Sizes<BITS, SIZE, CachedLayout>
 {
-    type Placed = <SizesLayout<SIZE, CachedLayout> as Layout>::Placed;
-
-    fn place_with(alloc: &mut Choreographer) -> Self::Placed {
-        SizesLayout::<SIZE, CachedLayout>::place_with(alloc)
-    }
-
-    fn placed() -> Placed<Self::Placed> {
-        SizesLayout::<SIZE, CachedLayout>::placed()
-    }
-
     type Allocated<M: ManagerBase> = <SizesLayout<SIZE, CachedLayout> as Layout>::Allocated<M>;
 
-    fn allocate<M: ManagerAlloc>(backend: &mut M, placed: Self::Placed) -> Self::Allocated<M> {
-        SizesLayout::<SIZE, CachedLayout>::allocate(backend, placed)
+    fn allocate<M: ManagerAlloc>(backend: &mut M) -> Self::Allocated<M> {
+        SizesLayout::<SIZE, CachedLayout>::allocate(backend)
     }
 }

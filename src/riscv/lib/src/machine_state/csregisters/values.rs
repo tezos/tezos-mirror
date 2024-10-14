@@ -14,8 +14,8 @@ use crate::{
     bits::Bits64,
     state_backend::{
         hash::{Hash, HashError, RootHashable},
-        AllocatedOf, Choreographer, EffectCell, EffectCellLayout, Layout, ManagerAlloc,
-        ManagerBase, ManagerRead, ManagerReadWrite, ManagerWrite, PlacedOf, Ref,
+        AllocatedOf, EffectCell, EffectCellLayout, Layout, ManagerAlloc, ManagerBase, ManagerRead,
+        ManagerReadWrite, ManagerWrite, Ref,
     },
 };
 use mstatus::MStatusLayout;
@@ -131,33 +131,18 @@ impl<M: ManagerBase> CSRegisters<M> {
 pub struct CSRValuesLayout;
 
 impl Layout for CSRValuesLayout {
-    type Placed = CSRValuesF<
-        PlacedOf<EffectCellLayout<CSRRepr>>,
-        PlacedOf<MStatusLayout>,
-        PlacedOf<XipCellLayout>,
-    >;
-
     type Allocated<M: ManagerBase> = CSRValuesF<
         AllocatedOf<EffectCellLayout<CSRRepr>, M>,
         AllocatedOf<MStatusLayout, M>,
         AllocatedOf<XipCellLayout, M>,
     >;
 
-    fn place_with(alloc: &mut Choreographer) -> Self::Placed {
-        let alloc = std::cell::RefCell::new(alloc);
-        Self::Placed::new(
-            || MStatusLayout::place_with(&mut alloc.borrow_mut()),
-            || XipCellLayout::place_with(&mut alloc.borrow_mut()),
-            || EffectCellLayout::<CSRRepr>::place_with(&mut alloc.borrow_mut()),
-        )
-    }
-
-    fn allocate<M: ManagerAlloc>(backend: &mut M, placed: Self::Placed) -> Self::Allocated<M> {
+    fn allocate<M: ManagerAlloc>(backend: &mut M) -> Self::Allocated<M> {
         let backend = std::cell::RefCell::new(backend);
-        placed.map(
-            |placed| MStatusLayout::allocate(*backend.borrow_mut(), placed),
-            |placed| XipCellLayout::allocate(*backend.borrow_mut(), placed),
-            |placed| EffectCellLayout::<CSRRepr>::allocate(*backend.borrow_mut(), placed),
+        Self::Allocated::new(
+            || MStatusLayout::allocate(*backend.borrow_mut()),
+            || XipCellLayout::allocate(*backend.borrow_mut()),
+            || EffectCellLayout::<CSRRepr>::allocate(*backend.borrow_mut()),
         )
     }
 }
