@@ -38,6 +38,7 @@ COPY --chown=tezos:nogroup dune-project tezos/dune-project
 COPY --chown=tezos:nogroup vendors tezos/vendors
 COPY --chown=tezos:nogroup rust-toolchain tezos/rust-toolchain
 COPY --chown=tezos:nogroup cohttp tezos/cohttp
+COPY --chown=tezos:nogroup opentelemetry tezos/opentelemetry
 COPY --chown=tezos:nogroup resto tezos/resto
 COPY --chown=tezos:nogroup prometheus tezos/prometheus
 COPY --chown=tezos:nogroup teztale tezos/teztale
