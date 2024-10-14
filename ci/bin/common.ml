@@ -267,12 +267,15 @@ let enable_kernels =
     environment dir [SCCACHE_DIR] such that sccache stores its caches
     there.
 
+    - [cache_size] sets the environment variable [SCCACHE_CACHE_SIZE]
+    that configures the maximum size of the cache.
+
     - [error_log], [idle_timeout] and [log] sets the environment
     variables [SCCACHE_ERROR_LOG], [SCCACHE_IDLE_TIMEOUT] and
     [SCCACHE_LOG] respectively. See the sccache documentation for more
     information on these variables. *)
 let enable_sccache ?key ?error_log ?idle_timeout ?log
-    ?(path = "$CI_PROJECT_DIR/_sccache") job =
+    ?(path = "$CI_PROJECT_DIR/_sccache") ?(cache_size = "5G") job =
   let key =
     Option.value
       ~default:("sccache-" ^ Gitlab_ci.Predefined_vars.(show ci_job_name_slug))
@@ -280,7 +283,7 @@ let enable_sccache ?key ?error_log ?idle_timeout ?log
   in
   job
   |> append_variables
-       ([("SCCACHE_DIR", path)]
+       ([("SCCACHE_DIR", path); ("SCCACHE_CACHE_SIZE", cache_size)]
        @ opt_var "SCCACHE_ERROR_LOG" Fun.id error_log
        @ opt_var "SCCACHE_IDLE_TIMEOUT" Fun.id idle_timeout
        @ opt_var "SCCACHE_LOG" Fun.id log)

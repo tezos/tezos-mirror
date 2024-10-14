@@ -105,6 +105,7 @@ oc.build:static-x86_64-linux-binaries:
     EXECUTABLE_FILES: script-inputs/released-executables script-inputs/experimental-executables
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
   artifacts:
     paths:
     - octez-binaries/$ARCH/*
@@ -141,6 +142,7 @@ oc.build:static-arm64-linux-binaries:
     EXECUTABLE_FILES: script-inputs/released-executables script-inputs/experimental-executables
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
   artifacts:
     paths:
     - octez-binaries/$ARCH/*
@@ -179,6 +181,7 @@ oc.build_arm64-released:
     EXECUTABLE_FILES: script-inputs/released-executables
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
   artifacts:
     name: build-$ARCH-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
@@ -227,6 +230,7 @@ oc.build_arm64-exp-dev-extra:
       tezt/tests/main.exe
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
   artifacts:
     name: build-$ARCH-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
@@ -383,6 +387,7 @@ documentation:odoc:
   variables:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
   artifacts:
     expire_in: 1 hour
     paths:
@@ -438,6 +443,7 @@ documentation:manuals:
   variables:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
   artifacts:
     expire_in: 1 week
     paths:
@@ -494,6 +500,7 @@ documentation:docgen:
   variables:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
   artifacts:
     expire_in: 1 week
     paths:
@@ -604,6 +611,7 @@ publish:documentation:
   variables:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
 
 docker:merge_manifests:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
@@ -656,3 +664,4 @@ publish_kernel_sdk:
   variables:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
