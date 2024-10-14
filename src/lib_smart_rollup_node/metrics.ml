@@ -414,6 +414,27 @@ module Performance = struct
         | h :: _ -> Int64.of_string_opt h)
       (function _exn -> Lwt.return None)
 
+  let get_disk_usage_percentage path =
+    Lwt.catch
+      (fun () ->
+        let open Lwt_syntax in
+        let+ s =
+          Lwt_process.with_process_in
+            ("df", [|"df"; path|])
+            (fun pc ->
+              let _ = Lwt_io.read_line pc#stdout in
+              Lwt_io.read_line pc#stdout)
+        in
+        let l = Str.split (Str.regexp "[ ]+") s in
+        let h = List.nth_opt l 4 in
+        match h with
+        | Some str ->
+            let len = String.length str in
+            let e = String.sub str 0 (len - 1) in
+            Int64.of_string_opt e
+        | None -> None)
+      (function _exn -> Lwt.return None)
+
   let storage = v_gauge ~help:"Storage Disk Usage" "performance_storage"
 
   let context = v_gauge ~help:"Context Disk Usage" "performance_context"
@@ -424,8 +445,12 @@ module Performance = struct
 
   let wasm = v_gauge ~help:"Wasm Disk Usage" "performance_wasm"
 
+  let percentage =
+    v_gauge ~help:"Disk Usage Percentage" "performance_disk_percentage"
+
   let set_disk_usage_stats data_dir =
     let open Lwt_syntax in
+    let* disk_percentage = get_disk_usage_percentage data_dir in
     let* storage_size = directory_size @@ Filename.concat data_dir "storage" in
     let* context_size = directory_size @@ Filename.concat data_dir "context" in
     let* daily_logs_size =
@@ -449,6 +474,9 @@ module Performance = struct
     Option.iter (aux context) context_size ;
     Option.iter (aux logs) daily_logs_size ;
     Option.iter (aux wasm) preimages_size ;
+    Option.iter
+      (fun s -> Gauge.set percentage @@ Int64.to_float s)
+      disk_percentage ;
     aux data total_size ;
     return_unit
 
