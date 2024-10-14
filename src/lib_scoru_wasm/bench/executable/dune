@@ -5,6 +5,7 @@
  (name octez_smart_rollup_wasm_benchmark)
  (instrumentation (backend bisect_ppx))
  (libraries
+  octez-rust-deps
   bls12-381.archive
   octez-libs.base
   octez-l2-libs.smart_rollup_wasm_benchmark_lib)

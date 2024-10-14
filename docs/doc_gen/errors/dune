@@ -4,6 +4,7 @@
 (executable
  (name error_doc)
  (libraries
+  octez-rust-deps
   bls12-381.archive
   octez-libs.base
   octez-libs.error-monad

@@ -18,6 +18,7 @@ depends: [
   "aches" { >= "1.1.0" }
   "aches-lwt" { >= "1.1.0" }
   "tezt" { with-test & >= "4.1.0" & < "5.0.0" }
+  "octez-rust-deps" { with-test & = version }
   "octez-alcotezt" { with-test & = version }
   "qcheck-alcotest" { with-test & >= "0.20" }
   "lwt" { with-test & >= "5.7.0" }

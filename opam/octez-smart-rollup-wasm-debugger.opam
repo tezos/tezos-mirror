@@ -10,6 +10,7 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
+  "octez-rust-deps" { = version }
   "bls12-381" { = version }
   "octez-smart-rollup-wasm-debugger-lib" { = version }
 ]

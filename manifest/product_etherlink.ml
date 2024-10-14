@@ -19,7 +19,7 @@ include Product (struct
   let source = ["etherlink"; "src"]
 end)
 
-let tezt ?(deps = []) = tezt ~deps:(bls12_381_archive :: deps)
+let tezt ?(deps = []) = tezt ~deps:(octez_rust_deps :: bls12_381_archive :: deps)
 
 let tezt_etherlink =
   private_lib
@@ -300,6 +300,7 @@ let _evm_node =
     ~with_macos_security_framework:true
     ~deps:
       [
+        octez_rust_deps;
         bls12_381_archive;
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix;

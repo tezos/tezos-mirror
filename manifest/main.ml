@@ -94,6 +94,7 @@ let () =
       octez_test_helpers |> open_;
       tezt_wrapper |> open_ |> open_ ~m:"Base";
       str;
+      octez_rust_deps;
       bls12_381_archive;
       bls12_381;
       tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";

@@ -12,8 +12,8 @@
  (inline_tests
   (flags -verbose)
   (modes native)
-  (executable (link_flags -linkall -cclib -lblst))
-  (libraries bls12-381.archive))
+  (executable (link_flags -linkall -cclib -lblst -cclib -loctez_rust_deps))
+  (libraries bls12-381.archive octez-rust-deps))
  (preprocess (pps ppx_expect))
  (library_flags (:standard -linkall))
  (flags

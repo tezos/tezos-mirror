@@ -7,6 +7,7 @@
  (package octez-evm-node)
  (instrumentation (backend bisect_ppx))
  (libraries
+  octez-rust-deps
   bls12-381.archive
   octez-libs.base
   octez-libs.base.unix

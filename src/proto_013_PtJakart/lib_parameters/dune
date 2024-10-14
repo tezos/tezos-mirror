@@ -19,6 +19,7 @@
 (executable
  (name gen)
  (libraries
+  octez-rust-deps
   bls12-381.archive
   octez-libs.base
   tezos-protocol-013-PtJakart.parameters

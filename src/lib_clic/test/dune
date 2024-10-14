@@ -6,6 +6,7 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
+  octez-rust-deps
   bls12-381.archive
   octez-libs.stdlib
   octez-libs.clic

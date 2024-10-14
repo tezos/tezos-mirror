@@ -34,6 +34,7 @@ depends: [
   "ocplib-endian"
   "fmt" { >= "0.8.7" }
   "tezos-benchmark" { = version }
+  "octez-rust-deps" { with-test & = version }
   "qcheck-alcotest" { with-test & >= "0.20" }
   "qcheck-core" {with-test}
   "lwt" { with-test & >= "5.7.0" }

@@ -164,6 +164,7 @@ let _teztale_archiver =
       ]
     ~deps:
       ([
+         octez_rust_deps (* for rustzcash *);
          bls12_381_archive;
          octez_base |> open_ ~m:"TzPervasives";
          octez_stdlib_unix |> open_;
