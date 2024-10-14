@@ -222,7 +222,9 @@ module Dune = struct
   let executable_or_library kind ?(public_names = Stdlib.List.[]) ?package
       ?(instrumentation = Stdlib.List.[]) ?(libraries = []) ?flags
       ?library_flags ?link_flags ?(inline_tests = false)
-      ?(inline_tests_deps = Stdlib.List.[]) ?(optional = false) ?ppx_kind
+      ?(inline_tests_deps = Stdlib.List.[])
+      ?(inline_tests_link_flags = Stdlib.List.[])
+      ?(inline_tests_libraries = Stdlib.List.[]) ?(optional = false) ?ppx_kind
       ?(ppx_runtime_libraries = []) ?preprocess
       ?(preprocessor_deps = Stdlib.List.[]) ?(virtual_modules = Stdlib.List.[])
       ?default_implementation ?implements ?modules
@@ -281,6 +283,17 @@ module Dune = struct
                (match inline_tests_deps with
                | [] -> E
                | deps -> S "deps" :: of_list deps);
+               (match inline_tests_link_flags with
+               | [] -> E
+               | flags ->
+                   [
+                     S "executable";
+                     S "link_flags" :: S "-linkall"
+                     :: of_list (List.map (fun x -> S x) flags);
+                   ]);
+               (match inline_tests_libraries with
+               | [] -> E
+               | libs -> S "libraries" :: of_list (List.map (fun x -> S x) libs));
              ]
            else E);
           (match ppx_kind with
@@ -1200,6 +1213,8 @@ module Target = struct
     implements : t option;
     inline_tests : bool;
     inline_tests_deps : Dune.s_expr list option;
+    inline_tests_link_flags : string list option;
+    inline_tests_libraries : t option list option;
     wrapped : bool option;
     documentation : Dune.s_expr option;
     kind : kind;
@@ -1415,6 +1430,8 @@ module Target = struct
     ?implements:t option ->
     ?inline_tests:inline_tests ->
     ?inline_tests_deps:Dune.s_expr list ->
+    ?inline_tests_link_flags:string list ->
+    ?inline_tests_libraries:t option list ->
     ?wrapped:bool ->
     ?documentation:Dune.s_expr ->
     ?link_flags:Dune.s_expr list ->
@@ -1473,8 +1490,9 @@ module Target = struct
       ?c_library_flags ?(conflicts = []) ?(dep_files = []) ?(dep_globs = [])
       ?(dep_globs_rec = []) ?(deps = []) ?(dune = Dune.[]) ?flags
       ?foreign_archives ?foreign_stubs ?ctypes ?implements ?inline_tests
-      ?inline_tests_deps ?wrapped ?documentation ?(link_flags = [])
-      ?(linkall = false) ?modes ?modules ?(modules_without_implementation = [])
+      ?inline_tests_deps ?inline_tests_link_flags ?inline_tests_libraries
+      ?wrapped ?documentation ?(link_flags = []) ?(linkall = false) ?modes
+      ?modules ?(modules_without_implementation = [])
       ?(ocaml = default_ocaml_dependency) ?opam ?opam_bug_reports ?opam_doc
       ?opam_homepage ?(opam_with_test = Always) ?opam_version
       ?(optional = false) ?ppx_kind ?(ppx_runtime_libraries = [])
@@ -1506,13 +1524,21 @@ module Target = struct
     in
     let kind = make_kind names in
     let preprocess, inline_tests =
-      match (inline_tests, inline_tests_deps) with
-      | None, None -> (preprocess, false)
-      | None, Some _ ->
+      match
+        ( inline_tests,
+          inline_tests_deps,
+          inline_tests_link_flags,
+          inline_tests_libraries )
+      with
+      | None, None, None, None -> (preprocess, false)
+      | None, Some _, _, _ | None, _, Some _, _ | None, _, _, Some _ ->
           invalid_arg
-            "Target.internal: cannot specify `inline_tests_deps` without \
-             inline_tests"
-      | Some (Inline_tests_backend target), (Some _ | None) -> (
+            "Target.internal: cannot configure `inline_tests` without \
+             `inline_tests` being set"
+      | ( Some (Inline_tests_backend target),
+          (Some _ | None),
+          (Some _ | None),
+          (Some _ | None) ) -> (
           match kind with
           | Public_library _ | Private_library _ -> (
               match preprocess with
@@ -1820,6 +1846,8 @@ module Target = struct
         implements;
         inline_tests;
         inline_tests_deps;
+        inline_tests_link_flags;
+        inline_tests_libraries;
         wrapped;
         documentation;
         kind;
@@ -2362,6 +2390,8 @@ module Sub_lib = struct
        ?implements
        ?inline_tests
        ?inline_tests_deps
+       ?inline_tests_link_flags
+       ?inline_tests_libraries
        ?wrapped
        ?documentation
        ?link_flags
@@ -2450,6 +2480,8 @@ module Sub_lib = struct
       ?implements
       ?inline_tests
       ?inline_tests_deps
+      ?inline_tests_link_flags
+      ?inline_tests_libraries
       ?wrapped
       ?documentation
       ?link_flags
@@ -2804,6 +2836,20 @@ let generate_dune (internal : Target.internal) =
     | Some docs -> Dune.(S "documentation" :: docs)
   in
   let ctypes = Option.map Ctypes.to_dune internal.ctypes in
+  let inline_tests_libraries =
+    Option.map
+      (fun targets ->
+        List.map
+          (fun target ->
+            match Target.library_name_for_dune target with
+            | Ok name -> name
+            | Error name ->
+                invalid_arg
+                  ("unsupported: ~inline_tests_libraries input that is not a \
+                    library (" ^ name ^ ")"))
+          (List.filter_map Fun.id targets))
+      internal.inline_tests_libraries
+  in
   Dune.(
     executable_or_library
       kind
@@ -2817,6 +2863,8 @@ let generate_dune (internal : Target.internal) =
       ?flags
       ~inline_tests:internal.inline_tests
       ?inline_tests_deps:internal.inline_tests_deps
+      ?inline_tests_link_flags:internal.inline_tests_link_flags
+      ?inline_tests_libraries
       ~optional:internal.optional
       ?ppx_kind:internal.ppx_kind
       ~ppx_runtime_libraries

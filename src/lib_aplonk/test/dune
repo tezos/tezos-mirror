@@ -5,6 +5,7 @@
  (name main)
  (instrumentation (backend bisect_ppx))
  (libraries
+  bls12-381.archive
   octez-libs.plonk.plonk-test
   octez-libs.aplonk)
  (modules main test_aplonk test_main_protocol))
@@ -32,6 +33,7 @@
 (executable
  (name bench)
  (libraries
+  bls12-381.archive
   octez-libs.plonk.plonk-test
   octez-libs.aplonk)
  (modules bench))

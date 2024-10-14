@@ -19,6 +19,7 @@
 (executable
  (name gen)
  (libraries
+  bls12-381.archive
   octez-libs.base
   tezos-protocol-015-PtLimaPt.parameters
   tezos-protocol-015-PtLimaPt.protocol)

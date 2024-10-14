@@ -11,6 +11,7 @@ depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
   "tezt" { with-test & >= "4.1.0" & < "5.0.0" }
+  "bls12-381" {with-test}
   "octez-libs" {with-test}
   "octez-alcotezt" {with-test}
   "octez-riscv-pvm" {with-test}

@@ -4,6 +4,7 @@
 (executables
  (names test_uf test_inference)
  (libraries
+  bls12-381.archive
   octez-libs.micheline
   tezos-micheline-rewriting
   tezos-benchmark-type-inference-alpha

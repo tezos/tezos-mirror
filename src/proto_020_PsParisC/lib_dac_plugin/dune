@@ -14,7 +14,11 @@
   octez-protocol-020-PsParisC-libs.client
   tezos-protocol-020-PsParisC.embedded-protocol
   tezos-protocol-020-PsParisC.protocol)
- (inline_tests (flags -verbose) (modes native))
+ (inline_tests
+  (flags -verbose)
+  (modes native)
+  (executable (link_flags -linkall -cclib -lblst))
+  (libraries bls12-381.archive))
  (preprocess (pps ppx_expect))
  (library_flags (:standard -linkall))
  (flags

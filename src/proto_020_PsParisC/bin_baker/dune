@@ -7,6 +7,7 @@
  (package octez-baker-PsParisC)
  (instrumentation (backend bisect_ppx))
  (libraries
+  bls12-381.archive
   octez-libs.base
   octez-libs.clic
   tezos-protocol-020-PsParisC.protocol

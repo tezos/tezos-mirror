@@ -22,6 +22,7 @@
 (executable
  (name yes_wallet)
  (libraries
+  bls12-381.archive
   yes_wallet_lib)
  (link_flags
   (:standard)

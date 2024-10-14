@@ -19,6 +19,7 @@
 (executable
  (name gen)
  (libraries
+  bls12-381.archive
   octez-libs.base
   tezos-protocol-016-PtMumbai.parameters
   tezos-protocol-016-PtMumbai.protocol)

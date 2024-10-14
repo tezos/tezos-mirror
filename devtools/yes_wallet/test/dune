@@ -4,6 +4,7 @@
 (executable
  (name bench_signature_perf)
  (libraries
+  bls12-381.archive
   octez-libs.error-monad
   octez-libs.crypto
   zarith

@@ -12,6 +12,7 @@ depends: [
   "ocaml" { >= "4.14" }
   "octez-libs" { = version }
   "octez-proto-libs" { = version }
+  "bls12-381" { = version }
   "lwt" { >= "5.7.0" }
   "ocp-ocamlres" { >= "0.4" }
   "base-unix"

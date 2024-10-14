@@ -71,6 +71,7 @@ let _octez_codec_kaitai =
     ~with_macos_security_framework:true
     ~deps:
       ([
+         bls12_381_archive;
          data_encoding |> open_;
          kaitai_of_data_encoding;
          kaitai;

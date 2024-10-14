@@ -4,6 +4,7 @@
 (executable
  (name tenderbrute_main)
  (libraries
+  bls12-381.archive
   octez-libs.base
   octez-shell-libs.client-base
   octez-protocol-021-PsQuebec-libs.client

@@ -4,6 +4,7 @@
 (executable
  (name get_git_info)
  (libraries
+  bls12-381.archive
   dune-configurator
   octez-libs.version.parser)
  (modules get_git_info))
@@ -29,6 +30,7 @@
  (public_name octez-evm-node-version)
  (package octez-version)
  (libraries
+  bls12-381.archive
   octez-version.value
   octez-libs.version
   octez-libs.base.unix

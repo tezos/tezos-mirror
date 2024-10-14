@@ -33,6 +33,7 @@ depends: [
   "ppx_import"
   "qcheck-alcotest" { >= "0.20" }
   "octez-alcotezt" { = version }
+  "bls12-381" { = version }
   "tezt" { >= "4.1.0" & < "5.0.0" }
 ]
 conflicts: [
