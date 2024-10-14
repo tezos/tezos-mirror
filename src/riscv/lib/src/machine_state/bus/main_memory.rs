@@ -34,6 +34,7 @@ macro_rules! gen_memory_layout {
 }
 
 gen_memory_layout!(M1K = 1 KiB);
+gen_memory_layout!(M8K = 8 KiB);
 gen_memory_layout!(M1M = 1 MiB);
 gen_memory_layout!(M100M = 100 MiB);
 gen_memory_layout!(M1G = 1 GiB);
