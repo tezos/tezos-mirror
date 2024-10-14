@@ -60,8 +60,7 @@ let may_start_profiler baking_dir =
   match Tezos_base.Profiler.parse_profiling_vars baking_dir with
   | Some max_lod, output_dir ->
       let profiler_maker ~name =
-        Profiler.instance
-          Tezos_base_unix.Simple_profiler.auto_write_to_txt_file
+        Tezos_base_unix.Simple_profiler.instantiate_default_driver
           Filename.Infix.
             ((output_dir // name) ^ Profiler.profiler_file_suffix, max_lod)
       in

@@ -255,15 +255,13 @@ let get_profiler file_name =
   profiler
 
 let run_test_with_profiler test_name test_fn =
-  let file_name =
-    Temp.file ("output_test_simple_profiling_" ^ test_name ^ ".txt")
-  in
+  let file_name = Temp.file ("output_test_simple_profiling_" ^ test_name) in
   let profiler = get_profiler file_name in
 
   test_fn profiler ;
   Log.info "\nProfiling result for %s" test_name ;
   Log.info "==================================" ;
-  check_file_content file_name
+  check_file_content (file_name ^ ".txt")
 
 let () =
   Tezt_core.Regression.register

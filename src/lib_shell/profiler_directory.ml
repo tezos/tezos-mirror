@@ -6,6 +6,5 @@
 (*****************************************************************************)
 
 let profiler_maker data_dir ~name max_lod =
-  Tezos_base.Profiler.instance
-    Tezos_base_unix.Simple_profiler.auto_write_to_txt_file
+  Tezos_base_unix.Simple_profiler.instantiate_default_driver
     Filename.Infix.((data_dir // name) ^ Profiler.profiler_file_suffix, max_lod)

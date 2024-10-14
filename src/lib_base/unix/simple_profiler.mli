@@ -35,3 +35,14 @@ val auto_write_to_txt_file : (string * Profiler.lod) Profiler.driver
 (** Driver printing its report in JSON to a file whenever a toplevel
     section ends. *)
 val auto_write_to_json_file : (string * Profiler.lod) Profiler.driver
+
+(** [default_driver] returns the unix driver that was chosen according
+    to the [PROFILING_BACKEND] environment variable.
+
+    The possible values are:
+    - ["json"]
+    - ["txt"] *)
+val default_driver : (string * Profiler.lod) Profiler.driver
+
+(** Create a [Profiler.instance] using the {!default_driver} *)
+val instantiate_default_driver : string * Profiler.lod -> Profiler.instance
