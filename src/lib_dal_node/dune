@@ -9,6 +9,7 @@
   octez-libs.base
   octez-libs.base.unix
   tezos-dal-node-services
+  dal_node_migrations
   octez-shell-libs.client-base
   octez-shell-libs.protocol-updater
   octez-shell-libs.client-base-unix

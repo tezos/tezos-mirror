@@ -12,6 +12,7 @@ depends: [
   "ocaml" { >= "4.14" }
   "octez-libs" { = version }
   "tezos-dal-node-services" { = version }
+  "dal_node_migrations" { = version }
   "octez-shell-libs" { = version }
   "octez-l2-libs" { = version }
 ]
