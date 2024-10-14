@@ -4387,7 +4387,7 @@ let octez_riscv_api =
     ~synopsis:"OCaml API of the RISC-V Rust components"
     ~flags:(Flags.standard ~disable_warnings:[9; 27; 66] ())
     ~deps:[octez_rust_deps]
-    ~dep_globs_rec:["../riscv/*"]
+    ~dep_globs_rec:["../../riscv/*"]
     ~modules:["octez_riscv_api"]
     ~dune:Dune.[[S "copy_files"; S "../../riscv/lib/octez_riscv_api.*"]]
 
