@@ -374,102 +374,112 @@ end = struct
                 min_next_request
               else Some next_request
         in
-        let actions, min_next_request, requests =
-          Table.fold
-            (fun key
-                 {unrequested_peers; requested_peers; next_request; delay}
-                 (actions, min_next_request, acc) ->
-              if Ptime.is_later next_request ~than:now then
-                ( actions,
-                  compute_new_min_next_request min_next_request next_request,
-                  acc )
-              else
-                (* Removing deactivated peers from sets of peers. *)
-                let remaining_unrequested_peers =
-                  P2p_peer.Set.inter unrequested_peers active_peers
-                in
-                let remaining_requested_peers =
-                  P2p_peer.Set.inter requested_peers active_peers
-                in
-                if
-                  (P2p_peer.Set.is_empty remaining_unrequested_peers
-                  && P2p_peer.Set.is_empty remaining_requested_peers)
-                  && not
-                       (P2p_peer.Set.is_empty unrequested_peers
-                       && P2p_peer.Set.is_empty requested_peers)
-                then (Remove {key} :: actions, min_next_request, acc)
-                else
-                  let ( requested_peer,
-                        remaining_unrequested_peers,
-                        remaining_requested_peers ) =
-                    match
-                      ( P2p_peer.Set.is_empty remaining_unrequested_peers,
-                        P2p_peer.Set.is_empty remaining_requested_peers )
-                    with
-                    | true, true ->
-                        (* If there is no specific peer to request, one of the
-                           active peers is randomly selected. *)
-                        ( P2p_peer.Id.Set.random_elt active_peers,
-                          remaining_unrequested_peers,
-                          remaining_requested_peers )
-                    | true, false ->
-                        (* If all requestable peers have already been
-                           requested, one of the already requested peers is
-                           randomly selected. *)
-                        ( P2p_peer.Id.Set.random_elt remaining_requested_peers,
-                          remaining_unrequested_peers,
-                          remaining_requested_peers )
-                    | false, _ ->
-                        (* If there are unrequested peers, one is randomly
-                           selected and moved to the set of requested peers. *)
-                        let peer =
-                          P2p_peer.Id.Set.random_elt remaining_unrequested_peers
-                        in
-                        ( peer,
-                          P2p_peer.Set.remove peer remaining_unrequested_peers,
-                          P2p_peer.Set.add peer remaining_requested_peers )
-                  in
-                  let next_request =
-                    Option.value ~default:Ptime.max (Ptime.add_span now delay)
-                  in
-                  let next =
-                    {
-                      unrequested_peers = remaining_unrequested_peers;
-                      requested_peers = remaining_requested_peers;
-                      next_request;
-                      delay = Time.System.Span.multiply_exn 1.5 delay;
-                    }
-                  in
-                  let new_acc =
-                    P2p_peer.Map.update
-                      requested_peer
-                      (function
-                        | None -> Some [key] | Some l -> Some (key :: l))
-                      acc
-                  in
-                  ( Replace {key; status = next} :: actions,
+        if
+          P2p_peer.Set.is_empty active_peers
+          && not (Table.length state.pending = 0)
+        then
+          (* When there is no active peer but there is already pending
+             requests, we wait a few seconds. *)
+          let* () = Events.(emit no_active_peers) () in
+          Lwt_unix.sleep 5.
+        else
+          let actions, min_next_request, requests =
+            Table.fold
+              (fun key
+                   {unrequested_peers; requested_peers; next_request; delay}
+                   (actions, min_next_request, acc) ->
+                if Ptime.is_later next_request ~than:now then
+                  ( actions,
                     compute_new_min_next_request min_next_request next_request,
-                    new_acc ))
-            state.pending
-            ([], None, P2p_peer.Map.empty)
-        in
-        (* Update pending table *)
-        List.iter
-          (function
-            | Remove {key} -> Table.remove state.pending key
-            | Replace {key; status} -> Table.replace state.pending key status)
-          actions ;
-        state.min_next_request <- min_next_request ;
-        P2p_peer.Map.iter (Request.send state.param) requests ;
-        let* () =
-          P2p_peer.Map.iter_s
-            (fun peer request ->
-              List.iter_s
-                (fun (key : key) -> Events.(emit requested) (key, peer))
-                request)
-            requests
-        in
-        loop state
+                    acc )
+                else
+                  (* Removing deactivated peers from sets of peers. *)
+                  let remaining_unrequested_peers =
+                    P2p_peer.Set.inter unrequested_peers active_peers
+                  in
+                  let remaining_requested_peers =
+                    P2p_peer.Set.inter requested_peers active_peers
+                  in
+                  if
+                    (P2p_peer.Set.is_empty remaining_unrequested_peers
+                    && P2p_peer.Set.is_empty remaining_requested_peers)
+                    && not
+                         (P2p_peer.Set.is_empty unrequested_peers
+                         && P2p_peer.Set.is_empty requested_peers)
+                  then (Remove {key} :: actions, min_next_request, acc)
+                  else
+                    let ( requested_peer,
+                          remaining_unrequested_peers,
+                          remaining_requested_peers ) =
+                      match
+                        ( P2p_peer.Set.is_empty remaining_unrequested_peers,
+                          P2p_peer.Set.is_empty remaining_requested_peers )
+                      with
+                      | true, true ->
+                          (* If there is no specific peer to request, one of the
+                             active peers is randomly selected. *)
+                          ( P2p_peer.Id.Set.random_elt active_peers,
+                            remaining_unrequested_peers,
+                            remaining_requested_peers )
+                      | true, false ->
+                          (* If all requestable peers have already been
+                             requested, one of the already requested peers is
+                             randomly selected. *)
+                          ( P2p_peer.Id.Set.random_elt remaining_requested_peers,
+                            remaining_unrequested_peers,
+                            remaining_requested_peers )
+                      | false, _ ->
+                          (* If there are unrequested peers, one is randomly
+                             selected and moved to the set of requested peers. *)
+                          let peer =
+                            P2p_peer.Id.Set.random_elt
+                              remaining_unrequested_peers
+                          in
+                          ( peer,
+                            P2p_peer.Set.remove peer remaining_unrequested_peers,
+                            P2p_peer.Set.add peer remaining_requested_peers )
+                    in
+                    let next_request =
+                      Option.value ~default:Ptime.max (Ptime.add_span now delay)
+                    in
+                    let next =
+                      {
+                        unrequested_peers = remaining_unrequested_peers;
+                        requested_peers = remaining_requested_peers;
+                        next_request;
+                        delay = Time.System.Span.multiply_exn 1.5 delay;
+                      }
+                    in
+                    let new_acc =
+                      P2p_peer.Map.update
+                        requested_peer
+                        (function
+                          | None -> Some [key] | Some l -> Some (key :: l))
+                        acc
+                    in
+                    ( Replace {key; status = next} :: actions,
+                      compute_new_min_next_request min_next_request next_request,
+                      new_acc ))
+              state.pending
+              ([], None, P2p_peer.Map.empty)
+          in
+          (* Update pending table *)
+          List.iter
+            (function
+              | Remove {key} -> Table.remove state.pending key
+              | Replace {key; status} -> Table.replace state.pending key status)
+            actions ;
+          state.min_next_request <- min_next_request ;
+          P2p_peer.Map.iter (Request.send state.param) requests ;
+          let* () =
+            P2p_peer.Map.iter_s
+              (fun peer request ->
+                List.iter_s
+                  (fun (key : key) -> Events.(emit requested) (key, peer))
+                  request)
+              requests
+          in
+          loop state
     in
     loop state
 

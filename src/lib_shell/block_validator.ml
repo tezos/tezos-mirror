@@ -756,9 +756,13 @@ let context_split w index =
   let bv = Worker.state w in
   Block_validator_process.context_split bv.validation_process index
 
-let fetch_and_compile_protocol w =
+let fetch_and_compile_protocol w ?peer ?timeout =
   let bv = Worker.state w in
-  Protocol_validator.fetch_and_compile_protocol bv.protocol_validator
+  let timeout = Option.value timeout ~default:bv.limits.protocol_timeout in
+  Protocol_validator.fetch_and_compile_protocol
+    bv.protocol_validator
+    ?peer
+    ~timeout
 
 let status = Worker.status
 
