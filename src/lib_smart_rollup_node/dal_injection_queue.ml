@@ -382,7 +382,8 @@ let fill_slots state ~slot_size ~num_slots =
    their commitments to L1. *)
 let on_produce_dal_slots state ~level =
   let open Lwt_result_syntax in
-  if Slot_index_queue.is_empty state.dal_slot_indices then
+  if Pending_messages.is_empty state.pending_messages then return_unit
+  else if Slot_index_queue.is_empty state.dal_slot_indices then
     (* No provided slot indices, no injection *)
     let*! () = Events.(emit no_dal_slot_indices_set) () in
     return_unit
