@@ -10,10 +10,9 @@ license: "Apache-2.0"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
-  "ppx_deriving"
   "octez-libs" { = version }
-  "zarith" { >= "1.13" & < "1.14" }
   "lwt" { >= "5.7.0" }
+  "ppx_deriving"
   "ctypes" { >= "0.18.0" }
   "ctypes-foreign" { >= "0.18.0" }
   "index" { >= "1.6.0" & < "1.7.0" }

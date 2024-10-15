@@ -2103,6 +2103,11 @@ module Target = struct
     in
     extract_targets internal.preprocess
     @ internal.deps @ internal.opam_only_deps @ internal.ppx_runtime_libraries
+
+  let tests_deps internal =
+    List.filter_map
+      Fun.id
+      (Option.value ~default:[] internal.inline_tests_libraries)
 end
 
 type target = Target.t option
@@ -2967,7 +2972,11 @@ let compute_opam_release_graph () : opam_dependency_graph_node String_map.t =
         in
         let add_internal_dependency acc internal =
           let tests_deps =
-            List.fold_left add_tests_dependency acc internal.Target.tests_deps
+            List.fold_left
+              add_tests_dependency
+              acc
+              (internal.Target.tests_deps
+              @ Option.value ~default:[] internal.inline_tests_libraries)
           in
           String_set.union
             (List.fold_left
@@ -3199,6 +3208,7 @@ let generate_opam ?release for_package (internals : Target.internal list) :
       match internal.kind with Test_executable _ -> Always | _ -> Never
     in
     let deps = Target.all_internal_deps internal in
+    let tests_deps = Target.tests_deps internal in
     let x_opam_monorepo_opam_provided =
       List.filter_map as_opam_monorepo_opam_provided deps
     in
@@ -3213,7 +3223,18 @@ let generate_opam ?release for_package (internals : Target.internal list) :
            ~optional:internal.optional)
         deps
     in
-    (deps, x_opam_monorepo_opam_provided)
+    let tests_deps =
+      List.concat_map
+        (as_opam_dependency
+           ~product
+           ~for_release
+           ~for_conflicts:false
+           ~for_package
+           ~with_test:Always
+           ~optional:internal.optional)
+        tests_deps
+    in
+    (deps @ tests_deps, x_opam_monorepo_opam_provided)
   in
   let depends = List.flatten depends in
   let x_opam_monorepo_opam_provided =

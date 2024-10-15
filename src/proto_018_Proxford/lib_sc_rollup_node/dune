@@ -40,7 +40,7 @@
   aches-lwt
   octez-injector
   octez-smart-rollup-node-lib
-  octez-l2-libs.scoru-wasm
+  octez-libs.scoru-wasm
   octez-l2-libs.scoru-wasm-fast
   octez-libs.crypto-dal
   octez-version.value)

@@ -14,7 +14,6 @@ depends: [
   "octez-rust-deps" {with-test}
   "bls12-381" {with-test}
   "octez-libs" {with-test}
-  "octez-l2-libs" {with-test}
   "qcheck-alcotest" { with-test & >= "0.20" }
   "octez-alcotezt" {with-test}
 ]

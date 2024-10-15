@@ -15,7 +15,7 @@
   octez-l2-libs.scoru-wasm-helpers
   octez-l2-libs.scoru_wasm_test_helpers
   octez-libs.test-helpers
-  octez-l2-libs.scoru-wasm
+  octez-libs.scoru-wasm
   octez-l2-libs.scoru-wasm-fast
   qcheck-alcotest
   octez-alcotezt)

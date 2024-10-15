@@ -13,6 +13,8 @@ depends: [
   "ppx_expect"
   "octez-libs" { = version }
   "tezos-protocol-020-PsParisC" { = version }
+  "bls12-381" { with-test & = version }
+  "octez-rust-deps" { with-test & = version }
   "octez-shell-libs" { = version }
   "uri" { >= "3.1.0" }
   "tezt" { >= "4.1.0" & < "5.0.0" }
@@ -23,8 +25,6 @@ depends: [
   "tezos-dal-node-services" { = version }
   "lwt-canceler" { >= "0.3" & < "0.4" }
   "lwt-exit"
-  "octez-rust-deps" { with-test & = version }
-  "bls12-381" { with-test & = version }
   "octez-protocol-compiler" { = version }
   "tezos-dal-node-lib" { = version }
   "tezos-dac-lib" { = version }

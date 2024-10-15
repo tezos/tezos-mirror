@@ -11,7 +11,7 @@
   octez-libs.base.unix
   octez-libs.base-test-helpers
   octez-libs.test-helpers
-  octez-l2-libs.scoru-wasm
+  octez-libs.scoru-wasm
   octez-l2-libs.scoru_wasm_durable_snapshot
   octez-l2-libs.scoru-wasm-fast
   octez-l2-libs.scoru-wasm-helpers

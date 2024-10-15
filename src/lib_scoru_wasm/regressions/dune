@@ -9,7 +9,7 @@
   octez-rust-deps
   bls12-381.archive
   octez-libs.base
-  octez-l2-libs.scoru-wasm
+  octez-libs.scoru-wasm
   octez-l2-libs.scoru-wasm-helpers
   octez-libs.test-helpers
   tezos-protocol-alpha.protocol

@@ -8,7 +8,7 @@
   tezt.core
   octez-rust-deps
   bls12-381.archive
-  octez-l2-libs.webassembly-interpreter
+  octez-libs.webassembly-interpreter
   octez-alcotezt)
  (library_flags (:standard -linkall))
  (flags

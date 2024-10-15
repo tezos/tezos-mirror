@@ -6,7 +6,7 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   bls12-381.archive
-  octez-l2-libs.webassembly-interpreter
+  octez-libs.webassembly-interpreter
   octez-l2-libs.webassembly-interpreter-extra
   lwt.unix
   octez-libs.tree-encoding
