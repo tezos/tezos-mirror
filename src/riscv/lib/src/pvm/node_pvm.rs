@@ -4,7 +4,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::{
-    machine_state::{bus::main_memory::M100M, mode::Mode, DefaultCacheLayouts},
+    machine_state::{bus::main_memory::M100M, mode::Mode, TestCacheLayouts},
     program::Program,
     pvm::common::{Pvm, PvmHooks, PvmLayout, PvmStatus},
     state_backend::{self, hash::RootHashable, owned_backend::Owned, AllocatedOf},
@@ -14,7 +14,7 @@ use std::{fmt, ops::Bound, path::Path};
 use thiserror::Error;
 
 pub type StateLayout = (
-    PvmLayout<M100M, DefaultCacheLayouts>,
+    PvmLayout<M100M, TestCacheLayouts>,
     state_backend::Atom<bool>,
     state_backend::Atom<u32>,
     state_backend::Atom<u64>,
@@ -22,7 +22,7 @@ pub type StateLayout = (
 );
 
 pub struct State<M: state_backend::ManagerBase> {
-    pvm: Pvm<M100M, DefaultCacheLayouts, M>,
+    pvm: Pvm<M100M, TestCacheLayouts, M>,
     level_is_set: state_backend::Cell<bool, M>,
     level: state_backend::Cell<u32, M>,
     message_counter: state_backend::Cell<u64, M>,
