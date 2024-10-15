@@ -13,6 +13,8 @@ depends: [
   "ppx_expect"
   "octez-libs" { = version }
   "tezos-protocol-016-PtMumbai" { = version }
+  "bls12-381" { with-test & = version }
+  "octez-rust-deps" { with-test & = version }
   "octez-shell-libs" { = version }
   "uri" { >= "3.1.0" }
   "octez-proto-libs" { = version }
