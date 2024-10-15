@@ -64,6 +64,14 @@ let err_impl_mismatch ~got =
     ~expected:"shell, memory, brassaia or brassaia_memory"
     ~got
 
+let irmin_dir = "context"
+
+let brassaia_dir = "brassaia_context"
+
+let irmin_context_dir root = Filename.(concat root irmin_dir)
+
+let brassaia_context_dir root = Filename.(concat root brassaia_dir)
+
 let init ~kind ?patch_context ?readonly ?index_log_size path =
   let open Lwt_syntax in
   let init_context () =
@@ -704,6 +712,61 @@ let compute_testchain_chain_id (context : Environment_context.t) block_hash =
       Context_wrapper.Memory_context.compute_testchain_chain_id block_hash
   | Context t -> err_impl_mismatch ~got:t.impl_name
 
-let export_snapshot = assert false
+let export_snapshot context_index context_hash ~path =
+  match context_index with
+  | Disk_index index -> Context.export_snapshot index context_hash ~path
+  | Memory_index index ->
+      Tezos_context_memory.Context.export_snapshot index context_hash ~path
+  | Brassaia_index index -> Brassaia.export_snapshot index context_hash ~path
+  | Brassaia_memory_index index ->
+      Brassaia_memory.export_snapshot index context_hash ~path
+  | Duo_index index ->
+      Context_wrapper.Context.export_snapshot index context_hash ~path
+  | Duo_memory_index index ->
+      Context_wrapper.Memory_context.export_snapshot index context_hash ~path
 
-let integrity_check = assert false
+let integrity_check ?ppf ~root ~auto_repair ~always ~heads context_index =
+  let open Lwt_syntax in
+  match context_index with
+  | Disk_index _ ->
+      Context.Checks.Pack.Integrity_check.run
+        ?ppf
+        ~root:(irmin_context_dir root)
+        ~auto_repair
+        ~always
+        ~heads
+        ()
+  | Memory_index _ ->
+      Fmt.failwith
+        "An in memory context doesn't need to be checked for integrity"
+  | Brassaia_index _ ->
+      Brassaia.Checks.Pack.Integrity_check.run
+        ?ppf
+        ~root:(brassaia_context_dir root)
+        ~auto_repair
+        ~always
+        ~heads
+        ()
+  | Brassaia_memory_index _ ->
+      Fmt.failwith
+        "An in memory context doesn't need to be checked for integrity"
+  | Duo_index _ ->
+      let* () =
+        Context.Checks.Pack.Integrity_check.run
+          ?ppf
+          ~root:(irmin_context_dir root)
+          ~auto_repair
+          ~always
+          ~heads
+          ()
+      in
+      Brassaia.Checks.Pack.Integrity_check.run
+        ?ppf
+        ~root:(brassaia_context_dir root)
+        ~auto_repair
+        ~always
+        ~heads
+        ()
+  | Duo_memory_index _ ->
+      Fmt.failwith
+        "An in memory context doesn't need to be checked for integrity"

@@ -3952,6 +3952,9 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
           ~time:genesis.Genesis.time
           ~protocol:genesis.protocol
       in
+      (* TODO: Temporary fix before the context_dir is never provided
+         outside of context_ops *)
+      let dst_context_dir = Filename.dirname dst_context_dir in
       let*! () =
         if check_consistency then
           Animation.three_dots
@@ -3964,7 +3967,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
             ~auto_repair:false
             ~always:false
             ~heads:(Some [Context_hash.to_b58check imported_context_hash])
-            ()
+            context_index
         else Lwt.return_unit
       in
       let* block_validation_result =
