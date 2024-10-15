@@ -1061,13 +1061,6 @@ module Encoding = struct
                   @@ union [make preattestation_case]))
                (varopt "signature" Signature.encoding)))
 
-  let consensus_content_encoding =
-    obj4
-      (req "slot" Slot_repr.encoding)
-      (req "level" Raw_level_repr.encoding)
-      (req "round" Round_repr.encoding)
-      (req "block_payload_hash" Block_payload_hash.encoding)
-
   let dal_content_encoding =
     obj1 (req "dal_attestation" Dal_attestation_repr.encoding)
 
@@ -1077,37 +1070,20 @@ module Encoding = struct
   (* Precondition: [dal_content = None]. *)
   let attestation_encoding_proj
       (Attestation {consensus_content; dal_content = _}) =
-    ( consensus_content.slot,
-      consensus_content.level,
-      consensus_content.round,
-      consensus_content.block_payload_hash )
+    consensus_content
 
-  let attestation_encoding_inj (slot, level, round, block_payload_hash) =
-    Attestation
-      {
-        consensus_content = {slot; level; round; block_payload_hash};
-        dal_content = None;
-      }
+  let attestation_encoding_inj consensus_content =
+    Attestation {consensus_content; dal_content = None}
 
   (* Precondition: [dal_content <> None]. Check usage! *)
   let attestation_with_dal_encoding_proj
       (Attestation {consensus_content; dal_content}) =
     match dal_content with
     | None -> assert false
-    | Some dal_content ->
-        ( ( consensus_content.slot,
-            consensus_content.level,
-            consensus_content.round,
-            consensus_content.block_payload_hash ),
-          dal_content.attestation )
+    | Some dal_content -> (consensus_content, dal_content.attestation)
 
-  let attestation_with_dal_encoding_inj
-      ((slot, level, round, block_payload_hash), attestation) =
-    Attestation
-      {
-        consensus_content = {slot; level; round; block_payload_hash};
-        dal_content = Some {attestation};
-      }
+  let attestation_with_dal_encoding_inj (consensus_content, attestation) =
+    Attestation {consensus_content; dal_content = Some {attestation}}
 
   let attestation_case =
     Case
