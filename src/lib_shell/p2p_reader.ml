@@ -336,35 +336,41 @@ let handle_msg state msg =
                @@ P2p.try_send state.p2p state.conn
                @@ Operation op ;
                Lwt.return_unit)
-         hashes)
-      [@profiler.span_s
-        ["Get_operations"; P2p_peer_id.to_short_b58check state.gid]]
+         hashes
+       [@profiler.span_s
+         ["Get_operations"; P2p_peer_id.to_short_b58check state.gid]])
+      [@profiler.span_s ["Get_operations"]]
   | Operation operation -> (
-      let hash = Operation.hash operation in
-      match[@profiler.span_s
-             [
-               "Operation";
-               (match Char.code (Bytes.get operation.proto 0) with
-               | 0x14 -> "preattestation"
-               | 0x15 -> "attestation"
-               | _ -> "other");
-               P2p_peer_id.to_short_b58check state.gid;
-             ]]
-        find_pending_operation state hash
-      with
-      | None ->
-          Peer_metadata.incr meta Unexpected_response ;
-          Lwt.return_unit
-      | Some chain_db ->
-          let* () =
-            Distributed_db_requester.Raw_operation.notify
-              chain_db.operation_db
-              state.gid
-              hash
-              operation
-          in
-          Peer_metadata.incr meta @@ Received_response Operations ;
-          Lwt.return_unit)
+      (let hash = Operation.hash operation in
+       let[@warning "-26"] operation_type =
+         match Char.code (Bytes.get operation.proto 0) with
+         | 0x14 -> "preattestation"
+         | 0x15 -> "attestation"
+         | _ -> "other"
+       in
+       match[@profiler.span_s ["Operation"; operation_type]]
+         find_pending_operation
+           state
+           hash
+         [@profiler.span_f
+           [
+             "Operation"; operation_type; P2p_peer_id.to_short_b58check state.gid;
+           ]]
+       with
+       | None ->
+           Peer_metadata.incr meta Unexpected_response ;
+           Lwt.return_unit
+       | Some chain_db ->
+           let* () =
+             Distributed_db_requester.Raw_operation.notify
+               chain_db.operation_db
+               state.gid
+               hash
+               operation
+           in
+           Peer_metadata.incr meta @@ Received_response Operations ;
+           Lwt.return_unit)
+      [@profiler.span_s ["Operation"]])
   | Get_protocols hashes ->
       (Peer_metadata.incr meta @@ Received_request Protocols ;
        List.iter_p
