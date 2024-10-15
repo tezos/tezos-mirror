@@ -4,7 +4,7 @@
 (executable
  (name tenderbrute_main)
  (libraries
-  octez-rust-deps
+  octez-rustzcash-deps
   bls12-381.archive
   octez-libs.base
   octez-shell-libs.client-base

@@ -16,7 +16,7 @@ depends: [
   "ppx_expect"
   "uri" { >= "3.1.0" }
   "bls12-381" { with-test & = version }
-  "octez-rust-deps" { with-test & = version }
+  "octez-rustzcash-deps" { with-test & = version }
   "octez-proto-libs" { = version }
 ]
 build: [

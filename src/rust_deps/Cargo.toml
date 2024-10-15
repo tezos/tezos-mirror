@@ -12,7 +12,7 @@ default-features = false
 features = ["singlepass", "cranelift", "wat", "middlewares"]
 
 [dependencies.librustzcash]
-path = "librustzcash"
+path = "../rustzcash_deps"
 
 [dependencies.octez-riscv]
 path = "../riscv/lib"

@@ -23,7 +23,7 @@ rust-version = "1.59"
 [lib]
 name = "rustzcash"
 path = "src/rustzcash.rs"
-crate-type = ["staticlib", "rlib"]
+crate-type = ["staticlib", "rlib", "cdylib"]
 
 [[bin]]
 name = "zcashd-wallet-tool"

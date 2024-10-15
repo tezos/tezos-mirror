@@ -6,7 +6,7 @@
  (public_name proto_context_du)
  (package internal-devtools_proto-context-du)
  (libraries
-  octez-rust-deps
+  octez-rustzcash-deps
   bls12-381.archive
   octez-libs.clic
   octez-libs.base
