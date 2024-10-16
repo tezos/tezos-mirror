@@ -3043,6 +3043,25 @@ module Dal = struct
         ~query:level_query
         ~output
         RPC_path.(path / "published_slot_headers")
+
+    let skip_list_cells_of_level =
+      let output =
+        Data_encoding.(
+          list
+            (tup2
+               Dal.Slots_history.Pointer_hash.encoding
+               Dal.Slots_history.encoding))
+      in
+      RPC_service.get_service
+        ~description:
+          "Returns the cells of the DAL skip list constructed during this \
+           targeted block and stored in the context. The cells ordering in the \
+           list is not specified (not relevant). The list is expected to be \
+           empty if the entry is not initialized in the context (yet), or to \
+           have a size that coincides with the number of DAL slots otherwise."
+        ~query:RPC_query.empty
+        ~output
+        RPC_path.(path / "skip_list_cells_of_level")
   end
 
   let register_dal_commitments_history () =
@@ -3088,6 +3107,9 @@ module Dal = struct
   let dal_published_slot_headers ctxt block ?level () =
     RPC_context.make_call0 S.published_slot_headers ctxt block level ()
 
+  let skip_list_cells_of_level ctxt block () =
+    RPC_context.make_call0 S.skip_list_cells_of_level ctxt block () ()
+
   let register_published_slot_headers () =
     let open Lwt_result_syntax in
     Registration.register0 ~chunked:true S.published_slot_headers
@@ -3100,10 +3122,18 @@ module Dal = struct
         Environment.Error_monad.tzfail
         @@ Published_slot_headers_not_initialized level
 
+  let register_skip_list_cells_of_level () =
+    let open Lwt_result_syntax in
+    Registration.register0 ~chunked:true S.skip_list_cells_of_level
+    @@ fun ctxt () () ->
+    let* result = Dal.Slots_storage.find_level_histories ctxt in
+    match result with Some l -> return l | None -> return []
+
   let register () =
     register_dal_commitments_history () ;
     register_shards () ;
-    register_published_slot_headers ()
+    register_published_slot_headers () ;
+    register_skip_list_cells_of_level ()
 end
 
 module Forge = struct
