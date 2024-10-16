@@ -332,73 +332,6 @@ pub struct EvmHandler<'a, Host: Runtime> {
     reentrancy_guard: ReentrancyGuard,
 }
 
-#[allow(clippy::too_many_arguments)]
-fn trace<Host: Runtime>(
-    host: &mut Host,
-    tracer_input: &Option<TracerInput>,
-    return_data: Vec<u8>,
-    pc: Result<usize, ExitReason>,
-    opcode: Option<Opcode>,
-    gas: u64,
-    gas_cost: u64,
-    depth: usize,
-    step_result: &Result<(), Capture<ExitReason, Resolve<EvmHandler<'_, Host>>>>,
-    stack: Vec<H256>,
-    memory: Vec<u8>,
-    storage: Vec<StorageMapItem>,
-) -> Result<(), EthereumError> {
-    if let (
-        Some(StructLogger(StructLoggerInput {
-            transaction_hash,
-            config,
-        })),
-        Some(opcode),
-        Ok(pc),
-    ) = (tracer_input, opcode, pc)
-    {
-        let opcode = opcode.as_u8();
-        let pc: u64 = pc.try_into().unwrap_or_default();
-        let depth: u16 = depth.try_into().unwrap_or_default();
-        let stack = (!config.disable_stack).then_some(stack);
-        let return_data = config.enable_return_data.then_some(return_data);
-        let memory = config.enable_memory.then_some(memory);
-        let storage = (!config.disable_storage).then_some(storage);
-
-        // TODO: https://gitlab.com/tezos/tezos/-/issues/7437
-        // For error, find the appropriate value to return for tracing.
-        // The following value is kind of a placeholder.
-        let error = if let Err(Capture::Exit(reason)) = &step_result {
-            match &reason {
-                ExitReason::Error(exit) => {
-                    Some(format!("{:?}", exit).as_bytes().to_vec())
-                }
-                ExitReason::Fatal(exit) => {
-                    Some(format!("{:?}", exit).as_bytes().to_vec())
-                }
-                _ => None,
-            }
-        } else {
-            None
-        };
-
-        let struct_log = StructLog {
-            pc,
-            opcode,
-            gas,
-            gas_cost,
-            depth,
-            error,
-            stack,
-            return_data,
-            memory,
-            storage,
-        };
-
-        tracer::store_struct_log(host, struct_log, transaction_hash)?;
-    }
-    Ok(())
-}
-
 impl<'a, Host: Runtime> EvmHandler<'a, Host> {
     /// Create a new handler to suit a new, initial EVM call context
     #[allow(clippy::too_many_arguments)]
@@ -768,6 +701,93 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         Ok(())
     }
 
+    /// Prepare trace info if needed
+    fn prepare_trace(
+        &self,
+        runtime: &evm::Runtime,
+        opcode: &Option<Opcode>,
+    ) -> Option<StructLog> {
+        if let (
+            Some(StructLogger(StructLoggerInput {
+                transaction_hash: _,
+                config,
+            })),
+            Some(opcode),
+        ) = (&self.tracer, opcode)
+        {
+            let opcode = opcode.as_u8();
+            let pc: u64 = runtime
+                .machine()
+                .trace_position()
+                .ok()?
+                .try_into()
+                .unwrap_or_default();
+            let gas = self.gas_remaining();
+            let depth: u16 = self.transaction_data.len().try_into().unwrap_or_default();
+            let stack = (!config.disable_stack)
+                .then(|| runtime.machine().stack().data().to_owned());
+            let return_data = config
+                .enable_return_data
+                .then(|| runtime.machine().return_value());
+            let memory = config
+                .enable_memory
+                .then(|| runtime.machine().memory().data()[..].to_vec());
+            let storage = (!config.disable_storage).then(|| self.storage_state.clone());
+
+            Some(StructLog::prepare(
+                pc,
+                opcode,
+                gas,
+                depth,
+                stack,
+                return_data,
+                memory,
+                storage,
+            ))
+        } else {
+            None
+        }
+    }
+
+    fn complete_and_store_trace(
+        &mut self,
+        trace: Option<StructLog>,
+        gas_cost: u64,
+        step_result: &Result<(), Capture<ExitReason, Resolve<EvmHandler<'_, Host>>>>,
+    ) -> Result<(), EthereumError> {
+        if let (
+            Some(StructLogger(StructLoggerInput {
+                transaction_hash,
+                config: _,
+            })),
+            Some(struct_log),
+        ) = (self.tracer, trace)
+        {
+            // TODO: https://gitlab.com/tezos/tezos/-/issues/7437
+            // For error, find the appropriate value to return for tracing.
+            // The following value is kind of a placeholder.
+            let error = if let Err(Capture::Exit(reason)) = &step_result {
+                match &reason {
+                    ExitReason::Error(exit) => {
+                        Some(format!("{:?}", exit).as_bytes().to_vec())
+                    }
+                    ExitReason::Fatal(exit) => {
+                        Some(format!("{:?}", exit).as_bytes().to_vec())
+                    }
+                    _ => None,
+                }
+            } else {
+                None
+            };
+            tracer::store_struct_log(
+                self.host,
+                struct_log.finish(gas_cost, error),
+                &transaction_hash,
+            )?;
+        }
+        Ok(())
+    }
+
     /// Execute a SputnikVM run with this handler
     ///
     // DO NOT RENAME: function name is used during benchmark
@@ -784,13 +804,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             // level. At the end of each step if the kernel takes more than the
             // allocated ticks the transaction is marked as failed.
             let opcode = runtime.machine().inspect().map(|p| p.0);
-            let program_counter = runtime.machine().trace_position();
-            let gas_remaining = self.gas_remaining();
-            let return_value = runtime.machine().return_value();
-            let depth = self.transaction_data.len();
-            let stack = runtime.machine().stack().data().to_owned();
-            let memory = runtime.machine().memory().data()[..].to_vec();
-            let storage = self.storage_state.clone();
+            let trace = self.prepare_trace(runtime, &opcode);
 
             #[cfg(feature = "benchmark-opcodes")]
             if let Some(opcode) = opcode {
@@ -816,20 +830,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                 benchmarks::end_opcode_section(self.host, gas_cost, &step_result);
             };
 
-            trace(
-                self.host,
-                &self.tracer,
-                return_value,
-                program_counter,
-                opcode,
-                gas_remaining,
-                gas_cost,
-                depth,
-                &step_result,
-                stack,
-                memory,
-                storage,
-            )?;
+            self.complete_and_store_trace(trace, gas_cost, &step_result)?;
 
             match step_result {
                 Ok(()) => (),

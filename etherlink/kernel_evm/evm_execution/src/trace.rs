@@ -321,6 +321,41 @@ pub struct StructLog {
     pub storage: Option<Vec<StorageMapItem>>,
 }
 
+impl StructLog {
+    #[allow(clippy::too_many_arguments)]
+    pub fn prepare(
+        pc: u64,
+        opcode: u8,
+        gas: u64,
+        depth: u16,
+        stack: Option<Vec<H256>>,
+        return_data: Option<Vec<u8>>,
+        memory: Option<Vec<u8>>,
+        storage: Option<Vec<StorageMapItem>>,
+    ) -> Self {
+        StructLog {
+            pc,
+            opcode,
+            gas,
+            gas_cost: 0,
+            depth,
+            error: None,
+            stack,
+            return_data,
+            memory,
+            storage,
+        }
+    }
+
+    pub fn finish(self, gas_cost: u64, error: Option<Vec<u8>>) -> Self {
+        StructLog {
+            gas_cost,
+            error,
+            ..self
+        }
+    }
+}
+
 impl Encodable for StructLog {
     fn rlp_append(&self, stream: &mut RlpStream) {
         stream.begin_list(10);
