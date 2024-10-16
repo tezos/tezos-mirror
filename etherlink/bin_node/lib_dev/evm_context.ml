@@ -34,7 +34,7 @@ type session_state = {
   mutable finalized_number : Ethereum_types.quantity;
   mutable next_blueprint_number : Ethereum_types.quantity;
   mutable current_block_hash : Ethereum_types.block_hash;
-  mutable pending_upgrade : Evm_events.Upgrade.t option;
+  mutable pending_upgrade : Evm_store.pending_kernel_upgrade option;
   mutable evm_state : Evm_state.t;
   mutable last_split_block : (Ethereum_types.quantity * Time.Protocol.t) option;
       (** Garbage collector session related information. *)
@@ -71,7 +71,10 @@ let session_to_head_info session =
     finalized_number = session.finalized_number;
     next_blueprint_number = session.next_blueprint_number;
     current_block_hash = session.current_block_hash;
-    pending_upgrade = session.pending_upgrade;
+    pending_upgrade =
+      Option.map
+        (fun pending_upgrade -> pending_upgrade.Evm_store.kernel_upgrade)
+        session.pending_upgrade;
   }
 
 let pvm_config ctxt =
@@ -563,7 +566,12 @@ module State = struct
     match event with
     | Evm_events.Upgrade_event upgrade ->
         let on_success session =
-          session.pending_upgrade <- Some upgrade ;
+          session.pending_upgrade <-
+            Some
+              {
+                kernel_upgrade = upgrade;
+                injected_before = ctxt.session.next_blueprint_number;
+              } ;
           background_preemptive_download ctxt upgrade ;
           on_success session
         in
@@ -714,13 +722,16 @@ module State = struct
     match ctxt.session.pending_upgrade with
     | None -> None
     | Some upgrade ->
-        if Time.Protocol.(upgrade.timestamp <= timestamp) then Some upgrade
+        if Time.Protocol.(upgrade.kernel_upgrade.timestamp <= timestamp) then
+          Some upgrade
         else None
 
   let check_upgrade ctxt evm_state =
     let open Lwt_result_syntax in
     function
-    | Some Evm_events.Upgrade.({hash = root_hash; _} as kernel_upgrade) ->
+    | Some
+        Evm_store.{kernel_upgrade = Evm_events.Upgrade.{hash = root_hash; _}; _}
+      ->
         let*! bytes =
           Evm_state.inspect evm_state Durable_storage_path.kernel_root_hash
         in
@@ -743,8 +754,8 @@ module State = struct
         in
 
         (* Even if the upgrade failed, we consider it has been applied. *)
-        return_some kernel_upgrade
-    | None -> return_none
+        return_true
+    | None -> return_false
 
   let store_block_unsafe conn evm_state block =
     let open Lwt_result_syntax in
@@ -857,10 +868,11 @@ module State = struct
         in
 
         let upgrade_candidate = check_pending_upgrade ctxt timestamp in
-        let* kernel_upgrade = check_upgrade ctxt evm_state upgrade_candidate in
-
+        let* applied_kernel_upgrade =
+          check_upgrade ctxt evm_state upgrade_candidate
+        in
         let* () =
-          when_ Option.(is_some kernel_upgrade) @@ fun () ->
+          when_ applied_kernel_upgrade @@ fun () ->
           Evm_store.Kernel_upgrades.record_apply
             conn
             ctxt.session.next_blueprint_number
@@ -870,7 +882,12 @@ module State = struct
           commit_next_head ctxt conn timestamp evm_state
         in
         return
-          (evm_state, context, block.hash, kernel_upgrade, split_info, gc_info)
+          ( evm_state,
+            context,
+            block.hash,
+            applied_kernel_upgrade,
+            split_info,
+            gc_info )
     | Apply_failure (* Did not produce a block *) ->
         let*! () = Blueprint_events.invalid_blueprint_produced next in
         tzfail (Cannot_apply_blueprint {local_state_level = Z.pred next})
@@ -902,7 +919,7 @@ module State = struct
     let* ( evm_state,
            context,
            current_block_hash,
-           kernel_upgrade,
+           applied_kernel_upgrade,
            split_info,
            gc_info ) =
       with_store_transaction ctxt @@ fun conn ->
@@ -913,12 +930,20 @@ module State = struct
         payload
         delayed_transactions
     in
+    let kernel_upgrade =
+      match ctxt.session.pending_upgrade with
+      | Some {injected_before; kernel_upgrade}
+        when injected_before = ctxt.session.next_blueprint_number ->
+          Some kernel_upgrade
+      | _ -> None
+    in
+
     let*! () =
       on_new_head
         ?split_info
         ?gc_info
         ctxt
-        ~applied_upgrade:Option.(is_some kernel_upgrade)
+        ~applied_upgrade:applied_kernel_upgrade
         evm_state
         context
         current_block_hash
@@ -1124,7 +1149,7 @@ module State = struct
 
     let*! () =
       Option.iter_s
-        (fun upgrade -> Events.pending_upgrade upgrade)
+        (fun upgrade -> Events.pending_upgrade upgrade.Evm_store.kernel_upgrade)
         pending_upgrade
     in
 
@@ -1171,22 +1196,6 @@ module State = struct
     in
     let block = Option.map Ethereum_types.block_from_rlp bytes in
     return (Option.map (fun block -> block.Ethereum_types.number) block)
-
-  let blueprint_with_events ctxt level =
-    let open Lwt_result_syntax in
-    Evm_store.use ctxt.store @@ fun conn ->
-    let* blueprint = Evm_store.Blueprints.find conn level in
-    let* kernel_upgrade =
-      Evm_store.Kernel_upgrades.find_applied_before conn level
-    in
-    match blueprint with
-    | None -> return None
-    | Some blueprint ->
-        let* delayed_transactions =
-          Evm_store.Delayed_transactions.at_level conn level
-        in
-        return_some
-          Blueprint_types.{delayed_transactions; kernel_upgrade; blueprint}
 
   let messages_of_level store level =
     let open Lwt_result_syntax in
@@ -1470,7 +1479,8 @@ module Handlers = struct
     | Blueprint {level} ->
         protect @@ fun () ->
         let ctxt = Worker.state self in
-        State.blueprint_with_events ctxt level
+        Evm_store.use ctxt.store @@ fun conn ->
+        Evm_store.Blueprints.find_with_events conn level
     | Blueprints_range {from; to_} ->
         protect @@ fun () ->
         let ctxt = Worker.state self in

@@ -39,7 +39,7 @@ type time_between_blocks =
 type mode =
   | Observer of {
       initial_kernel : string;
-      preimages_dir : string;
+      preimages_dir : string option;
       private_rpc_port : int option;  (** Port for private RPC server*)
       rollup_node_endpoint : string;
     }

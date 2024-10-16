@@ -75,6 +75,11 @@ module Context_hashes : sig
   val clear_after : conn -> Ethereum_types.quantity -> unit tzresult Lwt.t
 end
 
+type pending_kernel_upgrade = {
+  kernel_upgrade : Evm_events.Upgrade.t;
+  injected_before : Ethereum_types.quantity;
+}
+
 module Kernel_upgrades : sig
   val store :
     conn ->
@@ -84,12 +89,7 @@ module Kernel_upgrades : sig
 
   val activation_levels : conn -> Ethereum_types.quantity list tzresult Lwt.t
 
-  val find_latest_pending : conn -> Evm_events.Upgrade.t option tzresult Lwt.t
-
-  val find_applied_before :
-    conn ->
-    Ethereum_types.quantity ->
-    Evm_events.Upgrade.t option tzresult Lwt.t
+  val find_latest_pending : conn -> pending_kernel_upgrade option tzresult Lwt.t
 
   val record_apply : conn -> Ethereum_types.quantity -> unit tzresult Lwt.t
 

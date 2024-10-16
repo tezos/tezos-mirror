@@ -151,7 +151,7 @@ let run_new_observer_node ?(patch_config = Fun.id) ~sc_rollup_node evm_node =
         (Evm_node.Observer
            {
              initial_kernel;
-             preimages_dir;
+             preimages_dir = Some preimages_dir;
              private_rpc_port = Some (Port.fresh ());
              rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
            })

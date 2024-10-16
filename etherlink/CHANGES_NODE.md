@@ -4,6 +4,9 @@
 
 ### Features
 
+- The sequencer forwards the kernel upgrade event as soon as possible so
+  observers can download in advance the kernel. (!15276)
+
 #### RPCs
 
 - The experimental feature `node_transaction_validation` that enables validating
