@@ -44,6 +44,8 @@ let has_observer {observers; _} = not (Slot_set.is_empty observers)
 let attester_only t =
   has_attester t && (not (has_producer t)) && not (has_observer t)
 
+let attesters t = t.attesters
+
 let is_empty op =
   (not (has_observer op)) && (not (has_attester op)) && not (has_producer op)
 
