@@ -345,6 +345,19 @@ let timeout_reached node_ctxt ~self ~opponent =
       not is_it_me
   | _ -> false
 
+let timeout node_ctxt ~self ~opponent =
+  let open Lwt_result_syntax in
+  let Node_context.{config; cctxt; _} = node_ctxt in
+  let+ timeout =
+    Plugin.RPC.Sc_rollup.timeout
+      (new Protocol_client_context.wrap_full cctxt)
+      (cctxt#chain, `Head 0)
+      config.sc_rollup_address
+      self
+      opponent
+  in
+  Option.map Sc_rollup_proto_types.Game.timeout_to_octez timeout
+
 let get_conflicts cctxt rollup staker =
   let open Lwt_result_syntax in
   let cctxt = new Protocol_client_context.wrap_full cctxt in

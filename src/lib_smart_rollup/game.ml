@@ -40,6 +40,12 @@ module V1 = struct
     bob : Signature.Public_key_hash.t;
   }
 
+  type timeout = {
+    alice_timeout : int;
+    bob_timeout : int;
+    last_turn_level : int32;
+  }
+
   let make_index a b =
     let alice, bob =
       if Signature.Public_key_hash.(a > b) then (b, a) else (a, b)

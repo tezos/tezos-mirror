@@ -134,6 +134,12 @@ module Game : sig
 
   val to_octez : t -> Octez_smart_rollup.Game.t
 
+  type timeout = Sc_rollup.Game.timeout
+
+  val timeout_of_octez : Octez_smart_rollup.Game.timeout -> timeout
+
+  val timeout_to_octez : timeout -> Octez_smart_rollup.Game.timeout
+
   type conflict = Sc_rollup.Refutation_storage.conflict
 
   val conflict_of_octez : Octez_smart_rollup.Game.conflict -> conflict

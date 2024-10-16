@@ -236,6 +236,14 @@ module type REFUTATION_GAME_HELPERS = sig
     last_level:int32 ->
     Game.dissection_chunk trace tzresult Lwt.t
 
+  (** [timeout node_ctxt ~self ~opponent] returns the current state of the timeout
+    if there is a refutation game between self and opponent. *)
+  val timeout :
+    _ Node_context.t ->
+    self:Signature.public_key_hash ->
+    opponent:Signature.public_key_hash ->
+    Game.timeout option tzresult Lwt.t
+
   (** [timeout_reached node_ctxt ~self ~opponent] returns [true] if the
     timeout is reached against opponent in head of the L1 chain. *)
   val timeout_reached :
