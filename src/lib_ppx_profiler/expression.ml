@@ -10,7 +10,7 @@ module Rewriter = Rewriter.Rewriter
 
 (** [add_wrapping_function expr name _ key] will create
       {[
-        Profiler.name ~verbosity:(Terse | Detailed | Verbose) key @@ fun () -> (expr)
+        Profiler.name ~verbosity:(Notice | Detailed | Verbose) key @@ fun () -> (expr)
       ]}
   *)
 let add_wrapping_function expr fun_name loc key =
@@ -22,7 +22,7 @@ let add_wrapping_function expr fun_name loc key =
 
 (** [add_unit_function ~verbosity expr name _ key] will create
       {[
-        Profiler.name (if verbosity then ~verbosity:(Terse | Detailed | Verbose)) key;
+        Profiler.name (if verbosity then ~verbosity:(Notice | Detailed | Verbose)) key;
         expr
       ]}
   *)

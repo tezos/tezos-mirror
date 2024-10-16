@@ -212,7 +212,7 @@ The payload is made of two parts, the first one being optional:
    fields ::= field ; fields | empty
 
    field ::=
-     | level_of_detail = (Terse | Detailed | Verbose)
+     | level_of_detail = (Notice | Detailed | Verbose)
      | profiler_module = module_ident
 
    args ::= <string> | <string list> | <function application> | ident | empty

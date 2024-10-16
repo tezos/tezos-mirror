@@ -42,7 +42,7 @@ let get_level_of_detail loc {level_of_detail; _} =
         econstruct
           (constructor_declaration
              ~loc
-             ~name:(Located.mk ~loc "Terse")
+             ~name:(Located.mk ~loc "Notice")
              ~args:(Ppxlib_ast.Ast.Pcstr_tuple [])
              ~res:None))
         None

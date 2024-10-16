@@ -37,7 +37,7 @@ let ( +* ) {wall = walla; cpu = cpua} {wall = wallb; cpu = cpub} =
 let ( -* ) {wall = walla; cpu = cpua} {wall = wallb; cpu = cpub} =
   {wall = walla -. wallb; cpu = cpua -. cpub}
 
-type verbosity = Terse | Detailed | Verbose
+type verbosity = Notice | Detailed | Verbose
 
 type aggregated_node = {
   count : int;
@@ -71,7 +71,7 @@ let span_encoding =
 
 let verbosity_encoding =
   let open Data_encoding in
-  string_enum [("terse", Terse); ("detailed", Detailed); ("verbose", Verbose)]
+  string_enum [("notice", Notice); ("detailed", Detailed); ("verbose", Verbose)]
 
 let aggregated_encoding =
   let open Data_encoding in
@@ -230,19 +230,19 @@ let iter (p : profiler) f =
       r)
     p
 
-let record p ?(verbosity = Terse) id =
+let record p ?(verbosity = Notice) id =
   iter p (fun (module I) -> I.Driver.record I.state verbosity id)
 
-let aggregate p ?(verbosity = Terse) id =
+let aggregate p ?(verbosity = Notice) id =
   iter p (fun (module I) -> I.Driver.aggregate I.state verbosity id)
 
-let stamp p ?(verbosity = Terse) ids =
+let stamp p ?(verbosity = Notice) ids =
   iter p (fun (module I) -> I.Driver.stamp I.state verbosity ids)
 
-let mark p ?(verbosity = Terse) ids =
+let mark p ?(verbosity = Notice) ids =
   iter p (fun (module I) -> I.Driver.mark I.state verbosity ids)
 
-let span p ?(verbosity = Terse) d ids =
+let span p ?(verbosity = Notice) d ids =
   iter p (fun (module I) -> I.Driver.span I.state verbosity d ids)
 
 let inc p report = iter p (fun (module I) -> I.Driver.inc I.state report)
@@ -262,7 +262,7 @@ let record_f p ?verbosity id f = section p (fun p -> record p ?verbosity) id f
 let aggregate_f p ?verbosity id f =
   section p (fun p -> aggregate p ?verbosity) id f
 
-let span_f p ?(verbosity = Terse) ids f =
+let span_f p ?(verbosity = Notice) ids f =
   let is = plugged p in
   let t0s = List.map (fun i -> (i, time i)) is in
   let r = try Ok (f ()) with exn -> Error exn in
@@ -289,7 +289,7 @@ let record_s p ?verbosity id f = section_s p (fun p -> record p ?verbosity) id f
 let aggregate_s p ?verbosity id f =
   section_s p (fun p -> aggregate p ?verbosity) id f
 
-let span_s p ?(verbosity = Terse) ids f =
+let span_s p ?(verbosity = Notice) ids f =
   let is = plugged p in
   let t0s = List.map (fun i -> (i, time i)) is in
   Lwt.catch
@@ -353,7 +353,7 @@ let with_new_profiler_s driver state f =
 let main = unplugged ()
 
 module type GLOBAL_PROFILER = sig
-  type nonrec verbosity = verbosity = Terse | Detailed | Verbose
+  type nonrec verbosity = verbosity = Notice | Detailed | Verbose
 
   val plug : instance -> unit
 
@@ -397,7 +397,7 @@ end
 
 let wrap profiler =
   let module Wrapped = struct
-    type nonrec verbosity = verbosity = Terse | Detailed | Verbose
+    type nonrec verbosity = verbosity = Notice | Detailed | Verbose
 
     let plug i = plug profiler i
 
@@ -444,14 +444,14 @@ let parse_profiling_vars (default_dir : string) =
     match Sys.getenv_opt "PROFILING" |> Option.map String.lowercase_ascii with
     | Some "verbose" -> Some Verbose
     | Some "detailed" -> Some Detailed
-    | Some ("true" | "on" | "yes" | "terse") -> Some Terse
+    | Some ("true" | "on" | "yes" | "notice") -> Some Notice
     | Some invalid_value ->
         Printf.eprintf
           "Warning: Invalid PROFILING value '%s', disabling profiling.\n"
           invalid_value ;
         None
     | None ->
-        Option.map (fun _ -> Terse) (Sys.getenv_opt "PROFILING_OUTPUT_DIR")
+        Option.map (fun _ -> Notice) (Sys.getenv_opt "PROFILING_OUTPUT_DIR")
   in
   let output_dir =
     match Sys.getenv_opt "PROFILING_OUTPUT_DIR" with
