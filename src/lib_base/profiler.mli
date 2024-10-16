@@ -68,7 +68,7 @@ val ( +* ) : time -> time -> time
     level. The driver could also record everything, including the
     level of detail, and let a post processor skip or aggregate at
     display time. *)
-type verbosity = Notice | Detailed | Verbose
+type verbosity = Notice | Detailed | Debug
 
 (** An aggregate node registers multiple calls to a section and sum
     their occurences and time. It also recursively aggregate its
@@ -269,7 +269,7 @@ val main : profiler
 
 (** {2 Global Profiler} *)
 module type GLOBAL_PROFILER = sig
-  type nonrec verbosity = verbosity = Notice | Detailed | Verbose
+  type nonrec verbosity = verbosity = Notice | Detailed | Debug
 
   (** {3 Plugging} *)
 
@@ -361,7 +361,7 @@ val wrap : profiler -> (module GLOBAL_PROFILER)
 val profiler_file_suffix : string
 
 (** [parse_profiling_vars default_dir] checks for the existence of the following environment variables:
-   - PROFILING: determines the level of detail of the profiling output (notice / detailed / verbose).
+   - PROFILING: determines the level of detail of the profiling output (notice / detailed / debug).
      If no valid profiling argument is provided, profiling will be disabled.
    - PROFILING_OUTPUT_DIR: specifies where the profiling output will be written, defaults to the current
      [default_dir] data directory if not provided. *)

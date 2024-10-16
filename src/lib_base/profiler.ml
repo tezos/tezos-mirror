@@ -37,7 +37,7 @@ let ( +* ) {wall = walla; cpu = cpua} {wall = wallb; cpu = cpub} =
 let ( -* ) {wall = walla; cpu = cpua} {wall = wallb; cpu = cpub} =
   {wall = walla -. wallb; cpu = cpua -. cpub}
 
-type verbosity = Notice | Detailed | Verbose
+type verbosity = Notice | Detailed | Debug
 
 type aggregated_node = {
   count : int;
@@ -71,7 +71,7 @@ let span_encoding =
 
 let verbosity_encoding =
   let open Data_encoding in
-  string_enum [("notice", Notice); ("detailed", Detailed); ("verbose", Verbose)]
+  string_enum [("notice", Notice); ("detailed", Detailed); ("debug", Debug)]
 
 let aggregated_encoding =
   let open Data_encoding in
@@ -353,7 +353,7 @@ let with_new_profiler_s driver state f =
 let main = unplugged ()
 
 module type GLOBAL_PROFILER = sig
-  type nonrec verbosity = verbosity = Notice | Detailed | Verbose
+  type nonrec verbosity = verbosity = Notice | Detailed | Debug
 
   val plug : instance -> unit
 
@@ -397,7 +397,7 @@ end
 
 let wrap profiler =
   let module Wrapped = struct
-    type nonrec verbosity = verbosity = Notice | Detailed | Verbose
+    type nonrec verbosity = verbosity = Notice | Detailed | Debug
 
     let plug i = plug profiler i
 
@@ -442,7 +442,7 @@ let profiler_file_suffix = "_profiling"
 let parse_profiling_vars (default_dir : string) =
   let max_verbosity =
     match Sys.getenv_opt "PROFILING" |> Option.map String.lowercase_ascii with
-    | Some "verbose" -> Some Verbose
+    | Some "debug" -> Some Debug
     | Some "detailed" -> Some Detailed
     | Some ("true" | "on" | "yes" | "notice") -> Some Notice
     | Some invalid_value ->
