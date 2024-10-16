@@ -110,7 +110,10 @@ module Term = struct
     let doc =
       Format.asprintf
         "The TCP address and optionally the port at which this instance can be \
-         reached by other P2P nodes. By default, the address is '127.0.0.1'."
+         reached by other P2P nodes. By default, the point is \
+         '127.0.0.1:11732'. You can override the port using the syntax \
+         ':2222'. If the IP address is detected as a special address (such as \
+         a localhost one) it won't be advertised, only the port will."
     in
     Arg.(
       value
