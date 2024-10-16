@@ -255,6 +255,59 @@ module Profile_handlers = struct
   let get_assigned_shard_indices ctxt pkh level () () =
     Node_context.fetch_assigned_shard_indices ctxt ~level ~pkh
 
+  let warn_missing_shards store published_level expected_number_of_shards
+      number_of_stored_shards_per_slot =
+    let open Lwt_result_syntax in
+    let statuses_store = Store.slot_header_statuses store in
+    let*! problems =
+      List.filter_s
+        (fun (slot_index, num_stored) ->
+          if num_stored = expected_number_of_shards then Lwt.return_false
+          else
+            let*! res =
+              Store.Statuses.get_slot_status
+                statuses_store
+                ~slot_id:{slot_level = published_level; slot_index}
+            in
+            match res with
+            | Error `Not_found ->
+                (* that is, it was not published *)
+                Lwt.return_false
+            | Error (`Other tztrace) ->
+                let*! () =
+                  Event.(
+                    emit
+                      slot_header_status_storage_error
+                      (published_level, slot_index, tztrace))
+                in
+                Lwt.return_false
+            | Ok res -> (
+                match res with
+                | `Waiting_attestation -> Lwt.return_true
+                | status ->
+                    let*! () =
+                      Event.(
+                        emit
+                          unexpected_slot_header_status
+                          ( published_level,
+                            slot_index,
+                            `Waiting_attestation,
+                            status ))
+                    in
+                    Lwt.return_false))
+        number_of_stored_shards_per_slot
+    in
+    if List.is_empty problems then Lwt.return_unit
+    else
+      let indexes, number_of_stored_shards = List.split problems in
+      Event.(
+        emit
+          get_attestable_slots_warning
+          ( published_level,
+            indexes,
+            number_of_stored_shards,
+            expected_number_of_shards ))
+
   let get_attestable_slots ctxt pkh attested_level () () =
     let get_attestable_slots ~shard_indices store proto_parameters
         ~attested_level =
@@ -271,18 +324,39 @@ module Profile_handlers = struct
               attested_level
               (of_int proto_parameters.Dal_plugin.attestation_lag))
         in
+        let shards_store = Store.shards store in
         let are_shards_stored slot_index =
           let slot_id : Types.slot_id =
             {slot_level = published_level; slot_index}
           in
-          let shards_store = Store.shards store in
-          Store.Shards.are_shards_available shards_store slot_id shard_indices
-          |> lwt_map_error (fun e -> `Other e)
+          let+ number_stored_shards =
+            Store.Shards.number_of_shards_available
+              shards_store
+              slot_id
+              shard_indices
+            |> lwt_map_error (fun e -> `Other e)
+          in
+          (slot_index, number_stored_shards)
         in
         let all_slot_indexes =
           Utils.Infix.(0 -- (proto_parameters.number_of_slots - 1))
         in
-        let* flags = List.map_es are_shards_stored all_slot_indexes in
+        let* number_of_stored_shards_per_slot =
+          List.map_es are_shards_stored all_slot_indexes
+        in
+        let flags =
+          List.map
+            (fun (_slot_index, stored) -> stored = expected_number_of_shards)
+            number_of_stored_shards_per_slot
+        in
+        Lwt.dont_wait
+          (fun () ->
+            warn_missing_shards
+              store
+              published_level
+              expected_number_of_shards
+              number_of_stored_shards_per_slot)
+          (fun _exn -> ()) ;
         return (Types.Attestable_slots {slots = flags; published_level})
     in
     call_handler1 (fun () ->

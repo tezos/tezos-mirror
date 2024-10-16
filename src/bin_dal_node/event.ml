@@ -320,6 +320,33 @@ let removed_status =
     ~level:Debug
     ("level", Data_encoding.int32)
 
+let slot_header_status_storage_error =
+  declare_3
+    ~section
+    ~name:"slot_header_status_storage_error"
+    ~msg:
+      "slot header status storage error for level {published_level}, slot \
+       index {slot_index}: {error}"
+    ~level:Error
+    ("published_level", Data_encoding.int32)
+    ("slot_index", Data_encoding.int31)
+    ("error", Error_monad.trace_encoding)
+
+let unexpected_slot_header_status =
+  declare_4
+    ~section
+    ~name:"unexpected_slot_header_status"
+    ~msg:
+      "Internal error: unexpected slot header status {got_status}, expected \
+       {expected_status}, for level {published_level}, slot index {slot_index}"
+    ~level:Error
+    ("published_level", Data_encoding.int32)
+    ("slot_index", Data_encoding.int31)
+    ("expected_status", Types.header_status_encoding)
+    ("got_status", Types.header_status_encoding)
+    ~pp3:Types.pp_header_status
+    ~pp4:Types.pp_header_status
+
 let removed_skip_list_cells =
   declare_1
     ~section
@@ -607,3 +634,27 @@ let main_process_enqueue_query =
     ~msg:"main process: enqueue query #{query_id}."
     ~level:Info
     ("query_id", Data_encoding.int31)
+
+let pp_int_list fmt l =
+  Format.pp_print_list
+    ~pp_sep:(fun fmt () -> Format.pp_print_string fmt ", ")
+    Format.pp_print_int
+    fmt
+    l
+
+let get_attestable_slots_warning =
+  declare_4
+    ~section
+    ~name:"get_attestable_slots_warning"
+    ~msg:
+      "At level {published_level}, for the published slot(s) {slot_indexes}, \
+       the number of stored shards, namely {number_of_stored_shards} \
+       respectively, is smaller than the expected number \
+       {expected_number_of_shards}."
+    ~level:Warning
+    ("published_level", Data_encoding.int32)
+    ("slot_indexes", Data_encoding.(list int31))
+    ("number_of_stored_shards", Data_encoding.(list int31))
+    ("expected_number_of_shards", Data_encoding.int16)
+    ~pp2:pp_int_list
+    ~pp3:pp_int_list
