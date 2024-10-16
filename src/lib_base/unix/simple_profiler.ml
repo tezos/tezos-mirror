@@ -279,11 +279,70 @@ let pp_report ?t0 ppf report =
   in
   Format.fprintf ppf "@[<v 0>%a@]" (pp_report t0 0) report
 
+(** The [Base] functor helps to define other backend
+    without having to write the same functions again and again.
+
+    Given a way to get and set a [state] and an output function,
+    the functor will produce a module implementing the [DRIVER]
+    interface.
+
+    Note that the produced module will try to [output] report every
+    time [stamp], [inc], [mark], [span] or [stop] is used.
+    *)
+module Base (P : sig
+  type t
+
+  val get_state : t -> state
+
+  val set_state : t -> state -> unit
+
+  val output_report : (t -> report -> unit) option
+end) =
+struct
+  let time _ = time ()
+
+  let record t lod id = P.set_state t @@ record (P.get_state t) lod id
+
+  let aggregate t lod id = P.set_state t @@ aggregate (P.get_state t) lod id
+
+  let report t =
+    match (P.get_state t).stack with
+    | Toplevel {aggregated; recorded}
+      when StringMap.cardinal aggregated > 0 || recorded <> [] ->
+        P.set_state t @@ empty (P.get_state t).max_lod ;
+        let report = {aggregated; recorded = List.rev recorded} in
+        Some (apply_lod (P.get_state t).max_lod report)
+    | _ -> None
+
+  let may_output =
+    match P.output_report with
+    | Some fn -> fun t -> Option.iter (fun r -> fn t r) (report t)
+    | None -> fun _ -> ()
+
+  let stamp t lod id =
+    P.set_state t @@ stamp (P.get_state t) lod id ;
+    may_output t
+
+  let inc t report =
+    P.set_state t @@ inc (P.get_state t) report ;
+    may_output t
+
+  let mark t lod id =
+    P.set_state t @@ mark (P.get_state t) lod id ;
+    may_output t
+
+  let span t lod d id =
+    P.set_state t @@ span (P.get_state t) lod d id ;
+    may_output t
+
+  let stop t =
+    P.set_state t @@ stop (P.get_state t) ;
+    may_output t
+end
+
 type (_, _) Profiler.kind += Headless : (lod, state ref) Profiler.kind
 
 module Headless = struct
-  let time _ = time ()
-
   type nonrec state = state ref
 
   type config = lod
@@ -292,28 +351,15 @@ module Headless = struct
 
   let create lod = ref (empty lod)
 
-  let stamp state lod id = state := stamp !state lod id
+  include Base (struct
+    type t = state
 
-  let record state lod id = state := record !state lod id
+    let[@inline] get_state t = !t
 
-  let aggregate state lod id = state := aggregate !state lod id
+    let[@inline] set_state t s = t := s
 
-  let inc state report = state := inc !state report
-
-  let mark state lod id = state := mark !state lod id
-
-  let span state lod d id = state := span !state lod d id
-
-  let stop state = state := stop !state
-
-  let report state =
-    match !state.stack with
-    | Toplevel {aggregated; recorded}
-      when StringMap.cardinal aggregated > 0 || recorded <> [] ->
-        state := empty !state.max_lod ;
-        let report = {aggregated; recorded = List.rev recorded} in
-        Some (apply_lod !state.max_lod report)
-    | _ -> None
+    let output_report = None
+  end)
 
   let close _ = ()
 end
@@ -353,68 +399,40 @@ let make_driver ~file_format =
       in
       {profiler_state = empty lod; time = time (); output = Closed file_name}
 
-    let time _ = time ()
+    include Base (struct
+      type t = state
 
-    let record state lod id =
-      state.profiler_state <- record state.profiler_state lod id
+      let[@inline] get_state t = t.profiler_state
 
-    let aggregate state lod id =
-      state.profiler_state <- aggregate state.profiler_state lod id
+      let[@inline] set_state t s = t.profiler_state <- s
 
-    let report ({profiler_state; _} as state) =
-      match profiler_state.stack with
-      | Toplevel {aggregated; recorded}
-        when StringMap.cardinal aggregated > 0 || recorded <> [] ->
-          state.profiler_state <- empty profiler_state.max_lod ;
-          let report = {aggregated; recorded = List.rev recorded} in
-          Some (apply_lod profiler_state.max_lod report)
-      | _ -> None
+      let writer_of =
+        match file_format with
+        | Plain_text ->
+            fun formatter report time ->
+              Format.fprintf formatter "%a%!" (pp_report ~t0:time) report
+        | Json ->
+            fun formatter report _time ->
+              let encoded_report =
+                Data_encoding.Json.construct Profiler.report_encoding report
+              in
+              Data_encoding.Json.pp formatter encoded_report ;
+              Format.pp_print_newline formatter ()
 
-    let writer_of file_format formatter report time =
-      match file_format with
-      | Plain_text ->
-          Format.fprintf formatter "%a%!" (pp_report ~t0:time) report
-      | Json ->
-          let encoded_report =
-            Data_encoding.Json.construct Profiler.report_encoding report
-          in
-          Data_encoding.Json.pp formatter encoded_report ;
-          Format.pp_print_newline formatter ()
-
-    let may_write ({time = t0; output; _} as state) =
-      match report state with
-      | None -> ()
-      | Some report ->
-          let ppf =
-            match output with
-            | Open (_, _, ppf) -> ppf
-            | Closed fn ->
-                let fp = open_out fn in
-                let ppf = Format.formatter_of_out_channel fp in
-                state.output <- Open (fn, fp, ppf) ;
-                ppf
-          in
-          writer_of file_format ppf report t0
-
-    let inc state report =
-      state.profiler_state <- inc state.profiler_state report ;
-      may_write state
-
-    let mark state lod id =
-      state.profiler_state <- mark state.profiler_state lod id ;
-      may_write state
-
-    let stamp state lod id =
-      state.profiler_state <- stamp state.profiler_state lod id ;
-      may_write state
-
-    let span state lod d id =
-      state.profiler_state <- span state.profiler_state lod d id ;
-      may_write state
-
-    let stop ({profiler_state; _} as state) =
-      state.profiler_state <- stop profiler_state ;
-      may_write state
+      let output_report =
+        Some
+          (fun state report ->
+            let ppf =
+              match state.output with
+              | Open (_, _, ppf) -> ppf
+              | Closed fn ->
+                  let fp = open_out fn in
+                  let ppf = Format.formatter_of_out_channel fp in
+                  state.output <- Open (fn, fp, ppf) ;
+                  ppf
+            in
+            writer_of ppf report state.time)
+    end)
 
     let close ({output; _} as state) =
       match output with

@@ -102,9 +102,7 @@ type (_, _) kind = ..
 
     The [Driver] is a signature that, when instantiated, specifies the behaviour
     of any profiler. This means that all profilers should implement this set of
-    functions with their specifities.
-
-    Example: this driver writes text files in a unix filesystem *)
+    functions with their specifities. *)
 module type DRIVER = sig
   (** Parameters to launch an instance of the driver. *)
   type config
