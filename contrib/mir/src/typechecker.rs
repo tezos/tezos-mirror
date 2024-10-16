@@ -1569,6 +1569,15 @@ pub(crate) fn typecheck_instruction<'a>(
         }
         (App(EMPTY_SET, expect_args!(1), _), _) => unexpected_micheline!(),
 
+        (App(EMPTY_MAP, [kty, vty], _), _) => {
+            let kty = parse_ty(ctx, kty)?;
+            kty.ensure_prop(&mut ctx.gas, TypeProperty::Comparable)?;
+            let vty = parse_ty(ctx, vty)?;
+            stack.push(T::new_map(kty.clone(), vty.clone()));
+            I::EmptyMap
+        }
+        (App(EMPTY_MAP, expect_args!(2), _), _) => unexpected_micheline!(),
+
         (App(EMPTY_BIG_MAP, [kty, vty], _), _) => {
             let kty = parse_ty(ctx, kty)?;
             kty.ensure_prop(&mut ctx.gas, TypeProperty::Comparable)?;

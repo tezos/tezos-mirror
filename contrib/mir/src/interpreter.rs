@@ -13,9 +13,9 @@ use cryptoxide::hashing::{blake2b_256, keccak256, sha256, sha3_256, sha512};
 use num_bigint::{BigInt, BigUint, Sign};
 use num_integer::Integer;
 use num_traits::{Signed, ToPrimitive, Zero};
+use std::cmp::min;
 use std::ops::{Shl, Shr};
 use std::rc::Rc;
-use std::cmp::min;
 use tezos_crypto_rs::blake2b::digest as blake2bdigest;
 use typed_arena::Arena;
 
@@ -1185,6 +1185,11 @@ fn interpret_one<'a>(
             use std::collections::BTreeSet;
             ctx.gas.consume(interpret_cost::EMPTY_SET)?;
             stack.push(V::Set(BTreeSet::new()))
+        }
+        I::EmptyMap => {
+            use std::collections::BTreeMap;
+            ctx.gas.consume(interpret_cost::EMPTY_MAP)?;
+            stack.push(V::Map(BTreeMap::new()))
         }
         I::EmptyBigMap(kty, vty) => {
             use std::collections::BTreeMap;
@@ -3731,6 +3736,18 @@ mod interpreter_tests {
         assert_eq!(
             ctx.gas.milligas(),
             Gas::default().milligas() - interpret_cost::EMPTY_SET - interpret_cost::INTERPRET_RET
+        );
+    }
+
+    #[test]
+    fn empty_map() {
+        let mut ctx = Ctx::default();
+        let mut stack = stk![];
+        assert_eq!(interpret(&[EmptyMap], &mut ctx, &mut stack), Ok(()));
+        assert_eq!(stack, stk![TypedValue::Map(BTreeMap::new())]);
+        assert_eq!(
+            ctx.gas.milligas(),
+            Gas::default().milligas() - interpret_cost::EMPTY_MAP - interpret_cost::INTERPRET_RET
         );
     }
 
