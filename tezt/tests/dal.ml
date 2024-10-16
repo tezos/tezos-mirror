@@ -6937,7 +6937,7 @@ let dal_crypto_benchmark () =
   let file =
     match Cli.Logs.level with
     | Info | Debug -> "/dev/stdout"
-    | _ -> Temp.file "/dev/null"
+    | _ -> Temp.file "profiler-output"
   in
   let instance = Profiler.instance driver (file, Verbose) in
   Profiler.plug Profiler.main instance ;
