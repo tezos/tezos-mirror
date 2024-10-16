@@ -69,6 +69,9 @@ Minor Changes
 - Added a feature flag to enable the aggregation of block attestation lists into
   a single aggregate operation. (MR :gl:!15283)
 
+- Added a feature flag which would allow tz4 (BLS) addresses as delegate and or
+  as consensus keys. (MR :gl:`!15311`)
+
 Internal
 --------
 
