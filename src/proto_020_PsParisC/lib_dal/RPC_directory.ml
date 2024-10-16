@@ -19,7 +19,7 @@ module Skip_list_handlers = struct
     in
     let* cell =
       match rpc_context with
-      | `KVS store -> Skip_list_cells_store.find store hash
+      | `KVS store -> Kvs_skip_list_cells_store.find store hash
       | `SQLite3 store -> Dal_store_sqlite3.Skip_list_cells.find store hash
     in
     return

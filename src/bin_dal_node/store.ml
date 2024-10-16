@@ -442,7 +442,7 @@ module Storage_backend = struct
       [SQLite3] corresponds to the new implementation integrating a
       [Sqlite.t] database into the DAL node for storing skip list
       cells and whose purpose is to replace the
-      [Skip_list_cells_store] module. *)
+      [Kvs_skip_list_cells_store] module. *)
   type kind = Legacy | SQLite3
 
   let encoding =
@@ -528,7 +528,7 @@ type t = {
   slot_header_statuses : Statuses.t;
   shards : Shards.t;
   slots : Slots.t;
-  skip_list_cells : Skip_list_cells_store.t;
+  skip_list_cells : Kvs_skip_list_cells_store.t;
   cache :
     (Cryptobox.slot * Cryptobox.share array * Cryptobox.shard_proof array)
     Commitment_indexed_cache.t;
@@ -562,17 +562,17 @@ let slots {slots; _} = slots
 module Skip_list_cells = struct
   let find t =
     match t.storage_backend with
-    | Legacy -> Skip_list_cells_store.find t.skip_list_cells
+    | Legacy -> Kvs_skip_list_cells_store.find t.skip_list_cells
     | SQLite3 -> Dal_store_sqlite3.Skip_list_cells.find t.sqlite3
 
   let insert t =
     match t.storage_backend with
-    | Legacy -> Skip_list_cells_store.insert t.skip_list_cells
+    | Legacy -> Kvs_skip_list_cells_store.insert t.skip_list_cells
     | SQLite3 -> Dal_store_sqlite3.Skip_list_cells.insert t.sqlite3
 
   let remove t =
     match t.storage_backend with
-    | Legacy -> Skip_list_cells_store.remove t.skip_list_cells
+    | Legacy -> Kvs_skip_list_cells_store.remove t.skip_list_cells
     | SQLite3 -> Dal_store_sqlite3.Skip_list_cells.remove t.sqlite3
 end
 
@@ -709,7 +709,7 @@ let init_skip_list_cells_store base_dir =
      encoding in Dal_proto_types and then in skip_list_cells_store, we
      have an extra 4 bytes for encoding the size. *)
   let encoded_hash_size = 32 + 4 in
-  Skip_list_cells_store.init
+  Kvs_skip_list_cells_store.init
     ~node_store_dir:base_dir
     ~skip_list_store_dir:Stores_dirs.skip_list_cells
     ~padded_encoded_cell_size

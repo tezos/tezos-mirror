@@ -8,5 +8,5 @@
 
 (** The RPCs directory of the protocol part of DAL nodes. *)
 val directory :
-  [< `KVS of Skip_list_cells_store.t | `SQLite3 of Dal_store_sqlite3.t] ->
+  [< `KVS of Kvs_skip_list_cells_store.t | `SQLite3 of Dal_store_sqlite3.t] ->
   unit Environment.RPC_directory.t

@@ -172,7 +172,7 @@ module type T = sig
 
   module RPC : sig
     val directory :
-      [< `KVS of Skip_list_cells_store.t | `SQLite3 of Dal_store_sqlite3.t] ->
+      [< `KVS of Kvs_skip_list_cells_store.t | `SQLite3 of Dal_store_sqlite3.t] ->
       unit Tezos_rpc.Directory.t
   end
 end
