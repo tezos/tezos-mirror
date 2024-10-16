@@ -112,8 +112,7 @@ let apply_slashes ~slashable_deposits_period slashing_history ~from_cycle amount
     amount
     slashing_history
 
-let prepare_finalize_unstake ctxt ~for_next_cycle_use_only_after_slashing
-    contract =
+let prepare_finalize_unstake ctxt contract =
   let open Lwt_result_syntax in
   let slashable_deposits_period =
     Constants_storage.slashable_deposits_period ctxt
@@ -123,10 +122,6 @@ let prepare_finalize_unstake ctxt ~for_next_cycle_use_only_after_slashing
     slashable_deposits_period + max_slashing_period
   in
   let current_cycle = (Raw_context.current_level ctxt).cycle in
-  let current_cycle =
-    if for_next_cycle_use_only_after_slashing then Cycle_repr.succ current_cycle
-    else current_cycle
-  in
   let* requests_opt = Storage.Contract.Unstake_requests.find ctxt contract in
   match requests_opt with
   | None | Some {delegate = _; requests = []} -> return_none

@@ -351,7 +351,6 @@ module For_RPC = struct
       let* result =
         Unstake_requests_storage.prepare_finalize_unstake
           ctxt
-          ~for_next_cycle_use_only_after_slashing:false
           (Contract_repr.Implicit delegate)
       in
       match result with

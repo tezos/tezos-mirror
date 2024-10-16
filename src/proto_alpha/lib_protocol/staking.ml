@@ -65,8 +65,7 @@ let perform_finalizable_unstake_transfers ctxt contract finalizable =
 
 (* The [check_unfinalizable] function in argument must consume its gas, if
    relevant. *)
-let finalize_unstake_and_check ~for_next_cycle_use_only_after_slashing
-    ~check_unfinalizable ctxt contract =
+let finalize_unstake_and_check ~check_unfinalizable ctxt contract =
   let open Lwt_result_syntax in
   let*? ctxt =
     Raw_context.consume_gas
@@ -74,10 +73,7 @@ let finalize_unstake_and_check ~for_next_cycle_use_only_after_slashing
       Adaptive_issuance_costs.prepare_finalize_unstake_cost
   in
   let* prepared_opt =
-    Unstake_requests_storage.prepare_finalize_unstake
-      ~for_next_cycle_use_only_after_slashing
-      ctxt
-      contract
+    Unstake_requests_storage.prepare_finalize_unstake ctxt contract
   in
   match prepared_opt with
   | None -> return (ctxt, [], None)
@@ -105,20 +101,15 @@ let finalize_unstake_and_check ~for_next_cycle_use_only_after_slashing
           in
           return (ctxt, balance_updates, Some unfinalizable))
 
-let finalize_unstake ctxt ~for_next_cycle_use_only_after_slashing contract =
+let finalize_unstake ctxt contract =
   let open Lwt_result_syntax in
   let check_unfinalizable ctxt _unfinalizable = return ctxt in
   let* ctxt, balance_updates, _ =
-    finalize_unstake_and_check
-      ~for_next_cycle_use_only_after_slashing
-      ~check_unfinalizable
-      ctxt
-      contract
+    finalize_unstake_and_check ~check_unfinalizable ctxt contract
   in
   return (ctxt, balance_updates)
 
-let can_stake_from_unstake ctxt ~for_next_cycle_use_only_after_slashing
-    ~delegate =
+let can_stake_from_unstake ctxt ~delegate =
   let open Lwt_result_syntax in
   let* slashing_history_opt = Storage.Slashed_deposits.find ctxt delegate in
   let slashing_history = Option.value slashing_history_opt ~default:[] in
@@ -136,10 +127,6 @@ let can_stake_from_unstake ctxt ~for_next_cycle_use_only_after_slashing
   let slashing_history = slashing_history @ slashing_history_o in
 
   let current_cycle = (Raw_context.current_level ctxt).cycle in
-  let current_cycle =
-    if for_next_cycle_use_only_after_slashing then Cycle_repr.succ current_cycle
-    else current_cycle
-  in
   let slashable_deposits_period =
     Constants_storage.slashable_deposits_period ctxt
   in
@@ -157,8 +144,8 @@ let can_stake_from_unstake ctxt ~for_next_cycle_use_only_after_slashing
   in
   return @@ not (is_denounced || is_slashed)
 
-let stake_from_unstake_for_delegate ctxt ~for_next_cycle_use_only_after_slashing
-    ~delegate ~unfinalizable_requests_opt amount =
+let stake_from_unstake_for_delegate ctxt ~delegate ~unfinalizable_requests_opt
+    amount =
   let open Lwt_result_syntax in
   let remove_from_unstaked_frozen_deposit ctxt cycle delegate sender_contract
       amount =
@@ -190,12 +177,7 @@ let stake_from_unstake_for_delegate ctxt ~for_next_cycle_use_only_after_slashing
       then (* Should not be possible *)
         return (ctxt, [], Tez_repr.zero)
       else
-        let* allowed =
-          can_stake_from_unstake
-            ctxt
-            ~for_next_cycle_use_only_after_slashing
-            ~delegate
-        in
+        let* allowed = can_stake_from_unstake ctxt ~delegate in
         if not allowed then
           (* a slash could have modified the unstaked frozen deposits: cannot stake from unstake *)
           return (ctxt, [], amount)
@@ -283,9 +265,8 @@ let stake_from_unstake_for_delegate ctxt ~for_next_cycle_use_only_after_slashing
           in
           return (ctxt, balance_updates, remaining_amount_to_transfer)
 
-let stake ctxt ~for_next_cycle_use_only_after_slashing
-    ~(amount : [`At_most of Tez_repr.t | `Exactly of Tez_repr.t]) ~sender
-    ~delegate =
+let stake ctxt ~(amount : [`At_most of Tez_repr.t | `Exactly of Tez_repr.t])
+    ~sender ~delegate =
   let open Lwt_result_syntax in
   let check_unfinalizable ctxt
       Unstake_requests_storage.{delegate = unstake_delegate; requests} =
@@ -299,11 +280,7 @@ let stake ctxt ~for_next_cycle_use_only_after_slashing
   in
   let sender_contract = Contract_repr.Implicit sender in
   let* ctxt, finalize_balance_updates, unfinalizable_requests_opt =
-    finalize_unstake_and_check
-      ~check_unfinalizable
-      ctxt
-      ~for_next_cycle_use_only_after_slashing
-      sender_contract
+    finalize_unstake_and_check ~check_unfinalizable ctxt sender_contract
   in
   let tez_amount =
     match amount with `Exactly amount | `At_most amount -> amount
@@ -315,7 +292,6 @@ let stake ctxt ~for_next_cycle_use_only_after_slashing
     else
       stake_from_unstake_for_delegate
         ctxt
-        ~for_next_cycle_use_only_after_slashing
         ~delegate
         ~unfinalizable_requests_opt
         tez_amount
@@ -352,8 +328,7 @@ let stake ctxt ~for_next_cycle_use_only_after_slashing
     stake_balance_updates1 @ stake_balance_updates2 @ stake_balance_updates3
     @ finalize_balance_updates )
 
-let request_unstake ctxt ~for_next_cycle_use_only_after_slashing
-    ~sender_contract ~delegate requested_amount =
+let request_unstake ctxt ~sender_contract ~delegate requested_amount =
   let open Lwt_result_syntax in
   let* ctxt, tez_to_unstake, request_unstake_balance_updates =
     Staking_pseudotokens_storage.request_unstake
@@ -369,11 +344,6 @@ let request_unstake ctxt ~for_next_cycle_use_only_after_slashing
       Raw_context.consume_gas ctxt Adaptive_issuance_costs.request_unstake_cost
     in
     let current_cycle = (Raw_context.current_level ctxt).cycle in
-    let concerned_cycle =
-      if for_next_cycle_use_only_after_slashing then
-        Cycle_repr.succ current_cycle
-      else current_cycle
-    in
     let* ctxt, balance_updates =
       Token.transfer
         ctxt
@@ -381,21 +351,18 @@ let request_unstake ctxt ~for_next_cycle_use_only_after_slashing
           (Frozen_staker_repr.single_staker ~staker:sender_contract ~delegate))
         (`Unstaked_frozen_deposits
           ( Unstaked_frozen_staker_repr.Single (sender_contract, delegate),
-            concerned_cycle ))
+            current_cycle ))
         tez_to_unstake
     in
     let* ctxt, finalize_balance_updates =
-      finalize_unstake
-        ctxt
-        ~for_next_cycle_use_only_after_slashing
-        sender_contract
+      finalize_unstake ctxt sender_contract
     in
     let+ ctxt =
       Unstake_requests_storage.add
         ctxt
         ~contract:sender_contract
         ~delegate
-        concerned_cycle
+        current_cycle
         tez_to_unstake
     in
     ( ctxt,
