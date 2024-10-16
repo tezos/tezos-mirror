@@ -69,7 +69,7 @@ let span_encoding =
   let open Data_encoding in
   conv (fun (Span t) -> t) (fun t -> Span t) time_encoding
 
-let lod_encoding =
+let verbosity_encoding =
   let open Data_encoding in
   string_enum [("terse", Terse); ("detailed", Detailed); ("verbose", Verbose)]
 
@@ -95,7 +95,7 @@ let aggregated_encoding =
                     (req "count" int31)
                     (req "total" span_encoding)
                     (dft "children" aggregated_encoding StringMap.empty)
-                    (req "verbosity" lod_encoding))))))
+                    (req "verbosity" verbosity_encoding))))))
 
 let recorded_encoding report_encoding =
   let open Data_encoding in
@@ -110,7 +110,7 @@ let recorded_encoding report_encoding =
           (req "start" time_encoding)
           (req "duration" span_encoding)
           (req "report" report_encoding)
-          (req "verbosity" lod_encoding)))
+          (req "verbosity" verbosity_encoding)))
 
 let report_encoding =
   let open Data_encoding in
