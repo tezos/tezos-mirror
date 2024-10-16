@@ -486,13 +486,13 @@ module Handler = struct
               | Dal_plugin.Failed -> return_unit)
             slot_headers
         in
-        let*? attested_slots = Plugin.attested_slot_headers block_info in
+        let*? dal_attestation = Plugin.dal_attestation block_info in
         let* () =
           Slot_manager.update_selected_slot_headers_statuses
             ~block_level
             ~attestation_lag:proto_parameters.attestation_lag
             ~number_of_slots:proto_parameters.number_of_slots
-            (Plugin.is_attested attested_slots)
+            (Plugin.is_attested dal_attestation)
             store
         in
         let*! () =
@@ -501,7 +501,7 @@ module Handler = struct
             ctxt
             ~published_level:
               Int32.(sub block_level (of_int proto_parameters.attestation_lag))
-            (Plugin.is_attested attested_slots)
+            (Plugin.is_attested dal_attestation)
         in
         let* () = may_update_topics ctxt proto_parameters ~block_level in
         return_unit
