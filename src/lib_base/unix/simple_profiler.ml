@@ -86,10 +86,10 @@ and merge_maps amap bmap =
     amap
     bmap
 
-let rec apply_lod_to_aggregated verbosity aggregated =
+let rec apply_verbosity_to_aggregated verbosity aggregated =
   StringMap.fold
     (fun id node acc ->
-      let children = apply_lod_to_aggregated verbosity node.children in
+      let children = apply_verbosity_to_aggregated verbosity node.children in
       if node.node_lod <= verbosity then
         StringMap.add id {node with children} acc
       else merge_maps acc children)
@@ -106,7 +106,7 @@ let rec aggregate_report {aggregated; recorded} =
     recorded
 
 let rec apply_lod verbosity {aggregated; recorded} =
-  let aggregated = apply_lod_to_aggregated verbosity aggregated in
+  let aggregated = apply_verbosity_to_aggregated verbosity aggregated in
   let aggregated, recorded =
     List.fold_left
       (fun (aggregated, recorded) (id, item) ->
