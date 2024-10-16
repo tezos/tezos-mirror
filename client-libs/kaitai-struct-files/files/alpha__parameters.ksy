@@ -614,3 +614,6 @@ seq:
 - id: aggregate_attestation
   type: u1
   enum: bool
+- id: allow_tz4_delegate_enable
+  type: u1
+  enum: bool
