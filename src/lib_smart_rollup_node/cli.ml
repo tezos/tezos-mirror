@@ -202,9 +202,13 @@ struct
   let metrics_addr_arg =
     Tezos_clic.arg
       ~long:"metrics-addr"
-      ~placeholder:
-        "ADDR:PORT or :PORT (by default ADDR is localhost and PORT is 9933)"
-      ~doc:(Format.sprintf "The address of the %s metrics server." binary_name)
+      ~placeholder:"ADDR:PORT|:PORT"
+      ~doc:
+        (Format.sprintf
+           "Start the %s metrics server at the specified address ADDR:PORT. \
+            Default value is localhost:%d"
+           binary_name
+           Configuration.default_metrics_port)
       string_parameter
 
   let enable_performance_metrics_arg :
