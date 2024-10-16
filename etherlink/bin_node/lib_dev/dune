@@ -26,6 +26,7 @@
   octez-l2-libs.scoru-wasm-helpers
   octez-smart-rollup-wasm-debugger-lib
   octez-l2-libs.layer2_store
+  octez-l2-libs.irmin_context
   octez-l2-libs.smart-rollup
   octez-l2-libs.octez-smart-rollup-node-lib.store
   octez-evm-node-libs.evm_node_migrations
@@ -46,4 +47,5 @@
   -open Tezos_scoru_wasm_helpers
   -open Octez_smart_rollup_wasm_debugger_lib
   -open Tezos_layer2_store
+  -open Tezos_layer2_irmin_context
   -open Octez_smart_rollup))

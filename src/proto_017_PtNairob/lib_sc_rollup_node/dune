@@ -30,6 +30,7 @@
   octez-protocol-017-PtNairob-libs.layer2-utils
   octez-l2-libs.layer2_store
   octez-l2-libs.riscv_context
+  octez-l2-libs.irmin_context
   octez-crawler
   octez-libs.tree-encoding
   octez-libs.data-encoding
@@ -67,6 +68,7 @@
   -open Tezos_layer2_utils_017_PtNairob
   -open Tezos_layer2_store
   -open Tezos_layer2_riscv_context
+  -open Tezos_layer2_irmin_context
   -open Octez_crawler
   -open Octez_injector
   -open Octez_smart_rollup_node

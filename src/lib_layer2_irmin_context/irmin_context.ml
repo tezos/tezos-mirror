@@ -28,7 +28,7 @@
 open Store_sigs
 open Context_sigs
 module Context_encoding = Tezos_context_encoding.Context_binary
-module Event = Layer2_store_events
+module Event = Irmin_context_events
 
 (* We shadow [Tezos_context_encoding] to prevent accidentally using
    [Tezos_context_encoding.Context] instead of

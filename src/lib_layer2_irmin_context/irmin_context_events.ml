@@ -27,7 +27,7 @@
 module Simple = struct
   include Internal_event.Simple
 
-  let section = ["layer2_store"]
+  let section = ["irmin_context"]
 
   let starting_context_gc =
     declare_1

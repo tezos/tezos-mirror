@@ -4521,6 +4521,26 @@ let octez_layer2_store =
     ~linkall:true
     ~conflicts:[Conflicts.checkseum]
 
+let octez_layer2_irmin_context =
+  octez_l2_lib
+    "irmin_context"
+    ~internal_name:"tezos_layer2_irmin_context"
+    ~path:"src/lib_layer2_irmin_context"
+    ~synopsis:"Irmin context for the smart rollup PVMs"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        irmin_pack;
+        irmin_pack_unix;
+        irmin;
+        octez_context_encoding;
+        octez_context_sigs;
+        octez_context_helpers;
+        octez_layer2_store |> open_;
+      ]
+    ~linkall:true
+    ~conflicts:[Conflicts.checkseum]
+
 let octez_layer2_riscv_context =
   octez_l2_lib
     "riscv_context"
@@ -6922,6 +6942,7 @@ let hash = Protocol.hash
             layer2_utils |> if_some |> open_;
             octez_layer2_store |> open_;
             octez_layer2_riscv_context |> open_;
+            octez_layer2_irmin_context |> open_;
             octez_crawler |> open_;
             tree_encoding;
             data_encoding;
@@ -8468,6 +8489,7 @@ let _octez_smart_rollup_node_lib_tests =
         octez_stdlib_unix |> open_;
         octez_test_helpers |> open_;
         octez_layer2_store |> open_;
+        octez_layer2_irmin_context |> open_;
         octez_smart_rollup_lib |> open_;
         octez_smart_rollup_node_store_lib |> open_;
         octez_smart_rollup_node_lib |> open_;

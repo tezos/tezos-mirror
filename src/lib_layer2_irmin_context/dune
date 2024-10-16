@@ -1,0 +1,21 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_layer2_irmin_context)
+ (public_name octez-l2-libs.irmin_context)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.base
+  octez-internal-libs.irmin_pack
+  octez-internal-libs.irmin_pack.unix
+  octez-internal-libs.irmin
+  octez-libs.tezos-context.encoding
+  octez-libs.context.sigs
+  octez-libs.tezos-context.helpers
+  octez-l2-libs.layer2_store)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_layer2_store))
