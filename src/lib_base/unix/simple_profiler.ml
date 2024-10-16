@@ -39,13 +39,13 @@ type stack = Toplevel of report | Cons of stack_item * stack
 
 type scope = {id : string; verbosity : verbosity; time : time}
 
-type state = {stack : stack; scopes : scope list; max_lod : verbosity}
+type state = {stack : stack; scopes : scope list; max_verbosity : verbosity}
 
-let empty max_lod =
+let empty max_verbosity =
   {
     stack = Toplevel {aggregated = StringMap.empty; recorded = []};
     scopes = [];
-    max_lod;
+    max_verbosity;
   }
 
 let aggregate state verbosity id =
@@ -321,9 +321,9 @@ struct
     match (P.get_state t).stack with
     | Toplevel {aggregated; recorded}
       when StringMap.cardinal aggregated > 0 || recorded <> [] ->
-        P.set_state t @@ empty (P.get_state t).max_lod ;
+        P.set_state t @@ empty (P.get_state t).max_verbosity ;
         let report = {aggregated; recorded = List.rev recorded} in
-        Some (apply_lod (P.get_state t).max_lod report)
+        Some (apply_lod (P.get_state t).max_verbosity report)
     | _ -> None
 
   let may_output =

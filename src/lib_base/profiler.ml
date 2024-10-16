@@ -440,7 +440,7 @@ let wrap profiler =
 let profiler_file_suffix = "_profiling"
 
 let parse_profiling_vars (default_dir : string) =
-  let max_lod =
+  let max_verbosity =
     match Sys.getenv_opt "PROFILING" |> Option.map String.lowercase_ascii with
     | Some "verbose" -> Some Verbose
     | Some "detailed" -> Some Detailed
@@ -468,4 +468,4 @@ let parse_profiling_vars (default_dir : string) =
             Sys.mkdir output_dir 0o777 ;
             output_dir)
   in
-  (max_lod, output_dir)
+  (max_verbosity, output_dir)
