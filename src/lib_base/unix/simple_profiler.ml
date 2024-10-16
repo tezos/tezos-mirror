@@ -67,13 +67,23 @@ let record state verbosity id =
     {state with stack}
 
 let rec merge
-    {count = na; total = Span ta; children = contentsa; node_verbosity = loda}
-    {count = nb; total = Span tb; children = contentsb; node_verbosity = lodb} =
+    {
+      count = na;
+      total = Span ta;
+      children = contentsa;
+      node_verbosity = verbosity_a;
+    }
+    {
+      count = nb;
+      total = Span tb;
+      children = contentsb;
+      node_verbosity = verbosity_b;
+    } =
   {
     count = na + nb;
     total = Span (ta +* tb);
     children = merge_maps contentsa contentsb;
-    node_verbosity = min loda lodb;
+    node_verbosity = min verbosity_a verbosity_b;
   }
 
 and merge_maps amap bmap =
@@ -194,13 +204,15 @@ let stop state =
         match state.stack with
         | Cons
             ( {id; time = start; report = contents; verbosity},
-              Cons ({id = pid; time = pt0; report; verbosity = plod}, rest) ) ->
+              Cons
+                ({id = pid; time = pt0; report; verbosity = p_verbosity}, rest)
+            ) ->
             Cons
               ( {
                   id = pid;
                   time = pt0;
                   report = stop_report id start contents report verbosity;
-                  verbosity = plod;
+                  verbosity = p_verbosity;
                 },
                 rest )
         | Cons
