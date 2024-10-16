@@ -33,7 +33,7 @@ module Plugin = struct
 
   type block_info = Protocol_client_context.Alpha_block_services.block_info
 
-  type attested_indices = Bitset.t
+  type dal_attestation = Bitset.t
 
   let parametric_constants chain block ctxt =
     let cpctxt = new Protocol_client_context.wrap_rpc_context ctxt in
@@ -125,7 +125,7 @@ module Plugin = struct
       Signature.Public_key_hash.Map.empty
       pkh_to_shards
 
-  let attested_slot_headers (block : block_info) =
+  let dal_attestation (block : block_info) =
     let open Result_syntax in
     let* metadata =
       Option.to_result

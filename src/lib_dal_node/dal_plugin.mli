@@ -62,7 +62,7 @@ module type T = sig
 
   type block_info
 
-  type attested_indices
+  type dal_attestation
 
   (** [block_info ?chain ?block ~metadata ctxt] returns the information of the
       [block] in [ctxt] for the given [chain]. Block's metadata are included or
@@ -93,18 +93,17 @@ module type T = sig
     level:int32 ->
     int list Signature.Public_key_hash.Map.t tzresult Lwt.t
 
-  (** [attested_slot_headers block_info] reads the metadata of the
-      given [block_info] and constructs the list of attested slot
-      indices as an abstract value of type [attested_indices] to be
-      passed to the [is_attested] function.
+  (** [dal_attestation block_info] returns the metadata of the given
+      [block_info] as an abstract value of type [dal_attestation] to be passed
+      to the [is_attested] function.
 
       Fails with [Cannot_read_block_metadata] if [block_info]'s metadata are
       stripped.  *)
-  val attested_slot_headers : block_info -> attested_indices tzresult
+  val dal_attestation : block_info -> dal_attestation tzresult
 
-  (** [is_attested attested_indices index] returns [true] if [index]
-      is one of the [attested_indices] and [false] otherwise.  *)
-  val is_attested : attested_indices -> slot_index -> bool
+  (** [is_attested dal_attestation index] returns [true] if [index]
+      is one of the [dal_attestation] and [false] otherwise.  *)
+  val is_attested : dal_attestation -> slot_index -> bool
 
   (** [get_round fitness] returns the block round contained in [fitness]. *)
   val get_round : Fitness.t -> int32 tzresult
