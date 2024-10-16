@@ -32,3 +32,24 @@ module Schemas : sig
       the tables in the current store. *)
   val get_all : conn -> string list tzresult Lwt.t
 end
+
+module Skip_list_cells : sig
+  open Dal_proto_types
+
+  (** [find store hash] returns the cell associated to [hash] in the [store], if
+      any. *)
+  val find : t -> Skip_list_hash.t -> Skip_list_cell.t tzresult Lwt.t
+
+  (** [insert store ~attested_level values] inserts the given list of [values]
+      associated to the given [attested_level] in the [store]. Any existing value
+      is overridden. *)
+  val insert :
+    t ->
+    attested_level:int32 ->
+    (Skip_list_hash.t * Skip_list_cell.t) list ->
+    unit tzresult Lwt.t
+
+  (** [remove store ~attested_level] removes any data related to [attested_level]
+      from the [store]. *)
+  val remove : t -> attested_level:int32 -> unit tzresult Lwt.t
+end
