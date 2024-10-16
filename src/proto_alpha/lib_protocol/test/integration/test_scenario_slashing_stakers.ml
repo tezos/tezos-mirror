@@ -78,9 +78,7 @@ let init_with_stakers () =
           Half
     |+ Empty
   in
-  init_constants ()
-  --> set S.Adaptive_issuance.autostaking_enable false
-  --> activate_ai `Force
+  init_constants () --> activate_ai `Force
   --> branch_flag S.Adaptive_issuance.ns_enable
   --> begin_test
         [

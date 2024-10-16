@@ -1080,14 +1080,15 @@ val spawn_set_deposits_limit :
   t ->
   Process.t
 
-(** Run [octez-client unset deposits limit for <src>]. *)
-val unset_deposits_limit :
+(** Run [octez-client unset deposits limit for <src>]; do not wait for
+    the process to exit. *)
+val spawn_unset_deposits_limit :
   ?hooks:Process.hooks ->
   ?endpoint:endpoint ->
   ?wait:string ->
   src:string ->
   t ->
-  string Lwt.t
+  Process.t
 
 (** Run [octez-client increase the paid storage of <contract> by <amount> bytes from <payer>]. *)
 val increase_paid_storage :

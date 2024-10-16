@@ -58,12 +58,12 @@ This sequence of operations was run:
     [ { "cycle": 2, "pkh": "[PUBLIC_KEY_HASH]" } ] }
 
 ./octez-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]'
-{ "full_balance": "4000002964496", "current_frozen_deposits": "200000148225",
+{ "full_balance": "4000002964496", "current_frozen_deposits": "200000148243",
   "frozen_deposits": "200000000000", "staking_balance": "4000002964496",
   "delegated_contracts": [ "[PUBLIC_KEY_HASH]" ],
   "delegated_balance": "0",
   "min_delegated_in_current_cycle":
-    { "amount": "3800001278724",
+    { "amount": "3800001278709",
       "level":
         { "level": 5, "level_position": 4, "cycle": 1, "cycle_position": 0,
           "expected_commitment": false } }, "deactivated": false,
@@ -73,12 +73,12 @@ This sequence of operations was run:
   "active_consensus_key": "[PUBLIC_KEY_HASH]" }
 
 ./octez-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]'
-{ "full_balance": "4000002964496", "current_frozen_deposits": "200000148225",
+{ "full_balance": "4000002964496", "current_frozen_deposits": "200000148243",
   "frozen_deposits": "200000000000", "staking_balance": "4000002964496",
   "delegated_contracts": [ "[PUBLIC_KEY_HASH]" ],
   "delegated_balance": "0",
   "min_delegated_in_current_cycle":
-    { "amount": "3800001278724",
+    { "amount": "3800001278709",
       "level":
         { "level": 5, "level_position": 4, "cycle": 1, "cycle_position": 0,
           "expected_commitment": false } }, "deactivated": false,
@@ -119,12 +119,12 @@ This sequence of operations was run:
 
 
 ./octez-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]'
-{ "full_balance": "238000509096", "current_frozen_deposits": "200000164892",
-  "frozen_deposits": "200000067302", "staking_balance": "238000509096",
+{ "full_balance": "238000184482", "current_frozen_deposits": "200000149074",
+  "frozen_deposits": "200000067317", "staking_balance": "238000184482",
   "delegated_contracts": [ "[PUBLIC_KEY_HASH]" ],
   "delegated_balance": "0",
   "min_delegated_in_current_cycle":
-    { "amount": "18",
+    { "amount": "0",
       "level":
         { "level": 9, "level_position": 8, "cycle": 2, "cycle_position": 0,
           "expected_commitment": false } }, "deactivated": false,
@@ -134,7 +134,7 @@ This sequence of operations was run:
   "active_consensus_key": "[PUBLIC_KEY_HASH]" }
 
 ./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/balance'
-"38000344186"
+"38000035408"
 
 ./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/balance'
 "3762002724483"

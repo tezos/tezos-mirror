@@ -202,12 +202,6 @@ end = struct
     else if c < 0 then (op2, op1)
     else (op1, op2)
 
-  let adaptive_issuance =
-    {
-      Default_parameters.constants_test.adaptive_issuance with
-      autostaking_enable = false;
-    }
-
   let issuance_weights =
     {
       Default_parameters.constants_test.issuance_weights with
@@ -229,7 +223,6 @@ end = struct
     let* genesis, contracts =
       Context.init_n
         ~issuance_weights
-        ~adaptive_issuance
         ~consensus_threshold:0
         ~consensus_committee_size:64
         10
@@ -367,9 +360,7 @@ end = struct
   let test_two_double_preattestation_evidences_leads_to_duplicate_denunciation
       () =
     let open Lwt_result_syntax in
-    let* genesis, _contracts =
-      Context.init2 ~adaptive_issuance ~consensus_threshold:0 ()
-    in
+    let* genesis, _contracts = Context.init2 ~consensus_threshold:0 () in
     let* blk_1, blk_2 = block_fork genesis in
     let* blk_a = Block.bake blk_1 in
     let* blk_b = Block.bake blk_2 in

@@ -38,11 +38,6 @@ open Alpha_context
 (****************************************************************)
 (*                  Utility functions                           *)
 (****************************************************************)
-let autostaking_disabled =
-  {
-    Default_parameters.constants_test.adaptive_issuance with
-    autostaking_enable = false;
-  }
 
 let block_fork ?excluding b =
   let open Lwt_result_syntax in
@@ -368,12 +363,7 @@ let test_two_double_attestation_evidences_leadsto_no_bake () =
     Then the delegate is forbidden and can no longer bake. *)
 let test_two_double_attestation_evidences_staggered () =
   let open Lwt_result_syntax in
-  let* genesis, _contracts =
-    Context.init3
-      ~consensus_threshold:0
-      ~adaptive_issuance:autostaking_disabled
-      ()
-  in
+  let* genesis, _contracts = Context.init3 ~consensus_threshold:0 () in
   let* blk_1, blk_2 = block_fork genesis in
   let* blk_a = Block.bake blk_1 in
   let* blk_b = Block.bake blk_2 in
@@ -448,12 +438,7 @@ let test_two_double_attestation_evidences_staggered () =
     is forbidden and can no longer bake. *)
 let test_two_double_attestation_evidences_consecutive_cycles () =
   let open Lwt_result_syntax in
-  let* genesis, _contracts =
-    Context.init3
-      ~consensus_threshold:0
-      ~adaptive_issuance:autostaking_disabled
-      ()
-  in
+  let* genesis, _contracts = Context.init3 ~consensus_threshold:0 () in
   let* blk_1, blk_2 = block_fork genesis in
   let* blk_a = Block.bake blk_1 in
   let* blk_b = Block.bake blk_2 in
@@ -710,11 +695,6 @@ let test_freeze_more_with_low_balance =
         percentage_of_frozen_deposits_slashed_per_double_attestation =
           (* enforce that percentage is 50% in the test's params. *)
           Percentage.p50;
-        adaptive_issuance =
-          {
-            Default_parameters.constants_test.adaptive_issuance with
-            autostaking_enable = false;
-          };
       }
     in
     let* genesis, (c1, c2) = Context.init_with_constants2 constants in

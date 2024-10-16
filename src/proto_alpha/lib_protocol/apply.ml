@@ -1069,7 +1069,6 @@ let apply_manager_operation :
                   (Script.is_unit parameters)
                   (Script_interpreter.Bad_contract_parameter source_contract)
               in
-              let*? () = Staking.check_manual_staking_allowed ctxt in
               apply_stake
                 ~ctxt
                 ~sender:source
@@ -1082,7 +1081,6 @@ let apply_manager_operation :
                   (Script.is_unit parameters)
                   (Script_interpreter.Bad_contract_parameter source_contract)
               in
-              let*? () = Staking.check_manual_staking_allowed ctxt in
               apply_unstake
                 ~ctxt
                 ~sender:source
@@ -1407,29 +1405,8 @@ let apply_manager_operation :
             }
         in
         return (ctxt, result, [])
-    | Set_deposits_limit limit ->
-        let*! is_registered = Delegate.registered ctxt source in
-        let*? () =
-          error_unless
-            is_registered
-            (Set_deposits_limit_on_unregistered_delegate source)
-        in
-        let is_autostaking_enabled =
-          match Staking.staking_automation ctxt with
-          | Manual_staking -> false
-          | Auto_staking -> true
-        in
-        let*? () =
-          error_unless
-            is_autostaking_enabled
-            Set_deposits_limit_when_automated_staking_off
-        in
-        let*! ctxt = Delegate.set_frozen_deposits_limit ctxt source limit in
-        return
-          ( ctxt,
-            Set_deposits_limit_result
-              {consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt},
-            [] )
+    | Set_deposits_limit _limit ->
+        tzfail Set_deposits_limit_when_automated_staking_off
     | Increase_paid_storage {amount_in_bytes; destination} ->
         let* ctxt =
           Contract.increase_paid_storage ctxt destination ~amount_in_bytes

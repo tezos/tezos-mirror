@@ -23,8 +23,6 @@ let apply_end_cycle current_cycle previous_block block state :
       previous_block
       state
   in
-  (* Apply autostaking *)
-  let* state = State_ai_flags.Autostake.run_at_cycle_end block state in
   (* Sets initial frozen for future cycle *)
   let* state = update_map_es ~f:(compute_future_frozen_rights block) state in
   (* Apply parameter changes *)

@@ -50,57 +50,6 @@ let check_grace_period ~loc src_name =
     rpc_grace
 
 (** Test that a delegate gets deactivated after a set period of time if it is not baking.
-    Test that with autostaking, the frozen funds are completely unstaked, which get
-    finalizable (but not finalized) after a set period of time.
-    Test that these finalizable funds can indeed be finalized. *)
-let test_simple_scenario_with_autostaking =
-  init_constants ()
-  --> set S.Adaptive_issuance.autostaking_enable true
-  --> activate_ai `No
-  --> begin_test ["delegate"; "baker"]
-  --> check_grace_period ~loc:__LOC__ "baker"
-  --> set_baker "baker"
-  --> wait_n_cycles_f (fun (_, state) ->
-          (2 * state.State.constants.consensus_rights_delay) + 1)
-  --> check_balance_field "delegate" `Staked (Tez.of_mutez 200_000_000_000L)
-  --> check_is_active ~loc:__LOC__ "delegate"
-  --> next_cycle
-  --> check_is_not_active ~loc:__LOC__ "delegate"
-  --> check_balance_field "delegate" `Staked Tez.zero
-  --> check_grace_period ~loc:__LOC__ "baker"
-  --> next_block
-  --> check_grace_period ~loc:__LOC__ "baker"
-  --> check_balance_field
-        "delegate"
-        `Unstaked_frozen_total
-        (Tez.of_mutez 200_000_000_000L)
-  --> wait_n_cycles_f Test_scenario_stake.unstake_wait
-  --> check_balance_field "delegate" `Unstaked_frozen_total Tez.zero
-  --> check_grace_period ~loc:__LOC__ "delegate"
-  --> check_grace_period ~loc:__LOC__ "baker"
-  --> check_balance_field
-        "delegate"
-        `Unstaked_finalizable
-        (Tez.of_mutez 200_000_000_000L)
-  --> (Tag "Reactivate"
-       --> set_delegate "delegate" (Some "delegate")
-       --> check_is_active ~loc:__LOC__ "delegate"
-       --> next_cycle
-       --> check_balance_field "delegate" `Unstaked_finalizable Tez.zero
-       --> check_balance_field
-             "delegate"
-             `Staked
-             (Tez.of_mutez 200_000_000_000L)
-      |+ Tag "manual finalize unstake"
-         --> finalize_unstake "delegate"
-         --> check_balance_field "delegate" `Unstaked_finalizable Tez.zero
-         --> check_balance_field "delegate" `Staked Tez.zero
-         --> check_balance_field
-               "delegate"
-               `Liquid
-               (Tez.of_mutez 4_000_000_000_000L))
-
-(** Test that a delegate gets deactivated after a set period of time if it is not baking.
     Test that with AI, the frozen funds stay frozen, and the delegate can still issue AI
     operations without reactivating. *)
 let test_simple_scenario_with_ai =
@@ -178,8 +127,6 @@ let test_baking_deactivation =
 let tests =
   tests_of_scenarios
     [
-      ( "Test simple deactivation scenario with autostaking",
-        test_simple_scenario_with_autostaking );
       ("Test simple deactivation scenario with ai", test_simple_scenario_with_ai);
       ( "Test deactivation and reactivation scenarios with baking",
         test_baking_deactivation );

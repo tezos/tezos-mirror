@@ -305,7 +305,6 @@ let constants_mainnet : Constants.Parametric.t =
             radius_dz = Q.(1 // 50);
           };
         activation_vote_enable = true;
-        autostaking_enable = true;
         force_activation = false;
         ns_enable = true;
       };

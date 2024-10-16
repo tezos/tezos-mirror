@@ -25,44 +25,9 @@ open Scenario
 let test_wait_rewards_no_ai_no_auto =
   (* Prime number to always trigger roundings *)
   init_constants ~reward_per_block:1_000_000_007L ()
-  --> set S.Adaptive_issuance.autostaking_enable false
   --> activate_ai `No
   --> begin_test ["delegate1"; "delegate2"; "delegate3"]
   --> wait_n_cycles 20
-
-(** Test reward distribution without AI and with autostaking.
-    We expect autostaking to keep the ratio total/frozen equal to
-    [limit_of_delegation_over_baking + 1], rounding towards frozen.
-*)
-let test_wait_rewards_no_ai_yes_auto =
-  let open Lwt_result_syntax in
-  let check_balanced_balance src_name =
-    exec_unit (fun (_block, state) ->
-        let src_balance, src_total =
-          balance_and_total_balance_of_account src_name state.State.account_map
-        in
-        let rat = state.constants.limit_of_delegation_over_baking + 1 in
-        let expected_frozen =
-          Tez_helpers.(mul_q src_total Q.(1 // rat) |> of_q ~round:`Up)
-        in
-        let* () =
-          Assert.equal_tez
-            ~loc:__LOC__
-            expected_frozen
-            (Tez_helpers.of_q ~round:`Down src_balance.staked_b)
-        in
-        return_unit)
-  in
-  let check_all_balanced_balances = unfold check_balanced_balance in
-  let all_delegates = ["delegate1"; "delegate2"; "delegate3"] in
-  init_constants ~reward_per_block:1_000_000_007L ()
-  --> set S.Adaptive_issuance.autostaking_enable true
-  --> activate_ai `No --> begin_test all_delegates
-  --> loop
-        20
-        (exec bake_until_dawn_of_next_cycle
-        --> check_all_balanced_balances all_delegates
-        --> next_block)
 
 (** Tests reward distribution under AI:
     - with and without stakers (sometimes overstaking);
@@ -234,7 +199,6 @@ let test_ai_curve_activation_time =
     state.State.constants.consensus_rights_delay
   in
   init_constants ~reward_per_block:1_000_000_000L ~deactivate_dynamic:true ()
-  --> set S.Adaptive_issuance.autostaking_enable false
   --> activate_ai `Zero_threshold
   --> begin_test ~burn_rewards:true [""]
   --> next_block --> save_current_rate (* before AI rate *)
@@ -272,7 +236,6 @@ let test_static_decreasing =
   in
   init_constants ~reward_per_block:1L ~deactivate_dynamic:true ()
   (* Set rate bounds that should not be reached *)
-  --> set S.Adaptive_issuance.autostaking_enable false
   --> set
         S.Adaptive_issuance.Adaptive_rewards_params.issuance_ratio_final_min
         Q.(1 // 100_000)
@@ -316,7 +279,6 @@ let test_static_timing =
   in
   init_constants ~reward_per_block:1L ~deactivate_dynamic:true ()
   (* Set rate bounds that should not be reached *)
-  --> set S.Adaptive_issuance.autostaking_enable false
   --> set
         S.Adaptive_issuance.Adaptive_rewards_params.issuance_ratio_final_min
         Q.(1 // 100_000)
@@ -370,7 +332,7 @@ let begin_test_with_rewards_checks ~init_limit =
   --> stake "staker" (Amount (Tez.of_mutez 111_000_000_000L))
   --> check_snapshot_balances
         ~f:
-          (Test_scenario_autostaking.assert_balance_evolution
+          (assert_balance_evolution
              ~loc:__LOC__
              ~for_accounts:["staker"]
              ~part:`staked
@@ -400,7 +362,7 @@ let test_rewards_with_limit_change =
   (* The last cycle when the staker gets rewards *)
   --> check_snapshot_balances
         ~f:
-          (Test_scenario_autostaking.assert_balance_evolution
+          (assert_balance_evolution
              ~loc:__LOC__
              ~for_accounts:["staker"]
              ~part:`staked
@@ -497,7 +459,7 @@ let test_overstake =
     let gt_diff (diff : Q.t) new_b old_b = Q.equal new_b (Q.add old_b diff) in
     check_snapshot_balances
       ~f:
-        (Test_scenario_autostaking.assert_balance_evolution
+        (assert_balance_evolution
            ~loc
            ~for_accounts:[name]
            ~part:`staked
@@ -558,8 +520,6 @@ let tests =
   tests_of_scenarios
   @@ [
        ("Test wait rewards no AI no autostake", test_wait_rewards_no_ai_no_auto);
-       ( "Test wait rewards no AI yes autostake",
-         test_wait_rewards_no_ai_yes_auto );
        ("Test wait rewards with AI, stakers and edge", test_wait_rewards_with_ai);
        ( "Test wait rewards with AI and stake variation events",
          test_wait_rewards_with_ai_staker_variation );

@@ -25,39 +25,27 @@
 
 type error +=
   | Cannot_stake_with_unfinalizable_unstake_requests_to_another_delegate
-  | Manual_staking_forbidden
 
-(** [stake ctxt ~sender ~for_next_cycle_use_only_after_slashing ~delegate amount]
-    add [amount] as [sender]'s stake to [delegate].
-
-    If [for_next_cycle_use_only_after_slashing] is true, the implicit
-    finalisation is done for the next cycle. It is meant to be used only at
-    cycle end after the application of the slashing.
-
- *)
+(** [stake ctxt ~sender ~delegate amount] adds [amount] as [sender]'s
+    stake to [delegate]. *)
 val stake :
   Raw_context.t ->
-  for_next_cycle_use_only_after_slashing:bool ->
   amount:[`At_most of Tez_repr.t | `Exactly of Tez_repr.t] ->
   sender:Signature.Public_key_hash.t ->
   delegate:Signature.public_key_hash ->
   (Raw_context.t * Receipt_repr.balance_updates) tzresult Lwt.t
 
-(** [request_unstake ctxt ~for_next_cycle_use_only_after_slashing ~sender_contract ~delegate amount]
-    records a request from [sender_contract] to unstake [amount] from [delegate].
-
-    If [for_next_cycle_use_only_after_slashing] is true, the unstake request and
-    the implicit finalisation is done for the next cycle. It is meant to be used
-    only at cycle end after the application of the slashing.  *)
+(** [request_unstake ctxt ~sender_contract ~delegate amount] records a
+    request from [sender_contract] to unstake [amount] from
+    [delegate]. *)
 val request_unstake :
   Raw_context.t ->
-  for_next_cycle_use_only_after_slashing:bool ->
   sender_contract:Contract_repr.t ->
   delegate:Signature.public_key_hash ->
   Tez_repr.t ->
   (Raw_context.t * Receipt_repr.balance_updates) tzresult Lwt.t
 
-(** [finalize_unstake ctxt ~for_next_cycle_use_only_after_slashing contract]
+(** [finalize_unstake ctxt contract]
     performs the finalization of all unstake requests from [contract] that can
     be finalized.
     An unstake request can be finalized if it is old enough, specifically the
@@ -66,21 +54,8 @@ val request_unstake :
     request.
     Amounts are transferred from the [contract]'s delegate (at request time)
     unstaked frozen deposits to [contract]'s spendable balance, minus slashing
-    the requested stake undergone in between.
-
-    If [for_next_cycle_use_only_after_slashing] is true, the finalization is
-    done for the next cycle. It is meant to be used only at cycle end after the
-    application of the slashing.*)
+    the requested stake undergone in between. *)
 val finalize_unstake :
   Raw_context.t ->
-  for_next_cycle_use_only_after_slashing:bool ->
   Contract_repr.t ->
   (Raw_context.t * Receipt_repr.balance_updates) tzresult Lwt.t
-
-(** Staking can be either automated or manual. If Adaptive Issuance is
-    enabled, staking must be manual. *)
-type staking_automation = Auto_staking | Manual_staking
-
-val staking_automation : Raw_context.t -> staking_automation
-
-val check_manual_staking_allowed : Raw_context.t -> unit tzresult

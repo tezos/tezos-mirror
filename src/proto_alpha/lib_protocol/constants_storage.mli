@@ -154,8 +154,6 @@ val adaptive_issuance_activation_vote_enable : Raw_context.t -> bool
 val adaptive_issuance_rewards_params :
   Raw_context.t -> Constants_parametric_repr.adaptive_rewards_params
 
-val adaptive_issuance_autostaking_enable : Raw_context.t -> bool
-
 val adaptive_issuance_force_activation : Raw_context.t -> bool
 
 val adaptive_issuance_ns_enable : Raw_context.t -> bool

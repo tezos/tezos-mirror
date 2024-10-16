@@ -1108,7 +1108,6 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
                  launch_ema_threshold;
                  adaptive_rewards_params = _;
                  activation_vote_enable;
-                 autostaking_enable;
                  force_activation;
                  ns_enable;
                }
@@ -1122,7 +1121,6 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
               launch_ema_threshold;
               adaptive_rewards_params;
               activation_vote_enable;
-              autostaking_enable;
               force_activation;
               ns_enable;
             }
@@ -1393,7 +1391,7 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
                  launch_ema_threshold;
                  adaptive_rewards_params = _;
                  activation_vote_enable;
-                 autostaking_enable;
+                 autostaking_enable = _;
                  force_activation;
                  ns_enable;
                }
@@ -1407,7 +1405,6 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
               launch_ema_threshold;
               adaptive_rewards_params;
               activation_vote_enable;
-              autostaking_enable;
               force_activation;
               ns_enable;
             }

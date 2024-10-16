@@ -55,7 +55,6 @@ let init_staker_delegate_or_external =
   let begin_test ~self_stake =
     let name = if self_stake then "staker" else "delegate" in
     init_constants ()
-    --> set S.Adaptive_issuance.autostaking_enable false
     --> Scenario_begin.activate_ai `Force
     --> begin_test [name]
     --> set_delegate_params name init_params
@@ -164,7 +163,6 @@ let shorter_roundtrip_for_baker =
     {limit_of_staking_over_baking = Q.one; edge_of_baking_over_staking = Q.one}
   in
   init_constants ()
-  --> set S.Adaptive_issuance.autostaking_enable false
   --> set S.consensus_rights_delay consensus_rights_delay
   --> activate_ai `Force
   --> begin_test ["delegate"; "faucet"]
@@ -364,9 +362,7 @@ let change_delegate_to_self =
   let init_params =
     {limit_of_staking_over_baking = Q.one; edge_of_baking_over_staking = Q.one}
   in
-  init_constants ()
-  --> set S.Adaptive_issuance.autostaking_enable false
-  --> activate_ai `Force --> begin_test ["delegate"]
+  init_constants () --> activate_ai `Force --> begin_test ["delegate"]
   --> set_delegate_params "delegate" init_params
   --> add_account_with_funds
         "staker"
@@ -418,9 +414,7 @@ let change_delegate =
   let init_params =
     {limit_of_staking_over_baking = Q.one; edge_of_baking_over_staking = Q.one}
   in
-  init_constants ()
-  --> set S.Adaptive_issuance.autostaking_enable false
-  --> activate_ai `Force
+  init_constants () --> activate_ai `Force
   --> begin_test ["delegate1"; "delegate2"]
   --> set_delegate_params "delegate1" init_params
   --> set_delegate_params "delegate2" init_params
@@ -481,9 +475,7 @@ let unset_delegate =
   let init_params =
     {limit_of_staking_over_baking = Q.one; edge_of_baking_over_staking = Q.one}
   in
-  init_constants ()
-  --> set S.Adaptive_issuance.autostaking_enable false
-  --> activate_ai `Force --> begin_test ["delegate"]
+  init_constants () --> activate_ai `Force --> begin_test ["delegate"]
   --> set_delegate_params "delegate" init_params
   --> add_account_with_funds
         "staker"
@@ -522,7 +514,6 @@ let forbid_costaking =
   |+ Tag "large delegate parameters delay"
      --> init_constants ~delegate_parameters_activation_delay:10 ())
   (* Set flags *)
-  --> set S.Adaptive_issuance.autostaking_enable false
   --> activate_ai `Zero_threshold
   (* Start scenario *)
   --> begin_test ["delegate"]
@@ -579,9 +570,7 @@ let test_deactivation =
   in
   let check_is_deactivated = check_deactivated_status ~expected:true in
   let check_is_not_deactivated = check_deactivated_status ~expected:false in
-  init_constants ()
-  --> set S.Adaptive_issuance.autostaking_enable false
-  --> activate_ai `Force
+  init_constants () --> activate_ai `Force
   --> begin_test ["delegate"; "faucet"]
   --> stake "delegate" (Amount (Tez.of_mutez 1_800_000_000_000L))
   --> set_delegate_params "delegate" init_params

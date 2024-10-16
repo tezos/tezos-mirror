@@ -288,9 +288,6 @@ let adaptive_issuance_rewards_params c =
 let adaptive_issuance_activation_vote_enable c =
   (adaptive_issuance c).activation_vote_enable
 
-let adaptive_issuance_autostaking_enable c =
-  (adaptive_issuance c).autostaking_enable
-
 let adaptive_issuance_force_activation c =
   (adaptive_issuance c).force_activation
 

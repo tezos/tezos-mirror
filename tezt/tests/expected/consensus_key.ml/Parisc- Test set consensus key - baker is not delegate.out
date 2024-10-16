@@ -58,12 +58,12 @@ This sequence of operations was run:
     [ { "cycle": 2, "pkh": "[PUBLIC_KEY_HASH]" } ] }
 
 ./octez-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]'
-{ "full_balance": "4000002964496", "current_frozen_deposits": "200000148225",
+{ "full_balance": "4000002964496", "current_frozen_deposits": "200000148243",
   "frozen_deposits": "200000000000", "staking_balance": "4000002964496",
   "delegated_contracts": [ "[PUBLIC_KEY_HASH]" ],
   "delegated_balance": "0",
   "min_delegated_in_current_cycle":
-    { "amount": "3800001278724",
+    { "amount": "3800001278709",
       "level":
         { "level": 5, "level_position": 4, "cycle": 1, "cycle_position": 0,
           "expected_commitment": false } }, "deactivated": false,

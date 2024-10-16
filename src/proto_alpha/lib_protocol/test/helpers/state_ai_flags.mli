@@ -31,18 +31,6 @@ module AI : sig
   val enabled : Block.t -> State.t -> bool
 end
 
-module Autostake : sig
-  (** This module takes care of autostaking when it is enabled *)
-
-  (** Autostaking is enabled iff the flag [autostaking_enable] is true and
-      AI is not activated ([AI.enabled = false]). *)
-  val enabled : Block.t -> State.t -> bool
-
-  (** Runs the autostake operations at cycle end. Does nothing if
-      [enabled = false]. *)
-  val run_at_cycle_end : Block.t -> State.t -> State.t tzresult Lwt.t
-end
-
 module Delayed_slashing : sig
   (** This module takes care of choosing the denunciations that need to be
       applied at the end of a cycle. It depends on the flag [ns_enable]. *)
