@@ -44,6 +44,7 @@ Beta and Testnet, and allows users to deposit and withdraw FA 2.1 tokens.
 - Fix gas cost of contract creation by fixing the implementation of init code
   cost recording. (!14892)
 - Fix call trace reporting of error messages. (!15000)
+- Fix performance regression due to struct logger. (!15319)
 
 ## Version af7909023768bc4aad3120bec7bea4a64a576047
 
