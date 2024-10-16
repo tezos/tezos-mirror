@@ -643,7 +643,7 @@ module Make (Proto : Protocol_plugin.T) = struct
                           oph
                           op
                         [@profiler.record_s sec]
-                        (* TODO: Add a ~verbosity:detailed payload *))
+                        (* TODO: Add a ~verbosity:info payload *))
                      in
                      return (state, op_metadata :: acc))
                    (state, [])
@@ -1346,7 +1346,7 @@ module Make (Proto : Protocol_plugin.T) = struct
                    ~check_signature
                    state
                    oph
-                   op [@profiler.record_s {level_of_detail = Detailed} sec]))
+                   op [@profiler.record_s {level_of_detail = Info} sec]))
               state
               ops [@profiler.record_s sec]))
          state

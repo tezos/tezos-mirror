@@ -99,7 +99,7 @@ We can now easily create an instance for a ``Driver``:
    let read_instance =
      Tezos_base.Profiler.instance
        Tezos_base_unix.Simple_profiler.auto_write_to_txt_file
-       ("read_profiling.txt", Profiler.Detailed)
+       ("read_profiling.txt", Profiler.Info)
 
 We just need one last thing. We have a ``read_profiler`` and a ``read_instance`` that
 writes in ``read_profiling.txt`` but they are not connected. That's where the
@@ -173,7 +173,7 @@ monitor our functions more precisely:
    let instance =
      Tezos_base.Profiler.instance
        Tezos_base_unix.Simple_profiler.auto_write_to_txt_file
-       ("/tmp/test_profiler.txt", Profiler.Detailed)
+       ("/tmp/test_profiler.txt", Profiler.Info)
 
    let read_int ic =
      let rec aux acc =

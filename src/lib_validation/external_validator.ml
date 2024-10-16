@@ -112,12 +112,12 @@ module Processing = struct
     let headless =
       Tezos_base.Profiler.instance
         Tezos_base_unix.Simple_profiler.headless
-        Profiler.Detailed
+        Profiler.Info
     in
     let profiler_headless =
       Tezos_base.Profiler.instance
         Tezos_base_unix.Simple_profiler.headless
-        Profiler.Detailed
+        Profiler.Info
     in
 
     Tezos_base.Profiler.(plug main) headless ;

@@ -249,7 +249,7 @@ let get_profiler file_name =
   let test_profiler_instance =
     Profiler.instance
       Tezos_base_unix.Simple_profiler.auto_write_to_txt_file
-      (file_name, Profiler.Detailed)
+      (file_name, Profiler.Info)
   in
   plug profiler test_profiler_instance ;
   profiler
