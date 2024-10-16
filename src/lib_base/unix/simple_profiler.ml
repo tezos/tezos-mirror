@@ -107,14 +107,14 @@ let rec aggregate_report {aggregated; recorded} =
     aggregated
     recorded
 
-let rec apply_lod verbosity {aggregated; recorded} =
+let rec apply_verbosity verbosity {aggregated; recorded} =
   let aggregated = apply_verbosity_to_aggregated verbosity aggregated in
   let aggregated, recorded =
     List.fold_left
       (fun (aggregated, recorded) (id, item) ->
         if item.item_verbosity <= verbosity then
           ( aggregated,
-            (id, {item with contents = apply_lod verbosity item.contents})
+            (id, {item with contents = apply_verbosity verbosity item.contents})
             :: recorded )
         else (merge_maps aggregated (aggregate_report item.contents), recorded))
       (aggregated, [])
@@ -327,7 +327,7 @@ struct
       when StringMap.cardinal aggregated > 0 || recorded <> [] ->
         P.set_state t @@ empty (P.get_state t).max_verbosity ;
         let report = {aggregated; recorded = List.rev recorded} in
-        Some (apply_lod (P.get_state t).max_verbosity report)
+        Some (apply_verbosity (P.get_state t).max_verbosity report)
     | _ -> None
 
   let may_output =
