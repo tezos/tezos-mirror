@@ -920,6 +920,19 @@ module Consensus = struct
     let block_state = may_update_attestation_power info block_state power in
     let operation_state = add_attestation operation_state oph operation in
     return {info; operation_state; block_state}
+
+  let validate_attestations_aggregate info _operation_state _block_state _oph
+      (_operation : Kind.attestations_aggregate operation) =
+    match info.mode with
+    | Mempool ->
+        (* Aggregate operations are built at baking time and shouldn't be
+           broadcasted between mempools. *)
+        tzfail Validate_errors.Consensus.Aggregate_in_mempool
+    | Application _ | Partial_validation _ | Construction _ ->
+        (* Feature flag check *)
+        if Constants.aggregate_attestation info.ctxt then
+          tzfail Validate_errors.Consensus.Aggregate_not_implemented
+        else tzfail Validate_errors.Consensus.Aggregate_disabled
 end
 
 (** {2 Validation of voting operations}
@@ -1331,13 +1344,17 @@ module Anonymous = struct
       (op1 : kind Kind.consensus Operation.t)
       (op2 : kind Kind.consensus Operation.t) =
     let open Lwt_result_syntax in
-    let e1, e2, kind =
+    let* e1, e2, kind =
       match (op1.protocol_data.contents, op2.protocol_data.contents) with
       | Single (Preattestation e1), Single (Preattestation e2) ->
-          (e1, e2, Misbehaviour.Double_preattesting)
+          return (e1, e2, Misbehaviour.Double_preattesting)
       | ( Single (Attestation {consensus_content = e1; dal_content = _}),
           Single (Attestation {consensus_content = e2; dal_content = _}) ) ->
-          (e1, e2, Double_attesting)
+          return (e1, e2, Misbehaviour.Double_attesting)
+      | Single (Attestations_aggregate _), Single (Attestations_aggregate _) ->
+          (* TODO : https://gitlab.com/tezos/tezos/-/issues/7598
+             handle denunciation for aggregates. *)
+          tzfail Aggregate_denunciation_not_implemented
     in
     let op1_hash = Operation.hash op1 in
     let op2_hash = Operation.hash op2 in
@@ -2816,6 +2833,8 @@ let check_operation ?(check_signature = true) info (type kind)
         Consensus.check_attestation info ~check_signature operation
       in
       return_unit
+  | Single (Attestations_aggregate _) ->
+      tzfail Validate_errors.Consensus.Aggregate_in_mempool
   | Single (Proposals _) ->
       Voting.check_proposals info ~check_signature operation
   | Single (Ballot _) -> Voting.check_ballot info ~check_signature operation
@@ -2873,6 +2892,10 @@ let check_operation_conflict (type kind) operation_conflict_state oph
         operation_conflict_state
         oph
         operation
+  | Single (Attestations_aggregate _) ->
+      (* This case is unreachable because the operation is assumed to be valid,
+         and aggregates are never valid in mempools. *)
+      assert false
   | Single (Proposals _) ->
       Voting.check_proposals_conflict operation_conflict_state oph operation
   | Single (Ballot _) ->
@@ -2933,6 +2956,10 @@ let add_valid_operation operation_conflict_state oph (type kind)
       Consensus.add_preattestation operation_conflict_state oph operation
   | Single (Attestation _) ->
       Consensus.add_attestation operation_conflict_state oph operation
+  | Single (Attestations_aggregate _) ->
+      (* This case is unreachable because the operation is assumed to be valid,
+         and aggregates are never valid in mempools. *)
+      assert false
   | Single (Proposals _) ->
       Voting.add_proposals operation_conflict_state oph operation
   | Single (Ballot _) ->
@@ -2981,6 +3008,10 @@ let remove_operation operation_conflict_state (type kind)
       Consensus.remove_preattestation operation_conflict_state operation
   | Single (Attestation _) ->
       Consensus.remove_attestation operation_conflict_state operation
+  | Single (Attestations_aggregate _) ->
+      (* This case is unreachable because the operation is assumed to be valid,
+         and aggregates are never valid in mempools. *)
+      assert false
   | Single (Proposals _) ->
       Voting.remove_proposals operation_conflict_state operation
   | Single (Ballot _) -> Voting.remove_ballot operation_conflict_state operation
@@ -3076,6 +3107,13 @@ let validate_operation ?(check_signature = true)
       | Single (Attestation _) ->
           Consensus.validate_attestation
             ~check_signature
+            info
+            operation_state
+            block_state
+            oph
+            operation
+      | Single (Attestations_aggregate _) ->
+          Consensus.validate_attestations_aggregate
             info
             operation_state
             block_state

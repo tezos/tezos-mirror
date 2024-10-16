@@ -129,6 +129,40 @@ let raw_attestation ?delegate ?slot ?level ?round ?block_payload_hash
        branch
        op)
 
+let aggregate attestations =
+  let aggregate_content =
+    List.fold_left
+      (fun acc op ->
+        let {shell; protocol_data = {contents; signature}} : _ Operation.t =
+          op
+        in
+        match (contents, signature) with
+        | Single (Attestation {consensus_content; _}), Some (Bls bls_sig) -> (
+            let {slot; _} = consensus_content in
+            match acc with
+            | Some (shell, proposal, slots, signatures) ->
+                Some (shell, proposal, slot :: slots, bls_sig :: signatures)
+            | None ->
+                let {level; round; block_payload_hash; _} = consensus_content in
+                let proposal = {level; round; block_payload_hash} in
+                Some (shell, proposal, [slot], [bls_sig]))
+        | _, _ -> acc)
+      None
+      attestations
+  in
+  let open Option_syntax in
+  let* shell, consensus_content, committee, signatures = aggregate_content in
+  let+ signature =
+    Bls12_381_signature.MinPk.aggregate_signature_opt signatures
+  in
+  let contents =
+    Single (Attestations_aggregate {consensus_content; committee})
+  in
+  let protocol_data =
+    Operation_data {contents; signature = Some (Bls signature)}
+  in
+  {shell; protocol_data}
+
 let attestation ?delegate ?slot ?level ?round ?block_payload_hash ?dal_content
     ?branch attested_block =
   let open Lwt_result_syntax in
@@ -144,6 +178,38 @@ let attestation ?delegate ?slot ?level ?round ?block_payload_hash ?dal_content
       attested_block
   in
   return (Operation.pack op)
+
+let attestations_aggregate ?committee ?level ?round ?block_payload_hash ?branch
+    attested_block =
+  let open Lwt_result_syntax in
+  let* committee =
+    match committee with
+    | Some committee -> return committee
+    | None ->
+        let* attesters = Context.get_attesters (B attested_block) in
+        return
+        @@ List.filter_map
+             (fun attester ->
+               match attester.Plugin.RPC.Validators.consensus_key with
+               | Bls _ -> Some attester.delegate
+               | _ -> None)
+             attesters
+  in
+  let* attestations =
+    List.map_es
+      (fun delegate ->
+        raw_attestation
+          ~delegate
+          ?level
+          ?round
+          ?block_payload_hash
+          ?branch
+          attested_block)
+      committee
+  in
+  match aggregate attestations with
+  | Some aggregate_attestation -> return aggregate_attestation
+  | None -> failwith "no Bls delegate found"
 
 let raw_preattestation ?delegate ?slot ?level ?round ?block_payload_hash ?branch
     attested_block =

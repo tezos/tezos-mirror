@@ -82,6 +82,15 @@ type t = {
   consensus_pkh : Signature.Public_key_hash.t;
 }
 
+let encoding =
+  let open Data_encoding in
+  conv
+    (fun {delegate; consensus_pkh} -> (delegate, consensus_pkh))
+    (fun (delegate, consensus_pkh) -> {delegate; consensus_pkh})
+  @@ obj2
+       (req "delegate" Signature.Public_key_hash.encoding)
+       (req "consensus_pkh" Signature.Public_key_hash.encoding)
+
 let pkh {delegate; consensus_pkh; consensus_pk = _} = {delegate; consensus_pkh}
 
 let zero =

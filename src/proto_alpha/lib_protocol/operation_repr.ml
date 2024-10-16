@@ -32,13 +32,20 @@ module Kind = struct
 
   type attestation_consensus_kind = Attestation_consensus_kind
 
+  type attestations_aggregate_consensus_kind =
+    | Attestations_aggregate_consensus_kind
+
   type 'a consensus =
     | Preattestation_kind : preattestation_consensus_kind consensus
     | Attestation_kind : attestation_consensus_kind consensus
+    | Attestations_aggregate_kind
+        : attestations_aggregate_consensus_kind consensus
 
   type preattestation = preattestation_consensus_kind consensus
 
   type attestation = attestation_consensus_kind consensus
+
+  type attestations_aggregate = attestations_aggregate_consensus_kind consensus
 
   type seed_nonce_revelation = Seed_nonce_revelation_kind
 
@@ -141,6 +148,14 @@ end
 type 'a consensus_operation_type =
   | Attestation : Kind.attestation consensus_operation_type
   | Preattestation : Kind.preattestation consensus_operation_type
+  | Attestations_aggregate
+      : Kind.attestations_aggregate consensus_operation_type
+
+type consensus_aggregate_content = {
+  level : Raw_level_repr.t;
+  round : Round_repr.t;
+  block_payload_hash : Block_payload_hash.t;
+}
 
 type consensus_content = {
   slot : Slot_repr.t;
@@ -158,18 +173,28 @@ type consensus_content = {
 
 type dal_content = {attestation : Dal_attestation_repr.t}
 
+let consensus_aggregate_content_encoding =
+  let open Data_encoding in
+  conv
+    (fun ({level; round; block_payload_hash} : consensus_aggregate_content) ->
+      (level, round, block_payload_hash))
+    (fun (level, round, block_payload_hash) : consensus_aggregate_content ->
+      {level; round; block_payload_hash})
+    (obj3
+       (req "level" Raw_level_repr.encoding)
+       (req "round" Round_repr.encoding)
+       (req "block_payload_hash" Block_payload_hash.encoding))
+
 let consensus_content_encoding =
   let open Data_encoding in
   conv
     (fun {slot; level; round; block_payload_hash} ->
-      (slot, level, round, block_payload_hash))
-    (fun (slot, level, round, block_payload_hash) ->
+      (slot, {level; round; block_payload_hash}))
+    (fun (slot, {level; round; block_payload_hash}) ->
       {slot; level; round; block_payload_hash})
-    (obj4
-       (req "slot" Slot_repr.encoding)
-       (req "level" Raw_level_repr.encoding)
-       (req "round" Round_repr.encoding)
-       (req "block_payload_hash" Block_payload_hash.encoding))
+    (merge_objs
+       (obj1 (req "slot" Slot_repr.encoding))
+       consensus_aggregate_content_encoding)
 
 let pp_consensus_content ppf content =
   Format.fprintf
@@ -238,6 +263,11 @@ and _ contents =
       dal_content : dal_content option;
     }
       -> Kind.attestation contents
+  | Attestations_aggregate : {
+      consensus_content : consensus_aggregate_content;
+      committee : Slot_repr.t list;
+    }
+      -> Kind.attestations_aggregate contents
   | Seed_nonce_revelation : {
       level : Raw_level_repr.t;
       nonce : Seed_repr.nonce;
@@ -1151,6 +1181,28 @@ module Encoding = struct
                        ]))
                (varopt "signature" Signature.encoding)))
 
+  let attestations_aggregate_encoding =
+    obj2
+      (req "consensus_content" consensus_aggregate_content_encoding)
+      (req "committee" (list Slot_repr.encoding))
+
+  let attestations_aggregate_case =
+    Case
+      {
+        tag = 31;
+        name = "attestations_aggregate";
+        encoding = attestations_aggregate_encoding;
+        select =
+          (function
+          | Contents (Attestations_aggregate _ as op) -> Some op | _ -> None);
+        proj =
+          (fun (Attestations_aggregate {consensus_content; committee}) ->
+            (consensus_content, committee));
+        inj =
+          (fun (consensus_content, committee) ->
+            Attestations_aggregate {consensus_content; committee});
+      }
+
   let seed_nonce_revelation_case =
     Case
       {
@@ -1480,6 +1532,7 @@ module Encoding = struct
     [
       PCase preattestation_case;
       PCase attestation_case;
+      PCase attestations_aggregate_case;
       PCase attestation_with_dal_case;
       PCase double_preattestation_evidence_case;
       PCase double_attestation_evidence_case;
@@ -1737,6 +1790,7 @@ let acceptable_pass (op : packed_operation) =
   | Single (Failing_noop _) -> None
   | Single (Preattestation _) -> Some consensus_pass
   | Single (Attestation _) -> Some consensus_pass
+  | Single (Attestations_aggregate _) -> Some consensus_pass
   | Single (Proposals _) -> Some voting_pass
   | Single (Ballot _) -> Some voting_pass
   | Single (Seed_nonce_revelation _) -> Some anonymous_pass
@@ -1834,7 +1888,7 @@ let check_signature (type kind) key chain_id (op : kind operation) =
             | Vdf_revelation _ | Double_attestation_evidence _
             | Double_preattestation_evidence _ | Double_baking_evidence _
             | Dal_entrapment_evidence _ | Activate_account _ | Drain_delegate _
-            | Manager_operation _ ) ->
+            | Manager_operation _ | Attestations_aggregate _ ) ->
             Generic_operation
         | Cons (Manager_operation _, _ops) -> Generic_operation
       in
@@ -1914,6 +1968,8 @@ let equal_contents_kind : type a b. a contents -> b contents -> (a, b) eq option
   | Preattestation _, _ -> None
   | Attestation _, Attestation _ -> Some Eq
   | Attestation _, _ -> None
+  | Attestations_aggregate _, Attestations_aggregate _ -> Some Eq
+  | Attestations_aggregate _, _ -> None
   | Seed_nonce_revelation _, Seed_nonce_revelation _ -> Some Eq
   | Seed_nonce_revelation _, _ -> None
   | Vdf_revelation _, Vdf_revelation _ -> Some Eq
@@ -2022,6 +2078,10 @@ type round_infos = {level : int32; round : int}
    convert into an {!int}. *)
 type preattestation_infos = {round : round_infos; slot : int}
 
+(** [aggregate_infos] is the pair of a {!round_infos} and a [committee] that is
+    a list of slots converted into a {!int list}. *)
+type aggregate_infos = {round : round_infos; committee : int list}
+
 (** [attestation_infos] is the tuple consisting of a {!round_infos} value, a
     [slot], and the number of DAL slots in the DAL attestation. *)
 type attestation_infos = {
@@ -2084,6 +2144,24 @@ let attestation_infos_from_content (c : consensus_content)
           Dal_attestation_repr.number_of_attested_slots d.attestation)
         d;
   }
+
+(** Compute an {!aggregate_info} value from {!consensus_aggregate_content} 
+    and {!Slot_repr.t list} values. It is used to compute the weight of an
+    {!Aggregate_attestation}.
+
+    Precondition: [aggregate_consensus_content] and [committee] come from a
+    valid operation.  *)
+let aggregate_infos_from_content (proposal : consensus_aggregate_content)
+    (committee : Slot_repr.t list) =
+  let level = Raw_level_repr.to_int32 proposal.level in
+  let round =
+    match Round_repr.to_int proposal.round with
+    | Ok round -> round
+    | Error _ -> -1
+  in
+  let round_infos = {level; round} in
+  let committee = List.map Slot_repr.to_int committee in
+  {round = round_infos; committee}
 
 (** Compute a {!double_baking_infos} and a {!Block_header_repr.hash}
    from a {!Block_header_repr.t}. It is used to compute the weight of
@@ -2151,6 +2229,9 @@ type dal_entrapment_info = {level : int32; number_of_attested_slots : int}
 type _ weight =
   | Weight_attestation : attestation_infos -> consensus_pass_type weight
   | Weight_preattestation : preattestation_infos -> consensus_pass_type weight
+  | Weight_attestations_aggregate :
+      aggregate_infos
+      -> consensus_pass_type weight
   | Weight_proposals :
       int32 * Signature.Public_key_hash.t
       -> voting_pass_type weight
@@ -2252,6 +2333,11 @@ let weight_of : packed_operation -> operation_weight =
         ( Consensus,
           Weight_attestation
             (attestation_infos_from_content consensus_content dal_content) )
+  | Single (Attestations_aggregate {consensus_content; committee}) ->
+      let aggregate_infos =
+        aggregate_infos_from_content consensus_content committee
+      in
+      W (Consensus, Weight_attestations_aggregate aggregate_infos)
   | Single (Proposals {period; source; _}) ->
       W (Voting, Weight_proposals (period, source))
   | Single (Ballot {period; source; _}) ->
@@ -2387,6 +2473,18 @@ let compare_dal_entrapment_infos infos1 infos2 =
     (infos1.level, infos1.number_of_attested_slots)
     (infos2.level, infos2.number_of_attested_slots)
 
+(** Two {!Attestations_aggregate} are compared by their {!aggregate_infos}. When their
+    {!round_infos} are equal, they are compared according to their [committee]
+    by lexicographic order. *)
+let compare_attestations_aggregate_infos
+    {round = infos1; committee = committee1}
+    {round = infos2; committee = committee2} =
+  compare_pair_in_lexico_order
+    ~cmp_fst:compare_round_infos
+    ~cmp_snd:(List.compare Compare.Int.compare)
+    (infos1, committee1)
+    (infos2, committee2)
+
 (** {4 Comparison of valid operations of the same validation pass} *)
 
 (** {5 Comparison of valid consensus operations} *)
@@ -2413,6 +2511,21 @@ let compare_consensus_weight w1 w2 =
       if Compare.Int.(cmp <> 0) then cmp else 1
   | ( Weight_preattestation {round = round_infos1; _},
       Weight_attestation {round_infos = round_infos2; _} ) ->
+      let cmp = compare_round_infos round_infos1 round_infos2 in
+      if Compare.Int.(cmp <> 0) then cmp else -1
+  | Weight_attestations_aggregate infos1, Weight_attestations_aggregate infos2
+    ->
+      compare_attestations_aggregate_infos infos1 infos2
+  | ( Weight_attestations_aggregate {round = round_infos1; _},
+      Weight_preattestation {round = round_infos2; _} )
+  | ( Weight_attestations_aggregate {round = round_infos1; _},
+      Weight_attestation {round_infos = round_infos2; _} ) ->
+      let cmp = compare_round_infos round_infos1 round_infos2 in
+      if Compare.Int.(cmp <> 0) then cmp else 1
+  | ( Weight_preattestation {round = round_infos1; _},
+      Weight_attestations_aggregate {round = round_infos2; _} )
+  | ( Weight_attestation {round_infos = round_infos1; _},
+      Weight_attestations_aggregate {round = round_infos2; _} ) ->
       let cmp = compare_round_infos round_infos1 round_infos2 in
       if Compare.Int.(cmp <> 0) then cmp else -1
 

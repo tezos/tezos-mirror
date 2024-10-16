@@ -887,6 +887,12 @@ type 'kind contents_result =
       consensus_power : int;
     }
       -> Kind.attestation contents_result
+  | Attestations_aggregate_result : {
+      balance_updates : Receipt.balance_updates;
+      committee : Consensus_key.t list;
+      consensus_power : int;
+    }
+      -> Kind.attestations_aggregate contents_result
   | Seed_nonce_revelation_result :
       Receipt.balance_updates
       -> Kind.seed_nonce_revelation contents_result
@@ -1024,6 +1030,13 @@ module Encoding = struct
       (req "consensus_power" int31)
       (req "consensus_key" Signature.Public_key_hash.encoding)
 
+  let consensus_aggregate_result_encoding =
+    let open Data_encoding in
+    obj3
+      (dft "balance_updates" Receipt.balance_updates_encoding [])
+      (req "committee" (list Consensus_key.encoding))
+      (req "consensus_power" int31)
+
   type case =
     | Case : {
         op_case : 'kind Operation.Encoding.case;
@@ -1118,6 +1131,31 @@ module Encoding = struct
           (fun (balance_updates, delegate, consensus_power, consensus_key) ->
             Attestation_result
               {balance_updates; delegate; consensus_key; consensus_power});
+      }
+
+  let attestations_aggregate_case =
+    Case
+      {
+        op_case = Operation.Encoding.attestations_aggregate_case;
+        encoding = consensus_aggregate_result_encoding;
+        select =
+          (function
+          | Contents_result (Attestations_aggregate_result _ as op) -> Some op
+          | _ -> None);
+        mselect =
+          (function
+          | Contents_and_result ((Attestations_aggregate _ as op), res) ->
+              Some (op, res)
+          | _ -> None);
+        proj =
+          (function
+          | Attestations_aggregate_result
+              {balance_updates; committee; consensus_power} ->
+              (balance_updates, committee, consensus_power));
+        inj =
+          (fun (balance_updates, committee, consensus_power) ->
+            Attestations_aggregate_result
+              {balance_updates; committee; consensus_power});
       }
 
   let seed_nonce_revelation_case =
@@ -1397,6 +1435,7 @@ module Encoding = struct
                        {op with operation_result = Failed (kind, errs)}))
           | Contents_result (Preattestation_result _) -> None
           | Contents_result (Attestation_result _) -> None
+          | Contents_result (Attestations_aggregate_result _) -> None
           | Contents_result Ballot_result -> None
           | Contents_result (Seed_nonce_revelation_result _) -> None
           | Contents_result (Vdf_revelation_result _) -> None
@@ -1692,8 +1731,9 @@ let common_cases =
 let contents_cases =
   let open Encoding in
   attestation_case :: attestation_with_dal_case :: preattestation_case
-  :: double_attestation_evidence_case :: double_preattestation_evidence_case
-  :: dal_entrapment_evidence_case :: common_cases
+  :: attestations_aggregate_case :: double_attestation_evidence_case
+  :: double_preattestation_evidence_case :: dal_entrapment_evidence_case
+  :: common_cases
 
 let make_contents_result
     (Encoding.Case
@@ -1853,6 +1893,8 @@ let kind_equal :
   | Attestation _, _ -> None
   | Preattestation _, Preattestation_result _ -> Some Eq
   | Preattestation _, _ -> None
+  | Attestations_aggregate _, Attestations_aggregate_result _ -> Some Eq
+  | Attestations_aggregate _, _ -> None
   | Seed_nonce_revelation _, Seed_nonce_revelation_result _ -> Some Eq
   | Seed_nonce_revelation _, _ -> None
   | Vdf_revelation _, Vdf_revelation_result _ -> Some Eq

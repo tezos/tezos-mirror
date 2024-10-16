@@ -154,7 +154,6 @@ let () =
     Data_encoding.(obj1 (req "source" Destination.encoding))
     (function Non_empty_transaction_from c -> Some c | _ -> None)
     (fun c -> Non_empty_transaction_from c) ;
-
   register_error_kind
     `Permanent
     ~id:"internal_operation_replay"
@@ -2237,6 +2236,7 @@ let record_operation (type kind) ctxt hash (operation : kind operation) :
   match operation.protocol_data.contents with
   | Single (Preattestation _) -> ctxt
   | Single (Attestation _) -> ctxt
+  | Single (Attestations_aggregate _) -> ctxt
   | Single
       ( Failing_noop _ | Proposals _ | Ballot _ | Seed_nonce_revelation _
       | Vdf_revelation _ | Double_attestation_evidence _
@@ -2398,7 +2398,7 @@ let punish_delegate ctxt ~operation_hash delegate level misbehaviour mk_result
     ~payload_producer =
   let open Lwt_result_syntax in
   let rewarded = payload_producer.Consensus_key.delegate in
-  let+ ctxt =
+  let* ctxt =
     Delegate.punish_double_signing
       ctxt
       ~operation_hash
@@ -2407,7 +2407,8 @@ let punish_delegate ctxt ~operation_hash delegate level misbehaviour mk_result
       level
       ~rewarded
   in
-  (ctxt, Single_result (mk_result (Some delegate) []))
+  let content_result = mk_result (Some delegate) [] in
+  return (ctxt, Single_result content_result)
 
 let punish_double_preattestation ctxt ~operation_hash
     ~(op1 : Kind.preattestation Operation.t) ~payload_producer =
@@ -2493,6 +2494,10 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
       record_preattestation ctxt mode consensus_content
   | Single (Attestation {consensus_content; dal_content}) ->
       record_attestation ctxt mode consensus_content dal_content
+  | Single (Attestations_aggregate _) ->
+      if Constants.aggregate_attestation ctxt then
+        tzfail Validate_errors.Consensus.Aggregate_not_implemented
+      else tzfail Validate_errors.Consensus.Aggregate_disabled
   | Single (Seed_nonce_revelation {level; nonce}) ->
       let level = Level.from_raw ctxt level in
       let* ctxt = Nonce.reveal ctxt level nonce in

@@ -100,6 +100,26 @@ val attestation :
   Block.t ->
   Operation.packed tzresult Lwt.t
 
+(** Create a packed attestations_aggregate that is expected for a given
+    [Block.t]. Block context is expected to include at least one delegate with a
+    BLS key (or a registered consensus keys). *)
+val attestations_aggregate :
+  ?committee:public_key_hash list ->
+  ?level:Raw_level.t ->
+  ?round:Round.t ->
+  ?block_payload_hash:Block_payload_hash.t ->
+  ?branch:Block_hash.t ->
+  Block.t ->
+  Operation.packed tzresult Lwt.t
+
+(** Aggregate a list of attestations in a single Attestations_aggregate.
+    Attestations signed by non-bls delegates are ignored. Evaluates to {!None} if
+    no bls-signed attestations are found or if signature_aggregation failed
+    (due to unreadable signature representation). *)
+val aggregate :
+  Kind.attestation_consensus_kind Kind.consensus operation trace ->
+  Operation.packed option
+
 (** Create a packed preattestation that is expected for a given
     [Block.t] by packing the result of {!raw_preattestation}. *)
 val preattestation :
