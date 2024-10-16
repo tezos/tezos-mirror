@@ -68,7 +68,7 @@ val ( +* ) : time -> time -> time
     level. The driver could also record everything, including the
     level of detail, and let a post processor skip or aggregate at
     display time. *)
-type lod = Terse | Detailed | Verbose
+type verbosity = Terse | Detailed | Verbose
 
 (** An aggregate node registers multiple calls to a section and sum
     their occurences and time. It also recursively aggregate its
@@ -77,7 +77,7 @@ type aggregated_node = {
   count : int;
   total : span;
   children : aggregated_node StringMap.t;
-  node_lod : lod;
+  node_lod : verbosity;
 }
 
 (** A sequence item registers one section with potential sub-reports
@@ -86,7 +86,7 @@ type seq_item = {
   start : time;
   duration : span;
   contents : report;
-  item_lod : lod;
+  item_lod : verbosity;
 }
 
 and report = {
@@ -122,22 +122,22 @@ module type DRIVER = sig
   (** Open a sequence in the current sequence.
       If currently aggregating (not all aggregation scopes are closed),
       this has the same semantics as {!aggregate} instead. *)
-  val record : state -> lod -> string -> unit
+  val record : state -> verbosity -> string -> unit
 
   (** Open an aggregation node in the current sequence. *)
-  val aggregate : state -> lod -> string -> unit
+  val aggregate : state -> verbosity -> string -> unit
 
   (** Close the most recently opened sequence or aggregation scope. *)
   val stop : state -> unit
 
   (** Record a timestamp in the most recently opened sequence. *)
-  val stamp : state -> lod -> string -> unit
+  val stamp : state -> verbosity -> string -> unit
 
   (** Count this event's occurences in the most recent sequence. *)
-  val mark : state -> lod -> string list -> unit
+  val mark : state -> verbosity -> string list -> unit
 
   (** Sum the time spent in this event in the most recent sequence. *)
-  val span : state -> lod -> span -> string list -> unit
+  val span : state -> verbosity -> span -> string list -> unit
 
   (** Include a report in the current sequence. *)
   val inc : state -> report -> unit
@@ -199,56 +199,63 @@ val plugged : profiler -> instance list
 (** Open a sequence in the current sequence.
     If currently aggregating (not all aggregation scopes are closed),
     this has the same semantics as {!aggregate} instead. *)
-val record : profiler -> ?lod:lod -> string -> unit
+val record : profiler -> ?verbosity:verbosity -> string -> unit
 
 (** Open an aggregation node in the current sequence. *)
-val aggregate : profiler -> ?lod:lod -> string -> unit
+val aggregate : profiler -> ?verbosity:verbosity -> string -> unit
 
 (** Close the most recently opened sequence or aggregation scope. *)
 val stop : profiler -> unit
 
 (** Record a timestamp in the most recently opened sequence. *)
-val stamp : profiler -> ?lod:lod -> string -> unit
+val stamp : profiler -> ?verbosity:verbosity -> string -> unit
 
 (** Count this event's occurences in the most recent sequence. *)
-val mark : profiler -> ?lod:lod -> string list -> unit
+val mark : profiler -> ?verbosity:verbosity -> string list -> unit
 
 (** Sum the time spent in this event in the most recent sequence. *)
-val span : profiler -> ?lod:lod -> span -> string list -> unit
+val span : profiler -> ?verbosity:verbosity -> span -> string list -> unit
 
 (** Include a report in the current sequence. *)
 val inc : profiler -> report -> unit
 
-(** [record_f profiler ?lod label f] will call:
+(** [record_f profiler ?verbosity label f] will call:
     {[
-      record profiler ?lod name;
+      record profiler ?verbosity name;
       f ();
       stop ();
     ]} *)
-val record_f : profiler -> ?lod:lod -> string -> (unit -> 'a) -> 'a
+val record_f : profiler -> ?verbosity:verbosity -> string -> (unit -> 'a) -> 'a
 
 (** Same as {!record_f} but for Lwt function *)
-val record_s : profiler -> ?lod:lod -> string -> (unit -> 'a Lwt.t) -> 'a Lwt.t
+val record_s :
+  profiler -> ?verbosity:verbosity -> string -> (unit -> 'a Lwt.t) -> 'a Lwt.t
 
-(** [aggregate_f profiler ?lod label f] will call:
+(** [aggregate_f profiler ?verbosity label f] will call:
     {[
-      aggregate profiler ?lod name;
+      aggregate profiler ?verbosity name;
       f ();
       stop ();
     ]} *)
-val aggregate_f : profiler -> ?lod:lod -> string -> (unit -> 'a) -> 'a
+val aggregate_f :
+  profiler -> ?verbosity:verbosity -> string -> (unit -> 'a) -> 'a
 
 (** Same as {!aggregate_f} but for Lwt functions *)
 val aggregate_s :
-  profiler -> ?lod:lod -> string -> (unit -> 'a Lwt.t) -> 'a Lwt.t
+  profiler -> ?verbosity:verbosity -> string -> (unit -> 'a Lwt.t) -> 'a Lwt.t
 
-(** [span_f profiler ?lod label_list f] will compute [span] but
+(** [span_f profiler ?verbosity label_list f] will compute [span] but
     specifically around [f] *)
-val span_f : profiler -> ?lod:lod -> string list -> (unit -> 'a) -> 'a
+val span_f :
+  profiler -> ?verbosity:verbosity -> string list -> (unit -> 'a) -> 'a
 
 (** Same as {!span_f} but for Lwt functions *)
 val span_s :
-  profiler -> ?lod:lod -> string list -> (unit -> 'a Lwt.t) -> 'a Lwt.t
+  profiler ->
+  ?verbosity:verbosity ->
+  string list ->
+  (unit -> 'a Lwt.t) ->
+  'a Lwt.t
 
 val with_new_profiler : 'a driver -> 'a -> (profiler -> 'r) -> 'r * report list
 
@@ -262,7 +269,7 @@ val main : profiler
 
 (** {2 Global Profiler} *)
 module type GLOBAL_PROFILER = sig
-  type nonrec lod = lod = Terse | Detailed | Verbose
+  type nonrec verbosity = verbosity = Terse | Detailed | Verbose
 
   (** {3 Plugging} *)
 
@@ -290,10 +297,10 @@ module type GLOBAL_PROFILER = sig
   (** Open a sequence in the current sequence.
       If currently aggregating (not all aggregation scopes are closed),
       this has the same semantics as {!aggregate} instead. *)
-  val record : ?lod:lod -> string -> unit
+  val record : ?verbosity:verbosity -> string -> unit
 
   (** Open an aggregation node in the current sequence. *)
-  val aggregate : ?lod:lod -> string -> unit
+  val aggregate : ?verbosity:verbosity -> string -> unit
 
   (** Close the most recently opened sequence or aggregation scope. *)
   val stop : unit -> unit
@@ -301,45 +308,48 @@ module type GLOBAL_PROFILER = sig
   (** {3 Profiling} *)
 
   (** Record a timestamp in the most recently opened sequence. *)
-  val stamp : ?lod:lod -> string -> unit
+  val stamp : ?verbosity:verbosity -> string -> unit
 
   (** Count this event's occurences in the most recent sequence. *)
-  val mark : ?lod:lod -> string list -> unit
+  val mark : ?verbosity:verbosity -> string list -> unit
 
   (** Sum the time spent in this event in the most recent sequence. *)
-  val span : ?lod:lod -> span -> string list -> unit
+  val span : ?verbosity:verbosity -> span -> string list -> unit
 
   (** Include a report in the current sequence. *)
   val inc : report -> unit
 
-  (** [record_f ?lod label f] will call:
+  (** [record_f ?verbosity label f] will call:
       {[
-        record ?lod name;
+        record ?verbosity name;
         f ();
         stop ();
       ]} *)
-  val record_f : ?lod:lod -> string -> (unit -> 'a) -> 'a
+  val record_f : ?verbosity:verbosity -> string -> (unit -> 'a) -> 'a
 
   (** Same as {!record_f} but for Lwt function *)
-  val record_s : ?lod:lod -> string -> (unit -> 'a Lwt.t) -> 'a Lwt.t
+  val record_s :
+    ?verbosity:verbosity -> string -> (unit -> 'a Lwt.t) -> 'a Lwt.t
 
-  (** [aggregate_f ?lod label f] will call:
+  (** [aggregate_f ?verbosity label f] will call:
       {[
-        aggregate ?lod name;
+        aggregate ?verbosity name;
         f ();
         stop ();
       ]} *)
-  val aggregate_f : ?lod:lod -> string -> (unit -> 'a) -> 'a
+  val aggregate_f : ?verbosity:verbosity -> string -> (unit -> 'a) -> 'a
 
   (** Same as {!aggregate_f} but for Lwt functions *)
-  val aggregate_s : ?lod:lod -> string -> (unit -> 'a Lwt.t) -> 'a Lwt.t
+  val aggregate_s :
+    ?verbosity:verbosity -> string -> (unit -> 'a Lwt.t) -> 'a Lwt.t
 
-  (** [span_f ?lod label_list f] will compute [span] but specifically
+  (** [span_f ?verbosity label_list f] will compute [span] but specifically
       around [f] *)
-  val span_f : ?lod:lod -> string list -> (unit -> 'a) -> 'a
+  val span_f : ?verbosity:verbosity -> string list -> (unit -> 'a) -> 'a
 
   (** Same as {!span_f} but for Lwt functions *)
-  val span_s : ?lod:lod -> string list -> (unit -> 'a Lwt.t) -> 'a Lwt.t
+  val span_s :
+    ?verbosity:verbosity -> string list -> (unit -> 'a Lwt.t) -> 'a Lwt.t
 end
 
 (** [wrap profiler] stores [profiler] in a {!GLOBAL_PROFILER} module
@@ -355,4 +365,4 @@ val profiler_file_suffix : string
      If no valid profiling argument is provided, profiling will be disabled.
    - PROFILING_OUTPUT_DIR: specifies where the profiling output will be written, defaults to the current
      [default_dir] data directory if not provided. *)
-val parse_profiling_vars : string -> lod option * string
+val parse_profiling_vars : string -> verbosity option * string

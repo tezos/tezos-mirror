@@ -10,24 +10,24 @@ module Rewriter = Rewriter.Rewriter
 
 (** [add_wrapping_function expr name _ key] will create
       {[
-        Profiler.name ~lod:(Terse | Detailed | Verbose) key @@ fun () -> (expr)
+        Profiler.name ~verbosity:(Terse | Detailed | Verbose) key @@ fun () -> (expr)
       ]}
   *)
 let add_wrapping_function expr fun_name loc key =
   [%expr
     [%e fun_name]
-      ~lod:[%e Key.get_level_of_detail loc key]
+      ~verbosity:[%e Key.get_level_of_detail loc key]
       [%e Key.to_expression loc key]
     @@ fun () -> [%e expr]]
 
-(** [add_unit_function ~lod expr name _ key] will create
+(** [add_unit_function ~verbosity expr name _ key] will create
       {[
-        Profiler.name (if lod then ~lod:(Terse | Detailed | Verbose)) key;
+        Profiler.name (if verbosity then ~verbosity:(Terse | Detailed | Verbose)) key;
         expr
       ]}
   *)
-let add_unit_function ~lod expr fun_name loc key =
-  match lod with
+let add_unit_function ~verbosity expr fun_name loc key =
+  match verbosity with
   | false ->
       [%expr
         [%e fun_name] [%e Key.to_expression loc key] ;
@@ -35,7 +35,7 @@ let add_unit_function ~lod expr fun_name loc key =
   | true ->
       [%expr
         [%e fun_name]
-          ~lod:[%e Key.get_level_of_detail loc key]
+          ~verbosity:[%e Key.get_level_of_detail loc key]
           [%e Key.to_expression loc key] ;
         [%e expr]]
 
@@ -60,18 +60,18 @@ let rewrite rewriters t =
             (Rewriter.to_fully_qualified_lident_expr rewriter loc)
             loc
             rewriter.key
-      (* Functions that have a ~lod parameter *)
+      (* Functions that have a ~verbosity parameter *)
       | Rewriter.Mark | Rewriter.Record | Rewriter.Stamp ->
           add_unit_function
-            ~lod:true
+            ~verbosity:true
             expr
             (Rewriter.to_fully_qualified_lident_expr rewriter loc)
             loc
             rewriter.key
-      (* Functions that don't have a ~lod parameter *)
+      (* Functions that don't have a ~verbosity parameter *)
       | Rewriter.Reset_block_section | Rewriter.Stop ->
           add_unit_function
-            ~lod:false
+            ~verbosity:false
             expr
             (Rewriter.to_fully_qualified_lident_expr rewriter loc)
             loc
