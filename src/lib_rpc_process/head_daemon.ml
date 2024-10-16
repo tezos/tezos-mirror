@@ -195,6 +195,8 @@ let init (dynamic_store : Store.t option ref) parameters
     include RPC_client_unix.RetryClient
 
     let call ?ctx:_ = call ~ctx
+
+    let call_with_closefn ?ctx:_ = call_with_closefn ~ctx
   end in
   let module Custom_rpc_client =
     RPC_client.Make (Resto_cohttp_client.Client.OfCohttp (CustomRetryClient)) in

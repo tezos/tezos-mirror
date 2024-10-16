@@ -36,6 +36,13 @@ module type CALL = sig
     Cohttp.Code.meth ->
     Uri.t ->
     (Cohttp.Response.t * Cohttp_lwt.Body.t) Lwt.t
+
+  val call_with_closefn :
+    ?headers:Cohttp.Header.t ->
+    ?body:Cohttp_lwt.Body.t ->
+    Cohttp.Code.meth ->
+    Uri.t ->
+    ((Cohttp.Response.t * Cohttp_lwt.Body.t) Lwt.t * (unit -> unit)) Lwt.t
 end
 
 module OfCohttp (Client : Cohttp_lwt.S.Client) : CALL

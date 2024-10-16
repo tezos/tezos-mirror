@@ -33,10 +33,20 @@ module type CALL = sig
     Cohttp.Code.meth ->
     Uri.t ->
     (Cohttp.Response.t * Cohttp_lwt.Body.t) Lwt.t
+
+  val call_with_closefn :
+    ?headers:Cohttp.Header.t ->
+    ?body:Cohttp_lwt.Body.t ->
+    Cohttp.Code.meth ->
+    Uri.t ->
+    ((Cohttp.Response.t * Cohttp_lwt.Body.t) Lwt.t * (unit -> unit)) Lwt.t
 end
 
 module OfCohttp (Client : Cohttp_lwt.S.Client) : CALL = struct
   let call ?headers ?body meth uri = Client.call ?headers ?body meth uri
+
+  let call_with_closefn ?headers ?body meth uri =
+    Client.call_with_closefn ?headers ?body meth uri
 end
 
 type redirect_behaviour =
@@ -197,7 +207,7 @@ module Make (Encoding : Resto.ENCODING) (Call : CALL) = struct
 
   let rec generic_call_loop meth redirect_status redirect_behaviour
       ?(headers = []) ?accept ?body ?media uri :
-      (content, content) generic_rest_result Lwt.t =
+      ((content, content) generic_rest_result * (unit -> unit)) Lwt.t =
     let orig_body = body in
     let orig_headers = headers in
     let host =
@@ -242,8 +252,9 @@ module Make (Encoding : Resto.ENCODING) (Call : CALL) = struct
     Resto.Utils.configure_cohttp_log_reporter () ;
     Lwt.catch
       (fun () ->
-        Call.call ~headers (meth :> Code.meth) ~body uri
-        >>= fun (response, ansbody) ->
+        Call.call_with_closefn ~headers (meth :> Code.meth) ~body uri
+        >>= fun (resp, closefn) ->
+        resp >>= fun (response, ansbody) ->
         let headers = Response.headers response in
         let media_name =
           match Header.get_media_type headers with
@@ -262,38 +273,39 @@ module Make (Encoding : Resto.ENCODING) (Call : CALL) = struct
         let status = Response.status response in
         let unexpected_status_code code =
           Lwt.return
-            (`Unexpected_status_code (code, (ansbody, media_name, media)))
+            ( `Unexpected_status_code (code, (ansbody, media_name, media)),
+              closefn )
         in
+        let return x = Lwt.return (x, closefn) in
         match status with
-        | `OK -> Lwt.return (`Ok (Some (ansbody, media_name, media)))
-        | `No_content -> Lwt.return (`Ok None)
+        | `OK -> return (`Ok (Some (ansbody, media_name, media)))
+        | `No_content -> return (`Ok None)
         | `Created ->
             (* TODO handle redirection ?? *)
             failwith "Resto_cohttp_client.generic_json_call: unimplemented"
-        | `Unauthorized ->
-            Lwt.return (`Unauthorized (ansbody, media_name, media))
+        | `Unauthorized -> return (`Unauthorized (ansbody, media_name, media))
         | `Forbidden when Cohttp.Header.mem headers "X-OCaml-Resto-CORS-Error"
           ->
-            Lwt.return (`Unauthorized_host host)
-        | `Forbidden -> Lwt.return (`Forbidden (ansbody, media_name, media))
-        | `Not_found -> Lwt.return (`Not_found (ansbody, media_name, media))
-        | `Gone -> Lwt.return (`Gone (ansbody, media_name, media))
-        | `Conflict -> Lwt.return (`Conflict (ansbody, media_name, media))
+            return (`Unauthorized_host host)
+        | `Forbidden -> return (`Forbidden (ansbody, media_name, media))
+        | `Not_found -> return (`Not_found (ansbody, media_name, media))
+        | `Gone -> return (`Gone (ansbody, media_name, media))
+        | `Conflict -> return (`Conflict (ansbody, media_name, media))
         | `Internal_server_error ->
             if media_name = Some ("text", "ocaml.exception") then
               Cohttp_lwt.Body.to_string ansbody >>= fun msg ->
-              Lwt.return (`OCaml_exception msg)
-            else Lwt.return (`Error (ansbody, media_name, media))
+              return (`OCaml_exception msg)
+            else return (`Error (ansbody, media_name, media))
         | `Bad_request ->
             Cohttp_lwt.Body.to_string ansbody >>= fun body ->
-            Lwt.return (`Bad_request body)
+            return (`Bad_request body)
         | `Method_not_allowed ->
             let allowed = Cohttp.Header.get_multi headers "accept" in
-            Lwt.return (`Method_not_allowed allowed)
-        | `Unsupported_media_type -> Lwt.return `Unsupported_media_type
+            return (`Method_not_allowed allowed)
+        | `Unsupported_media_type -> return `Unsupported_media_type
         | `Not_acceptable ->
             Cohttp_lwt.Body.to_string ansbody >>= fun body ->
-            Lwt.return (`Not_acceptable body)
+            return (`Not_acceptable body)
         | `Moved_permanently | `Temporary_redirect | `Permanent_redirect -> (
             match redirect_behaviour with
             | Do_not_follow_redirects -> unexpected_status_code status
@@ -315,7 +327,7 @@ module Make (Encoding : Resto.ENCODING) (Call : CALL) = struct
                     match new_redirect_status with
                     | Error `Too_many_redirects ->
                         Cohttp_lwt.Body.to_string ansbody >>= fun body ->
-                        Lwt.return (`Too_many_redirects body)
+                        return (`Too_many_redirects body)
                     | Ok new_redirect_status ->
                         generic_call_loop
                           meth
@@ -328,7 +340,7 @@ module Make (Encoding : Resto.ENCODING) (Call : CALL) = struct
                           location)
                 | None ->
                     Cohttp_lwt.Body.to_string ansbody >>= fun body ->
-                    Lwt.return (`Redirect_without_location body)))
+                    return (`Redirect_without_location body)))
         | code -> unexpected_status_code code)
       (fun exn ->
         let msg =
@@ -337,11 +349,12 @@ module Make (Encoding : Resto.ENCODING) (Call : CALL) = struct
           | Invalid_argument msg -> msg
           | e -> Printexc.to_string e
         in
-        Lwt.return (`Connection_failed msg))
+        Lwt.return (`Connection_failed msg, fun () -> ()))
 
-  let generic_call meth ?(redirect_behaviour = Do_not_follow_redirects)
-      ?(headers = []) ?accept ?body ?media uri :
-      (content, content) generic_rest_result Lwt.t =
+  let generic_call_with_closefn meth
+      ?(redirect_behaviour = Do_not_follow_redirects) ?(headers = []) ?accept
+      ?body ?media uri :
+      ((content, content) generic_rest_result * (unit -> unit)) Lwt.t =
     generic_call_loop
       meth
       Redirect_not_in_progress
@@ -351,6 +364,18 @@ module Make (Encoding : Resto.ENCODING) (Call : CALL) = struct
       ?body
       ?media
       uri
+
+  let generic_call meth ?redirect_behaviour ?headers ?accept ?body ?media uri :
+      (content, content) generic_rest_result Lwt.t =
+    generic_call_with_closefn
+      meth
+      ?redirect_behaviour
+      ?headers
+      ?accept
+      ?body
+      ?media
+      uri
+    >|= fst
 
   let handle_error log service (body, media_name, media) status f =
     Cohttp_lwt.Body.is_empty body >>= fun empty ->
@@ -443,68 +468,74 @@ module Make (Encoding : Resto.ENCODING) (Call : CALL) = struct
       ?base service ~on_chunk ~on_close params query body =
     prepare media_types ?logger ?base service params query body
     >>= fun (log, meth, uri, body, media) ->
-    (generic_call
-       meth
-       ?redirect_behaviour
-       ?headers
-       ~accept:media_types
-       ?body
-       ?media
-       uri
-     >>= function
-     | `Ok None ->
-         on_close () ;
-         log.log Encoding.untyped `No_content (lazy (Lwt.return ""))
-         >>= fun () -> Lwt.return (`Ok None)
-     | `Ok (Some (body, media_name, media)) -> (
-         match media with
-         | None -> Lwt.return (`Unexpected_content_type (body, media_name))
-         | Some media ->
-             let stream = Cohttp_lwt.Body.to_stream body in
-             let buffer = Buffer.create 2048 in
-             let output = Service.output_encoding service in
-             let rec loop () =
-               Lwt_stream.get stream >>= function
-               | None ->
-                   on_close () ;
-                   Lwt.return_unit
-               | Some chunk -> (
-                   Buffer.add_string buffer chunk ;
-                   let data = Buffer.contents buffer in
-                   log.log ~media output `OK (lazy (Lwt.return chunk))
-                   >>= fun () ->
-                   match media.destruct output data with
-                   | Ok body ->
-                       Buffer.reset buffer ;
-                       on_chunk body ;
-                       loop ()
-                   | Error _msg -> loop ())
-             in
-             ignore (loop () : unit Lwt.t) ;
-             Lwt.return
-               (`Ok
-                 (Some
-                    (fun () ->
-                      ignore
-                        (Lwt_stream.junk_while (fun _ -> true) stream
-                          : unit Lwt.t) ;
-                      ()))))
-     | `Conflict body ->
-         handle_error log service body `Conflict (fun v -> `Conflict v)
-     | `Error body ->
-         handle_error log service body `Internal_server_error (fun v ->
-             `Error v)
-     | `Forbidden body ->
-         handle_error log service body `Forbidden (fun v -> `Forbidden v)
-     | `Gone body -> handle_error log service body `Gone (fun v -> `Gone v)
-     | `Not_found body ->
-         handle_error log service body `Not_found (fun v -> `Not_found v)
-     | `Unauthorized body ->
-         handle_error log service body `Unauthorized (fun v -> `Unauthorized v)
-     | ( `Bad_request _ | `Method_not_allowed _ | `Unsupported_media_type
-       | `Not_acceptable _ | `Unexpected_status_code _ | `Connection_failed _
-       | `OCaml_exception _ | `Unauthorized_host _ | `Too_many_redirects _
-       | `Redirect_without_location _ ) as err ->
-         Lwt.return err)
+    ( generic_call_with_closefn
+        meth
+        ?redirect_behaviour
+        ?headers
+        ~accept:media_types
+        ?body
+        ?media
+        uri
+    >>= fun (res, closefn) ->
+      match res with
+      | `Ok None ->
+          closefn () ;
+          on_close () ;
+          log.log Encoding.untyped `No_content (lazy (Lwt.return ""))
+          >>= fun () -> Lwt.return (`Ok None)
+      | `Ok (Some (body, media_name, media)) -> (
+          match media with
+          | None -> Lwt.return (`Unexpected_content_type (body, media_name))
+          | Some media ->
+              let stream = Cohttp_lwt.Body.to_stream body in
+              let buffer = Buffer.create 2048 in
+              let output = Service.output_encoding service in
+              let rec loop () =
+                Lwt_stream.get stream >>= function
+                | None ->
+                    on_close () ;
+                    Lwt.return_unit
+                | Some chunk -> (
+                    Buffer.add_string buffer chunk ;
+                    let data = Buffer.contents buffer in
+                    log.log ~media output `OK (lazy (Lwt.return chunk))
+                    >>= fun () ->
+                    match media.destruct output data with
+                    | Ok body ->
+                        Buffer.reset buffer ;
+                        on_chunk body ;
+                        loop ()
+                    | Error _msg -> loop ())
+              in
+              ignore (loop () : unit Lwt.t) ;
+              Lwt.return
+                (`Ok
+                  (Some
+                     (fun () ->
+                       Lwt.dont_wait
+                         (fun () ->
+                           closefn () ;
+                           Lwt_stream.junk_while (fun _ -> true) stream)
+                         (fun exn ->
+                           Format.eprintf
+                             "Warning: Closing stream failed: %s@."
+                             (Printexc.to_string exn))))))
+      | `Conflict body ->
+          handle_error log service body `Conflict (fun v -> `Conflict v)
+      | `Error body ->
+          handle_error log service body `Internal_server_error (fun v ->
+              `Error v)
+      | `Forbidden body ->
+          handle_error log service body `Forbidden (fun v -> `Forbidden v)
+      | `Gone body -> handle_error log service body `Gone (fun v -> `Gone v)
+      | `Not_found body ->
+          handle_error log service body `Not_found (fun v -> `Not_found v)
+      | `Unauthorized body ->
+          handle_error log service body `Unauthorized (fun v -> `Unauthorized v)
+      | ( `Bad_request _ | `Method_not_allowed _ | `Unsupported_media_type
+        | `Not_acceptable _ | `Unexpected_status_code _ | `Connection_failed _
+        | `OCaml_exception _ | `Unauthorized_host _ | `Too_many_redirects _
+        | `Redirect_without_location _ ) as err ->
+          Lwt.return err )
     >>= fun ans -> Lwt.return (meth, uri, ans)
 end
