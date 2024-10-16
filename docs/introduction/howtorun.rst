@@ -265,7 +265,7 @@ The accuser uses the same format of configuration file as the client (see :ref:`
 DAL node
 ~~~~~~~~
 
-When running a delegate, it is recommended to also run a :doc:`Data Availability Layer (DAL) node <../shell/dal_overview>` to support data transmission across the network, see :doc:`../shell/dal_run`.
+To add a Data Availability Layer (DAL) node to support data transmission across the network, see :doc:`DAL layer <../shell/dal_overview>`.
 
 Docker
 ~~~~~~
