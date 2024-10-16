@@ -125,41 +125,51 @@ using the Octez signer.
 Configuring the signer
 ----------------------
 
-First, logged as the user chosen to run the signer, we must create a set of keys. These are the
-private keys that will be entrusted to the signer to actually sign
-operations on behalf of the baker. The signer will run in a different
-process (possibly on a separate host), and ideally using a hardware
-enclave such as a :ref:`hardware ledger <ledger>`. For the sake of brevity, in this
-example, the keys will be simply stored on the disk, but this is not a
+First, logged as the user chosen to run the signer, we must create a set of
+keys. These are the private keys that will be entrusted to the signer to
+actually sign operations on behalf of the baker. The signer will run in a
+different process (possibly on a separate host), and ideally using a hardware
+enclave such as a :ref:`hardware ledger <ledger>`. For the sake of brevity, in
+this example, the keys will be simply stored on the disk, but this is not a
 recomended setting for a production baker.
 
 We create an authentication key that is going to be used to authenticate
 the baker with the signer, and a signing key to sign the operations.
 
+The signer secret key is stored in the current user directory and
+we will configure the baker using the ``tz1`` address for this key.
+
+The signer authentication key is stored in the ``tezos`` user space
+and we will configure the signer using the public key associated to
+the auth key.
+
 .. code:: shell
 
-   # create a signing key
+   # create a signing key ( as current user )
    $ octez-signer gen keys alice
 
-   # create an authentication key
-   $ octez-client gen keys auth
+   # create an authentication key for signer authorization
+   $ sudo su tezos -c "octez-client gen keys auth"
 
-   $ octez-client show address auth
+   $ sudo su tezos -c "octez-client show address auth"
    Hash: tz1V7TgBR52wAjjqsh24w8y9CymFGdegt9qs
    Public Key: edpk123456789....
 
-   # add the auth key to the octez-signer. This is the default options set in the octez-signer.service file
+   # add the auth key to the octez-signer. This is the default
+   # options set in the octez-signer.service file
    $ octez-signer add authorized key edpk123456789... --name auth
 
-Now we need to configure the ``octez-signer`` service. We use again ``systemd`` and
-we run it as a user service. The ``octez-signer.service`` file can be
-customized by the user if needed to allow for more complex and secure scenarios.
+Now we need to configure the ``octez-signer`` service. We use again ``systemd``
+and we run it as a user service. The ``octez-signer.service`` file can be
+customized by the user if needed to allow for more complex and secure
+scenarios.
 
 .. code:: shell
 
    # customize the signer service if needed
    $ mkdir -p ~/.config/systemd/user/
-   $ cp /usr/share/doc/octez-signer/octez-signer.service ~/.config/systemd/user/
+   $ cp /usr/share/doc/octez-signer/octez-signer.service \
+        ~/.config/systemd/user/
 
    # start the service
    $ systemctl --user start octez-signer
@@ -183,7 +193,8 @@ Since the baker runs as the user ``tezos``, we use ``sudo su tezos -c`` to wrap 
    Public Key: edpkvGAz71r8SZomcvF7LGajXT3AnhYX9CrmK3JWgA2xk8rf8CudY8
 
    # Configure the baker to use the remote signer
-   sudo su tezos -c "octez-client -R tcp://localhost:7732 import secret key alice remote:tz1V7TgBR52wAjjqsh24w8y9CymFGdegt9qs"
+   sudo su tezos -c "octez-client -R tcp://localhost:7732 \
+      import secret key alice remote:tz1V7TgBR52wAjjqsh24w8y9CymFGdegt9qs"
 
 Now that everything is in place, as for the node, we can first enable,
 then start the Octez baker.
