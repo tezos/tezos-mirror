@@ -3932,13 +3932,70 @@ let test_storage_migration_v18 protocols =
   storage_migration_v18 ~from:Mainnet ~number_blocks:5 protocols ;
   storage_migration_v18 ~from:Mainnet ~number_blocks:256 protocols
 
+let test_withdrawal_precompiled_balance_migration protocols =
+  let withdrawal_precompiled_balance_migration ~from =
+    let from_tag, from_use = Kernel.to_uses_and_tags from in
+    Protocol.register_test
+      ~__FILE__
+      ~tags:["evm"; "migration"; "upgrade"; from_tag; "v20"]
+      ~uses:(fun _protocol ->
+        [
+          Constant.octez_smart_rollup_node;
+          Constant.octez_evm_node;
+          Constant.smart_rollup_installer;
+          Constant.WASM.evm_kernel;
+          from_use;
+        ])
+      ~title:Format.(sprintf "Test migration V20 (%s -> latest)" from_tag)
+    @@ fun protocol ->
+    let value = Wei.of_eth_int 1 in
+    let withdraw_address = "0xff00000000000000000000000000000000000001" in
+    let scenario_prior ~evm_setup:{evm_node; endpoint; produce_block; _} =
+      let* _tx =
+        call_withdraw
+          ~sender:Eth_account.bootstrap_accounts.(0)
+          ~endpoint:(Evm_node.endpoint evm_node)
+          ~value
+          ~produce_block
+          ~receiver:"tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX"
+          ()
+      in
+      let* () = check_balance ~receiver:withdraw_address ~endpoint Tez.one in
+      unit
+    in
+    let scenario_after ~evm_setup:{evm_node; endpoint; produce_block; _}
+        ~sanity_check:_ =
+      let* () = check_balance ~receiver:withdraw_address ~endpoint Tez.zero in
+      let* _tx =
+        call_withdraw
+          ~sender:Eth_account.bootstrap_accounts.(0)
+          ~endpoint:(Evm_node.endpoint evm_node)
+          ~value
+          ~produce_block
+          ~receiver:"tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX"
+          ()
+      in
+      let* () = check_balance ~receiver:withdraw_address ~endpoint Tez.zero in
+      unit
+    in
+    gen_kernel_migration_test
+      ~from
+      ~to_:Latest
+      ~scenario_prior
+      ~scenario_after
+      protocol
+  in
+  withdrawal_precompiled_balance_migration ~from:Ghostnet protocols ;
+  withdrawal_precompiled_balance_migration ~from:Mainnet protocols
+
 let register_evm_migration ~protocols =
   test_latest_kernel_migration protocols ;
   test_mainnet_ghostnet_kernel_migration protocols ;
   test_deposit_before_and_after_migration protocols ;
   test_block_storage_before_and_after_migration protocols ;
   test_transaction_storage_before_and_after_migration protocols ;
-  test_storage_migration_v18 protocols
+  test_storage_migration_v18 protocols ;
+  test_withdrawal_precompiled_balance_migration protocols
 
 let block_transaction_count_by ~by arg =
   let method_ = "eth_getBlockTransactionCountBy" ^ by_block_arg_string by in

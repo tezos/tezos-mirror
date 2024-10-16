@@ -183,6 +183,12 @@ pub fn withdrawal_precompile<Host: Runtime>(
                 }
             };
 
+            // Burn the withdrawn amount
+            let mut withdrawal_precompiled =
+                handler.get_or_create_account(WITHDRAWAL_ADDRESS)?;
+            withdrawal_precompiled
+                .balance_remove(handler.borrow_host(), transfer.value)?;
+
             log!(
                 handler.borrow_host(),
                 Info,
