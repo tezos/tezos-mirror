@@ -67,13 +67,13 @@ let record state verbosity id =
     {state with stack}
 
 let rec merge
-    {count = na; total = Span ta; children = contentsa; node_lod = loda}
-    {count = nb; total = Span tb; children = contentsb; node_lod = lodb} =
+    {count = na; total = Span ta; children = contentsa; node_verbosity = loda}
+    {count = nb; total = Span tb; children = contentsb; node_verbosity = lodb} =
   {
     count = na + nb;
     total = Span (ta +* tb);
     children = merge_maps contentsa contentsb;
-    node_lod = min loda lodb;
+    node_verbosity = min loda lodb;
   }
 
 and merge_maps amap bmap =
@@ -90,7 +90,7 @@ let rec apply_verbosity_to_aggregated verbosity aggregated =
   StringMap.fold
     (fun id node acc ->
       let children = apply_verbosity_to_aggregated verbosity node.children in
-      if node.node_lod <= verbosity then
+      if node.node_verbosity <= verbosity then
         StringMap.add id {node with children} acc
       else merge_maps acc children)
     aggregated
@@ -100,7 +100,9 @@ let rec aggregate_report {aggregated; recorded} =
   List.fold_left
     (fun acc (id, {start = _; duration; item_lod; contents}) ->
       let children = aggregate_report contents in
-      let node = {count = 1; total = duration; node_lod = item_lod; children} in
+      let node =
+        {count = 1; total = duration; node_verbosity = item_lod; children}
+      in
       StringMap.add id node acc)
     aggregated
     recorded
@@ -151,7 +153,7 @@ let span state verbosity d ids =
             let count, total = if tids = [] then (1, d) else (0, zero_time) in
             StringMap.singleton
               id
-              {count; total; children; node_lod = verbosity}
+              {count; total; children; node_verbosity = verbosity}
       in
       inc state {recorded = []; aggregated = build_node tids}
 
@@ -167,7 +169,9 @@ let stop_aggregate state verbosity d id scopes =
     | (id, d) :: tids ->
         let children = build_node tids in
         let count, total = if tids = [] then (1, d) else (0, zero_time) in
-        StringMap.singleton id {count; total; children; node_lod = verbosity}
+        StringMap.singleton
+          id
+          {count; total; children; node_verbosity = verbosity}
   in
   inc state {recorded = []; aggregated = build_node tids}
 
@@ -262,7 +266,7 @@ let pp_line ?toplevel_timestamp nindent ppf id n t t0 =
 
 let rec pp_report ?(toplevel_call = true) t0 nident ppf {aggregated; recorded} =
   StringMap.iter
-    (fun id {count = n; total = Span d; children; node_lod = _} ->
+    (fun id {count = n; total = Span d; children; node_verbosity = _} ->
       pp_line nident ppf id n d None ;
       pp_report
         ~toplevel_call:false

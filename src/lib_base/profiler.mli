@@ -77,7 +77,7 @@ type aggregated_node = {
   count : int;
   total : span;
   children : aggregated_node StringMap.t;
-  node_lod : verbosity;
+  node_verbosity : verbosity;
 }
 
 (** A sequence item registers one section with potential sub-reports

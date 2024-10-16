@@ -43,7 +43,7 @@ type aggregated_node = {
   count : int;
   total : span;
   children : aggregated_node StringMap.t;
-  node_lod : verbosity;
+  node_verbosity : verbosity;
 }
 
 type seq_item = {
@@ -87,10 +87,10 @@ let aggregated_encoding =
            (merge_objs
               (obj1 (req "name" string))
               (conv
-                 (fun {count; total; children; node_lod} ->
-                   (count, total, children, node_lod))
-                 (fun (count, total, children, node_lod) ->
-                   {count; total; children; node_lod})
+                 (fun {count; total; children; node_verbosity} ->
+                   (count, total, children, node_verbosity))
+                 (fun (count, total, children, node_verbosity) ->
+                   {count; total; children; node_verbosity})
                  (obj4
                     (req "count" int31)
                     (req "total" span_encoding)
