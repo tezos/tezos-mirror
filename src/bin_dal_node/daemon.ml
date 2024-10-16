@@ -426,6 +426,65 @@ module Handler = struct
       ~attested_level:block_level
       cells_of_level
 
+  let check_dal_attestation node_ctxt ~number_of_slots ~block_level
+      dal_attestation get_attestations is_attested =
+    let open Lwt_result_syntax in
+    let attesters =
+      match
+        Profile_manager.get_profiles @@ Node_context.get_profile_ctxt node_ctxt
+      with
+      | Operator profile -> Operator_profile.attesters profile
+      | _ -> Signature.Public_key_hash.Set.empty
+    in
+    if Signature.Public_key_hash.Set.is_empty attesters then return_unit
+    else
+      let* committee =
+        Node_context.fetch_committee node_ctxt ~level:(Int32.pred block_level)
+      in
+      let attestations = get_attestations () in
+      let*! () =
+        List.iter_s
+          (fun (_tb_slot, delegate_opt, bitset_opt) ->
+            match delegate_opt with
+            | Some delegate
+              when Signature.Public_key_hash.Set.mem delegate attesters -> (
+                match bitset_opt with
+                | None ->
+                    let in_committee =
+                      match
+                        Signature.Public_key_hash.Map.find delegate committee
+                      with
+                      | Some (_ :: _) -> true
+                      | _ -> false
+                    in
+                    if in_committee then
+                      Event.(emit warn_attester_not_dal_attesting delegate)
+                    else (* no assigned shards... *)
+                      Lwt.return_unit
+                | Some bitset ->
+                    List.iter_s
+                      (fun index ->
+                        if
+                          is_attested dal_attestation index
+                          && not (is_attested bitset index)
+                        then
+                          Event.(
+                            emit
+                              warn_attester_did_not_attest_slot
+                              (delegate, index))
+                        else Lwt.return_unit)
+                      (0 -- (number_of_slots - 1)))
+            | None | Some _ ->
+                (* None = the receipt does not contain the delegate (which
+                   probably should not happen; if it can happen, we should use
+                   the Tenderbake slot instead)...
+                   Some _ = the delegate who signed the operation is not among
+                   the registered attesters *)
+                Lwt.return_unit)
+          attestations
+      in
+      return_unit
+
   let process_block ctxt cctxt proto_parameters finalized_shell_header =
     let open Lwt_result_syntax in
     let store = Node_context.get_store ctxt in
@@ -504,6 +563,18 @@ module Handler = struct
             (Plugin.is_attested dal_attestation)
         in
         let* () = may_update_topics ctxt proto_parameters ~block_level in
+        let* () =
+          let get_attestations () =
+            Plugin.get_dal_content_of_attestations block_info
+          in
+          check_dal_attestation
+            ctxt
+            ~number_of_slots:proto_parameters.number_of_slots
+            ~block_level
+            dal_attestation
+            get_attestations
+            Plugin.is_attested
+        in
         return_unit
       else return_unit
     in
