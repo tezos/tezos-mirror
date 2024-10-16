@@ -25,6 +25,8 @@
 
 let find_slot_headers ctxt level = Storage.Dal.Slot.Headers.find ctxt level
 
+let find_level_histories ctxt = Storage.Dal.Slot.LevelHistories.find ctxt
+
 let finalize_current_slot_headers ctxt =
   Storage.Dal.Slot.Headers.add
     ctxt

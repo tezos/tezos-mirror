@@ -53,6 +53,16 @@ val find_slot_headers :
   Raw_level_repr.t ->
   Dal_slot_repr.Header.t list option tzresult Lwt.t
 
+(** [find_level_histories ctxt] returns the cells of the DAL skip list produced
+    at the current level alongside their hashes. Returns [None] if no entry is
+    present in the storage (yet). The function fails if the reading from the
+    context fails. *)
+val find_level_histories :
+  Raw_context.t ->
+  (Dal_slot_repr.History.Pointer_hash.t * Dal_slot_repr.History.t) list option
+  tzresult
+  Lwt.t
+
 (** [finalize_current_slot_headers ctxt] finalizes the current slot
    headers posted on this block and marks them as pending into the
    context.  *)
