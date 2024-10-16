@@ -315,6 +315,9 @@ let constants_mainnet : Constants.Parametric.t =
     direct_ticket_spending_enable = false;
     (* attestation aggregation feature flag *)
     aggregate_attestation = false;
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/7553
+       Enable once we built performance confidance *)
+    allow_tz4_delegate_enable = false;
   }
 
 let constants_sandbox =

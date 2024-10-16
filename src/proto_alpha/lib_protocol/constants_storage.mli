@@ -160,6 +160,8 @@ val adaptive_issuance_ns_enable : Raw_context.t -> bool
 
 val direct_ticket_spending_enable : Raw_context.t -> bool
 
+val allow_tz4_delegate_enable : Raw_context.t -> bool
+
 (** The following accessors are not actual parameters, but constants that
     derive from the protocol parameter. *)
 
