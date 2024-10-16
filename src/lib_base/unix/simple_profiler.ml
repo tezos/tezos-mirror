@@ -98,10 +98,10 @@ let rec apply_verbosity_to_aggregated verbosity aggregated =
 
 let rec aggregate_report {aggregated; recorded} =
   List.fold_left
-    (fun acc (id, {start = _; duration; item_lod; contents}) ->
+    (fun acc (id, {start = _; duration; item_verbosity; contents}) ->
       let children = aggregate_report contents in
       let node =
-        {count = 1; total = duration; node_verbosity = item_lod; children}
+        {count = 1; total = duration; node_verbosity = item_verbosity; children}
       in
       StringMap.add id node acc)
     aggregated
@@ -112,7 +112,7 @@ let rec apply_lod verbosity {aggregated; recorded} =
   let aggregated, recorded =
     List.fold_left
       (fun (aggregated, recorded) (id, item) ->
-        if item.item_lod <= verbosity then
+        if item.item_verbosity <= verbosity then
           ( aggregated,
             (id, {item with contents = apply_lod verbosity item.contents})
             :: recorded )
@@ -182,11 +182,11 @@ let stop state =
       let state = {state with scopes} in
       stop_aggregate state verbosity d id scopes
   | [] ->
-      let stop_report id start contents report item_lod =
+      let stop_report id start contents report item_verbosity =
         let contents = {contents with recorded = List.rev contents.recorded} in
         let duration = Span (time () -* start) in
         let recorded =
-          (id, {start; duration; contents; item_lod}) :: report.recorded
+          (id, {start; duration; contents; item_verbosity}) :: report.recorded
         in
         {report with recorded}
       in
@@ -276,7 +276,7 @@ let rec pp_report ?(toplevel_call = true) t0 nident ppf {aggregated; recorded} =
         {recorded = []; aggregated = children})
     aggregated ;
   List.iter
-    (fun (id, {start = t; duration = Span d; contents; item_lod = _}) ->
+    (fun (id, {start = t; duration = Span d; contents; item_verbosity = _}) ->
       let toplevel_timestamp = if toplevel_call then Some t else None in
       pp_line ?toplevel_timestamp nident ppf id 1 d (Some (t -* t0)) ;
       pp_report ~toplevel_call:false t (nident + 1) ppf contents)

@@ -50,7 +50,7 @@ type seq_item = {
   start : time;
   duration : span;
   contents : report;
-  item_lod : verbosity;
+  item_verbosity : verbosity;
 }
 
 and report = {
@@ -101,10 +101,10 @@ let recorded_encoding report_encoding =
   let open Data_encoding in
   list
     (conv
-       (fun (n, {start; duration; contents; item_lod}) ->
-         (n, start, duration, contents, item_lod))
-       (fun (n, start, duration, contents, item_lod) ->
-         (n, {start; duration; contents; item_lod}))
+       (fun (n, {start; duration; contents; item_verbosity}) ->
+         (n, start, duration, contents, item_verbosity))
+       (fun (n, start, duration, contents, item_verbosity) ->
+         (n, {start; duration; contents; item_verbosity}))
        (obj5
           (req "name" string)
           (req "start" time_encoding)

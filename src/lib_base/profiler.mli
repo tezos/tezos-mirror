@@ -86,7 +86,7 @@ type seq_item = {
   start : time;
   duration : span;
   contents : report;
-  item_lod : verbosity;
+  item_verbosity : verbosity;
 }
 
 and report = {
