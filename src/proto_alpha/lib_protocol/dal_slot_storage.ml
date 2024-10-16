@@ -57,15 +57,27 @@ let get_slot_headers_history ctxt =
 let update_skip_list ctxt ~confirmed_slot_headers ~level_attested
     ~number_of_slots =
   let open Lwt_result_syntax in
+  let open Dal_slot_repr.History in
   let* slots_history = get_slot_headers_history ctxt in
-  let*? slots_history =
-    Dal_slot_repr.History.add_confirmed_slot_headers_no_cache
+  let*? slots_history, cache =
+    (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/7126
+
+       Handle DAL parameters (number_of_slots) evolution.
+    *)
+    (* We expect to put exactly [number_of_slots] cells in the cache. *)
+    let cache = History_cache.empty ~capacity:(Int64.of_int number_of_slots) in
+    add_confirmed_slot_headers
       ~number_of_slots
       slots_history
+      cache
       level_attested
       confirmed_slot_headers
   in
   let*! ctxt = Storage.Dal.Slot.History.add ctxt slots_history in
+  let*! ctxt =
+    History_cache.(view cache |> Map.bindings)
+    |> Storage.Dal.Slot.LevelHistories.add ctxt
+  in
   return ctxt
 
 let finalize_pending_slot_headers ctxt ~number_of_slots =
