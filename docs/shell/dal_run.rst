@@ -20,21 +20,27 @@ Follow these steps to run a DAL node along with a layer 1 node and a baker.
 
       octez-client rpc get /chains/main/blocks/head/helpers/attestation_rights?delegate="$MY_ADDRESS"
 
-#. Initialize the DAL node by running its ``config init`` command with the URL to an RPC node.
-   For example, this command initializes the DAL node with the address of a local ``octez-node`` instance on port 8732:
+#. Initialize the DAL node by running its ``config init`` command.
+   For example, this command initializes the DAL node with the address of a local ``octez-node`` instance on port 8732 and stores data in the default DAL node directory (``~/.tezos-dal-node``):
 
    .. code-block:: shell
 
       octez-dal-node config init --endpoint http://127.0.0.1:8732
 
+   You can specify a custom directory to store the DAL node data in by using the ``--data-dir`` argument:
+
+   .. code-block:: shell
+
+      octez-dal-node config init --endpoint http://127.0.0.1:8732 --data-dir .tezos-dal-node
+
    You can specify parameters such as the RPC node in the ``config init`` command or in the ``run`` command.
-   These commands have the same parameters; for information about them, run ``octez-dal-node config init --help`` or see :ref:`DAL node commands <dal-node-commands>`.
+   These commands have the same parameters. For information about them, run ``octez-dal-node config init --help`` or see :ref:`DAL node commands <dal-node-commands>`.
 
    At minimum, you must specify with the ``--endpoint`` parameter the URL of an RPC node that the DAL node can use.
 
-#. Ensure that the port that the DAL node runs on is accessible from outside its system.
+#. Recommended: Ensure that the P2P port that the DAL node runs on is accessible from outside its system.
 
-   By default, it runs on port 11732, but you can change the port and address that the node listens on by setting the ``--net-addr`` argument, as in ``--net-addr 0.0.0.0:11732``.
+   By default, the DAL node accepts P2P connections on port 11732, but you can change the port and address that the node listens on by setting the ``--net-addr`` argument, as in ``--net-addr 0.0.0.0:11732``.
    Depending on your network, you may need to adapt your firewall rules or set up network address translation (NAT) to direct external traffic to the DAL node.
    For example, you might need to redirect external traffic on TCP port ``<external_port>`` to your node at ``<local_ip_address>:<port>`` where ``<local_ip_address>`` is the IP address of the node on your local network and ``<port>`` is the port given in the ``--net-addr`` argument.
 
@@ -42,18 +48,17 @@ Follow these steps to run a DAL node along with a layer 1 node and a baker.
 
    This setup assumes that ``<external_ip_address>`` is fixed and won't change during the lifetime of the node.
 
-#. Start the DAL node by running its ``run`` command, using the URL of your ``octez-node`` instance.
+#. Start the DAL node by running its ``run`` command, passing the directory that you set in the ``config init`` command if you changed the default.
+   You can also pass any other parameters that you did not set in that command:
 
    .. code-block:: shell
 
-      octez-dal-node run
-
-   To set the address and port that the node listens on, pass the ``--net-addr`` argument.
+      octez-dal-node run --data-dir .tezos-dal-node
 
    Leave the DAL node process running.
 
-#. In a new terminal window, start or restart a baking daemon as usual, but tell it to connect to the DAL node by passing the ``--dal-node`` argument.
-   The DAL node runs on port 10732 by default, so the command might look like this example, where ``<PROTO_HASH>`` is the short hash of the current protocol of the network:
+#. In a new terminal window, start or restart a baking daemon as usual, but tell it to connect to the DAL node by passing the ``--dal-node`` argument with the host name and RPC port of the DAL node.
+   The DAL node accepts RPC calls on port 10732 by default, so the command might look like this example, where ``<PROTO_HASH>`` is the short hash of the current protocol of the network:
 
    .. code-block:: shell
 
