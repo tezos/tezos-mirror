@@ -2193,6 +2193,25 @@ module Dal = struct
 
           let encoding = Dal_slot_repr.History.encoding
         end)
+
+    module LevelHistories =
+      Make_single_data_storage (Registered) (Raw_context)
+        (struct
+          let name = ["slot_headers_successive_histories_of_level"]
+        end)
+        (struct
+          type t =
+            (Dal_slot_repr.History.Pointer_hash.t * Dal_slot_repr.History.t)
+            list
+
+          let encoding =
+            let open Data_encoding in
+            let module H = Dal_slot_repr.History in
+            list
+              (obj2
+                 (req "cell_hash" H.Pointer_hash.encoding)
+                 (req "cell" H.encoding))
+        end)
   end
 end
 

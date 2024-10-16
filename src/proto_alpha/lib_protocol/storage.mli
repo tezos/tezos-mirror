@@ -1022,6 +1022,29 @@ module Dal : sig
       Single_data_storage
         with type t := Raw_context.t
          and type value = Dal_slot_repr.History.t
+
+    (** This single entry stores the cells of the DAL skip list constructed
+        during the block under validation. The list is expected to have exactly
+        [number_of_slots] elements. Its cells ordering is not specified (and not
+        relevant). A cell's binary encoding is bounded (the only part that is
+        evolving in size over time is the number of backpointers, which is
+        bounded by 64). *)
+    module LevelHistories :
+      Single_data_storage
+        with type t := Raw_context.t
+         and type value =
+          (* We sometimes need to access all the cells at once (e.g. if we want
+             to index them, like it'd currently done by the DAL node). In some
+             other situations, we may want to only access a specific cell, given
+             its published level and the index of the corresponding DAL slot.
+
+             We could index the list as an irmin sub-tree for this second usage,
+             but this would require some extra work to access the slot id and to
+             populate the sub-tree. For the moment, it's sufficient and more
+             convenient to have a "small" list of elements of the form (hash,
+             cell) and search inside it when needed (e.g. to know if a slot is
+             attested or to access its attestation ratio). *)
+          (Dal_slot_repr.History.Pointer_hash.t * Dal_slot_repr.History.t) list
   end
 end
 
