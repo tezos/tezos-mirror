@@ -658,3 +658,24 @@ let get_attestable_slots_warning =
     ("expected_number_of_shards", Data_encoding.int16)
     ~pp2:pp_int_list
     ~pp3:pp_int_list
+
+let warn_attester_not_dal_attesting =
+  declare_1
+    ~section
+    ~name:"attester_not_dal_attesting"
+    ~msg:
+      "The attester {attester} has assigned shards, but it did not include a \
+       DAL content in its attestation! Is the baker using the DAL node?"
+    ~level:Warning
+    ("attester", Signature.Public_key_hash.encoding)
+
+let warn_attester_did_not_attest_slot =
+  declare_2
+    ~section
+    ~name:"attester_did_not_attest_slot"
+    ~msg:
+      "The slot with index {slot_index} was attested by sufficiently many \
+       attesters, but not by {attester}, which is registered with this node."
+    ~level:Warning
+    ("attester", Signature.Public_key_hash.encoding)
+    ("slot_index", Data_encoding.int31)
