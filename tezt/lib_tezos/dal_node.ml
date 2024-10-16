@@ -399,3 +399,9 @@ let load_last_finalized_processed_level dal_node =
   in
   let* v_res = aux () in
   match v_res with Ok v -> Lwt.return_some v | Error _ -> Lwt.return_none
+
+let debug_print_store_schemas ?(path = Uses.path Constant.octez_dal_node) ?hooks
+    () =
+  let args = ["debug"; "print"; "store"; "schemas"] in
+  let process = Process.spawn ?hooks path @@ args in
+  Process.check process

@@ -1,0 +1,3 @@
+
+./octez-dal-node debug print store schemas
+

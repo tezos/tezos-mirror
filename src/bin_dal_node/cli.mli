@@ -60,7 +60,7 @@ type options = {
 (** Subcommands that can be used by the DAL node. In the future this type
     could be generalized if a command recgonizes a different set of
     options. *)
-type t = Run | Config_init
+type t = Run | Config_init | Debug_print_store_schemas
 
 (** [commands ~run] attaches a callback to each subcommands of the DAL
     node. *)

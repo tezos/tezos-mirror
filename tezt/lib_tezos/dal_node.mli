@@ -199,3 +199,11 @@ val point_str : t -> string
     the crawler and stored in store/last_processed_level KVS file. The function
     returns [None] in case of error (e.g. file not found, file locked, ...). *)
 val load_last_finalized_processed_level : t -> int option Lwt.t
+
+(** [debug_print_store_schemas ?path ?hooks ()] calls [path debug
+    print store schemas] where:
+    - [path] is the provided executable path (defaults to
+      [Constant.octez_dal_node]),
+    - [hooks] are attached to the process (defaults to [None]). *)
+val debug_print_store_schemas :
+  ?path:string -> ?hooks:Process_hooks.t -> unit -> unit Lwt.t
