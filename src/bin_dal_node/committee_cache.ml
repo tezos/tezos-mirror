@@ -33,7 +33,7 @@ module Level_map =
 
 type shard_indexes = int list
 
-type committee = shard_indexes Tezos_crypto.Signature.Public_key_hash.Map.t
+type committee = shard_indexes Signature.Public_key_hash.Map.t
 
 type t = committee Level_map.t
 

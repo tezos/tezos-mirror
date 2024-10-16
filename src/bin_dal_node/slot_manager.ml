@@ -227,7 +227,7 @@ end)
     index, yields the pkh of its attester for that level. *)
 let shards_to_attesters committee =
   let to_array committee =
-    Tezos_crypto.Signature.Public_key_hash.Map.fold
+    Signature.Public_key_hash.Map.fold
       (fun pkh indexes index_map ->
         List.fold_left
           (fun index_map index -> IndexMap.add index pkh index_map)

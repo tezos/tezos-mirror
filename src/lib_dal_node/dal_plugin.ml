@@ -30,7 +30,7 @@ type slot_index = int
 type slot_header = {
   published_level : int32;
   slot_index : slot_index;
-  commitment : Tezos_crypto_dal.Cryptobox.Verifier.commitment;
+  commitment : Cryptobox.Verifier.commitment;
 }
 
 type proto_parameters = {
@@ -39,7 +39,7 @@ type proto_parameters = {
   number_of_slots : int;
   attestation_lag : int;
   attestation_threshold : int;
-  cryptobox_parameters : Tezos_crypto_dal.Cryptobox.Verifier.parameters;
+  cryptobox_parameters : Cryptobox.Verifier.parameters;
   sc_rollup_challenge_window_in_blocks : int;
   commitment_period_in_blocks : int;
   dal_attested_slots_validity_lag : int;
@@ -99,9 +99,7 @@ let proto_parameters_encoding : proto_parameters Data_encoding.t =
        (req "number_of_slots" int31)
        (req "attestation_lag" int31)
        (req "attestation_threshold" int31)
-       (req
-          "cryptobox_parameters"
-          Tezos_crypto_dal.Cryptobox.Verifier.parameters_encoding)
+       (req "cryptobox_parameters" Cryptobox.Verifier.parameters_encoding)
        (req "sc_rollup_challenge_window_in_blocks" int31)
        (req "commitment_period_in_blocks" int31)
        (req "dal_attested_slots_validity_lag" int31)
@@ -134,7 +132,7 @@ module type T = sig
   val get_committee :
     Tezos_rpc.Context.generic ->
     level:int32 ->
-    int list Tezos_crypto.Signature.Public_key_hash.Map.t tzresult Lwt.t
+    int list Signature.Public_key_hash.Map.t tzresult Lwt.t
 
   val attested_slot_headers : block_info -> attested_indices tzresult
 

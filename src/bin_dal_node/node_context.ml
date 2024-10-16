@@ -187,14 +187,14 @@ let fetch_committee ctxt ~level =
 let fetch_assigned_shard_indices ctxt ~level ~pkh =
   let open Lwt_result_syntax in
   let+ committee = fetch_committee ctxt ~level in
-  match Tezos_crypto.Signature.Public_key_hash.Map.find pkh committee with
+  match Signature.Public_key_hash.Map.find pkh committee with
   | None -> []
   | Some indexes -> indexes
 
 let get_fetched_assigned_shard_indices ctxt ~level ~pkh =
   Option.map
     (fun committee ->
-      Tezos_crypto.Signature.Public_key_hash.Map.find_opt pkh committee
+      Signature.Public_key_hash.Map.find_opt pkh committee
       |> Option.value ~default:[])
     (Committee_cache.find ctxt.committee_cache ~level)
 

@@ -88,7 +88,7 @@ val get_slot_content :
 val get_slot_pages :
   < meth : [`GET]
   ; input : unit
-  ; output : Tezos_crypto_dal.Cryptobox.page list
+  ; output : Cryptobox.page list
   ; prefix : unit
   ; params : (unit * Types.level) * Types.slot_index
   ; query : unit >
@@ -154,7 +154,7 @@ val get_assigned_shard_indices :
   ; input : unit
   ; output : Types.shard_index list
   ; prefix : unit
-  ; params : (unit * Tezos_crypto.Signature.public_key_hash) * Types.level
+  ; params : (unit * Signature.public_key_hash) * Types.level
   ; query : unit >
   service
 
@@ -167,7 +167,7 @@ val get_attestable_slots :
   ; input : unit
   ; output : Types.attestable_slots
   ; prefix : unit
-  ; params : (unit * Tezos_crypto.Signature.public_key_hash) * Types.level
+  ; params : (unit * Signature.public_key_hash) * Types.level
   ; query : unit >
   service
 
@@ -175,7 +175,7 @@ val get_attestable_slots :
 val get_slot_shard :
   < meth : [`GET]
   ; input : unit
-  ; output : Tezos_crypto_dal.Cryptobox.shard
+  ; output : Cryptobox.shard
   ; prefix : unit
   ; params : ((unit * Types.level) * Types.slot_index) * int
   ; query : unit >
