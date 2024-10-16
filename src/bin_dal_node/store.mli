@@ -18,11 +18,11 @@ module Shards : sig
 
   type t
 
-  (** [are_shards_available store slot_id shard_indices] returns
-      true IFF a share is stored for each given shard index of the
-      given slot id.  *)
-  val are_shards_available :
-    t -> Types.slot_id -> int list -> bool tzresult Lwt.t
+  (** [number_of_shards_available store slot_id shard_indices] returns the
+      number of shards stored among the ones given by indexes in [shard_indices]
+      for the given [slot_id]. *)
+  val number_of_shards_available :
+    t -> Types.slot_id -> int list -> int tzresult Lwt.t
 
   (** [write_all store slot_id shards] adds to the shard store all the given
       shards of the given slot id. *)
