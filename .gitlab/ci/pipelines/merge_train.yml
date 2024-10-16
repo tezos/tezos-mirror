@@ -209,6 +209,9 @@ oc.ocaml_fmt:
   script:
   - scripts/lint.sh --check-ocamlformat
   - dune build --profile=dev @fmt
+  after_script:
+  - eval $(opam env)
+  - dune cache trim --size=5GB
   variables:
     DUNE_CACHE: enabled
     DUNE_CACHE_STORAGE_MODE: hardlink
@@ -743,6 +746,8 @@ oc.build_x86_64-exp-dev-extra:
   - ./scripts/ci/build_full_unreleased.sh
   after_script:
   - ./scripts/ci/sccache-stop.sh
+  - eval $(opam env)
+  - dune cache trim --size=5GB
   variables:
     ARCH: x86_64
     EXECUTABLE_FILES: script-inputs/experimental-executables script-inputs/dev-executables
@@ -894,6 +899,8 @@ ocaml-check:
   - dune build @check --stop-on-first-error
   after_script:
   - ./scripts/ci/sccache-stop.sh
+  - eval $(opam env)
+  - dune cache trim --size=5GB
   variables:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
@@ -2470,6 +2477,8 @@ oc.script:snapshot_alpha_and_link:
   - ./scripts/ci/script:snapshot_alpha_and_link.sh
   after_script:
   - ./scripts/ci/sccache-stop.sh
+  - eval $(opam env)
+  - dune cache trim --size=5GB
   variables:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
@@ -2948,6 +2957,8 @@ oc.unit:non-proto-x86_64:
   - ./scripts/ci/merge_coverage.sh
   after_script:
   - ./scripts/ci/sccache-stop.sh
+  - eval $(opam env)
+  - dune cache trim --size=5GB
   variables:
     ARCH: x86_64
     MAKE_TARGETS: test-nonproto-unit
@@ -3031,6 +3042,8 @@ oc.unit:other-x86_64:
   - ./scripts/ci/merge_coverage.sh
   after_script:
   - ./scripts/ci/sccache-stop.sh
+  - eval $(opam env)
+  - dune cache trim --size=5GB
   variables:
     ARCH: x86_64
     MAKE_TARGETS: test-other-unit
@@ -3114,6 +3127,8 @@ oc.unit:proto-x86_64:
   - ./scripts/ci/merge_coverage.sh
   after_script:
   - ./scripts/ci/sccache-stop.sh
+  - eval $(opam env)
+  - dune cache trim --size=5GB
   variables:
     ARCH: x86_64
     MAKE_TARGETS: test-proto-unit

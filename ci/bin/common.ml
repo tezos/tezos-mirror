@@ -326,13 +326,15 @@ let enable_cargo_cache job =
     environment dir [DUNE_CACHE_ROOT] such that dune stores its caches
     there.
 
+    - [cache_size] sets the maximum size of the cache.
+
     - [copy_mode], if [true] (default is [false]) sets
     {{:https://dune.readthedocs.io/en/stable/caching.html#cache-storage-mode}Dune
     Cache Storage Mode} to [copy]. If [false], [hardlink] mode is
     used, which is typically more performant but requires that the
     build and cache folder be on the same volume. *)
 let enable_dune_cache ?key ?(path = "$CI_PROJECT_DIR/_dune_cache")
-    ?(copy_mode = false) ?policy job =
+    ?(cache_size = "5GB") ?(copy_mode = false) ?policy job =
   let key =
     Option.value
       ~default:
@@ -347,6 +349,8 @@ let enable_dune_cache ?key ?(path = "$CI_PROJECT_DIR/_dune_cache")
          ("DUNE_CACHE_ROOT", path);
        ]
   |> append_cache (cache ?policy ~key [path])
+  |> append_after_script
+       ["eval $(opam env)"; "dune cache trim --size=" ^ cache_size]
 
 (** {2 Changesets} *)
 
