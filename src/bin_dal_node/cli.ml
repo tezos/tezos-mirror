@@ -95,8 +95,7 @@ module Term = struct
     let doc =
       Format.asprintf
         "The TCP address and optionally the port at which this instance can be \
-         reached by other P2P nodes. The default address is 0.0.0.0. The \
-         default port is 11732."
+         reached by other P2P nodes. By default, the address is '127.0.0.1'."
     in
     Arg.(
       value

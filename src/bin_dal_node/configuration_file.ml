@@ -94,6 +94,10 @@ let default_listen_addr =
   let default_net_port = listening_port in
   P2p_point.Id.of_string_exn ~default_port:default_net_port default_net_host
 
+let default_public_addr =
+  let open Gossipsub.Transport_layer.Default_parameters.P2p_config in
+  P2p_point.Id.of_string_exn ~default_port:listening_port "127.0.0.1"
+
 let default_neighbors = []
 
 let default_peers = []
@@ -123,7 +127,7 @@ let default =
     rpc_addr = default_rpc_addr;
     neighbors = default_neighbors;
     listen_addr = default_listen_addr;
-    public_addr = default_listen_addr;
+    public_addr = default_public_addr;
     peers = default_peers;
     expected_pow = default_expected_pow;
     network_name = default_network_name;
