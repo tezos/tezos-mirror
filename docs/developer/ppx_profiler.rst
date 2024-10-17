@@ -212,7 +212,7 @@ The payload is made of two parts, the first one being optional:
    fields ::= field ; fields | empty
 
    field ::=
-     | level_of_detail = (Terse | Detailed | Verbose)
+     | level_of_detail = (Notice | Info | Debug)
      | profiler_module = module_ident
 
    args ::= <string> | <string list> | <function application> | ident | empty
@@ -221,16 +221,16 @@ As an example:
 
 .. code-block:: OCaml
 
-   f x [@profiler.aggregate_s {level_of_detail = Detailed} g y z] ;
-   g x [@profiler.span_f {level_of_detail = Verbose; profiler_module = Prof} "label"]
+   f x [@profiler.aggregate_s {level_of_detail = Info} g y z] ;
+   g x [@profiler.span_f {level_of_detail = Debug; profiler_module = Prof} "label"]
    ...
 
 will be preprocessed as
 
 .. code-block:: OCaml
 
-   Profiler.aggregate_s ~verbosity:Detailed (g y z) @@ f x ;
-   Prof.span_f ~verbosity:Verbose "label" @@ g x
+   Profiler.aggregate_s ~verbosity:Info (g y z) @@ f x ;
+   Prof.span_f ~verbosity:Debug "label" @@ g x
    ...
 
 Adding functionalities
