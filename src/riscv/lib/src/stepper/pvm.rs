@@ -117,6 +117,17 @@ impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts> PvmStepper<'hooks, ML, CL> 
             }
         }
     }
+
+    /// Obtain the root hash for the PVM state.
+    pub fn hash(&self) -> crate::state_backend::hash::Hash
+    where
+        for<'a> crate::state_backend::AllocatedOf<PvmLayout<ML, CL>, crate::state_backend::Ref<'a, Owned>>:
+            crate::state_backend::hash::RootHashable,
+    {
+        use crate::state_backend::hash::RootHashable;
+        let refs = self.pvm.struct_ref();
+        RootHashable::hash(&refs).unwrap()
+    }
 }
 
 impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts> Stepper for PvmStepper<'hooks, ML, CL> {
