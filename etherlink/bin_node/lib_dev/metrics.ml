@@ -57,7 +57,7 @@ module Health = struct
 end
 
 module Chain = struct
-  type t = {head : Gauge.t; confirmed_head : Gauge.t}
+  type t = {head : Gauge.t; confirmed_head : Gauge.t; gas_price : Gauge.t}
 
   let init name =
     let head =
@@ -80,7 +80,17 @@ module Chain = struct
         "confirmed_head"
         name
     in
-    {head; confirmed_head}
+    let gas_price =
+      Gauge.v_label
+        ~registry
+        ~label_name:"gas_price"
+        ~help:"Gas price"
+        ~namespace
+        ~subsystem
+        "gas_price"
+        name
+    in
+    {head; confirmed_head; gas_price}
 end
 
 module Info = struct
@@ -301,6 +311,8 @@ let init ~mode ~tx_pool_size_info ~smart_rollup_address =
   Tx_pool.register tx_pool_size_info
 
 let set_level ~level = Gauge.set metrics.chain.head (Z.to_float level)
+
+let set_gas_price price = Gauge.set metrics.chain.gas_price (Z.to_float price)
 
 let set_confirmed_level ~level =
   Gauge.set metrics.chain.confirmed_head (Z.to_float level)
