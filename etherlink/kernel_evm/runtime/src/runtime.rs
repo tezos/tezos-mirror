@@ -14,7 +14,8 @@ use std::{
 };
 
 use crate::{
-    internal_runtime::{ExtendedRuntime, InternalRuntime},
+    extensions::WithGas,
+    internal_runtime::{ExtendedRuntime, InternalHost, InternalRuntime},
     mock_internal::MockInternal,
 };
 use tezos_evm_logging::{Level, Verbosity};
@@ -24,16 +25,25 @@ use tezos_smart_rollup_host::{
     dal_parameters::RollupDalParameters,
     input::Message,
     metadata::RollupMetadata,
-    path::Path,
+    path::{Path, RefPath},
     runtime::{Runtime as SdkRuntime, RuntimeError, ValueType},
 };
 use tezos_smart_rollup_mock::MockHost;
 
-pub trait Runtime: SdkRuntime + InternalRuntime + ExtendedRuntime + Verbosity {}
+// Set by the node, contains the verbosity for the logs
+pub const VERBOSITY_PATH: RefPath = RefPath::assert_from(b"/evm/logging_verbosity");
+
+pub trait Runtime:
+    SdkRuntime + InternalRuntime + ExtendedRuntime + Verbosity + WithGas
+{
+}
 
 // If a type implements the Runtime, InternalRuntime and ExtendedRuntime traits,
 // it also implements the kernel Runtime.
-impl<T: SdkRuntime + InternalRuntime + ExtendedRuntime + Verbosity> Runtime for T {}
+impl<T: SdkRuntime + InternalRuntime + ExtendedRuntime + Verbosity + WithGas> Runtime
+    for T
+{
+}
 
 // This type has two interesting parts:
 // 1. Host: BorrowMut<R> + Borrow<R>
@@ -55,6 +65,7 @@ pub struct KernelHost<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>, Internal> {
     pub host: Host,
     pub internal: Internal,
     pub logs_verbosity: Level,
+    pub execution_gas_used: u64,
     pub _pd: PhantomData<R>,
 }
 
@@ -270,6 +281,7 @@ where
             host: &mut self.host,
             internal: &mut self.internal,
             logs_verbosity: self.logs_verbosity,
+            execution_gas_used: self.execution_gas_used,
             _pd: PhantomData,
         }
     }
@@ -283,6 +295,38 @@ impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>, Internal: InternalRuntime> V
     }
 }
 
+pub fn read_logs_verbosity<Host: tezos_smart_rollup_host::runtime::Runtime>(
+    host: &Host,
+) -> Level {
+    match host.store_read_all(&VERBOSITY_PATH) {
+        Ok(value) if value.len() == 1 => {
+            Level::try_from(value[0]).unwrap_or(Level::default())
+        }
+        _ => Level::default(),
+    }
+}
+
+impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>, Internal: InternalRuntime> WithGas
+    for KernelHost<R, Host, Internal>
+{
+    fn add_execution_gas(&mut self, gas: u64) {
+        self.execution_gas_used += gas;
+    }
+}
+
+impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>> KernelHost<R, Host, InternalHost> {
+    pub fn init(host: Host) -> Self {
+        let internal_storage = InternalHost();
+        let logs_verbosity = read_logs_verbosity(host.borrow());
+        Self {
+            host,
+            internal: internal_storage,
+            logs_verbosity,
+            execution_gas_used: 0,
+            _pd: PhantomData,
+        }
+    }
+}
 pub type MockKernelHost = KernelHost<MockHost, MockHost, MockInternal>;
 
 impl Default for MockKernelHost {
@@ -291,6 +335,7 @@ impl Default for MockKernelHost {
             host: MockHost::default(),
             internal: MockInternal(),
             logs_verbosity: Level::default(),
+            execution_gas_used: 0,
             _pd: PhantomData,
         }
     }
@@ -304,6 +349,7 @@ impl MockKernelHost {
             host,
             internal,
             logs_verbosity: Level::default(),
+            execution_gas_used: 0,
             _pd: PhantomData,
         }
     }

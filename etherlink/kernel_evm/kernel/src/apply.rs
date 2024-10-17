@@ -99,6 +99,7 @@ pub struct TransactionReceiptInfo {
     pub to: Option<H160>,
     pub effective_gas_price: U256,
     pub type_: TransactionType,
+    pub overall_gas_used: U256,
 }
 
 /// Details about the original transaction.
@@ -122,6 +123,7 @@ pub struct TransactionObjectInfo {
 }
 
 #[inline(always)]
+#[allow(clippy::too_many_arguments)]
 fn make_receipt_info(
     tx_hash: TransactionHash,
     index: u32,
@@ -130,6 +132,7 @@ fn make_receipt_info(
     to: Option<H160>,
     effective_gas_price: U256,
     type_: TransactionType,
+    overall_gas_used: U256,
 ) -> TransactionReceiptInfo {
     TransactionReceiptInfo {
         tx_hash,
@@ -139,6 +142,7 @@ fn make_receipt_info(
         to,
         effective_gas_price,
         type_,
+        overall_gas_used,
     }
 }
 
@@ -561,7 +565,6 @@ pub fn handle_transaction_result<Host: Runtime>(
         log!(host, Debug, "Transaction executed, outcome: {:?}", outcome);
         log!(host, Benchmarking, "gas_used: {:?}", outcome.gas_used);
         log!(host, Benchmarking, "reason: {:?}", outcome.result);
-        fee_updates.modify_outcome(outcome);
         for message in outcome.withdrawals.drain(..) {
             let outbox_message: OutboxMessage<RouterInterface> = message;
             let len = outbox_queue.queue_message(host, outbox_message)?;
@@ -583,6 +586,7 @@ pub fn handle_transaction_result<Host: Runtime>(
         to,
         fee_updates.overall_gas_price,
         transaction.type_(),
+        fee_updates.overall_gas_used,
     );
 
     Ok(ExecutionInfo {

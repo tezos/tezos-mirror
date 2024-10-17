@@ -269,7 +269,9 @@ impl BlockInProgress {
                 hex::encode(transaction.tx_hash)
             );
         };
-        self.add_gas(gas_used.into())?;
+        host.add_execution_gas(gas_used);
+
+        self.add_gas(receipt_info.overall_gas_used)?;
 
         // account for transaction ticks
         self.add_ticks(tick_model::ticks_of_valid_transaction(
@@ -456,7 +458,7 @@ impl BlockInProgress {
                     to,
                     cumulative_gas_used: cumulative_gas,
                     effective_gas_price,
-                    gas_used: U256::from(outcome.gas_used),
+                    gas_used: receipt_info.overall_gas_used,
                     contract_address,
                     logs_bloom: TransactionReceipt::logs_to_bloom(&logs),
                     logs,

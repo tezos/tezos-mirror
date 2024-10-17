@@ -15,10 +15,7 @@ use evm_execution::trace::{
 use num_derive::{FromPrimitive, ToPrimitive};
 use num_traits::{FromPrimitive, ToPrimitive};
 use tezos_crypto_rs::hash::ContractKt1Hash;
-use tezos_evm_logging::{
-    log,
-    Level::{self, *},
-};
+use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_indexable_storage::IndexableStorage;
 use tezos_smart_rollup_core::MAX_FILE_CHUNK_SIZE;
@@ -171,9 +168,6 @@ const EVM_NODE_FLAG: RefPath = RefPath::assert_from(b"/__evm_node");
 
 const MAX_BLUEPRINT_LOOKAHEAD_IN_SECONDS: RefPath =
     RefPath::assert_from(b"/evm/max_blueprint_lookahead_in_seconds");
-
-// Set by the node, contains the verbosity for the logs
-pub const VERBOSITY_PATH: RefPath = RefPath::assert_from(b"/evm/logging_verbosity");
 
 pub fn receipt_path(receipt_hash: &TransactionHash) -> Result<OwnedPath, Error> {
     let hash = hex::encode(receipt_hash);
@@ -901,18 +895,6 @@ pub fn max_blueprint_lookahead_in_seconds(host: &impl Runtime) -> anyhow::Result
     let bytes = host.store_read_all(&MAX_BLUEPRINT_LOOKAHEAD_IN_SECONDS)?;
     let bytes: [u8; 8] = bytes.as_slice().try_into()?;
     Ok(i64::from_le_bytes(bytes))
-}
-
-// Doesn't use the kernel runtime as it is used to build the kernel runtime
-pub fn read_logs_verbosity<Host: tezos_smart_rollup_host::runtime::Runtime>(
-    host: &Host,
-) -> Level {
-    match host.store_read_all(&VERBOSITY_PATH) {
-        Ok(value) if value.len() == 1 => {
-            Level::try_from(value[0]).unwrap_or(Level::default())
-        }
-        _ => Level::default(),
-    }
 }
 
 #[cfg(test)]
