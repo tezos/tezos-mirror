@@ -978,10 +978,19 @@ let run ~data_dir ~configuration_override =
 
   let cctxt = Rpc_context.make endpoint in
   let* dal_config = fetch_dal_config cctxt in
+  let points = points @ dal_config.bootstrap_peers in
+  let*! () =
+    if points = [] then Event.(emit config_error_no_bootstrap) ()
+    else Lwt.return_unit
+  in
   (* Resolve:
      - [points] from DAL node config file and CLI.
      - [dal_config.bootstrap_peers] from the L1 network config. *)
-  let* points = resolve (points @ dal_config.bootstrap_peers) in
+  let* points = resolve points in
+  let*! () =
+    if points = [] then Event.(emit resolved_bootstrap_no_points) ()
+    else Event.(emit resolved_bootstrap_points (List.length points))
+  in
   (* Create and start a GS worker *)
   let gs_worker =
     let rng =

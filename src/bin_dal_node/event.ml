@@ -107,6 +107,31 @@ let retry_fetching_node_config_notice =
 let retry_fetching_node_config_warning =
   retry_fetching_node_config Internal_event.Warning "warning"
 
+let config_error_no_bootstrap =
+  declare_0
+    ~section
+    ~name:"config_error_no_bootstrap"
+    ~msg:
+      "no bootstrap peers found in the configuration file or network settings"
+    ~level:Error
+    ()
+
+let resolved_bootstrap_no_points =
+  declare_0
+    ~section
+    ~name:"resolved_bootstrap_no_points"
+    ~msg:"no bootstrap points could be resolved"
+    ~level:Error
+    ()
+
+let resolved_bootstrap_points =
+  declare_1
+    ~section
+    ~name:"resolved_bootstrap_points"
+    ~msg:"resolved {number} bootstrap points"
+    ~level:Notice
+    ("number", Data_encoding.int31)
+
 let fetched_config_success =
   declare_1
     ~section
