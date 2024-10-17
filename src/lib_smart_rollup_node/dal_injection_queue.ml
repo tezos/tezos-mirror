@@ -303,6 +303,19 @@ let inject_slot state ~slot_index ~slot_content =
 
 let on_register state ~message : unit tzresult Lwt.t =
   let open Lwt_result_syntax in
+  let* () =
+    if Slot_index_queue.is_empty state.dal_slot_indices then
+      (* When there is no DAL slot index on which the worker can
+         publish, we reject all requests to register new messages. *)
+      let*! () = Events.(emit no_dal_slot_indices_set) () in
+      tzfail
+      @@ error_of_fmt
+           "DAL message registration rejected because the rollup cannot \
+            publish on the DAL. Please use the POST /local/dal/slot/indices \
+            RPC to set the slot indices on which the rollup node should \
+            publish."
+    else return_unit
+  in
   let slot_size =
     (Reference.get state.node_ctxt.current_protocol).constants.dal
       .cryptobox_parameters
@@ -382,7 +395,8 @@ let fill_slots state ~slot_size ~num_slots =
    their commitments to L1. *)
 let on_produce_dal_slots state ~level =
   let open Lwt_result_syntax in
-  if Slot_index_queue.is_empty state.dal_slot_indices then
+  if Pending_messages.is_empty state.pending_messages then return_unit
+  else if Slot_index_queue.is_empty state.dal_slot_indices then
     (* No provided slot indices, no injection *)
     let*! () = Events.(emit no_dal_slot_indices_set) () in
     return_unit

@@ -66,6 +66,9 @@ module Make
   (** [clear q] removes all bindings from [q]. *)
   val clear : t -> unit
 
+  (** [is_empty q] returns [true] iff [q] is empty. *)
+  val is_empty : t -> bool
+
   (** [fold f q init] folds the function [f] over the bindings
       of [q]. The elements are iterated from oldest to newest. *)
   val fold : (K.t -> V.t -> 'a -> 'a) -> t -> 'a -> 'a
