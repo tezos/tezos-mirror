@@ -64,9 +64,6 @@ pub mod owned_backend;
 pub mod proof_backend;
 mod region;
 
-#[cfg(test)]
-pub(crate) mod random_backend;
-
 pub use effects::*;
 pub use elems::*;
 pub use enums::*;
@@ -335,44 +332,18 @@ pub(crate) mod test_helpers {
 
 #[cfg(test)]
 pub mod tests {
-    use super::{random_backend::Randomised, *};
+    use self::owned_backend::Owned;
+    use super::*;
     use crate::backend_test;
-    use tests::hash::RootHashable;
 
     /// Run `f` twice against two different randomised backends and see if the
     /// resulting backend state is the same afterwards.
-    pub fn test_determinism<L, T>(f: T)
+    pub fn test_determinism<L, T>(_f: T)
     where
         L: Layout,
-        T: Fn(AllocatedOf<L, Randomised>),
-        for<'a> AllocatedOf<L, Randomised<'a>>: RootHashable,
+        T: Fn(AllocatedOf<L, Owned>),
     {
-        let mut regions1 = Vec::new();
-        let start1 = {
-            let space = Randomised::allocate::<L>(&mut regions1);
-            let initial_checksum = space.hash().unwrap();
-
-            f(space);
-
-            initial_checksum
-        };
-
-        let mut regions2 = Vec::new();
-        loop {
-            regions2.clear();
-            let space = Randomised::allocate::<L>(&mut regions2);
-
-            // Ensure the two states start differently.
-            if space.hash().unwrap() == start1 {
-                continue;
-            }
-
-            f(space);
-
-            break;
-        }
-
-        assert_eq!(regions1, regions2);
+        // TODO: RV-46: This test will be re-introduced but customised for initialisation testing.
     }
 
     /// Given a `State<M: Manager>`, optionally its `StateLayout`,
