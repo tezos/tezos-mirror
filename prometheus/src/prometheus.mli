@@ -149,6 +149,9 @@ module type METRIC = sig
     ?subsystem:string ->
     string ->
     t
+
+  (** [clear] will clean every metric that was sent. *)
+  val clear : family -> unit
 end
 
 (** A counter is a cumulative metric that represents a single numerical value that only ever goes up. *)
