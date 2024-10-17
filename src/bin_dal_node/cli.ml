@@ -31,7 +31,22 @@ module Term = struct
     let decoder str =
       match P2p_point.Id.of_string ~default_port str with
       | Ok x -> Ok x
-      | Error msg -> Error (`Msg msg)
+      | Error msg -> (
+          (* Let's check if the user has entered a port *)
+          match String.split_on_char ':' str with
+          | [""; port] -> (
+              try
+                let port = int_of_string port in
+                let default =
+                  (fst Configuration_file.default.public_addr, port)
+                in
+                Ok default
+              with Failure _ ->
+                Error
+                  (`Msg
+                    (Format.asprintf "The port provided: '%s' is invalid" port))
+              )
+          | _ -> Error (`Msg msg))
     in
     let printer = P2p_point.Id.pp in
     Arg.conv (decoder, printer)
@@ -95,8 +110,10 @@ module Term = struct
     let doc =
       Format.asprintf
         "The TCP address and optionally the port at which this instance can be \
-         reached by other P2P nodes. The default address is 0.0.0.0. The \
-         default port is 11732."
+         reached by other P2P nodes. By default, the point is \
+         '127.0.0.1:11732'. You can override the port using the syntax \
+         ':2222'. If the IP address is detected as a special address (such as \
+         a localhost one) it won't be advertised, only the port will."
     in
     Arg.(
       value
