@@ -333,3 +333,6 @@ seq:
 - id: direct_ticket_spending_enable
   type: u1
   enum: bool
+- id: aggregate_attestation
+  type: u1
+  enum: bool

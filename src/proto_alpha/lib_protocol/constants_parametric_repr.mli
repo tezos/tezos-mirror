@@ -224,6 +224,8 @@ type t = {
   zk_rollup : zk_rollup;
   adaptive_issuance : adaptive_issuance;
   direct_ticket_spending_enable : bool;
+  (* attestation aggregation feature flag *)
+  aggregate_attestation : bool;
 }
 
 val encoding : t Data_encoding.encoding

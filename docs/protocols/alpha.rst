@@ -57,6 +57,9 @@ Bug Fixes
 Minor Changes
 -------------
 
+- Added a feature flag to enable the aggregation of block attestation lists into
+  a single aggregate operation. (MR :gl:!15283)
+
 Internal
 --------
 
