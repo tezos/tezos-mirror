@@ -20,6 +20,8 @@ Follow these steps to run a DAL node along with a layer 1 node and a baker.
 
       octez-client rpc get /chains/main/blocks/head/helpers/attestation_rights?delegate="$MY_ADDRESS"
 
+#. Install the DAL trusted setup as described in :ref:`Install DAL trusted setup <setup_dal_crypto_params>`.
+
 #. Initialize the DAL node by running its ``config init`` command.
    For example, this command initializes the DAL node with the address of a local ``octez-node`` instance on port 8732 and stores data in the default DAL node directory (``~/.tezos-dal-node``):
 
