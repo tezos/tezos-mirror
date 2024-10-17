@@ -6,10 +6,10 @@
  (public_name octez-evm-node-libs.evm_node_wasm_runtime)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-l2-libs.layer2_store
+  octez-l2-libs.irmin_context
   octez-rust-deps
   octez-evm-node-libs.wasm_runtime_callbacks)
  (flags
   (:standard)
   -w -66
-  -open Tezos_layer2_store))
+  -open Tezos_layer2_irmin_context))
