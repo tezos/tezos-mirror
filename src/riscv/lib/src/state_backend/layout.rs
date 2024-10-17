@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 use super::{Cell, Cells};
+use crate::default::ConstDefault;
 use std::marker::PhantomData;
 
 /// Structural description of a state type
@@ -29,11 +30,11 @@ pub struct Atom<T> {
     _pd: PhantomData<T>,
 }
 
-impl<T: 'static> Layout for Atom<T> {
+impl<T: ConstDefault + 'static> Layout for Atom<T> {
     type Allocated<M: super::ManagerBase> = super::Cell<T, M>;
 
     fn allocate<M: super::ManagerAlloc>(backend: &mut M) -> Self::Allocated<M> {
-        let region = backend.allocate_region();
+        let region = backend.allocate_region([T::DEFAULT; 1]);
         Cell::bind(region)
     }
 }
@@ -44,11 +45,14 @@ pub struct Array<T, const LEN: usize> {
     _pd: PhantomData<T>,
 }
 
-impl<T: 'static, const LEN: usize> Layout for Array<T, LEN> {
+impl<T: 'static, const LEN: usize> Layout for Array<T, LEN>
+where
+    [T; LEN]: ConstDefault,
+{
     type Allocated<M: super::ManagerBase> = Cells<T, LEN, M>;
 
     fn allocate<M: super::ManagerAlloc>(backend: &mut M) -> Self::Allocated<M> {
-        let region = backend.allocate_region();
+        let region = backend.allocate_region(<[T; LEN]>::DEFAULT);
         Cells::bind(region)
     }
 }

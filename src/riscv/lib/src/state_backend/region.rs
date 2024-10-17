@@ -3,13 +3,12 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::storage::binary;
-
 use super::{
     hash::{self, Hash, HashError, HashWriter, RootHashable},
-    AllocatedOf, Array, Atom, Elem, ManagerBase, ManagerClone, ManagerDeserialise, ManagerRead,
-    ManagerReadWrite, ManagerSerialise, ManagerWrite, Ref,
+    Elem, ManagerBase, ManagerClone, ManagerDeserialise, ManagerRead, ManagerReadWrite,
+    ManagerSerialise, ManagerWrite, Ref,
 };
+use crate::storage::binary;
 use std::num::NonZeroUsize;
 
 /// Single element of type `E`
@@ -27,7 +26,7 @@ impl<E: 'static, M: ManagerBase> Cell<E, M> {
     }
 
     /// Obtain a structure with references to the bound regions of this type.
-    pub fn struct_ref(&self) -> AllocatedOf<Atom<E>, Ref<'_, M>> {
+    pub fn struct_ref(&self) -> Cell<E, Ref<'_, M>> {
         Cell {
             region: self.region.struct_ref(),
         }
@@ -212,7 +211,7 @@ impl<E: 'static, const LEN: usize, M: ManagerBase> Cells<E, LEN, M> {
     }
 
     /// Obtain a structure with references to the bound regions of this type.
-    pub fn struct_ref(&self) -> AllocatedOf<Array<E, LEN>, Ref<'_, M>> {
+    pub fn struct_ref(&self) -> Cells<E, LEN, Ref<'_, M>> {
         Cells::bind(&self.region)
     }
 }

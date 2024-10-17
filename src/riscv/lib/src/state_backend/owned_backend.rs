@@ -31,8 +31,11 @@ impl ManagerBase for Owned {
 }
 
 impl ManagerAlloc for Owned {
-    fn allocate_region<E: 'static, const LEN: usize>(&mut self) -> Self::Region<E, LEN> {
-        unsafe { std::mem::zeroed() }
+    fn allocate_region<E: 'static, const LEN: usize>(
+        &mut self,
+        value: [E; LEN],
+    ) -> Self::Region<E, LEN> {
+        value
     }
 
     fn allocate_dyn_region<const LEN: usize>(&mut self) -> Self::DynRegion<LEN> {
