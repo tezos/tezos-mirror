@@ -251,7 +251,7 @@ let () =
        create this pipeline by pushing a tag to a fork of 'tezos/tezos', e.g. \
        to the 'nomadic-labs/tezos' project."
 
-(** {3 Scheduled pipelines} *)
+(** {4 Scheduled pipelines} *)
 
 (* All jobs in scheduled pipelines have "interruptible: false"
    to prevent them from being canceled after a push to master.
@@ -292,7 +292,14 @@ let () =
       "Scheduled run of all tezt tests with single-process validation, weekly \
        on 'master'.\n\n\
        This scheduled pipeline exercices the full tezt tests suites, but with \
-       Octez nodes configured to use single-process validation."
+       Octez nodes configured to use single-process validation." ;
+  register
+    "schedule_master_test_release"
+    schedule_test_release
+    ~jobs:(Release_tag.octez_jobs ~test:true Schedule_test)
+    ~description:
+      "Scheduled pipeline that runs a test release pipeline for master. The \
+       jobs are the same as a release pipeline but run in dry-mode."
 
 (** {2 Entry point of the generator binary} *)
 
