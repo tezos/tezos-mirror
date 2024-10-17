@@ -26,9 +26,7 @@ module Baker = struct
   }
 
   let baker_path ?(user_path = "./") proto_hash =
-    let short_name =
-      Parameters.protocol_short_hash (Protocol_hash.to_b58check proto_hash)
-    in
+    let short_name = Parameters.protocol_short_hash proto_hash in
     Format.sprintf "%soctez-baker-%s" user_path short_name
 
   let shutdown protocol_hash process =
@@ -101,9 +99,7 @@ let monitor_heads ~node_addr =
 
 let hot_swap_baker ~state ~next_protocol_hash =
   let open Lwt_result_syntax in
-  let next_proto_status =
-    Parameters.protocol_status (Protocol_hash.to_b58check next_protocol_hash)
-  in
+  let next_proto_status = Parameters.protocol_status next_protocol_hash in
   let*! () =
     Agnostic_baker_events.(emit protocol_encountered)
       (next_proto_status, next_protocol_hash)
@@ -169,9 +165,7 @@ let may_start_initial_baker state =
     let* protocol_hash =
       Rpc_services.get_next_protocol_hash ~node_addr:state.node_endpoint
     in
-    let proto_status =
-      Parameters.protocol_status (Protocol_hash.to_b58check protocol_hash)
-    in
+    let proto_status = Parameters.protocol_status protocol_hash in
     let*! () =
       match last_known_proto with
       | None -> Lwt.return_unit

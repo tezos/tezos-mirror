@@ -7,7 +7,7 @@
 
 (** Default endpoint to contact the node. Based on the
     [Octez_node_config.Config_file.default_rpc_port]. *)
-val default_node_addr : string
+val default_node_endpoint : string
 
 val log_config : base_dir:string option -> Tezos_base.Internal_event_config.t
 
@@ -24,6 +24,6 @@ val pp_status : Format.formatter -> status -> unit
 
 val status_encoding : status t
 
-val protocol_short_hash : string -> string
+val protocol_short_hash : Protocol_hash.t -> string
 
-val protocol_status : string -> status
+val protocol_status : Protocol_hash.t -> status

@@ -84,7 +84,9 @@ let parse_args all_args =
   let () = fail_on_empty_baker_args baker_args in
   let () = help_cmd agnostic_baker_args in
   let endpoint =
-    Option.value ~default:Parameters.default_node_addr (get_endpoint baker_args)
+    Option.value
+      ~default:Parameters.default_node_endpoint
+      (get_endpoint baker_args)
   in
   let binaries_directory = get_binaries_directory agnostic_baker_args in
   let base_dir = get_base_dir baker_args in
