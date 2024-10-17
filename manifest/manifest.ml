@@ -4403,6 +4403,16 @@ let generate_dependency_graph ?(source = []) ?(without = []) filename =
     let id (node : t) =
       node.target.path ^ " " ^ Target.name_for_errors (Internal node.target)
 
+    let cluster (node : t) =
+      match
+        node.target.path |> String.split_on_char '/' |> List.filter (( <> ) "")
+      with
+      | "src" :: subdir :: _ ->
+          if String.starts_with ~prefix:"proto_" subdir then Some subdir
+          else None
+      | dir :: _ -> Some dir
+      | [] -> None
+
     let compare a b = String.compare (id a) (id b)
 
     (* Can't store node metadata inside [t] itself because we sometimes create the

@@ -5,6 +5,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* Cluster identifiers. We need a map to group nodes by cluster. *)
+module Cluster = struct
+  type t = string option
+
+  let compare = Option.compare String.compare
+end
+
+module Cluster_map = Map.Make (Cluster)
+
 module type NODE = sig
   type t
 
@@ -13,6 +22,8 @@ module type NODE = sig
   val id : t -> string
 
   val attributes : t -> (string * string) list
+
+  val cluster : t -> string option
 end
 
 module type S = sig
@@ -99,16 +110,45 @@ module Make (Node : NODE) : S with type node = Node.t = struct
     in
     let node_id node = quote_id (Node.id node) in
     Format.fprintf fmt "@[<v 2>digraph {" ;
-    ( iter graph @@ fun source targets ->
+    (* Group nodes by cluster. *)
+    let clusters = ref Cluster_map.empty in
+    ( iter graph @@ fun node _ ->
+      let cluster = Node.cluster node in
+      let old =
+        Cluster_map.find_opt cluster !clusters |> Option.value ~default:[]
+      in
+      clusters := Cluster_map.add cluster (node :: old) !clusters ) ;
+    (* Declare clusters and their nodes. *)
+    let declare_nodes nodes =
+      Fun.flip List.iter nodes @@ fun node ->
       Format.fprintf
         fmt
         "@ @[%s[%s]@]"
-        (node_id source)
+        (node_id node)
         (String.concat
            ","
            (List.map
               (fun (k, v) -> quote_id k ^ "=" ^ quote_id v)
-              (Node.attributes source))) ;
+              (Node.attributes node)))
+    in
+    let cluster_index = ref 0 in
+    let declare_cluster cluster nodes =
+      match cluster with
+      | None -> declare_nodes nodes
+      | Some cluster ->
+          Format.fprintf
+            fmt
+            "@ @[<v 2>@[subgraph cluster_%d@] {@ label=%s@ style=filled@ \
+             color=\"#eeeeee\""
+            !cluster_index
+            (quote_id cluster) ;
+          incr cluster_index ;
+          declare_nodes nodes ;
+          Format.fprintf fmt "@]@ }"
+    in
+    Cluster_map.iter declare_cluster !clusters ;
+    (* Declare edges. *)
+    ( iter graph @@ fun source targets ->
       Fun.flip Nodes.iter targets @@ fun target ->
       Format.fprintf fmt "@ @[%s -> %s@]" (node_id source) (node_id target) ) ;
     Format.fprintf fmt "@]@ }@."
