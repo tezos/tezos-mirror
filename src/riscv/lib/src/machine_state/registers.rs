@@ -6,7 +6,7 @@
 // specification.
 #![allow(non_upper_case_globals)]
 
-use crate::machine_state::backend;
+use crate::{default::ConstDefault, machine_state::backend};
 use arbitrary_int::u5;
 use std::fmt;
 
@@ -371,6 +371,10 @@ impl fmt::Display for FRegister {
     serde::Deserialize,
 )]
 pub struct FValue(u64);
+
+impl ConstDefault for FValue {
+    const DEFAULT: Self = Self(0);
+}
 
 impl backend::Elem for FValue {
     #[inline(always)]

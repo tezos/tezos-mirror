@@ -6,6 +6,7 @@
 use super::csregisters::xstatus::MStatus;
 use crate::{
     bits::u64,
+    default::ConstDefault,
     machine_state::{
         bus::Address,
         csregisters::{self, xstatus, CSRegister},
@@ -81,7 +82,7 @@ impl<M: backend::ManagerBase> HartState<M> {
         self.xregisters.reset();
         self.fregisters.reset();
         self.csregisters.reset();
-        self.mode.write(Mode::default());
+        self.mode.write(Mode::DEFAULT);
         self.pc.write(pc);
         self.reservation_set.reset();
     }

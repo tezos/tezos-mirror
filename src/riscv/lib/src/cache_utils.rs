@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::{
+    default::ConstDefault,
     machine_state::bus::Address,
     state_backend::{Layout, ManagerAlloc, ManagerBase, Many},
 };
@@ -26,6 +27,10 @@ impl FenceCounter {
     pub fn next(self) -> Self {
         Self(self.0.wrapping_add(1))
     }
+}
+
+impl ConstDefault for FenceCounter {
+    const DEFAULT: Self = Self::INITIAL;
 }
 
 /// Configuration object for the size of a cache indexed by physical address.

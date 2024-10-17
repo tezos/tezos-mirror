@@ -426,6 +426,7 @@ impl<const LEN: usize, M: ManagerClone> Clone for DynCells<LEN, M> {
 pub(crate) mod tests {
     use crate::{
         backend_test,
+        default::ConstDefault,
         state_backend::{
             layout::{Atom, Layout},
             Array, DynCells, Elem, ManagerAlloc, ManagerBase,
@@ -439,6 +440,10 @@ pub(crate) mod tests {
     struct Flipper {
         a: u8,
         b: u8,
+    }
+
+    impl ConstDefault for Flipper {
+        const DEFAULT: Self = Self { a: 0, b: 0 };
     }
 
     impl serde::Serialize for Flipper {

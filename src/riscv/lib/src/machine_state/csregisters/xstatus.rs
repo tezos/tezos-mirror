@@ -16,6 +16,7 @@ use super::bits::NormaliseFields;
 use crate::{
     bits::{Bits64, ConstantBits},
     csr,
+    default::ConstDefault,
     machine_state::mode::Mode,
 };
 
@@ -26,6 +27,10 @@ pub enum MPPValue {
     #[default]
     Supervisor = 0b01,
     Machine = 0b11,
+}
+
+impl ConstDefault for MPPValue {
+    const DEFAULT: Self = MPPValue::Supervisor;
 }
 
 impl From<MPPValue> for Mode {
@@ -76,6 +81,10 @@ pub enum SPPValue {
     Supervisor = 0b1,
 }
 
+impl ConstDefault for SPPValue {
+    const DEFAULT: Self = SPPValue::Supervisor;
+}
+
 impl From<u8> for SPPValue {
     fn from(value: u8) -> Self {
         match value & 1 {
@@ -111,6 +120,10 @@ pub enum XLenValue {
     MXL64 = 0b10,
 }
 
+impl ConstDefault for XLenValue {
+    const DEFAULT: Self = XLenValue::MXL64;
+}
+
 impl From<XLenValue> for u8 {
     fn from(value: XLenValue) -> Self {
         value as u8
@@ -143,6 +156,10 @@ pub enum ExtensionValue {
     Off = 0b00,
     #[default]
     Dirty = 0b11,
+}
+
+impl ConstDefault for ExtensionValue {
+    const DEFAULT: Self = ExtensionValue::Dirty;
 }
 
 impl From<ExtensionValue> for u8 {

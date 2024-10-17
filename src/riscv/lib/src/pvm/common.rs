@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::{
+    default::ConstDefault,
     machine_state::{self, bus::main_memory},
     pvm::sbi,
     state_backend::{self, Atom, Cell},
@@ -77,11 +78,8 @@ pub enum PvmStatus {
     WaitingForMetadata,
 }
 
-impl Default for PvmStatus {
-    #[inline(always)]
-    fn default() -> Self {
-        Self::Evaluating
-    }
+impl ConstDefault for PvmStatus {
+    const DEFAULT: Self = Self::Evaluating;
 }
 
 impl fmt::Display for PvmStatus {
@@ -142,7 +140,7 @@ impl<
     {
         self.version.write(INITIAL_VERSION);
         self.machine_state.reset();
-        self.status.write(PvmStatus::default());
+        self.status.write(PvmStatus::DEFAULT);
     }
 
     /// Handle an exception using the defined Execution Environment.

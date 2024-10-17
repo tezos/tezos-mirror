@@ -5,6 +5,7 @@
 
 pub mod bits;
 mod cache_utils;
+pub mod default;
 pub mod devicetree;
 mod interpreter;
 pub mod kernel_loader;
