@@ -73,6 +73,13 @@ let fail_on_empty_baker_args baker_args =
 
 let get_base_dir = get_arg_value ~arg:base_dir_arg ~short_arg:base_dir_short_arg
 
+type args = {
+  node_endpoint : string;
+  base_dir : string option;
+  binaries_directory : string option;
+  baker_args : string list;
+}
+
 let parse_args all_args =
   let all_args = Array.to_list all_args in
   (* Specific vesrion case *)
@@ -83,11 +90,11 @@ let parse_args all_args =
   let agnostic_baker_args, baker_args = split_args all_args in
   let () = fail_on_empty_baker_args baker_args in
   let () = help_cmd agnostic_baker_args in
-  let endpoint =
+  let node_endpoint =
     Option.value
       ~default:Parameters.default_node_endpoint
       (get_endpoint baker_args)
   in
   let binaries_directory = get_binaries_directory agnostic_baker_args in
   let base_dir = get_base_dir baker_args in
-  (endpoint, base_dir, binaries_directory, baker_args)
+  {node_endpoint; base_dir; binaries_directory; baker_args}

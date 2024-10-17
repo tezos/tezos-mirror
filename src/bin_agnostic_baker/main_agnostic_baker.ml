@@ -7,7 +7,7 @@
 
 let run () =
   let open Lwt_result_syntax in
-  let node_endpoint, base_dir, binaries_directory, baker_args =
+  let Run_args.{node_endpoint; base_dir; binaries_directory; baker_args} =
     Run_args.parse_args Sys.argv
   in
   let*! () =
