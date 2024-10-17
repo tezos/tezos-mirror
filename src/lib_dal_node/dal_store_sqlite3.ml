@@ -62,7 +62,7 @@ module Q = struct
       You can review the result at
       [tezt/tests/expected/dal.ml/DAL Node- debug print store schemas.out].
     *)
-    let version = 1
+    let version = 2
 
     let all : Dal_node_migrations.migration list =
       Dal_node_migrations.migrations version
