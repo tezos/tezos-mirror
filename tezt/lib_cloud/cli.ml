@@ -233,7 +233,7 @@ let open_telemetry =
     ~section
     ~set_long:"open-telemetry"
     ~unset_long:"no-open-telemetry"
-    ~set_long_synonyms:["ot"]
+    ~set_long_synonyms:["otel"]
     ~description:"Run the Open Telemetry stack"
     grafana
 
