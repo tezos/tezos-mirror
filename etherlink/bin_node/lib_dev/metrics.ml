@@ -204,7 +204,12 @@ module Tx_pool = struct
 end
 
 module Simulation = struct
-  type t = {inconsistent_da_fees : Counter.t; confirm_gas_needed : Counter.t}
+  type t = {
+    inconsistent_da_fees : Counter.t;
+    confirm_gas_needed : Counter.t;
+    time_waiting : Counter.t;
+    queue_size : Gauge.t;
+  }
 
   let init name =
     let inconsistent_da_fees =
@@ -227,7 +232,27 @@ module Simulation = struct
         "confirm_gas_needed"
         name
     in
-    {inconsistent_da_fees; confirm_gas_needed}
+    let time_waiting =
+      Counter.v_label
+        ~registry
+        ~label_name:"time_waiting"
+        ~help:"Time spent by a request waiting for a worker (in picosecond)."
+        ~namespace
+        ~subsystem
+        "time_waiting"
+        name
+    in
+    let queue_size =
+      Gauge.v_label
+        ~registry
+        ~label_name:"queue_size"
+        ~help:"Size of the execution queue of simulations"
+        ~namespace
+        ~subsystem
+        "queue_size"
+        name
+    in
+    {inconsistent_da_fees; confirm_gas_needed; time_waiting; queue_size}
 end
 
 type t = {
@@ -283,6 +308,13 @@ let set_confirmed_level ~level =
 let start_bootstrapping () = Gauge.set metrics.health.bootstrapping 1.
 
 let stop_bootstrapping () = Gauge.set metrics.health.bootstrapping 0.
+
+let inc_time_waiting span =
+  let _, time = Ptime.Span.to_d_ps span in
+  Counter.inc metrics.simulation.time_waiting (Int64.to_float time)
+
+let set_simulation_queue_size size =
+  Gauge.set metrics.simulation.queue_size (Int.to_float size)
 
 let is_bootstrapping () =
   (* [bootstrapping] is set to 1.0 when bootstrapping, and 0.0 otherwise. To
