@@ -24,15 +24,14 @@
 //! memory have no guarantees of being consecutive in virtual memory - even if they are at one
 //! point.
 
-use crate::cache_utils::{Sizes, Unparsed};
-use crate::state_backend::{self, CellWrite, ManagerClone};
+use crate::cache_utils::Sizes;
+use crate::state_backend::{self, ManagerClone};
 use crate::traps::EnvironException;
 use crate::{
     cache_utils::FenceCounter,
     parser::instruction::InstrCacheable,
     state_backend::{
-        AllocatedOf, Atom, Cell, LazyCell, ManagerBase, ManagerRead, ManagerReadWrite,
-        ManagerWrite, Ref,
+        AllocatedOf, Atom, Cell, ManagerBase, ManagerRead, ManagerReadWrite, ManagerWrite, Ref,
     },
     traps::Exception,
 };
@@ -56,7 +55,7 @@ pub type CachedLayout = (
     Atom<Address>,
     Atom<FenceCounter>,
     Atom<u8>,
-    [Atom<Unparsed>; CACHE_INSTR],
+    [Atom<InstrCacheable>; CACHE_INSTR],
 );
 
 /// Block cache entry.
@@ -67,7 +66,7 @@ pub struct Cached<M: ManagerBase> {
     address: Cell<Address, M>,
     fence_counter: Cell<FenceCounter, M>,
     len_instr: Cell<u8, M>,
-    instr: [LazyCell<Unparsed, (InstrCacheable, Unparsed), M>; CACHE_INSTR],
+    instr: [Cell<InstrCacheable, M>; CACHE_INSTR],
 }
 
 impl<M: ManagerBase> Cached<M> {
@@ -76,14 +75,7 @@ impl<M: ManagerBase> Cached<M> {
             address: space.0,
             fence_counter: space.1,
             len_instr: space.2,
-            instr: space
-                .3
-                .into_iter()
-                .map(|p| LazyCell::wrap(p))
-                .collect::<Vec<_>>()
-                .try_into()
-                .ok()
-                .unwrap(),
+            instr: space.3,
         }
     }
 
@@ -102,7 +94,9 @@ impl<M: ManagerBase> Cached<M> {
         self.address.write(0);
         self.fence_counter.write(FenceCounter::INITIAL);
         self.len_instr.write(0);
-        self.instr.iter_mut().for_each(|lc| lc.reset(Unparsed(0)));
+        self.instr
+            .iter_mut()
+            .for_each(|lc| lc.write(InstrCacheable::Unknown { instr: 0 }));
     }
 
     fn start_block(&mut self, block_addr: Address, fence_counter: FenceCounter)
@@ -128,13 +122,7 @@ impl<M: ManagerBase> Cached<M> {
             self.address.struct_ref(),
             self.fence_counter.struct_ref(),
             self.len_instr.struct_ref(),
-            self.instr
-                .iter()
-                .map(LazyCell::struct_ref)
-                .collect::<Vec<_>>()
-                .try_into()
-                .map_err(|_| "mismatching lengths for block instructions")
-                .unwrap(),
+            self.instr.each_ref().map(Cell::struct_ref),
         )
     }
 }
@@ -300,7 +288,7 @@ impl<BCL: BlockCacheLayout, M: ManagerBase> BlockCache<BCL, M> {
     where
         M: ManagerReadWrite,
     {
-        let (phys_addr, instr, unparsed) = entry.to_inner();
+        let (phys_addr, instr) = entry.to_inner();
 
         let next_addr = self.next_instr_addr.read();
 
@@ -310,7 +298,7 @@ impl<BCL: BlockCacheLayout, M: ManagerBase> BlockCache<BCL, M> {
             self.reset_to(phys_addr);
         }
 
-        self.cache_inner::<WIDTH>(phys_addr, instr, unparsed);
+        self.cache_inner::<WIDTH>(phys_addr, instr);
     }
 
     fn reset_to(&mut self, phys_addr: Address)
@@ -324,12 +312,8 @@ impl<BCL: BlockCacheLayout, M: ManagerBase> BlockCache<BCL, M> {
     /// Add the instruction into a block.
     ///
     /// If the block is full, a new block will be started.
-    fn cache_inner<const WIDTH: u64>(
-        &mut self,
-        phys_addr: Address,
-        instr: InstrCacheable,
-        bytes: Unparsed,
-    ) where
+    fn cache_inner<const WIDTH: u64>(&mut self, phys_addr: Address, instr: InstrCacheable)
+    where
         M: ManagerReadWrite,
     {
         let mut block_addr = self.current_block_addr.read();
@@ -354,7 +338,7 @@ impl<BCL: BlockCacheLayout, M: ManagerBase> BlockCache<BCL, M> {
             len_instr = 0;
         }
 
-        entry.instr[len_instr as usize].write((instr, bytes));
+        entry.instr[len_instr as usize].write(instr);
 
         let new_len = len_instr + 1;
         entry.len_instr.write(new_len);
@@ -395,7 +379,7 @@ impl<BCL: BlockCacheLayout, M: ManagerClone> Clone for BlockCache<BCL, M> {
 
 /// A block fetched from the block cache, that can be executed against the machine state.
 pub struct Block<'a, M: ManagerBase> {
-    instr: &'a mut [LazyCell<Unparsed, (InstrCacheable, Unparsed), M>],
+    instr: &'a mut [Cell<InstrCacheable, M>],
 }
 
 impl<'a, M: ManagerRead> Block<'a, M> {
@@ -436,8 +420,8 @@ impl<'a, M: ManagerRead> Block<'a, M> {
         ML: main_memory::MainMemoryLayout,
         M: ManagerReadWrite,
     {
-        for i in self.instr.iter_mut().map(|i| &i.read_ref().0) {
-            match core.run_instr_cacheable(i) {
+        for i in self.instr.iter() {
+            match core.run_instr_cacheable(i.as_ref()) {
                 Ok(ProgramCounterUpdate::Add(width)) => {
                     *instr_pc += width;
                     core.hart.pc.write(*instr_pc);
@@ -473,9 +457,7 @@ impl<'a, M: ManagerRead> Block<'a, M> {
     where
         M: ManagerRead,
     {
-        use crate::state_backend::CellRead;
-
-        self.instr.iter().map(|cell| cell.read().0).collect()
+        self.instr.iter().map(|cell| cell.read()).collect()
     }
 }
 
@@ -495,7 +477,6 @@ mod tests {
     backend_test!(test_writing_full_block_fetchable_uncompressed, F, {
         let mut state = create_state!(BlockCache, TestLayout, F, TestLayout);
 
-        let uncompressed_bytes = 0x00533423;
         let uncompressed = InstrCacheable::Sd(SBTypeArgs {
             rs1: t1,
             rs2: t0,
@@ -505,11 +486,7 @@ mod tests {
         let phys_addr = 10;
 
         for offset in 0..(CACHE_INSTR as u64) {
-            let entry = ValidatedCacheEntry::from_raw(
-                phys_addr + (offset * 4),
-                uncompressed,
-                Unparsed(uncompressed_bytes),
-            );
+            let entry = ValidatedCacheEntry::from_raw(phys_addr + (offset * 4), uncompressed);
             state.push_instr::<4>(entry);
         }
 
@@ -521,17 +498,12 @@ mod tests {
     backend_test!(test_writing_full_block_fetchable_compressed, F, {
         let mut state = create_state!(BlockCache, TestLayout, F, TestLayout);
 
-        let compressed_bytes = 0x4505;
         let compressed = InstrCacheable::CLi(CIBTypeArgs { rd_rs1: a0, imm: 1 });
 
         let phys_addr = 10;
 
         for offset in 0..(CACHE_INSTR as u64) {
-            let entry = ValidatedCacheEntry::from_raw(
-                phys_addr + (offset * 2),
-                compressed,
-                Unparsed(compressed_bytes),
-            );
+            let entry = ValidatedCacheEntry::from_raw(phys_addr + (offset * 2), compressed);
             state.push_instr::<2>(entry);
         }
 
@@ -544,17 +516,12 @@ mod tests {
     backend_test!(test_writing_half_block_fetchable_compressed, F, {
         let mut state = create_state!(BlockCache, TestLayout, F, TestLayout);
 
-        let compressed_bytes = 0x4505;
         let compressed = InstrCacheable::CLi(CIBTypeArgs { rd_rs1: a0, imm: 1 });
 
         let phys_addr = 10;
 
         for offset in 0..((CACHE_INSTR / 2) as u64) {
-            let entry = ValidatedCacheEntry::from_raw(
-                phys_addr + (offset * 2),
-                compressed,
-                Unparsed(compressed_bytes),
-            );
+            let entry = ValidatedCacheEntry::from_raw(phys_addr + (offset * 2), compressed);
             state.push_instr::<2>(entry);
         }
 
@@ -566,17 +533,12 @@ mod tests {
     backend_test!(test_writing_two_blocks_fetchable_compressed, F, {
         let mut state = create_state!(BlockCache, TestLayout, F, TestLayout);
 
-        let compressed_bytes = 0x4505;
         let compressed = InstrCacheable::CLi(CIBTypeArgs { rd_rs1: a0, imm: 1 });
 
         let phys_addr = 10;
 
         for offset in 0..((CACHE_INSTR * 2) as u64) {
-            let entry = ValidatedCacheEntry::from_raw(
-                phys_addr + (offset * 2),
-                compressed,
-                Unparsed(compressed_bytes),
-            );
+            let entry = ValidatedCacheEntry::from_raw(phys_addr + (offset * 2), compressed);
             state.push_instr::<2>(entry);
         }
 
@@ -593,17 +555,12 @@ mod tests {
     backend_test!(test_crossing_page_exactly_creates_new_block, F, {
         let mut state = create_state!(BlockCache, TestLayout, F, TestLayout);
 
-        let compressed_bytes = 0x4505;
         let compressed = InstrCacheable::CLi(CIBTypeArgs { rd_rs1: a0, imm: 1 });
 
         let phys_addr = PAGE_SIZE - 10;
 
         for offset in 0..10 {
-            let entry = ValidatedCacheEntry::from_raw(
-                phys_addr + (offset * 2),
-                compressed,
-                Unparsed(compressed_bytes),
-            );
+            let entry = ValidatedCacheEntry::from_raw(phys_addr + (offset * 2), compressed);
             state.push_instr::<2>(entry);
         }
 

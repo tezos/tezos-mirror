@@ -52,6 +52,8 @@ pub enum Privilege {
     TryFromPrimitive,
     strum::Display,
     Hash,
+    serde::Serialize,
+    serde::Deserialize,
 )]
 #[repr(usize)]
 pub enum CSRegister {
