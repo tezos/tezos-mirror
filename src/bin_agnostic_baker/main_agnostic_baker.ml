@@ -15,11 +15,8 @@ let run () =
       ~config:(Parameters.log_config ~base_dir)
       ()
   in
-  let* _daemon =
-    Daemon.run
-      ~state:
-        {binaries_directory; node_endpoint; baker_args; current_baker = None}
-  in
+  let daemon = Daemon.create ~binaries_directory ~node_endpoint ~baker_args in
+  let* (_ : unit) = Daemon.run daemon in
   let*! () = Lwt_utils.never_ending () in
   return_unit
 

@@ -7,15 +7,16 @@
 
 (** Daemon handling the bakers life cycle. *)
 
-module Baker : sig
-  type t
-end
+type t
 
-type state = {
-  binaries_directory : string option;
-  node_endpoint : string;
-  baker_args : string list;
-  mutable current_baker : Baker.t option;
-}
+(** [create binaries_directory node_endpoint baker_args] returns a non
+    initialized daemon.*)
+val create :
+  binaries_directory:string option ->
+  node_endpoint:string ->
+  baker_args:string trace ->
+  t
 
-val run : state:state -> unit tzresult Lwt.t
+(** [run t] Runs the daemon responsible for the spawn/stop of the
+    baker daemons.  *)
+val run : t -> unit tzresult Lwt.t

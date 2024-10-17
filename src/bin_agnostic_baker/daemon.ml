@@ -73,6 +73,8 @@ type state = {
   mutable current_baker : Baker.t option;
 }
 
+type t = state
+
 let monitor_heads ~node_addr =
   let open Lwt_result_syntax in
   let uri = Format.sprintf "%s/monitor/heads/main" node_addr in
@@ -210,7 +212,10 @@ let may_start_initial_baker state =
   in
   may_start ~head_stream:None ()
 
-let run ~state =
+let create ~binaries_directory ~node_endpoint ~baker_args =
+  {binaries_directory; node_endpoint; baker_args; current_baker = None}
+
+let run state =
   let open Lwt_result_syntax in
   let node_addr = state.node_endpoint in
   let*! () = Agnostic_baker_events.(emit starting_daemon) () in
