@@ -43,93 +43,6 @@ let () =
     (function Lost_node_connection -> Some () | _ -> None)
     (fun () -> Lost_node_connection)
 
-module Events = struct
-  include Internal_event.Simple
-
-  let section = ["agnostic-baker"]
-
-  let alternative_color = Internal_event.Green
-
-  (* Notice *)
-  let starting_baker =
-    declare_2
-      ~section
-      ~alternative_color
-      ~level:Notice
-      ~name:"starting_baker"
-      ~msg:"starting baker for protocol {proto} with arguments: {args}"
-      ("proto", Protocol_hash.encoding)
-      ("args", string)
-      ~pp1:Protocol_hash.pp_short
-
-  let baker_running =
-    declare_1
-      ~section
-      ~alternative_color
-      ~level:Notice
-      ~name:"baker_running"
-      ~msg:"baker for protocol {proto} is now running"
-      ("proto", Protocol_hash.encoding)
-      ~pp1:Protocol_hash.pp_short
-
-  let stopping_baker =
-    declare_1
-      ~section
-      ~level:Notice
-      ~name:"stopping_baker"
-      ~msg:"stopping baker for protocol {proto}"
-      ("proto", Protocol_hash.encoding)
-      ~pp1:Protocol_hash.pp_short
-
-  let starting_daemon =
-    declare_0
-      ~section
-      ~alternative_color
-      ~level:Notice
-      ~name:"starting_daemon"
-      ~msg:"agnostic baker started"
-      ()
-
-  let stopping_daemon =
-    declare_0
-      ~section
-      ~level:Notice
-      ~name:"stopping_daemon"
-      ~msg:"stopping agnostic daemon"
-      ()
-
-  let protocol_encountered =
-    declare_2
-      ~section
-      ~level:Notice
-      ~name:"protocol_encountered"
-      ~msg:"the {status} protocol {proto_hash} was encountered"
-      ("status", Parameters.status_encoding)
-      ~pp1:Parameters.pp_status
-      ("proto_hash", Protocol_hash.encoding)
-      ~pp2:Protocol_hash.pp_short
-
-  let waiting_for_active_protocol =
-    declare_0
-      ~section
-      ~alternative_color
-      ~level:Notice
-      ~name:"waiting_for_active_protocol"
-      ~msg:"waiting for active protocol"
-      ()
-
-  let period_status =
-    declare_2
-      ~section
-      ~alternative_color
-      ~level:Notice
-      ~name:"period_status"
-      ~msg:
-        "new block on {period} period (remaining period duration {remaining})"
-      ("period", string)
-      ("remaining", int31)
-end
-
 module Baker = struct
   type t = {
     protocol_hash : Protocol_hash.t;
@@ -146,7 +59,7 @@ module Baker = struct
 
   let shutdown protocol_hash process =
     let open Lwt_syntax in
-    let* () = Events.(emit stopping_baker) protocol_hash in
+    let* () = Agnostic_baker_events.(emit stopping_baker) protocol_hash in
     process#terminate ;
     Lwt.return_unit
 
@@ -160,7 +73,9 @@ module Baker = struct
            Format.pp_print_string)
         baker_args
     in
-    let*! () = Events.(emit starting_baker) (protocol_hash, args_as_string) in
+    let*! () =
+      Agnostic_baker_events.(emit starting_baker) (protocol_hash, args_as_string)
+    in
     let binary_path = baker_path ?user_path:binaries_directory protocol_hash in
     let baker_args = binary_path :: baker_args in
     let baker_args = Array.of_list baker_args in
@@ -170,7 +85,7 @@ module Baker = struct
         ~stderr:`Keep
         (binary_path, baker_args)
     in
-    let*! () = Events.(emit baker_running) protocol_hash in
+    let*! () = Agnostic_baker_events.(emit baker_running) protocol_hash in
     let ccid =
       Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
           let*! () = shutdown protocol_hash process in
@@ -330,7 +245,8 @@ module Daemon = struct
       Parameters.protocol_status (Protocol_hash.to_b58check next_protocol_hash)
     in
     let*! () =
-      Events.(emit protocol_encountered) (next_proto_status, next_protocol_hash)
+      Agnostic_baker_events.(emit protocol_encountered)
+        (next_proto_status, next_protocol_hash)
     in
     let*! () =
       match state.current_baker with
@@ -358,7 +274,9 @@ module Daemon = struct
       match v with
       | Some _tick ->
           let* period_kind, remaining = RPC.get_current_period ~node_addr in
-          let*! () = Events.(emit period_status) (period_kind, remaining) in
+          let*! () =
+            Agnostic_baker_events.(emit period_status) (period_kind, remaining)
+          in
           let* next_protocol_hash = RPC.get_next_protocol_hash ~node_addr in
           let current_protocol_hash =
             match state.current_baker with
@@ -396,7 +314,8 @@ module Daemon = struct
         | None -> Lwt.return_unit
         | Some h ->
             if not (Protocol_hash.equal h protocol_hash) then
-              Events.(emit protocol_encountered) (proto_status, protocol_hash)
+              Agnostic_baker_events.(emit protocol_encountered)
+                (proto_status, protocol_hash)
             else Lwt.return_unit
       in
       match proto_status with
@@ -415,10 +334,12 @@ module Daemon = struct
             | Some v -> return v
             | None ->
                 let*! () =
-                  Events.(emit protocol_encountered)
+                  Agnostic_baker_events.(emit protocol_encountered)
                     (proto_status, protocol_hash)
                 in
-                let*! () = Events.(emit waiting_for_active_protocol) () in
+                let*! () =
+                  Agnostic_baker_events.(emit waiting_for_active_protocol) ()
+                in
                 monitor_heads ~node_addr:state.node_endpoint
           in
           let*! v = Lwt_stream.get head_stream in
@@ -435,10 +356,10 @@ module Daemon = struct
   let run ~state =
     let open Lwt_result_syntax in
     let node_addr = state.node_endpoint in
-    let*! () = Events.(emit starting_daemon) () in
+    let*! () = Agnostic_baker_events.(emit starting_daemon) () in
     let _ccid =
       Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
-          let*! () = Events.(emit stopping_daemon) () in
+          let*! () = Agnostic_baker_events.(emit stopping_daemon) () in
           Lwt.return_unit)
     in
     let* () = may_start_initial_baker state in
