@@ -4,12 +4,14 @@
 (* Copyright (c) 2021-2023 Nomadic Labs <contact@nomadic-labs.com>           *)
 (* Copyright (c) 2022-2023 Trili Tech <contact@trili.tech>                   *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
+(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (*****************************************************************************)
 
 open Manifest
 open Externals
 open Internals
+open Product_cohttp
 open Product_octez
 open Product_prometheus
 
@@ -339,3 +341,26 @@ let _tezt_testnet_scenarios =
         tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
         tezt_etherlink |> open_;
       ]
+
+let _etherlink_governance_observer =
+  public_exe
+    "etherlink-governance-observer"
+    ~internal_name:"governance_observer"
+    ~path:"etherlink/governance-metrics/src"
+    ~opam:"etherlink-governance-observer"
+    ~synopsis:
+      "A binary to observe, scrap and store Etherlink's governance contracts \
+       informations"
+    ~deps:
+      [
+        bls12_381_archive;
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_base_unix;
+        octez_clic;
+        prometheus_app;
+        cohttp_lwt_unix;
+        cohttp_lwt;
+        octez_rpc_http |> open_;
+        octez_rpc_http_client_unix;
+      ]
+    ~bisect_ppx:Yes
