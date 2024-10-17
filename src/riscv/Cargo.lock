@@ -1318,6 +1318,7 @@ dependencies = [
  "goldenfile",
  "hex",
  "ieee-apsqrt",
+ "itertools",
  "lazy_static",
  "num_enum",
  "ocaml",
