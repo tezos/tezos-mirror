@@ -112,7 +112,93 @@ module Migrations = struct
     Db.exec conn Q.Migrations.register_migration (id, M.name)
 end
 
+module Types = struct
+  let from_encoding ~name encoding =
+    custom
+      ~encode:(fun v ->
+        Data_encoding.Binary.to_string encoding v
+        |> Result.map_error
+             (Format.asprintf
+                "Fail to encode %s for database: %a"
+                name
+                Data_encoding.Binary.pp_write_error))
+      ~decode:(fun s ->
+        Data_encoding.Binary.of_string encoding s
+        |> Result.map_error
+             (Format.asprintf
+                "Fail to decode %s from database: %a"
+                name
+                Data_encoding.Binary.pp_read_error))
+      octets
+
+  open Tezos_dal_node_services.Types
+
+  let attested_level : level Caqti_type.t = int32
+
+  let dal_slot_index : slot_index Caqti_type.t = int16
+
+  let skip_list_hash =
+    from_encoding ~name:"skip_list_hash" Dal_proto_types.Skip_list_hash.encoding
+
+  let skip_list_cell =
+    from_encoding ~name:"skip_list_cell" Dal_proto_types.Skip_list_cell.encoding
+end
+
 module Skip_list_cells = struct
+  open Types
+
+  module Q = struct
+    [@@@warning "-32"]
+
+    open Dal_proto_types
+    open Tezos_dal_node_services.Types
+
+    let find : (Skip_list_hash.t, Skip_list_cell.t, [`One]) Caqti_request.t =
+      (skip_list_hash ->! skip_list_cell)
+      @@ {sql|
+      SELECT cell
+      FROM skip_list_cells
+      WHERE hash = $1
+      |sql}
+
+    let insert_skip_list_slot :
+        (level * slot_index * Skip_list_hash.t, unit, [`Zero]) Caqti_request.t =
+      (t3 attested_level dal_slot_index skip_list_hash ->. unit)
+      @@ {sql|
+      INSERT INTO skip_list_slots
+      (attested_level, slot_index, skip_list_cell_hash)
+      VALUES ($1, $2, $3)
+      ON CONFLICT DO UPDATE SET skip_list_cell_hash = $3
+      |sql}
+
+    let insert_skip_list_cell :
+        (Skip_list_hash.t * Skip_list_cell.t, unit, [`Zero]) Caqti_request.t =
+      (t2 skip_list_hash skip_list_cell ->. unit)
+      @@ {sql|
+      INSERT INTO skip_list_cells
+      (hash, cell)
+      VALUES ($1, $2)
+      ON CONFLICT DO UPDATE SET cell = $2
+      |sql}
+
+    let delete_skip_list_cell : (level, unit, [`Zero]) Caqti_request.t =
+      (attested_level ->. unit)
+      @@ {sql|
+      DELETE FROM skip_list_cells
+      WHERE hash IN (
+        SELECT skip_list_cell_hash
+        FROM skip_list_slots
+        WHERE attested_level = $1)
+      |sql}
+
+    let delete_skip_list_slot : (level, unit, [`Zero]) Caqti_request.t =
+      (attested_level ->. unit)
+      @@ {sql|
+      DELETE FROM skip_list_slots
+      WHERE attested_level = $1
+      |sql}
+  end
+
   let find _store _hash =
     failwith "Dal_store_sqlite3.Skip_list_cells.find not implemented"
 
