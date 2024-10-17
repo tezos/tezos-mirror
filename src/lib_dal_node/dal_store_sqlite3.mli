@@ -36,20 +36,25 @@ end
 module Skip_list_cells : sig
   open Dal_proto_types
 
-  (** [find store hash] returns the cell associated to [hash] in the [store], if
-      any. *)
-  val find : t -> Skip_list_hash.t -> Skip_list_cell.t tzresult Lwt.t
+  (** [find ?conn store hash] returns the cell associated to [hash] in
+      the [store], if any. Uses the [conn] if provided (defaults to
+      [None]). *)
+  val find :
+    ?conn:conn -> t -> Skip_list_hash.t -> Skip_list_cell.t tzresult Lwt.t
 
-  (** [insert store ~attested_level values] inserts the given list of [values]
-      associated to the given [attested_level] in the [store]. Any existing value
-      is overridden. *)
+  (** [insert ?conn store ~attested_level values] inserts the given
+      list of [values] associated to the given [attested_level] in the
+      [store]. Any existing value is overridden. Uses the [conn] if
+      provided (defaults to [None]). *)
   val insert :
+    ?conn:conn ->
     t ->
     attested_level:int32 ->
     (Skip_list_hash.t * Skip_list_cell.t) list ->
     unit tzresult Lwt.t
 
-  (** [remove store ~attested_level] removes any data related to [attested_level]
-      from the [store]. *)
-  val remove : t -> attested_level:int32 -> unit tzresult Lwt.t
+  (** [remove ?conn store ~attested_level] removes any data related to
+      [attested_level] from the [store]. Uses the [conn] if provided
+      (defaults to [None]). *)
+  val remove : ?conn:conn -> t -> attested_level:int32 -> unit tzresult Lwt.t
 end

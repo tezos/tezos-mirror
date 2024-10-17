@@ -144,12 +144,16 @@ module Types = struct
     from_encoding ~name:"skip_list_cell" Dal_proto_types.Skip_list_cell.encoding
 end
 
+let with_connection store conn =
+  match conn with
+  | Some conn -> Sqlite.with_connection conn
+  | None ->
+      fun k -> Sqlite.use store @@ fun conn -> Sqlite.with_connection conn k
+
 module Skip_list_cells = struct
   open Types
 
   module Q = struct
-    [@@@warning "-32"]
-
     open Dal_proto_types
     open Tezos_dal_node_services.Types
 
@@ -199,14 +203,30 @@ module Skip_list_cells = struct
       |sql}
   end
 
-  let find _store _hash =
-    failwith "Dal_store_sqlite3.Skip_list_cells.find not implemented"
+  let find ?conn store skip_list_hash =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.find conn Q.find skip_list_hash
 
-  let insert _store ~attested_level:_ _values =
-    failwith "Dal_store_sqlite3.Skip_list_cells.insert not implemented"
+  let remove ?conn store ~attested_level =
+    let open Lwt_result_syntax in
+    with_connection store conn @@ fun conn ->
+    let* () = Sqlite.Db.exec conn Q.delete_skip_list_cell attested_level in
+    let* () = Sqlite.Db.exec conn Q.delete_skip_list_slot attested_level in
+    return_unit
 
-  let remove _store ~attested_level:_ =
-    failwith "Dal_store_sqlite3.Skip_list_cells.remove not implemented"
+  let insert ?conn store ~attested_level items =
+    let open Lwt_result_syntax in
+    with_connection store conn @@ fun conn ->
+    List.iteri_es
+      (fun slot_index (cell_hash, cell) ->
+        let* () =
+          Sqlite.Db.exec
+            conn
+            Q.insert_skip_list_slot
+            (attested_level, slot_index, cell_hash)
+        in
+        Sqlite.Db.exec conn Q.insert_skip_list_cell (cell_hash, cell))
+      items
 end
 
 let sqlite_file_name = "store.sqlite"
