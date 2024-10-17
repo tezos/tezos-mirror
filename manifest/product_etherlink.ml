@@ -97,7 +97,7 @@ let wasm_runtime_callbacks =
         Product_cohttp.cohttp_lwt_unix;
       ]
 
-let wasm_runtime_callbacks_tests =
+let _wasm_runtime_callbacks_tests =
   tezt
     ["test_vector"; "test_store"]
     ~path:"src/lib_wasm_runtime_callbacks/test"
