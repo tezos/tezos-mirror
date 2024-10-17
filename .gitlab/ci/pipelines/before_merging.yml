@@ -4698,6 +4698,29 @@ oc.build:homebrew:
   variables:
     CARGO_NET_OFFLINE: "false"
 
+build_grafazos_dashboards:
+  image: ${jsonnet_image_name}:${jsonnet_image_tag}
+  stage: build
+  tags:
+  - gcp
+  rules:
+  - when: manual
+    allow_failure: true
+  dependencies:
+  - oc.docker:jsonnet:amd64
+  timeout: 60 minutes
+  before_script:
+  - cd grafazos/
+  - jb install github.com/google/go-jsonnet/cmd/jsonnetfmt@7903819
+  script:
+  - make
+  artifacts:
+    name: grafazos-dashboards
+    expire_in: 1 day
+    paths:
+    - grafazos/output/**/*.json
+    when: on_success
+
 oc.script.docker_verify_image_arm64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
   stage: manual
