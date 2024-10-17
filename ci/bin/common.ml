@@ -1200,6 +1200,29 @@ let job_datadog_pipeline_trace : tezos_job =
        pipeline_type:$PIPELINE_TYPE";
     ]
 
+(* Manual job that builds the Grafazos dashboards *)
+let job_build_grafazos : tezos_job =
+  job
+    ~__POS__
+    ~name:"build_grafazos_dashboards"
+    ~image:Images.jsonnet
+    ~stage:Stages.build
+    ~rules:[job_rule ~when_:Manual ()]
+    ~artifacts:
+      (artifacts
+         ~name:"grafazos-dashboards"
+         ~expire_in:(Duration (Days 1))
+         ~when_:On_success
+         ["grafazos/output/**/*.json"])
+    ~before_script:
+      [
+        "cd grafazos/";
+        (* For security, we explicitly install v0.20
+           which corresponds to commit [7903819]. *)
+        "jb install github.com/google/go-jsonnet/cmd/jsonnetfmt@7903819";
+      ]
+    ["make"]
+
 module Tezt = struct
   (** Create a tezt job.
 
