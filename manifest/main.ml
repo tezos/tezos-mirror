@@ -78,6 +78,8 @@ let exclude filename =
   | "src" :: "riscv" :: _ -> true
   (* [src/dune] is either absent or copied from [script-inputs/slim-mode-dune]. *)
   | "src" :: "dune" :: _ -> true
+  (* [manifest/dune] serves for ocaml-lsp to handle the manifest. *)
+  | "manifest" :: "dune" :: _ -> true
   | _ -> false
 
 let () =
