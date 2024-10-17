@@ -31,7 +31,22 @@ module Term = struct
     let decoder str =
       match P2p_point.Id.of_string ~default_port str with
       | Ok x -> Ok x
-      | Error msg -> Error (`Msg msg)
+      | Error msg -> (
+          (* Let's check if the user has entered a port *)
+          match String.split_on_char ':' str with
+          | [""; port] -> (
+              try
+                let port = int_of_string port in
+                let default =
+                  (fst Configuration_file.default.public_addr, port)
+                in
+                Ok default
+              with Failure _ ->
+                Error
+                  (`Msg
+                    (Format.asprintf "The port provided: '%s' is invalid" port))
+              )
+          | _ -> Error (`Msg msg))
     in
     let printer = P2p_point.Id.pp in
     Arg.conv (decoder, printer)
