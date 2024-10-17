@@ -95,6 +95,12 @@ module Accountability = struct
 
   type t = {number_of_attested_shards : int SlotMap.t; number_of_slots : int}
 
+  type attestation_status = {
+    total_shards : int;
+    attested_shards : int;
+    is_proto_attested : bool;
+  }
+
   let init ~number_of_slots =
     {number_of_attested_shards = SlotMap.empty; number_of_slots}
 
@@ -136,6 +142,13 @@ module Accountability = struct
       | None -> 0
       | Some v -> v
     in
-    Compare.Int.(
-      number_of_attested_shards >= threshold * number_of_shards / 100)
+    let is_proto_attested =
+      Compare.Int.(
+        number_of_attested_shards >= threshold * number_of_shards / 100)
+    in
+    {
+      is_proto_attested;
+      attested_shards = number_of_attested_shards;
+      total_shards = number_of_shards;
+    }
 end

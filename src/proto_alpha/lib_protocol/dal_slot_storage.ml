@@ -36,7 +36,9 @@ let finalize_current_slot_headers ctxt =
 let compute_attested_slot_headers ~is_slot_attested seen_slot_headers =
   let open Dal_slot_repr in
   let fold_attested_slots (rev_attested_slot_headers, attestation) slot =
-    if is_slot_attested slot then
+    let attestation_status = is_slot_attested slot in
+    if attestation_status.Dal_attestation_repr.Accountability.is_proto_attested
+    then
       ( slot :: rev_attested_slot_headers,
         Dal_attestation_repr.commit attestation slot.Header.id.index )
     else (rev_attested_slot_headers, attestation)

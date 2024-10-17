@@ -2776,6 +2776,12 @@ module Dal : sig
 
     type shard_index = int
 
+    type attestation_status = {
+      total_shards : int;
+      attested_shards : int;
+      is_proto_attested : bool;
+    }
+
     module Shard_map : Map.S with type key = shard_index
 
     val encoding : t Data_encoding.t
@@ -2876,7 +2882,7 @@ module Dal : sig
       context -> number_of_slots:int -> (context * Attestation.t) tzresult Lwt.t
 
     val compute_attested_slot_headers :
-      is_slot_attested:(Header.t -> bool) ->
+      is_slot_attested:(Header.t -> Attestation.attestation_status) ->
       Header.t list ->
       Header.t list * Attestation.t
   end

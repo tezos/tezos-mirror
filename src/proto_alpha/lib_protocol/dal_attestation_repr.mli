@@ -92,6 +92,15 @@ module Accountability : sig
   (** The data-structure used to record the shards attestations. *)
   type t
 
+  type attestation_status = {
+    total_shards : int;  (** The total number of (attestable) shards. *)
+    attested_shards : int;
+        (** The total number of shards that have been attested. *)
+    is_proto_attested : bool;
+        (** The boolean is set to [true] IFF the [attestation_ratio] is below or
+            equal to the threshold defined by the protocol. *)
+  }
+
   (** DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3145
 
      Consider using the [Bounded] module. In particular, change the
@@ -113,7 +122,15 @@ module Accountability : sig
       [threshold] with respect to the total number of shards specified by
       [number_of_shards]. Returns [false] otherwise or if the [index] is out of
       the interval [0; number_of_slots - 1] where [number_of_slots] is the value
-      provided to the [init] function. *)
+      provided to the [init] function.
+
+      Whether the slot is attested by the protocol or not, the function also
+      returns the ratio of attested shards w.r.t. total shards, as a rational
+      number. *)
   val is_slot_attested :
-    t -> threshold:int -> number_of_shards:int -> Dal_slot_index_repr.t -> bool
+    t ->
+    threshold:int ->
+    number_of_shards:int ->
+    Dal_slot_index_repr.t ->
+    attestation_status
 end

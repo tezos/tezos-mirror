@@ -87,6 +87,8 @@ val get_slot_headers_history :
     filter the given [published_slot_headers] and return the list of attested
     slot headers and the corresponding bitset. *)
 val compute_attested_slot_headers :
-  is_slot_attested:(Dal_slot_repr.Header.t -> bool) ->
+  is_slot_attested:
+    (Dal_slot_repr.Header.t ->
+    Dal_attestation_repr.Accountability.attestation_status) ->
   Dal_slot_repr.Header.t list ->
   Dal_slot_repr.Header.t list * Dal_attestation_repr.t
