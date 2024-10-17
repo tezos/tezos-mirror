@@ -930,6 +930,31 @@ let[@warning "-32"] get_previous_protocol_constants ctxt =
              context."
       | Some constants -> return constants)
 
+let update_cycle_eras ctxt level ~prev_blocks_per_cycle ~blocks_per_cycle
+    ~blocks_per_commitment =
+  let open Lwt_result_syntax in
+  let* cycle_eras = get_cycle_eras ctxt in
+  let current_era = Level_repr.current_era cycle_eras in
+  let current_cycle =
+    let level_position =
+      Int32.sub level (Raw_level_repr.to_int32 current_era.first_level)
+    in
+    Cycle_repr.add
+      current_era.first_cycle
+      (Int32.to_int (Int32.div level_position prev_blocks_per_cycle))
+  in
+  let new_cycle_era =
+    Level_repr.
+      {
+        first_level = Raw_level_repr.of_int32_exn (Int32.succ level);
+        first_cycle = Cycle_repr.succ current_cycle;
+        blocks_per_cycle;
+        blocks_per_commitment;
+      }
+  in
+  let*? new_cycle_eras = Level_repr.add_cycle_era new_cycle_era cycle_eras in
+  set_cycle_eras ctxt new_cycle_eras
+
 (* Start of code to remove at next automatic protocol snapshot *)
 
 (* Please add here any code that should be removed at the next automatic protocol snapshot *)
@@ -947,7 +972,7 @@ let[@warning "-32"] get_previous_protocol_constants ctxt =
    encoding directly in a way which is compatible with the previous
    protocol. However, by doing so, you do not change the value of
    these constants inside the context. *)
-let prepare_first_block ~level ~timestamp _chain_id ctxt =
+let prepare_first_block ~level ~timestamp chain_id ctxt =
   let open Lwt_result_syntax in
   let* previous_proto, ctxt = check_and_update_protocol_version ctxt in
   let* ctxt, previous_proto_constants =
@@ -1531,6 +1556,41 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
             direct_ticket_spending_enable;
             aggregate_attestation = false;
           }
+        in
+        let new_constants : Constants_parametric_repr.t option =
+          (* This check is used to trigger the constants changes at migration on
+             this protocol for mainnet *)
+          if
+            Chain_id.(chain_id = Constants_repr.mainnet_id)
+            && Compare.Int32.(constants.blocks_per_cycle > 10800l)
+            && Compare.Int64.(Period_repr.to_seconds c.minimal_block_delay = 8L)
+          then
+            Some
+              {
+                constants with
+                blocks_per_cycle = 10800l;
+                cycles_per_voting_period = 14l;
+              }
+          else if
+            (* for ghostnet with block_time = 4s *)
+            Compare.Int32.(constants.blocks_per_cycle > 10800l)
+            && Compare.Int64.(Period_repr.to_seconds c.minimal_block_delay = 4L)
+          then Some {constants with blocks_per_cycle = 10800l}
+          else None
+        in
+        let* ctxt, constants =
+          match new_constants with
+          | Some new_constants ->
+              let* ctxt =
+                update_cycle_eras
+                  ctxt
+                  level
+                  ~prev_blocks_per_cycle:constants.blocks_per_cycle
+                  ~blocks_per_cycle:new_constants.blocks_per_cycle
+                  ~blocks_per_commitment:new_constants.blocks_per_commitment
+              in
+              return (ctxt, new_constants)
+          | None -> return (ctxt, constants)
         in
         let*! ctxt = add_constants ctxt constants in
 

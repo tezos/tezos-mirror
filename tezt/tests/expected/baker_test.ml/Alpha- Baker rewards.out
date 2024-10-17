@@ -15,7 +15,7 @@
   "voting_period_info":
     { "voting_period":
         { "index": 0, "kind": "proposal", "start_position": 0 },
-      "position": 1, "remaining": 153598 }, "nonce_hash": null,
+      "position": 1, "remaining": 151198 }, "nonce_hash": null,
   "deactivated": [],
   "balance_updates":
     [ { "kind": "minted", "category": "bootstrap",
