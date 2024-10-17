@@ -643,7 +643,7 @@ module Make (Proto : Protocol_plugin.T) = struct
                           oph
                           op
                         [@profiler.record_s sec]
-                        (* TODO: Add a ~lod:detailed payload *))
+                        (* TODO: Add a ~verbosity:detailed payload *))
                      in
                      return (state, op_metadata :: acc))
                    (state, [])

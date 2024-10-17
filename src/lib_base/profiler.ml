@@ -37,20 +37,20 @@ let ( +* ) {wall = walla; cpu = cpua} {wall = wallb; cpu = cpub} =
 let ( -* ) {wall = walla; cpu = cpua} {wall = wallb; cpu = cpub} =
   {wall = walla -. wallb; cpu = cpua -. cpub}
 
-type lod = Terse | Detailed | Verbose
+type verbosity = Terse | Detailed | Verbose
 
 type aggregated_node = {
   count : int;
   total : span;
   children : aggregated_node StringMap.t;
-  node_lod : lod;
+  node_verbosity : verbosity;
 }
 
 type seq_item = {
   start : time;
   duration : span;
   contents : report;
-  item_lod : lod;
+  item_verbosity : verbosity;
 }
 
 and report = {
@@ -69,7 +69,7 @@ let span_encoding =
   let open Data_encoding in
   conv (fun (Span t) -> t) (fun t -> Span t) time_encoding
 
-let lod_encoding =
+let verbosity_encoding =
   let open Data_encoding in
   string_enum [("terse", Terse); ("detailed", Detailed); ("verbose", Verbose)]
 
@@ -87,30 +87,30 @@ let aggregated_encoding =
            (merge_objs
               (obj1 (req "name" string))
               (conv
-                 (fun {count; total; children; node_lod} ->
-                   (count, total, children, node_lod))
-                 (fun (count, total, children, node_lod) ->
-                   {count; total; children; node_lod})
+                 (fun {count; total; children; node_verbosity} ->
+                   (count, total, children, node_verbosity))
+                 (fun (count, total, children, node_verbosity) ->
+                   {count; total; children; node_verbosity})
                  (obj4
                     (req "count" int31)
                     (req "total" span_encoding)
                     (dft "children" aggregated_encoding StringMap.empty)
-                    (req "lod" lod_encoding))))))
+                    (req "verbosity" verbosity_encoding))))))
 
 let recorded_encoding report_encoding =
   let open Data_encoding in
   list
     (conv
-       (fun (n, {start; duration; contents; item_lod}) ->
-         (n, start, duration, contents, item_lod))
-       (fun (n, start, duration, contents, item_lod) ->
-         (n, {start; duration; contents; item_lod}))
+       (fun (n, {start; duration; contents; item_verbosity}) ->
+         (n, start, duration, contents, item_verbosity))
+       (fun (n, start, duration, contents, item_verbosity) ->
+         (n, {start; duration; contents; item_verbosity}))
        (obj5
           (req "name" string)
           (req "start" time_encoding)
           (req "duration" span_encoding)
           (req "report" report_encoding)
-          (req "lod" lod_encoding)))
+          (req "verbosity" verbosity_encoding)))
 
 let report_encoding =
   let open Data_encoding in
@@ -135,17 +135,17 @@ module type DRIVER = sig
 
   val time : state -> time
 
-  val record : state -> lod -> string -> unit
+  val record : state -> verbosity -> string -> unit
 
-  val aggregate : state -> lod -> string -> unit
+  val aggregate : state -> verbosity -> string -> unit
 
   val stop : state -> unit
 
-  val stamp : state -> lod -> string -> unit
+  val stamp : state -> verbosity -> string -> unit
 
-  val mark : state -> lod -> string list -> unit
+  val mark : state -> verbosity -> string list -> unit
 
-  val span : state -> lod -> span -> string list -> unit
+  val span : state -> verbosity -> span -> string list -> unit
 
   val inc : state -> report -> unit
 
@@ -230,20 +230,20 @@ let iter (p : profiler) f =
       r)
     p
 
-let record p ?(lod = Terse) id =
-  iter p (fun (module I) -> I.Driver.record I.state lod id)
+let record p ?(verbosity = Terse) id =
+  iter p (fun (module I) -> I.Driver.record I.state verbosity id)
 
-let aggregate p ?(lod = Terse) id =
-  iter p (fun (module I) -> I.Driver.aggregate I.state lod id)
+let aggregate p ?(verbosity = Terse) id =
+  iter p (fun (module I) -> I.Driver.aggregate I.state verbosity id)
 
-let stamp p ?(lod = Terse) ids =
-  iter p (fun (module I) -> I.Driver.stamp I.state lod ids)
+let stamp p ?(verbosity = Terse) ids =
+  iter p (fun (module I) -> I.Driver.stamp I.state verbosity ids)
 
-let mark p ?(lod = Terse) ids =
-  iter p (fun (module I) -> I.Driver.mark I.state lod ids)
+let mark p ?(verbosity = Terse) ids =
+  iter p (fun (module I) -> I.Driver.mark I.state verbosity ids)
 
-let span p ?(lod = Terse) d ids =
-  iter p (fun (module I) -> I.Driver.span I.state lod d ids)
+let span p ?(verbosity = Terse) d ids =
+  iter p (fun (module I) -> I.Driver.span I.state verbosity d ids)
 
 let inc p report = iter p (fun (module I) -> I.Driver.inc I.state report)
 
@@ -257,18 +257,19 @@ let section p start id f =
   stop p ;
   match r with Ok r -> r | Error exn -> raise exn
 
-let record_f p ?lod id f = section p (fun p -> record p ?lod) id f
+let record_f p ?verbosity id f = section p (fun p -> record p ?verbosity) id f
 
-let aggregate_f p ?lod id f = section p (fun p -> aggregate p ?lod) id f
+let aggregate_f p ?verbosity id f =
+  section p (fun p -> aggregate p ?verbosity) id f
 
-let span_f p ?(lod = Terse) ids f =
+let span_f p ?(verbosity = Terse) ids f =
   let is = plugged p in
   let t0s = List.map (fun i -> (i, time i)) is in
   let r = try Ok (f ()) with exn -> Error exn in
   List.iter
     (fun (((module I : INSTANCE) as i), t0) ->
       let t = time i in
-      I.Driver.span I.state lod (Span (t -* t0)) ids)
+      I.Driver.span I.state verbosity (Span (t -* t0)) ids)
     t0s ;
   match r with Ok r -> r | Error exn -> raise exn
 
@@ -283,11 +284,12 @@ let section_s p start id f =
       stop p ;
       Lwt.fail exn)
 
-let record_s p ?lod id f = section_s p (fun p -> record p ?lod) id f
+let record_s p ?verbosity id f = section_s p (fun p -> record p ?verbosity) id f
 
-let aggregate_s p ?lod id f = section_s p (fun p -> aggregate p ?lod) id f
+let aggregate_s p ?verbosity id f =
+  section_s p (fun p -> aggregate p ?verbosity) id f
 
-let span_s p ?(lod = Terse) ids f =
+let span_s p ?(verbosity = Terse) ids f =
   let is = plugged p in
   let t0s = List.map (fun i -> (i, time i)) is in
   Lwt.catch
@@ -296,14 +298,14 @@ let span_s p ?(lod = Terse) ids f =
           List.iter
             (fun (((module I : INSTANCE) as i), t0) ->
               let t = time i in
-              I.Driver.span I.state lod (Span (t -* t0)) ids)
+              I.Driver.span I.state verbosity (Span (t -* t0)) ids)
             t0s ;
           Lwt.return r))
     (fun exn ->
       List.iter
         (fun (((module I : INSTANCE) as i), t0) ->
           let t = time i in
-          I.Driver.span I.state lod (Span (t -* t0)) ids)
+          I.Driver.span I.state verbosity (Span (t -* t0)) ids)
         t0s ;
       Lwt.fail exn)
 
@@ -351,7 +353,7 @@ let with_new_profiler_s driver state f =
 let main = unplugged ()
 
 module type GLOBAL_PROFILER = sig
-  type nonrec lod = lod = Terse | Detailed | Verbose
+  type nonrec verbosity = verbosity = Terse | Detailed | Verbose
 
   val plug : instance -> unit
 
@@ -363,36 +365,39 @@ module type GLOBAL_PROFILER = sig
 
   val plugged : unit -> instance list
 
-  val record : ?lod:lod -> string -> unit
+  val record : ?verbosity:verbosity -> string -> unit
 
-  val aggregate : ?lod:lod -> string -> unit
+  val aggregate : ?verbosity:verbosity -> string -> unit
 
   val stop : unit -> unit
 
-  val stamp : ?lod:lod -> string -> unit
+  val stamp : ?verbosity:verbosity -> string -> unit
 
-  val mark : ?lod:lod -> string list -> unit
+  val mark : ?verbosity:verbosity -> string list -> unit
 
-  val span : ?lod:lod -> span -> string list -> unit
+  val span : ?verbosity:verbosity -> span -> string list -> unit
 
   val inc : report -> unit
 
-  val record_f : ?lod:lod -> string -> (unit -> 'a) -> 'a
+  val record_f : ?verbosity:verbosity -> string -> (unit -> 'a) -> 'a
 
-  val record_s : ?lod:lod -> string -> (unit -> 'a Lwt.t) -> 'a Lwt.t
+  val record_s :
+    ?verbosity:verbosity -> string -> (unit -> 'a Lwt.t) -> 'a Lwt.t
 
-  val aggregate_f : ?lod:lod -> string -> (unit -> 'a) -> 'a
+  val aggregate_f : ?verbosity:verbosity -> string -> (unit -> 'a) -> 'a
 
-  val aggregate_s : ?lod:lod -> string -> (unit -> 'a Lwt.t) -> 'a Lwt.t
+  val aggregate_s :
+    ?verbosity:verbosity -> string -> (unit -> 'a Lwt.t) -> 'a Lwt.t
 
-  val span_f : ?lod:lod -> string list -> (unit -> 'a) -> 'a
+  val span_f : ?verbosity:verbosity -> string list -> (unit -> 'a) -> 'a
 
-  val span_s : ?lod:lod -> string list -> (unit -> 'a Lwt.t) -> 'a Lwt.t
+  val span_s :
+    ?verbosity:verbosity -> string list -> (unit -> 'a Lwt.t) -> 'a Lwt.t
 end
 
 let wrap profiler =
   let module Wrapped = struct
-    type nonrec lod = lod = Terse | Detailed | Verbose
+    type nonrec verbosity = verbosity = Terse | Detailed | Verbose
 
     let plug i = plug profiler i
 
@@ -404,38 +409,38 @@ let wrap profiler =
 
     let plugged () = plugged profiler
 
-    let record ?lod id = record profiler ?lod id
+    let record ?verbosity id = record profiler ?verbosity id
 
-    let record_f ?lod id f = record_f profiler ?lod id f
+    let record_f ?verbosity id f = record_f profiler ?verbosity id f
 
-    let record_s ?lod id f = record_s profiler ?lod id f
+    let record_s ?verbosity id f = record_s profiler ?verbosity id f
 
-    let aggregate ?lod id = aggregate profiler ?lod id
+    let aggregate ?verbosity id = aggregate profiler ?verbosity id
 
-    let aggregate_f ?lod id f = aggregate_f profiler ?lod id f
+    let aggregate_f ?verbosity id f = aggregate_f profiler ?verbosity id f
 
-    let aggregate_s ?lod id f = aggregate_s profiler ?lod id f
+    let aggregate_s ?verbosity id f = aggregate_s profiler ?verbosity id f
 
     let stop () = stop profiler
 
-    let stamp ?lod id = stamp profiler ?lod id
+    let stamp ?verbosity id = stamp profiler ?verbosity id
 
-    let mark ?lod ids = mark profiler ?lod ids
+    let mark ?verbosity ids = mark profiler ?verbosity ids
 
-    let span ?lod d ids = span profiler ?lod d ids
+    let span ?verbosity d ids = span profiler ?verbosity d ids
 
     let inc r = inc profiler r
 
-    let span_f ?lod ids f = span_f ?lod profiler ids f
+    let span_f ?verbosity ids f = span_f ?verbosity profiler ids f
 
-    let span_s ?lod ids f = span_s ?lod profiler ids f
+    let span_s ?verbosity ids f = span_s ?verbosity profiler ids f
   end in
   (module Wrapped : GLOBAL_PROFILER)
 
 let profiler_file_suffix = "_profiling"
 
 let parse_profiling_vars (default_dir : string) =
-  let max_lod =
+  let max_verbosity =
     match Sys.getenv_opt "PROFILING" |> Option.map String.lowercase_ascii with
     | Some "verbose" -> Some Verbose
     | Some "detailed" -> Some Detailed
@@ -463,4 +468,4 @@ let parse_profiling_vars (default_dir : string) =
             Sys.mkdir output_dir 0o777 ;
             output_dir)
   in
-  (max_lod, output_dir)
+  (max_verbosity, output_dir)

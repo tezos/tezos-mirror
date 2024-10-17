@@ -28,26 +28,31 @@ open Profiler
 
 let time () = {wall = Unix.gettimeofday (); cpu = Sys.time ()}
 
-type stack_item = {id : string; time : time; report : report; lod : lod}
+type stack_item = {
+  id : string;
+  time : time;
+  report : report;
+  verbosity : verbosity;
+}
 
 type stack = Toplevel of report | Cons of stack_item * stack
 
-type scope = {id : string; lod : lod; time : time}
+type scope = {id : string; verbosity : verbosity; time : time}
 
-type state = {stack : stack; scopes : scope list; max_lod : lod}
+type state = {stack : stack; scopes : scope list; max_verbosity : verbosity}
 
-let empty max_lod =
+let empty max_verbosity =
   {
     stack = Toplevel {aggregated = StringMap.empty; recorded = []};
     scopes = [];
-    max_lod;
+    max_verbosity;
   }
 
-let aggregate state lod id =
-  {state with scopes = {id; lod; time = time ()} :: state.scopes}
+let aggregate state verbosity id =
+  {state with scopes = {id; verbosity; time = time ()} :: state.scopes}
 
-let record state lod id =
-  if state.scopes <> [] then aggregate state lod id
+let record state verbosity id =
+  if state.scopes <> [] then aggregate state verbosity id
   else
     let stack =
       Cons
@@ -55,20 +60,30 @@ let record state lod id =
             id;
             time = time ();
             report = {recorded = []; aggregated = StringMap.empty};
-            lod;
+            verbosity;
           },
           state.stack )
     in
     {state with stack}
 
 let rec merge
-    {count = na; total = Span ta; children = contentsa; node_lod = loda}
-    {count = nb; total = Span tb; children = contentsb; node_lod = lodb} =
+    {
+      count = na;
+      total = Span ta;
+      children = contentsa;
+      node_verbosity = verbosity_a;
+    }
+    {
+      count = nb;
+      total = Span tb;
+      children = contentsb;
+      node_verbosity = verbosity_b;
+    } =
   {
     count = na + nb;
     total = Span (ta +* tb);
     children = merge_maps contentsa contentsb;
-    node_lod = min loda lodb;
+    node_verbosity = min verbosity_a verbosity_b;
   }
 
 and merge_maps amap bmap =
@@ -81,33 +96,36 @@ and merge_maps amap bmap =
     amap
     bmap
 
-let rec apply_lod_to_aggregated lod aggregated =
+let rec apply_verbosity_to_aggregated verbosity aggregated =
   StringMap.fold
     (fun id node acc ->
-      let children = apply_lod_to_aggregated lod node.children in
-      if node.node_lod <= lod then StringMap.add id {node with children} acc
+      let children = apply_verbosity_to_aggregated verbosity node.children in
+      if node.node_verbosity <= verbosity then
+        StringMap.add id {node with children} acc
       else merge_maps acc children)
     aggregated
     StringMap.empty
 
 let rec aggregate_report {aggregated; recorded} =
   List.fold_left
-    (fun acc (id, {start = _; duration; item_lod; contents}) ->
+    (fun acc (id, {start = _; duration; item_verbosity; contents}) ->
       let children = aggregate_report contents in
-      let node = {count = 1; total = duration; node_lod = item_lod; children} in
+      let node =
+        {count = 1; total = duration; node_verbosity = item_verbosity; children}
+      in
       StringMap.add id node acc)
     aggregated
     recorded
 
-let rec apply_lod lod {aggregated; recorded} =
-  let aggregated = apply_lod_to_aggregated lod aggregated in
+let rec apply_verbosity verbosity {aggregated; recorded} =
+  let aggregated = apply_verbosity_to_aggregated verbosity aggregated in
   let aggregated, recorded =
     List.fold_left
       (fun (aggregated, recorded) (id, item) ->
-        if item.item_lod <= lod then
+        if item.item_verbosity <= verbosity then
           ( aggregated,
-            (id, {item with contents = apply_lod lod item.contents}) :: recorded
-          )
+            (id, {item with contents = apply_verbosity verbosity item.contents})
+            :: recorded )
         else (merge_maps aggregated (aggregate_report item.contents), recorded))
       (aggregated, [])
       recorded
@@ -129,7 +147,7 @@ let inc state report =
   in
   {state with stack}
 
-let span state lod d ids =
+let span state verbosity d ids =
   let tids =
     List.rev_append
       (List.map (fun {id; _} -> (id, zero_time)) state.scopes)
@@ -143,13 +161,15 @@ let span state lod d ids =
         | (id, d) :: tids ->
             let children = build_node tids in
             let count, total = if tids = [] then (1, d) else (0, zero_time) in
-            StringMap.singleton id {count; total; children; node_lod = lod}
+            StringMap.singleton
+              id
+              {count; total; children; node_verbosity = verbosity}
       in
       inc state {recorded = []; aggregated = build_node tids}
 
-let mark state lod ids = span state lod zero_time ids
+let mark state verbosity ids = span state verbosity zero_time ids
 
-let stop_aggregate state lod d id scopes =
+let stop_aggregate state verbosity d id scopes =
   let tids =
     let s_scopes = List.map (fun {id; _} -> (id, d)) scopes in
     List.rev ((id, d) :: s_scopes)
@@ -159,45 +179,51 @@ let stop_aggregate state lod d id scopes =
     | (id, d) :: tids ->
         let children = build_node tids in
         let count, total = if tids = [] then (1, d) else (0, zero_time) in
-        StringMap.singleton id {count; total; children; node_lod = lod}
+        StringMap.singleton
+          id
+          {count; total; children; node_verbosity = verbosity}
   in
   inc state {recorded = []; aggregated = build_node tids}
 
 let stop state =
   match state.scopes with
-  | {id; lod; time = t0} :: scopes ->
+  | {id; verbosity; time = t0} :: scopes ->
       let d = Span (time () -* t0) in
       let state = {state with scopes} in
-      stop_aggregate state lod d id scopes
+      stop_aggregate state verbosity d id scopes
   | [] ->
-      let stop_report id start contents report item_lod =
+      let stop_report id start contents report item_verbosity =
         let contents = {contents with recorded = List.rev contents.recorded} in
         let duration = Span (time () -* start) in
         let recorded =
-          (id, {start; duration; contents; item_lod}) :: report.recorded
+          (id, {start; duration; contents; item_verbosity}) :: report.recorded
         in
         {report with recorded}
       in
       let stack =
         match state.stack with
         | Cons
-            ( {id; time = start; report = contents; lod},
-              Cons ({id = pid; time = pt0; report; lod = plod}, rest) ) ->
+            ( {id; time = start; report = contents; verbosity},
+              Cons
+                ({id = pid; time = pt0; report; verbosity = p_verbosity}, rest)
+            ) ->
             Cons
               ( {
                   id = pid;
                   time = pt0;
-                  report = stop_report id start contents report lod;
-                  lod = plod;
+                  report = stop_report id start contents report verbosity;
+                  verbosity = p_verbosity;
                 },
                 rest )
-        | Cons ({id; time = start; report = contents; lod}, Toplevel report) ->
-            Toplevel (stop_report id start contents report lod)
+        | Cons
+            ({id; time = start; report = contents; verbosity}, Toplevel report)
+          ->
+            Toplevel (stop_report id start contents report verbosity)
         | Toplevel _ -> (* Shhh, everything will be alright. *) state.stack
       in
       {state with stack}
 
-let stamp state lod id = stop (record state lod id)
+let stamp state verbosity id = stop (record state verbosity id)
 
 let pp_delta_t ppf t =
   let t = int_of_float (t *. 1000000.) in
@@ -252,7 +278,7 @@ let pp_line ?toplevel_timestamp nindent ppf id n t t0 =
 
 let rec pp_report ?(toplevel_call = true) t0 nident ppf {aggregated; recorded} =
   StringMap.iter
-    (fun id {count = n; total = Span d; children; node_lod = _} ->
+    (fun id {count = n; total = Span d; children; node_verbosity = _} ->
       pp_line nident ppf id n d None ;
       pp_report
         ~toplevel_call:false
@@ -262,7 +288,7 @@ let rec pp_report ?(toplevel_call = true) t0 nident ppf {aggregated; recorded} =
         {recorded = []; aggregated = children})
     aggregated ;
   List.iter
-    (fun (id, {start = t; duration = Span d; contents; item_lod = _}) ->
+    (fun (id, {start = t; duration = Span d; contents; item_verbosity = _}) ->
       let toplevel_timestamp = if toplevel_call then Some t else None in
       pp_line ?toplevel_timestamp nident ppf id 1 d (Some (t -* t0)) ;
       pp_report ~toplevel_call:false t (nident + 1) ppf contents)
@@ -301,17 +327,19 @@ end) =
 struct
   let time _ = time ()
 
-  let record t lod id = P.set_state t @@ record (P.get_state t) lod id
+  let record t verbosity id =
+    P.set_state t @@ record (P.get_state t) verbosity id
 
-  let aggregate t lod id = P.set_state t @@ aggregate (P.get_state t) lod id
+  let aggregate t verbosity id =
+    P.set_state t @@ aggregate (P.get_state t) verbosity id
 
   let report t =
     match (P.get_state t).stack with
     | Toplevel {aggregated; recorded}
       when StringMap.cardinal aggregated > 0 || recorded <> [] ->
-        P.set_state t @@ empty (P.get_state t).max_lod ;
+        P.set_state t @@ empty (P.get_state t).max_verbosity ;
         let report = {aggregated; recorded = List.rev recorded} in
-        Some (apply_lod (P.get_state t).max_lod report)
+        Some (apply_verbosity (P.get_state t).max_verbosity report)
     | _ -> None
 
   let may_output =
@@ -319,20 +347,20 @@ struct
     | Some fn -> fun t -> Option.iter (fun r -> fn t r) (report t)
     | None -> fun _ -> ()
 
-  let stamp t lod id =
-    P.set_state t @@ stamp (P.get_state t) lod id ;
+  let stamp t verbosity id =
+    P.set_state t @@ stamp (P.get_state t) verbosity id ;
     may_output t
 
   let inc t report =
     P.set_state t @@ inc (P.get_state t) report ;
     may_output t
 
-  let mark t lod id =
-    P.set_state t @@ mark (P.get_state t) lod id ;
+  let mark t verbosity id =
+    P.set_state t @@ mark (P.get_state t) verbosity id ;
     may_output t
 
-  let span t lod d id =
-    P.set_state t @@ span (P.get_state t) lod d id ;
+  let span t verbosity d id =
+    P.set_state t @@ span (P.get_state t) verbosity d id ;
     may_output t
 
   let stop t =
@@ -340,16 +368,16 @@ struct
     may_output t
 end
 
-type (_, _) Profiler.kind += Headless : (lod, state ref) Profiler.kind
+type (_, _) Profiler.kind += Headless : (verbosity, state ref) Profiler.kind
 
 module Headless = struct
   type nonrec state = state ref
 
-  type config = lod
+  type config = verbosity
 
   let kind = Headless
 
-  let create lod = ref (empty lod)
+  let create verbosity = ref (empty verbosity)
 
   include Base (struct
     type t = state
@@ -364,7 +392,7 @@ module Headless = struct
   let close _ = ()
 end
 
-let headless = (module Headless : DRIVER with type config = lod)
+let headless = (module Headless : DRIVER with type config = verbosity)
 
 type output =
   | Closed of string
@@ -377,7 +405,7 @@ type auto_writer_state = {
 }
 
 type (_, _) Profiler.kind +=
-  | Auto_write_to_file : (string * lod, auto_writer_state) Profiler.kind
+  | Auto_write_to_file : (string * verbosity, auto_writer_state) Profiler.kind
 
 type file_format = Plain_text | Json
 
@@ -385,19 +413,23 @@ let make_driver ~file_format =
   (module struct
     type nonrec state = auto_writer_state
 
-    type config = string * lod
+    type config = string * verbosity
 
     let file_format = file_format
 
     let kind = Auto_write_to_file
 
-    let create (file_name, lod) =
+    let create (file_name, verbosity) =
       let file_name =
         match file_format with
         | Plain_text -> file_name ^ ".txt"
         | Json -> file_name ^ ".js"
       in
-      {profiler_state = empty lod; time = time (); output = Closed file_name}
+      {
+        profiler_state = empty verbosity;
+        time = time ();
+        output = Closed file_name;
+      }
 
     include Base (struct
       type t = state
@@ -442,7 +474,7 @@ let make_driver ~file_format =
           state.output <- Closed fn
       | Closed _ -> ()
   end : DRIVER
-    with type config = string * lod)
+    with type config = string * verbosity)
 
 let auto_write_to_txt_file = make_driver ~file_format:Plain_text
 

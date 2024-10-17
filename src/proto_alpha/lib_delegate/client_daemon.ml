@@ -58,11 +58,11 @@ let await_protocol_start (cctxt : #Protocol_client_context.full) ~chain =
 
 let may_start_profiler baking_dir =
   match Tezos_base.Profiler.parse_profiling_vars baking_dir with
-  | Some max_lod, output_dir ->
+  | Some max_verbosity, output_dir ->
       let profiler_maker ~name =
         Tezos_base_unix.Simple_profiler.instantiate_default_driver
           Filename.Infix.
-            ((output_dir // name) ^ Profiler.profiler_file_suffix, max_lod)
+            ((output_dir // name) ^ Profiler.profiler_file_suffix, max_verbosity)
       in
       Baking_profiler.init profiler_maker ;
       RPC_profiler.init profiler_maker

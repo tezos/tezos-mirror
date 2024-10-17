@@ -735,15 +735,15 @@ let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
   in
   let () =
     match Tezos_base.Profiler.parse_profiling_vars config.data_dir with
-    | Some max_lod, output_dir ->
+    | Some max_verbosity, output_dir ->
         let profiler_maker =
-          Tezos_shell.Profiler_directory.profiler_maker output_dir max_lod
+          Tezos_shell.Profiler_directory.profiler_maker output_dir max_verbosity
         in
         Shell_profiling.activate_all ~profiler_maker ;
         let context_instance =
           Tezos_base.Profiler.instance
             Tezos_base_unix.Simple_profiler.auto_write_to_txt_file
-            Filename.Infix.(output_dir // "context_profiling.txt", max_lod)
+            Filename.Infix.(output_dir // "context_profiling.txt", max_verbosity)
         in
         Tezos_protocol_environment.Environment_profiler.Context_ops_profiler
         .plug

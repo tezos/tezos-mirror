@@ -84,13 +84,13 @@ Octez already provides two ``Drivers``:
 
 .. code-block:: OCaml
 
-   val auto_write_to_txt_file : (string * Profiler.lod) Profiler.driver
+   val auto_write_to_txt_file : (string * Profiler.verbosity) Profiler.driver
 
-   val auto_write_to_json_file : (string * Profiler.lod) Profiler.driver
+   val auto_write_to_json_file : (string * Profiler.verbosity) Profiler.driver
 
 These ``Drivers`` are specifically crafted to write text or JSON files in a Unix
 filesystem. As you can see, they expect two 'arguments', a ``string`` (where to
-write) and a ``Profiler.lod`` (the level of detail expected from the profiler).
+write) and a ``Profiler.verbosity`` (the level of detail expected from the profiler).
 
 We can now easily create an instance for a ``Driver``:
 

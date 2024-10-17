@@ -26,15 +26,15 @@
 
 (** Memory driver allowing building intermediate reports with purpose
     of being included in external reports or manipulated directly. *)
-val headless : Profiler.lod Profiler.driver
+val headless : Profiler.verbosity Profiler.driver
 
 (** Driver printing its report in plain text to a file whenever a toplevel
     section ends. *)
-val auto_write_to_txt_file : (string * Profiler.lod) Profiler.driver
+val auto_write_to_txt_file : (string * Profiler.verbosity) Profiler.driver
 
 (** Driver printing its report in JSON to a file whenever a toplevel
     section ends. *)
-val auto_write_to_json_file : (string * Profiler.lod) Profiler.driver
+val auto_write_to_json_file : (string * Profiler.verbosity) Profiler.driver
 
 (** [default_driver] returns the unix driver that was chosen according
     to the [PROFILING_BACKEND] environment variable.
@@ -42,7 +42,8 @@ val auto_write_to_json_file : (string * Profiler.lod) Profiler.driver
     The possible values are:
     - ["json"]
     - ["txt"] *)
-val default_driver : (string * Profiler.lod) Profiler.driver
+val default_driver : (string * Profiler.verbosity) Profiler.driver
 
 (** Create a [Profiler.instance] using the {!default_driver} *)
-val instantiate_default_driver : string * Profiler.lod -> Profiler.instance
+val instantiate_default_driver :
+  string * Profiler.verbosity -> Profiler.instance
