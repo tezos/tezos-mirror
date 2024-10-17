@@ -131,6 +131,9 @@ types:
     - id: attestation
       type: attestation
       if: (alpha__operation__alpha__contents_tag == alpha__operation__alpha__contents_tag::attestation)
+    - id: attestations_aggregate
+      type: attestations_aggregate
+      if: (alpha__operation__alpha__contents_tag == alpha__operation__alpha__contents_tag::attestations_aggregate)
     - id: attestation_with_dal
       type: attestation_with_dal
       if: (alpha__operation__alpha__contents_tag == alpha__operation__alpha__contents_tag::attestation_with_dal)
@@ -301,6 +304,12 @@ types:
       size: 32
     - id: dal_attestation
       type: z
+  attestations_aggregate:
+    seq:
+    - id: consensus_content
+      type: consensus_content
+    - id: committee
+      type: committee_0
   ballot:
     seq:
     - id: source
@@ -378,6 +387,32 @@ types:
       size: 32
     - id: number_of_ticks
       type: s8be
+  committee:
+    seq:
+    - id: committee_entries
+      type: committee_entries
+      repeat: eos
+  committee_0:
+    seq:
+    - id: len_committee
+      type: u4be
+      valid:
+        max: 1073741823
+    - id: committee
+      type: committee
+      size: len_committee
+  committee_entries:
+    seq:
+    - id: committee_elt
+      type: u2be
+  consensus_content:
+    seq:
+    - id: level
+      type: s4be
+    - id: round
+      type: s4be
+    - id: block_payload_hash
+      size: 32
   contents_entries:
     seq:
     - id: alpha__operation__alpha__contents
@@ -1958,6 +1993,7 @@ enums:
     21: attestation
     23: attestation_with_dal
     24: dal_entrapment_evidence
+    31: attestations_aggregate
     107: reveal
     108: transaction
     109: origination
