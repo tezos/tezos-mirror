@@ -4380,10 +4380,60 @@ let precheck () =
 
 let generate_dependency_graph ?(source = []) ?(without = []) filename =
   let module Node = struct
-    type t = Target.internal
+    type t = {target : Target.internal; size : int}
+
+    let make (target : Target.internal) =
+      let size =
+        let all () =
+          (* As a first approximation we ignore modules with only an .mli for now. *)
+          Sys.readdir target.path |> Array.to_list
+          |> List.filter (fun f ->
+                 match Filename.extension f with
+                 | ".ml" | ".mli" | ".mll" | ".mly" -> true
+                 | _ -> false)
+          |> List.length
+        in
+        match target.modules with
+        | All -> all ()
+        | Modules list -> List.length list
+        | All_modules_except list -> all () - List.length list
+      in
+      {target; size}
 
     let id (node : t) =
-      node.path ^ "\n" ^ Target.name_for_errors (Internal node)
+      node.target.path ^ " " ^ Target.name_for_errors (Internal node.target)
+
+    let compare a b = String.compare (id a) (id b)
+
+    (* Can't store node metadata inside [t] itself because we sometimes create the
+       same node multiple times. *)
+    type metadata = {mutable recompile_percent : int option}
+
+    module Map = Map.Make (struct
+      type nonrec t = t
+
+      let compare = compare
+    end)
+
+    let metadata_map : metadata Map.t ref = ref Map.empty
+
+    let metadata node =
+      match Map.find_opt node !metadata_map with
+      | None ->
+          let metadata = {recompile_percent = None} in
+          metadata_map := Map.add node metadata !metadata_map ;
+          metadata
+      | Some metadata -> metadata
+
+    let label (node : t) =
+      node.target.path ^ "\\n"
+      ^ Target.name_for_errors (Internal node.target)
+      ^ "\\n" ^ string_of_int node.size ^ " OCaml file"
+      ^ (if node.size = 1 then "" else "s")
+      ^
+      match (metadata node).recompile_percent with
+      | None -> ""
+      | Some percent -> "\\nrecompile " ^ string_of_int percent ^ "%"
 
     let id_matches pattern node =
       let string_contains sub str =
@@ -4399,10 +4449,20 @@ let generate_dependency_graph ?(source = []) ?(without = []) filename =
       in
       string_contains pattern (id node)
 
-    let compare a b = String.compare (id a) (id b)
-
     let attributes (node : t) =
-      match node.kind with
+      ("label", label node)
+      ::
+      (match (metadata node).recompile_percent with
+      | None -> []
+      | Some percent ->
+          (* Reach 100% red when [percent >= cap]. *)
+          let cap = 75 in
+          let rgb =
+            Printf.sprintf "#%02x0000" (min 255 (max 0 (percent * 255 / cap)))
+          in
+          [("color", rgb); ("fontcolor", rgb)])
+      @
+      match node.target.kind with
       | Public_library _ | Private_library _ -> [("shape", "box")]
       | Public_executable _ | Private_executable _ | Test_executable _ -> []
   end in
@@ -4416,7 +4476,8 @@ let generate_dependency_graph ?(source = []) ?(without = []) filename =
     | None ->
         (* Not an internal dependency, exclude from the graph. *)
         ()
-    | Some internal_dep -> graph := G.add internal internal_dep !graph ) ;
+    | Some internal_dep ->
+        graph := G.add (Node.make internal) (Node.make internal_dep) !graph ) ;
   let graph = !graph in
   (* Restrict it to dependencies of [source]. *)
   let graph =
@@ -4446,6 +4507,15 @@ let generate_dependency_graph ?(source = []) ?(without = []) filename =
   in
   (* Remove redundant edges. *)
   let graph = G.simplify graph in
+  (* Annotate nodes with their recompile percentage. *)
+  (let total_size = G.fold graph 0 @@ fun node _ acc -> acc + node.size in
+   let rev_dep_size_map =
+     G.map_nodes (G.transitive_closure (G.reverse graph)) @@ fun _ rev_deps ->
+     G.Nodes.fold (fun node acc -> acc + node.size) rev_deps 0
+   in
+   Fun.flip G.Node_map.iter rev_dep_size_map @@ fun node rev_dep_size ->
+   (Node.metadata node).recompile_percent <-
+     Some (rev_dep_size * 100 / total_size)) ;
   write_raw filename @@ fun fmt -> G.output_dot_file fmt graph
 
 let generate ~make_tezt_exe ~tezt_exe_deps ~default_profile ~add_to_meta_package
