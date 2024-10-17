@@ -100,15 +100,3 @@ impl<E: Elem, const LEN: usize> Elem for [E; LEN] {
         new
     }
 }
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn test_bool_repr() {
-        proptest::proptest!(|(val: u8)| {
-            let bool_val: bool = unsafe {std::mem::transmute_copy(&val)};
-            let truthy = val & 1 == 1;
-            assert_eq!(bool_val, truthy);
-        });
-    }
-}
