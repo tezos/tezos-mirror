@@ -387,6 +387,11 @@ let header_status_encoding : header_status Data_encoding.t =
         (function () -> `Unattested);
     ]
 
+let pp_header_status fmt = function
+  | `Waiting_attestation -> Format.fprintf fmt "waiting_attestation"
+  | `Attested -> Format.fprintf fmt "attested"
+  | `Unattested -> Format.fprintf fmt "unattested"
+
 let slot_header_encoding =
   let open Data_encoding in
   conv

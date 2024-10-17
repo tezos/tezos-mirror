@@ -273,6 +273,8 @@ val with_proof_encoding : with_proof Data_encoding.t
 
 val attestable_slots_encoding : attestable_slots Data_encoding.t
 
+val pp_header_status : Format.formatter -> header_status -> unit
+
 module Store : sig
   (** [stored_data] is the kind of data being encoded/decoded. This
     datatype is used to get better events UX. *)
