@@ -8,11 +8,10 @@
 
 open Filename.Infix
 include Sqlite
+open Caqti_request.Infix
+open Caqti_type.Std
 
 module Q = struct
-  open Caqti_request.Infix
-  open Caqti_type.Std
-
   let table_exists =
     (string ->! bool)
     @@ {|
