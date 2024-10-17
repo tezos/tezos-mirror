@@ -21,7 +21,7 @@
   octez-shell-libs.shell-services
   octez-libs.tezos-p2p-services
   octez-shell-libs.protocol-updater
-  octez-libs.requester
+  octez-shell-libs.requester
   octez-libs.tezos-workers
   octez-shell-libs.validation
   octez-libs.version
