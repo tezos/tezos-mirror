@@ -75,17 +75,6 @@ module Schemas = struct
     Db.collect_list conn Q.Schemas.get_all ()
 end
 
-module Skip_list_cells = struct
-  let find _store _hash =
-    failwith "Dal_store_sqlite3.Skip_list_cells.find not implemented"
-
-  let insert _store ~attested_level:_ _values =
-    failwith "Dal_store_sqlite3.Skip_list_cells.insert not implemented"
-
-  let remove _store ~attested_level:_ =
-    failwith "Dal_store_sqlite3.Skip_list_cells.remove not implemented"
-end
-
 module Migrations = struct
   let create_table store =
     with_connection store @@ fun conn ->
@@ -121,6 +110,17 @@ module Migrations = struct
     with_connection store @@ fun conn ->
     let* () = List.iter_es (fun up -> Db.exec conn up ()) M.up in
     Db.exec conn Q.Migrations.register_migration (id, M.name)
+end
+
+module Skip_list_cells = struct
+  let find _store _hash =
+    failwith "Dal_store_sqlite3.Skip_list_cells.find not implemented"
+
+  let insert _store ~attested_level:_ _values =
+    failwith "Dal_store_sqlite3.Skip_list_cells.insert not implemented"
+
+  let remove _store ~attested_level:_ =
+    failwith "Dal_store_sqlite3.Skip_list_cells.remove not implemented"
 end
 
 let sqlite_file_name = "store.sqlite"
