@@ -14,16 +14,13 @@ and `.opam` files. If you are removing targets, you need to remove the
 corresponding `dune` and `.opam` files manually. Then, commit both
 your modifications to the manifest and to the `dune` and `.opam` files.
 
-## VS Code
+## Alternative build system
 
-If you use VS Code to edit the files in this directory, you may want
-to add a `dune` file for better editor integration with `ocaml-lsp-server`.
-This `dune` file can simply contain:
-
-    (executable (name main))
-
-Then, instead of using `make -C manifest` to build, use
-`dune exec manifest/main.exe` (from the root directory of the repository).
-
-You can see more information about this issue in:
+The manifest comes with a `dune` configuration that mainly serves for
+`ocaml-lsp-server` users to have a working integration with `VS Code` or any
+other editor with an LSP client. You can see more information about this issue in:
 https://gitlab.com/tezos/tezos/-/merge_requests/3366#note_763223998
+
+This `dune` configuration generates a fully working manifest, as such instead of
+using `make -C manifest` to build, you can use `dune exec manifest/main.exe`
+(from the root directory of the repository).
