@@ -1,5 +1,19 @@
 {
   "nodes": {
+    "flake-compat": {
+      "locked": {
+        "lastModified": 1696426674,
+        "narHash": "sha256-kvjfFW7WAETZlt09AgDn1MrtKzP7t90Vf7vypd3OL1U=",
+        "rev": "0f9255e01c2351cc7d116c072cb317785dd33b33",
+        "revCount": 57,
+        "type": "tarball",
+        "url": "https://api.flakehub.com/f/pinned/edolstra/flake-compat/1.0.1/018afb31-abd1-7bff-a5e4-cff7e18efb7a/source.tar.gz"
+      },
+      "original": {
+        "type": "tarball",
+        "url": "https://flakehub.com/f/edolstra/flake-compat/1.tar.gz"
+      }
+    },
     "flake-utils": {
       "inputs": {
         "systems": "systems"
@@ -87,14 +101,16 @@
       "inputs": {
         "flake-utils": "flake-utils_2",
         "nixpkgs": "nixpkgs_2",
-        "opam-repository": "opam-repository"
+        "opam-repository": [
+          "opam-repository"
+        ]
       },
       "locked": {
-        "lastModified": 1716561961,
-        "narHash": "sha256-SgeZItYuUZV7WSaoX4G7J1ZpmwgeI3ocQCLP95E+O1U=",
+        "lastModified": 1728662094,
+        "narHash": "sha256-tOAquEaPr15wNWbfsxNqV6s6oCfC0yQvC5D5MRKm+ig=",
         "owner": "vapourismo",
         "repo": "opam-nix-integration",
-        "rev": "0f98236c75cdb436be7669ccaa249264456baa37",
+        "rev": "576bfd60b8fc1cf548ae71b842496a15a797f4fd",
         "type": "github"
       },
       "original": {
@@ -104,22 +120,6 @@
       }
     },
     "opam-repository": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1688548241,
-        "narHash": "sha256-cmk1kCLtcL9GJplfl4J7t0r8g0N25O4G0ctycV4eyPo=",
-        "owner": "ocaml",
-        "repo": "opam-repository",
-        "rev": "860072345fa2f234ff10ffeee88db6906e138e92",
-        "type": "github"
-      },
-      "original": {
-        "owner": "ocaml",
-        "repo": "opam-repository",
-        "type": "github"
-      }
-    },
-    "opam-repository_2": {
       "flake": false,
       "locked": {
         "lastModified": 1727454553,
@@ -137,10 +137,11 @@
     },
     "root": {
       "inputs": {
+        "flake-compat": "flake-compat",
         "flake-utils": "flake-utils",
         "nixpkgs": "nixpkgs",
         "opam-nix-integration": "opam-nix-integration",
-        "opam-repository": "opam-repository_2",
+        "opam-repository": "opam-repository",
         "rust-overlay": "rust-overlay"
       }
     },

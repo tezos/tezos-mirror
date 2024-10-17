@@ -1,23 +1,38 @@
 let
-  default-opam-nix-integration-src = fetchTarball {
-    url = "https://github.com/vapourismo/opam-nix-integration/archive/0f98236c75cdb436be7669ccaa249264456baa37.tar.gz";
-    sha256 = "0m9v7s8zgkr280f7l8qy12dnjmi7pf0mza16b5xral9fsqi9j1sa";
-  };
+  endsWith = suffix: str: let
+    found =
+      builtins.substring
+      (builtins.stringLength str - builtins.stringLength suffix) (builtins.stringLength suffix)
+      str;
+  in
+    found == suffix;
 
-  default-rust-overlay-src = fetchTarball {
-    url = "https://github.com/oxalica/rust-overlay/archive/38c2f156fca1868c8be7195ddac150522752f6ab.tar.gz";
-    sha256 = "0dsalgdr99k02zzym3j2ql9awlxgavzafsm1frp4pf45ci6awf4n";
-  };
-
-  default-pkgs-src = fetchTarball {
-    url = "https://github.com/NixOS/nixpkgs/archive/refs/tags/24.05.tar.gz";
-    sha256 = "1lr1h35prqkd1mkmzriwlpvxcb34kmhc9dnr48gkm8hh089hifmx";
-  };
+  flakeInputs =
+    (
+      import
+      (
+        let
+          lock = builtins.fromJSON (builtins.readFile ../flake.lock);
+        in
+          fetchTarball {
+            url = lock.nodes.flake-compat.locked.url or "https://github.com/edolstra/flake-compat/archive/${lock.nodes.flake-compat.locked.rev}.tar.gz";
+            sha256 = lock.nodes.flake-compat.locked.narHash;
+          }
+      )
+      {
+        src =
+          builtins.filterSource
+          (path: type: endsWith ".nix" path || endsWith "flake.lock" path)
+          ../.;
+      }
+    )
+    .defaultNix
+    .inputs;
 in
   {
-    opam-nix-integration-src ? default-opam-nix-integration-src,
-    pkgs-src ? default-pkgs-src,
-    rust-overlay-src ? default-rust-overlay-src,
+    opam-nix-integration-src ? flakeInputs.opam-nix-integration,
+    pkgs-src ? flakeInputs.nixpkgs,
+    rust-overlay-src ? flakeInputs.rust-overlay,
   }: let
     opam-nix-integration = import opam-nix-integration-src;
 
