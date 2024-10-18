@@ -187,16 +187,22 @@ module Remote = struct
         let* () =
           if Env.dns then
             let tezt_cloud = Env.tezt_cloud in
-            let* ip = Gcloud.DNS.get_ip ~tezt_cloud ~zone:"tezt-cloud" in
+            let* ip =
+              Gcloud.DNS.get_value ~zone:"tezt-cloud" ~domain:tezt_cloud
+            in
             let* () =
               match ip with
               | None -> Lwt.return_unit
-              | Some ip -> Gcloud.DNS.remove ~tezt_cloud ~zone:"tezt-cloud" ~ip
+              | Some ip ->
+                  Gcloud.DNS.remove_subdomain
+                    ~zone:"tezt-cloud"
+                    ~name:tezt_cloud
+                    ~value:ip
             in
-            Gcloud.DNS.add
-              ~tezt_cloud:Env.tezt_cloud
+            Gcloud.DNS.add_subdomain
               ~zone:"tezt-cloud"
-              ~ip:(Agent.point agent |> Option.get |> fst)
+              ~name:Env.tezt_cloud
+              ~value:(Agent.point agent |> Option.get |> fst)
           else Lwt.return_unit
         in
         Lwt.return {agents = agent :: agents}

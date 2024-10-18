@@ -119,7 +119,9 @@ let register_dns_add ~tags =
   match ip with
   | None -> Test.fail "You must provide an IP address via -a ip=<ip>"
   | Some ip ->
-      let* () = Gcloud.DNS.add ~tezt_cloud ~zone:"tezt-cloud" ~ip in
+      let* () =
+        Gcloud.DNS.add_subdomain ~name:tezt_cloud ~zone:"tezt-cloud" ~value:ip
+      in
       unit
 
 let register_dns_remove ~tags =
@@ -129,12 +131,14 @@ let register_dns_remove ~tags =
     ~title:"Remove a DNS entry"
     ~tags:("dns" :: "remove" :: tags)
   @@ fun _cloud ->
-  let tezt_cloud = Env.tezt_cloud in
-  let* ip = Gcloud.DNS.get_ip ~tezt_cloud ~zone:"tezt-cloud" in
+  let name = Env.tezt_cloud in
+  let* ip = Gcloud.DNS.get_value ~zone:"tezt-cloud" ~domain:name in
   match ip with
   | None -> Test.fail "No record found for the current domain"
   | Some ip ->
-      let* () = Gcloud.DNS.remove ~tezt_cloud ~zone:"tezt-cloud" ~ip in
+      let* () =
+        Gcloud.DNS.remove_subdomain ~name ~zone:"tezt-cloud" ~value:ip
+      in
       unit
 
 let register ~tags =

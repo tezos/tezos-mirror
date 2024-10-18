@@ -29,9 +29,8 @@ val compute_ssh :
 
 type cmd_wrapper = {cmd : string; args : string list}
 
-(** [cmd_wrapper ~zone ~vm_name cmd args] is the wrapper to run a command on the
-  vm [vm_name]. 
-  *)
+(** [cmd_wrapper ~zone ~vm_name cmd args] is the wrapper to run a command on
+    the vm [vm_name]. *)
 val cmd_wrapper :
   zone:string ->
   vm_name:string ->
@@ -49,11 +48,21 @@ module DNS : sig
 
   val describe : zone:string -> unit -> string Lwt.t
 
-  val get_domain : tezt_cloud:string -> zone:string -> string Lwt.t
+  (** [get_fqdn ~zone ~name] returns the fully qualified domain name (FQDN)
+      corresponding to the subdomain or hostname [name] in the GCP zone [zone] *)
+  val get_fqdn : zone:string -> name:string -> string Lwt.t
 
-  val add : tezt_cloud:string -> zone:string -> ip:string -> unit Lwt.t
+  (** [get_value ~zone ~domain] returns the value associated to [domain] in the
+      zone [zone]. For example, an ip associated to a hostname. *)
+  val get_value : zone:string -> domain:string -> string option Lwt.t
 
-  val remove : tezt_cloud:string -> zone:string -> ip:string -> unit Lwt.t
+  (** [add_subdomain ~zone ~name ~value] adds a dns entry for the domain name
+    [name], associated to the value [value]. The value being an ip *)
+  val add_subdomain : zone:string -> name:string -> value:string -> unit Lwt.t
 
-  val get_ip : tezt_cloud:string -> zone:string -> string option Lwt.t
+  (** [remove_subdomain ~zone ~name ~value] removes the dns record associated
+      to [name] and value [value]. If follows the gcloud dns record-sets
+      semantics for removing values associated to the same key. *)
+  val remove_subdomain :
+    zone:string -> name:string -> value:string -> unit Lwt.t
 end
