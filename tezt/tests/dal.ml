@@ -7489,6 +7489,25 @@ module Refutations = struct
       faulty_sc_rollup_node
       ~exit_code:1
       ~msg:(rex "lost the refutation game")
+
+  let register_scenario_with_two_rollups_a_faulty_dal_node_and_a_correct_one
+      ~refute_operations_priority name protocols =
+    let scenario =
+      scenario_with_two_rollups_a_faulty_dal_node_and_a_correct_one
+        ~refute_operations_priority
+    in
+    scenario_with_all_nodes
+      name
+      ~regression:false
+      ~uses:(fun _protocol ->
+        [Constant.smart_rollup_installer; Constant.WASM.dal_echo_kernel])
+      ~pvm_name:"wasm_2_0_0"
+      ~commitment_period:5
+      ~smart_rollup_timeout_period_in_blocks:20
+      ~l1_history_mode:Default_with_refutation
+      ~tags:[Tag.slow]
+      scenario
+      protocols
 end
 
 (** This test injects a DAL slot to (DAL and L1) network(s) via the rollup node
@@ -8376,32 +8395,16 @@ let register ~protocols =
   (* Register tutorial test *)
   scenario_tutorial_dal_baker protocols ;
 
-  scenario_with_all_nodes
+  Refutations
+  .register_scenario_with_two_rollups_a_faulty_dal_node_and_a_correct_one
     "Refutation where the faulty node timeouts"
-    ~regression:false
-    ~uses:(fun _protocol ->
-      [Constant.smart_rollup_installer; Constant.WASM.dal_echo_kernel])
-    ~pvm_name:"wasm_2_0_0"
-    ~commitment_period:5
-    (Refutations.scenario_with_two_rollups_a_faulty_dal_node_and_a_correct_one
-       ~refute_operations_priority:`Faulty_first)
-    ~smart_rollup_timeout_period_in_blocks:20
-    ~l1_history_mode:Default_with_refutation
-    ~tags:[Tag.slow]
+    ~refute_operations_priority:`Faulty_first
     protocols ;
 
-  scenario_with_all_nodes
+  Refutations
+  .register_scenario_with_two_rollups_a_faulty_dal_node_and_a_correct_one
     "Refutation where the honest node makes final move"
-    ~regression:false
-    ~uses:(fun _protocol ->
-      [Constant.smart_rollup_installer; Constant.WASM.dal_echo_kernel])
-    ~pvm_name:"wasm_2_0_0"
-    ~commitment_period:5
-    (Refutations.scenario_with_two_rollups_a_faulty_dal_node_and_a_correct_one
-       ~refute_operations_priority:`Honest_first)
-    ~smart_rollup_timeout_period_in_blocks:20
-    ~l1_history_mode:Default_with_refutation
-    ~tags:[Tag.slow]
+    ~refute_operations_priority:`Honest_first
     protocols ;
 
   scenario_with_all_nodes
