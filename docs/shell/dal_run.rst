@@ -12,6 +12,9 @@ For instructions on setting up the ``octez-node`` binary, see :doc:`Running Octe
 
    For the most secure setup, run the DAL node and layer 1 node on different IP addresses; for more information, see :doc:`Bakers & the DAL <./dal_bakers>`.
 
+Running the DAL node
+--------------------
+
 Follow these steps to run a DAL node along with a layer 1 node and a baker.
 
 #. Verify that you have attestation rights by running this command, where ``MY_ADDRESS`` is your account's address (not its ``octez-client`` alias):
@@ -86,12 +89,76 @@ Follow these steps to run a DAL node along with a layer 1 node and a baker.
 
       This command should return topics in the form ``{"slot_index":<index>,"pkh":"<ADDRESS OF BAKER>"}`` to represent the topics that the node is subscribed to on the DAL peer-to-peer network.
 
-   #. Verify that the node is assigned to attest DAL shards by running this command and using your address:
+   #. Verify that your baker is assigned to attest DAL shards by running this command and using the address of the baker:
 
       .. code-block:: shell
 
          octez-client rpc get /chains/main/blocks/head/context/dal/shards?delegates=$MY_ADDRESS
 
+      The response should show the address and the indexes of multiple shards that the baker is assigned to attest.
+
       For more information about topics and shards, see :doc:`DAL overview <./dal_overview>`.
 
+#. Verify that the node is connected to the network by going to the `Explorus <https://explorus.io/consensus_ops>`_ block explorer, selecting the network, going to the Consensus Ops tab, and looking up your baker.
+
+   The **DAL attested/total published slots** column shows information about bakers' attestations.
+
+   If the column for your baker shows a symbol that looks like a missing image or empty page, then either the baker did not have shards assign to it at the corresponding level or the DAL node is not connected to the network. If you have sufficient stake and you always see the missing image symbol, check the steps above and make sure that the DAL node is running correctly.
+
+   If the baker is connected to the network, the column shows the ratio of slots attested by the baker to published slots.
+
+   - If the numbers are equal, as in ``2/2``, the baker is attesting all published slots (the DAL node has seen all shards that are assigned to it).
+
+   - If the first number is always 0, as in ``0/2``, the DAL node and baker may not be configured correctly. See the troubleshooting section below.
+
+   - If the baker attests all published slots sometimes and other times attests zero or fewer slots, the DAL node may be running too slowly or failing to fetch the data in time. Verify that the node hardware is sufficient, using these `Hardware and bandwidth requirements for the Tezos DAL <https://forum.tezosagora.org/t/hardware-and-bandwidth-requirements-for-the-tezos-dal/6230>`_.
+
 Now the DAL node is running and subscribed to the relevant topics.
+
+Troubleshooting
+---------------
+
+Troubleshooting connections
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Follow these steps if the DAL node is running but not connected to the network:
+
+#. Upgrade your installation of Octez to the latest version.
+   The Octez DAL node version 20.3 has some issues that are resolved in later versions.
+
+#. Check if the ``config.json`` file of the ``octez-node`` daemon that the DAL node is connected to has a field named ``network``.
+   If there is a ``network`` field, update the node's configuration by running this command:
+
+   .. code-block:: shell
+
+      octez-node config update --network <network>
+
+   Use ``mainnet``, ``ghostnet``, or ``sandbox`` as the value for the ``--network`` argument.
+
+#. Verify that the node is connected to a bootstrap peer by running this command with the address and RPC port of your DAL node:
+
+   .. code-block:: shell
+
+      octez-client --endpoint http://127.0.0.1:10732 rpc get /p2p/gossipsub/connections | jq ".[].connection.bootstrap"
+
+   At least one entry in the output should show ``true`` to indicate that the peer is a bootstrap node.
+   If not, run the command a few more times over a one-minute interval.
+   If you still see no entries that say ``true``, restart the DAL node.
+
+#. If the problem persists, contact Octez developers on the `tezos-dev <https://tezos-dev.slack.com/>`_ Slack or the Tezos `Discord <https://discord.gg/tezos>`_.
+
+Troubleshooting firewall/NAT issues
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+By default, the P2P port for a DAL node is 11732, but you can change it with the ``--net-addr`` argument.
+
+If you want to use an external port different from the one specified in ``--net-addr``, use the ``--public-addr`` argument.
+Currently, there is a limitation requiring you to know your public IP address to do this, though we plan to improve this in the future.
+
+For both producers and bakers, it is essential to maintain good connectivity by ensuring that your node can receive connections:
+
+- If you're behind a NAT, you must implement a forwarding rule.
+
+- If you're behind a firewall, you must configure it to allow both incoming and outgoing connections on the P2P port.
+
+- If you're not using the ``--public-addr`` argument, ensure that the NAT forwarding rule uses the same external and internal ports.
