@@ -4329,7 +4329,7 @@ let test_peers_reconnection _protocol _parameters _cryptobox node client
 let test_l1_migration_scenario ?(tags = []) ~migrate_from ~migrate_to
     ~migration_level ~scenario ~description ?producer_profiles ?attestation_lag
     ?number_of_slots ?number_of_shards ?slot_size ?page_size ?redundancy_factor
-    ?consensus_committee_size () =
+    ?consensus_committee_size ?skip_list_storage_backend () =
   let tags =
     Tag.tezos2 :: "dal" :: Protocol.tag migrate_from :: Protocol.tag migrate_to
     :: "migration" :: tags
@@ -4375,7 +4375,9 @@ let test_l1_migration_scenario ?(tags = []) ~migrate_from ~migrate_to
   let* () = Node.wait_for_ready node in
 
   let dal_node = Dal_node.create ~node () in
-  let* () = Dal_node.init_config ?producer_profiles dal_node in
+  let* () =
+    Dal_node.init_config ?producer_profiles ?skip_list_storage_backend dal_node
+  in
   let* () = Dal_node.run dal_node ~wait_ready:true in
 
   scenario ~migration_level dal_parameters client node dal_node
