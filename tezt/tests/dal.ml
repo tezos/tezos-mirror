@@ -5000,23 +5000,55 @@ module History_rpcs = struct
         ~error_msg:"No cell with the 'attested' status has been visited") ;
     unit
 
-  let test_commitments_history_rpcs protocol dal_parameters _cryptobox node
-      client dal_node =
-    scenario
-      ~slot_index:3
-      ~first_cell_level:0
-      ~first_dal_level:1
-      ~last_confirmed_published_level:3
-      ~initial_blocks_to_bake:0
-      protocol
-      dal_parameters
-      client
-      node
-      dal_node
+  (** [test_commitments_history_rpcs] is registered with both backends
+      ([Legacy] and [SQLite3]) as it concerns skip lists and must
+      remain valid for the [SQLite3] storage. Also, running the test
+      with both backends provide additional guarantees that they
+      exhibit identical behavior. *)
+  let test_commitments_history_rpcs protocols =
+    let register skip_list_storage_backend =
+      let scenario protocol dal_parameters _ client node dal_node =
+        scenario
+          ~slot_index:3
+          ~first_cell_level:0
+          ~first_dal_level:1
+          ~last_confirmed_published_level:3
+          ~initial_blocks_to_bake:0
+          protocol
+          dal_parameters
+          node
+          client
+          dal_node
+      in
+      let tags = ["rpc"; "skip_list"] in
+      let tags =
+        if skip_list_storage_backend = Dal_node.SQLite3 then
+          skip_list_sqlite3_tag :: tags
+        else tags
+      in
+      let description =
+        Format.sprintf
+          "commitments history RPCs (storage_backend = %s)"
+          (Dal_node.string_of_skip_list_storage_backend
+             skip_list_storage_backend)
+      in
+      scenario_with_layer1_and_dal_nodes
+        ~tags
+        ~producer_profiles:[3; 15]
+        ~skip_list_storage_backend
+        description
+        scenario
+        protocols
+    in
+    List.iter register [Legacy; SQLite3]
 
-  let test_commitments_history_rpcs_with_migration ~migrate_from ~migrate_to =
-    let tags = ["rpc"; "skip_list"; Tag.memory_3k] in
-    let description = "test commitments history with migration" in
+  (** [test_commitments_history_rpcs_with_migration] is registered
+      with both backends ([Legacy] and [SQLite3]) as it concerns skip
+      lists and must remain valid for the [SQLite3] storage. Also,
+      running the test with both backends provide additional
+      guarantees that they exhibit identical behavior. *)
+  let test_commitments_history_rpcs_with_migration ~migrate_from ~migrate_to
+      ~migration_level =
     let slot_index = 3 in
     let scenario ~migrate_to ~migration_level dal_parameters =
       let lag = dal_parameters.Dal.Parameters.attestation_lag in
@@ -5040,22 +5072,39 @@ module History_rpcs = struct
         migrate_to
         dal_parameters
     in
-    test_l1_migration_scenario
-      ~migrate_from
-      ~migrate_to
-      ~scenario:(fun ~migration_level dal_parameters ->
-        scenario ~migrate_to ~migration_level dal_parameters)
-      ~tags
-      ~description
-      ~producer_profiles:[slot_index] (* use the same parameters as Alpha *)
-      ~consensus_committee_size:512
-      ~attestation_lag:8
-      ~number_of_slots:32
-      ~number_of_shards:512
-      ~slot_size:126944
-      ~redundancy_factor:8
-      ~page_size:3967
-      ()
+    let register_test_l1_migration_scenario skip_list_storage_backend =
+      let description =
+        Format.sprintf
+          "test commitments history with migration (storage_backend = %s)"
+          (Dal_node.string_of_skip_list_storage_backend
+             skip_list_storage_backend)
+      in
+      let tags = ["rpc"; "skip_list"; Tag.memory_3k] in
+      let tags =
+        if skip_list_storage_backend = Dal_node.SQLite3 then
+          skip_list_sqlite3_tag :: tags
+        else tags
+      in
+      test_l1_migration_scenario
+        ~migrate_from
+        ~migrate_to
+        ~migration_level
+        ~scenario:(fun ~migration_level ->
+          scenario ~migrate_to ~migration_level)
+        ~tags
+        ~description
+        ~producer_profiles:[slot_index] (* use the same parameters as Alpha *)
+        ~consensus_committee_size:512
+        ~attestation_lag:8
+        ~number_of_slots:32
+        ~number_of_shards:512
+        ~slot_size:126944
+        ~redundancy_factor:8
+        ~page_size:3967
+        ~skip_list_storage_backend
+        ()
+    in
+    List.iter register_test_l1_migration_scenario Dal_node.[Legacy; SQLite3]
 end
 
 (* This test sets up a migration and starts the DAL around the migration
@@ -8322,12 +8371,7 @@ let register ~protocols =
     "attestation through p2p"
     test_attestation_through_p2p
     protocols ;
-  scenario_with_layer1_and_dal_nodes
-    ~tags:["rpc"; "skip_list"]
-    ~producer_profiles:[3; 15]
-    "commitments history RPCs"
-    History_rpcs.test_commitments_history_rpcs
-    protocols ;
+  History_rpcs.test_commitments_history_rpcs protocols ;
   scenario_with_layer1_and_dal_nodes
     ~tags:["amplification"; Tag.memory_4k]
     ~bootstrap_profile:true
