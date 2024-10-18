@@ -1217,9 +1217,9 @@ let job_build_grafazos : tezos_job =
     ~before_script:
       [
         "cd grafazos/";
-        (* For security, we explicitly install v0.20
-           which corresponds to commit [7903819]. *)
-        "jb install github.com/google/go-jsonnet/cmd/jsonnetfmt@7903819";
+        (* For security, we explicitly install v11.1.0
+           which corresponds to commit [1ce5aec]. *)
+        "jb install github.com/grafana/grafonnet/gen/grafonnet-v11.1.0@1ce5aec";
       ]
     ["make"]
 
