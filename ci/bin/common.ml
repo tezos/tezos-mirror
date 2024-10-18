@@ -1196,8 +1196,9 @@ let job_datadog_pipeline_trace : tezos_job =
     ~image:Images.CI.build
     ~stage:Stages.sanity
     [
+      "CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}";
       "DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags \
-       pipeline_type:$PIPELINE_TYPE";
+       pipeline_type:$PIPELINE_TYPE --tags mr_number:$CI_MERGE_REQUEST_IID";
     ]
 
 (* Manual job that builds the Grafazos dashboards *)
