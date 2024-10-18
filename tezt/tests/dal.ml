@@ -6346,12 +6346,23 @@ module Garbage_collection = struct
     Log.info "End of test" ;
     unit
 
-  let test_gc_skip_list_cells ~protocols =
+  let test_gc_skip_list_cells ~protocols ~skip_list_storage_backend =
+    let title =
+      Format.sprintf
+        "garbage collection of skip list cells (storage_backend = %s)"
+        (Dal_node.string_of_skip_list_storage_backend skip_list_storage_backend)
+    in
+    let tags = Tag.[tezos2; memory_3k; "dal"; "gc"; "skip_list"] in
+    let tags =
+      if skip_list_storage_backend = Dal_node.SQLite3 then
+        skip_list_sqlite3_tag :: tags
+      else tags
+    in
     Protocol.register_test
       ~__FILE__
-      ~tags:[Tag.tezos2; Tag.memory_3k; "dal"; "gc"; "skip_list"]
+      ~tags
       ~uses:(fun _protocol -> [Constant.octez_dal_node])
-      ~title:"garbage collection of skip list cells"
+      ~title
       ~supports:(Protocol.From_protocol 19)
       (fun protocol ->
         (* We choose some arbitrary, small values *)
@@ -6385,7 +6396,12 @@ module Garbage_collection = struct
         let number_of_slots = dal_parameters.Dal.Parameters.number_of_slots in
         let lag = dal_parameters.attestation_lag in
         let dal_node = Dal_node.create ~node () in
-        let* () = Dal_node.init_config ~producer_profiles:[1] dal_node in
+        let* () =
+          Dal_node.init_config
+            ~producer_profiles:[1]
+            ~skip_list_storage_backend
+            dal_node
+        in
         let* () = Dal_node.run dal_node ~wait_ready:true in
         Log.info
           "The first level with stored cells is 1 + lag = %d. We bake till \
@@ -8350,7 +8366,11 @@ let register ~protocols =
     "garbage collection of shards for all profiles"
     Garbage_collection.test_gc_with_all_profiles
     protocols ;
-  Garbage_collection.test_gc_skip_list_cells ~protocols ;
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7561
+     Adapt the test for the SQLite3 backend. *)
+  Garbage_collection.test_gc_skip_list_cells
+    ~protocols
+    ~skip_list_storage_backend:Legacy ;
   scenario_with_layer1_and_dal_nodes
     ~tags:["crawler"; "reconnection"]
     "DAL node crawler reconnects to L1 without crashing"
