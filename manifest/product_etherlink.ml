@@ -356,6 +356,7 @@ let _etherlink_governance_observer =
         bls12_381_archive;
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix;
+        octez_version_value;
         octez_clic;
         prometheus_app;
         cohttp_lwt_unix;

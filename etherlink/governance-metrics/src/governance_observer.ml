@@ -264,6 +264,31 @@ let parse_options () =
   in
   Tezos_clic.dispatch commands () remaining_args
 
-let () =
-  Lwt_main.run (parse_options ())
-  |> Result.iter_error (Format.printf "ERROR: %a%!" Error_monad.pp_print_trace)
+let handle_error = function
+  | Ok _ -> ()
+  | Error [Tezos_clic.Version] ->
+      let evm_node_version =
+        (* reuse octez evm node version, this is a small hack because
+           we need a version so we can add this bin into
+           `experimental` *)
+        Tezos_version_value.Bin_version.octez_evm_node_version_string
+      in
+      Format.printf "%s\n" evm_node_version ;
+      exit 0
+  | Error [Tezos_clic.Help command] ->
+      Tezos_clic.usage
+        Format.std_formatter
+        ~executable_name
+        ~global_options
+        (match command with None -> [] | Some c -> [c]) ;
+      Stdlib.exit 0
+  | Error errs ->
+      Tezos_clic.pp_cli_errors
+        Format.err_formatter
+        ~executable_name
+        ~global_options
+        ~default:Error_monad.pp
+        errs ;
+      Stdlib.exit 1
+
+let () = Lwt_main.run (parse_options ()) |> handle_error
