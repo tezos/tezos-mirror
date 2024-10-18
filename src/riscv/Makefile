@@ -52,7 +52,8 @@ assets/jstz assets/jstz.checksum::
 
 .PHONY: build-deps
 build-deps:
-	@exec ./scripts/install-rust-std-hermit.sh
+	@make -C jstz build-deps
+	@make -C dummy_kernel build-deps
 	@rustup component add rustfmt clippy
 ifneq ($(NATIVE_TARGET),)
 	@rustup target add $(NATIVE_TARGET)
