@@ -617,7 +617,7 @@ let scenario_with_layer1_and_dal_nodes ?regression ?(tags = [])
     ?number_of_slots ?attestation_lag ?attestation_threshold ?commitment_period
     ?challenge_window ?(dal_enable = true) ?activation_timestamp
     ?bootstrap_profile ?producer_profiles ?history_mode ?prover ?l1_history_mode
-    variant scenario =
+    ?skip_list_storage_backend variant scenario =
   let description = "Testing DAL node" in
   let tags = if List.mem team tags then tags else team :: tags in
   let tags =
@@ -655,7 +655,12 @@ let scenario_with_layer1_and_dal_nodes ?regression ?(tags = [])
         ~protocol
         ~dal_enable
       @@ fun parameters cryptobox node client ->
-      with_dal_node ?bootstrap_profile ?producer_profiles ?history_mode node
+      with_dal_node
+        ?bootstrap_profile
+        ?producer_profiles
+        ?history_mode
+        ?skip_list_storage_backend
+        node
       @@ fun _key dal_node ->
       scenario protocol parameters cryptobox node client dal_node)
 
