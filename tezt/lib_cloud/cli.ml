@@ -220,6 +220,13 @@ let dns =
     ~description:"Associate a domain name with the website"
     (proxy && website)
 
+let dns_zones =
+  Clap.list_string
+    ~section
+    ~long:"dns-zone"
+    ~description:"DNS zones to register the entries into"
+    ()
+
 let octez_release =
   Clap.optional_string
     ~section

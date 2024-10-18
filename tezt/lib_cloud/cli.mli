@@ -97,6 +97,9 @@ val dns : bool
     excluding the parent domain part attached to the zone.*)
 val dns_domain : string option
 
+(** DNS zones to register entries into *)
+val dns_zones : string list
+
 (** OS used by the VM. *)
 val os : string
 

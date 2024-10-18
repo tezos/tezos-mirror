@@ -133,8 +133,26 @@ module Remote = struct
     in
     match agents with [agent] -> Lwt.return agent | _ -> assert false
 
+  (* Adds a dns record for the proxy for each configured zone *)
+  let dns_add_record agent =
+    let name =
+      match Env.dns_domain with None -> Env.tezt_cloud | Some d -> d
+    in
+    let zones = if Env.dns_zones = [] then ["tezt-cloud"] else Env.dns_zones in
+    Lwt_list.iter_s
+      (fun zone ->
+        let* ip = Gcloud.DNS.get_value ~zone ~domain:name in
+        let* () =
+          match ip with
+          | None -> Lwt.return_unit
+          | Some ip -> Gcloud.DNS.remove_subdomain ~zone ~name ~value:ip
+        in
+        let ip = Agent.point agent |> Option.get |> fst in
+        Gcloud.DNS.add_subdomain ~zone ~name ~value:ip)
+      zones
+
   (*
-      Deployement requires to create new VMs and organizing them per group of
+      Deployment requires to create new VMs and organizing them per group of
       configuration. Each configuration leads to one terraform workspace.
     *)
   let deploy ~proxy ~configurations =
@@ -184,27 +202,7 @@ module Remote = struct
     let* t =
       if proxy then
         let* agent = deploy_proxy () in
-        let* () =
-          if Env.dns then
-            let tezt_cloud = Env.tezt_cloud in
-            let* ip =
-              Gcloud.DNS.get_value ~zone:"tezt-cloud" ~domain:tezt_cloud
-            in
-            let* () =
-              match ip with
-              | None -> Lwt.return_unit
-              | Some ip ->
-                  Gcloud.DNS.remove_subdomain
-                    ~zone:"tezt-cloud"
-                    ~name:tezt_cloud
-                    ~value:ip
-            in
-            Gcloud.DNS.add_subdomain
-              ~zone:"tezt-cloud"
-              ~name:Env.tezt_cloud
-              ~value:(Agent.point agent |> Option.get |> fst)
-          else Lwt.return_unit
-        in
+        let* () = if Env.dns then dns_add_record agent else Lwt.return_unit in
         Lwt.return {agents = agent :: agents}
       else Lwt.return {agents}
     in
