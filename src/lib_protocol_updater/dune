@@ -13,7 +13,7 @@
   octez-proto-libs.protocol-environment
   octez-protocol-compiler.registerer
   octez-protocol-compiler.native
-  octez-libs.tezos-context
+  octez-shell-libs.context-ops
   lwt-exit
   dynlink)
  (flags
@@ -22,4 +22,4 @@
   -open Tezos_stdlib_unix
   -open Tezos_micheline
   -open Tezos_shell_services
-  -open Tezos_context))
+  -open Tezos_context_ops))

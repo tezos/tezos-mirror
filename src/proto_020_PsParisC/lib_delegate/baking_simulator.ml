@@ -38,7 +38,7 @@ type incremental = {
 let load_context ~context_path =
   let open Lwt_result_syntax in
   protect (fun () ->
-      let*! index = Context.init ~readonly:true context_path in
+      let*! index = Context_ops.init ~kind:`Disk ~readonly:true context_path in
       return (Abstract_context_index.abstract index))
 
 let check_context_consistency (abstract_index : Abstract_context_index.t)

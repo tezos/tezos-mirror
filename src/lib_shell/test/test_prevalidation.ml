@@ -51,16 +51,15 @@ module Init = struct
     Lwt_utils_unix.with_tempdir "tezos_test_" (fun base_dir ->
         let open Lwt_result_syntax in
         let root = Filename.concat base_dir "context" in
-        let*! idx = Context.init root in
+        let*! idx = Context_ops.init ~kind:`Disk root in
         let* genesis =
-          Context.commit_genesis
+          Context_ops.commit_genesis
             idx
             ~chain_id
             ~time:Shell_test_helpers.genesis_time
             ~protocol:Shell_test_helpers.genesis_protocol_hash
         in
-        let*! v = Context.checkout_exn idx genesis in
-        let v = Tezos_shell_context.Shell_context.wrap_disk_context v in
+        let*! v = Context_ops.checkout_exn idx genesis in
         f v)
 
   let genesis_block ~timestamp ctxt =

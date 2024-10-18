@@ -1459,7 +1459,7 @@ module type EXPORTER = sig
     unit Lwt.t
 
   val export_context :
-    t -> Context.index -> Context_hash.t -> unit tzresult Lwt.t
+    t -> Context_ops.index -> Context_hash.t -> unit tzresult Lwt.t
 
   val copy_cemented_block :
     t -> file:string -> start_level:int32 -> end_level:int32 -> unit Lwt.t
@@ -1567,7 +1567,10 @@ module Raw_exporter : EXPORTER = struct
       Naming.(snapshot_context_file t.snapshot_tmp_dir |> file_path)
     in
     let*! () =
-      Context.export_snapshot context_index context_hash ~path:tmp_context_path
+      Context_ops.export_snapshot
+        context_index
+        context_hash
+        ~path:tmp_context_path
     in
     return_unit
 
@@ -1813,7 +1816,10 @@ module Tar_exporter : EXPORTER = struct
       Naming.(snapshot_context_file t.snapshot_tmp_dir |> file_path)
     in
     let*! () =
-      Context.export_snapshot context_index context_hash ~path:tmp_context_path
+      Context_ops.export_snapshot
+        context_index
+        context_hash
+        ~path:tmp_context_path
     in
     let*! () =
       Onthefly.add_directory_and_finalize
@@ -2457,8 +2463,10 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
   let export_context snapshot_exporter ~context_dir context_hash =
     let open Lwt_result_syntax in
     let*! () = Event.(emit exporting_context) () in
-    let*! context_index = Context.init ~readonly:true context_dir in
-    let is_gc_allowed = Context.is_gc_allowed context_index in
+    let*! context_index =
+      Context_ops.init ~kind:`Disk ~readonly:true context_dir
+    in
+    let is_gc_allowed = Context_ops.is_gc_allowed context_index in
     let* () =
       if not is_gc_allowed then tzfail Cannot_export_snapshot_format
       else
@@ -2469,7 +2477,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
         Lwt.finalize
           (fun () ->
             Exporter.export_context snapshot_exporter context_index context_hash)
-          (fun () -> Context.close context_index)
+          (fun () -> Context_ops.close context_index)
     in
     let*! () = Event.(emit context_exported) () in
     return_unit
@@ -3831,13 +3839,10 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
       ~user_activated_protocol_overrides ~operation_metadata_size_limit =
     let open Lwt_result_syntax in
     let* predecessor_context =
-      let*! o = Context.checkout context_index imported_context_hash in
+      let*! o = Context_ops.checkout context_index imported_context_hash in
       match o with
       | Some ch -> return ch
       | None -> tzfail (Inconsistent_context imported_context_hash)
-    in
-    let predecessor_context =
-      Tezos_shell_context.Shell_context.wrap_disk_context predecessor_context
     in
     let apply_environment =
       {
@@ -3933,14 +3938,15 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
         @@ fun () -> Importer.restore_context snapshot_importer ~dst_context_dir
       in
       let*! context_index =
-        Context.init
+        Context_ops.init
+          ~kind:`Disk
           ~readonly:false
           ~index_log_size:default_index_log_size
           ?patch_context
           dst_context_dir
       in
       let* genesis_ctxt_hash =
-        Context.commit_genesis
+        Context_ops.commit_genesis
           context_index
           ~chain_id
           ~time:genesis.Genesis.time
@@ -3952,7 +3958,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
             ~progress_display_mode:Auto
             ~msg:"Checking context integrity"
           @@ fun () ->
-          Context.Checks.Pack.Integrity_check.run
+          Context_ops.integrity_check
             ?ppf:None
             ~root:dst_context_dir
             ~auto_repair:false
@@ -3975,7 +3981,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
           ~user_activated_protocol_overrides
           ~operation_metadata_size_limit
       in
-      let*! () = Context.close context_index in
+      let*! () = Context_ops.close context_index in
       return (genesis_ctxt_hash, block_validation_result)
     in
     let* () =
@@ -4073,15 +4079,6 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
         ~snapshot_metadata
         snapshot_path
         user_expected_block
-    in
-    let patch_context =
-      Option.map
-        (fun f ctxt ->
-          let open Tezos_shell_context in
-          let ctxt = Shell_context.wrap_disk_context ctxt in
-          let+ ctxt = f ctxt in
-          Shell_context.unwrap_disk_context ctxt)
-        patch_context
     in
     (* Restore protocols *)
     let* protocol_levels =

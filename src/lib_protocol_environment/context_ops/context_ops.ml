@@ -703,3 +703,7 @@ let compute_testchain_chain_id (context : Environment_context.t) block_hash =
   | Context {kind = Duo_memory_context.Context; _} ->
       Context_wrapper.Memory_context.compute_testchain_chain_id block_hash
   | Context t -> err_impl_mismatch ~got:t.impl_name
+
+let export_snapshot = assert false
+
+let integrity_check = assert false

@@ -88,7 +88,7 @@
   octez-libs.stdlib-unix
   octez-libs.crypto
   octez-shell-libs.shell-services
-  octez-libs.tezos-context
+  octez-shell-libs.context-ops
   octez-shell-libs.validation
   octez-shell-libs.store.shared
   octez-shell-libs.store.unix)
@@ -99,7 +99,7 @@
   -open Tezos_stdlib_unix
   -open Tezos_crypto
   -open Tezos_shell_services
-  -open Tezos_context
+  -open Tezos_context_ops
   -open Tezos_validation
   -open Tezos_store_shared
   -open Tezos_store_unix)

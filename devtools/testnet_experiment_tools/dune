@@ -39,7 +39,7 @@
   octez-shell-libs.client-base-unix
   octez-shell-libs.store
   octez-shell-libs.store.shared
-  octez-libs.tezos-context
+  octez-shell-libs.context-ops
   octez-protocol-020-PsParisC-libs.baking
   octez-protocol-020-PsParisC-libs.client
   octez-protocol-020-PsParisC-libs.client.commands
@@ -62,7 +62,7 @@
   -open Tezos_client_base_unix
   -open Tezos_store
   -open Tezos_store_shared
-  -open Tezos_context)
+  -open Tezos_context_ops)
  (modules sigs tool_020_PsParisC tool_021_PsQuebec tool_alpha))
 
 (executable
