@@ -539,6 +539,9 @@ let changeset_semgrep_files =
 (** Set of Jsonnet files for formatting ([jsonnetfmt --test]). *)
 let changeset_jsonnet_fmt_files = Changeset.(make ["**/*.jsonnet"])
 
+(** Set of Grafazos files *)
+let changeset_grafazos = Changeset.(make ["grafazos/**/*"])
+
 (* We only need to run the [oc.script:snapshot_alpha_and_link] job if
    protocol Alpha or if the scripts changed. *)
 let changeset_script_snapshot_alpha_and_link =
