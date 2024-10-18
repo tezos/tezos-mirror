@@ -4711,7 +4711,7 @@ build_grafazos_dashboards:
   timeout: 60 minutes
   before_script:
   - cd grafazos/
-  - jb install github.com/google/go-jsonnet/cmd/jsonnetfmt@7903819
+  - jb install github.com/grafana/grafonnet/gen/grafonnet-v11.1.0@1ce5aec
   script:
   - make
   artifacts:
