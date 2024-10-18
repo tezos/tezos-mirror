@@ -63,8 +63,10 @@ impl ValidatedCacheEntry {
     /// Panics if the validity checks fail. See [`ValidatedCacheEntry`].
     #[cfg(test)]
     pub fn from_raw(phys_addr: Address, instr: InstrCacheable) -> Self {
+        use crate::parser::instruction::InstrWidth;
+
         assert!(
-            instr.width() == 2 || cacheable_uncompressed(phys_addr),
+            instr.width() == InstrWidth::Compressed || cacheable_uncompressed(phys_addr),
             "Cache entry would cross page boundaries"
         );
 

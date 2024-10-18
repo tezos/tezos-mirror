@@ -422,8 +422,8 @@ impl<'a, M: ManagerRead> Block<'a, M> {
     {
         for i in self.instr.iter() {
             match core.run_instr_cacheable(i.as_ref()) {
-                Ok(ProgramCounterUpdate::Add(width)) => {
-                    *instr_pc += width;
+                Ok(ProgramCounterUpdate::Next(width)) => {
+                    *instr_pc += width as u64;
                     core.hart.pc.write(*instr_pc);
                     *steps += 1;
                 }
