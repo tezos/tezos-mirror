@@ -258,7 +258,7 @@ let gen_slot_history =
   in
   List.fold_left_e
     (fun hist (published_level, attested_slots) ->
-      Dal.Slots_history.add_confirmed_slot_headers_no_cache
+      Dal.Slots_history.update_skip_list_no_cache
         ~number_of_slots
         hist
         published_level
@@ -286,7 +286,7 @@ let gen_slot_history_cache =
   in
   List.fold_left_e
     (fun (hist, cache) (published_level, attested_slots) ->
-      Dal.Slots_history.add_confirmed_slot_headers
+      Dal.Slots_history.update_skip_list
         ~number_of_slots
         hist
         cache

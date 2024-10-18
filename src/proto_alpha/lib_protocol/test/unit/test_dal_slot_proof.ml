@@ -63,7 +63,7 @@ struct
     let index = mk_slot_index id in
     let* _data, _poly, slot = mk_slot ~level ~index () in
     let@ result =
-      Hist.add_confirmed_slot_headers_no_cache
+      Hist.update_skip_list_no_cache
         skip_list
         level
         [slot]
@@ -188,7 +188,7 @@ struct
     let open Lwt_result_wrap_syntax in
     let* _slot_data, polynomial, slot = mk_slot ~level ?index () in
     let*?@ skip_list, cache =
-      Hist.add_confirmed_slot_headers
+      Hist.update_skip_list
         ~number_of_slots:Parameters.dal_parameters.number_of_slots
         genesis_history
         genesis_history_cache

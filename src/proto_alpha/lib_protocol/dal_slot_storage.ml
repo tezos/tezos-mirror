@@ -79,7 +79,7 @@ let update_skip_list ctxt ~slot_headers_statuses ~level_attested
       (* WIP/Temporary: will be extended in next commits. *)
       List.map fst slot_headers_statuses
     in
-    add_confirmed_slot_headers
+    update_skip_list
       ~number_of_slots
       slots_history
       cache

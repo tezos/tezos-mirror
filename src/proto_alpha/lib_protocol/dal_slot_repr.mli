@@ -229,12 +229,12 @@ module History : sig
       {!Raw_level_repr.root} as published level and no attested slots. Since Dal
       is not necessarily activated in the genesis block (e.g. this will be the case
       on mainnet), the skip list is reset at the first call to
-      {!add_confirmed_slot_headers} to enforce the invariant that there are no gaps
+      {!update_skip_list} to enforce the invariant that there are no gaps
       in the levels of the cells of the skip list.
 
       So, a skip list is initialized with this genesis cell. It's then replaced
       with a growing (non-dummy) skip list as soon as a call to
-      {!add_confirmed_slot_headers} with a level bigger than
+      {!update_skip_list} with a level bigger than
       {!Raw_level_repr.root} is performed. This allows to activate Dal at any
       level and having a contiguous skip list (w.r.t. L1 levels). This
       representation allows to produce simpler proofs with a bounded history
@@ -254,7 +254,7 @@ module History : sig
   module History_cache :
     Bounded_history_repr.S with type key = hash and type value = t
 
-  (** [add_confirmed_slots hist cache published_level ~number_of_slots
+  (** [update_skip_list hist cache published_level ~number_of_slots
       slot_headers] updates the given structure [hist] with the list of
       [slot_headers]. The given [cache] is also updated to add successive values
       of [cell] to it.
@@ -270,7 +270,7 @@ module History : sig
 
       - [slot_headers] is sorted in increasing order w.r.t. slots indices.
   *)
-  val add_confirmed_slot_headers :
+  val update_skip_list :
     t ->
     History_cache.t ->
     Raw_level_repr.t ->
@@ -278,9 +278,9 @@ module History : sig
     Header.t list ->
     (t * History_cache.t) tzresult
 
-  (** Similiar to {!add_confirmed_slot_headers}, but no cache is provided or
+  (** Similiar to {!update_skip_list}, but no cache is provided or
       updated. *)
-  val add_confirmed_slot_headers_no_cache :
+  val update_skip_list_no_cache :
     t -> Raw_level_repr.t -> number_of_slots:int -> Header.t list -> t tzresult
 
   (** [equal a b] returns true iff a is equal to b. *)

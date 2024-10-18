@@ -105,7 +105,7 @@ struct
           slots_headers
       in
       let*?@ cell, cache =
-        Dal_slot_repr.History.add_confirmed_slot_headers
+        Dal_slot_repr.History.update_skip_list
           ~number_of_slots:Parameters.dal_parameters.number_of_slots
           cell
           cache

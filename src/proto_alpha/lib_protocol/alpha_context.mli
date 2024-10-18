@@ -2923,14 +2923,14 @@ module Dal : sig
     module History_cache :
       Bounded_history_repr.S with type key = hash and type value = t
 
-    val add_confirmed_slot_headers_no_cache :
+    val update_skip_list_no_cache :
       t ->
       Raw_level.t ->
       number_of_slots:int ->
       Slot.Header.t list ->
       t tzresult
 
-    val add_confirmed_slot_headers :
+    val update_skip_list :
       t ->
       History_cache.t ->
       Raw_level.t ->

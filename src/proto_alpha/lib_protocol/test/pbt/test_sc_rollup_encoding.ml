@@ -191,11 +191,7 @@ let gen_dal_slots_history () =
             slot_headers
         in
         History.(
-          add_confirmed_slot_headers_no_cache
-            ~number_of_slots
-            history
-            level
-            slot_headers)
+          update_skip_list_no_cache ~number_of_slots history level slot_headers)
         |> function
         | Ok history -> loop history llist
         | Error e ->
