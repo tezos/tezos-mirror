@@ -24,7 +24,7 @@ export recommended_node_version=18.18.2
 
 ## opam_repository is a commit hash of the public opam repository, i.e.
 ## https://github.com/ocaml/opam-repository
-export opam_repository_tag=a70ac3366bdaaf354374c8ac8929d09c17e6f494
+export opam_repository_tag=6be71e78343d97c4343a15c3c24a5b39cd162fd6
 
 # SHA-256 hashes of the DAL SRSs, as used in 'scripts/install_dal_trusted_setup.sh' to verify
 # integrity of downloaded SRS.
@@ -56,7 +56,7 @@ export cargo_version='1.78.0'
 export opam_version='2.2.1'
 
 # Installed via apk python3-dev
-export python_version='3.12'
+export python_version='3.12.7'
 
 # Installed via apk
 export poetry_version='1.8.3'
