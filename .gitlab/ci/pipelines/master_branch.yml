@@ -300,7 +300,9 @@ datadog_pipeline_trace:
   allow_failure: true
   timeout: 60 minutes
   script:
+  - CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}
   - DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags pipeline_type:$PIPELINE_TYPE
+    --tags mr_number:$CI_MERGE_REQUEST_IID
 
 oc.unified_coverage:
   image: ${ci_image_name}/test:${ci_image_tag}
