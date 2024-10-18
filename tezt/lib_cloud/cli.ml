@@ -227,3 +227,12 @@ let octez_release =
     ~placeholder:"<tag>"
     ~description:"Use the octez release <tag> instead of local octez binaries."
     ()
+
+let open_telemetry =
+  Clap.flag
+    ~section
+    ~set_long:"open-telemetry"
+    ~unset_long:"no-open-telemetry"
+    ~set_long_synonyms:["otel"]
+    ~description:"Run the Open Telemetry stack"
+    grafana

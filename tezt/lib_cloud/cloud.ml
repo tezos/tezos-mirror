@@ -88,6 +88,8 @@ type t = {
   website : Web.t option;
   prometheus : Prometheus.t option;
   grafana : Grafana.t option;
+  otel : Otel.t option;
+  jaeger : Jaeger.t option;
   deployement : Deployement.t option;
 }
 
@@ -163,6 +165,8 @@ let shutdown ?exn t =
   let* () =
     Option.fold ~none:Lwt.return_unit ~some:Grafana.shutdown t.grafana
   in
+  let* () = Option.fold ~none:Lwt.return_unit ~some:Otel.shutdown t.otel in
+  let* () = Option.fold ~none:Lwt.return_unit ~some:Jaeger.shutdown t.jaeger in
   let* () =
     Option.fold
       ~none:Lwt.return_unit
@@ -215,9 +219,24 @@ let orchestrator deployement f =
       Lwt.return_some grafana
     else Lwt.return_none
   in
+  let* otel, jaeger =
+    if Env.open_telemetry then
+      let* otel = Otel.run ~jaeger:true in
+      let* jaeger = Jaeger.run () in
+      Lwt.return (Some otel, Some jaeger)
+    else Lwt.return (None, None)
+  in
   Log.info "Post prometheus" ;
   let t =
-    {website; agents; prometheus; grafana; deployement = Some deployement}
+    {
+      website;
+      agents;
+      prometheus;
+      grafana;
+      otel;
+      jaeger;
+      deployement = Some deployement;
+    }
   in
   let sigint = sigint () in
   let main_promise =
@@ -500,6 +519,8 @@ let register ?proxy_files ?vms ~__FILE__ ~title ~tags ?seed f =
           agents = [default_agent];
           website = None;
           grafana = None;
+          otel = None;
+          jaeger = None;
           prometheus = None;
           deployement = None;
         }

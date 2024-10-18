@@ -1,0 +1,12 @@
+(*****************************************************************************)
+(*                                                                           *)
+(* SPDX-License-Identifier: MIT                                              *)
+(* SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>      *)
+(*                                                                           *)
+(*****************************************************************************)
+
+type t
+
+val run : unit -> t Lwt.t
+
+val shutdown : t -> unit Lwt.t
