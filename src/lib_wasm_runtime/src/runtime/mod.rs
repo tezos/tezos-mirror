@@ -11,6 +11,7 @@ use crate::{
     types::EvmTree,
 };
 pub use env::Env;
+use log::trace;
 use ocaml::Error;
 use wasmer::{Engine, Function, FunctionEnv, Instance, Store};
 
@@ -33,11 +34,6 @@ pub trait Runtime {
         // the reboot flag can be set and we remove it, and (2) we will create it once the
         // computation is over.
         let _ = self.mut_host().reboot_requested()?;
-
-        // We don’t modify the reboot counter, so the kernel will never print the `Kernel
-        // Invocation` header. We print it ourselves instead.
-        self.host()
-            .write_debug("------------------ Kernel Invocation ------------------\n".as_bytes());
 
         loop {
             self.call()?;
@@ -99,6 +95,7 @@ impl Runtime for WasmRuntime {
     }
 
     fn call(&mut self) -> Result<(), Error> {
+        trace!("WasmRuntime::call()");
         let _result = self.entrypoint.call(&mut self.store, &[])?;
         Ok(())
     }
