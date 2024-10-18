@@ -84,7 +84,9 @@ let process_governance_contracts_entrypoints ~governance_operations ~level =
           GovernanceMetrics.Entrypoints.trigger_upgrade
             ~source
             ~address
-            Sequencer
+            Sequencer ;
+          GovernanceMetrics.Entrypoints.clear_proposal Sequencer ;
+          GovernanceMetrics.Entrypoints.clear_vote Sequencer
       | Sequencer (Vote value) ->
           GovernanceMetrics.Entrypoints.vote ~source ~value Sequencer
       | Sequencer (Upvote_proposal {sequencer_pk; pool_address}) ->
@@ -100,7 +102,9 @@ let process_governance_contracts_entrypoints ~governance_operations ~level =
             ~pool_address
             Sequencer
       | Kernel (Trigger_kernel_upgrade address) ->
-          GovernanceMetrics.Entrypoints.trigger_upgrade ~source ~address Kernel
+          GovernanceMetrics.Entrypoints.trigger_upgrade ~source ~address Kernel ;
+          GovernanceMetrics.Entrypoints.clear_proposal Kernel ;
+          GovernanceMetrics.Entrypoints.clear_vote Kernel
       | Kernel (Vote value) ->
           GovernanceMetrics.Entrypoints.vote ~source ~value Kernel
       | Kernel (Upvote_proposal proposal) ->
@@ -111,7 +115,9 @@ let process_governance_contracts_entrypoints ~governance_operations ~level =
           GovernanceMetrics.Entrypoints.trigger_upgrade
             ~source
             ~address
-            Security_kernel
+            Security_kernel ;
+          GovernanceMetrics.Entrypoints.clear_proposal Security_kernel ;
+          GovernanceMetrics.Entrypoints.clear_vote Security_kernel
       | Security_kernel (Vote value) ->
           GovernanceMetrics.Entrypoints.vote ~source ~value Security_kernel
       | Security_kernel (Upvote_proposal proposal) ->

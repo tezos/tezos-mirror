@@ -383,5 +383,25 @@ module GovernanceMetrics = struct
             MetricsRegistration.SecurityKernelEntrypointsRegistration.proposal
             ~labels:[source; proposal]
             ()
+
+    let clear_vote = function
+      | Sequencer ->
+          Gauge.clear MetricsRegistration.SequencerEntrypointsRegistration.vote
+      | Kernel ->
+          Gauge.clear MetricsRegistration.KernelEntrypointsRegistration.vote
+      | Security_kernel ->
+          Gauge.clear
+            MetricsRegistration.SecurityKernelEntrypointsRegistration.vote
+
+    let clear_proposal = function
+      | Sequencer ->
+          Counter.clear
+            MetricsRegistration.SequencerEntrypointsRegistration.proposal
+      | Kernel ->
+          Counter.clear
+            MetricsRegistration.KernelEntrypointsRegistration.proposal
+      | Security_kernel ->
+          Counter.clear
+            MetricsRegistration.SecurityKernelEntrypointsRegistration.proposal
   end
 end

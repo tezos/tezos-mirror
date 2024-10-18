@@ -80,5 +80,13 @@ module GovernanceMetrics : sig
       ?proposal:string ->
       governance_contract ->
       unit
+
+    (** [clear_vote contract] will clear every voting metrics targetting
+        [contract]. *)
+    val clear_vote : governance_contract -> unit
+
+    (** [clear_proposal contract] will clear every proposal metrics
+        targetting [contract]. *)
+    val clear_proposal : governance_contract -> unit
   end
 end
