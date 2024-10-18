@@ -117,3 +117,12 @@
   (with-stdout-to
    %{targets}
    (run %{dep:../ppinclude/ppinclude.exe} v13.in.ml))))
+
+(rule
+ (targets v14.ml)
+ (mode promote)
+ (deps v14.in.ml (glob_files v14/*.mli))
+ (action
+  (with-stdout-to
+   %{targets}
+   (run %{dep:../ppinclude/ppinclude.exe} v14.in.ml))))

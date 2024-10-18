@@ -519,7 +519,8 @@ module Make (Proto : Protocol_plugin.T) = struct
       match proto_env_version with
       | Protocol.V0 -> false
       | Protocol.(
-          V1 | V2 | V3 | V4 | V5 | V6 | V7 | V8 | V9 | V10 | V11 | V12 | V13) ->
+          ( V1 | V2 | V3 | V4 | V5 | V6 | V7 | V8 | V9 | V10 | V11 | V12 | V13
+          | V14 )) ->
           true
     in
     let block_metadata =
@@ -1030,7 +1031,8 @@ module Make (Proto : Protocol_plugin.T) = struct
       Protocol.(
         match Proto.environment_version with
         | V0 -> false
-        | V1 | V2 | V3 | V4 | V5 | V6 | V7 | V8 | V9 | V10 | V11 | V12 | V13 ->
+        | V1 | V2 | V3 | V4 | V5 | V6 | V7 | V8 | V9 | V10 | V11 | V12 | V13
+        | V14 ->
             true)
       && not is_from_genesis
     in
