@@ -540,7 +540,7 @@ let with_fresh_rollup ?(pvm_name = "arith") ?dal_node f tezos_node tezos_client
   f rollup_address sc_rollup_node
 
 let make_dal_node ?name ?peers ?attester_profiles ?producer_profiles
-    ?bootstrap_profile ?history_mode tezos_node =
+    ?bootstrap_profile ?history_mode ?skip_list_storage_backend tezos_node =
   let dal_node = Dal_node.create ?name ~node:tezos_node () in
   let* () =
     Dal_node.init_config
@@ -549,13 +549,15 @@ let make_dal_node ?name ?peers ?attester_profiles ?producer_profiles
       ?producer_profiles
       ?bootstrap_profile
       ?history_mode
+      ?skip_list_storage_backend
       dal_node
   in
   let* () = Dal_node.run ~event_level:`Debug dal_node ~wait_ready:true in
   return dal_node
 
 let with_dal_node ?peers ?attester_profiles ?producer_profiles
-    ?bootstrap_profile ?history_mode tezos_node f key =
+    ?bootstrap_profile ?history_mode ?skip_list_storage_backend tezos_node f key
+    =
   let* dal_node =
     make_dal_node
       ?peers
@@ -563,6 +565,7 @@ let with_dal_node ?peers ?attester_profiles ?producer_profiles
       ?producer_profiles
       ?bootstrap_profile
       ?history_mode
+      ?skip_list_storage_backend
       tezos_node
   in
   f key dal_node
