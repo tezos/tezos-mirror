@@ -2927,7 +2927,7 @@ module Dal : sig
       t ->
       Raw_level.t ->
       number_of_slots:int ->
-      Slot.Header.t list ->
+      (Slot.Header.t * Attestation.attestation_status) list ->
       t tzresult
 
     val update_skip_list :
@@ -2935,7 +2935,7 @@ module Dal : sig
       History_cache.t ->
       Raw_level.t ->
       number_of_slots:int ->
-      Slot.Header.t list ->
+      (Slot.Header.t * Attestation.attestation_status) list ->
       (t * History_cache.t) tzresult
 
     type proof

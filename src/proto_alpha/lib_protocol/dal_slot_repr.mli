@@ -255,9 +255,9 @@ module History : sig
     Bounded_history_repr.S with type key = hash and type value = t
 
   (** [update_skip_list hist cache published_level ~number_of_slots
-      slot_headers] updates the given structure [hist] with the list of
-      [slot_headers]. The given [cache] is also updated to add successive values
-      of [cell] to it.
+      slot_headers_with_statuses] updates the given structure [hist] with the
+      list of [slot_headers_with_statuses]. The given [cache] is also updated to
+      add successive values of [cell] to it.
 
 
       This function checks the following pre-conditions before updating the
@@ -268,20 +268,24 @@ module History : sig
 
       - [published_level] is the successor the last inserted cell's level.
 
-      - [slot_headers] is sorted in increasing order w.r.t. slots indices.
-  *)
+      - [slot_headers_with_statuses] is sorted in increasing order w.r.t. slots
+      indices. *)
   val update_skip_list :
     t ->
     History_cache.t ->
     Raw_level_repr.t ->
     number_of_slots:int ->
-    Header.t list ->
+    (Header.t * Dal_attestation_repr.Accountability.attestation_status) list ->
     (t * History_cache.t) tzresult
 
   (** Similiar to {!update_skip_list}, but no cache is provided or
       updated. *)
   val update_skip_list_no_cache :
-    t -> Raw_level_repr.t -> number_of_slots:int -> Header.t list -> t tzresult
+    t ->
+    Raw_level_repr.t ->
+    number_of_slots:int ->
+    (Header.t * Dal_attestation_repr.Accountability.attestation_status) list ->
+    t tzresult
 
   (** [equal a b] returns true iff a is equal to b. *)
   val equal : t -> t -> bool

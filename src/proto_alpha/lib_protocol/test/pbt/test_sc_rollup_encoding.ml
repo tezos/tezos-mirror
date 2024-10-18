@@ -122,13 +122,18 @@ module Index = Dal_slot_index_repr
 let pack_slots_headers_by_level list =
   let module ML = Map.Make (Raw_level_repr) in
   let module SSH = Set.Make (struct
-    include Dal_slot_repr.Header
+    type t =
+      Dal_slot_repr.Header.t
+      * Dal_attestation_repr.Accountability.attestation_status
 
-    let compare a b = Dal_slot_index_repr.compare a.id.index b.id.index
+    let compare (a, _) (b, _) =
+      let open Dal_slot_repr.Header in
+      Dal_slot_index_repr.compare a.id.index b.id.index
   end) in
   let map =
     List.fold_left
-      (fun map (Dal_slot_repr.Header.{id = {published_level; _}; _} as sh) ->
+      (fun map
+           ((Dal_slot_repr.Header.{id = {published_level; _}; _}, _status) as sh) ->
         let l =
           ML.find published_level map |> Option.value ~default:SSH.empty
         in
@@ -160,10 +165,18 @@ let gen_dal_slots_history () =
   in
   let number_of_slots = constants.dal.number_of_slots in
   (* Generate a list of (level * confirmed slot ID). *)
-  let* list = small_list (pair small_nat small_nat) in
+  let* list = small_list (triple small_nat small_nat bool) in
   let list =
     List.rev_map
-      (fun (level, slot_index) ->
+      (fun (level, slot_index, is_proto_attested) ->
+        let attestation_status =
+          Dal_attestation_repr.Accountability.
+            {
+              attested_shards = (if is_proto_attested then 1 else 0);
+              total_shards = 1;
+              is_proto_attested;
+            }
+        in
         let published_level =
           Raw_level_repr.(
             (* use succ to avoid having a published_level = 0, as it's the
@@ -174,7 +187,8 @@ let gen_dal_slots_history () =
           Index.of_int_opt ~number_of_slots slot_index
           |> Option.value ~default:Index.zero
         in
-        Header.{id = {published_level; index}; commitment = Commitment.zero})
+        ( Header.{id = {published_level; index}; commitment = Commitment.zero},
+          attestation_status ))
       list
   in
   let rec loop history = function
@@ -183,7 +197,7 @@ let gen_dal_slots_history () =
         let slot_headers =
           (* Sort the list in the right ordering before adding slots to slots_history. *)
           List.sort_uniq
-            (fun {Header.id = a; _} {id = b; _} ->
+            (fun ({Header.id = a; _}, _status) ({id = b; _}, _status) ->
               let c =
                 Raw_level_repr.compare a.published_level b.published_level
               in

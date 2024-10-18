@@ -75,16 +75,12 @@ let update_skip_list ctxt ~slot_headers_statuses ~level_attested
     *)
     (* We expect to put exactly [number_of_slots] cells in the cache. *)
     let cache = History_cache.empty ~capacity:(Int64.of_int number_of_slots) in
-    let confirmed_slot_headers =
-      (* WIP/Temporary: will be extended in next commits. *)
-      List.map fst slot_headers_statuses
-    in
     update_skip_list
       ~number_of_slots
       slots_history
       cache
       level_attested
-      confirmed_slot_headers
+      slot_headers_statuses
   in
   let*! ctxt = Storage.Dal.Slot.History.add ctxt slots_history in
   let*! ctxt =

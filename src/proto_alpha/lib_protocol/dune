@@ -84,8 +84,8 @@
   Indexable
   Entrypoint_repr
   Dal_slot_index_repr
-  Dal_slot_repr
   Dal_attestation_repr
+  Dal_slot_repr
   Michelson_v1_gas_costs_generated
   Michelson_v1_gas_costs
   Sc_rollup_repr
@@ -379,8 +379,8 @@
   indexable.ml indexable.mli
   entrypoint_repr.ml entrypoint_repr.mli
   dal_slot_index_repr.ml dal_slot_index_repr.mli
-  dal_slot_repr.ml dal_slot_repr.mli
   dal_attestation_repr.ml dal_attestation_repr.mli
+  dal_slot_repr.ml dal_slot_repr.mli
   michelson_v1_gas_costs_generated.ml
   michelson_v1_gas_costs.ml
   sc_rollup_repr.ml sc_rollup_repr.mli
@@ -678,8 +678,8 @@
   indexable.ml indexable.mli
   entrypoint_repr.ml entrypoint_repr.mli
   dal_slot_index_repr.ml dal_slot_index_repr.mli
-  dal_slot_repr.ml dal_slot_repr.mli
   dal_attestation_repr.ml dal_attestation_repr.mli
+  dal_slot_repr.ml dal_slot_repr.mli
   michelson_v1_gas_costs_generated.ml
   michelson_v1_gas_costs.ml
   sc_rollup_repr.ml sc_rollup_repr.mli
@@ -961,8 +961,8 @@
   indexable.ml indexable.mli
   entrypoint_repr.ml entrypoint_repr.mli
   dal_slot_index_repr.ml dal_slot_index_repr.mli
-  dal_slot_repr.ml dal_slot_repr.mli
   dal_attestation_repr.ml dal_attestation_repr.mli
+  dal_slot_repr.ml dal_slot_repr.mli
   michelson_v1_gas_costs_generated.ml
   michelson_v1_gas_costs.ml
   sc_rollup_repr.ml sc_rollup_repr.mli
