@@ -236,11 +236,3 @@ let open_telemetry =
     ~set_long_synonyms:["otel"]
     ~description:"Run the Open Telemetry stack"
     grafana
-
-let jaeger =
-  Clap.flag
-    ~section
-    ~set_long:"jaeger"
-    ~unset_long:"no-jeager"
-    ~description:"Set the jaeger output"
-    open_telemetry

@@ -219,17 +219,12 @@ let orchestrator deployement f =
       Lwt.return_some grafana
     else Lwt.return_none
   in
-  let* otel =
+  let* otel, jaeger =
     if Env.open_telemetry then
-      let* otel = Otel.run ~jaeger:Env.jaeger in
-      Lwt.return_some otel
-    else Lwt.return_none
-  in
-  let* jaeger =
-    if Env.jaeger && Env.open_telemetry then
+      let* otel = Otel.run ~jaeger:true in
       let* jaeger = Jaeger.run () in
-      Lwt.return_some jaeger
-    else Lwt.return_none
+      Lwt.return (Some otel, Some jaeger)
+    else Lwt.return (None, None)
   in
   Log.info "Post prometheus" ;
   let t =

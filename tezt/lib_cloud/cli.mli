@@ -103,6 +103,3 @@ val octez_release : string option
 
 (** Activate the Open Telemetry collector. *)
 val open_telemetry : bool
-
-(** Activate Jaeger. *)
-val jaeger : bool
