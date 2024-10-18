@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Features
+
+### Bug fixes
+
+### Internals
+
 ## Version 0.6 (2024-10-21)
 
 This release introduces a new, still experimental runtime to execute Etherlink
