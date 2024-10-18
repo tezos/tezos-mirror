@@ -34,7 +34,7 @@ RUN curl https://sh.rustup.rs --silent --show-error --fail | \
 ENV PATH=/root/.cargo/bin:$PATH
 
 # install rust toolchains and compilation targets
-RUN rustup update 1.66.0 1.73.0 1.76.0 1.78.0 && \
+RUN rustup update 1.66.0 1.73.0 1.76.0 1.77.2 1.78.0 && \
     for tc in $(rustup toolchain list | awk '{print $1}'); do \
     rustup target add --toolchain="$tc" \
     wasm32-unknown-unknown \

@@ -19,7 +19,7 @@ export opam_version_major=2
 # The recommended rust version should equal the version set in the
 # root rust-toolchain file, such that:
 # rust-toolchain == recommended_rust_version
-export recommended_rust_version=1.78.0
+export recommended_rust_version=1.77.2
 export recommended_node_version=18.18.2
 
 ## opam_repository is a commit hash of the public opam repository, i.e.
@@ -47,10 +47,10 @@ export dal_srs_g2_sha=97d76e266e657cc3c859c3359c717136f55cfe4c0256ea418f907406cb
 export alpine_version='3.20'
 
 # Installed via apk rust
-export rust_version='1.78.0'
+export rust_version='1.77.2'
 
 # Installed via apk cargo
-export cargo_version='1.78.0'
+export cargo_version='1.77.2'
 
 # Installed via apk opam
 export opam_version='2.2.1'
