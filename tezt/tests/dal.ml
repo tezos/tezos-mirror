@@ -7313,19 +7313,26 @@ module Refutations = struct
   *)
   let scenario_with_two_rollups_a_faulty_dal_node_and_a_correct_one
       ~refute_operations_priority _protocol parameters _dal_node _sc_rollup_node
-      _sc_rollup_address node client pvm_name =
+      _sc_rollup_address ?honest_storage_backend ?faulty_storage_backend node
+      client pvm_name =
     (* Initializing the real SRS. *)
     let faulty_operator_key = Constant.bootstrap4.public_key_hash in
     let honest_operator_key = Constant.bootstrap5.public_key_hash in
     (* We have two DAL nodes in producer mode *)
     let* honest_dal_node =
-      make_dal_node ~name:"dal-honest" ~peers:[] ~producer_profiles:[0; 1] node
+      make_dal_node
+        ~name:"dal-honest"
+        ~peers:[]
+        ~producer_profiles:[0; 1]
+        ?skip_list_storage_backend:honest_storage_backend
+        node
     in
     let* faulty_dal_node =
       make_dal_node
         ~name:"dal-faulty"
         ~peers:[Dal_node.listen_addr honest_dal_node]
         ~producer_profiles:[0; 1]
+        ?skip_list_storage_backend:faulty_storage_backend
         node
     in
 
@@ -7492,24 +7499,54 @@ module Refutations = struct
       ~exit_code:1
       ~msg:(rex "lost the refutation game")
 
+  (** [register_scenario_with_two_rollups_a_faulty_dal_node_and_a_correct_one]
+      is registered with both backends ([Legacy] and [SQLite3]) as it
+      concerns refutations that rely on skip lists and must remain
+      valid for the [SQLite3] storage. Also, running the test with
+      both backends provide additional guarantees that they exhibit
+      identical behavior. *)
   let register_scenario_with_two_rollups_a_faulty_dal_node_and_a_correct_one
       ~refute_operations_priority name protocols =
-    let scenario =
-      scenario_with_two_rollups_a_faulty_dal_node_and_a_correct_one
-        ~refute_operations_priority
+    let backends = Dal_node.[Legacy; SQLite3] in
+    let modes =
+      let open List in
+      (* We take the cartesian product of the storage backends. *)
+      concat (map (fun x -> map (fun y -> (x, y)) backends) backends)
     in
-    scenario_with_all_nodes
-      name
-      ~regression:false
-      ~uses:(fun _protocol ->
-        [Constant.smart_rollup_installer; Constant.WASM.dal_echo_kernel])
-      ~pvm_name:"wasm_2_0_0"
-      ~commitment_period:5
-      ~smart_rollup_timeout_period_in_blocks:20
-      ~l1_history_mode:Default_with_refutation
-      ~tags:[Tag.slow]
-      scenario
-      protocols
+    List.iter
+      (fun (honest_storage_backend, faulty_storage_backend) ->
+        let new_name =
+          Format.sprintf
+            "%s (storage backends: honest=%s, faulty=%s)"
+            name
+            (Dal_node.string_of_skip_list_storage_backend
+               honest_storage_backend)
+            (Dal_node.string_of_skip_list_storage_backend
+               faulty_storage_backend)
+        in
+        let scenario =
+          scenario_with_two_rollups_a_faulty_dal_node_and_a_correct_one
+            ~honest_storage_backend
+            ~faulty_storage_backend
+        in
+        let tags =
+          match (honest_storage_backend, faulty_storage_backend) with
+          | SQLite3, _ | _, SQLite3 -> skip_list_sqlite3_tag :: [Tag.slow]
+          | _ -> [Tag.slow]
+        in
+        scenario_with_all_nodes
+          new_name
+          ~regression:false
+          ~uses:(fun _protocol ->
+            [Constant.smart_rollup_installer; Constant.WASM.dal_echo_kernel])
+          ~pvm_name:"wasm_2_0_0"
+          ~commitment_period:5
+          ~smart_rollup_timeout_period_in_blocks:20
+          ~l1_history_mode:Default_with_refutation
+          ~tags
+          (scenario ~refute_operations_priority)
+          protocols)
+      modes
 end
 
 (** This test injects a DAL slot to (DAL and L1) network(s) via the rollup node
