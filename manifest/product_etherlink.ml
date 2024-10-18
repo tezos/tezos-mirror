@@ -364,4 +364,5 @@ let _etherlink_governance_observer =
         octez_rpc_http |> open_;
         octez_rpc_http_client_unix;
       ]
+    ~release_status:Experimental
     ~bisect_ppx:Yes

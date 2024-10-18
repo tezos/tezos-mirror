@@ -1106,6 +1106,7 @@ let job_build_dynamic_binaries ?rules ~__POS__ ~arch ?(release = false)
         "_build/default/src/lib_protocol_compiler/bin/main_native.exe";
         "_build/default/tezt/tests/main.exe";
         "_build/default/contrib/octez_injector_server/octez_injector_server.exe";
+        "etherlink-governance-observer";
       ]
   in
   let job =
