@@ -5,3 +5,6 @@ rustflags = ["-C", "link-args=-Wl,-undefined,dynamic_lookup"]
 [profile.profiling]
 inherits = "release"
 debug = true
+
+[profile.test]
+opt-level = 1
