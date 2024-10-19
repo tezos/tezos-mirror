@@ -426,8 +426,27 @@ module Handler = struct
       ~attested_level:block_level
       cells_of_level
 
-  let check_dal_attestation node_ctxt ~number_of_slots ~block_level
-      dal_attestation get_attestations is_attested =
+  (* This functions counts, for each slot, the number of shards attested by the bakers. *)
+  let get_attestable_slots attestations committee ~number_of_slots is_attested =
+    let count_per_slot = Array.make number_of_slots 0 in
+    List.iter
+      (fun (_tb_slot, delegate_opt, dal_attestation_opt) ->
+        match (delegate_opt, dal_attestation_opt) with
+        | Some delegate, Some dal_attestation -> (
+            match Signature.Public_key_hash.Map.find delegate committee with
+            | None -> ()
+            | Some shard_indexes ->
+                let num_shards = List.length shard_indexes in
+                for i = 0 to number_of_slots - 1 do
+                  if is_attested dal_attestation i then
+                    count_per_slot.(i) <- count_per_slot.(i) + num_shards
+                done)
+        | _ -> ())
+      attestations ;
+    count_per_slot
+
+  let check_attesters_attested node_ctxt parameters ~block_level
+      get_attestations is_attested =
     let open Lwt_result_syntax in
     let attesters =
       match
@@ -442,6 +461,21 @@ module Handler = struct
         Node_context.fetch_committee node_ctxt ~level:(Int32.pred block_level)
       in
       let attestations = get_attestations () in
+      let attestable_slots =
+        get_attestable_slots
+          attestations
+          committee
+          ~number_of_slots:parameters.Dal_plugin.number_of_slots
+          is_attested
+      in
+      let threshold =
+        parameters.cryptobox_parameters.number_of_shards
+        / parameters.cryptobox_parameters.redundancy_factor
+      in
+      let should_be_attested index =
+        let num_attested_shards = attestable_slots.(index) in
+        num_attested_shards >= threshold
+      in
       let*! () =
         List.iter_s
           (fun (_tb_slot, delegate_opt, bitset_opt) ->
@@ -465,7 +499,7 @@ module Handler = struct
                     List.iter_s
                       (fun index ->
                         if
-                          is_attested dal_attestation index
+                          should_be_attested index
                           && not (is_attested bitset index)
                         then
                           Event.(
@@ -473,7 +507,7 @@ module Handler = struct
                               warn_attester_did_not_attest_slot
                               (delegate, index))
                         else Lwt.return_unit)
-                      (0 -- (number_of_slots - 1)))
+                      (0 -- (parameters.number_of_slots - 1)))
             | None | Some _ ->
                 (* None = the receipt does not contain the delegate (which
                    probably should not happen; if it can happen, we should use
@@ -567,11 +601,10 @@ module Handler = struct
           let get_attestations () =
             Plugin.get_dal_content_of_attestations block_info
           in
-          check_dal_attestation
+          check_attesters_attested
             ctxt
-            ~number_of_slots:proto_parameters.number_of_slots
+            proto_parameters
             ~block_level
-            dal_attestation
             get_attestations
             Plugin.is_attested
         in
