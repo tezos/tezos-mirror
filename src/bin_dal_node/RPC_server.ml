@@ -255,16 +255,17 @@ module Profile_handlers = struct
   let get_assigned_shard_indices ctxt pkh level () () =
     Node_context.fetch_assigned_shard_indices ctxt ~level ~pkh
 
-  let warn_missing_shards store published_level expected_number_of_shards
-      number_of_stored_shards_per_slot =
-    let open Lwt_result_syntax in
+  let warn_missing_shards store attester published_level
+      expected_number_of_shards number_of_stored_shards_per_slot =
+    let open Lwt_syntax in
     let statuses_store = Store.slot_header_statuses store in
-    let*! problems =
-      List.filter_s
+    let* problems =
+      List.filter_map_s
         (fun (slot_index, num_stored) ->
-          if num_stored = expected_number_of_shards then Lwt.return_false
+          if num_stored = expected_number_of_shards then
+            Lwt.return_some (`Ok (slot_index, num_stored))
           else
-            let*! res =
+            let* res =
               Store.Statuses.get_slot_status
                 statuses_store
                 ~slot_id:{slot_level = published_level; slot_index}
@@ -272,20 +273,21 @@ module Profile_handlers = struct
             match res with
             | Error `Not_found ->
                 (* that is, it was not published *)
-                Lwt.return_false
+                Lwt.return_none
             | Error (`Other tztrace) ->
-                let*! () =
+                let* () =
                   Event.(
                     emit
                       slot_header_status_storage_error
                       (published_level, slot_index, tztrace))
                 in
-                Lwt.return_false
+                Lwt.return_none
             | Ok res -> (
                 match res with
-                | `Waiting_attestation -> Lwt.return_true
+                | `Waiting_attestation ->
+                    Lwt.return_some (`Not_ok (slot_index, num_stored))
                 | status ->
-                    let*! () =
+                    let* () =
                       Event.(
                         emit
                           unexpected_slot_header_status
@@ -294,19 +296,44 @@ module Profile_handlers = struct
                             `Waiting_attestation,
                             status ))
                     in
-                    Lwt.return_false))
+                    Lwt.return_none))
         number_of_stored_shards_per_slot
     in
-    if List.is_empty problems then Lwt.return_unit
-    else
-      let indexes, number_of_stored_shards = List.split problems in
-      Event.(
-        emit
-          get_attestable_slots_warning
-          ( published_level,
-            indexes,
-            number_of_stored_shards,
-            expected_number_of_shards ))
+    let ok, not_ok =
+      List.partition (function `Ok _ -> true | `Not_ok _ -> false) problems
+    in
+    let* () =
+      if List.is_empty ok then Lwt.return_unit
+      else
+        let ok =
+          List.filter_map (function `Ok v -> Some v | `Not_ok _ -> None) ok
+        in
+        (* TODO: improve (do not go twice through the list)  *)
+        let indexes, _ = List.split ok in
+        Event.(
+          emit
+            get_attestable_slots_ok_notice
+            (attester, published_level, indexes))
+    in
+    let* () =
+      if List.is_empty not_ok then Lwt.return_unit
+      else
+        let not_ok =
+          List.filter_map
+            (function `Ok v -> Some v | `Not_ok _ -> None)
+            not_ok
+        in
+        let indexes, number_of_stored_shards = List.split not_ok in
+        Event.(
+          emit
+            get_attestable_slots_not_ok_warning
+            ( attester,
+              published_level,
+              indexes,
+              number_of_stored_shards,
+              expected_number_of_shards ))
+    in
+    Lwt.return_unit
 
   let get_attestable_slots ctxt pkh attested_level () () =
     let get_attestable_slots ~shard_indices store proto_parameters
@@ -353,6 +380,7 @@ module Profile_handlers = struct
           (fun () ->
             warn_missing_shards
               store
+              pkh
               published_level
               expected_number_of_shards
               number_of_stored_shards_per_slot)

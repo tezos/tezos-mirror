@@ -642,22 +642,38 @@ let pp_int_list fmt l =
     fmt
     l
 
-let get_attestable_slots_warning =
-  declare_4
+let get_attestable_slots_ok_notice =
+  declare_3
+    ~section
+    ~name:"get_attestable_slots_ok_notice"
+    ~msg:
+      "At level {published_level}, for {attester}, for published slot(s) \
+       {slot_indexes}, all assigned shards were found."
+    ~level:Notice
+    ("attester", Signature.Public_key_hash.encoding)
+    ("published_level", Data_encoding.int32)
+    ("slot_indexes", Data_encoding.(list int31))
+    ~pp1:Signature.Public_key_hash.pp_short
+    ~pp3:pp_int_list
+
+let get_attestable_slots_not_ok_warning =
+  declare_5
     ~section
     ~name:"get_attestable_slots_warning"
     ~msg:
-      "At level {published_level}, for the published slot(s) {slot_indexes}, \
-       the number of stored shards, namely {number_of_stored_shards} \
-       respectively, is smaller than the expected number \
-       {expected_number_of_shards}."
+      "At level {published_level}, for {attester}, for published slot(s) \
+       {slot_indexes}, the number of stored shards, namely \
+       {number_of_stored_shards} respectively, is smaller than the expected \
+       number {expected_number_of_shards}."
     ~level:Warning
+    ("attester", Signature.Public_key_hash.encoding)
     ("published_level", Data_encoding.int32)
     ("slot_indexes", Data_encoding.(list int31))
     ("number_of_stored_shards", Data_encoding.(list int31))
     ("expected_number_of_shards", Data_encoding.int16)
-    ~pp2:pp_int_list
+    ~pp1:Signature.Public_key_hash.pp_short
     ~pp3:pp_int_list
+    ~pp4:pp_int_list
 
 let warn_attester_not_dal_attesting =
   declare_1
