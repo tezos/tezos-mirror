@@ -502,8 +502,14 @@ impl<'de, const LEN: usize, M: ManagerDeserialise> serde::Deserialize<'de> for D
     }
 }
 
-// SAFETY: This constant is non-zero.
-const MERKLE_LEAF_SIZE: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(4096) };
+// TODO RV-322: Choose optimal Merkleisation parameters for main memory.
+/// Size of the Merkle leaf used for Merkleising [`DynCells`].
+pub const MERKLE_LEAF_SIZE: NonZeroUsize =
+    // SAFETY: This constant is non-zero.
+    unsafe { NonZeroUsize::new_unchecked(4096) };
+
+// TODO RV-322: Choose optimal Merkleisation parameters for main memory.
+/// Arity of the Merkle tree used for Merkleising [`DynCells`].
 const MERKLE_ARITY: usize = 3;
 
 impl<const LEN: usize, M: ManagerSerialise> RootHashable for DynCells<LEN, M> {
