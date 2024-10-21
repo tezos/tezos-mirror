@@ -853,6 +853,10 @@ module State = struct
         Metrics.set_block
           ~time_processed:!time_processed
           ~transactions:number_of_transactions ;
+        Option.iter
+          (fun baseFeePerGas ->
+            baseFeePerGas |> Ethereum_types.Qty.to_z |> Metrics.set_gas_price)
+          block.baseFeePerGas ;
         let* () =
           Evm_store.Blueprints.store
             conn
