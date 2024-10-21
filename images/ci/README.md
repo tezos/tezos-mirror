@@ -29,13 +29,13 @@ graph TB
 
 The images, their content and intended usage, are:
 
-| Image          | Contents                           | Usage                             |
-|----------------|------------------------------------|-----------------------------------|
-| `runtime`      | run-time libraries + zcash-params  | distributing Octez executables    |
-| `prebuild`     | OCaml + opam package cache + Cargo | CI: OPAM installability tests     |
-| `build`        | opam packages                      | CI: Building Octez                |
-| `test`         | Python + NVM + ShellCheck          | CI: Octez tests and documentation |
-| `e2etest`      | `eth-cli` + cast                   | CI: Octez integration tests       |
+| Image      | Contents                           | Usage                             |
+|------------|------------------------------------|-----------------------------------|
+| `runtime`  | runtime libraries + zcash-params   | distributing Octez executables    |
+| `prebuild` | OCaml + opam package cache + Cargo | CI: OPAM installability tests     |
+| `build`    | opam packages                      | CI: Building Octez                |
+| `test`     | Python + NVM + ShellCheck          | CI: Octez tests and documentation |
+| `e2etest`  | `eth-cli` + cast                   | CI: Octez integration tests       |
 
 For more details on the contents and usage of each image, see the
 header comment of each corresponding layer in the Dockerfile.
