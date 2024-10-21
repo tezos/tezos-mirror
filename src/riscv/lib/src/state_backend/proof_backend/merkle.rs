@@ -7,6 +7,7 @@
 // TODO: RV-271 Allow unused code until functionality is exposed to the OCaml bindings.
 #![allow(dead_code)]
 
+use super::DynAccess;
 use crate::state_backend::hash::{Hash, HashError, RootHashable, DIGEST_SIZE};
 use itertools::Itertools;
 
@@ -23,7 +24,7 @@ pub enum MerkleTree {
 
 impl MerkleTree {
     /// Get the root hash of a Merkle tree
-    fn root_hash(&self) -> Hash {
+    pub fn root_hash(&self) -> Hash {
         match self {
             Self::Node(hash, _) => *hash,
             Self::Leaf(hash, _, _) => *hash,
@@ -140,6 +141,16 @@ pub enum AccessInfo {
 }
 
 impl AccessInfo {
+    /// Obtain the [`AccessInfo`] which corresponds to the `read` and `write` values.
+    pub fn from_bools(read: bool, write: bool) -> Self {
+        match (read, write) {
+            (false, false) => AccessInfo::NoAccess,
+            (true, false) => AccessInfo::Read,
+            (false, true) => AccessInfo::Write,
+            (true, true) => AccessInfo::ReadWrite,
+        }
+    }
+
     /// Convert an access info to a compressed access info, potentially with additional data.
     pub(super) fn to_compressed(self, data: Vec<u8>) -> CompressedAccessInfo {
         match self {
@@ -267,6 +278,116 @@ impl_merkleisable_for_tuple!(A, B, C);
 impl_merkleisable_for_tuple!(A, B, C, D);
 impl_merkleisable_for_tuple!(A, B, C, D, E);
 impl_merkleisable_for_tuple!(A, B, C, D, E, F);
+
+/// Writer which splits data in fixed-sized chunks and produces a [`MerkleTree`]
+/// with a given arity in which each leaf represents a chunk.
+pub struct MerkleWriter {
+    leaf_size: usize,
+    arity: usize,
+    read_log: DynAccess,
+    write_log: DynAccess,
+    buffer: Vec<u8>,
+    leaves: Vec<MerkleTree>,
+}
+
+impl MerkleWriter {
+    /// Initialise a new writer with a leaf size and arity for the Merkle tree,
+    /// the access logs of the underlying data, and the expected number of leaves.
+    ///
+    /// # Panics
+    /// Panics if `arity < 2`.
+    pub fn new(
+        leaf_size: std::num::NonZeroUsize,
+        arity: usize,
+        read_log: DynAccess,
+        write_log: DynAccess,
+        expected_leaves: usize,
+    ) -> Self {
+        assert!(arity >= 2, "Arity must be at least 2");
+
+        let leaf_size = leaf_size.get();
+        Self {
+            leaf_size,
+            arity,
+            read_log,
+            write_log,
+            buffer: Vec::with_capacity(leaf_size),
+            leaves: Vec::with_capacity(expected_leaves),
+        }
+    }
+
+    /// Commit the leaf corresponding to the contents of the buffer before
+    /// clearing it.
+    fn flush_buffer(&mut self) -> Result<(), HashError> {
+        let pos = self.leaves.len() * self.leaf_size;
+        let range = pos..pos + self.leaf_size;
+
+        // Determine whether addresses in the range of the current buffer
+        // have been accessed.
+        let read = self.read_log.includes_range(range.clone());
+        let write = self.write_log.includes_range(range);
+        let access_info = AccessInfo::from_bools(read, write);
+
+        self.leaves.push(MerkleTree::make_merkle_leaf(
+            self.buffer.clone(),
+            access_info,
+        )?);
+        self.buffer.clear();
+
+        Ok(())
+    }
+
+    /// Finalise the writer by generating the Merkle tree with the configured
+    /// arity from the stored leaves. The last node in every level might have
+    /// a smaller arity.
+    pub fn finalise(mut self) -> Result<MerkleTree, HashError> {
+        if !self.buffer.is_empty() {
+            self.flush_buffer()?;
+        }
+
+        if self.leaves.is_empty() {
+            return Err(HashError::NonEmptyBufferExpected);
+        }
+
+        let mut next_level = Vec::with_capacity(self.leaves.len().div_ceil(self.arity));
+
+        while self.leaves.len() > 1 {
+            for chunk in self.leaves.chunks(self.arity) {
+                next_level.push(MerkleTree::Node(chunk.hash()?, chunk.to_vec()));
+            }
+
+            std::mem::swap(&mut self.leaves, &mut next_level);
+            next_level.truncate(0);
+        }
+
+        Ok(self.leaves[0].clone())
+    }
+}
+
+impl std::io::Write for MerkleWriter {
+    fn write(&mut self, mut buf: &[u8]) -> std::io::Result<usize> {
+        let consumed = buf.len();
+
+        while !buf.is_empty() {
+            let rem_buffer_len = self.leaf_size - self.buffer.len();
+            let new_buf_len = std::cmp::min(rem_buffer_len, buf.len());
+
+            let new_buf = &buf[..new_buf_len];
+            buf = &buf[new_buf_len..];
+            self.buffer.extend_from_slice(new_buf);
+
+            // If the buffer has been completely filled, flush it.
+            if rem_buffer_len == new_buf_len {
+                self.flush_buffer().map_err(std::io::Error::other)?;
+            }
+        }
+        Ok(consumed)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
 
 #[cfg(test)]
 mod tests {

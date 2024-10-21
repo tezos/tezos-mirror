@@ -357,7 +357,8 @@ mod tests {
         region::{DynCells, MERKLE_LEAF_SIZE},
         Cells,
     };
-    use proptest::{prop_assert_eq, proptest};
+    use proptest::{array, prop_assert_eq, proptest};
+    use std::collections::VecDeque;
     use tests::merkle::MerkleTree;
 
     impl<M: ManagerBase, E: 'static, const LEN: usize> ProofRegion<E, LEN, M> {
@@ -530,6 +531,69 @@ mod tests {
             dyn_cells.write_all(write_address, &bytes_after);
             dyn_cells.read_all(write_address, &mut value);
             assert_eq!(value, bytes_after);
+        });
+
+        // Check correct Merkleisation of a dynamic region which was read from and written to
+        proptest!(|(byte_before: u8,
+                    bytes_after: [u8; ELEM_SIZE],
+                    reads in array::uniform2(&address_range),
+                    writes in array::uniform2(&address_range))| {
+            let region = Box::new([byte_before; DYN_REGION_SIZE]);
+            let dyn_region: ProofDynRegion<DYN_REGION_SIZE, Owned> =
+                ProofDynRegion::from_source_region(region.clone());
+            let mut dyn_cells: DynCells<DYN_REGION_SIZE, ProofGen<'_, Owned>> =
+                DynCells::bind(dyn_region);
+
+            // Perform memory accesses
+            let value_before = [byte_before; ELEM_SIZE];
+            reads.iter().for_each(|i| {
+                let mut value = [0u8; ELEM_SIZE];
+                dyn_cells.read_all(*i, &mut value);
+                assert_eq!(value, value_before)
+            });
+            writes.iter().for_each(|i| {
+                dyn_cells.write_all(*i, &bytes_after);
+            });
+
+            // Build the Merkle tree and check that it has the root hash of the
+            // initial wrapped region.
+            let merkle_tree = dyn_cells.to_merkle_tree().unwrap();
+            let cells: DynCells<DYN_REGION_SIZE,Owned> = DynCells::bind(region);
+            let initial_root_hash = cells.hash().unwrap();
+            prop_assert_eq!(merkle_tree.root_hash(), initial_root_hash);
+
+            // Compute expected access info for each leaf, assuming that an access
+            // cannot span more than 2 leaves.
+            let expected_leaves = |accesses: &[usize]| {
+                let mut leaves = BTreeSet::<usize>::new();
+                for i in accesses {
+                    leaves.insert(*i / MERKLE_LEAF_SIZE);
+                    leaves.insert((i + ELEM_SIZE - 1) / MERKLE_LEAF_SIZE);
+                }
+                leaves
+            };
+            let read_leaves = expected_leaves(&reads);
+            let written_leaves = expected_leaves(&writes);
+
+            // Traverse the generated Merkle tree and check each leaf's access log
+            let mut queue = VecDeque::with_capacity(LEAVES + 1);
+            queue.push_back(merkle_tree);
+            let mut leaf: usize = 0;
+            while let Some(node) = queue.pop_front() {
+                match node {
+                    MerkleTree::Node(_, children) => queue.extend(children),
+                    MerkleTree::Leaf(_, access_info, _) => {
+                        assert_eq!(
+                            access_info,
+                            AccessInfo::from_bools(
+                                read_leaves.contains(&leaf),
+                                written_leaves.contains(&leaf)
+                            )
+                        );
+                        leaf += 1;
+                    }
+                }
+            }
         });
     }
 }
