@@ -23,6 +23,7 @@ depends: [
   "qcheck-alcotest" { >= "0.20" }
   "octez-proto-libs" { = version }
   "octez-version" { = version }
+  "octez-node-config" { = version }
   "tezos-dal-node-services" { = version }
   "lwt-canceler" { >= "0.3" & < "0.4" }
   "lwt-exit"

@@ -665,4 +665,26 @@ module Health = struct
       (fun {status; checks} -> (status, checks))
       (fun (status, checks) -> {status; checks})
       (obj2 (req "status" status_encoding) (req "checks" checks_encoding))
+
+  let pp_status fmt status =
+    Format.pp_print_string
+      fmt
+      (match status with
+      | Up -> "up"
+      | Degraded -> "degraded"
+      | Down -> "down"
+      | Ok -> "ok"
+      | Ko -> "ko")
+
+  let pp fmt {status; checks} =
+    Format.fprintf
+      fmt
+      "status: %a; checks: %a"
+      pp_status
+      status
+      (Format.pp_print_list
+         ~pp_sep:Format.pp_print_cut
+         (fun fmt (name, status) ->
+           Format.fprintf fmt "(%s: %a)" name pp_status status))
+      checks
 end

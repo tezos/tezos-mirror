@@ -48,8 +48,8 @@ let sleep_until_block_timestamp prepared_block =
       waiter
   | None -> Lwt.return_unit
 
-let create_state cctxt ?synchronize ?monitor_node_mempool ~config
-    ~current_proposal delegates =
+let create_state cctxt ?dal_node_rpc_ctxt ?synchronize ?monitor_node_mempool
+    ~config ~current_proposal delegates =
   let open Lwt_result_syntax in
   let chain = cctxt#chain in
   let monitor_node_operations = monitor_node_mempool in
@@ -58,6 +58,7 @@ let create_state cctxt ?synchronize ?monitor_node_mempool ~config
   in
   Baking_scheduling.create_initial_state
     cctxt
+    ?dal_node_rpc_ctxt
     ?synchronize
     ~chain
     config
@@ -762,11 +763,11 @@ let rec baking_minimal_timestamp ~count state
     in
     baking_minimal_timestamp ~count:(pred count) new_state block_stream
 
-let bake (cctxt : Protocol_client_context.full) ?minimal_fees
+let bake (cctxt : Protocol_client_context.full) ?dal_node_rpc_ctxt ?minimal_fees
     ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte
     ?force_apply_from_round ?force ?(minimal_timestamp = false)
-    ?extra_operations ?(monitor_node_mempool = true) ?context_path
-    ?dal_node_endpoint ?(count = 1) ?votes ?state_recorder delegates =
+    ?extra_operations ?(monitor_node_mempool = true) ?context_path ?(count = 1)
+    ?votes ?state_recorder delegates =
   let open Lwt_result_syntax in
   let*! () = Events.(emit Baking_events.Delegates.delegates_used delegates) in
   let config =
@@ -778,7 +779,6 @@ let bake (cctxt : Protocol_client_context.full) ?minimal_fees
       ?force_apply_from_round
       ?force
       ?extra_operations
-      ?dal_node_endpoint
       ?votes
       ?state_recorder
       ()
@@ -788,6 +788,7 @@ let bake (cctxt : Protocol_client_context.full) ?minimal_fees
   let* state =
     create_state
       cctxt
+      ?dal_node_rpc_ctxt
       ~monitor_node_mempool
       ~synchronize:(not minimal_timestamp)
       ~config

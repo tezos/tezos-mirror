@@ -357,9 +357,11 @@ module Version : sig
 end
 
 module Health : sig
-  type status = Up | Degraded | Down | Ok | Ko
+  type status = (* TODO: missing doc strings *) Up | Degraded | Down | Ok | Ko
 
   type t = {status : status; checks : (string * status) list}
 
   val encoding : t Data_encoding.t
+
+  val pp : Format.formatter -> t -> unit
 end

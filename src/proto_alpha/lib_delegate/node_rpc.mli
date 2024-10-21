@@ -101,3 +101,8 @@ val register_dal_profiles :
   Tezos_rpc.Context.generic ->
   Baking_state.consensus_key list ->
   unit tzresult Lwt.t
+
+(** [get_dal_health ctxt] calls the DAL node RPC 'GET /health' *)
+val get_dal_health :
+  Tezos_rpc.Context.generic ->
+  Tezos_dal_node_services.Types.Health.t tzresult Lwt.t

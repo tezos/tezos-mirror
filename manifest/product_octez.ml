@@ -6561,6 +6561,7 @@ let hash = Protocol.hash
             plugin |> if_some |> open_;
             octez_protocol_environment;
             octez_shell_services |> open_;
+            octez_node_config;
             octez_client_base |> open_;
             client |> if_some |> open_;
             octez_client_commands |> open_;

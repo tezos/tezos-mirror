@@ -332,3 +332,38 @@ let () =
       | _ -> None)
     (fun (chain, block_hash, length) ->
       Unexpected_empty_block_list {chain; block_hash; length})
+
+type error += No_dal_node_endpoint
+
+let () =
+  let description = "The mandatory argument --dal-node is missing." in
+  register_error_kind
+    `Permanent
+    ~id:"Client_commands.no_dal_node_endpoint"
+    ~title:"Missing_dal_node_argument"
+    ~description
+    ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
+    Data_encoding.unit
+    (function No_dal_node_endpoint -> Some () | _ -> None)
+    (fun () -> No_dal_node_endpoint)
+
+type error +=
+  | Unhealthy_dal_node of {health : Tezos_dal_node_services.Types.Health.t}
+
+let () =
+  let open Tezos_dal_node_services.Types.Health in
+  register_error_kind
+    `Permanent
+    ~id:"Client_commands.Unhealthy_dal_node"
+    ~title:"Unhealthy_DAL_node"
+    ~description:"The DAL node is not performing well."
+    ~pp:(fun ppf health ->
+      Format.fprintf
+        ppf
+        "The DAL node is not performing well.\n\
+         Please check your DAL node. Its health is %a"
+        pp
+        health)
+    Data_encoding.(obj1 (req "health" encoding))
+    (function Unhealthy_dal_node {health} -> Some health | _ -> None)
+    (fun health -> Unhealthy_dal_node {health})
