@@ -551,11 +551,7 @@ impl Parsable for SequencerInput {
                     remaining,
                     &mut context.buffer_transaction_chunks,
                 ),
-            _ => {
-                let tx = parsable!(EthereumTransactionCommon::from_bytes(bytes).ok());
-                let tx_hash: TransactionHash = Keccak256::digest(bytes).into();
-                Some((tx, tx_hash))
-            }
+            _ => None,
         });
 
         InputResult::Input(Input::ModeSpecific(Self::DelayedInput(Box::new(
