@@ -343,9 +343,13 @@ mod tests {
         MichelsonOr::Left(MichelsonOr::Left(MichelsonPair(receiver, ticket)))
     }
 
-    fn dummy_delayed_transaction() -> RollupType {
-        let raw_tx = hex::decode(DUMMY_RAW_TRANSACTION).unwrap();
-        MichelsonOr::Left(MichelsonOr::Right(MichelsonBytes(raw_tx.to_vec())))
+    fn dummy_delayed_transaction() -> [RollupType; 2] {
+        let mut raw_tx: Vec<u8> = vec![1];
+        raw_tx.extend(hex::decode(DUMMY_RAW_TRANSACTION).unwrap().to_vec());
+        [
+            MichelsonOr::Left(MichelsonOr::Right(MichelsonBytes(vec![0, 1]))),
+            MichelsonOr::Left(MichelsonOr::Right(MichelsonBytes(raw_tx))),
+        ]
     }
 
     fn delayed_bridge(conf: &Configuration) -> ContractKt1Hash {
@@ -568,8 +572,9 @@ mod tests {
             delayed_bridge(&conf),
             PublicKeyHash::from_b58check("tz1NiaviJwtMbpEcNqSP6neeoBYj8Brb3QPv").unwrap(),
         );
-        host.host
-            .add_transfer(dummy_delayed_transaction(), &metadata);
+        for message in dummy_delayed_transaction() {
+            host.host.add_transfer(message, &metadata);
+        }
         fetch_blueprints(&mut host, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
 
         if read_next_blueprint(&mut host, &mut conf)
@@ -602,8 +607,9 @@ mod tests {
             ContractKt1Hash::from_b58check(DUMMY_INVALID_TICKETER).unwrap(),
             PublicKeyHash::from_b58check("tz1NiaviJwtMbpEcNqSP6neeoBYj8Brb3QPv").unwrap(),
         );
-        host.host
-            .add_transfer(dummy_delayed_transaction(), &metadata);
+        for message in dummy_delayed_transaction() {
+            host.host.add_transfer(message, &metadata);
+        }
         fetch_blueprints(&mut host, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
 
         if read_next_blueprint(&mut host, &mut conf)
@@ -637,8 +643,9 @@ mod tests {
             ContractKt1Hash::from_b58check(DUMMY_INVALID_TICKETER).unwrap(),
             PublicKeyHash::from_b58check("tz1NiaviJwtMbpEcNqSP6neeoBYj8Brb3QPv").unwrap(),
         );
-        host.host
-            .add_transfer(dummy_delayed_transaction(), &metadata);
+        for message in dummy_delayed_transaction() {
+            host.host.add_transfer(message, &metadata)
+        }
         fetch_blueprints(&mut host, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
 
         match read_next_blueprint(&mut host, &mut conf)
