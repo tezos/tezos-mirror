@@ -351,10 +351,14 @@ impl DynAccess {
 mod tests {
     use super::*;
     use crate::state_backend::{
+        hash::RootHashable,
         owned_backend::Owned,
+        proof_backend::merkle::Merkleisable,
         region::{DynCells, MERKLE_LEAF_SIZE},
+        Cells,
     };
     use proptest::{prop_assert_eq, proptest};
+    use tests::merkle::MerkleTree;
 
     impl<M: ManagerBase, E: 'static, const LEN: usize> ProofRegion<E, LEN, M> {
         pub fn from_source_region(source: M::Region<E, LEN>) -> Self {
@@ -426,6 +430,22 @@ mod tests {
             let values = ProofGen::<'_, Owned>::region_read_all(&region);
             prop_assert_eq!(values.as_slice(), data_after);
             prop_assert_eq!(region.get_access_info(), AccessInfo::ReadWrite);
+
+            // Check correct Merkleisation
+            let cells = [value_before; CELLS_SIZE];
+            let region: ProofRegion<u64, CELLS_SIZE, Owned> = ProofRegion::from_source_region(cells);
+            let mut cells: Cells<u64, CELLS_SIZE, ProofGen<'_, Owned>> = Cells::bind(region);
+            let initial_root_hash = cells.hash().unwrap();
+            cells.write(i, value_after);
+            prop_assert_eq!(cells.hash().unwrap(), initial_root_hash);
+            let merkle_tree = cells.to_merkle_tree().unwrap();
+            match merkle_tree {
+                MerkleTree::Leaf(hash, access_info, _) => {
+                    prop_assert_eq!(hash, initial_root_hash);
+                    prop_assert_eq!(access_info, AccessInfo::Write);
+                },
+                _ => panic!("Expected Merkle tree to contain a single written leaf"),
+            }
         });
     }
 

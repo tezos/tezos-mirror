@@ -61,6 +61,13 @@ impl MerkleTree {
         true
     }
 
+    /// Make a Merkle tree consisting of a single leaf; representing
+    /// the given data and its access pattern.
+    pub fn make_merkle_leaf(data: Vec<u8>, access_info: AccessInfo) -> Result<Self, HashError> {
+        let hash = Hash::blake2b_hash_bytes(&data)?;
+        Ok(MerkleTree::Leaf(hash, access_info, data))
+    }
+
     /// Compress all fully blindable subtrees to a single leaf node, obtaining a [`CompressedMerkleTree`].
     ///
     /// To fit a proof in a manager operation, the Merkle tree it contains needs to be compressed.
