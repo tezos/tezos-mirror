@@ -107,7 +107,12 @@ module Publish_commitment : Benchmark.S = struct
       in
       let workload = () in
       let closure () =
-        match Dal_apply.apply_publish_commitment ctxt op with
+        match
+          Dal_apply.apply_publish_commitment
+            ctxt
+            op
+            ~source:Environment.Signature.Public_key_hash.zero
+        with
         | Error errs ->
             Format.eprintf "%a@." Environment.Error_monad.pp_trace errs ;
             Stdlib.failwith

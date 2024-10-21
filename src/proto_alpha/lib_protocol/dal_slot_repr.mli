@@ -187,12 +187,14 @@ module Slot_market : sig
      (see {!val:init}). *)
   val length : t -> int
 
-  (** [register t index fees] updates the candidate associated to
-     index [index]. Returns [Some (_, true)] if the candidate is
-     registered. Returns [Some (_, false)] otherwise. Returns [None]
-     if the [index] is not in the interval [0;length] where [length]
-     is the value provided to the [init] function. *)
-  val register : t -> Header.t -> (t * bool) option
+  (** [register t slot_header ~source] possibly updates the candidate associated
+      to [slot_header.id] with the [slot_header] published by [source].
+
+      The function returns [Some (_, true)] if the candidate is
+      registered. Returns [Some (_, false)] otherwise. Returns [None] if
+      [slot_header.id] is not a valid slot id. *)
+  val register :
+    t -> Header.t -> source:Signature.public_key_hash -> (t * bool) option
 
   (** [candidates t] returns a list of slot header candidates. *)
   val candidates : t -> Header.t list

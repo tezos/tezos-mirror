@@ -228,8 +228,10 @@ module Slot_market = struct
 
   let length {length; _} = length
 
-  let register t new_slot_header =
+  let register t new_slot_header ~source =
     let open Header in
+    (* WIP: This will be used in the next commits. *)
+    ignore source ;
     if
       not
         Compare.Int.(

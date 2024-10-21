@@ -87,7 +87,7 @@ let apply_attestation ctxt attestation ~power =
 let validate_publish_commitment ctxt _operation =
   assert_dal_feature_enabled ctxt
 
-let apply_publish_commitment ctxt operation =
+let apply_publish_commitment ctxt operation ~source =
   let open Result_syntax in
   let* ctxt = Gas.consume ctxt Dal_costs.cost_Dal_publish_commitment in
   let number_of_slots = Dal.number_of_slots ctxt in
@@ -100,7 +100,7 @@ let apply_publish_commitment ctxt operation =
       ~current_level
       operation
   in
-  let* ctxt = Dal.Slot.register_slot_header ctxt slot_header in
+  let* ctxt = Dal.Slot.register_slot_header ctxt slot_header ~source in
   return (ctxt, slot_header)
 
 let finalisation ctxt =
