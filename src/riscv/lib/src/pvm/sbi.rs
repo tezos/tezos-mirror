@@ -413,7 +413,7 @@ where
     // No matter the outcome, we need to bump the
     // program counter because ECALL's don't update it
     // to the following instructions.
-    let pc = machine.core.hart.pc.read() + InstrUncacheable::Ecall.width();
+    let pc = machine.core.hart.pc.read() + InstrUncacheable::Ecall.width() as u64;
     machine.core.hart.pc.write(pc);
 
     // SBI extension is contained in a7.

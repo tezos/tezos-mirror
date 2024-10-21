@@ -31,7 +31,7 @@ use crate::{
         hart_state::{HartState, HartStateLayout},
     },
     parser::{
-        instruction::{Instr, InstrCacheable, InstrUncacheable},
+        instruction::{Instr, InstrCacheable, InstrUncacheable, InstrWidth},
         is_compressed,
     },
     program::Program,
@@ -112,8 +112,8 @@ impl<ML: main_memory::MainMemoryLayout, CL: CacheLayouts, M: backend::ManagerClo
 enum ProgramCounterUpdate {
     /// Jump to a fixed address
     Set(Address),
-    /// Offset the program counter by a certain value
-    Add(u64),
+    /// Offset to the next instruction by current instruction width
+    Next(InstrWidth),
 }
 
 /// Result type when running multiple steps at a time with [`MachineState::step_many`]
@@ -130,7 +130,7 @@ macro_rules! run_r_type_instr {
             .hart
             .xregisters
             .$run_fn($args.rs1, $args.rs2, $args.rd);
-        Ok(Add($instr.width()))
+        Ok(Next($instr.width()))
     }};
 }
 
@@ -141,7 +141,7 @@ macro_rules! run_i_type_instr {
             .hart
             .xregisters
             .$run_fn($args.imm, $args.rs1, $args.rd);
-        Ok(Add($instr.width()))
+        Ok(Next($instr.width()))
     }};
 }
 
@@ -158,7 +158,7 @@ macro_rules! run_u_type_instr {
         // XXX: Funky syntax to capture xregister.run_fn identifier
         // correctly since Rust doesn't like dots in macro arguments
         $state.hart.$($run_fn).+($args.imm, $args.rd);
-        Ok(Add($instr.width()))
+        Ok(Next($instr.width()))
     }};
 }
 
@@ -167,7 +167,7 @@ macro_rules! run_load_instr {
     ($state: ident, $instr: ident, $args: ident, $run_fn: ident) => {{
         $state
             .$run_fn($args.imm, $args.rs1, $args.rd)
-            .map(|_| Add($instr.width()))
+            .map(|_| Next($instr.width()))
     }};
 }
 
@@ -176,7 +176,7 @@ macro_rules! run_store_instr {
     ($state: ident, $instr: ident, $args: ident, $run_fn: ident) => {{
         $state
             .$run_fn($args.imm, $args.rs1, $args.rs2)
-            .map(|_| Add($instr.width()))
+            .map(|_| Next($instr.width()))
     }};
 }
 
@@ -186,7 +186,7 @@ macro_rules! run_csr_instr {
         $state
             .hart
             .$run_fn($args.csr, $args.rs1, $args.rd)
-            .map(|_| Add($instr.width()))
+            .map(|_| Next($instr.width()))
     }};
 }
 
@@ -196,7 +196,7 @@ macro_rules! run_csr_imm_instr {
         $state
             .hart
             .$run_fn($args.csr, $args.imm as u64, $args.rd)
-            .map(|_| Add($instr.width()))
+            .map(|_| Next($instr.width()))
     }};
 }
 
@@ -218,7 +218,7 @@ macro_rules! run_xret_instr {
 macro_rules! run_no_args_instr {
     ($state: ident, $instr: ident, $run_fn: ident) => {{
         $state.$run_fn();
-        Ok(Add($instr.width()))
+        Ok(Next($instr.width()))
     }};
 }
 
@@ -226,12 +226,12 @@ macro_rules! run_no_args_instr {
 macro_rules! run_f_x_instr {
     ($state: ident, $instr: ident, $args: ident, $run_fn: ident) => {{
         $state.hart.$run_fn($args.rs1, $args.rd)?;
-        Ok(Add($instr.width()))
+        Ok(Next($instr.width()))
     }};
 
     ($state: ident, $instr: ident, $args: ident, $run_fn: ident, $rm:ident) => {{
         $state.hart.$run_fn($args.rs1, $args.$rm, $args.rd)?;
-        Ok(Add($instr.width()))
+        Ok(Next($instr.width()))
     }};
 }
 
@@ -239,11 +239,11 @@ macro_rules! run_f_x_instr {
 macro_rules! run_f_r_instr {
     ($state: ident, $instr: ident, $args: ident, $run_fn: ident) => {{
         $state.hart.$run_fn($args.rs1, $args.rs2, $args.rd)?;
-        Ok(Add($instr.width()))
+        Ok(Next($instr.width()))
     }};
     ($state: ident, $instr: ident, $args: ident, $run_fn: ident, $($field: ident),+) => {{
         $state.hart.$run_fn($args.rs1, $($args.$field,)* $args.rd)?;
-        Ok(Add($instr.width()))
+        Ok(Next($instr.width()))
     }};
 }
 
@@ -253,7 +253,7 @@ macro_rules! run_amo_instr {
     ($state: ident, $instr: ident, $args: ident, $run_fn: ident) => {{
         $state
             .$run_fn($args.rs1, $args.rs2, $args.rd, $args.rl, $args.aq)
-            .map(|_| Add($instr.width()))
+            .map(|_| Next($instr.width()))
     }};
 }
 
@@ -261,7 +261,7 @@ macro_rules! run_amo_instr {
 macro_rules! run_cr_type_instr {
     ($state: ident, $instr:ident, $args:ident, $run_fn: ident) => {{
         $state.hart.xregisters.$run_fn($args.rd_rs1, $args.rs2);
-        Ok(ProgramCounterUpdate::Add($instr.width()))
+        Ok(ProgramCounterUpdate::Next($instr.width()))
     }};
 }
 
@@ -269,7 +269,7 @@ macro_rules! run_cr_type_instr {
 macro_rules! run_ci_type_instr {
     ($state: ident, $instr:ident, $args:ident, $run_fn: ident) => {{
         $state.hart.xregisters.$run_fn($args.imm, $args.rd_rs1);
-        Ok(ProgramCounterUpdate::Add($instr.width()))
+        Ok(ProgramCounterUpdate::Next($instr.width()))
     }};
 }
 
@@ -278,7 +278,7 @@ macro_rules! run_ci_load_sp_instr {
     ($state: ident, $instr: ident, $args: ident, $run_fn: ident) => {{
         $state
             .$run_fn($args.imm, $args.rd_rs1)
-            .map(|_| Add($instr.width()))
+            .map(|_| Next($instr.width()))
     }};
 }
 
@@ -287,7 +287,7 @@ macro_rules! run_css_instr {
     ($state: ident, $instr: ident, $args: ident, $run_fn: ident) => {{
         $state
             .$run_fn($args.imm, $args.rs2)
-            .map(|_| Add($instr.width()))
+            .map(|_| Next($instr.width()))
     }};
 }
 
@@ -340,7 +340,7 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::ManagerBase> MachineCoreStat
         // Update program couter
         let pc = match pc_update {
             ProgramCounterUpdate::Set(address) => address,
-            ProgramCounterUpdate::Add(width) => instr_pc + width,
+            ProgramCounterUpdate::Next(width) => instr_pc + width as u64,
         };
 
         self.hart.pc.write(pc);
@@ -386,7 +386,7 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::ManagerBase> MachineCoreStat
     where
         M: backend::ManagerReadWrite,
     {
-        use ProgramCounterUpdate::{Add, Set};
+        use ProgramCounterUpdate::{Next, Set};
 
         match instr {
             // RV64I R-type instructions
@@ -594,7 +594,7 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::ManagerBase> MachineCoreStat
             InstrCacheable::CAddi(args) => run_ci_type_instr!(self, instr, args, run_caddi),
             InstrCacheable::CAddi16sp(args) => {
                 self.hart.xregisters.run_caddi16sp(args.imm);
-                Ok(ProgramCounterUpdate::Add(instr.width()))
+                Ok(ProgramCounterUpdate::Next(instr.width()))
             }
             InstrCacheable::CAddi4spn(args) => run_ci_type_instr!(self, instr, args, run_caddi4spn),
             InstrCacheable::CSlli(args) => run_ci_type_instr!(self, instr, args, run_cslli),
@@ -609,7 +609,7 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::ManagerBase> MachineCoreStat
             InstrCacheable::CSub(args) => run_cr_type_instr!(self, instr, args, run_csub),
             InstrCacheable::CNop => {
                 self.run_cnop();
-                Ok(ProgramCounterUpdate::Add(instr.width()))
+                Ok(ProgramCounterUpdate::Next(instr.width()))
             }
 
             // RV64C compressed instructions
@@ -745,7 +745,10 @@ impl<ML: main_memory::MainMemoryLayout, CL: CacheLayouts, M: backend::ManagerBas
         // Hence we can't read all 4 bytes eagerly.
         let instr = if is_compressed(first_halfword) {
             self.instruction_cache.cache_compressed(
-                |cache_entry| self.block_cache.push_instr::<2>(cache_entry),
+                |cache_entry| {
+                    self.block_cache
+                        .push_instr::<{ InstrWidth::Compressed as u64 }>(cache_entry)
+                },
                 phys_addr,
                 first_halfword,
             )
@@ -767,7 +770,10 @@ impl<ML: main_memory::MainMemoryLayout, CL: CacheLayouts, M: backend::ManagerBas
 
             let combined = (upper as u32) << 16 | (first_halfword as u32);
             self.instruction_cache.cache_uncompressed(
-                |cache_entry| self.block_cache.push_instr::<4>(cache_entry),
+                |cache_entry| {
+                    self.block_cache
+                        .push_instr::<{ InstrWidth::Uncompressed as u64 }>(cache_entry)
+                },
                 phys_addr,
                 combined,
             )
@@ -784,14 +790,14 @@ impl<ML: main_memory::MainMemoryLayout, CL: CacheLayouts, M: backend::ManagerBas
     where
         M: backend::ManagerReadWrite,
     {
-        use ProgramCounterUpdate::{Add, Set};
+        use ProgramCounterUpdate::{Next, Set};
 
         let core = &mut self.core;
 
         match instr {
             InstrUncacheable::Fence(args) => {
                 self.core.run_fence(args.pred, args.succ);
-                Ok(Add(instr.width()))
+                Ok(Next(instr.width()))
             }
             InstrUncacheable::FenceTso(_args) => Err(Exception::IllegalInstruction),
             InstrUncacheable::Ecall => run_syscall_instr!(core, run_ecall),
@@ -808,7 +814,7 @@ impl<ML: main_memory::MainMemoryLayout, CL: CacheLayouts, M: backend::ManagerBas
             // Supervisor Memory-Management
             InstrUncacheable::SFenceVma { asid, vaddr } => {
                 self.core.run_sfence_vma(*asid, *vaddr)?;
-                Ok(ProgramCounterUpdate::Add(instr.width()))
+                Ok(ProgramCounterUpdate::Next(instr.width()))
             }
 
             // RV32C compressed instructions

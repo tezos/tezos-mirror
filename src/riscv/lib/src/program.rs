@@ -129,7 +129,7 @@ impl<'a, ML: MainMemoryLayout> Program<'a, ML> {
             let instructions = parse_block(segment.1);
             for instr in instructions {
                 parsed.insert(address, instr.to_string());
-                address += instr.width();
+                address += instr.width() as u64;
             }
         }
         parsed

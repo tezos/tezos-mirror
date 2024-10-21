@@ -502,10 +502,21 @@ pub enum Instr {
     Uncacheable(InstrUncacheable),
 }
 
+/// RISC-V instruction width.
+///
+/// This is either 4 bytes, in the case of an uncompressed instruction,
+/// or 2 bytes, in the case of a compressed instruction.
+#[derive(Debug, PartialEq, Eq)]
+#[repr(u64)]
+pub enum InstrWidth {
+    Compressed = 2,
+    Uncompressed = 4,
+}
+
 impl InstrCacheable {
     /// Return the width of the instruction in bytes.
     #[inline(always)]
-    pub const fn width(&self) -> u64 {
+    pub const fn width(&self) -> InstrWidth {
         use InstrCacheable::*;
         match self {
             // 4 bytes instructions
@@ -661,7 +672,7 @@ impl InstrCacheable {
             | Csrrwi(_)
             | Csrrsi(_)
             | Csrrci(_)
-            | Unknown { instr: _ } => 4,
+            | Unknown { instr: _ } => InstrWidth::Uncompressed,
 
             // 2 bytes instructions (compressed instructions)
             CLw(_)
@@ -700,7 +711,7 @@ impl InstrCacheable {
             | CFldsp(_)
             | CFsd(_)
             | CFsdsp(_)
-            | UnknownCompressed { instr: _ } => 2,
+            | UnknownCompressed { instr: _ } => InstrWidth::Compressed,
         }
     }
 }
@@ -708,7 +719,7 @@ impl InstrCacheable {
 impl InstrUncacheable {
     /// Return the width of the instruction in bytes.
     #[inline(always)]
-    pub const fn width(&self) -> u64 {
+    pub const fn width(&self) -> InstrWidth {
         use InstrUncacheable::*;
         match self {
             FenceI
@@ -720,9 +731,9 @@ impl InstrUncacheable {
             | Sret
             | Mnret
             | Wfi
-            | SFenceVma { .. } => 4,
+            | SFenceVma { .. } => InstrWidth::Uncompressed,
 
-            CEbreak => 2,
+            CEbreak => InstrWidth::Compressed,
         }
     }
 }
@@ -730,7 +741,7 @@ impl InstrUncacheable {
 impl Instr {
     /// Return the width of the instruction in bytes.
     #[inline(always)]
-    pub const fn width(&self) -> u64 {
+    pub const fn width(&self) -> InstrWidth {
         use Instr::*;
         match self {
             Cacheable(c) => c.width(),
