@@ -155,26 +155,23 @@ module Plugin = struct
 
     let cell_hash = Dal.Slots_history.hash
 
-    (*
-      This function mimics what the protocol does in
-      {!Dal_slot_storage.finalize_pending_slot_headers}. Given a block_info at
-      some level L, an RPC context, the DAL constants for level L, and for level
-      L - attestation_lag - 1, the this function computes the cells produced by the
-      DAL skip list during the level L using:
+    (* This function returns the list of cells of the DAL skip list constructed
+       at the level of the block whose info are given. For that, it calls the
+       {!Plugin.RPC.Dal.skip_list_cells_of_level} RPC that directly retrieves
+       the list of cells from the L1 context. In case the entry in the context
+       is not initialized yet, the empty list is returned.
 
-       - The information telling which slot headers were waiting for attestation
-       at level [L - attestation_lag];
+       Compared to the old implementation in {!cells_of_level_legacy}, this
+       version is much simpler as it doesn't redo the computations. On the
+       contrary, the legacy version accesses published DAL commitments and the
+       attestation bitset in the block's metadata, and then reconstructs the
+       cells of the skip list by calling the appropriate DAL function in the
+       protocol. *)
 
-       - The bitset of attested slots at level [L] in the block's metadata.
-
-      It is assumed that at level L the DAL is enabled.
-
-      The ordering of the elements in the returned list is not relevant.
-    *)
     let cells_of_level (block_info : block_info) ctxt ~dal_constants
-        ~pred_publication_level_dal_constants =
+        ~pred_publication_level_dal_constants:_ =
       let open Lwt_result_syntax in
-      (* 0. Let's call [attested_level] the block's level. *)
+      let cpctxt = new Protocol_client_context.wrap_rpc_context ctxt in
       let attested_level = block_info.header.shell.level in
       let published_level =
         Int32.sub
@@ -184,107 +181,10 @@ module Plugin = struct
       (* 1. There are no cells for [published_level = 0]. *)
       if published_level <= 0l then return []
       else
-        let* feature_enable, prev_number_of_slots =
-          if published_level = 1l then
-            (* For this level, cannot retrieve the constants (as [pred
-               publication_level = 0]), but dummy values will suffice. *)
-            return (false, 0)
-          else
-            let* prev_constants =
-              Lazy.force pred_publication_level_dal_constants
-            in
-            return
-              ( prev_constants.Dal_plugin.feature_enable,
-                prev_constants.number_of_slots )
-        in
-        let cpctxt = new Protocol_client_context.wrap_rpc_context ctxt in
-        (* 2. We retrieve the last cell of the DAL skip list from the context,
-           if any. It's the one stored in the context at [attested_level -
-           1]. If no cell is stored yet, we return the genesis cell. *)
-        let* previous_cell =
-          let* previous_cell_opt =
-            (* Should not be negative as [attestation_lag > 0]. *)
-            let prev_level = Int32.pred attested_level in
-            Plugin.RPC.Dal.dal_commitments_history
-              cpctxt
-              (`Main, `Level prev_level)
-          in
-          return
-          @@ Option.value previous_cell_opt ~default:Dal.Slots_history.genesis
-        in
-        let* attested_slot_headers =
-          if not feature_enable then
-            (* There are no published headers, because the DAL was not enabled,
-               and therefore there are no attested headers. *)
-            return []
-          else
-            (* 3. We retrieve the slot headers published at level [level -
-               attestation_lag] from the context. *)
-            let* published_slot_headers =
-              if published_level = 1l then return []
-              else
-                Plugin.RPC.Dal.dal_published_slot_headers
-                  cpctxt
-                  (`Main, `Level published_level)
-                  ()
-            in
-            (* 4. We retrieve the bitset of attested slots at level [level]. *)
-            let* attested_slots =
-              let*? metadata =
-                Option.to_result
-                  block_info.metadata
-                  ~none:
-                    (TzTrace.make
-                   @@ Layer1_services.Cannot_read_block_metadata block_info.hash
-                    )
-              in
-              return metadata.protocol_data.dal_attestation
-            in
-            let is_slot_attested slot =
-              Dal.Attestation.is_attested
-                attested_slots
-                slot.Dal.Slot.Header.id.index
-            in
-            (* 5. We filter the list of slot headers published at [level -
-               attestation_lag] and keep only those attested at level [level]. *)
-            let attested_slot_headers, _attested_slots_bitset =
-              Dal.Slot.compute_attested_slot_headers
-                ~is_slot_attested
-                published_slot_headers
-            in
-            return attested_slot_headers
-        in
-        let*? published_level =
-          Raw_level.of_int32 published_level |> Environment.wrap_tzresult
-        in
-        (* 6. Starting from the [previous_cell], we insert the successive cells
-           of level [level] in the skip list thanks to function
-           {!add_confirmed_slot_headers}. The function is fed with an empty
-           history cache, so the returned [cache] contains exactly the cells
-           produced for this [level]. *)
-        let*? _last_cell, cache =
-          let capacity =
-            Int64.of_int
-            @@ max prev_number_of_slots dal_constants.number_of_slots
-          in
-          Dal.Slots_history.add_confirmed_slot_headers
-            previous_cell
-            (Dal.Slots_history.History_cache.empty ~capacity)
-            published_level
-            (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3997
-
-               Not resilient to DAL parameters change. *)
-            ~number_of_slots:dal_constants.number_of_slots
-            attested_slot_headers
-          |> Environment.wrap_tzresult
-        in
-        (* 7. We finally export and return the cells alongside their hashes as a
-           list. *)
-        let last_cells =
-          let open Dal.Slots_history.History_cache in
-          view cache |> Map.bindings
-        in
-        return last_cells
+        Plugin.RPC.Dal.skip_list_cells_of_level
+          cpctxt
+          (`Main, `Level attested_level)
+          ()
   end
 
   module RPC = struct

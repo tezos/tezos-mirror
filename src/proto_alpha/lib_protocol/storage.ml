@@ -2178,6 +2178,9 @@ module Dal = struct
           let name = ["slot_headers"]
         end)
         (struct
+          (* The size of the list below is at most equal to the
+             [number_of_slots] as declared in the DAL parameters of the
+             protocol. *)
           type t = Dal_slot_repr.Header.t list
 
           let encoding = Data_encoding.(list Dal_slot_repr.Header.encoding)
@@ -2192,6 +2195,27 @@ module Dal = struct
           type t = Dal_slot_repr.History.t
 
           let encoding = Dal_slot_repr.History.encoding
+        end)
+
+    module LevelHistories =
+      Make_single_data_storage (Registered) (Raw_context)
+        (struct
+          let name = ["slot_headers_successive_histories_of_level"]
+        end)
+        (struct
+          (* The size of the list below is always equal to the [number_of_slots]
+             as declared in the DAL parameters of the protocol. *)
+          type t =
+            (Dal_slot_repr.History.Pointer_hash.t * Dal_slot_repr.History.t)
+            list
+
+          let encoding =
+            let open Data_encoding in
+            let module H = Dal_slot_repr.History in
+            list
+              (obj2
+                 (req "cell_hash" H.Pointer_hash.encoding)
+                 (req "cell" H.encoding))
         end)
   end
 end

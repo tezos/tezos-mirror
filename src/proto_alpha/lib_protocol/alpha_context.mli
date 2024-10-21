@@ -2939,6 +2939,11 @@ module Dal : sig
 
   module Slots_storage : sig
     val get_slot_headers_history : context -> Slots_history.t tzresult Lwt.t
+
+    val find_level_histories :
+      context ->
+      (Slots_history.Pointer_hash.t * Slots_history.t) list option tzresult
+      Lwt.t
   end
 end
 
