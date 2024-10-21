@@ -19,10 +19,17 @@ let withdrawal_abi_path () =
 let fa_withdrawal_abi_path () =
   Base.(project_root // "etherlink/tezos_contracts/fa_withdrawal.abi")
 
-let delayed_path () =
-  Base.(
-    project_root
-    // "etherlink/tezos_contracts/chunked_delayed_transaction_bridge.tz")
+let delayed_path ~kernel =
+  (* The path to the delayed transaction bridge depends on the version
+     of the kernel. The versions which don't support chunking must use
+     "delayed_transaction_bridge.tz", the versions which do support
+     chunking must use "chunked_delayed_transaction_bridge.tz" *)
+  let contract_basename =
+    match kernel with
+    | Kernel.Latest -> "chunked_delayed_transaction_bridge"
+    | Mainnet | Ghostnet -> "delayed_transaction_bridge"
+  in
+  Base.(project_root // sf "etherlink/tezos_contracts/%s.tz" contract_basename)
 
 let ticket_router_tester_path () =
   Base.(
