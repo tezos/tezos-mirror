@@ -539,8 +539,55 @@ module History = struct
             attested_shards
             total_shards
 
-    let to_bytes current_slot =
-      Data_encoding.Binary.to_bytes_exn encoding current_slot
+    (* ADAL/TODO: https://gitlab.com/tezos/tezos/-/issues/7554
+
+       The implementation of [to_bytes] can be simplified after migration. See the
+       similar TODO in the encoding above for more details.
+    *)
+    let to_bytes =
+      let to_new_bytes current_slot =
+        Data_encoding.Binary.to_bytes_exn encoding current_slot
+      in
+      (* This function, and the [hash] function when {!Content_v2} are now
+         parameterized by an optional value [with_migration] for the following
+         reason:
+
+         Outside of refutation games, [with_migration] is set to
+         [None]. However, when verifying a proof (for proofs production, the
+         hashes are provided, not computed), we need to hash the cells along the
+         path from the snapshot cell to the target cell.
+
+         Hashing the cells of the previous protocol should be done using the
+         previous representation/encoding. To be able to do so, the proof
+         validation function should take a parameter [with_migration], which
+         includes the attestation lag and the level at which the migration
+         occurred. This way, we'll able to determine in which protocol we hashed
+         the content the first time (and computed a backpointer from the hash)
+         to continue using the same hash function on the same representation. *)
+      fun ?with_migration current_slot ->
+        match with_migration with
+        | None -> to_new_bytes current_slot
+        | Some (migration_level, attestation_lag) -> (
+            let Header.{published_level; _} = content_id current_slot in
+            let attested_level =
+              Raw_level_repr.add published_level attestation_lag
+            in
+            if Raw_level_repr.(attested_level >= migration_level) then
+              (* If attested_level is at least equal to migration_level, this
+                 means that the content has always been hashed using the new
+                 encoding. So, we continue doing so. *)
+              to_new_bytes current_slot
+            else
+              (* if attested_level < migration_level, this means that this
+                 content has already been hashed with the representation of
+                 cells' content in the previous protocol. To keep getting the
+                 same hash used as a backpointer, we rehash using the same
+                 (legacy) function. *)
+              Content_v1.to_bytes
+              @@
+              match current_slot with
+              | Unpublished id -> Content_v1.Unattested id
+              | Published {header; _} -> Content_v1.Attested header)
   end
 
   module Mk_skip_list (Content : sig
