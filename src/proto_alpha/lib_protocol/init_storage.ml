@@ -109,6 +109,37 @@ let patch_script ctxt (address, hash, patched_code) =
         address ;
       return ctxt
 
+(* This temporary function is meant to be used when migrating from Quebec to R.
+   It removes possible entries from the [Storage.Dal.Slot.Headers] map, as the
+   type of values in this map evolved. *)
+let remove_old_published_dal_slot_headers ctxt ~level ~attestation_lag =
+  (* DAL/TODO: https://gitlab.com/tezos/tezos/-/issues/7562
+
+     Add a test that triggers this migration:
+     - Cover all corner cases
+     - Check that all data have been correctly wiped.
+  *)
+  let open Lwt_syntax in
+  (* This function removes all entries at levels [LVL] from
+     [Storage.Dal.Slot.Headers], where:
+
+     max (0, level - attestation_lag) <= LVL <= level
+  *)
+  let rec aux ctxt n =
+    if Compare.Int.(n > attestation_lag) then
+      (* All entries have been wiped. *)
+      Lwt.return ctxt
+    else
+      match Raw_level_repr.sub level n with
+      | None ->
+          (* This happens when level < attestation_lag *)
+          Lwt.return ctxt
+      | Some pub_level ->
+          let* ctxt = Storage.Dal.Slot.Headers.remove ctxt pub_level in
+          aux ctxt (n + 1)
+  in
+  aux ctxt 0
+
 let prepare_first_block chain_id ctxt ~typecheck_smart_contract
     ~typecheck_smart_rollup ~level ~timestamp ~predecessor =
   let open Lwt_result_syntax in
@@ -214,6 +245,12 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
         (* Migration of refutation games needs to be kept for each protocol. *)
         let* ctxt =
           Sc_rollup_refutation_storage.migrate_clean_refutation_games ctxt
+        in
+        let*! ctxt =
+          remove_old_published_dal_slot_headers
+            ctxt
+            ~level
+            ~attestation_lag:parametric.dal.attestation_lag
         in
         return (ctxt, [])
     (* End of alpha predecessor stitching. Comment used for automatic snapshot *)
