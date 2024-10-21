@@ -313,7 +313,7 @@ module History = struct
         | _ -> None)
       (fun () -> Add_element_in_slots_skip_list_violates_ordering)
 
-  module Content = struct
+  module Content_v1 = struct
     (** Each cell of the skip list is either a slot header that has been
         attested, or a published level and a slot index for which no slot header
         is attested (so, no associated commitment). *)
@@ -367,7 +367,12 @@ module History = struct
           Format.fprintf fmt "Attested (%a)" Header.pp slot_header
   end
 
-  module Skip_list = struct
+  module Mk_skip_list (Content : sig
+    type t
+
+    val content_id : t -> Header.id
+  end) =
+  struct
     include Skip_list.Make (Skip_list_parameters)
 
     (** All Dal slot indices for all levels will be stored in a skip list
@@ -430,6 +435,9 @@ module History = struct
   end
 
   module V1 = struct
+    module Content = Content_v1
+    module Skip_list = Mk_skip_list (Content)
+
     type content = Content.t
 
     (* A pointer to a cell is the hash of its content and all the back
