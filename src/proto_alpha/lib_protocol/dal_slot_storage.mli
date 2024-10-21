@@ -44,14 +44,16 @@
     - For every level below [current_level - attestation_lag], there should not be
    any slot in the storage.  *)
 
-(** [find_slot_headers ctxt level] returns [Some slot_headers] where [slot_headers]
-   are pending slots at level [level].  [None] is returned if no
-   [slot_header] was registered at this level. The function fails if
-   the reading into the context fails. *)
+(** [find_slot_headers ctxt level] returns [Some slot_headers] where
+    [slot_headers] are pending slots at level [level] alongside the public key
+    hashes that published them.  [None] is returned if no [slot_header] was
+    registered at this level. The function fails if the reading into the context
+    fails. *)
 val find_slot_headers :
   Raw_context.t ->
   Raw_level_repr.t ->
-  Dal_slot_repr.Header.t list option tzresult Lwt.t
+  (Dal_slot_repr.Header.t * Signature.public_key_hash) list option tzresult
+  Lwt.t
 
 (** [find_level_histories ctxt] returns the cells of the DAL skip list produced
     at the current level alongside their hashes. Returns [None] if no entry is

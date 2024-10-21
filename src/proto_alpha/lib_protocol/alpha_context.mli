@@ -2875,7 +2875,9 @@ module Dal : sig
       context -> Header.t -> source:public_key_hash -> context tzresult
 
     val find_slot_headers :
-      context -> Raw_level.t -> Header.t list option tzresult Lwt.t
+      context ->
+      Raw_level.t ->
+      (Header.t * Signature.public_key_hash) list option tzresult Lwt.t
 
     val finalize_current_slot_headers : context -> context Lwt.t
 

@@ -31,9 +31,7 @@ let finalize_current_slot_headers ctxt =
   Storage.Dal.Slot.Headers.add
     ctxt
     (Raw_context.current_level ctxt).level
-    (* WIP: The correct handling of addresses associated to commitments will be
-       done in the next commits. *)
-    (Raw_context.Dal.candidates ctxt |> List.map fst)
+    (Raw_context.Dal.candidates ctxt)
 
 let compute_slot_headers_statuses ~is_slot_attested seen_slot_headers =
   let open Dal_slot_repr in
@@ -104,6 +102,9 @@ let finalize_pending_slot_headers ctxt ~number_of_slots =
         match seen_slots with
         | None -> return (ctxt, Dal_attestation_repr.empty, [])
         | Some seen_slots ->
+            (* WIP: Handle tz addresses that published the commitments in the next
+               commits. *)
+            let seen_slots = List.map fst seen_slots in
             let slot_headers_statuses, attestation =
               let is_slot_attested slot =
                 Raw_context.Dal.is_slot_index_attested
