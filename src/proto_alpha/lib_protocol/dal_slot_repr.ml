@@ -365,6 +365,9 @@ module History = struct
           Format.fprintf fmt "Unattested (%a)" Header.pp_id slot_id
       | Attested slot_header ->
           Format.fprintf fmt "Attested (%a)" Header.pp slot_header
+
+    let to_bytes current_slot =
+      Data_encoding.Binary.to_bytes_exn encoding current_slot
   end
 
   module Mk_skip_list (Content : sig
@@ -493,7 +496,7 @@ module History = struct
     let hash cell =
       let current_slot = Skip_list.content cell in
       let back_pointers_hashes = Skip_list.back_pointers cell in
-      Data_encoding.Binary.to_bytes_exn Content.encoding current_slot
+      Content.to_bytes current_slot
       :: List.map Pointer_hash.to_bytes back_pointers_hashes
       |> Pointer_hash.hash_bytes
 
