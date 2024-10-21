@@ -394,6 +394,16 @@ module History = struct
 
     let encoding =
       let open Data_encoding in
+      (* ADAL/TODO: https://gitlab.com/tezos/tezos/-/issues/7554
+
+         The two legacy cases below can be removed once migration from Quebec to
+         R is done, assuming no legacy cells could be used in refutation anymore
+         (i.e. ~3 months after migrating to Content_v2). If so, the code in
+         protocol S can be simplfied.
+
+         However, make sure to not modify the tags (2) and (3) of the regular
+         cases below, as this would break the ability to read normal Content_v2
+         cells. *)
       union
         ~tag_size:`Uint8
         [
