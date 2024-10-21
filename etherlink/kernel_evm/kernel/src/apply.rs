@@ -473,7 +473,7 @@ fn apply_fa_deposit<Host: Runtime>(
 ) -> Result<ExecutionResult<TransactionResult>, Error> {
     let caller = H160::zero();
     // Prevent inner calls to XTZ/FA withdrawal precompiles
-    let precompiles = precompiles::pure_precompile_set();
+    let precompiles = precompiles::precompile_set_with_revert_withdrawals(true);
     let outcome = execute_fa_deposit(
         host,
         block_constants,

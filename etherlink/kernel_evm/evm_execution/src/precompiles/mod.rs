@@ -20,6 +20,7 @@ mod hash;
 mod identity;
 mod modexp;
 pub(crate) mod reentrancy_guard;
+mod revert;
 mod withdrawal;
 mod zero_knowledge;
 
@@ -34,6 +35,7 @@ use hash::{ripemd160_precompile, sha256_precompile};
 use identity::identity_precompile;
 use modexp::modexp_precompile;
 use primitive_types::H160;
+use revert::revert_precompile;
 use tezos_evm_runtime::runtime::Runtime;
 use withdrawal::withdrawal_precompile;
 use zero_knowledge::{ecadd_precompile, ecmul_precompile, ecpairing_precompile};
@@ -160,9 +162,7 @@ pub const WITHDRAWAL_ADDRESS: H160 = H160([
     0xff, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
 ]);
 
-/// Factory function for generating the pure precompile set that does not mutate kernel state.
-/// This does not include XTZ/FA withdrawal precompiles (for reentrancy protection).
-pub fn pure_precompile_set<Host: Runtime>() -> PrecompileBTreeMap<Host> {
+pub fn evm_precompile_set<Host: Runtime>() -> PrecompileBTreeMap<Host> {
     BTreeMap::from([
         (
             H160::from_low_u64_be(1u64),
@@ -207,7 +207,7 @@ pub fn pure_precompile_set<Host: Runtime>() -> PrecompileBTreeMap<Host> {
 pub fn precompile_set<Host: Runtime>(
     enable_fa_withdrawals: bool,
 ) -> PrecompileBTreeMap<Host> {
-    let mut precompiles = pure_precompile_set();
+    let mut precompiles = evm_precompile_set();
 
     precompiles.insert(
         WITHDRAWAL_ADDRESS,
@@ -220,6 +220,23 @@ pub fn precompile_set<Host: Runtime>(
             fa_bridge_precompile as PrecompileFn<Host>,
         );
     }
+    precompiles
+}
+
+pub fn precompile_set_with_revert_withdrawals<Host: Runtime>(
+    enable_fa_withdrawals: bool,
+) -> PrecompileBTreeMap<Host> {
+    let mut precompiles = evm_precompile_set();
+
+    precompiles.insert(WITHDRAWAL_ADDRESS, revert_precompile as PrecompileFn<Host>);
+
+    if enable_fa_withdrawals {
+        precompiles.insert(
+            FA_BRIDGE_PRECOMPILE_ADDRESS,
+            revert_precompile as PrecompileFn<Host>,
+        );
+    }
+
     precompiles
 }
 
