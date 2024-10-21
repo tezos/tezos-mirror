@@ -655,7 +655,7 @@ let job_docker_authenticated ?(skip_docker_initialization = false)
 (** A set of internally and externally built images.
 
     Use this module to register images built in the CI of
-    [tezos/tezos] that are also used in the same pipelines.See
+    [tezos/tezos] that are also used in the same pipelines. See
     {!Images_external} for external images.
 
     To make the distinction between internal and external images

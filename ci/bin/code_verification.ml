@@ -645,7 +645,7 @@ let jobs pipeline_type =
       ()
   in
 
-  (*Build jobs *)
+  (* Build jobs *)
   let build =
     (* TODO: The code is a bit convoluted here because these jobs are
        either in the build or in the manual stage depending on the
@@ -742,7 +742,7 @@ let jobs pipeline_type =
     @ bin_packages_jobs
   in
 
-  (*Packaging jobs *)
+  (* Packaging jobs *)
   let packaging =
     Opam.jobs_opam_packages ~dependencies:dependencies_needs_start pipeline_type
   in
@@ -763,7 +763,7 @@ let jobs pipeline_type =
       ~schedule_extended_test:(fun () -> Staged [])
   in
 
-  (*Test jobs*)
+  (* Test jobs*)
   let test =
     (* This job triggers the debian child pipeline automatically if any
        files in the changeset is modified. It's the same as
