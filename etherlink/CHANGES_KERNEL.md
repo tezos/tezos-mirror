@@ -8,6 +8,7 @@
 
 - The kernel is able to trace calls for the `callTracer` configuration. (!14290)
 - Gas cost of XTZ withdrawals is increased to prevent abuses. (!14016)
+- Support of larger delayed transactions (was limited at 4KBytes before). (!14467 !15353)
 
 #### Experimental
 
@@ -25,7 +26,6 @@ Beta and Testnet, and allows users to deposit and withdraw FA 2.1 tokens.
   It will allow to remove old transactions from the durable storage. (!14688)
 - Tick model is updated with regards to FA deposits and withdrawals. (!14016)
 - L1 proxy address is added as a field to the FA withdrawal event. (!14260)
-- Preliminary support of larger delayed transactions. (!14467)
 - Move block storage related functions to another file to improve the readability
   (!14685)
 - EVM Execution no longer require an additional storage for block number to
