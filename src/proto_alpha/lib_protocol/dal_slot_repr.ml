@@ -218,7 +218,10 @@ module Slot_market = struct
 
   module Slot_index_map = Map.Make (Dal_slot_index_repr)
 
-  type t = {length : int; slot_headers : Header.t Slot_index_map.t}
+  type t = {
+    length : int;
+    slot_headers : (Header.t * Signature.public_key_hash) Slot_index_map.t;
+  }
 
   let init ~length =
     if Compare.Int.(length < 0) then
@@ -230,8 +233,6 @@ module Slot_market = struct
 
   let register t new_slot_header ~source =
     let open Header in
-    (* WIP: This will be used in the next commits. *)
-    ignore source ;
     if
       not
         Compare.Int.(
@@ -243,7 +244,7 @@ module Slot_market = struct
       let update = function
         | None ->
             has_changed := true ;
-            Some new_slot_header
+            Some (new_slot_header, source)
         | Some x -> Some x
       in
       let slot_headers =

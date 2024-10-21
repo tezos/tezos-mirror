@@ -196,8 +196,9 @@ module Slot_market : sig
   val register :
     t -> Header.t -> source:Signature.public_key_hash -> (t * bool) option
 
-  (** [candidates t] returns a list of slot header candidates. *)
-  val candidates : t -> Header.t list
+  (** [candidates t] returns a list of slot header candidates associated to the
+      public key hashes of the managers who published them. *)
+  val candidates : t -> (Header.t * Signature.public_key_hash) list
 end
 
 (** This module provides an abstract data structure (type {!History.t}) that
