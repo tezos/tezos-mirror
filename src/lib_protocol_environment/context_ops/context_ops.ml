@@ -75,9 +75,14 @@ let irmin_context_dir root = Filename.(concat root irmin_dir)
 let brassaia_context_dir root = Filename.(concat root brassaia_dir)
 
 let context_dir root =
-  match Sys.getenv_opt backend_variable with
-  | Some "Brassaia" -> brassaia_context_dir root
-  | _ -> irmin_context_dir root
+  match Sys.getenv backend_variable |> String.lowercase_ascii with
+  | "brassaia" -> brassaia_context_dir root
+  | "irmin" | "duo" | (exception Not_found) -> irmin_context_dir root
+  | s ->
+      Fmt.failwith
+        "You tried to initialise the context with %s, this is not a known \
+         context. Try `irmin` or `brassaia`"
+        s
 
 let init ~kind ?patch_context ?readonly ?index_log_size context_root_dir =
   let open Lwt_syntax in
@@ -144,12 +149,11 @@ let init ~kind ?patch_context ?readonly ?index_log_size context_root_dir =
    to select the backend between Memory|Brassaia_memory and Disk|Brassaia *)
 let init ~kind ?patch_context ?readonly ?index_log_size context_root_dir =
   let open Lwt_syntax in
-  let backend_variable = "TEZOS_CONTEXT_BACKEND" in
   (* Gather the initialisation profiling otherwise aggregates will behave
      like records and create a section for each call *)
   () [@profiler.record {verbosity = Notice} "Context init"] ;
-  match Sys.getenv_opt backend_variable with
-  | Some "Brassaia" -> (
+  match Sys.getenv backend_variable |> String.lowercase_ascii with
+  | "brassaia" -> (
       match kind with
       | `Disk ->
           init
@@ -167,7 +171,7 @@ let init ~kind ?patch_context ?readonly ?index_log_size context_root_dir =
             context_root_dir
       | _ ->
           init ~kind ?patch_context ?readonly ?index_log_size context_root_dir)
-  | Some "Duo" -> (
+  | "duo" -> (
       match kind with
       | `Disk ->
           let* () = Events.(emit warning_experimental) () in
@@ -187,7 +191,8 @@ let init ~kind ?patch_context ?readonly ?index_log_size context_root_dir =
             context_root_dir
       | _ ->
           init ~kind ?patch_context ?readonly ?index_log_size context_root_dir)
-  | _ -> init ~kind ?patch_context ?readonly ?index_log_size context_root_dir
+  | _ | (exception Not_found) ->
+      init ~kind ?patch_context ?readonly ?index_log_size context_root_dir
 
 let index (context : Environment_context.t) =
   match[@profiler.span_f {verbosity = Notice} ["context_ops"; "index"]]

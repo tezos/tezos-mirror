@@ -3427,10 +3427,15 @@ module Tar_importer : IMPORTER = struct
       List.iter_s
         (fun file ->
           let filename = Onthefly.get_filename file in
-          Onthefly.copy_to_file
-            t.tar
-            file
-            ~dst:Filename.(concat dst_dir filename))
+          (* Remove context from the filename since we can
+             restore a brassaia context and would want to
+             store it in brassaia_context *)
+          let dst =
+            Tezos_context_ops.Context_ops.context_dir dst_dir
+            ^ (String.remove_prefix ~prefix:"context" filename
+              |> Option.value ~default:"")
+          in
+          Onthefly.copy_to_file t.tar file ~dst)
         context_files
     in
     return_unit

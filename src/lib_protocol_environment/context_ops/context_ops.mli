@@ -18,8 +18,12 @@ type index
     context provider (Irmin/Brassaia/Duo) *)
 val backend_variable : string
 
-(** [context_dir root] returns the context's directory depending on the backend
-    that was chosen
+(** [context_dir ?envvar root] returns the context's directory concatenated to [root]
+    depending on the backend that was chosen with TEZOS_CONTEXT_BACKEND
+
+    Example:
+    - [context_dir "/tmp/"] returns ["/tmp/context"] if Irmin or Duo was chosen
+    - [context_dir "/tmp/"] returns ["/tmp/brassaia_context"] if Brassaia was chosen
 
     This function should always be used when doing operations
     on the context directory. *)

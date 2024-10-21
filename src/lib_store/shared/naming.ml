@@ -222,6 +222,8 @@ let snapshot_tmp_tar_file dir = mk_file dir "tmp_snapshot.tar"
 
 let snapshot_block_data_file dir = mk_file dir "block_data"
 
+(* Exception to the "never use context" rule since exporting should always
+   be done in a context directory for consistancy *)
 let snapshot_context_file dir = mk_file dir "context"
 
 let snapshot_floating_blocks_file dir = mk_file dir "floating_blocks"
