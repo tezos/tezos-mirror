@@ -175,6 +175,15 @@ fn migrate_to<Host: Runtime>(
                 Ok(MigrationStatus::None)
             }
         }
+        StorageVersion::V22 => {
+            if is_etherlink_network(host, MAINNET_CHAIN_ID)? {
+                host.store_write_all(&ENABLE_FA_BRIDGE, &[1u8])?;
+                Ok(MigrationStatus::Done)
+            } else {
+                // Not applicable for other networks
+                Ok(MigrationStatus::None)
+            }
+        }
     }
 }
 
