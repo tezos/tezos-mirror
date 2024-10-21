@@ -1218,6 +1218,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
                  adaptive_issuance = _;
                  direct_ticket_spending_enable;
                  aggregate_attestation;
+                 allow_tz4_delegate_enable;
                }
                 : Previous.t) =
             c
@@ -1268,6 +1269,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             adaptive_issuance;
             direct_ticket_spending_enable;
             aggregate_attestation;
+            allow_tz4_delegate_enable;
           }
         in
         let*! ctxt = add_constants ctxt constants in
@@ -1555,6 +1557,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             adaptive_issuance;
             direct_ticket_spending_enable;
             aggregate_attestation = false;
+            allow_tz4_delegate_enable = false;
           }
         in
         let new_constants : Constants_parametric_repr.t option =

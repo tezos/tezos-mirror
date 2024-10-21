@@ -226,6 +226,7 @@ type t = {
   direct_ticket_spending_enable : bool;
   (* attestation aggregation feature flag *)
   aggregate_attestation : bool;
+  allow_tz4_delegate_enable : bool;
 }
 
 val encoding : t Data_encoding.encoding

@@ -249,6 +249,7 @@ type t = {
   adaptive_issuance : adaptive_issuance;
   direct_ticket_spending_enable : bool;
   aggregate_attestation : bool;
+  allow_tz4_delegate_enable : bool;
 }
 
 let sc_rollup_encoding =
@@ -584,8 +585,9 @@ let encoding =
                 ( c.dal,
                   ( (c.sc_rollup, c.zk_rollup),
                     ( c.adaptive_issuance,
-                      (c.direct_ticket_spending_enable, c.aggregate_attestation)
-                    ) ) ) ) ) ) ) ))
+                      ( c.direct_ticket_spending_enable,
+                        c.aggregate_attestation,
+                        c.allow_tz4_delegate_enable ) ) ) ) ) ) ) ) ))
     (fun ( ( ( consensus_rights_delay,
                blocks_preservation_cycles,
                delegate_parameters_activation_delay ),
@@ -627,8 +629,9 @@ let encoding =
                    ( dal,
                      ( (sc_rollup, zk_rollup),
                        ( adaptive_issuance,
-                         (direct_ticket_spending_enable, aggregate_attestation)
-                       ) ) ) ) ) ) ) ) ->
+                         ( direct_ticket_spending_enable,
+                           aggregate_attestation,
+                           allow_tz4_delegate_enable ) ) ) ) ) ) ) ) ) ->
       {
         consensus_rights_delay;
         blocks_preservation_cycles;
@@ -674,6 +677,7 @@ let encoding =
         adaptive_issuance;
         direct_ticket_spending_enable;
         aggregate_attestation;
+        allow_tz4_delegate_enable;
       })
     (merge_objs
        (merge_objs
@@ -739,9 +743,10 @@ let encoding =
                          (merge_objs sc_rollup_encoding zk_rollup_encoding)
                          (merge_objs
                             adaptive_issuance_encoding
-                            (obj2
+                            (obj3
                                (req "direct_ticket_spending_enable" bool)
-                               (req "aggregate_attestation" bool))))))))))
+                               (req "aggregate_attestation" bool)
+                               (req "allow_tz4_delegate_enable" bool))))))))))
 
 let update_sc_rollup_parameter ratio_i32 c =
   (* Constants remain small enough to fit in [int32] after update (as a
