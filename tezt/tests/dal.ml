@@ -49,6 +49,8 @@ let hooks = Tezos_regression.hooks
 
 let rpc_hooks = Tezos_regression.rpc_hooks
 
+let skip_list_sqlite3_tag = "dal_skip_list_sqlite3"
+
 module Dal = Dal_common
 module Helpers = Dal.Helpers
 module Cryptobox = Dal.Cryptobox
