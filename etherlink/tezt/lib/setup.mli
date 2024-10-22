@@ -33,9 +33,10 @@ type sequencer_setup = {
 (** [uses protocol] returns the list of dependencies for the tests. *)
 val uses : Protocol.t -> Uses.t list
 
-(** [setup_l1_contracts ~dictator client] setups the necessary contracts for the
-    rollup. *)
-val setup_l1_contracts : ?dictator:Account.key -> Client.t -> l1_contracts Lwt.t
+(** [setup_l1_contracts ~dictator ~kernel client] setups the necessary
+    contracts for the rollup. *)
+val setup_l1_contracts :
+  ?dictator:Account.key -> kernel:Kernel.t -> Client.t -> l1_contracts Lwt.t
 
 (** [run_new_rpc_endpoint node] starts a new rpc node following the setup. *)
 val run_new_rpc_endpoint : Evm_node.t -> Evm_node.t Lwt.t

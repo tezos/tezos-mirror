@@ -40,14 +40,14 @@ let uses _protocol =
     Constant.smart_rollup_installer;
   ]
 
-let setup_l1_contracts ?(dictator = Constant.bootstrap2) client =
+let setup_l1_contracts ?(dictator = Constant.bootstrap2) ~kernel client =
   (* Originates the delayed transaction bridge. *)
   let* delayed_transaction_bridge =
     Client.originate_contract
       ~alias:"evm-seq-delayed-bridge"
       ~amount:Tez.zero
       ~src:Constant.bootstrap1.public_key_hash
-      ~prg:(delayed_path ())
+      ~prg:(delayed_path ~kernel)
       ~burn_cap:Tez.one
       client
   in
@@ -193,7 +193,9 @@ let setup_sequencer ?next_wasm_runtime ?block_storage_sqlite3
     else none
   in
   let client = Client.with_dal_node client ?dal_node in
-  let* l1_contracts = setup_l1_contracts client in
+  let* l1_contracts =
+    setup_l1_contracts ~kernel:(Kernel.of_use kernel) client
+  in
   let sc_rollup_node =
     Sc_rollup_node.create
       ~default_operator:Constant.bootstrap1.public_key_hash
