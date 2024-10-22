@@ -35,6 +35,9 @@ val u16_to_bytes : int -> string
 (** [add_0x s] will add the hexa prefix `0x` before the given string. *)
 val add_0x : string -> string
 
+(** [remove_0x s] removes the [0x] prefix in [s] if it is present. *)
+val remove_0x : string -> string
+
 (** [mapping_position key map_position] computes the storage position for
     a value in a mapping given its [key] and the position of the map
     itself.

@@ -712,7 +712,7 @@ let deploy ~contract ~sender full_evm_setup =
       Eth_cli.update_abi ~label:contract.label ~abi:contract.abi ()
     else Eth_cli.add_abi ~label:contract.label ~abi:contract.abi ()
   in
-  let send_deploy () =
+  let send_deploy =
     Eth_cli.deploy
       ~source_private_key:sender.Eth_account.private_key
       ~endpoint:evm_node_endpoint

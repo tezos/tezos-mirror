@@ -74,7 +74,7 @@ val check_abi : label:string -> unit -> bool Lwt.t
 (** [show_abi] ~label () returns the ABI registered in the client. *)
 val show_abi : label:string -> unit -> string Lwt.t
 
-(** [deploy ~source_private_key ~endpoint ~abi ~bin] crafts and sign a
+(** [deploy ?args ~source_private_key ~endpoint ~abi ~bin ()] crafts and sign a
     transaction deploying [bin] whose interface [abi] is registered in the
     client, and sends the raw transaction to the JSON-API server listening at
     [endpoint]. [bin] is a path to the binary file, and [abi] is the label used
@@ -82,10 +82,12 @@ val show_abi : label:string -> unit -> string Lwt.t
 
     Returns a pair [(address, tx_hash)]. *)
 val deploy :
+  ?args:string ->
   source_private_key:string ->
   endpoint:string ->
   abi:string ->
   bin:string ->
+  unit ->
   (string * string) Lwt.t
 
 (** [contract_send ~source_private_key ~endpoint ~abi_label ~address

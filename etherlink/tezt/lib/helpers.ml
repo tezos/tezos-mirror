@@ -41,6 +41,10 @@ let leftPad32 s =
 
 let add_0x s = "0x" ^ s
 
+let remove_0x s =
+  if String.starts_with ~prefix:"0x" s then String.sub s 2 (String.length s - 2)
+  else s
+
 let mapping_position index map_position =
   Tezos_crypto.Hacl.Hash.Keccak_256.digest
     (Hex.to_bytes

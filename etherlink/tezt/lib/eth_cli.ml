@@ -99,7 +99,7 @@ let check_abi ~label () =
   let* abi_list = spawn_command_and_read_string ["abi:list"] in
   return (String.split_on_char '\n' abi_list |> List.mem label)
 
-let deploy ~source_private_key ~endpoint ~abi ~bin =
+let deploy ?args ~source_private_key ~endpoint ~abi ~bin () =
   let decode json =
     let open JSON in
     let contract_address =
@@ -109,16 +109,17 @@ let deploy ~source_private_key ~endpoint ~abi ~bin =
     Some (contract_address, tx_hash)
   in
   spawn_command_and_read_json
-    [
-      "contract:deploy";
-      "--pk";
-      source_private_key;
-      "--abi";
-      abi;
-      "--network";
-      endpoint;
-      bin;
-    ]
+    ([
+       "contract:deploy";
+       "--pk";
+       source_private_key;
+       "--abi";
+       abi;
+       "--network";
+       endpoint;
+       bin;
+     ]
+    @ Cli_arg.optional_arg "args" Fun.id args)
     decode
 
 let contract_send ?(expect_failure = false) ~source_private_key ~endpoint
