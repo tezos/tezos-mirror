@@ -1209,14 +1209,14 @@ let job_datadog_pipeline_trace : tezos_job =
        pipeline_type:$PIPELINE_TYPE --tags mr_number:$CI_MERGE_REQUEST_IID";
     ]
 
-(* Manual job that builds the Grafazos dashboards *)
-let job_build_grafazos : tezos_job =
+(* Job that builds the Grafazos dashboards *)
+let job_build_grafazos ?rules () =
   job
     ~__POS__
     ~name:"build_grafazos_dashboards"
     ~image:Images.jsonnet
     ~stage:Stages.build
-    ~rules:[job_rule ~when_:Manual ()]
+    ?rules
     ~artifacts:
       (artifacts
          ~name:"grafazos-dashboards"

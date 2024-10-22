@@ -1820,7 +1820,7 @@ let jobs pipeline_type =
             job_docker_arm64_test_manual;
             job_build_rpm_amd64_manual;
             job_build_homebrew_manual;
-            job_build_grafazos;
+            job_build_grafazos ~rules:[job_rule ~when_:Manual ()] ();
           ]
           @ [job_docker_verify_test_arm64; job_docker_verify_test_amd64]
         in
