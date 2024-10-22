@@ -74,10 +74,6 @@ RUN mkdir -p /usr/share/dal-trusted-setup && \
     sh /tmp/install_dal_trusted_setup.sh && \
     rm /tmp/install_dal_trusted_setup.sh /tmp/version.sh
 
-# source: https://github.com/DataDog/datadog-ci/blob/master/container/Dockerfile
-# hadolint ignore=DL3016,DL3018,DL4006
-RUN apk add --no-cache npm git && npm install -g "@datadog/datadog-ci"
-
 USER tezos
 ENV USER=tezos
 WORKDIR /home/tezos
@@ -337,7 +333,7 @@ ENV NODE_OPTIONS="--dns-result-order=ipv4first"
 # We need curl since a bunch of tezt tests use curl.
 # Same, some tests use [file].
 
-# hadolint ignore=DL3018,DL3019,DL4006
+# hadolint ignore=DL3018,DL3019
 RUN apk update \
  && apk add --no-cache curl npm git file make jq \
  gcc clang lld ca-certificates build-base musl-dev libusb-dev linux-headers \
