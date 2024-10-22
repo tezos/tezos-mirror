@@ -4,6 +4,22 @@
 
 ### Features
 
+### Bug fixes
+
+### Internals
+
+## Version 0.6 (2024-10-21)
+
+This release introduces a new, still experimental runtime to execute Etherlink
+kernel. It will eventually replace the general-purpose WASM runtime initially
+implemented for the Octez Rollup Node. This release also introduces a few
+metrics, to help with monitoring.
+
+The node will apply two migrations to its internal store (version 13), meaning
+it is not possible to downgrade to the previous version.
+
+### Features
+
 - The sequencer forwards the kernel upgrade event as soon as possible so
   observers can download in advance the kernel. (!15276)
 
@@ -14,14 +30,31 @@
   default. It does not change the notion of transaction validation but should
   provide faster validation. (!15062)
 
+#### Metrics
+
+- Adds `time_waiting` to expose the time spent by client waiting for their
+  requests’ execution to start. (!15241)
+- Adds `queue_size` to expose the number of clients waiting for their turn in
+  the execution queue. (!15241)
+- Add `gas_price` to expose the gas price of the latest block. (!15239)
+
+#### Experimental
+
+- The new WASM Runtime can be enabled by setting
+  `experimental_features.next_wasm_runtime` to `true` in the  configuration
+  file. It brings better performances (especially for short calls to the
+  kernel), and fixes the memory leak that was affecting the node since its
+  beginnings. (!15025 !15039 !15017 !15272 !15269)
+
 ### Bug fixes
 
 - The node will no longer crash when catching-up if it cannot fetch a blueprint
   from its upstream EVM node. Instead, it will retry as many time as necessary.
   This is aligned with the behavior of the node when it is up-to-date with its
   upstream node. (!15232)
-
-### Internals
+- The node will now create its daily logs file with Unix read permission
+  granted to the group owning them. This makes them easier to collect by
+  an external process like `promtail`. (!15227)
 
 ## Version 0.5 (2024-09-27)
 
