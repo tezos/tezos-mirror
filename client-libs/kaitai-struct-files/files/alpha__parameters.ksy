@@ -468,6 +468,8 @@ seq:
   type: u1
 - id: delegate_parameters_activation_delay
   type: u1
+- id: tolerated_inactivity_period
+  type: u1
 - id: blocks_per_cycle
   type: s4be
 - id: blocks_per_commitment
