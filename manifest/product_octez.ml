@@ -3398,6 +3398,20 @@ let octez_protocol_compiler_compat =
                 S "%{target}";
               ]
             ~enabled_if:[S ">="; S "%{ocaml_version}"; S "5"];
+          target_rule
+            "compiler_libs.ml"
+            ~action:
+              [
+                S "copy"; S "compat_files/compiler_libs_ocaml4.ml"; S "%{target}";
+              ]
+            ~enabled_if:[S "<"; S "%{ocaml_version}"; S "5"];
+          target_rule
+            "compiler_libs.ml"
+            ~action:
+              [
+                S "copy"; S "compat_files/compiler_libs_ocaml5.ml"; S "%{target}";
+              ]
+            ~enabled_if:[S ">="; S "%{ocaml_version}"; S "5"];
         ]
 
 let _octez_protocol_compiler_cmis_of_cma =

@@ -28,13 +28,18 @@ let patch_env_loading () =
   let preloaded_cmis : Persistent_env.Persistent_signature.t String.Hashtbl.t =
     Octez_protocol_compiler.Compiler.preloaded_cmis
   in
-  Persistent_env.Persistent_signature.load :=
-    fun ~unit_name ->
-      match
-        String.Hashtbl.find preloaded_cmis (String.capitalize_ascii unit_name)
-      with
-      | Some v -> Some v
-      | None -> Octez_protocol_compiler.Compiler.default_load ~unit_name
+  Octez_protocol_compiler_compat.Compiler_libs
+  .override_persistent_signature_loader
+  @@ fun ~allow_hidden ~unit_name ->
+  match
+    String.Hashtbl.find preloaded_cmis (String.capitalize_ascii unit_name)
+  with
+  | Some v -> Some v
+  | None ->
+      Octez_protocol_compiler_compat.Compiler_libs
+      .default_persistent_signature_loader
+        ~unit_name
+        ~allow_hidden
 
 let directive_string_fn fn_name =
   match Toploop.get_directive fn_name with

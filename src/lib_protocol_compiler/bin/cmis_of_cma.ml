@@ -12,7 +12,7 @@ let parse_cma file =
       let cma = (input_value c : Cmo_format.library) in
       close_in c ;
       List.map
-        (fun (cmo : Cmo_format.compilation_unit) -> cmo.cu_name)
+        Octez_protocol_compiler_compat.Compiler_libs.compunit_name
         cma.lib_units)
     else if buffer = Config.cmxa_magic_number then (
       let cmxa = (input_value c : Cmx_format.library_infos) in

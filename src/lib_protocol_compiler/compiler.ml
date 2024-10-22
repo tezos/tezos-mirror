@@ -34,19 +34,19 @@ let default_warn_error = "-a+8"
 let preloaded_cmis : Persistent_env.Persistent_signature.t String.Hashtbl.t =
   String.Hashtbl.create ~random:true 42
 
-let default_load = !Persistent_env.Persistent_signature.load
-
 (* Set hook *)
 let () =
-  Persistent_env.Persistent_signature.load :=
-    fun ~unit_name ->
-      String.Hashtbl.find preloaded_cmis (String.capitalize_ascii unit_name)
+  Compiler_libs.override_persistent_signature_loader
+  @@ fun ~allow_hidden:_ ~unit_name ->
+  String.Hashtbl.find preloaded_cmis (String.capitalize_ascii unit_name)
 
 let load_cmi_from_file file =
   String.Hashtbl.add
     preloaded_cmis
     (String.capitalize_ascii Filename.(basename (chop_extension file)))
-    {filename = file; cmi = Cmi_format.read_cmi file}
+    (Compiler_libs.make_persistent_signature
+       ~filename:file
+       ~cmi:(Cmi_format.read_cmi file))
 
 let load_embedded_cmi (unit_name, content) =
   let content = Bytes.of_string content in
@@ -67,10 +67,9 @@ let load_embedded_cmi (unit_name, content) =
   String.Hashtbl.add
     preloaded_cmis
     (String.capitalize_ascii unit_name)
-    {
-      filename = unit_name ^ ".cmi";
-      cmi = {cmi_name; cmi_sign; cmi_crcs; cmi_flags};
-    }
+    (Compiler_libs.make_persistent_signature
+       ~filename:(unit_name ^ ".cmi")
+       ~cmi:{cmi_name; cmi_sign; cmi_crcs; cmi_flags})
 
 let load_embedded_cmis cmis = List.iter load_embedded_cmi cmis
 
