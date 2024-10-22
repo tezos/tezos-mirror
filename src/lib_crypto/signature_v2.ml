@@ -1013,3 +1013,31 @@ module Of_V0 = struct
     | Signature_v0.P256 k -> P256 k
     | Signature_v0.Unknown k -> Unknown k
 end
+
+module Of_V1 = struct
+  let public_key_hash : Signature_v1.Public_key_hash.t -> Public_key_hash.t =
+    function
+    | Signature_v1.Ed25519 k -> Ed25519 k
+    | Signature_v1.Secp256k1 k -> Secp256k1 k
+    | Signature_v1.P256 k -> P256 k
+    | Signature_v1.Bls k -> Bls k
+
+  let public_key : Signature_v1.Public_key.t -> Public_key.t = function
+    | Signature_v1.Ed25519 k -> Ed25519 k
+    | Signature_v1.Secp256k1 k -> Secp256k1 k
+    | Signature_v1.P256 k -> P256 k
+    | Signature_v1.Bls k -> Bls k
+
+  let secret_key : Signature_v1.Secret_key.t -> Secret_key.t = function
+    | Signature_v1.Ed25519 k -> Ed25519 k
+    | Signature_v1.Secp256k1 k -> Secp256k1 k
+    | Signature_v1.P256 k -> P256 k
+    | Signature_v1.Bls k -> Bls k
+
+  let signature : Signature_v1.t -> t = function
+    | Signature_v1.Ed25519 k -> Ed25519 k
+    | Signature_v1.Secp256k1 k -> Secp256k1 k
+    | Signature_v1.P256 k -> P256 k
+    | Signature_v1.Unknown k -> Unknown k
+    | Signature_v1.Bls k -> Bls k
+end
