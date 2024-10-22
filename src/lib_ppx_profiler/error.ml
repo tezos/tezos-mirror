@@ -97,7 +97,7 @@ let error loc err =
             "@[<v 2>It looks like you tried to provide some additional options \
              through the mandatory record but no option could be parsed out of \
              it. Possible options are:@,\
-             - the level_of_detail@,\
+             - the verbosity@,\
              - the profiler_module@,\
              Found: { @[<v 2>%a@] }@."
             Format.(
@@ -109,7 +109,7 @@ let error loc err =
         ( "Improper field.",
           Format.asprintf
             "@[<v 2>Expecting a field specifying either:@,\
-             - the level_of_detail@,\
+             - the verbosity@,\
              - the profiler_module@,\
              Found: @[<v 0>%a@]@."
             pp_field

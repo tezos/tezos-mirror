@@ -1346,7 +1346,7 @@ module Make (Proto : Protocol_plugin.T) = struct
                    ~check_signature
                    state
                    oph
-                   op [@profiler.record_s {level_of_detail = Info} sec]))
+                   op [@profiler.record_s {verbosity = Info} sec]))
               state
               ops [@profiler.record_s sec]))
          state

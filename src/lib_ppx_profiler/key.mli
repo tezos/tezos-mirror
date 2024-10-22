@@ -14,7 +14,7 @@ type content =
   | Other of Ppxlib.expression
 
 type t = {
-  level_of_detail : string option;
+  verbosity : string option;
   profiler_module : string option;
   content : content;
 }
