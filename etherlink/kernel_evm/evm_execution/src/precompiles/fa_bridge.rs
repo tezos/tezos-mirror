@@ -155,7 +155,7 @@ pub fn fa_bridge_precompile<Host: Runtime>(
 
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
+    use std::{borrow::Cow, str::FromStr};
 
     use alloy_sol_types::SolCall;
     use evm::{Config, ExitError};
@@ -502,7 +502,7 @@ mod tests {
             contents.into(),
         ));
 
-        let outcome = execute_precompile(
+        let outcome: ExecutionOutcome = execute_precompile(
             &mut mock_runtime,
             &mut evm_account_storage,
             sender,
@@ -515,8 +515,12 @@ mod tests {
             false,
             false,
         );
-        assert!(!outcome.is_success());
-        // we cannot capture the actual revert reason here because it's not propagated
+        assert_eq!(
+            outcome.result,
+            ExecutionResult::FatalError(evm::ExitFatal::CallErrorAsFatal(
+                ExitError::Other(Cow::from("Circular calls are not allowed"))
+            ))
+        );
 
         let outcome = execute_precompile(
             &mut mock_runtime,
