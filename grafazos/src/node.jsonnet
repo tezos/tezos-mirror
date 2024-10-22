@@ -29,10 +29,8 @@ local timeSeries = panel.timeSeries;
 // Base
 local base = import './base.jsonnet';
 local namespace = base.namespace;
-local node_instance = base.node_instance;
 local prometheus = base.prometheus;
 local info = base.info;
-local infoName = base.infoName;
 local graph = base.graph;
 local table = base.table;
 
