@@ -251,7 +251,7 @@ let () =
        create this pipeline by pushing a tag to a fork of 'tezos/tezos', e.g. \
        to the 'nomadic-labs/tezos' project."
 
-(** {4 Scheduled pipelines} *)
+(** {3 Scheduled pipelines} *)
 
 (* All jobs in scheduled pipelines have "interruptible: false"
    to prevent them from being canceled after a push to master.
