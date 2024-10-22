@@ -17,12 +17,12 @@ repos:
     rev: v0.20.0
     hooks:
       - id: jsonnet-format
-      # jsonnet-lint hook doesn't work
-      # We use this as a workaround
       - id: jsonnet-lint
         name: jsonnet-lint
-        pass_filenames: false
-        entry: 'find grafazos/src -name "*.jsonnet" -exec jsonnet-lint -J grafazos/vendor/ {} \;'
+        # jsonnet-lint hook doesn't work
+        # We check every file in parallel as a workaround
+        require_serial: true
+        entry: jsonnet-lint -J grafazos/vendor
   - repo: https://github.com/cisagov/pre-commit-shfmt
     rev: v0.0.2
     hooks:
