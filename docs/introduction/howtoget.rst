@@ -109,16 +109,15 @@ In order to add the Tezos package repository to your machine, do:
 
 ::
 
-    export distribution=debian
-    export release=bookworm
-    export bucket="tezos-linux-protected-repo"
+  export distribution=debian
+  export release=bookworm
 
 and run:
 
 .. literalinclude:: install-bin-deb.sh
    :language: shell
-   :start-after: [install prerequisites]
-   :end-before: [ preeseed octez ]
+   :start-after: [add repository]
+   :end-before: [end add repository]
 
 We also maintain a separate repository for release candidates. To install
 the last release candidate simply prepend ``RC/`` to the distribution name
@@ -164,12 +163,11 @@ The new set of packages can be installed by adding the following apt repository:
 
   export distribution=debian
   export release=bookworm
-  export bucket="tezos-linux-protected-repo"
 
-  curl "https://$bucket.storage.googleapis.com/next/$distribution/octez.asc" | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/octez.gpg
-  echo "deb [arch=amd64] https://$bucket.storage.googleapis.com/next/$distribution $release main" | sudo tee /etc/apt/sources.list.d/octez.list
-  sudo apt-get update
-  sudo apt-get install octez-node ...
+.. literalinclude:: install-bin-deb.sh
+   :language: shell
+   :start-after: [add next repository]
+   :end-before: [end add next repository]
 
 Once the Octez binary packages are installed, they can be set up as services
 as explained in :doc:`./services`.
