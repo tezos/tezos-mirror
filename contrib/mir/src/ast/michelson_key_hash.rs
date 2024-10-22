@@ -8,7 +8,7 @@
 //! Representation for typed Michelson `key_hash` values.
 
 use tezos_crypto_rs::hash::{
-    ContractTz1Hash, ContractTz2Hash, ContractTz3Hash, ContractTz4Hash, Hash, HashTrait,
+    ContractTz1Hash, ContractTz2Hash, ContractTz3Hash, ContractTz4Hash, HashTrait,
 };
 
 use super::{ByteReprError, ByteReprTrait};
@@ -31,7 +31,7 @@ macro_rules! key_hash_type_and_impls {
         impl AsRef<[u8]> for KeyHash {
             fn as_ref(&self) -> &[u8] {
                 match self {
-                    $(KeyHash::$con($ty(h)))|* => h,
+                    $(KeyHash::$con(h) => h.as_ref(),)*
                 }
             }
         }
@@ -39,7 +39,7 @@ macro_rules! key_hash_type_and_impls {
         impl From<KeyHash> for Vec<u8> {
             fn from(value: KeyHash) -> Self {
                 match value {
-                    $(KeyHash::$con($ty(h)))|* => h,
+                    $(KeyHash::$con(h) => h.as_ref().to_vec(),)*
                 }
             }
         }
@@ -143,7 +143,7 @@ impl ByteReprTrait for KeyHash {
 
     fn to_bytes(&self, out: &mut Vec<u8>) {
         use KeyHash::*;
-        fn go(out: &mut Vec<u8>, tag: u8, hash: impl AsRef<Hash>) {
+        fn go(out: &mut Vec<u8>, tag: u8, hash: impl AsRef<[u8]>) {
             out.push(tag);
             out.extend_from_slice(hash.as_ref());
         }
