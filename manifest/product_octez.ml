@@ -4923,12 +4923,34 @@ let octez_smart_rollup_node_lib =
         octez_smart_rollup_lib |> open_;
       ]
 
+let wasm_helpers_intf_modules = ["wasm_utils_intf"]
+
+let octez_scoru_wasm_helpers_intf =
+  octez_l2_lib
+    "scoru-wasm-helpers-intf"
+    ~internal_name:"tezos_scoru_wasm_helpers_intf"
+    ~path:"src/lib_scoru_wasm/helpers"
+    ~synopsis:
+      "Helpers for the smart rollup wasm functionality and debugger \
+       (signatures)"
+    ~modules:wasm_helpers_intf_modules
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        tree_encoding;
+        octez_base_unix;
+        octez_scoru_wasm;
+        octez_webassembly_interpreter_extra |> open_;
+      ]
+    ~preprocess:(staged_pps [ppx_import; ppx_deriving_show])
+
 let octez_scoru_wasm_helpers =
   octez_l2_lib
     "scoru-wasm-helpers"
     ~internal_name:"tezos_scoru_wasm_helpers"
     ~path:"src/lib_scoru_wasm/helpers"
     ~synopsis:"Helpers for the smart rollup wasm functionality and debugger"
+    ~all_modules_except:wasm_helpers_intf_modules
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
@@ -4936,6 +4958,7 @@ let octez_scoru_wasm_helpers =
         octez_base_unix;
         octez_scoru_wasm;
         octez_scoru_wasm_fast;
+        octez_scoru_wasm_helpers_intf |> open_;
         octez_webassembly_interpreter_extra |> open_;
       ]
     ~preprocess:(staged_pps [ppx_import; ppx_deriving_show])
@@ -8393,7 +8416,7 @@ let octez_scoru_wasm_debugger_lib =
         Protocol.(client_exn alpha);
         cohttp_lwt_unix;
         octez_scoru_wasm;
-        octez_scoru_wasm_helpers |> open_;
+        octez_scoru_wasm_helpers_intf |> open_;
         octez_smart_rollup_lib;
         octez_webassembly_interpreter |> open_;
         octez_webassembly_interpreter_extra |> open_;
@@ -8416,6 +8439,7 @@ let _octez_scoru_wasm_debugger =
       [
         octez_rust_deps;
         bls12_381_archive;
+        octez_scoru_wasm_helpers |> open_;
         octez_scoru_wasm_debugger_lib |> open_;
       ]
 

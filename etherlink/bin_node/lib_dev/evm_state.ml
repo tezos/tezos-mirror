@@ -32,7 +32,9 @@ type t = Irmin_context.PVMState.value
 
 module Wasm_utils =
   Wasm_utils.Make (Tezos_tree_encoding.Encodings_util.Make (Bare_context))
-module Wasm = Wasm_debugger.Make (Wasm_utils)
+
+module Wasm =
+  Octez_smart_rollup_wasm_debugger_lib.Wasm_debugger.Make (Wasm_utils)
 
 let kernel_logs_directory ~data_dir = Filename.concat data_dir "kernel_logs"
 
