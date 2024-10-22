@@ -2,8 +2,8 @@
 # Edit file ci/bin/main.ml instead.
 
 stages:
+- start
 - images
-- sanity
 - build
 - test_coverage
 - doc
@@ -293,12 +293,11 @@ oc.docker:arm64:
     EXECUTABLE_FILES: script-inputs/released-executables script-inputs/experimental-executables
 
 datadog_pipeline_trace:
-  image: ${ci_image_name}/build:${ci_image_tag}
-  stage: sanity
+  image: datadog/ci:v2.44.0
+  stage: start
   tags:
   - gcp
-  dependencies:
-  - oc.docker:ci:amd64
+  dependencies: []
   allow_failure: true
   timeout: 60 minutes
   script:

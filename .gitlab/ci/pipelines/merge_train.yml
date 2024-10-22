@@ -115,7 +115,7 @@ oc.docker:ci:arm64:
     - runner_system_failure
 
 trigger:
-  image: alpine:3.20
+  image: datadog/ci:v2.44.0
   stage: start
   tags:
   - gcp
@@ -129,17 +129,6 @@ trigger:
   timeout: 10 minutes
   script:
   - echo 'Trigger pipeline!'
-
-datadog_pipeline_trace:
-  image: ${ci_image_name}/build:${ci_image_tag}
-  stage: sanity
-  tags:
-  - gcp
-  dependencies:
-  - oc.docker:ci:amd64
-  allow_failure: true
-  timeout: 60 minutes
-  script:
   - CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}
   - DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags pipeline_type:$PIPELINE_TYPE
     --tags mr_number:$CI_MERGE_REQUEST_IID
@@ -524,8 +513,6 @@ oc.build:static-x86_64-linux-binaries:
   needs:
   - job: oc.docker:ci:amd64
   - job: trigger
-  - job: datadog_pipeline_trace
-    optional: true
   - job: sanity_ci
     optional: true
   - job: docker:hadolint
@@ -611,8 +598,6 @@ oc.build_x86_64-released:
   needs:
   - job: oc.docker:ci:amd64
   - job: trigger
-  - job: datadog_pipeline_trace
-    optional: true
   - job: sanity_ci
     optional: true
   - job: docker:hadolint
@@ -709,8 +694,6 @@ oc.build_x86_64-exp-dev-extra:
   needs:
   - job: oc.docker:ci:amd64
   - job: trigger
-  - job: datadog_pipeline_trace
-    optional: true
   - job: sanity_ci
     optional: true
   - job: docker:hadolint
@@ -797,8 +780,6 @@ wasm-runtime-check:
   needs:
   - job: oc.docker:ci:amd64
   - job: trigger
-  - job: datadog_pipeline_trace
-    optional: true
   - job: sanity_ci
     optional: true
   - job: docker:hadolint
@@ -863,8 +844,6 @@ ocaml-check:
   needs:
   - job: oc.docker:ci:amd64
   - job: trigger
-  - job: datadog_pipeline_trace
-    optional: true
   - job: sanity_ci
     optional: true
   - job: docker:hadolint
@@ -1259,8 +1238,6 @@ opam:prepare:
   needs:
   - job: oc.docker:ci:amd64
   - job: trigger
-  - job: datadog_pipeline_trace
-    optional: true
   - job: sanity_ci
     optional: true
   - job: docker:hadolint
@@ -2104,8 +2081,6 @@ trigger:debian_repository_partial_auto:
     when: on_success
   needs:
   - job: trigger
-  - job: datadog_pipeline_trace
-    optional: true
   - job: sanity_ci
     optional: true
   - job: docker:hadolint
@@ -2146,8 +2121,6 @@ kaitai_checks:
   needs:
   - job: oc.docker:ci:amd64
   - job: trigger
-  - job: datadog_pipeline_trace
-    optional: true
   - job: sanity_ci
     optional: true
   - job: docker:hadolint
@@ -2243,8 +2216,6 @@ oc.check_lift_limits_patch:
   needs:
   - job: oc.docker:ci:amd64
   - job: trigger
-  - job: datadog_pipeline_trace
-    optional: true
   - job: sanity_ci
     optional: true
   - job: docker:hadolint
@@ -2309,8 +2280,6 @@ oc.python_check:
   needs:
   - job: oc.docker:ci:amd64
   - job: trigger
-  - job: datadog_pipeline_trace
-    optional: true
   - job: sanity_ci
     optional: true
   - job: docker:hadolint
@@ -2437,8 +2406,6 @@ oc.script:test-gen-genesis:
   needs:
   - job: oc.docker:ci:amd64
   - job: trigger
-  - job: datadog_pipeline_trace
-    optional: true
   - job: sanity_ci
     optional: true
   - job: docker:hadolint
@@ -2585,8 +2552,6 @@ oc.script:b58_prefix:
   needs:
   - job: oc.docker:ci:amd64
   - job: trigger
-  - job: datadog_pipeline_trace
-    optional: true
   - job: sanity_ci
     optional: true
   - job: docker:hadolint
@@ -2654,8 +2619,6 @@ oc:scripts:release_script_values:
   needs:
   - job: oc.docker:ci:amd64
   - job: trigger
-  - job: datadog_pipeline_trace
-    optional: true
   - job: sanity_ci
     optional: true
   - job: docker:hadolint
@@ -2697,8 +2660,6 @@ mir_unit:
   needs:
   - job: oc.docker:ci:amd64
   - job: trigger
-  - job: datadog_pipeline_trace
-    optional: true
   - job: sanity_ci
     optional: true
   - job: docker:hadolint
@@ -3561,8 +3522,6 @@ oc.install_opam_jammy:
     allow_failure: true
   needs:
   - job: trigger
-  - job: datadog_pipeline_trace
-    optional: true
   - job: sanity_ci
     optional: true
   - job: docker:hadolint
@@ -3604,8 +3563,6 @@ oc.compile_sources_doc_bookworm:
     allow_failure: true
   needs:
   - job: trigger
-  - job: datadog_pipeline_trace
-    optional: true
   - job: sanity_ci
     optional: true
   - job: docker:hadolint
@@ -4314,8 +4271,6 @@ oc.install_python_bookworm:
     allow_failure: true
   needs:
   - job: trigger
-  - job: datadog_pipeline_trace
-    optional: true
   - job: sanity_ci
     optional: true
   - job: docker:hadolint
@@ -4371,8 +4326,6 @@ documentation:odoc:
   needs:
   - job: oc.docker:ci:amd64
   - job: trigger
-  - job: datadog_pipeline_trace
-    optional: true
   - job: sanity_ci
     optional: true
   - job: docker:hadolint
@@ -4452,8 +4405,6 @@ documentation:manuals:
   needs:
   - job: oc.docker:ci:amd64
   - job: trigger
-  - job: datadog_pipeline_trace
-    optional: true
   - job: sanity_ci
     optional: true
   - job: docker:hadolint
@@ -4534,8 +4485,6 @@ documentation:docgen:
   needs:
   - job: oc.docker:ci:amd64
   - job: trigger
-  - job: datadog_pipeline_trace
-    optional: true
   - job: sanity_ci
     optional: true
   - job: docker:hadolint

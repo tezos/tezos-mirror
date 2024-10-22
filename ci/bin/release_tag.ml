@@ -172,7 +172,7 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
       ()
   in
   [
-    (* Stage: sanity *)
+    (* Stage: start *)
     job_datadog_pipeline_trace;
     (* Stage: build *)
     job_static_x86_64_release;
@@ -258,7 +258,7 @@ let octez_evm_node_jobs ?(test = false) () =
       ["./scripts/ci/create_gitlab_octez_evm_node_release.sh"]
   in
   [
-    (* Stage: sanity *)
+    (* Stage: start *)
     job_datadog_pipeline_trace;
     (* Stage: build *)
     job_static_arm64_release;
