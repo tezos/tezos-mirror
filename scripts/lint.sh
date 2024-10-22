@@ -16,6 +16,7 @@ Where <action> can be:
 * --check-rust-toolchain: check the contents of rust-toolchain files
 * --check-licenses-git-new: check license headers of added OCaml .ml(i) files.
 * --check-jsonnet-format: checks that the jsonnet files are formatted.
+* --check-jsonnet-lint: checks that the jsonnet files are compliant with linting rules..
 * --help: display this and return 0.
 EOF
 }
@@ -247,7 +248,7 @@ check_licenses_git_new() {
 check_jsonnet_format() {
 
   function jsonnetfmt_script() {
-    jsonnetfmt --test grafazos/src/*.jsonnet
+    jsonnetfmt --test grafazos/src/**/*.jsonnet
   }
 
   if jsonnetfmt_script; then
@@ -258,6 +259,56 @@ check_jsonnet_format() {
     exit 1
   fi
 
+}
+
+# Check the linting for Jsonnet files
+# We check file by file to prevent a known jsonnet-lint bug
+# when checking several files at once.
+check_jsonnet_lint() {
+
+  all_files_ok=true
+
+  lint_file() {
+
+    set +e
+
+    local file=$1
+
+    RET=0
+    function jsonnetlint_script() {
+      jsonnet-lint -J grafazos/vendor/ "$file"
+      RET="$?"
+    }
+
+    jsonnetlint_script &> /dev/null
+    lint_output=$(jsonnetlint_script 2>&1)
+
+    if [ "$RET" == "0" ]; then
+      echo "$file is correctly linted ✅"
+    else
+      echo "Error in $file ❌"
+      echo "Error details:"
+      echo "$lint_output"
+      all_files_ok=false
+    fi
+  }
+
+  files=(grafazos/**/*.jsonnet)
+
+  for file in "${files[@]}"; do
+    echo "checking $file..."
+    lint_file "$file"
+  done
+
+  set -e
+
+  if "$all_files_ok"; then
+    echo "All files are correctly linted! ✅"
+    exit 0
+  else
+    echo "Some jsonnet files have linting errors. ❌"
+    exit 1
+  fi
 }
 
 if [ $# -eq 0 ] || [[ "$1" != --* ]]; then
@@ -298,6 +349,9 @@ case "$action" in
   ;;
 "--check-jsonnet-format")
   action=check_jsonnet_format
+  ;;
+"--check-jsonnet-lint")
+  action=check_jsonnet_lint
   ;;
 "help" | "-help" | "--help" | "-h")
   usage

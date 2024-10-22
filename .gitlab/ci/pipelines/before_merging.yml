@@ -279,7 +279,7 @@ oc.misc_checks:
   - ./src/bin_dal_node/scripts/check_dal_store_migrations.sh check
   - ./scripts/ci/lint_check_licenses.sh
 
-check_jsonnet_fmt:
+check_jsonnet:
   image: ${jsonnet_image_name}:${jsonnet_image_tag}
   stage: sanity
   tags:
@@ -294,8 +294,13 @@ check_jsonnet_fmt:
   dependencies:
   - oc.docker:jsonnet:amd64
   timeout: 60 minutes
+  before_script:
+  - cd grafazos/
+  - jb install github.com/grafana/grafonnet/gen/grafonnet-v11.1.0@1ce5aec
+  - cd ../
   script:
   - scripts/lint.sh --check-jsonnet-format
+  - scripts/lint.sh --check-jsonnet-lint
 
 check_rust_fmt:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
@@ -529,7 +534,7 @@ oc.build:static-x86_64-linux-binaries:
     optional: true
   - job: oc.misc_checks
     optional: true
-  - job: check_jsonnet_fmt
+  - job: check_jsonnet
     optional: true
   - job: check_rust_fmt
     optional: true
@@ -616,7 +621,7 @@ oc.build_x86_64-released:
     optional: true
   - job: oc.misc_checks
     optional: true
-  - job: check_jsonnet_fmt
+  - job: check_jsonnet
     optional: true
   - job: check_rust_fmt
     optional: true
@@ -713,7 +718,7 @@ oc.build_x86_64-exp-dev-extra:
     optional: true
   - job: oc.misc_checks
     optional: true
-  - job: check_jsonnet_fmt
+  - job: check_jsonnet
     optional: true
   - job: check_rust_fmt
     optional: true
@@ -800,7 +805,7 @@ wasm-runtime-check:
     optional: true
   - job: oc.misc_checks
     optional: true
-  - job: check_jsonnet_fmt
+  - job: check_jsonnet
     optional: true
   - job: check_rust_fmt
     optional: true
@@ -866,7 +871,7 @@ ocaml-check:
     optional: true
   - job: oc.misc_checks
     optional: true
-  - job: check_jsonnet_fmt
+  - job: check_jsonnet
     optional: true
   - job: check_rust_fmt
     optional: true
@@ -1236,7 +1241,7 @@ opam:prepare:
     optional: true
   - job: oc.misc_checks
     optional: true
-  - job: check_jsonnet_fmt
+  - job: check_jsonnet
     optional: true
   - job: check_rust_fmt
     optional: true
@@ -2081,7 +2086,7 @@ trigger:debian_repository_partial_auto:
     optional: true
   - job: oc.misc_checks
     optional: true
-  - job: check_jsonnet_fmt
+  - job: check_jsonnet
     optional: true
   - job: check_rust_fmt
     optional: true
@@ -2123,7 +2128,7 @@ kaitai_checks:
     optional: true
   - job: oc.misc_checks
     optional: true
-  - job: check_jsonnet_fmt
+  - job: check_jsonnet
     optional: true
   - job: check_rust_fmt
     optional: true
@@ -2220,7 +2225,7 @@ oc.check_lift_limits_patch:
     optional: true
   - job: oc.misc_checks
     optional: true
-  - job: check_jsonnet_fmt
+  - job: check_jsonnet
     optional: true
   - job: check_rust_fmt
     optional: true
@@ -2286,7 +2291,7 @@ oc.python_check:
     optional: true
   - job: oc.misc_checks
     optional: true
-  - job: check_jsonnet_fmt
+  - job: check_jsonnet
     optional: true
   - job: check_rust_fmt
     optional: true
@@ -2414,7 +2419,7 @@ oc.script:test-gen-genesis:
     optional: true
   - job: oc.misc_checks
     optional: true
-  - job: check_jsonnet_fmt
+  - job: check_jsonnet
     optional: true
   - job: check_rust_fmt
     optional: true
@@ -2562,7 +2567,7 @@ oc.script:b58_prefix:
     optional: true
   - job: oc.misc_checks
     optional: true
-  - job: check_jsonnet_fmt
+  - job: check_jsonnet
     optional: true
   - job: check_rust_fmt
     optional: true
@@ -2631,7 +2636,7 @@ oc:scripts:release_script_values:
     optional: true
   - job: oc.misc_checks
     optional: true
-  - job: check_jsonnet_fmt
+  - job: check_jsonnet
     optional: true
   - job: check_rust_fmt
     optional: true
@@ -3447,7 +3452,7 @@ oc.install_opam_jammy:
     optional: true
   - job: oc.misc_checks
     optional: true
-  - job: check_jsonnet_fmt
+  - job: check_jsonnet
     optional: true
   - job: check_rust_fmt
     optional: true
@@ -3490,7 +3495,7 @@ oc.compile_sources_doc_bookworm:
     optional: true
   - job: oc.misc_checks
     optional: true
-  - job: check_jsonnet_fmt
+  - job: check_jsonnet
     optional: true
   - job: check_rust_fmt
     optional: true
@@ -4200,7 +4205,7 @@ oc.install_python_bookworm:
     optional: true
   - job: oc.misc_checks
     optional: true
-  - job: check_jsonnet_fmt
+  - job: check_jsonnet
     optional: true
   - job: check_rust_fmt
     optional: true
@@ -4257,7 +4262,7 @@ documentation:odoc:
     optional: true
   - job: oc.misc_checks
     optional: true
-  - job: check_jsonnet_fmt
+  - job: check_jsonnet
     optional: true
   - job: check_rust_fmt
     optional: true
@@ -4338,7 +4343,7 @@ documentation:manuals:
     optional: true
   - job: oc.misc_checks
     optional: true
-  - job: check_jsonnet_fmt
+  - job: check_jsonnet
     optional: true
   - job: check_rust_fmt
     optional: true
@@ -4420,7 +4425,7 @@ documentation:docgen:
     optional: true
   - job: oc.misc_checks
     optional: true
-  - job: check_jsonnet_fmt
+  - job: check_jsonnet
     optional: true
   - job: check_rust_fmt
     optional: true

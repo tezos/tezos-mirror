@@ -478,16 +478,28 @@ let jobs pipeline_type =
             ["./scripts/ci/lint_check_licenses.sh"]
         | Schedule_extended_test -> [])
     in
-    let job_jsonnet_fmt =
+    let job_check_jsonnet =
       job
         ~__POS__
-        ~name:"check_jsonnet_fmt"
+        ~name:"check_jsonnet"
         ~image:Images.jsonnet
         ~stage
         ~dependencies
         ~rules:
           (make_rules ~dependent:true ~changes:changeset_jsonnet_fmt_files ())
-        ["scripts/lint.sh --check-jsonnet-format"]
+        ~before_script:
+          [
+            "cd grafazos/";
+            (* For security, we explicitly install v11.1.0
+               which corresponds to commit [1ce5aec]. *)
+            "jb install \
+             github.com/grafana/grafonnet/gen/grafonnet-v11.1.0@1ce5aec";
+            "cd ../";
+          ]
+        [
+          "scripts/lint.sh --check-jsonnet-format";
+          "scripts/lint.sh --check-jsonnet-lint";
+        ]
     in
     let job_check_rust_fmt : tezos_job =
       job
@@ -542,7 +554,7 @@ let jobs pipeline_type =
       job_oc_ocaml_fmt;
       job_semgrep;
       job_oc_misc_checks;
-      job_jsonnet_fmt;
+      job_check_jsonnet;
       job_check_rust_fmt;
       job_check_rst;
     ]
@@ -757,13 +769,13 @@ let jobs pipeline_type =
        files in the changeset is modified. It's the same as
        job_debian_repository_trigger that can be run manually.
         We want both:
-        - to trigger the debian repository test automatically when relevant
+       - to trigger the debian repository test automatically when relevant
           files change, if the whole pipeline was triggered;
-        - and to be able to trigger the debian repository test manually,
+       - and to be able to trigger the debian repository test manually,
           whether relevant files changed or not, without having to trigger the
           whole pipeline.
-        To achieve that we need to duplicate the job, because
-        it needs two different sets of dependencies. *)
+         To achieve that we need to duplicate the job, because
+         it needs two different sets of dependencies. *)
     let job_debian_repository_trigger_auto =
       trigger_job
         ~__POS__
@@ -1233,10 +1245,10 @@ let jobs pipeline_type =
               ~project:"tezos/tezos"
               ~branch:"latest-release";
           ]
-          (* Test compiling the [master] branch on Bookworm, to make sure
-             that the compilation instructions in this branch are still
-             valid.
-          *)
+      (* Test compiling the [master] branch on Bookworm, to make sure
+         that the compilation instructions in this branch are still
+         valid.
+      *)
       | _ ->
           [
             job_compile_sources
@@ -1251,11 +1263,11 @@ let jobs pipeline_type =
 
        The Tezt jobs are split into a set of special-purpose jobs running the
        tests of the corresponding tag:
-        - [tezt-memory-3k]: runs the jobs with tag [memory_3k],
-        - [tezt-memory-4k]: runs the jobs with tag [memory_4k],
-        - [tezt-time_sensitive]: runs the jobs with tag [time-sensitive],
-        - [tezt-slow]: runs the jobs with tag [slow].
-        - [tezt-flaky]: runs the jobs with tag [flaky] and
+       - [tezt-memory-3k]: runs the jobs with tag [memory_3k],
+       - [tezt-memory-4k]: runs the jobs with tag [memory_4k],
+       - [tezt-time_sensitive]: runs the jobs with tag [time-sensitive],
+       - [tezt-slow]: runs the jobs with tag [slow].
+       - [tezt-flaky]: runs the jobs with tag [flaky] and
           none of the tags above.
 
        and a job [tezt] that runs all remaining tests (excepting those
