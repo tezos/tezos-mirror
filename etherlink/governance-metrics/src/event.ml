@@ -26,6 +26,14 @@ module Simple = struct
       ~msg:"Starting Prometheus' metrics server"
       ()
 
+  let monitor_head_restart =
+    declare_0
+      ~section
+      ~level:Notice
+      ~name:"monitor_head_restart"
+      ~msg:"Head monitoring process exited, trying to restart it"
+      ()
+
   let contract_metrics =
     declare_1
       ~section
@@ -43,12 +51,26 @@ module Simple = struct
       ~pp1:Format.pp_print_string
       ~msg:"Error while processing storage state: {error_msg}"
       ("error_msg", Data_encoding.string)
+
+  let contract_operations_error =
+    declare_1
+      ~section
+      ~level:Error
+      ~name:"contract_operations_error"
+      ~pp1:Format.pp_print_string
+      ~msg:"Error while processing contract operations: {error_msg}"
+      ("error_msg", Data_encoding.string)
 end
 
 let starting_observer = Simple.(emit starting_observer)
 
 let starting_metrics_server = Simple.(emit starting_metrics_server)
 
+let monitor_head_restart = Simple.(emit monitor_head_restart)
+
 let contract_metrics metrics = Simple.(emit contract_metrics metrics)
 
 let storage_state_error error_msg = Simple.(emit storage_state_error error_msg)
+
+let contract_operations_error error_msg =
+  Simple.(emit contract_operations_error error_msg)

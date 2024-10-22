@@ -1,0 +1,2467 @@
+{
+    "__inputs": [
+        {
+            "name": "DB_SOURCE",
+            "label": "Data Unique identifier",
+            "type": "datasource",
+            "default": "Prometheus"
+        }
+    ],
+    "annotations": {
+        "list": [
+            {
+                "builtIn": 1,
+                "datasource": {
+                    "type": "grafana",
+                    "uid": "-- Grafana --"
+                },
+                "enable": true,
+                "hide": true,
+                "iconColor": "rgba(0, 211, 255, 1)",
+                "name": "Annotations & Alerts",
+                "type": "dashboard"
+            }
+        ]
+    },
+    "editable": true,
+    "fiscalYearStartMonth": 0,
+    "graphTooltip": 0,
+    "id": 1,
+    "links": [],
+    "panels": [
+        {
+            "datasource": {
+                "default": true,
+                "type": "prometheus",
+                "uid": "${DB_SOURCE}"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "red",
+                                "value": ""
+                            }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 4,
+                "w": 5,
+                "x": 10,
+                "y": 0
+            },
+            "id": 15,
+            "options": {
+                "colorMode": "none",
+                "graphMode": "none",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "percentChangeColorMode": "standard",
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "showPercentChange": false,
+                "textMode": "auto",
+                "wideLayout": true
+            },
+            "pluginVersion": "11.2.2",
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${DB_SOURCE}"
+                    },
+                    "disableTextWrap": false,
+                    "editorMode": "code",
+                    "expr": "etherlink_governance_current_l1_level",
+                    "fullMetaSearch": false,
+                    "includeNullMetadata": true,
+                    "instant": false,
+                    "legendFormat": "__auto",
+                    "range": true,
+                    "refId": "A",
+                    "useBackend": false
+                }
+            ],
+            "title": "Current L1 Level",
+            "type": "stat"
+        },
+        {
+            "collapsed": false,
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 4
+            },
+            "id": 16,
+            "panels": [],
+            "title": "Kernel Governance",
+            "type": "row"
+        },
+        {
+            "datasource": {
+                "default": true,
+                "type": "prometheus",
+                "uid": "${DB_SOURCE}"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 4,
+                "w": 18,
+                "x": 0,
+                "y": 5
+            },
+            "id": 25,
+            "options": {
+                "colorMode": "value",
+                "graphMode": "none",
+                "justifyMode": "center",
+                "orientation": "auto",
+                "percentChangeColorMode": "standard",
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "/.*/",
+                    "values": false
+                },
+                "showPercentChange": false,
+                "textMode": "auto",
+                "wideLayout": true
+            },
+            "pluginVersion": "11.2.2",
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${DB_SOURCE}"
+                    },
+                    "editorMode": "code",
+                    "expr": "etherlink_governance_kernel_configuration",
+                    "format": "table",
+                    "instant": false,
+                    "legendFormat": "__auto",
+                    "range": true,
+                    "refId": "A"
+                }
+            ],
+            "title": "Configuration",
+            "transformations": [
+                {
+                    "id": "organize",
+                    "options": {
+                        "excludeByName": {
+                            "Time": true,
+                            "Value 2": true,
+                            "__name__": true,
+                            "instance": true,
+                            "job": true,
+                            "Value": true
+                        },
+                        "includeByName": {},
+                        "indexByName": {},
+                        "renameByName": {
+                            "adoption_period": "Adoption Period",
+                            "period_length": "Period Length",
+                            "promotion_quorum": "Promotion Quorum",
+                            "promotion_supermajority": "Promotion Supermajority",
+                            "proposal_quorum": "Proposal Quorum",
+                            "scale": "Scale",
+                            "start_level": "Start Level",
+                            "upvoting_limit": "Upvoting Limit"
+                        }
+                    }
+                }
+            ],
+            "type": "stat"
+        },
+        {
+            "datasource": {
+                "default": true,
+                "type": "prometheus",
+                "uid": "${DB_SOURCE}"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 2,
+                "w": 3,
+                "x": 18,
+                "y": 5
+            },
+            "id": 27,
+            "options": {
+                "colorMode": "none",
+                "graphMode": "none",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "percentChangeColorMode": "standard",
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "showPercentChange": false,
+                "text": {
+                    "titleSize": 25,
+                    "valueSize": 25
+                },
+                "textMode": "auto",
+                "wideLayout": true
+            },
+            "pluginVersion": "11.2.2",
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${DB_SOURCE}"
+                    },
+                    "editorMode": "code",
+                    "expr": "etherlink_governance_kernel_remaining_blocks",
+                    "instant": false,
+                    "legendFormat": "__auto",
+                    "range": true,
+                    "refId": "A"
+                }
+            ],
+            "title": "Remaining Blocks",
+            "type": "stat"
+        },
+        {
+            "datasource": {
+                "default": true,
+                "type": "prometheus",
+                "uid": "${DB_SOURCE}"
+            },
+            "description": "",
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "mappings": [
+                        {
+                            "options": {
+                                "0": {
+                                    "index": 0,
+                                    "text": "Proposal"
+                                },
+                                "1": {
+                                    "index": 1,
+                                    "text": "Promotion"
+                                }
+                            },
+                            "type": "value"
+                        }
+                    ],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 4,
+                "w": 3,
+                "x": 21,
+                "y": 5
+            },
+            "id": 28,
+            "options": {
+                "colorMode": "none",
+                "graphMode": "none",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "percentChangeColorMode": "standard",
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "showPercentChange": false,
+                "textMode": "value",
+                "wideLayout": true
+            },
+            "pluginVersion": "11.2.2",
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${DB_SOURCE}"
+                    },
+                    "editorMode": "code",
+                    "expr": "etherlink_governance_kernel_current_period_type",
+                    "instant": false,
+                    "legendFormat": "{{type}}",
+                    "range": true,
+                    "refId": "A"
+                }
+            ],
+            "title": "Periode Type",
+            "type": "stat"
+        },
+        {
+            "datasource": {
+                "default": true,
+                "type": "prometheus",
+                "uid": "${DB_SOURCE}"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 2,
+                "w": 3,
+                "x": 18,
+                "y": 7
+            },
+            "id": 26,
+            "options": {
+                "colorMode": "none",
+                "graphMode": "none",
+                "justifyMode": "auto",
+                "orientation": "horizontal",
+                "percentChangeColorMode": "standard",
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "showPercentChange": false,
+                "text": {
+                    "titleSize": 25,
+                    "valueSize": 25
+                },
+                "textMode": "value",
+                "wideLayout": true
+            },
+            "pluginVersion": "11.2.2",
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${DB_SOURCE}"
+                    },
+                    "disableTextWrap": false,
+                    "editorMode": "code",
+                    "expr": "etherlink_governance_kernel_current_period_index",
+                    "fullMetaSearch": false,
+                    "includeNullMetadata": true,
+                    "instant": false,
+                    "legendFormat": "__auto",
+                    "range": true,
+                    "refId": "A",
+                    "useBackend": false
+                }
+            ],
+            "title": "Period index",
+            "type": "stat"
+        },
+        {
+            "datasource": {
+                "default": true,
+                "type": "prometheus",
+                "uid": "${DB_SOURCE}"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "custom": {
+                        "align": "auto",
+                        "cellOptions": {
+                            "type": "auto"
+                        },
+                        "filterable": true,
+                        "inspect": false
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 9
+            },
+            "id": 19,
+            "options": {
+                "cellHeight": "sm",
+                "footer": {
+                    "countRows": false,
+                    "fields": "",
+                    "reducer": [
+                        "sum"
+                    ],
+                    "show": false
+                },
+                "showHeader": true
+            },
+            "pluginVersion": "11.2.2",
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${DB_SOURCE}"
+                    },
+                    "editorMode": "code",
+                    "expr": "(etherlink_governance_kernel_trigger_upgrade and changes(etherlink_governance_kernel_trigger_upgrade[$__interval]) > 0) or (etherlink_governance_kernel_trigger_upgrade and ignoring(source,address,job,instance) absent(etherlink_governance_kernel_trigger_upgrade offset $__interval))",
+                    "format": "table",
+                    "instant": false,
+                    "legendFormat": "__auto",
+                    "range": true,
+                    "refId": "A"
+                }
+            ],
+            "title": "Upgrades",
+            "transformations": [
+                {
+                    "id": "organize",
+                    "options": {
+                        "excludeByName": {
+                            "Value": true,
+                            "__name__": true,
+                            "instance": true,
+                            "job": true
+                        },
+                        "includeByName": {},
+                        "indexByName": {
+                            "Time": 0,
+                            "Value #A": 6,
+                            "Value #B": 7,
+                            "__name__": 1,
+                            "address": 5,
+                            "instance": 2,
+                            "job": 3,
+                            "source": 4
+                        },
+                        "renameByName": {
+                            "address": "Rollup address",
+                            "source": "Source"
+                        }
+                    }
+                }
+            ],
+            "type": "table"
+        },
+        {
+            "datasource": {
+                "default": true,
+                "type": "prometheus",
+                "uid": "${DB_SOURCE}"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "custom": {
+                        "align": "auto",
+                        "cellOptions": {
+                            "type": "auto"
+                        },
+                        "filterable": true,
+                        "inspect": false
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 9
+            },
+            "id": 21,
+            "options": {
+                "cellHeight": "sm",
+                "footer": {
+                    "countRows": false,
+                    "fields": "",
+                    "reducer": [
+                        "sum"
+                    ],
+                    "show": false
+                },
+                "showHeader": true
+            },
+            "pluginVersion": "11.2.2",
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${DB_SOURCE}"
+                    },
+                    "editorMode": "code",
+                    "expr": "etherlink_governance_kernel_vote",
+                    "format": "table",
+                    "instant": false,
+                    "legendFormat": "__auto",
+                    "range": true,
+                    "refId": "A"
+                },
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${DB_SOURCE}"
+                    },
+                    "editorMode": "code",
+                    "expr": "absent(etherlink_governance_kernel_vote offset $__interval)",
+                    "format": "table",
+                    "hide": false,
+                    "instant": false,
+                    "legendFormat": "__auto",
+                    "range": true,
+                    "refId": "B"
+                }
+            ],
+            "title": "Voting status",
+            "transformations": [
+                {
+                    "id": "joinByField",
+                    "options": {
+                        "byField": "Time",
+                        "mode": "inner"
+                    }
+                },
+                {
+                    "id": "organize",
+                    "options": {
+                        "excludeByName": {
+                            "Value #A": true,
+                            "Value #B": true,
+                            "__name__": true,
+                            "instance": true,
+                            "job": true
+                        },
+                        "includeByName": {},
+                        "indexByName": {},
+                        "renameByName": {
+                            "source": "Source",
+                            "value": "Vote"
+                        }
+                    }
+                }
+            ],
+            "type": "table"
+        },
+        {
+            "datasource": {
+                "default": true,
+                "type": "prometheus",
+                "uid": "${DB_SOURCE}"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "displayName": "${__series.name}",
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 17
+            },
+            "id": 24,
+            "options": {
+                "displayMode": "gradient",
+                "maxVizHeight": 300,
+                "minVizHeight": 16,
+                "minVizWidth": 0,
+                "namePlacement": "auto",
+                "orientation": "vertical",
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "showUnfilled": true,
+                "sizing": "auto",
+                "text": {},
+                "valueMode": "color"
+            },
+            "pluginVersion": "11.2.2",
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${DB_SOURCE}"
+                    },
+                    "editorMode": "code",
+                    "expr": "etherlink_governance_kernel_proposal",
+                    "format": "time_series",
+                    "instant": false,
+                    "legendFormat": "{{proposal}}",
+                    "range": true,
+                    "refId": "A"
+                }
+            ],
+            "title": "Proposal Voting",
+            "type": "bargauge"
+        },
+        {
+            "datasource": {
+                "default": true,
+                "type": "prometheus",
+                "uid": "${DB_SOURCE}"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            }
+                        ]
+                    }
+                },
+                "overrides": [
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "« yea »"
+                        },
+                        "properties": [
+                            {
+                                "id": "color",
+                                "value": {
+                                    "fixedColor": "semi-dark-green",
+                                    "mode": "fixed"
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "« nay »"
+                        },
+                        "properties": [
+                            {
+                                "id": "color",
+                                "value": {
+                                    "fixedColor": "dark-red",
+                                    "mode": "fixed"
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "« pass »"
+                        },
+                        "properties": [
+                            {
+                                "id": "color",
+                                "value": {
+                                    "fixedColor": "#777782",
+                                    "mode": "fixed"
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Total"
+                        },
+                        "properties": [
+                            {
+                                "id": "color",
+                                "value": {
+                                    "fixedColor": "dark-blue",
+                                    "mode": "fixed"
+                                }
+                            }
+                        ]
+                    }
+                ]
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 17
+            },
+            "id": 20,
+            "options": {
+                "displayMode": "gradient",
+                "maxVizHeight": 300,
+                "minVizHeight": 16,
+                "minVizWidth": 8,
+                "namePlacement": "auto",
+                "orientation": "horizontal",
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "showUnfilled": true,
+                "sizing": "auto",
+                "valueMode": "color"
+            },
+            "pluginVersion": "11.2.2",
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${DB_SOURCE}"
+                    },
+                    "editorMode": "code",
+                    "expr": "sum(etherlink_governance_kernel_vote{value=\"yea\"}) or vector(0)",
+                    "instant": false,
+                    "legendFormat": "« yea »",
+                    "range": true,
+                    "refId": "A"
+                },
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${DB_SOURCE}"
+                    },
+                    "editorMode": "code",
+                    "expr": "sum(etherlink_governance_kernel_vote{value=\"nay\"})  or vector(0)",
+                    "hide": false,
+                    "instant": false,
+                    "legendFormat": "« nay »",
+                    "range": true,
+                    "refId": "B"
+                },
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${DB_SOURCE}"
+                    },
+                    "editorMode": "code",
+                    "expr": "sum(etherlink_governance_kernel_vote{value=\"pass\"}) or vector(0)",
+                    "hide": false,
+                    "instant": false,
+                    "legendFormat": "« pass »",
+                    "range": true,
+                    "refId": "C"
+                },
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${DB_SOURCE}"
+                    },
+                    "editorMode": "code",
+                    "expr": "sum(etherlink_governance_kernel_vote) or vector(0)",
+                    "hide": false,
+                    "instant": false,
+                    "legendFormat": "Total",
+                    "range": true,
+                    "refId": "D"
+                }
+            ],
+            "title": "Promotion Voting",
+            "type": "bargauge"
+        },
+        {
+            "collapsed": false,
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 25
+            },
+            "id": 5,
+            "panels": [],
+            "title": "Sequencer Governance",
+            "type": "row"
+        },
+        {
+            "datasource": {
+                "default": true,
+                "type": "prometheus",
+                "uid": "${DB_SOURCE}"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 4,
+                "w": 18,
+                "x": 0,
+                "y": 26
+            },
+            "id": 29,
+            "options": {
+                "colorMode": "value",
+                "graphMode": "none",
+                "justifyMode": "center",
+                "orientation": "auto",
+                "percentChangeColorMode": "standard",
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "/.*/",
+                    "values": false
+                },
+                "showPercentChange": false,
+                "textMode": "auto",
+                "wideLayout": true
+            },
+            "pluginVersion": "11.2.2",
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${DB_SOURCE}"
+                    },
+                    "editorMode": "code",
+                    "expr": "etherlink_governance_sequencer_configuration",
+                    "format": "table",
+                    "instant": false,
+                    "legendFormat": "__auto",
+                    "range": true,
+                    "refId": "A"
+                }
+            ],
+            "title": "Configuration",
+            "transformations": [
+                {
+                    "id": "organize",
+                    "options": {
+                        "excludeByName": {
+                            "Time": true,
+                            "Value 2": true,
+                            "__name__": true,
+                            "instance": true,
+                            "job": true,
+                            "Value": true
+                        },
+                        "includeByName": {},
+                        "indexByName": {},
+                        "renameByName": {
+                            "adoption_period": "Adoption Period",
+                            "period_length": "Period Length",
+                            "promotion_quorum": "Promotion Quorum",
+                            "promotion_supermajority": "Promotion Supermajority",
+                            "proposal_quorum": "Proposal Quorum",
+                            "scale": "Scale",
+                            "start_level": "Start Level",
+                            "upvoting_limit": "Upvoting Limit"
+                        }
+                    }
+                }
+            ],
+            "type": "stat"
+        },
+        {
+            "datasource": {
+                "default": true,
+                "type": "prometheus",
+                "uid": "${DB_SOURCE}"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 2,
+                "w": 3,
+                "x": 18,
+                "y": 26
+            },
+            "id": 31,
+            "options": {
+                "colorMode": "none",
+                "graphMode": "none",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "percentChangeColorMode": "standard",
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "showPercentChange": false,
+                "text": {
+                    "titleSize": 25,
+                    "valueSize": 25
+                },
+                "textMode": "auto",
+                "wideLayout": true
+            },
+            "pluginVersion": "11.2.2",
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${DB_SOURCE}"
+                    },
+                    "editorMode": "code",
+                    "expr": "etherlink_governance_sequencer_remaining_blocks",
+                    "instant": false,
+                    "legendFormat": "__auto",
+                    "range": true,
+                    "refId": "A"
+                }
+            ],
+            "title": "Remaining Blocks",
+            "type": "stat"
+        },
+        {
+            "datasource": {
+                "default": true,
+                "type": "prometheus",
+                "uid": "${DB_SOURCE}"
+            },
+            "description": "",
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "mappings": [
+                        {
+                            "options": {
+                                "0": {
+                                    "index": 0,
+                                    "text": "Proposal"
+                                },
+                                "1": {
+                                    "index": 1,
+                                    "text": "Promotion"
+                                }
+                            },
+                            "type": "value"
+                        }
+                    ],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 4,
+                "w": 3,
+                "x": 21,
+                "y": 26
+            },
+            "id": 33,
+            "options": {
+                "colorMode": "none",
+                "graphMode": "none",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "percentChangeColorMode": "standard",
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "showPercentChange": false,
+                "textMode": "value",
+                "wideLayout": true
+            },
+            "pluginVersion": "11.2.2",
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${DB_SOURCE}"
+                    },
+                    "editorMode": "code",
+                    "expr": "etherlink_governance_sequencer_current_period_type",
+                    "instant": false,
+                    "legendFormat": "{{type}}",
+                    "range": true,
+                    "refId": "A"
+                }
+            ],
+            "title": "Periode Type",
+            "type": "stat"
+        },
+        {
+            "datasource": {
+                "default": true,
+                "type": "prometheus",
+                "uid": "${DB_SOURCE}"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 2,
+                "w": 3,
+                "x": 18,
+                "y": 28
+            },
+            "id": 32,
+            "options": {
+                "colorMode": "none",
+                "graphMode": "none",
+                "justifyMode": "auto",
+                "orientation": "horizontal",
+                "percentChangeColorMode": "standard",
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "showPercentChange": false,
+                "text": {
+                    "titleSize": 25,
+                    "valueSize": 25
+                },
+                "textMode": "value",
+                "wideLayout": true
+            },
+            "pluginVersion": "11.2.2",
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${DB_SOURCE}"
+                    },
+                    "disableTextWrap": false,
+                    "editorMode": "code",
+                    "expr": "etherlink_governance_sequencer_current_period_index",
+                    "fullMetaSearch": false,
+                    "includeNullMetadata": true,
+                    "instant": false,
+                    "legendFormat": "__auto",
+                    "range": true,
+                    "refId": "A",
+                    "useBackend": false
+                }
+            ],
+            "title": "Period index",
+            "type": "stat"
+        },
+        {
+            "datasource": {
+                "default": true,
+                "type": "prometheus",
+                "uid": "${DB_SOURCE}"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "custom": {
+                        "align": "auto",
+                        "cellOptions": {
+                            "type": "auto"
+                        },
+                        "filterable": true,
+                        "inspect": false
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 30
+            },
+            "id": 37,
+            "options": {
+                "cellHeight": "sm",
+                "footer": {
+                    "countRows": false,
+                    "fields": "",
+                    "reducer": [
+                        "sum"
+                    ],
+                    "show": false
+                },
+                "showHeader": true
+            },
+            "pluginVersion": "11.2.2",
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${DB_SOURCE}"
+                    },
+                    "editorMode": "code",
+                    "expr": "(etherlink_governance_sequencer_trigger_commitee_upgrade and changes(etherlink_governance_sequencer_trigger_commitee_upgrade[$__interval]) > 0) or (etherlink_governance_sequencer_trigger_commitee_upgrade and ignoring(source,address,job,instance) absent(etherlink_governance_sequencer_trigger_commitee_upgrade offset $__interval))",
+                    "format": "table",
+                    "instant": false,
+                    "legendFormat": "__auto",
+                    "range": true,
+                    "refId": "A"
+                }
+            ],
+            "title": "Upgrades",
+            "transformations": [
+                {
+                    "id": "organize",
+                    "options": {
+                        "excludeByName": {
+                            "Value": true,
+                            "__name__": true,
+                            "instance": true,
+                            "job": true
+                        },
+                        "includeByName": {},
+                        "indexByName": {
+                            "Time": 0,
+                            "Value #A": 6,
+                            "Value #B": 7,
+                            "__name__": 1,
+                            "address": 5,
+                            "instance": 2,
+                            "job": 3,
+                            "source": 4
+                        },
+                        "renameByName": {
+                            "address": "Rollup address",
+                            "source": "Source"
+                        }
+                    }
+                }
+            ],
+            "type": "table"
+        },
+        {
+            "datasource": {
+                "default": true,
+                "type": "prometheus",
+                "uid": "${DB_SOURCE}"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "custom": {
+                        "align": "auto",
+                        "cellOptions": {
+                            "type": "auto"
+                        },
+                        "filterable": true,
+                        "inspect": false
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 30
+            },
+            "id": 38,
+            "options": {
+                "cellHeight": "sm",
+                "footer": {
+                    "countRows": false,
+                    "fields": "",
+                    "reducer": [
+                        "sum"
+                    ],
+                    "show": false
+                },
+                "showHeader": true
+            },
+            "pluginVersion": "11.2.2",
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${DB_SOURCE}"
+                    },
+                    "editorMode": "code",
+                    "expr": "etherlink_governance_sequencer_vote",
+                    "format": "table",
+                    "instant": false,
+                    "legendFormat": "__auto",
+                    "range": true,
+                    "refId": "A"
+                },
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${DB_SOURCE}"
+                    },
+                    "editorMode": "code",
+                    "expr": "absent(etherlink_governance_sequencer_vote offset $__interval)",
+                    "format": "table",
+                    "hide": false,
+                    "instant": false,
+                    "legendFormat": "__auto",
+                    "range": true,
+                    "refId": "B"
+                }
+            ],
+            "title": "Voting status",
+            "transformations": [
+                {
+                    "id": "joinByField",
+                    "options": {
+                        "byField": "Time",
+                        "mode": "inner"
+                    }
+                },
+                {
+                    "id": "organize",
+                    "options": {
+                        "excludeByName": {
+                            "Value #A": true,
+                            "Value #B": true,
+                            "__name__": true,
+                            "instance": true,
+                            "job": true
+                        },
+                        "includeByName": {},
+                        "indexByName": {},
+                        "renameByName": {
+                            "source": "Source",
+                            "value": "Vote"
+                        }
+                    }
+                }
+            ],
+            "type": "table"
+        },
+        {
+            "datasource": {
+                "default": true,
+                "type": "prometheus",
+                "uid": "${DB_SOURCE}"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 38
+            },
+            "id": 41,
+            "options": {
+                "displayMode": "gradient",
+                "maxVizHeight": 300,
+                "minVizHeight": 16,
+                "minVizWidth": 0,
+                "namePlacement": "auto",
+                "orientation": "vertical",
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "showUnfilled": true,
+                "sizing": "auto",
+                "text": {},
+                "valueMode": "color"
+            },
+            "pluginVersion": "11.2.2",
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${DB_SOURCE}"
+                    },
+                    "editorMode": "code",
+                    "expr": "etherlink_governance_sequencer_proposal",
+                    "format": "time_series",
+                    "instant": false,
+                    "legendFormat": "{{proposal}}",
+                    "range": true,
+                    "refId": "A"
+                }
+            ],
+            "title": "Proposal Voting",
+            "type": "bargauge"
+        },
+        {
+            "datasource": {
+                "default": true,
+                "type": "prometheus",
+                "uid": "${DB_SOURCE}"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            }
+                        ]
+                    }
+                },
+                "overrides": [
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "« yea »"
+                        },
+                        "properties": [
+                            {
+                                "id": "color",
+                                "value": {
+                                    "fixedColor": "semi-dark-green",
+                                    "mode": "fixed"
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "« nay »"
+                        },
+                        "properties": [
+                            {
+                                "id": "color",
+                                "value": {
+                                    "fixedColor": "dark-red",
+                                    "mode": "fixed"
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "« pass »"
+                        },
+                        "properties": [
+                            {
+                                "id": "color",
+                                "value": {
+                                    "fixedColor": "#777782",
+                                    "mode": "fixed"
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Total"
+                        },
+                        "properties": [
+                            {
+                                "id": "color",
+                                "value": {
+                                    "fixedColor": "dark-blue",
+                                    "mode": "fixed"
+                                }
+                            }
+                        ]
+                    }
+                ]
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 38
+            },
+            "id": 42,
+            "options": {
+                "displayMode": "gradient",
+                "maxVizHeight": 300,
+                "minVizHeight": 16,
+                "minVizWidth": 8,
+                "namePlacement": "auto",
+                "orientation": "horizontal",
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "showUnfilled": true,
+                "sizing": "auto",
+                "valueMode": "color"
+            },
+            "pluginVersion": "11.2.2",
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${DB_SOURCE}"
+                    },
+                    "editorMode": "code",
+                    "expr": "sum(etherlink_governance_sequencer_vote{value=\"yea\"}) or vector(0)",
+                    "instant": false,
+                    "legendFormat": "« yea »",
+                    "range": true,
+                    "refId": "A"
+                },
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${DB_SOURCE}"
+                    },
+                    "editorMode": "code",
+                    "expr": "sum(etherlink_governance_sequencer_vote{value=\"nay\"})  or vector(0)",
+                    "hide": false,
+                    "instant": false,
+                    "legendFormat": "« nay »",
+                    "range": true,
+                    "refId": "B"
+                },
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${DB_SOURCE}"
+                    },
+                    "editorMode": "code",
+                    "expr": "sum(etherlink_governance_sequencer_vote{value=\"pass\"}) or vector(0)",
+                    "hide": false,
+                    "instant": false,
+                    "legendFormat": "« pass »",
+                    "range": true,
+                    "refId": "C"
+                },
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${DB_SOURCE}"
+                    },
+                    "editorMode": "code",
+                    "expr": "sum(etherlink_governance_sequencer_vote) or vector(0)",
+                    "hide": false,
+                    "instant": false,
+                    "legendFormat": "Total",
+                    "range": true,
+                    "refId": "D"
+                }
+            ],
+            "title": "Promotion Voting",
+            "type": "bargauge"
+        },
+        {
+            "collapsed": false,
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 46
+            },
+            "id": 23,
+            "panels": [],
+            "title": "Security Kernel Governance",
+            "type": "row"
+        },
+        {
+            "datasource": {
+                "default": true,
+                "type": "prometheus",
+                "uid": "${DB_SOURCE}"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 4,
+                "w": 18,
+                "x": 0,
+                "y": 47
+            },
+            "id": 30,
+            "options": {
+                "colorMode": "value",
+                "graphMode": "none",
+                "justifyMode": "center",
+                "orientation": "auto",
+                "percentChangeColorMode": "standard",
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "/.*/",
+                    "values": false
+                },
+                "showPercentChange": false,
+                "textMode": "auto",
+                "wideLayout": true
+            },
+            "pluginVersion": "11.2.2",
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${DB_SOURCE}"
+                    },
+                    "editorMode": "code",
+                    "expr": "etherlink_governance_security_kernel_configuration",
+                    "format": "table",
+                    "instant": false,
+                    "legendFormat": "__auto",
+                    "range": true,
+                    "refId": "A"
+                }
+            ],
+            "title": "Configuration",
+            "transformations": [
+                {
+                    "id": "organize",
+                    "options": {
+                        "excludeByName": {
+                            "Time": true,
+                            "Value 2": true,
+                            "__name__": true,
+                            "instance": true,
+                            "job": true,
+                            "Value": true
+                        },
+                        "includeByName": {},
+                        "indexByName": {},
+                        "renameByName": {
+                            "adoption_period": "Adoption Period",
+                            "period_length": "Period Length",
+                            "promotion_quorum": "Promotion Quorum",
+                            "promotion_supermajority": "Promotion Supermajority",
+                            "proposal_quorum": "Proposal Quorum",
+                            "scale": "Scale",
+                            "start_level": "Start Level",
+                            "upvoting_limit": "Upvoting Limit"
+                        }
+                    }
+                }
+            ],
+            "type": "stat"
+        },
+        {
+            "datasource": {
+                "default": true,
+                "type": "prometheus",
+                "uid": "${DB_SOURCE}"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 2,
+                "w": 3,
+                "x": 18,
+                "y": 47
+            },
+            "id": 34,
+            "options": {
+                "colorMode": "none",
+                "graphMode": "none",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "percentChangeColorMode": "standard",
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "showPercentChange": false,
+                "text": {
+                    "titleSize": 25,
+                    "valueSize": 25
+                },
+                "textMode": "auto",
+                "wideLayout": true
+            },
+            "pluginVersion": "11.2.2",
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${DB_SOURCE}"
+                    },
+                    "editorMode": "code",
+                    "expr": "etherlink_governance_security_kernel_remaining_blocks",
+                    "instant": false,
+                    "legendFormat": "__auto",
+                    "range": true,
+                    "refId": "A"
+                }
+            ],
+            "title": "Remaining Blocks",
+            "type": "stat"
+        },
+        {
+            "datasource": {
+                "default": true,
+                "type": "prometheus",
+                "uid": "${DB_SOURCE}"
+            },
+            "description": "",
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "mappings": [
+                        {
+                            "options": {
+                                "0": {
+                                    "index": 0,
+                                    "text": "Proposal"
+                                },
+                                "1": {
+                                    "index": 1,
+                                    "text": "Promotion"
+                                }
+                            },
+                            "type": "value"
+                        }
+                    ],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 4,
+                "w": 3,
+                "x": 21,
+                "y": 47
+            },
+            "id": 36,
+            "options": {
+                "colorMode": "none",
+                "graphMode": "none",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "percentChangeColorMode": "standard",
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "showPercentChange": false,
+                "textMode": "value",
+                "wideLayout": true
+            },
+            "pluginVersion": "11.2.2",
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${DB_SOURCE}"
+                    },
+                    "editorMode": "code",
+                    "expr": "etherlink_governance_security_kernel_current_period_type",
+                    "instant": false,
+                    "legendFormat": "{{type}}",
+                    "range": true,
+                    "refId": "A"
+                }
+            ],
+            "title": "Periode Type",
+            "type": "stat"
+        },
+        {
+            "datasource": {
+                "default": true,
+                "type": "prometheus",
+                "uid": "${DB_SOURCE}"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 2,
+                "w": 3,
+                "x": 18,
+                "y": 49
+            },
+            "id": 35,
+            "options": {
+                "colorMode": "none",
+                "graphMode": "none",
+                "justifyMode": "auto",
+                "orientation": "horizontal",
+                "percentChangeColorMode": "standard",
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "showPercentChange": false,
+                "text": {
+                    "titleSize": 25,
+                    "valueSize": 25
+                },
+                "textMode": "value",
+                "wideLayout": true
+            },
+            "pluginVersion": "11.2.2",
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${DB_SOURCE}"
+                    },
+                    "disableTextWrap": false,
+                    "editorMode": "code",
+                    "expr": "etherlink_governance_security_kernel_current_period_index",
+                    "fullMetaSearch": false,
+                    "includeNullMetadata": true,
+                    "instant": false,
+                    "legendFormat": "__auto",
+                    "range": true,
+                    "refId": "A",
+                    "useBackend": false
+                }
+            ],
+            "title": "Period index",
+            "type": "stat"
+        },
+        {
+            "datasource": {
+                "default": true,
+                "type": "prometheus",
+                "uid": "${DB_SOURCE}"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "custom": {
+                        "align": "auto",
+                        "cellOptions": {
+                            "type": "auto"
+                        },
+                        "filterable": true,
+                        "inspect": false
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 51
+            },
+            "id": 39,
+            "options": {
+                "cellHeight": "sm",
+                "footer": {
+                    "countRows": false,
+                    "fields": "",
+                    "reducer": [
+                        "sum"
+                    ],
+                    "show": false
+                },
+                "showHeader": true
+            },
+            "pluginVersion": "11.2.2",
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${DB_SOURCE}"
+                    },
+                    "editorMode": "code",
+                    "expr": "(etherlink_governance_security_kernel_trigger_upgrade and changes(etherlink_governance_security_kernel_trigger_upgrade[$__interval]) > 0) or (etherlink_governance_security_kernel_trigger_upgrade and ignoring(source,address,job,instance) absent(etherlink_governance_security_kernel_trigger_upgrade offset $__interval))",
+                    "format": "table",
+                    "instant": false,
+                    "legendFormat": "__auto",
+                    "range": true,
+                    "refId": "A"
+                }
+            ],
+            "title": "Upgrades",
+            "transformations": [
+                {
+                    "id": "organize",
+                    "options": {
+                        "excludeByName": {
+                            "Value": true,
+                            "__name__": true,
+                            "instance": true,
+                            "job": true
+                        },
+                        "includeByName": {},
+                        "indexByName": {
+                            "Time": 0,
+                            "Value #A": 6,
+                            "Value #B": 7,
+                            "__name__": 1,
+                            "address": 5,
+                            "instance": 2,
+                            "job": 3,
+                            "source": 4
+                        },
+                        "renameByName": {
+                            "address": "Rollup address",
+                            "source": "Source"
+                        }
+                    }
+                }
+            ],
+            "type": "table"
+        },
+        {
+            "datasource": {
+                "default": true,
+                "type": "prometheus",
+                "uid": "${DB_SOURCE}"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "custom": {
+                        "align": "auto",
+                        "cellOptions": {
+                            "type": "auto"
+                        },
+                        "filterable": true,
+                        "inspect": false
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 51
+            },
+            "id": 40,
+            "options": {
+                "cellHeight": "sm",
+                "footer": {
+                    "countRows": false,
+                    "fields": "",
+                    "reducer": [
+                        "sum"
+                    ],
+                    "show": false
+                },
+                "showHeader": true
+            },
+            "pluginVersion": "11.2.2",
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${DB_SOURCE}"
+                    },
+                    "editorMode": "code",
+                    "expr": "etherlink_governance_security_kernel_vote",
+                    "format": "table",
+                    "instant": false,
+                    "legendFormat": "__auto",
+                    "range": true,
+                    "refId": "A"
+                },
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${DB_SOURCE}"
+                    },
+                    "editorMode": "code",
+                    "expr": "absent(etherlink_governance_security_kernel_vote offset $__interval)",
+                    "format": "table",
+                    "hide": false,
+                    "instant": false,
+                    "legendFormat": "__auto",
+                    "range": true,
+                    "refId": "B"
+                }
+            ],
+            "title": "Voting status",
+            "transformations": [
+                {
+                    "id": "joinByField",
+                    "options": {
+                        "byField": "Time",
+                        "mode": "inner"
+                    }
+                },
+                {
+                    "id": "organize",
+                    "options": {
+                        "excludeByName": {
+                            "Value #A": true,
+                            "Value #B": true,
+                            "__name__": true,
+                            "instance": true,
+                            "job": true
+                        },
+                        "includeByName": {},
+                        "indexByName": {},
+                        "renameByName": {
+                            "source": "Source",
+                            "value": "Vote"
+                        }
+                    }
+                }
+            ],
+            "type": "table"
+        },
+        {
+            "datasource": {
+                "default": true,
+                "type": "prometheus",
+                "uid": "${DB_SOURCE}"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 59
+            },
+            "id": 43,
+            "options": {
+                "displayMode": "gradient",
+                "maxVizHeight": 300,
+                "minVizHeight": 16,
+                "minVizWidth": 0,
+                "namePlacement": "auto",
+                "orientation": "vertical",
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "showUnfilled": true,
+                "sizing": "auto",
+                "text": {},
+                "valueMode": "color"
+            },
+            "pluginVersion": "11.2.2",
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${DB_SOURCE}"
+                    },
+                    "editorMode": "code",
+                    "expr": "etherlink_governance_security_kernel_proposal",
+                    "format": "time_series",
+                    "instant": false,
+                    "legendFormat": "{{proposal}}",
+                    "range": true,
+                    "refId": "A"
+                }
+            ],
+            "title": "Proposal Voting",
+            "type": "bargauge"
+        },
+        {
+            "datasource": {
+                "default": true,
+                "type": "prometheus",
+                "uid": "${DB_SOURCE}"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            }
+                        ]
+                    }
+                },
+                "overrides": [
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "« yea »"
+                        },
+                        "properties": [
+                            {
+                                "id": "color",
+                                "value": {
+                                    "fixedColor": "semi-dark-green",
+                                    "mode": "fixed"
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "« nay »"
+                        },
+                        "properties": [
+                            {
+                                "id": "color",
+                                "value": {
+                                    "fixedColor": "dark-red",
+                                    "mode": "fixed"
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "« pass »"
+                        },
+                        "properties": [
+                            {
+                                "id": "color",
+                                "value": {
+                                    "fixedColor": "#777782",
+                                    "mode": "fixed"
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Total"
+                        },
+                        "properties": [
+                            {
+                                "id": "color",
+                                "value": {
+                                    "fixedColor": "dark-blue",
+                                    "mode": "fixed"
+                                }
+                            }
+                        ]
+                    }
+                ]
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 59
+            },
+            "id": 44,
+            "options": {
+                "displayMode": "gradient",
+                "maxVizHeight": 300,
+                "minVizHeight": 16,
+                "minVizWidth": 8,
+                "namePlacement": "auto",
+                "orientation": "horizontal",
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "showUnfilled": true,
+                "sizing": "auto",
+                "valueMode": "color"
+            },
+            "pluginVersion": "11.2.2",
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${DB_SOURCE}"
+                    },
+                    "editorMode": "code",
+                    "expr": "sum(etherlink_governance_security_kernel_vote{value=\"yea\"}) or vector(0)",
+                    "instant": false,
+                    "legendFormat": "« yea »",
+                    "range": true,
+                    "refId": "A"
+                },
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${DB_SOURCE}"
+                    },
+                    "editorMode": "code",
+                    "expr": "sum(etherlink_governance_security_kernel_vote{value=\"nay\"})  or vector(0)",
+                    "hide": false,
+                    "instant": false,
+                    "legendFormat": "« nay »",
+                    "range": true,
+                    "refId": "B"
+                },
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${DB_SOURCE}"
+                    },
+                    "editorMode": "code",
+                    "expr": "sum(etherlink_governance_security_kernel_vote{value=\"pass\"}) or vector(0)",
+                    "hide": false,
+                    "instant": false,
+                    "legendFormat": "« pass »",
+                    "range": true,
+                    "refId": "C"
+                },
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${DB_SOURCE}"
+                    },
+                    "editorMode": "code",
+                    "expr": "sum(etherlink_governance_security_kernel_vote) or vector(0)",
+                    "hide": false,
+                    "instant": false,
+                    "legendFormat": "Total",
+                    "range": true,
+                    "refId": "D"
+                }
+            ],
+            "title": "Promotion Voting",
+            "type": "bargauge"
+        }
+    ],
+    "refresh": "5s",
+    "schemaVersion": 39,
+    "tags": [],
+    "templating": {
+        "list": [
+            {
+                "datasource": {
+                    "type": "prometheus",
+                    "uid": "${DB_SOURCE}"
+                },
+                "filters": [],
+                "hide": 1,
+                "name": "Filters",
+                "skipUrlSync": false,
+                "type": "adhoc"
+            }
+        ]
+    },
+    "time": {
+        "from": "now-5m",
+        "to": "now"
+    },
+    "timepicker": {},
+    "timezone": "browser",
+    "title": "Etherlink governance",
+    "uid": "ddxoila1osn40a",
+    "version": 66,
+    "weekStart": ""
+}

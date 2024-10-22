@@ -30,6 +30,10 @@ let set_gauge t ?(labels = []) f x =
   let m = Gauge.labels t labels in
   Gauge.set m @@ f x
 
+let incr_counter t ?(labels = []) () =
+  let m = Counter.labels t labels in
+  Counter.inc_one m
+
 module Cohttp (Server : Cohttp_lwt.S.Server) = struct
   let callback _conn req _body =
     let open Cohttp in
@@ -63,6 +67,11 @@ let start_server ~config () =
     ~ctx
     ~mode
     (Cohttp_lwt_unix.Server.make ~callback ())
+
+let finalized_l1_level_register =
+  v_gauge ~help:"Current L1 Level" "current_l1_level"
+
+let set_finalized_l1_level = set_gauge finalized_l1_level_register Int.to_float
 
 type governance_contract = Sequencer | Kernel | Security_kernel
 
@@ -103,6 +112,14 @@ module MetricsRegistration = struct
     val current_period_type : Gauge.family
 
     val current_period_index : Gauge.family
+  end
+
+  module type Entrypoint = sig
+    val vote : Gauge.family
+
+    val trigger_upgrade : Gauge.family
+
+    val proposal : Counter.family
   end
 
   module MakeStorage (Contract : Contract) : Storage = struct
@@ -161,6 +178,69 @@ module MetricsRegistration = struct
   end)
 
   module KernelSecurityStorageRegistration = MakeStorage (struct
+    let gov_type = Security_kernel
+  end)
+
+  module MakeEntrypoints (Contract : Contract) : Entrypoint = struct
+    let vote_name = get_metric_txt ~metric:"vote" Contract.gov_type
+
+    let vote =
+      v_gauge
+        ~label_names:["source"; "value"]
+        ~help:(get_helper_txt ~helper:"vote" Contract.gov_type)
+        vote_name
+
+    let trigger_upgrade_name =
+      match Contract.gov_type with
+      | Sequencer ->
+          get_metric_txt ~metric:"trigger_commitee_upgrade" Contract.gov_type
+      | Kernel | Security_kernel ->
+          get_metric_txt ~metric:"trigger_upgrade" Contract.gov_type
+
+    let trigger_upgrade =
+      match Contract.gov_type with
+      | Sequencer ->
+          v_gauge
+            ~label_names:["source"; "address"]
+            ~help:
+              (get_helper_txt
+                 ~helper:"trigger comittee upgrade"
+                 Contract.gov_type)
+            trigger_upgrade_name
+      | Kernel | Security_kernel ->
+          v_gauge
+            ~label_names:["source"; "address"]
+            ~help:(get_helper_txt ~helper:"trigger upgrade" Contract.gov_type)
+            trigger_upgrade_name
+
+    let proposal_name = get_metric_txt ~metric:"proposal" Contract.gov_type
+
+    let proposal =
+      (* A new proposal can be treated as an upvote proposal: proposing also
+         means upvoting the proposal. This will ease the computation related
+         to the metric from PromQL and Grafana's perspective. *)
+      match Contract.gov_type with
+      | Sequencer ->
+          v_labels_counter
+            ~label_names:["source"; "sequencer_pk"; "pool_address"]
+            ~help:(get_helper_txt ~helper:"proposal" Contract.gov_type)
+            proposal_name
+      | Kernel | Security_kernel ->
+          v_labels_counter
+            ~label_names:["source"; "proposal"]
+            ~help:(get_helper_txt ~helper:"proposal" Contract.gov_type)
+            proposal_name
+  end
+
+  module SequencerEntrypointsRegistration = MakeEntrypoints (struct
+    let gov_type = Sequencer
+  end)
+
+  module KernelEntrypointsRegistration = MakeEntrypoints (struct
+    let gov_type = Kernel
+  end)
+
+  module SecurityKernelEntrypointsRegistration = MakeEntrypoints (struct
     let gov_type = Security_kernel
   end)
 end
@@ -242,5 +322,86 @@ module GovernanceMetrics = struct
             MetricsRegistration.KernelSecurityStorageRegistration
             .current_period_index
             Z.to_float
+  end
+
+  module Entrypoints = struct
+    let vote ~source ~value = function
+      | Sequencer ->
+          set_gauge
+            MetricsRegistration.SequencerEntrypointsRegistration.vote
+            ~labels:[source; value]
+            Fun.id
+            1.
+      | Kernel ->
+          set_gauge
+            MetricsRegistration.KernelEntrypointsRegistration.vote
+            ~labels:[source; value]
+            Fun.id
+            1.
+      | Security_kernel ->
+          set_gauge
+            MetricsRegistration.SecurityKernelEntrypointsRegistration.vote
+            ~labels:[source; value]
+            Fun.id
+            1.
+
+    let trigger_upgrade ~source ~address = function
+      | Sequencer ->
+          set_gauge
+            MetricsRegistration.SequencerEntrypointsRegistration.trigger_upgrade
+            ~labels:[source; address]
+            Fun.id
+            1.
+      | Kernel ->
+          set_gauge
+            MetricsRegistration.KernelEntrypointsRegistration.trigger_upgrade
+            ~labels:[source; address]
+            Fun.id
+            1.
+      | Security_kernel ->
+          set_gauge
+            MetricsRegistration.SecurityKernelEntrypointsRegistration
+            .trigger_upgrade
+            ~labels:[source; address]
+            Fun.id
+            1.
+
+    let proposal ~source ?(sequencer_pk = "") ?(pool_address = "")
+        ?(proposal = "") = function
+      | Sequencer ->
+          incr_counter
+            MetricsRegistration.SequencerEntrypointsRegistration.proposal
+            ~labels:[source; sequencer_pk; pool_address]
+            ()
+      | Kernel ->
+          incr_counter
+            MetricsRegistration.KernelEntrypointsRegistration.proposal
+            ~labels:[source; proposal]
+            ()
+      | Security_kernel ->
+          incr_counter
+            MetricsRegistration.SecurityKernelEntrypointsRegistration.proposal
+            ~labels:[source; proposal]
+            ()
+
+    let clear_vote = function
+      | Sequencer ->
+          Gauge.clear MetricsRegistration.SequencerEntrypointsRegistration.vote
+      | Kernel ->
+          Gauge.clear MetricsRegistration.KernelEntrypointsRegistration.vote
+      | Security_kernel ->
+          Gauge.clear
+            MetricsRegistration.SecurityKernelEntrypointsRegistration.vote
+
+    let clear_proposal = function
+      | Sequencer ->
+          Counter.clear
+            MetricsRegistration.SequencerEntrypointsRegistration.proposal
+      | Kernel ->
+          Counter.clear
+            MetricsRegistration.KernelEntrypointsRegistration.proposal
+      | Security_kernel ->
+          Counter.clear
+            MetricsRegistration.SecurityKernelEntrypointsRegistration.proposal
   end
 end

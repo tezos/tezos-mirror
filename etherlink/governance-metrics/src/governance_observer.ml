@@ -45,13 +45,14 @@ let process_contracts_configuration ~config =
   let*! () = Event.contract_metrics "security kernel configuration" in
   return_unit
 
-let rec contract_storage_state_process ~config ~contract ~chain_id =
+let contract_storage_state_process ~config ~contract ~chain_id ~level =
   let open Lwt_result_syntax in
   let* voting_state =
     RPC.micheline_view
       ~chain_id
       ~contract:(governance_to_contract ~config contract)
       ~view:"get_voting_state"
+      ~level
       ~decode:Contract_type.decode_voting_state
       config.endpoint
   in
@@ -71,8 +72,70 @@ let rec contract_storage_state_process ~config ~contract ~chain_id =
     Event.contract_metrics @@ "voting state for "
     ^ governance_to_string contract
   in
-  let*! () = Lwt_unix.sleep 5. in
-  contract_storage_state_process ~config ~contract ~chain_id
+  return_unit
+
+let process_governance_contracts_entrypoints ~governance_operations ~level =
+  let open Lwt_result_syntax in
+  let* operations = governance_operations ~level in
+  List.iter
+    (fun {source; parameters} ->
+      match parameters.value with
+      | Sequencer (Trigger_committee_upgrade address) ->
+          GovernanceMetrics.Entrypoints.trigger_upgrade
+            ~source
+            ~address
+            Sequencer ;
+          GovernanceMetrics.Entrypoints.clear_proposal Sequencer ;
+          GovernanceMetrics.Entrypoints.clear_vote Sequencer
+      | Sequencer (Vote value) ->
+          GovernanceMetrics.Entrypoints.vote ~source ~value Sequencer
+      | Sequencer (Upvote_proposal {sequencer_pk; pool_address}) ->
+          GovernanceMetrics.Entrypoints.proposal
+            ~source
+            ~sequencer_pk
+            ~pool_address
+            Sequencer
+      | Sequencer (New_proposal {sequencer_pk; pool_address}) ->
+          GovernanceMetrics.Entrypoints.proposal
+            ~source
+            ~sequencer_pk
+            ~pool_address
+            Sequencer
+      | Kernel (Trigger_kernel_upgrade address) ->
+          GovernanceMetrics.Entrypoints.trigger_upgrade ~source ~address Kernel ;
+          GovernanceMetrics.Entrypoints.clear_proposal Kernel ;
+          GovernanceMetrics.Entrypoints.clear_vote Kernel
+      | Kernel (Vote value) ->
+          GovernanceMetrics.Entrypoints.vote ~source ~value Kernel
+      | Kernel (Upvote_proposal proposal) ->
+          GovernanceMetrics.Entrypoints.proposal ~source ~proposal Kernel
+      | Kernel (New_proposal proposal) ->
+          GovernanceMetrics.Entrypoints.proposal ~source ~proposal Kernel
+      | Security_kernel (Trigger_kernel_upgrade address) ->
+          GovernanceMetrics.Entrypoints.trigger_upgrade
+            ~source
+            ~address
+            Security_kernel ;
+          GovernanceMetrics.Entrypoints.clear_proposal Security_kernel ;
+          GovernanceMetrics.Entrypoints.clear_vote Security_kernel
+      | Security_kernel (Vote value) ->
+          GovernanceMetrics.Entrypoints.vote ~source ~value Security_kernel
+      | Security_kernel (Upvote_proposal proposal) ->
+          GovernanceMetrics.Entrypoints.proposal
+            ~source
+            ~proposal
+            Security_kernel
+      | Security_kernel (New_proposal proposal) ->
+          GovernanceMetrics.Entrypoints.proposal
+            ~source
+            ~proposal
+            Security_kernel)
+    operations ;
+  return_unit
+
+(* This value is used in order to avoid fetching the same block twice in case of
+   a reorganization. *)
+let latest_finalized_level = ref 0
 
 let main ~config () =
   let open Lwt_result_syntax in
@@ -85,40 +148,48 @@ let main ~config () =
         Format.eprintf "Metrics server error: %s\n@." (Printexc.to_string exn))
   in
   let* () = process_contracts_configuration ~config in
-  let*! chain_id = RPC.chain_id config.endpoint in
-  match chain_id with
-  | Ok chain_id ->
-      let () =
-        Lwt.dont_wait
-          (fun () ->
-            let*! _ =
-              contract_storage_state_process
-                ~config
-                ~contract:Sequencer
-                ~chain_id
-            in
-            Lwt.return_unit)
-          (fun exn ->
-            Format.eprintf
-              "Sequencer storage state process error: %s\n@."
-              (Printexc.to_string exn))
+  let* chain_id = RPC.chain_id config.endpoint in
+  let governance_operations = RPC.governance_operations ~config in
+  (* Head monitoring.
+     This part will be the clock of our execution. Each detected
+     fresh head will trigger a process to update several metrics. *)
+  let process {level} =
+    (* We fetch the informations for [level - 2] to avoid reorg. problems. *)
+    let level = level - 2 in
+    if !latest_finalized_level != level then (
+      let* () =
+        contract_storage_state_process
+          ~config
+          ~contract:Sequencer
+          ~chain_id
+          ~level
       in
-      let () =
-        Lwt.dont_wait
-          (fun () ->
-            let*! _ =
-              contract_storage_state_process ~config ~contract:Kernel ~chain_id
-            in
-            Lwt.return_unit)
-          (fun exn ->
-            Format.eprintf
-              "Kernel storage state process error: %s\n@."
-              (Printexc.to_string exn))
+      let* () =
+        contract_storage_state_process ~config ~contract:Kernel ~chain_id ~level
       in
-      contract_storage_state_process ~config ~contract:Security_kernel ~chain_id
-  | Error trace ->
-      let*! () = Event.storage_state_error "Failed to GET chain ID" in
-      fail trace
+      let* () =
+        contract_storage_state_process
+          ~config
+          ~contract:Security_kernel
+          ~chain_id
+          ~level
+      in
+      let* () =
+        process_governance_contracts_entrypoints
+          ~governance_operations
+          ~level:(Int.to_string level)
+      in
+      set_finalized_l1_level level ;
+      latest_finalized_level := level ;
+      return_unit)
+    else return_unit
+  in
+  let rec governance_obsv_process () =
+    let* () = RPC.monitor_heads ~process config.endpoint in
+    let*! () = Event.monitor_head_restart () in
+    governance_obsv_process ()
+  in
+  governance_obsv_process ()
 
 let run =
   let open Tezos_clic in
