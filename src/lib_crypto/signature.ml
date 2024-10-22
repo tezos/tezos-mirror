@@ -54,7 +54,7 @@ module type CONV_OPT = sig
   val signature : V_from.t -> V_to.t option
 end
 
-module V_latest = Signature_v1
+module V_latest = Signature_v2
 
 module V0 = struct
   include Signature_v0
@@ -96,6 +96,40 @@ module V1 = struct
   module Of_V_latest :
     CONV_OPT with module V_from := V_latest and module V_to := Signature_v1 =
   struct
+    let public_key_hash : V_latest.Public_key_hash.t -> Public_key_hash.t option
+        = function
+      | V_latest.Ed25519 k -> Some (Ed25519 k)
+      | V_latest.Secp256k1 k -> Some (Secp256k1 k)
+      | V_latest.P256 k -> Some (P256 k)
+      | V_latest.Bls k -> Some (Bls k)
+
+    let public_key : V_latest.Public_key.t -> Public_key.t option = function
+      | V_latest.Ed25519 k -> Some (Ed25519 k)
+      | V_latest.Secp256k1 k -> Some (Secp256k1 k)
+      | V_latest.P256 k -> Some (P256 k)
+      | V_latest.Bls k -> Some (Bls k)
+
+    let secret_key : V_latest.Secret_key.t -> Secret_key.t option = function
+      | V_latest.Ed25519 k -> Some (Ed25519 k)
+      | V_latest.Secp256k1 k -> Some (Secp256k1 k)
+      | V_latest.P256 k -> Some (P256 k)
+      | V_latest.Bls k -> Some (Bls k)
+
+    let signature : V_latest.t -> t option = function
+      | V_latest.Ed25519 k -> Some (Ed25519 k)
+      | V_latest.Secp256k1 k -> Some (Secp256k1 k)
+      | V_latest.P256 k -> Some (P256 k)
+      | V_latest.Unknown k -> Some (Unknown k)
+      | V_latest.Bls k -> Some (Bls k)
+  end
+end
+
+module V2 = struct
+  include Signature_v2
+
+  module Of_V_latest :
+    CONV_OPT with module V_from := V_latest and module V_to := Signature_v2 =
+  struct
     let public_key_hash = Option.some
 
     let public_key = Option.some
@@ -107,9 +141,9 @@ module V1 = struct
 end
 
 include V_latest
-module Of_V_latest = V1.Of_V_latest
+module Of_V_latest = V2.Of_V_latest
 
-module Of_V1 : CONV with module V_from := V1 and module V_to := V1 = struct
+module Of_V2 : CONV with module V_from := V2 and module V_to := V2 = struct
   let public_key_hash = Fun.id
 
   let public_key = Fun.id
