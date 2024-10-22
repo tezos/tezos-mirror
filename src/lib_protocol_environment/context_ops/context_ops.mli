@@ -190,3 +190,14 @@ val exists : index -> Context_hash.t -> bool Lwt.t
 val close : index -> unit Lwt.t
 
 val compute_testchain_chain_id : t -> Block_hash.t -> Chain_id.t
+
+val export_snapshot : index -> Context_hash.t -> path:string -> unit Lwt.t
+
+val integrity_check :
+  ?ppf:Format.formatter ->
+  root:string ->
+  auto_repair:bool ->
+  always:bool ->
+  heads:string list option ->
+  index ->
+  unit Lwt.t

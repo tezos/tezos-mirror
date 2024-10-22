@@ -12,7 +12,7 @@
   octez-shell-libs.shell-services
   octez-libs.rpc-http
   octez-libs.rpc-http-server
-  octez-libs.tezos-context
+  octez-shell-libs.context-ops
   octez-shell-libs.store
   octez-shell-libs.validation)
  (flags
@@ -24,6 +24,6 @@
   -open Tezos_shell_services
   -open Tezos_rpc_http
   -open Tezos_rpc_http_server
-  -open Tezos_context
+  -open Tezos_context_ops
   -open Tezos_store
   -open Tezos_validation))

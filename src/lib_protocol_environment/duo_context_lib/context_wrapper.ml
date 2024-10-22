@@ -1320,6 +1320,14 @@ struct
       "hash"
       block_hash1
 
+  let export_snapshot : index -> Context_hash.t -> path:string -> unit Lwt.t =
+   fun index context_hash ~path ->
+    let open Lwt_syntax in
+    let* () =
+      Irmin_Context.export_snapshot index.irmin_index context_hash ~path
+    in
+    Brassaia_Context.export_snapshot index.brassaia_index context_hash ~path
+
   let merkle_tree :
       t ->
       Proof.merkle_leaf_kind ->

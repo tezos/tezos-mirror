@@ -2717,29 +2717,6 @@ let octez_context_disk =
       ]
     ~conflicts:[Conflicts.checkseum]
 
-(* Should not be used directly in most cases, use context_ops abstraction instead *)
-let octez_context_brassaia_disk =
-  octez_lib
-    "tezos-context-brassaia.disk"
-    ~path:"src/lib_context_brassaia/disk"
-    ~deps:
-      [
-        octez_base |> open_ ~m:"TzPervasives";
-        bigstringaf;
-        fmt;
-        brassaia;
-        brassaia_pack;
-        brassaia_pack_unix;
-        logs_fmt;
-        octez_stdlib_unix |> open_;
-        octez_stdlib |> open_;
-        octez_context_sigs;
-        octez_context_brassaia_helpers;
-        octez_context_brassaia_encoding;
-        octez_context_brassaia_memory |> open_;
-      ]
-    ~conflicts:[Conflicts.checkseum]
-
 let _tree_encoding_tests =
   tezt
     ["test_proofs"; "test_encoding"]
@@ -2758,20 +2735,6 @@ let _tree_encoding_tests =
         qcheck_alcotest;
         alcotezt;
       ]
-
-let octez_context =
-  octez_lib
-    "tezos-context"
-    ~path:"src/lib_context"
-    ~synopsis:"On-disk context abstraction for [octez-node]"
-    ~deps:[octez_context_disk; octez_context_memory]
-
-let octez_context_brassaia =
-  octez_lib
-    "tezos-context-brassaia"
-    ~path:"src/lib_context_brassaia"
-    ~synopsis:"On-disk context abstraction for [octez-node] (brassaia)"
-    ~deps:[octez_context_brassaia_disk; octez_context_brassaia_memory]
 
 let _octez_context_tests =
   tezt
@@ -2820,23 +2783,6 @@ let _irmin_tests =
         octez_base_unix;
         irmin_test_helpers;
         octez_context_disk;
-        octez_stdlib_unix |> open_;
-        octez_test_helpers |> open_;
-        tezt_lib |> open_ |> open_ ~m:"Base";
-      ]
-
-let _brassaia_tests =
-  tezt
-    ["tezt_brassaia"; "test_lib_brassaia_store"; "test_utils"]
-    ~path:"brassaia/test"
-    ~opam:"tezos_internal_brassaia_tests"
-    ~synopsis:"Tezos internal brassaia tests"
-    ~deps:
-      [
-        octez_base |> open_ ~m:"TzPervasives";
-        octez_base_unix;
-        brassaia_test_helpers;
-        octez_context_brassaia_disk;
         octez_stdlib_unix |> open_;
         octez_test_helpers |> open_;
         tezt_lib |> open_ |> open_ ~m:"Base";
@@ -3262,48 +3208,6 @@ let octez_protocol_environment =
         octez_event_logging;
       ]
 
-(* in general this library should not be used directly, context_ops should be
-   used instead *)
-let octez_shell_context =
-  octez_shell_lib
-    "shell-context"
-    ~internal_name:"tezos_shell_context"
-    ~path:"src/lib_protocol_environment/shell_context"
-    ~deps:
-      [
-        octez_base |> open_ ~m:"TzPervasives";
-        octez_protocol_environment;
-        octez_context;
-      ]
-
-let octez_brassaia_context =
-  octez_shell_lib
-    "brassaia-context"
-    ~internal_name:"tezos_brassaia_context"
-    ~path:"src/lib_protocol_environment/brassaia_context"
-    ~deps:
-      [
-        octez_base |> open_ ~m:"TzPervasives";
-        octez_protocol_environment;
-        octez_context_brassaia;
-      ]
-
-let octez_duo_context_lib =
-  let (PPX {preprocess; preprocessor_deps}) = ppx_profiler in
-  octez_shell_lib
-    "duo-context-lib"
-    ~internal_name:"tezos_duo_context_lib"
-    ~path:"src/lib_protocol_environment/duo_context_lib"
-    ~preprocess
-    ~preprocessor_deps
-    ~deps:
-      [
-        octez_base |> open_ ~m:"TzPervasives";
-        octez_protocol_environment;
-        octez_context_brassaia;
-        octez_context;
-      ]
-
 let _octez_protocol_environment_tests =
   tezt
     [
@@ -3327,6 +3231,85 @@ let _octez_protocol_environment_tests =
       ]
 
 let octez_context_ops =
+  let octez_context_brassaia_disk =
+    octez_lib
+      "tezos-context-brassaia.disk"
+      ~path:"src/lib_context_brassaia/disk"
+      ~deps:
+        [
+          octez_base |> open_ ~m:"TzPervasives";
+          bigstringaf;
+          fmt;
+          brassaia;
+          brassaia_pack;
+          brassaia_pack_unix;
+          logs_fmt;
+          octez_stdlib_unix |> open_;
+          octez_stdlib |> open_;
+          octez_context_sigs;
+          octez_context_brassaia_helpers;
+          octez_context_brassaia_encoding;
+          octez_context_brassaia_memory |> open_;
+        ]
+      ~conflicts:[Conflicts.checkseum]
+  in
+  let octez_context_brassaia =
+    (* Should not be used directly in most cases, use context_ops abstraction instead *)
+    octez_lib
+      "tezos-context-brassaia"
+      ~path:"src/lib_context_brassaia"
+      ~synopsis:"On-disk context abstraction for [octez-node] (brassaia)"
+      ~deps:[octez_context_brassaia_disk; octez_context_brassaia_memory]
+  in
+  let octez_brassaia_context =
+    octez_shell_lib
+      "brassaia-context"
+      ~internal_name:"tezos_brassaia_context"
+      ~path:"src/lib_protocol_environment/brassaia_context"
+      ~deps:
+        [
+          octez_base |> open_ ~m:"TzPervasives";
+          octez_protocol_environment;
+          octez_context_brassaia;
+        ]
+  in
+  let octez_context =
+    octez_lib
+      "tezos-context"
+      ~path:"src/lib_context"
+      ~synopsis:"On-disk context abstraction for [octez-node]"
+      ~deps:[octez_context_disk; octez_context_memory]
+  in
+  (* in general this library should not be used directly, context_ops should be
+     used instead *)
+  let octez_shell_context =
+    octez_shell_lib
+      "shell-context"
+      ~internal_name:"tezos_shell_context"
+      ~path:"src/lib_protocol_environment/shell_context"
+      ~deps:
+        [
+          octez_base |> open_ ~m:"TzPervasives";
+          octez_protocol_environment;
+          octez_context;
+        ]
+  in
+  let octez_duo_context_lib =
+    let (PPX {preprocess; preprocessor_deps}) = ppx_profiler in
+    octez_shell_lib
+      "duo-context-lib"
+      ~internal_name:"tezos_duo_context_lib"
+      ~path:"src/lib_protocol_environment/duo_context_lib"
+      ~preprocess
+      ~preprocessor_deps
+      ~deps:
+        [
+          octez_base |> open_ ~m:"TzPervasives";
+          octez_protocol_environment;
+          octez_context_brassaia;
+          octez_context;
+        ]
+  in
   let (PPX {preprocess; preprocessor_deps}) = ppx_profiler in
   octez_shell_lib
     "context-ops"
@@ -3347,6 +3330,23 @@ let octez_context_ops =
         octez_duo_context_lib |> open_;
       ]
 
+let _brassaia_tests =
+  tezt
+    ["tezt_brassaia"; "test_lib_brassaia_store"; "test_utils"]
+    ~path:"brassaia/test"
+    ~opam:"tezos_internal_brassaia_tests"
+    ~synopsis:"Tezos internal brassaia tests"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_base_unix;
+        brassaia_test_helpers;
+        octez_context_ops;
+        octez_stdlib_unix |> open_;
+        octez_test_helpers |> open_;
+        tezt_lib |> open_ |> open_ ~m:"Base";
+      ]
+
 let _octez_protocol_shell_context_tests =
   tezt
     ["test_proxy_context"]
@@ -3354,7 +3354,7 @@ let _octez_protocol_shell_context_tests =
     ~opam:"octez-shell-libs"
     ~deps:
       [
-        octez_shell_context;
+        octez_context_ops;
         alcotezt;
         octez_test_helpers |> open_;
         octez_base |> open_ ~m:"TzPervasives";
@@ -3523,7 +3523,7 @@ let octez_protocol_updater =
         octez_protocol_environment;
         octez_protocol_compiler_registerer;
         octez_protocol_compiler_native;
-        octez_context |> open_;
+        octez_context_ops |> open_;
         lwt_exit;
         dynlink;
       ]
@@ -3649,7 +3649,7 @@ let octez_store_unix_snapshots =
         octez_stdlib_unix |> open_;
         octez_crypto |> open_;
         octez_shell_services |> open_;
-        octez_context |> open_;
+        octez_context_ops |> open_;
         octez_validation |> open_;
         octez_store_shared |> open_;
         octez_store_unix |> open_;
@@ -4735,7 +4735,7 @@ let octez_node_config =
         octez_shell_services |> open_;
         octez_rpc_http |> open_;
         octez_rpc_http_server |> open_;
-        octez_context |> open_;
+        octez_context_ops |> open_;
         octez_store |> open_;
         octez_validation |> open_;
       ]
@@ -6567,8 +6567,6 @@ let hash = Protocol.hash
             octez_client_commands |> open_;
             octez_stdlib |> open_;
             octez_stdlib_unix |> open_;
-            octez_shell_context |> if_ N.(number <= 020) |> open_;
-            octez_context |> open_;
             octez_context_memory |> if_ (N.(number >= 012) && N.(number <= 019));
             octez_rpc_http_client_unix |> if_ N.(number >= 011);
             octez_rpc_http_client |> if_ N.(number >= 011) |> open_;
@@ -7384,9 +7382,7 @@ let _octez_shell_tests =
         octez_base_test_helpers |> open_;
         octez_store |> open_;
         octez_store_shared |> open_;
-        octez_context |> open_;
         octez_context_ops |> open_;
-        octez_shell_context |> open_;
         octez_protocol_updater |> open_;
         octez_p2p |> open_;
         octez_p2p_services |> open_;
@@ -7676,7 +7672,7 @@ let simulation_scenario_lib =
          octez_client_base_unix |> open_;
          octez_store |> open_;
          octez_store_shared |> open_;
-         octez_context |> open_;
+         octez_context_ops |> open_;
        ]
       @ List.flatten proto_deps)
     ~modules:("sigs" :: proto_tools)

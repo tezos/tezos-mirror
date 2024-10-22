@@ -12,9 +12,7 @@
   octez-libs.base-test-helpers
   octez-shell-libs.store
   octez-shell-libs.store.shared
-  octez-libs.tezos-context
   octez-shell-libs.context-ops
-  octez-shell-libs.shell-context
   octez-shell-libs.protocol-updater
   octez-shell-libs.p2p
   octez-libs.tezos-p2p-services
@@ -38,9 +36,7 @@
   -open Tezos_base_test_helpers
   -open Tezos_store
   -open Tezos_store_shared
-  -open Tezos_context
   -open Tezos_context_ops
-  -open Tezos_shell_context
   -open Tezos_protocol_updater
   -open Tezos_p2p
   -open Tezos_p2p_services

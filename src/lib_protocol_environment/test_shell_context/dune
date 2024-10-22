@@ -7,7 +7,7 @@
  (libraries
   tezt.core
   bls12-381.archive
-  octez-shell-libs.shell-context
+  octez-shell-libs.context-ops
   octez-alcotezt
   octez-libs.test-helpers
   octez-libs.base

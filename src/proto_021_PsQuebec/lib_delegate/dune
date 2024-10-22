@@ -20,7 +20,6 @@
   octez-shell-libs.client-commands
   octez-libs.stdlib
   octez-libs.stdlib-unix
-  octez-libs.tezos-context
   octez-libs.rpc-http-client-unix
   octez-libs.rpc-http-client
   octez-shell-libs.context-ops
@@ -46,7 +45,6 @@
   -open Tezos_client_commands
   -open Tezos_stdlib
   -open Tezos_stdlib_unix
-  -open Tezos_context
   -open Tezos_rpc_http_client
   -open Tezos_context_ops
   -open Tezos_rpc_http
