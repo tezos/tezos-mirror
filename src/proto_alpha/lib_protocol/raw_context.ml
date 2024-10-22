@@ -1176,6 +1176,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
                  consensus_rights_delay;
                  blocks_preservation_cycles;
                  delegate_parameters_activation_delay;
+                 tolerated_inactivity_period;
                  blocks_per_cycle;
                  blocks_per_commitment;
                  nonce_revelation_threshold;
@@ -1227,6 +1228,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             Constants_parametric_repr.consensus_rights_delay;
             blocks_preservation_cycles;
             delegate_parameters_activation_delay;
+            tolerated_inactivity_period;
             blocks_per_cycle;
             blocks_per_commitment;
             nonce_revelation_threshold;
@@ -1514,6 +1516,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             blocks_preservation_cycles;
             delegate_parameters_activation_delay;
             blocks_per_cycle;
+            tolerated_inactivity_period = consensus_rights_delay + 1;
             blocks_per_commitment;
             nonce_revelation_threshold;
             cycles_per_voting_period;

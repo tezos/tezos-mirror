@@ -59,7 +59,7 @@ let adaptive_issuance_activation_delay c =
 (** Tolerated inactivity period for delegates before being deactivated. *)
 let tolerated_inactivity_period c =
   let constants = Raw_context.constants c in
-  1 + constants.consensus_rights_delay
+  constants.tolerated_inactivity_period
 
 (** Delay between consensus key declaration by the delegate and the cycle where
     it has to be used to sign on behalf of the delegate.  *)

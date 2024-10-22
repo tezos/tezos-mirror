@@ -206,6 +206,7 @@ type t = {
   consensus_rights_delay : int;
   blocks_preservation_cycles : int;
   delegate_parameters_activation_delay : int;
+  tolerated_inactivity_period : int;
   blocks_per_cycle : int32;
   blocks_per_commitment : int32;
   nonce_revelation_threshold : int32;
@@ -546,7 +547,8 @@ let encoding =
     (fun c ->
       ( ( ( c.consensus_rights_delay,
             c.blocks_preservation_cycles,
-            c.delegate_parameters_activation_delay ),
+            c.delegate_parameters_activation_delay,
+            c.tolerated_inactivity_period ),
           ( c.blocks_per_cycle,
             c.blocks_per_commitment,
             c.nonce_revelation_threshold,
@@ -590,7 +592,8 @@ let encoding =
                         c.allow_tz4_delegate_enable ) ) ) ) ) ) ) ) ))
     (fun ( ( ( consensus_rights_delay,
                blocks_preservation_cycles,
-               delegate_parameters_activation_delay ),
+               delegate_parameters_activation_delay,
+               tolerated_inactivity_period ),
              ( blocks_per_cycle,
                blocks_per_commitment,
                nonce_revelation_threshold,
@@ -636,6 +639,7 @@ let encoding =
         consensus_rights_delay;
         blocks_preservation_cycles;
         delegate_parameters_activation_delay;
+        tolerated_inactivity_period;
         blocks_per_cycle;
         blocks_per_commitment;
         nonce_revelation_threshold;
@@ -681,10 +685,11 @@ let encoding =
       })
     (merge_objs
        (merge_objs
-          (obj3
+          (obj4
              (req "consensus_rights_delay" uint8)
              (req "blocks_preservation_cycles" uint8)
-             (req "delegate_parameters_activation_delay" uint8))
+             (req "delegate_parameters_activation_delay" uint8)
+             (req "tolerated_inactivity_period" uint8))
           (obj8
              (req "blocks_per_cycle" int32)
              (req "blocks_per_commitment" int32)
