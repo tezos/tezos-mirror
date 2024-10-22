@@ -54,3 +54,10 @@ module Compare : sig
 end
 
 val convert_from_o_to_p : t -> t
+
+module Internal_for_tests : sig
+  val equal : t -> t -> bool
+
+  (** Reader-friendly representation, e.g. "5%" or "0.2%" or "0.01%" *)
+  val pp_human : Format.formatter -> t -> unit
+end

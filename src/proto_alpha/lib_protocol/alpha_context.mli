@@ -152,6 +152,9 @@ module Tez : sig
   val mul_exn : t -> int -> t
 
   val div_exn : t -> int -> t
+
+  (** See {!Tez_repr.mul_percentage}. *)
+  val mul_percentage : rounding:[`Down | `Up] -> t -> Percentage.t -> t
 end
 
 (** This module re-exports definitions from {!Staking_pseudotoken_repr}. *)

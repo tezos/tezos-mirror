@@ -86,7 +86,8 @@ let stake_from_unstake amount current_cycle consensus_rights_delay delegate_name
           | [] -> (acc_unstakes, rem_amount)
           | (Unstaked_frozen.{requests; slash_pct; _} as h) :: t ->
               (* Stake from unstake cannot be called when slashing happened *)
-              assert (Compare.Int.(slash_pct = 0)) ;
+              assert (
+                Protocol.Percentage.(Internal_for_tests.equal slash_pct p0)) ;
               (* This ensures initial = current for each requester.
                  However, the "initial" field is for the sum of all unstakes,
                  so cannot be used here *)
