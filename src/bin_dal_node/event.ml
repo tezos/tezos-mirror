@@ -647,51 +647,60 @@ let get_attestable_slots_ok_notice =
     ~section
     ~name:"get_attestable_slots_ok_notice"
     ~msg:
-      "At level {published_level}, for {attester}, for published slot(s) \
-       {slot_indexes}, all assigned shards were found."
+      "For slots {slots_indices} published at level {published_level}, \
+       {attester} got all its shards."
     ~level:Notice
     ("attester", Signature.Public_key_hash.encoding)
     ("published_level", Data_encoding.int32)
-    ("slot_indexes", Data_encoding.(list int31))
+    ("slots_indices", Data_encoding.(list int31))
     ~pp1:Signature.Public_key_hash.pp_short
     ~pp3:pp_int_list
 
 let get_attestable_slots_not_ok_warning =
-  declare_5
+  declare_4
     ~section
     ~name:"get_attestable_slots_warning"
     ~msg:
-      "At level {published_level}, for {attester}, for published slot(s) \
-       {slot_indexes}, the number of stored shards, namely \
-       {number_of_stored_shards} respectively, is smaller than the expected \
-       number {expected_number_of_shards}."
+      "For slots {slots_indices} published at level {published_level}, \
+       {attester} missed shards:\n\
+       {slot_indexes_with_details}"
     ~level:Warning
     ("attester", Signature.Public_key_hash.encoding)
     ("published_level", Data_encoding.int32)
-    ("slot_indexes", Data_encoding.(list int31))
-    ("number_of_stored_shards", Data_encoding.(list int31))
-    ("expected_number_of_shards", Data_encoding.int16)
+    ("slots_indices", Data_encoding.(list int31))
+    ("slot_indexes_with_details", Data_encoding.(list (tup3 int31 int31 int31)))
     ~pp1:Signature.Public_key_hash.pp_short
     ~pp3:pp_int_list
-    ~pp4:pp_int_list
+    ~pp4:
+      (Format.pp_print_list
+         ~pp_sep:(fun fmt () -> Format.fprintf fmt "\n")
+         (fun fmt (slot_index, stored_shards, expected_shards) ->
+           Format.fprintf
+             fmt
+             " For slot index %d, %d shards out of %d were received"
+             slot_index
+             stored_shards
+             expected_shards))
 
 let warn_attester_not_dal_attesting =
-  declare_1
+  declare_2
     ~section
     ~name:"attester_not_dal_attesting"
-    ~msg:
-      "The attester {attester} has assigned shards, but it did not include a \
-       DAL content in its attestation! Is the baker using the DAL node?"
+    ~msg:"Expected {attester} to include DAL content for level {attested_level}"
     ~level:Warning
     ("attester", Signature.Public_key_hash.encoding)
+    ("attested_level", Data_encoding.int32)
+    ~pp1:Signature.Public_key_hash.pp_short
 
 let warn_attester_did_not_attest_slot =
-  declare_2
+  declare_3
     ~section
     ~name:"attester_did_not_attest_slot"
     ~msg:
-      "The slot with index {slot_index} was attested by sufficiently many \
-       attesters, but not by {attester}, which is registered with this node."
+      "At level {attested_level}, slot index {slot_index} was attested but \
+       shards from {attester} are missing"
     ~level:Warning
     ("attester", Signature.Public_key_hash.encoding)
     ("slot_index", Data_encoding.int31)
+    ("attested_level", Data_encoding.int32)
+    ~pp1:Signature.Public_key_hash.pp_short

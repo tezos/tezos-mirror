@@ -318,20 +318,26 @@ module Profile_handlers = struct
     let* () =
       if List.is_empty not_ok then Lwt.return_unit
       else
-        let not_ok =
+        let count_received_incomplete_shards_per_slot =
           List.filter_map
-            (function `Ok v -> Some v | `Not_ok _ -> None)
+            (function
+              | `Ok _ -> None
+              | `Not_ok (idx, stored) ->
+                  Some (idx, stored, expected_number_of_shards))
             not_ok
         in
-        let indexes, number_of_stored_shards = List.split not_ok in
+        let indexes =
+          List.map
+            (fun (idx, _, _) -> idx)
+            count_received_incomplete_shards_per_slot
+        in
         Event.(
           emit
             get_attestable_slots_not_ok_warning
             ( attester,
               published_level,
               indexes,
-              number_of_stored_shards,
-              expected_number_of_shards ))
+              count_received_incomplete_shards_per_slot ))
     in
     Lwt.return_unit
 
