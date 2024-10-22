@@ -59,7 +59,7 @@ module type S = sig
   val pp : Format.formatter -> _ t -> unit
 
   (** To OCaml parsetree *)
-  val to_expression : _ t -> Parsetree.expression
+  val to_expression : _ t -> Ppxlib.expression
 
   (** Existentials *)
 
@@ -147,7 +147,7 @@ struct
     | Variable _ -> 1
 
   module Parsetree = struct
-    open Ast_helper
+    open Ppxlib.Ast_helper
 
     let loc txt = {Asttypes.txt; loc = Location.none}
 
@@ -163,12 +163,12 @@ struct
 
     let call f args =
       let f = WithExceptions.Option.get ~loc:__LOC__ @@ Longident.unflatten f in
-      let args = List.map (fun x -> (Asttypes.Nolabel, x)) args in
+      let args = List.map (fun x -> (Ppxlib.Nolabel, x)) args in
       Exp.(apply (ident (loc f)) args)
 
     let string_of_fv fv = Format.asprintf "%a" Free_variable.pp fv
 
-    let rec to_expression : type a. a t -> Parsetree.expression = function
+    let rec to_expression : type a. a t -> Ppxlib.expression = function
       | Bool true -> Exp.construct (loc_ident "true") None
       | Bool false -> Exp.construct (loc_ident "false") None
       | Size (Int i) -> call (saturated "safe_int") [Exp.constant (Const.int i)]
@@ -222,7 +222,7 @@ struct
 
   let to_expression = Parsetree.to_expression
 
-  let pp ppf t = Pprintast.expression ppf @@ Parsetree.to_expression t
+  let pp ppf t = Ppxlib.Pprintast.expression ppf @@ Parsetree.to_expression t
 
   (* Existential *)
 
