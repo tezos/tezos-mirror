@@ -1159,6 +1159,32 @@ build_octez_source:
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
 
+build_grafazos_dashboards:
+  image: ${jsonnet_image_name}:${jsonnet_image_tag}
+  stage: build
+  tags:
+  - gcp
+  rules:
+  - changes:
+    - grafazos/**/*
+    when: always
+  - when: manual
+    allow_failure: true
+  dependencies:
+  - oc.docker:jsonnet:amd64
+  timeout: 60 minutes
+  before_script:
+  - cd grafazos/
+  - jb install github.com/grafana/grafonnet/gen/grafonnet-v11.1.0@1ce5aec
+  script:
+  - make
+  artifacts:
+    name: grafazos-dashboards
+    expire_in: 1 day
+    paths:
+    - grafazos/output/**/*.json
+    when: on_success
+
 select_tezts:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: build
@@ -4754,29 +4780,6 @@ oc.build:homebrew:
   - brew install -v scripts/packaging/Formula/octez.rb
   variables:
     CARGO_NET_OFFLINE: "false"
-
-build_grafazos_dashboards:
-  image: ${jsonnet_image_name}:${jsonnet_image_tag}
-  stage: build
-  tags:
-  - gcp
-  rules:
-  - when: manual
-    allow_failure: true
-  dependencies:
-  - oc.docker:jsonnet:amd64
-  timeout: 60 minutes
-  before_script:
-  - cd grafazos/
-  - jb install github.com/grafana/grafonnet/gen/grafonnet-v11.1.0@1ce5aec
-  script:
-  - make
-  artifacts:
-    name: grafazos-dashboards
-    expire_in: 1 day
-    paths:
-    - grafazos/output/**/*.json
-    when: on_success
 
 oc.script.docker_verify_image_arm64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
