@@ -26,14 +26,18 @@ let publisher_shutdown =
     ()
 
 let blueprint_application =
-  declare_2
+  declare_5
     ~name:"blueprint_application"
     ~section
     ~msg:
-      "Applied a blueprint for level {level} leading to creating block \
-       {block_hash}"
+      "Applied a blueprint for level {level} at {timestamp} containing \
+       {txs_nb} transactions for {gas_used} gas leading to creating block \
+       {block_hash}."
     ~level:Notice
     ("level", Data_encoding.n)
+    ("timestamp", Time.Protocol.rfc_encoding)
+    ("txs_nb", Data_encoding.int31)
+    ("gas_used", Data_encoding.n)
     ("block_hash", Ethereum_types.block_hash_encoding)
 
 let blueprint_injection =
@@ -134,7 +138,19 @@ let blueprint_injected_on_DAL ~level ~nb_chunks =
 let blueprint_injection_failed level trace =
   emit blueprint_injection_failure (level, trace)
 
-let blueprint_applied (level, hash) = emit blueprint_application (level, hash)
+let blueprint_applied block =
+  let open Ethereum_types in
+  let count_txs = function
+    | TxHash l -> List.length l
+    | TxFull l -> List.length l
+  in
+  emit
+    blueprint_application
+    ( Qty.to_z block.number,
+      block.timestamp |> Qty.to_z |> Z.to_int64 |> Time.Protocol.of_seconds,
+      count_txs block.transactions,
+      Qty.to_z block.gasUsed,
+      block.hash )
 
 let invalid_blueprint_produced level = emit invalid_blueprint level
 

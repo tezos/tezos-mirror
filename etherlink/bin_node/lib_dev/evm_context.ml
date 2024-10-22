@@ -916,7 +916,7 @@ module State = struct
     let* head_info in
     head_info := session_to_head_info ctxt.session ;
     Metrics.set_level ~level ;
-    Blueprint_events.blueprint_applied (level, block.hash)
+    Blueprint_events.blueprint_applied block
 
   let apply_blueprint ctxt timestamp payload delayed_transactions =
     let open Lwt_result_syntax in
