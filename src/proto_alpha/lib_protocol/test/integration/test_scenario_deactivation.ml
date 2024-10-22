@@ -37,7 +37,7 @@ let check_grace_period ~loc src_name =
   let src = State.find_account src_name state in
   let grace =
     Cycle.add
-      src.last_active_cycle
+      src.last_seen_activity
       (state.State.constants.consensus_rights_delay + 1)
   in
   let* rpc_grace = Context.Delegate.grace_period (B block) src.pkh in

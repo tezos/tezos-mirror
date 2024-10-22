@@ -151,7 +151,7 @@ let begin_test ?(burn_rewards = false) ?(force_attest_all = false)
                 ~liquid
                 ~frozen_deposits
                 ~frozen_rights
-                ~last_active_cycle:
+                ~last_seen_activity:
                   Cycle.(add root constants.consensus_rights_delay)
                 ()
             in
