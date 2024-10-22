@@ -122,11 +122,12 @@ let rec apply_verbosity verbosity {aggregated; recorded} =
   let aggregated, recorded =
     List.fold_left
       (fun (aggregated, recorded) (id, item) ->
+        let filtered_contents = apply_verbosity verbosity item.contents in
         if item.item_verbosity <= verbosity then
           ( aggregated,
-            (id, {item with contents = apply_verbosity verbosity item.contents})
-            :: recorded )
-        else (merge_maps aggregated (aggregate_report item.contents), recorded))
+            (id, {item with contents = filtered_contents}) :: recorded )
+        else
+          (merge_maps aggregated (aggregate_report filtered_contents), recorded))
       (aggregated, [])
       recorded
   in
