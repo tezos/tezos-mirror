@@ -62,7 +62,7 @@ module Codegen_helpers = struct
 
   let call f args =
     let f = WithExceptions.Option.get ~loc:__LOC__ @@ Longident.unflatten f in
-    let args = List.map (fun x -> (Asttypes.Nolabel, x)) args in
+    let args = List.map (fun x -> (Ppxlib.Nolabel, x)) args in
     Exp.(apply (ident (loc f)) args)
 
   let string_of_fv fv = Format.asprintf "%a" Free_variable.pp fv
