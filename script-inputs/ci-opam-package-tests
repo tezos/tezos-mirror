@@ -44,6 +44,7 @@ octez-protocol-020-PsParisC-libs	all	2
 octez-protocol-021-PsQuebec-libs	all	2
 octez-protocol-alpha-libs	all	2
 octez-protocol-compiler	exec	6
+octez-protocol-compiler-compat	all	7
 octez-riscv-api	all	7
 octez-riscv-pvm	all	6
 octez-rpc-process	all	4
