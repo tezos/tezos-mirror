@@ -126,7 +126,7 @@ Smart Rollup node
 - Storage now uses SQLite as a backend instead of the custom indexed-file based
   store. This change makes the rollup node more robust but entails a migration
   of the store data. (MRs :gl:`!15053`, :gl:`!15026`, :gl:`!15059`,
-  :gl:`!15073`, :gl:`!15218`)
+  :gl:`!15073`, :gl:`!15218`, :gl:`!15257`)
 
 Smart Rollup WASM Debugger
 --------------------------
