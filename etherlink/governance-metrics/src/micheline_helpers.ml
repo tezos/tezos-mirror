@@ -41,3 +41,7 @@ let decode_option decode_some =
       Ok (Some arg)
   | Prim (_, "None", [], _) -> Ok None
   | _ -> error_with "DecodeOptionError"
+
+let decode_set decode_elt = function
+  | Seq (_, all_elt) -> List.map_e decode_elt all_elt
+  | _ -> error_with "DecodeSetError"

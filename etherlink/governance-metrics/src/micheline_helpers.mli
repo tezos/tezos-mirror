@@ -32,3 +32,10 @@ val decode_option :
   (Micheline_parser.node -> 'b tzresult) ->
   Micheline_parser.node ->
   'b option tzresult
+
+(** [decode_set f set] decode [set] as a micheline set into a list and applies [f] to all
+    elements of [set]. *)
+val decode_set :
+  (Micheline_parser.node -> 'b tzresult) ->
+  Micheline_parser.node ->
+  'b list tzresult

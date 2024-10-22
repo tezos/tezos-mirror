@@ -89,6 +89,7 @@ type config = {
   period_length : Z.t;
   adoption_period_sec : Z.t;
   upvoting_limit : Z.t;
+  allowed_proposer : string list;
   scale : Z.t;
   proposal_quorum : Z.t;
   promotion_quorum : Z.t;
@@ -122,6 +123,39 @@ let decode_config micheline =
             period_length;
             adoption_period_sec;
             upvoting_limit;
+            allowed_proposer = [];
+            scale;
+            proposal_quorum;
+            promotion_quorum;
+            promotion_supermajority;
+          }
+    | [
+        started_at_level;
+        period_length;
+        adoption_period_sec;
+        upvoting_limit;
+        allowed_proposer;
+        scale;
+        proposal_quorum;
+        promotion_quorum;
+        promotion_supermajority;
+      ] ->
+        let* started_at_level = decode_nat started_at_level in
+        let* period_length = decode_nat period_length in
+        let* adoption_period_sec = decode_nat adoption_period_sec in
+        let* upvoting_limit = decode_nat upvoting_limit in
+        let* allowed_proposer = decode_set decode_string allowed_proposer in
+        let* scale = decode_nat scale in
+        let* proposal_quorum = decode_nat proposal_quorum in
+        let* promotion_quorum = decode_nat promotion_quorum in
+        let* promotion_supermajority = decode_nat promotion_supermajority in
+        Ok
+          {
+            started_at_level;
+            period_length;
+            adoption_period_sec;
+            upvoting_limit;
+            allowed_proposer;
             scale;
             proposal_quorum;
             promotion_quorum;

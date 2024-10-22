@@ -19,6 +19,7 @@ type config = {
   period_length : Z.t;
   adoption_period_sec : Z.t;
   upvoting_limit : Z.t;
+  allowed_proposer : string list; (* address list *)
   scale : Z.t;
   proposal_quorum : Z.t;
   promotion_quorum : Z.t;
