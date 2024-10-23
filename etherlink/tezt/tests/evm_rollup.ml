@@ -3722,8 +3722,8 @@ let test_transaction_storage_before_and_after_migration =
     ~scenario_after
     protocol
 
-(* TODO: remove me after Ghostnet upgrade *)
-let test_fa_bridge_flag_after_migration_v14 ~kernel_from ~chain_id ~chain_id_hex
+(* TODO: remove me after Mainnet upgrade *)
+let test_fa_bridge_flag_after_migration_v22 ~kernel_from ~chain_id ~chain_id_hex
     ~flag_expected =
   let chain_name, kernel_wasm_const =
     match kernel_from with
@@ -3732,7 +3732,7 @@ let test_fa_bridge_flag_after_migration_v14 ~kernel_from ~chain_id ~chain_id_hex
   in
   Protocol.register_test
     ~__FILE__
-    ~tags:["evm"; "migration"; "v14"; "fa_bridge"; "flag"]
+    ~tags:["evm"; "migration"; "v22"; "fa_bridge"; "flag"]
     ~uses:(fun _protocol ->
       [
         Constant.octez_smart_rollup_node;
@@ -3743,7 +3743,7 @@ let test_fa_bridge_flag_after_migration_v14 ~kernel_from ~chain_id ~chain_id_hex
       ])
     ~title:
       (sf
-         "FA bridge flag before and after migration v14 [%s -> latest]"
+         "FA bridge flag before and after migration v22 [%s -> latest]"
          chain_name)
   @@ fun protocol ->
   let assert_chain_id ~sc_rollup_node ~expected =
@@ -6531,12 +6531,12 @@ let register_evm_node ~protocols =
   test_simulation_out_of_funds protocols ;
   test_rpc_state_value_and_subkeys protocols ;
   (* See https://docs.etherlink.com/get-started/network-information for chain constants *)
-  test_fa_bridge_flag_after_migration_v14
+  test_fa_bridge_flag_after_migration_v22
     ~kernel_from:Mainnet
     ~chain_id:42793
     ~chain_id_hex:
       "29a7000000000000000000000000000000000000000000000000000000000000"
-    ~flag_expected:false
+    ~flag_expected:true
     protocols ;
   test_proxy_ignore_block_param protocols
 

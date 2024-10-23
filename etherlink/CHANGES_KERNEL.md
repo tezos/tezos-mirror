@@ -8,16 +8,9 @@
 
 - The kernel is able to trace calls for the `callTracer` configuration. (!14290)
 - Gas cost of XTZ withdrawals is increased to prevent abuses. (!14016)
-- Support of larger delayed transactions (was limited at 4KBytes before). (!14467 !15353)
-
-#### Experimental
-
-##### FA Bridge
-
-The FA Bridge complements the native bridge already available on both Mainnet
-Beta and Testnet, and allows users to deposit and withdraw FA 2.1 tokens.
-
 - Gas cost of FA withdrawals is increased to prevent abuses. (!14016)
+- Support of larger delayed transactions (was limited at 4KBytes before). (!14467 !15353)
+- Enable the FA bridge on Mainnet (!15355)
 
 ### Internal
 
