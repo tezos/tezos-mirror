@@ -86,11 +86,11 @@ will run a docker image. This docker image must follow some conditions
 use your own dockerfile.
 
 To help you write such an image, a default one based on debian is
-provided in `tezt/lib_cloud/default.Dockerfile`.
+provided in `tezt/lib_cloud/debian.Dockerfile`.
 
 The library takes care for you to push this image on a dedicated GCP
 registry. A docker image such as the one generated from
-`default.Dockerfile` may contain some binaries. Tezt cloud always
+`debian.Dockerfile` may contain some binaries. Tezt cloud always
 try to rebuild the docker image to be sure it uses the last version,
 however be sure to compile the binaries beforehand.
 
@@ -105,15 +105,16 @@ supported.
 
 Depending on your local setup, we recommend to copy/paste an image that is
 similar to your local setup. An example for a ubuntu/debian-like machine is
-given by `default.Dockerfile`. At the moment, several assumptions are made:
+given by `debian.Dockerfile`. At the moment, several assumptions are made:
 
 1. An ssh server is running on port `30000`
 2. For convenience, we recommend the image to contain the minimum necessary to
    run Octez binaries that were compiled on your local setup. In particular, we
    use the docker variable `ZCASH_PARAMS_PATH` to provide the place where the
    zcash parameters are used.
-3. Optionally, you can also put the binaries into the docker image (see
-   `default.Dockerfile`).
+3. Optionally, you can also put the binaries into the docker image
+   (see `debian.Dockerfile`). This is useful if you are using multiple
+   VMs, otherwise your upload bandwidth may limit the deployement time
 
 To ensure you can connect to the ssh server, the library generates (if
 it does not exist) and ssh key based on the `tezt-cloud` variable.

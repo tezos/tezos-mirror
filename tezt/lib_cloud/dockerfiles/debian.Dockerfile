@@ -53,3 +53,9 @@ COPY $DAL_TRUSTED_SETUP_PATH /usr/local/share/dal-trusted-setup
 # We run the ssh server but not as a daemon on the port 30000
 CMD ["-D", "-p", "30000", "-e"]
 ENTRYPOINT ["/usr/sbin/sshd"]
+
+FROM base AS full
+# Path where binaries should be stored on the docker container
+ARG BINARIES_DESTINATION_PATH
+COPY ./octez-node $BINARIES_DESTINATION_PATH/octez-node
+# Feel free to complete with the binaries you need
