@@ -103,21 +103,36 @@ supported.
 
 ## Write your own dockerfile
 
-Depending on your local setup, we recommend to copy/paste an image that is
-similar to your local setup. An example for a ubuntu/debian-like machine is
-given by `debian.Dockerfile`. At the moment, several assumptions are made:
+Depending on your local setup, we recommend copying and pasting an
+image that closely matches your environment. An example for an
+Ubuntu/Debian-like machine is given by `debian.Dockerfile`. The
+following assumptions apply:
 
 1. An ssh server is running on port `30000`
-2. For convenience, we recommend the image to contain the minimum necessary to
-   run Octez binaries that were compiled on your local setup. In particular, we
-   use the docker variable `ZCASH_PARAMS_PATH` to provide the place where the
-   zcash parameters are used.
-3. Optionally, you can also put the binaries into the docker image
-   (see `debian.Dockerfile`). This is useful if you are using multiple
-   VMs, otherwise your upload bandwidth may limit the deployement time
+
+2. For convenience, the image should include the minimum necessary
+components to run Octez binaries compiled on your local setup. In
+particular, the Docker variables ZCASH_PARAMS_PATH and
+DAL_TRUSTED_SETUP_PATH should specify the location where the Zcash
+parameters and DAL trusted setup are used.
+
+3. Optionally, you can also put the binaries into the docker image (see
+   `debian.Dockerfile`).
 
 To ensure you can connect to the ssh server, the library generates (if
 it does not exist) and ssh key based on the `tezt-cloud` variable.
+
+**Note**: In addition to the Dockerfile, you need to create a
+  `.dockerignore` file in the same directory. This ensures the Docker
+  context doesn't exclude some files ignored by the main Octez
+  Dockerfiles but still needed for tezt-cloud.
+
+### OS specific dockerfiles
+
+If you can't find an existing image that fits your distribution, feel
+free to create one. If you do so, remember to update the project's
+.gitignore file accordingly to ensure any changes to these files are
+committed.
 
 # One-time deployment
 
