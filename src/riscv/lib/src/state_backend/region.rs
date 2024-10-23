@@ -90,8 +90,10 @@ impl<E: serde::Serialize, M: ManagerSerialise> RootHashable for Cell<E, M> {
     }
 }
 
-impl<E: Eq + Copy, M: ManagerRead> PartialEq for Cell<E, M> {
-    fn eq(&self, other: &Self) -> bool {
+impl<A: PartialEq<B> + Copy, B: Copy, M: ManagerRead, N: ManagerRead> PartialEq<Cell<B, N>>
+    for Cell<A, M>
+{
+    fn eq(&self, other: &Cell<B, N>) -> bool {
         self.read() == other.read()
     }
 }
@@ -309,8 +311,10 @@ impl<E: serde::Serialize, const LEN: usize, M: ManagerSerialise> RootHashable fo
     }
 }
 
-impl<E: Eq + Copy, const LEN: usize, M: ManagerRead> PartialEq for Cells<E, LEN, M> {
-    fn eq(&self, other: &Self) -> bool {
+impl<A: PartialEq<B> + Copy, B: Copy, const LEN: usize, M: ManagerRead, N: ManagerRead>
+    PartialEq<Cells<B, LEN, N>> for Cells<A, LEN, M>
+{
+    fn eq(&self, other: &Cells<B, LEN, N>) -> bool {
         (0..LEN).all(|i| self.read(i) == other.read(i))
     }
 }
