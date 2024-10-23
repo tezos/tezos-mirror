@@ -152,6 +152,10 @@ module type METRIC = sig
 
   (** [clear] will clean every metric that was sent. *)
   val clear : family -> unit
+
+  (** [clear_specific t labels] will clear a specific metric [t] that matches the given
+      [labels]. *)
+  val clear_specific : family -> string list -> unit
 end
 
 (** A counter is a cumulative metric that represents a single numerical value that only ever goes up. *)

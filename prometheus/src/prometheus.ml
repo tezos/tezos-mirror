@@ -191,6 +191,8 @@ module type METRIC = sig
     t
 
   val clear : family -> unit
+
+  val clear_specific : family -> string list -> unit
 end
 
 module type CHILD = sig
@@ -263,6 +265,9 @@ end = struct
     labels family []
 
   let clear t = t.children <- LabelSetMap.empty
+
+  let clear_specific t labels =
+    t.children <- LabelSetMap.remove labels t.children
 end
 
 module Counter = struct
