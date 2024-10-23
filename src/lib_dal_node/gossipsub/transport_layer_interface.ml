@@ -30,7 +30,7 @@ module Types = Tezos_dal_node_services.Types
 
    Version this type to ease future migrations. *)
 module P2p_message_V1 = struct
-  type px_peer = {point : P2p_point.Id.t; peer : P2p_peer.Id.t}
+  type px_peer = Types.Peer.t
 
   type p2p_message =
     | Graft of {topic : Types.Topic.t}
@@ -52,10 +52,11 @@ module P2p_message_V1 = struct
   let px_peer_encoding =
     let open Data_encoding in
     conv
-      (fun {point; peer} -> (point, peer))
-      (fun (point, peer) -> {point; peer})
+      (fun Types.Peer.{maybe_reachable_point; peer_id} ->
+        (maybe_reachable_point, peer_id))
+      (fun (maybe_reachable_point, peer_id) -> {maybe_reachable_point; peer_id})
       (obj2
-         (req "point" P2p_point.Id.encoding)
+         (req "maybe_reachable_point" P2p_point.Id.encoding)
          (req "peer" P2p_peer.Id.encoding))
 
   (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5564
@@ -161,7 +162,7 @@ module P2p_message_V1 = struct
           Types.Topic.pp
           topic
           (pp_list Types.Peer.pp)
-          (List.of_seq px |> List.map (fun px_peer -> px_peer.peer))
+          (List.of_seq px)
           Types.Span.pp
           backoff
     | IHave {topic; message_ids} ->

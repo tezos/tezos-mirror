@@ -112,7 +112,7 @@ module Message : sig
   include ENCODABLE with type t := t
 end
 
-(** A connection from the point of view of gossipsub. *)
+(** A peer from the point of view of gossipsub. *)
 module Peer : sig
   (** For incoming connections, we know the peer is reachable, and the peer's
      address and the port are provided by the octez-p2p layer.
@@ -127,25 +127,6 @@ module Peer : sig
 
   (** Comparison is not a structural one, instead only the [peer_id]
       is used. *)
-
-  include PRINTABLE with type t := t
-
-  include ENCODABLE with type t := t
-
-  include COMPARABLE with type t := t
-
-  module Set : Set.S with type elt = t
-
-  module Map : Map.S with type key = t
-end
-
-(** From the Gossipsub point of view, a peer is given by a cryptographic node
-    identity {!P2p_peer.Id.t}. It's up to the caller to associate the
-    {!P2p_peer.Id.t} to a {!P2p_point.Id.t} if needed (to e.g. implement peers
-    exchange, which needs addresses and ports instead of cryptographic
-    identities). *)
-module Peer : sig
-  type t = P2p_peer.Id.t
 
   include PRINTABLE with type t := t
 

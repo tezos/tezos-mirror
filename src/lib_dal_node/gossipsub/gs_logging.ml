@@ -207,17 +207,23 @@ let event =
   | P2P_input event -> (
       match event with
       | New_connection {peer; direct; trusted; bootstrap} ->
-          emit new_connection (peer, direct, trusted, bootstrap)
-      | Disconnection {peer} -> emit disconnection peer
+          emit new_connection (peer.peer_id, direct, trusted, bootstrap)
+      | Disconnection {peer} -> emit disconnection peer.peer_id
       | In_message {from_peer; p2p_message} -> (
           match p2p_message with
           | Message_with_header {message = _; topic; message_id} ->
-              emit message_with_header (from_peer, topic, message_id)
-          | Subscribe {topic} -> emit subscribe (from_peer, topic)
-          | Unsubscribe {topic} -> emit unsubscribe (from_peer, topic)
-          | Graft {topic} -> emit graft (from_peer, topic)
+              emit message_with_header (from_peer.peer_id, topic, message_id)
+          | Subscribe {topic} -> emit subscribe (from_peer.peer_id, topic)
+          | Unsubscribe {topic} -> emit unsubscribe (from_peer.peer_id, topic)
+          | Graft {topic} -> emit graft (from_peer.peer_id, topic)
           | Prune {topic; px; backoff} ->
-              emit prune (from_peer, topic, backoff, List.of_seq px)
+              emit
+                prune
+                ( from_peer.peer_id,
+                  topic,
+                  backoff,
+                  List.of_seq px
+                  |> List.map (fun Types.Peer.{peer_id; _} -> peer_id) )
           | IHave {topic; message_ids} ->
-              emit ihave (from_peer, topic, message_ids)
-          | IWant {message_ids} -> emit iwant (from_peer, message_ids)))
+              emit ihave (from_peer.peer_id, topic, message_ids)
+          | IWant {message_ids} -> emit iwant (from_peer.peer_id, message_ids)))

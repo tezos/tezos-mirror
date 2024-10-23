@@ -136,13 +136,14 @@ end = struct
       P2p_peer.Id.equal px_peer k2.px_peer
       &&
       match (origin, k2.origin) with
-      | PX peer1, PX peer2 -> P2p_peer.Id.equal peer1 peer2
+      | PX peer1, PX peer2 -> P2p_peer.Id.equal peer1.peer_id peer2.peer_id
       | Trusted, Trusted -> true
       | PX _, _ | Trusted, _ -> false
 
     let hash {origin; px_peer} =
       match origin with
-      | PX peer -> (P2p_peer.Id.hash px_peer * 31) + P2p_peer.Id.hash peer
+      | PX peer ->
+          (P2p_peer.Id.hash px_peer * 31) + P2p_peer.Id.hash peer.peer_id
       | Trusted -> P2p_peer.Id.hash px_peer * 17
   end)
 
@@ -164,10 +165,10 @@ end
    missing from the connection's metadata, the function inspects the Internet
    connection link's information. It returns [None] if it does manage to get
    those information with both methods. *)
-let px_peer_of_peer p2p_layer peer =
+let px_peer_of_peer p2p_layer peer_id =
   let open Option_syntax in
   let open Transport_layer_interface in
-  let* conn = P2p.find_connection_by_peer_id p2p_layer peer in
+  let* conn = P2p.find_connection_by_peer_id p2p_layer peer_id in
   (* In general, people either provide an address and a port, or just a port.
      In any case, we use `P2p.connection_remote_metadata` to get the address and
      the port of the provided values, and we fall back to the values given by
@@ -185,7 +186,7 @@ let px_peer_of_peer p2p_layer peer =
   in
   let addr = Option.value advertised_net_addr ~default:conn_addr in
   let* port = Option.either advertised_net_port conn_port_opt in
-  return {point = (addr, port); peer}
+  return Types.Peer.{maybe_reachable_point = (addr, port); peer_id}
 
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/6637
 
@@ -196,8 +197,29 @@ let px_peer_of_peer p2p_layer peer =
    table. *)
 let cache_point_of_trusted_peer p2p_layer px_cache peer =
   px_peer_of_peer p2p_layer peer
-  |> Option.iter (fun Transport_layer_interface.{point; peer} ->
-         PX_cache.insert px_cache ~origin:Trusted ~px_peer:peer point)
+  |> Option.iter (fun Types.Peer.{maybe_reachable_point; peer_id} ->
+         PX_cache.insert
+           px_cache
+           ~origin:Trusted
+           ~px_peer:peer_id
+           maybe_reachable_point)
+
+let peer_of_connection p2p_layer conn =
+  let open Types.P2P.Metadata.Connection in
+  let {P2p_connection.Info.peer_id; id_point; remote_metadata; _} =
+    P2p.connection_info p2p_layer conn
+  in
+  let default_port =
+    Transport_layer_default_parameters.P2p_config.listening_port
+  in
+  let addr =
+    Option.value remote_metadata.advertised_net_addr ~default:(fst id_point)
+  in
+  let port =
+    Option.value remote_metadata.advertised_net_port ~default:default_port
+  in
+  let maybe_reachable_point = (addr, port) in
+  Types.Peer.{peer_id; maybe_reachable_point}
 
 (** This handler forwards information about connections established by the P2P
     layer to the Gossipsub worker.
@@ -212,7 +234,7 @@ let cache_point_of_trusted_peer p2p_layer px_cache peer =
     outbound to avoid possible love bombing attacks. The Rust version also
     implements a way to mitigate this risk, but not the Go implementation.
 *)
-let new_connections_handler px_cache gs_worker p2p_layer peer conn =
+let new_connections_handler px_cache gs_worker p2p_layer peer_id conn =
   let P2p_connection.Info.{id_point = addr, port_opt; _} =
     P2p.connection_info p2p_layer conn
   in
@@ -226,7 +248,7 @@ let new_connections_handler px_cache gs_worker p2p_layer peer conn =
       ~none:true (* It doesn't matter in fake networks where pool is None *)
       ~some:(fun pool -> f pool arg)
   in
-  let trusted_peer = fold_pool_opt P2p_pool.Peers.get_trusted peer in
+  let trusted_peer = fold_pool_opt P2p_pool.Peers.get_trusted peer_id in
   let trusted_point =
     Option.fold port_opt ~none:false ~some:(fun port ->
         fold_pool_opt P2p_pool.Points.get_trusted (addr, port))
@@ -236,25 +258,27 @@ let new_connections_handler px_cache gs_worker p2p_layer peer conn =
 
      Add the ability to have direct peers. *)
   let direct = false in
-  if trusted then cache_point_of_trusted_peer p2p_layer px_cache peer ;
+  if trusted then cache_point_of_trusted_peer p2p_layer px_cache peer_id ;
+  let peer = peer_of_connection p2p_layer conn in
   Worker.(
     New_connection {peer; direct; trusted; bootstrap} |> p2p_input gs_worker)
 
 (** This handler forwards information about P2P disconnections to the Gossipsub
     worker. *)
-let disconnections_handler gs_worker peer =
+let disconnections_handler gs_worker _peer =
+  (* Will be fixed in the next commit. The diff of this commit will
+     already be quite difficult to review. *)
+  let peer = assert false in
   Worker.(Disconnection {peer} |> p2p_input gs_worker)
 
 (* This function translates a Worker p2p_message to the type of messages sent
    via the P2P layer. The two types don't coincide because of Prune. *)
-let wrap_p2p_message p2p_layer =
+let wrap_p2p_message _p2p_layer =
   let module W = Worker in
   let open Transport_layer_interface in
   function
   | W.Graft {topic} -> Graft {topic}
-  | W.Prune {topic; px; backoff} ->
-      let px = Seq.filter_map (fun peer -> px_peer_of_peer p2p_layer peer) px in
-      Prune {topic; px; backoff}
+  | W.Prune {topic; px; backoff} -> Prune {topic; px; backoff}
   | W.IHave {topic; message_ids} -> IHave {topic; message_ids}
   | W.IWant {message_ids} -> IWant {message_ids}
   | W.Subscribe {topic} -> Subscribe {topic}
@@ -272,14 +296,15 @@ let unwrap_p2p_message p2p_layer ~from_peer px_cache =
   | I.Prune {topic; px; backoff} ->
       let px =
         Seq.map
-          (fun I.{point; peer} ->
-            if Option.is_none @@ P2p.find_connection_by_peer_id p2p_layer peer
+          (fun (Types.Peer.{maybe_reachable_point; peer_id} as peer) ->
+            if
+              Option.is_none @@ P2p.find_connection_by_peer_id p2p_layer peer_id
             then
               PX_cache.insert
                 px_cache
                 ~origin:(PX from_peer)
-                ~px_peer:peer
-                point ;
+                ~px_peer:peer_id
+                maybe_reachable_point ;
             peer)
           px
       in
@@ -367,7 +392,7 @@ let gs_worker_p2p_output_handler gs_worker p2p_layer px_cache =
     let* () =
       match p2p_output with
       | Worker.Out_message {to_peer; p2p_message} -> (
-          let conn = P2p.find_connection_by_peer_id p2p_layer to_peer in
+          let conn = P2p.find_connection_by_peer_id p2p_layer to_peer.peer_id in
           match conn with
           | None ->
               (* This could happen when the peer is disconnected or the
@@ -377,13 +402,13 @@ let gs_worker_p2p_output_handler gs_worker p2p_layer px_cache =
                  Are there weird cases in which there is no connection
                  associated to the peer, but the peer is still registered as
                  connected on the GS side? *)
-              Events.(emit no_connection_for_peer to_peer)
+              Events.(emit no_connection_for_peer to_peer.peer_id)
           | Some conn -> (
               let* (res : unit tzresult) =
                 let msg = wrap_p2p_message p2p_layer p2p_message in
                 let* () =
                   if log_sending_message p2p_message then
-                    Events.(emit send_p2p_message (to_peer, msg))
+                    Events.(emit send_p2p_message (to_peer.peer_id, msg))
                   else return_unit
                 in
                 P2p.send p2p_layer conn msg
@@ -391,20 +416,20 @@ let gs_worker_p2p_output_handler gs_worker p2p_layer px_cache =
               match res with
               | Ok () -> return_unit
               | Error err ->
-                  Events.(emit send_p2p_message_failed (to_peer, err))))
+                  Events.(emit send_p2p_message_failed (to_peer.peer_id, err))))
       | Disconnect {peer} ->
-          P2p.find_connection_by_peer_id p2p_layer peer
+          P2p.find_connection_by_peer_id p2p_layer peer.peer_id
           |> Option.iter_s
                (P2p.disconnect ~reason:"disconnected by Gossipsub" p2p_layer)
       | Connect {peer; origin} ->
-          try_connect p2p_layer px_cache ~px_peer:peer ~origin
+          try_connect p2p_layer px_cache ~px_peer:peer.peer_id ~origin
       | Connect_point {point} -> try_connect_point p2p_layer point
       | Forget {peer; origin} ->
-          PX_cache.drop px_cache ~px_peer:peer ~origin:(PX origin) ;
+          PX_cache.drop px_cache ~px_peer:peer.peer_id ~origin:(PX origin) ;
           return_unit
       | Kick {peer} ->
           P2p.pool p2p_layer
-          |> Option.iter_s (fun pool -> P2p_pool.Peers.ban pool peer)
+          |> Option.iter_s (fun pool -> P2p_pool.Peers.ban pool peer.peer_id)
     in
     loop output_stream
   in
@@ -416,9 +441,7 @@ let transport_layer_inputs_handler gs_worker p2p_layer advertised_px_cache =
   let open Lwt_syntax in
   let rec loop () =
     let* conn, msg = P2p.recv_any p2p_layer in
-    let {P2p_connection.Info.peer_id = from_peer; _} =
-      P2p.connection_info p2p_layer conn
-    in
+    let from_peer = peer_of_connection p2p_layer conn in
     Worker.(
       In_message
         {
