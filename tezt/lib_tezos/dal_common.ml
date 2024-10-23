@@ -430,7 +430,10 @@ module Dal_RPC = struct
     in
     let as_topic_and_peers json =
       let topic = get "topic" json |> as_topic in
-      let peers = get "peers" json |> as_list |> List.map as_string in
+      let peers =
+        get "peers" json |> as_list
+        |> List.map (fun x -> x |-> "peer_id" |> as_string)
+      in
       (topic, peers)
     in
     make ~query_string GET ["p2p"; "gossipsub"; "topics"; "peers"] (fun json ->
