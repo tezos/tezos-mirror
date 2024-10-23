@@ -78,6 +78,14 @@ __pycache__
 
 client-libs/kaitai-struct-files/doc
 
+# Ignore individual dockerfiles for `tezt-cloud`
+tezt/lib_cloud/dockerfiles/*.Dockerfile
+tezt/lib_cloud/dockerfiles/*.Dockerfile.dockerignore
+# Unless it is an OS specific dockerfile or an Octez one
+!tezt/lib_cloud/dockerfiles/debian.Dockerfile
+!tezt/lib_cloud/dockerfiles/debian.Dockerfile.dockerignore
+!tezt/lib_cloud/dockerfiles/octez.Dockerfile
+!tezt/lib_cloud/dockerfiles/octez.Dockerfile.dockerignore
 .merlin
 
 *~
