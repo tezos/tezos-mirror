@@ -1,7 +1,9 @@
 # When copying this image, feel free to change to debian:stable if you
 # encounter any dependency issue
-FROM debian:sid as raw
+FROM debian:sid AS base
 
+# ignore "Pin versions in apt get install" hadolint warning
+# hadolint ignore=DL3008
 RUN apt-get update && apt-get install -y \
     # netbase is needed to handle transport services
     netbase \
@@ -11,10 +13,20 @@ RUN apt-get update && apt-get install -y \
     openssh-server \
     # Tezos dependencies
     libgmp-dev curl libev-dev libhidapi-dev \
-    # With the proxy mode we may want to run docker inside docker
-    docker.io screen \
+    # Teztale dependencies
+    libpq-dev \
+    # Dependencies needed for tezt-cloud
+    docker.io docker-cli screen file \
+    # iproute2 installs traffic control tooling
+    iproute2 \
+    # emacs can be useful for debugging
+    emacs \
+    # wget can be used to import snapshots
+    wget \
     # Necessary certificates for mirages dependencies
     ca-certificates \
+    # jq is useful for pretty-printing json
+    jq \
     # nginx is used as reverse proxy to balance the load between DAL nodes
     nginx \
     # DL3015: Use --no-install-recommends
@@ -41,3 +53,9 @@ COPY $DAL_TRUSTED_SETUP_PATH /usr/local/share/dal-trusted-setup
 # We run the ssh server but not as a daemon on the port 30000
 CMD ["-D", "-p", "30000", "-e"]
 ENTRYPOINT ["/usr/sbin/sshd"]
+
+FROM base AS full
+# Path where binaries should be stored on the docker container
+ARG BINARIES_DESTINATION_PATH
+COPY ./octez-node $BINARIES_DESTINATION_PATH/octez-node
+# Feel free to complete with the binaries you need

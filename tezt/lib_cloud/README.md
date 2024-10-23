@@ -86,11 +86,11 @@ will run a docker image. This docker image must follow some conditions
 use your own dockerfile.
 
 To help you write such an image, a default one based on debian is
-provided in `tezt/lib_cloud/saroupille.Dockerfile`.
+provided in `tezt/lib_cloud/debian.Dockerfile`.
 
 The library takes care for you to push this image on a dedicated GCP
 registry. A docker image such as the one generated from
-`saroupille.Dockerfile` may contain some binaries. Tezt cloud always
+`debian.Dockerfile` may contain some binaries. Tezt cloud always
 try to rebuild the docker image to be sure it uses the last version,
 however be sure to compile the binaries beforehand.
 
@@ -105,15 +105,16 @@ supported.
 
 Depending on your local setup, we recommend to copy/paste an image that is
 similar to your local setup. An example for a ubuntu/debian-like machine is
-given by `saroupille.Dockerfile`. At the moment, several assumptions are made:
+given by `debian.Dockerfile`. At the moment, several assumptions are made:
 
 1. An ssh server is running on port `30000`
 2. For convenience, we recommend the image to contain the minimum necessary to
    run Octez binaries that were compiled on your local setup. In particular, we
    use the docker variable `ZCASH_PARAMS_PATH` to provide the place where the
    zcash parameters are used.
-3. Optionally, you can also put the binaries into the docker image (see
-   `saroupille.Dockerfile`).
+3. Optionally, you can also put the binaries into the docker image
+   (see `debian.Dockerfile`). This is useful if you are using multiple
+   VMs, otherwise your upload bandwidth may limit the deployement time
 
 To ensure you can connect to the ssh server, the library generates (if
 it does not exist) and ssh key based on the `tezt-cloud` variable.
@@ -149,7 +150,7 @@ Any Tezt cloud scenario can be run on the host machine for checking
 any deployment error, this is the `localhost` mode. Hence, when
 testing any scenario we recommend to provide the `--localhost`
 parameter with a low number of machines to check whether your scenario
-works as expected. 
+works as expected.
 
 When you are ready to deploy resources, you can remove the
 `--localhost` option, or alternatively use the `--cloud` option. When
@@ -276,10 +277,10 @@ To reattach the test, simply rerun the command. Normally, it should
 reattach back the running experiment.
 
 Killing an experiment manually requires some care. You must do it in
-two steps: 
+two steps:
 
 1. Press Ctrl+C. This will trigger the shutdown of the
-experiment. 
+experiment.
 
 2. Once you see the scenario has ended properly, you can press Ctrl+D.
 
@@ -299,7 +300,7 @@ mode to ensure the scenario behaves as expected.
 
 With the proxy mode, we recommend to use the website if you want to
 follow your experiment. The website should be provided in the logs
-once you detach from the experiment. 
+once you detach from the experiment.
 
 Otherwise, you can connect to it by looking at the external IP address
 of the `proxy` machine on GCP and use the port `8080`.
@@ -310,7 +311,7 @@ The website deployed with the proxy mode can be associated with a
 domain name if the `--dns` argument is provided (true by default).
 
 The domain associated with the website will be:
-`http://<tezt_cloud>.<gcp-project>.<domain>`. 
+`http://<tezt_cloud>.<gcp-project>.<domain>`.
 
 To make it work, any project must register a subdomain zone
 beforehand. This can be done via:
@@ -320,7 +321,7 @@ dune exec tezt/tests/cloud/main.exe -- cloud create dns zone -v --dns-domain <do
 ```
 
 The name servers associated with this domain must be added manually to
-the domain regstriy associated with `<domain>`. 
+the domain regstriy associated with `<domain>`.
 
 You can check this work as expected by running:
 
