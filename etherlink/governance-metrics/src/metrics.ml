@@ -95,6 +95,11 @@ let get_metric_txt ~metric = function
   | Kernel -> "kernel_" ^ metric
   | Security_kernel -> "security_kernel_" ^ metric
 
+(* This normalization is necessary because two contracts on Ghostnet are
+   using "yay" instead of "yea" to vote yes, normalizing help with Grafana
+   and Prometheus to have consistant values on the dashboard. *)
+let normalize_vote ~value = match value with "yay" -> "yea" | str -> str
+
 module MetricsRegistration = struct
   (* This module will set every metric **ONCE** at top level to avoid
      a fatal error from Grafana: registering the same metric multiple
@@ -325,7 +330,9 @@ module GovernanceMetrics = struct
   end
 
   module Entrypoints = struct
-    let vote ~source ~value = function
+    let vote ~source ~value contract_type =
+      let value = normalize_vote ~value in
+      match contract_type with
       | Sequencer ->
           set_gauge
             MetricsRegistration.SequencerEntrypointsRegistration.vote
