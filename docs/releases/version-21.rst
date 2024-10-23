@@ -81,6 +81,23 @@ Octez v21.0 introduces several UX improvements to the :doc:`logging infrastructu
 
 Please see the `Changelog`_ for further information and other optimizations.
 
+Minimal hardware specifications
+-------------------------------
+
+Our benchmarks suggest the following *minimal* specs for Octez node and baker operators:
+
+- 3 CPU cores: 2 needed by the node and 1 needed by the baker (arm64 or amd64/x86-64)
+- 8GB of RAM + 8GB of swap (or 16GB of RAM)
+- 100GB SSD storage (or similar I/O performance)
+- A low-latency reliable internet connection
+
+This configuration has been tested for running an Octez node in :doc:`rolling history mode <../user/history_modes>`.
+Other more specific uses may need adequate configurations.
+For instance:
+
+- running a node in full or archive mode requires extra storage space;
+- bakers participating to the DAL should consult `this article <https://forum.tezosagora.org/t/hardware-and-bandwidth-requirements-for-the-tezos-dal/6230>`__.
+
 Update Instructions
 -------------------
 
