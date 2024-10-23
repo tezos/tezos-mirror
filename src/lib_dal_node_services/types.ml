@@ -180,23 +180,45 @@ module Message = struct
          (req "shard_proof" Cryptobox.shard_proof_encoding))
 end
 
-module Peer = struct
-  type t = P2p_peer.Id.t
+module Connection = struct
+  type t = {peer_id : P2p_peer.Id.t; maybe_reachable_point : P2p_point.Id.t}
 
   module Cmp = struct
     type nonrec t = t
 
-    let compare p1 p2 = P2p_peer.Id.compare p1 p2
+    (* We only compare the peer id here. The reason is that it is safe to assume:
+
+       1. For connected peers, they can be identified by a unique IP address.
+
+       2. For not connected peers we want to advertise only one point
+       that can change with time. *)
+    let compare p1 p2 = P2p_peer.Id.compare p1.peer_id p2.peer_id
   end
 
   include Compare.Make (Cmp)
   module Set = Set.Make (Cmp)
   module Map = Map.Make (Cmp)
 
-  let pp = P2p_peer.Id.pp
+  let encoding =
+    let open Data_encoding in
+    conv
+      (fun {peer_id; maybe_reachable_point} -> (peer_id, maybe_reachable_point))
+      (fun (peer_id, maybe_reachable_point) -> {peer_id; maybe_reachable_point})
+      (obj2
+         (req "peer_id" P2p_peer.Id.encoding)
+         (req "maybe_reachable_point" P2p_point.Id.encoding))
 
-  let encoding = P2p_peer.Id.encoding
+  let pp fmt {peer_id; maybe_reachable_point} =
+    Format.fprintf
+      fmt
+      "{peer_id=%a;@,maybe_reachable_point=%a}"
+      P2p_peer.Id.pp
+      peer_id
+      P2p_point.Id.pp
+      maybe_reachable_point
 end
+
+module Peer = P2p_peer.Id
 
 module Point = struct
   type t = P2p_point.Id.t
