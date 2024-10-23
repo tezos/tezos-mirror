@@ -190,8 +190,8 @@ module DNS = struct
     let* domain = get_domain ~tezt_cloud ~zone in
     let* output = list ~name_filter:domain ~zone () in
     (* Example of output
-       NAME                               TYPE  TTL  DATA
-       saroupille.nl-dal.saroupille.com.  A     300  35.187.31.38
+       NAME                           TYPE  TTL  DATA
+       user.nl-dal.domain.com.        A     300  35.187.31.38
     *)
     match String.split_on_char '\n' (String.trim output) with
     | [_header; line] -> (
