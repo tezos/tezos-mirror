@@ -2071,9 +2071,13 @@ trigger:debian_repository_partial_auto:
   rules:
   - changes:
     - debian-deps-build.Dockerfile
+    - docs/introduction/install-bin-deb.sh
+    - docs/introduction/upgrade-bin-deb.sh
     - scripts/ci/build-debian-packages-dependencies.sh
     - scripts/ci/build-debian-packages.sh
     - scripts/ci/build-debian-packages_current.sh
+    - scripts/ci/create_debian_repo.sh
+    - scripts/ci/prepare-apt-repo.sh
     - scripts/packaging/**/*
     when: on_success
   needs:

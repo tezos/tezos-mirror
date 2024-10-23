@@ -445,6 +445,10 @@ let changeset_debian_packages =
         "scripts/ci/build-debian-packages_current.sh";
         "scripts/ci/build-debian-packages-dependencies.sh";
         "scripts/ci/build-debian-packages.sh";
+        "scripts/ci/prepare-apt-repo.sh";
+        "scripts/ci/create_debian_repo.sh";
+        "docs/introduction/install-bin-deb.sh";
+        "docs/introduction/upgrade-bin-deb.sh";
       ])
 
 (** The set of [changes:] that select opam jobs.
