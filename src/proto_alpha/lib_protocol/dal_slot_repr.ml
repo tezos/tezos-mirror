@@ -370,6 +370,169 @@ module History = struct
       Data_encoding.Binary.to_bytes_exn encoding current_slot
   end
 
+  module Content_v2 = struct
+    [@@@warning "-32"]
+
+    (** Each cell of the skip list is either a slot id (i.e. a published level
+        and a slot index) for which no slot header is published or a published
+        slot header associated to the address which signed the L1 operation, the
+        attestation status from the protocol point of view, the number of
+        attested shards and the total number of shards. *)
+    type t =
+      | Unpublished of Header.id
+      | Published of {
+          header : Header.t;
+          publisher : Signature.public_key_hash;
+          is_proto_attested : bool;
+          attested_shards : int;
+          total_shards : int;
+        }
+
+    let content_id = function
+      | Unpublished slot_id -> slot_id
+      | Published {header = {id; _}; _} -> id
+
+    let encoding =
+      let open Data_encoding in
+      union
+        ~tag_size:`Uint8
+        [
+          (* Legacy cases: we should be able to decode the content of the old
+             cells from the previous protocol in case of refutation. But, we
+             don't construct cells of that protocol anymore. *)
+          case
+            ~title:"unattested"
+            (Tag 0)
+            (merge_objs
+               (obj1 (req "kind" (constant "unattested")))
+               Header.id_encoding)
+            (fun _x -> None)
+            (fun ((), slot_id) ->
+              (* The old [Unattested] case is translated to [Unpublished]. When
+                 a slot was not attested, we act as if it was not published at
+                 all. *)
+              Unpublished slot_id);
+          case
+            ~title:"attested"
+            (Tag 1)
+            (merge_objs
+               (obj1 (req "kind" (constant "attested")))
+               Header.encoding)
+            (fun _x -> None)
+            (fun ((), slot_header) ->
+              (* The old [Attested] case is translated to [Published], with some
+                 extra placeholder fields. In this case, we act as if it were
+                 attested by all the bakers (i.e., a 100% attestation rate). *)
+              Published
+                {
+                  header = slot_header;
+                  publisher = Signature.Public_key_hash.zero;
+                  is_proto_attested = true;
+                  attested_shards = 1;
+                  total_shards = 1;
+                });
+          (* New/normal cases *)
+          case
+            ~title:"unpublished"
+            (Tag 2)
+            (merge_objs
+               (obj1 (req "kind" (constant "unpublished")))
+               Header.id_encoding)
+            (function
+              | Unpublished slot_id -> Some ((), slot_id) | Published _ -> None)
+            (fun ((), slot_id) -> Unpublished slot_id);
+          case
+            ~title:"published"
+            (Tag 3)
+            (merge_objs
+               (obj5
+                  (req "kind" (constant "published"))
+                  (req "publisher" Signature.Public_key_hash.encoding)
+                  (req "is_proto_attested" bool)
+                  (req "attested_shards" uint16)
+                  (req "total_shards" uint16))
+               Header.encoding)
+            (function
+              | Unpublished _ -> None
+              | Published
+                  {
+                    header;
+                    publisher;
+                    is_proto_attested;
+                    attested_shards;
+                    total_shards;
+                  } ->
+                  Some
+                    ( ( (),
+                        publisher,
+                        is_proto_attested,
+                        attested_shards,
+                        total_shards ),
+                      header ))
+            (fun ( ( (),
+                     publisher,
+                     is_proto_attested,
+                     attested_shards,
+                     total_shards ),
+                   header ) ->
+              Published
+                {
+                  header;
+                  publisher;
+                  is_proto_attested;
+                  attested_shards;
+                  total_shards;
+                });
+        ]
+
+    let equal t1 t2 =
+      match (t1, t2) with
+      | Unpublished sid1, Unpublished sid2 -> Header.slot_id_equal sid1 sid2
+      | ( Published
+            {
+              header;
+              publisher;
+              is_proto_attested;
+              attested_shards;
+              total_shards;
+            },
+          Published sh ) ->
+          Header.equal header sh.header
+          && Signature.Public_key_hash.equal publisher sh.publisher
+          && Compare.Bool.equal is_proto_attested sh.is_proto_attested
+          && Compare.Int.equal attested_shards sh.attested_shards
+          && Compare.Int.equal total_shards sh.total_shards
+      | Unpublished _, _ | Published _, _ -> false
+
+    let zero, zero_level =
+      let zero_level = Raw_level_repr.root in
+      let zero_index = Dal_slot_index_repr.zero in
+      ( Unpublished {published_level = zero_level; index = zero_index},
+        zero_level )
+
+    let pp fmt = function
+      | Unpublished slot_id ->
+          Format.fprintf fmt "Unpublished (%a)" Header.pp_id slot_id
+      | Published
+          {header; publisher; is_proto_attested; attested_shards; total_shards}
+        ->
+          Format.fprintf
+            fmt
+            "Published { @[header: %a@@] @[publisher: %a@@] \
+             @[is_proto_attested: %b@@] @[attested_shards: %d@@] \
+             @[total_shards: %d@@] }"
+            Header.pp
+            header
+            Signature.Public_key_hash.pp
+            publisher
+            is_proto_attested
+            attested_shards
+            total_shards
+
+    let to_bytes current_slot =
+      Data_encoding.Binary.to_bytes_exn encoding current_slot
+  end
+
   module Mk_skip_list (Content : sig
     type t
 
