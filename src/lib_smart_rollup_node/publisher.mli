@@ -104,3 +104,13 @@ val shutdown : unit -> unit Lwt.t
 
 (** Returns the status of the publisher worker. *)
 val worker_status : unit -> [`Running | `Not_running | `Crashed of exn]
+
+(** {2 Helper module} *)
+
+module Helpers : sig
+  (** Returns the committed/cemented status for a block's content. *)
+  val committed_status :
+    _ Node_context.t ->
+    Sc_rollup_block.t ->
+    Rollup_node_services.committed_status tzresult Lwt.t
+end
