@@ -45,3 +45,12 @@ let decode_option decode_some =
 let decode_set decode_elt = function
   | Seq (_, all_elt) -> List.map_e decode_elt all_elt
   | _ -> error_with "DecodeSetError"
+
+let decode_map ~decode_key ~decode_elt =
+  let open Result_syntax in
+  decode_set (function
+      | Prim (_, "Elt", [key; value], _) ->
+          let* key = decode_key key in
+          let* value = decode_elt value in
+          Ok (key, value)
+      | _ -> error_with "DecodeMapError")

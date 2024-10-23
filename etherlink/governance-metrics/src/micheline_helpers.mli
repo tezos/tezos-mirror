@@ -39,3 +39,11 @@ val decode_set :
   (Micheline_parser.node -> 'b tzresult) ->
   Micheline_parser.node ->
   'b list tzresult
+
+(** [decode_map decode_key decode_elt map] decode [map] as a micheline map into a list and applies
+    [decode_key] to its keys and [decode_elt] for all its elements. *)
+val decode_map :
+  decode_key:(Micheline_parser.node -> 'key tzresult) ->
+  decode_elt:(Micheline_parser.node -> 'value tzresult) ->
+  Micheline_parser.node ->
+  ('key * 'value) list tzresult
