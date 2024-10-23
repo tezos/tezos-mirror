@@ -145,6 +145,10 @@ Smart Rollup node
   (MR :gl:`!15627`)
 
 
+- RPCs ``/global/block/<block_id>/committed_status`` and to retrieve commitment
+  and cementation status for a given block (or an estimated timestamp
+  otherwise). (MR :gl:`!15409`)
+
 Smart Rollup WASM Debugger
 --------------------------
 
