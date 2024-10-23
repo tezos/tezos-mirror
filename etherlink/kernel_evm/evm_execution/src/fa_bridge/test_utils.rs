@@ -404,7 +404,9 @@ pub fn fa_bridge_precompile_call_withdraw(
         None,
     );
 
-    handler.begin_initial_transaction(false, None).unwrap();
+    handler
+        .begin_initial_transaction(false, Some(30_000_000))
+        .unwrap();
 
     let res = execute_fa_withdrawal(&mut handler, caller, withdrawal);
 

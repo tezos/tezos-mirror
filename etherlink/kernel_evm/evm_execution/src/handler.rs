@@ -384,7 +384,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
     }
 
     /// Get the amount of gas still available for the current transaction.
-    fn gas_remaining(&self) -> u64 {
+    pub fn gas_remaining(&self) -> u64 {
         self.transaction_data
             .last()
             .map(|layer| {
@@ -1015,6 +1015,10 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         }
     }
 
+    pub fn can_begin_inter_transaction_call_stack(&self) -> bool {
+        self.stack_depth() < self.config.call_stack_limit
+    }
+
     // Sub function to determine if the `caller` can create a new internal transaction.
     // According to the Ethereum yellow paper (p.37) for `CALL`, `CREATE`, ... instructions that
     // creates a new substate, it must always check that there are no `OutOfFund` or `CallTooDeep`
@@ -1023,7 +1027,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         // we can reproduce the exact same check on the stack from the Ethereum yellow paper (p.37).
         match (
             self.has_enough_fund(caller, value),
-            self.stack_depth() < self.config.call_stack_limit,
+            self.can_begin_inter_transaction_call_stack(),
         ) {
             (Ok(true), true) => Precondition::PassPrecondition,
             (Ok(false), _) => {
@@ -1697,7 +1701,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
     }
 
     /// Begin an intermediate transaction
-    fn begin_inter_transaction(
+    pub fn begin_inter_transaction(
         &mut self,
         is_static: bool,
         gas_limit: Option<u64>,
@@ -1852,7 +1856,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
     ///
     /// This function applies _only_ to intermediate transactions. Calling
     /// it with only the initial transaction in progress is an error.
-    fn end_inter_transaction<T>(
+    pub fn end_inter_transaction<T>(
         &mut self,
         execution_result: Result<CreateOutcome, EthereumError>,
     ) -> Capture<CreateOutcome, T> {
@@ -2000,7 +2004,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         }
     }
 
-    fn nested_call_gas_limit(&mut self, target_gas: Option<u64>) -> Option<u64> {
+    pub fn nested_call_gas_limit(&mut self, target_gas: Option<u64>) -> Option<u64> {
         // Part of EIP-150: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-150.md
         let gas_remaining = self.gas_remaining();
         let max_gas_limit = if self.config.call_l64_after_gas {
