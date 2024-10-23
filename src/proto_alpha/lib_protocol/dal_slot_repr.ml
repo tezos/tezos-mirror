@@ -552,7 +552,7 @@ module History = struct
 
        - [l] is well sorted wrt. slots indices. *)
     let fill_slot_headers ~number_of_slots ~published_level
-        attested_slot_headers =
+        slot_headers_with_statuses =
       let open Result_syntax in
       let module I = Dal_slot_index_repr in
       let* all_indices =
@@ -561,6 +561,8 @@ module History = struct
       let mk_unattested index =
         Content.Unattested Header.{published_level; index}
       in
+      (* TODO: Follow-up MR: Take the value of _s_status into account. *)
+      let attested_slot_headers = List.map fst slot_headers_with_statuses in
       (* Hypothesis: both lists are sorted in increasing order w.r.t. slots
          indices. *)
       let rec aux indices slots =
@@ -584,37 +586,37 @@ module History = struct
        insert exactly [number_of_slots] cells in the skip list per level. This
        will simplify the shape of proofs and help bounding the history cache
        required for their generation. *)
-    let add_confirmed_slot_headers (t : t) cache published_level
-        ~number_of_slots attested_slot_headers =
+    let update_skip_list (t : t) cache published_level ~number_of_slots
+        slot_headers_with_statuses =
       let open Result_syntax in
       let* () =
         List.iter_e
-          (fun slot_header ->
+          (fun (slot_header, _status) ->
             error_unless
               Raw_level_repr.(
                 published_level = slot_header.Header.id.published_level)
               Add_element_in_slots_skip_list_violates_ordering)
-          attested_slot_headers
+          slot_headers_with_statuses
       in
       let* slot_headers =
         fill_slot_headers
           ~number_of_slots
           ~published_level
-          attested_slot_headers
+          slot_headers_with_statuses
       in
       List.fold_left_e (add_cell ~number_of_slots) (t, cache) slot_headers
 
-    let add_confirmed_slot_headers_no_cache =
+    let update_skip_list_no_cache =
       let empty_cache = History_cache.empty ~capacity:0L in
-      fun t published_level ~number_of_slots slots ->
+      fun t published_level ~number_of_slots slot_headers_with_statuses ->
         let open Result_syntax in
         let+ cell, (_ : History_cache.t) =
-          add_confirmed_slot_headers
+          update_skip_list
             t
             empty_cache
             published_level
             ~number_of_slots
-            slots
+            slot_headers_with_statuses
         in
         cell
 

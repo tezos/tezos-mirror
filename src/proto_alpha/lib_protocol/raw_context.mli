@@ -454,8 +454,15 @@ module Dal : sig
   val candidates : t -> Dal_slot_repr.Header.t list
 
   (** [is_slot_index_attested ctxt slot_index] returns [true] if the
-     [slot_index] is declared available by the protocol. [false]
-     otherwise. If the [index] is out of the interval
-     [0;number_of_slots - 1], returns [false]. *)
-  val is_slot_index_attested : t -> Dal_slot_index_repr.t -> bool
+      [slot_index] is declared available by the protocol. [false] otherwise. If
+      the [index] is out of the interval [0;number_of_slots - 1], returns
+      [false].
+
+      Whether the slot is attested by the protocol or not, the function also
+      returns the ratio of attested shards w.r.t. total shards, as a rational
+      number. *)
+  val is_slot_index_attested :
+    t ->
+    Dal_slot_index_repr.t ->
+    Dal_attestation_repr.Accountability.attestation_status
 end

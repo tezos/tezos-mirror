@@ -2776,6 +2776,12 @@ module Dal : sig
 
     type shard_index = int
 
+    type attestation_status = {
+      total_shards : int;
+      attested_shards : int;
+      is_proto_attested : bool;
+    }
+
     module Shard_map : Map.S with type key = shard_index
 
     val encoding : t Data_encoding.t
@@ -2874,11 +2880,6 @@ module Dal : sig
 
     val finalize_pending_slot_headers :
       context -> number_of_slots:int -> (context * Attestation.t) tzresult Lwt.t
-
-    val compute_attested_slot_headers :
-      is_slot_attested:(Header.t -> bool) ->
-      Header.t list ->
-      Header.t list * Attestation.t
   end
 
   module Operations : sig
@@ -2922,19 +2923,19 @@ module Dal : sig
     module History_cache :
       Bounded_history_repr.S with type key = hash and type value = t
 
-    val add_confirmed_slot_headers_no_cache :
+    val update_skip_list_no_cache :
       t ->
       Raw_level.t ->
       number_of_slots:int ->
-      Slot.Header.t list ->
+      (Slot.Header.t * Attestation.attestation_status) list ->
       t tzresult
 
-    val add_confirmed_slot_headers :
+    val update_skip_list :
       t ->
       History_cache.t ->
       Raw_level.t ->
       number_of_slots:int ->
-      Slot.Header.t list ->
+      (Slot.Header.t * Attestation.attestation_status) list ->
       (t * History_cache.t) tzresult
 
     type proof

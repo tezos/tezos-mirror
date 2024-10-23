@@ -99,23 +99,32 @@ struct
               skip_slot ))
           slots_data
       in
-      let attested_slots_headers =
+      let slots_headers =
         List.filter_map
-          (fun (slot, skip_slot) -> if skip_slot then None else Some slot)
+          (fun (slot, skip_slot) ->
+            let attestation_status =
+              Dal_attestation_repr.Accountability.
+                {
+                  attested_shards = (if skip_slot then 0 else 1);
+                  total_shards = 1;
+                  is_proto_attested = not skip_slot;
+                }
+            in
+            if skip_slot then None else Some (slot, attestation_status))
           slots_headers
       in
       let*?@ cell, cache =
-        Dal_slot_repr.History.add_confirmed_slot_headers
+        Dal_slot_repr.History.update_skip_list
           ~number_of_slots:Parameters.dal_parameters.number_of_slots
           cell
           cache
           curr_level
-          attested_slots_headers
+          slots_headers
       in
       let slots_info =
         List.fold_left
-          (fun slots_info (slot, skip_slot) ->
-            (polynomial, slot, skip_slot) :: slots_info)
+          (fun slots_info (slot, slot_status) ->
+            (polynomial, slot, slot_status) :: slots_info)
           slots_info
           slots_headers
       in
@@ -128,9 +137,10 @@ struct
 
   (** This function returns the (correct) information of a page to
       prove that it is confirmed, or None if the page's slot is skipped. *)
-  let request_confirmed_page (poly, slot, skip_slot) =
+  let request_confirmed_page (poly, slot, slot_status) =
     let open Lwt_result_syntax in
-    if skip_slot then
+    if not slot_status.Dal_attestation_repr.Accountability.is_proto_attested
+    then
       (* We cannot check that a page of an unconfirmed slot is confirmed. *)
       return_none
     else
@@ -142,10 +152,11 @@ struct
       (but the slot is not confirmed). Otherwise, we increment the publish_level
       field to simulate a non confirmed slot (as for even levels, no slot is
       confirmed. See {!populate_slots_history}). *)
-  let request_unconfirmed_page (poly, slot, skip_slot) =
+  let request_unconfirmed_page (poly, slot, slot_status) =
     let open Lwt_result_syntax in
     let open Dal_slot_repr.Header in
-    if skip_slot then
+    if not slot_status.Dal_attestation_repr.Accountability.is_proto_attested
+    then
       let level = slot.id.published_level in
       let* _page_info, page_id = mk_page_info ~level slot poly in
       (* We should not provide the page's info if we want to build an

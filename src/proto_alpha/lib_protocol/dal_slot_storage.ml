@@ -33,13 +33,20 @@ let finalize_current_slot_headers ctxt =
     (Raw_context.current_level ctxt).level
     (Raw_context.Dal.candidates ctxt)
 
-let compute_attested_slot_headers ~is_slot_attested seen_slot_headers =
+let compute_slot_headers_statuses ~is_slot_attested seen_slot_headers =
   let open Dal_slot_repr in
   let fold_attested_slots (rev_attested_slot_headers, attestation) slot =
-    if is_slot_attested slot then
-      ( slot :: rev_attested_slot_headers,
-        Dal_attestation_repr.commit attestation slot.Header.id.index )
-    else (rev_attested_slot_headers, attestation)
+    let attestation_status = is_slot_attested slot in
+    let rev_attested_slot_headers =
+      (slot, attestation_status) :: rev_attested_slot_headers
+    in
+    let attestation =
+      if
+        attestation_status.Dal_attestation_repr.Accountability.is_proto_attested
+      then Dal_attestation_repr.commit attestation slot.Header.id.index
+      else attestation
+    in
+    (rev_attested_slot_headers, attestation)
   in
   let rev_attested_slot_headers, bitset =
     List.fold_left
@@ -56,7 +63,7 @@ let get_slot_headers_history ctxt =
   | None -> Dal_slot_repr.History.genesis
   | Some slots_history -> slots_history
 
-let update_skip_list ctxt ~confirmed_slot_headers ~level_attested
+let update_skip_list ctxt ~slot_headers_statuses ~level_attested
     ~number_of_slots =
   let open Lwt_result_syntax in
   let open Dal_slot_repr.History in
@@ -68,12 +75,12 @@ let update_skip_list ctxt ~confirmed_slot_headers ~level_attested
     *)
     (* We expect to put exactly [number_of_slots] cells in the cache. *)
     let cache = History_cache.empty ~capacity:(Int64.of_int number_of_slots) in
-    add_confirmed_slot_headers
+    update_skip_list
       ~number_of_slots
       slots_history
       cache
       level_attested
-      confirmed_slot_headers
+      slot_headers_statuses
   in
   let*! ctxt = Storage.Dal.Slot.History.add ctxt slots_history in
   let*! ctxt =
@@ -91,24 +98,24 @@ let finalize_pending_slot_headers ctxt ~number_of_slots =
   | Some level_attested ->
       let* seen_slots = find_slot_headers ctxt level_attested in
       let*! ctxt = Storage.Dal.Slot.Headers.remove ctxt level_attested in
-      let* ctxt, attestation, confirmed_slot_headers =
+      let* ctxt, attestation, slot_headers_statuses =
         match seen_slots with
         | None -> return (ctxt, Dal_attestation_repr.empty, [])
         | Some seen_slots ->
-            let attested_slot_headers, attestation =
+            let slot_headers_statuses, attestation =
               let is_slot_attested slot =
                 Raw_context.Dal.is_slot_index_attested
                   ctxt
                   slot.Dal_slot_repr.Header.id.index
               in
-              compute_attested_slot_headers ~is_slot_attested seen_slots
+              compute_slot_headers_statuses ~is_slot_attested seen_slots
             in
-            return (ctxt, attestation, attested_slot_headers)
+            return (ctxt, attestation, slot_headers_statuses)
       in
       let* ctxt =
         update_skip_list
           ctxt
-          ~confirmed_slot_headers
+          ~slot_headers_statuses
           ~level_attested
           ~number_of_slots
       in

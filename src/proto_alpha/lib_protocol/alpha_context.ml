@@ -142,6 +142,7 @@ module Dal = struct
   end
 
   module Attestation = struct
+    include Dal_attestation_repr.Accountability
     include Dal_attestation_repr
     include Raw_context.Dal
   end

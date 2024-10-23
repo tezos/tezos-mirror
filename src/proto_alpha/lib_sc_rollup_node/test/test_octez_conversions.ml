@@ -220,45 +220,59 @@ let compare_slot_header_id (s1 : Octez_smart_rollup.Dal.Slot_header.id)
   let c = Int32.compare s1.published_level s2.published_level in
   if c <> 0 then c else Int.compare s1.index s2.index
 
-let gen_slot_headers =
+let gen_slot_header_with_status =
+  let open Protocol.Alpha_context in
+  let open QCheck2.Gen in
+  let* status = bool in
+  let status =
+    let total_shards = 1 in
+    let attested_shards = if status then total_shards else 0 in
+    Dal.Attestation.{total_shards; attested_shards; is_proto_attested = status}
+  in
+  let+ header = gen_slot_header in
+  (header, status)
+
+let gen_slot_headers_with_statuses =
   let open QCheck2.Gen in
   let size = int_bound 50 in
-  let+ l = list_size size gen_slot_header in
+  let+ l = list_size size gen_slot_header_with_status in
   List.sort
-    (fun (h1 : Octez_smart_rollup.Dal.Slot_header.t)
-         (h2 : Octez_smart_rollup.Dal.Slot_header.t) ->
+    (fun ((h1 : Octez_smart_rollup.Dal.Slot_header.t), _status1)
+         ((h2 : Octez_smart_rollup.Dal.Slot_header.t), _status2) ->
       compare_slot_header_id h1.id h2.id)
     l
   |> fun l ->
   match l with
   | [] -> []
-  | (h : Octez_smart_rollup.Dal.Slot_header.t) :: _ ->
+  | ((h : Octez_smart_rollup.Dal.Slot_header.t), _status) :: _ ->
       let min_level = h.id.published_level in
       (* smallest level *)
       List.mapi
-        (fun i (h : Octez_smart_rollup.Dal.Slot_header.t) ->
+        (fun i ((h : Octez_smart_rollup.Dal.Slot_header.t), status) ->
           (* patch the published level to comply with the invariants *)
           let published_level = Int32.(add min_level (of_int i)) in
           let h = {h with id = {h.id with published_level}} in
-          (published_level, [h]))
+          (published_level, [(h, status)]))
         l
 
 let gen_slot_history =
   let open Protocol.Alpha_context in
   let open QCheck2.Gen in
-  let+ l = gen_slot_headers in
+  let+ l = gen_slot_headers_with_statuses in
   let l =
     List.map
       (fun (lvl, h) ->
         ( Raw_level.of_int32_exn lvl,
           List.map
-            (Sc_rollup_proto_types.Dal.Slot_header.of_octez ~number_of_slots)
+            (fun (h, status) ->
+              ( Sc_rollup_proto_types.Dal.Slot_header.of_octez ~number_of_slots h,
+                status ))
             h ))
       l
   in
   List.fold_left_e
     (fun hist (published_level, attested_slots) ->
-      Dal.Slots_history.add_confirmed_slot_headers_no_cache
+      Dal.Slots_history.update_skip_list_no_cache
         ~number_of_slots
         hist
         published_level
@@ -273,20 +287,22 @@ let gen_slot_history =
 let gen_slot_history_cache =
   let open Protocol.Alpha_context in
   let open QCheck2.Gen in
-  let+ l = gen_slot_headers in
+  let+ l = gen_slot_headers_with_statuses in
   let cache = Dal.Slots_history.History_cache.empty ~capacity:Int64.max_int in
   let l =
     List.map
       (fun (lvl, h) ->
         ( Raw_level.of_int32_exn lvl,
           List.map
-            (Sc_rollup_proto_types.Dal.Slot_header.of_octez ~number_of_slots)
+            (fun (h, status) ->
+              ( Sc_rollup_proto_types.Dal.Slot_header.of_octez ~number_of_slots h,
+                status ))
             h ))
       l
   in
   List.fold_left_e
     (fun (hist, cache) (published_level, attested_slots) ->
-      Dal.Slots_history.add_confirmed_slot_headers
+      Dal.Slots_history.update_skip_list
         ~number_of_slots
         hist
         cache

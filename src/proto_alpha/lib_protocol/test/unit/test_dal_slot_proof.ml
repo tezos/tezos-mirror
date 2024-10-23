@@ -51,6 +51,10 @@ struct
       Dal_helpers.mk_cryptobox Parameters.dal_parameters.cryptobox_parameters
   end)
 
+  let mk_attested =
+    Dal_attestation_repr.Accountability.
+      {total_shards = 1; attested_shards = 1; is_proto_attested = true}
+
   (* Tests to check insertion of slots in a dal skip list. *)
 
   (** Check insertion of a new slot in the given skip list. *)
@@ -63,13 +67,12 @@ struct
     let index = mk_slot_index id in
     let* _data, _poly, slot = mk_slot ~level ~index () in
     let@ result =
-      Hist.add_confirmed_slot_headers_no_cache
+      Hist.update_skip_list_no_cache
         skip_list
         level
-        [slot]
+        [(slot, mk_attested)]
         ~number_of_slots:Parameters.dal_parameters.number_of_slots
     in
-
     check_result result
 
   (** This test attempts to add a slot on top of genesis cell zero which would
@@ -188,12 +191,12 @@ struct
     let open Lwt_result_wrap_syntax in
     let* _slot_data, polynomial, slot = mk_slot ~level ?index () in
     let*?@ skip_list, cache =
-      Hist.add_confirmed_slot_headers
+      Hist.update_skip_list
         ~number_of_slots:Parameters.dal_parameters.number_of_slots
         genesis_history
         genesis_history_cache
         level
-        [slot]
+        [(slot, mk_attested)]
     in
     let* page_info, page_id = mk_page_info slot polynomial in
     produce_and_verify_proof
