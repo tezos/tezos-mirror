@@ -166,8 +166,8 @@ The new set of packages can be installed by adding the following apt repository:
 
 .. literalinclude:: install-bin-deb.sh
    :language: shell
-   :start-after: [add next repository]
-   :end-before: [end add next repository]
+   :start-after: [add repository]
+   :end-before: [end add repository]
 
 Once the Octez binary packages are installed, they can be set up as services
 as explained in :doc:`./services`.
