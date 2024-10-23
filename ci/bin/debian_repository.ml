@@ -95,7 +95,10 @@ let jobs pipeline_type =
       ~variables:(variables [("DISTRIBUTION", distribution)])
       ~parallel:(Matrix matrix)
       ~tag:Dynamic
-      ["./scripts/ci/build-debian-packages-dependencies.sh"]
+      [
+        "./scripts/ci/build-packages-dependencies.sh \
+         debian-deps-build.Dockerfile";
+      ]
   in
   let job_docker_build_debian_dependencies : tezos_job =
     make_job_docker_build_debian_dependencies
