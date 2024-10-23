@@ -53,8 +53,9 @@ struct
 
   (* Introduce some intermediate types. *)
 
-  (** The slot is not confirmed (skipped) iff the boolean is [true]. *)
-  type slot_skipped = bool
+  (** The slot is not confirmed (skipped) iff the boolean is [true]. The flag is
+      attached to the hypothetical publisher of the slot. *)
+  type slot_skipped = bool * Signature.public_key_hash
 
   type level = int
 
@@ -86,7 +87,7 @@ struct
       let curr_level = Raw_level_repr.of_int32_exn (Int32.of_int level) in
       let slots_headers =
         List.mapi
-          (fun sindex skip_slot ->
+          (fun sindex (skip_slot, slot_publisher) ->
             let index =
               Option.value_f
                 (Dal_slot_index_repr.of_int_opt
@@ -96,12 +97,13 @@ struct
             in
             ( Dal_slot_repr.Header.
                 {id = {published_level = curr_level; index}; commitment},
+              slot_publisher,
               skip_slot ))
           slots_data
       in
       let slots_headers =
         List.filter_map
-          (fun (slot, skip_slot) ->
+          (fun (slot, slot_publisher, skip_slot) ->
             let attestation_status =
               Dal_attestation_repr.Accountability.
                 {
@@ -110,7 +112,8 @@ struct
                   is_proto_attested = not skip_slot;
                 }
             in
-            if skip_slot then None else Some (slot, attestation_status))
+            if skip_slot then None
+            else Some (slot, slot_publisher, attestation_status))
           slots_headers
       in
       let*?@ cell, cache =
@@ -123,8 +126,8 @@ struct
       in
       let slots_info =
         List.fold_left
-          (fun slots_info (slot, slot_status) ->
-            (polynomial, slot, slot_status) :: slots_info)
+          (fun slots_info (slot, slot_publisher, slot_status) ->
+            (polynomial, slot, slot_publisher, slot_status) :: slots_info)
           slots_info
           slots_headers
       in
@@ -137,7 +140,7 @@ struct
 
   (** This function returns the (correct) information of a page to
       prove that it is confirmed, or None if the page's slot is skipped. *)
-  let request_confirmed_page (poly, slot, slot_status) =
+  let request_confirmed_page (poly, slot, _slot_publisher, slot_status) =
     let open Lwt_result_syntax in
     if not slot_status.Dal_attestation_repr.Accountability.is_proto_attested
     then
@@ -152,7 +155,7 @@ struct
       (but the slot is not confirmed). Otherwise, we increment the publish_level
       field to simulate a non confirmed slot (as for even levels, no slot is
       confirmed. See {!populate_slots_history}). *)
-  let request_unconfirmed_page (poly, slot, slot_status) =
+  let request_unconfirmed_page (poly, slot, _slot_publisher, slot_status) =
     let open Lwt_result_syntax in
     let open Dal_slot_repr.Header in
     if not slot_status.Dal_attestation_repr.Accountability.is_proto_attested
@@ -215,7 +218,12 @@ struct
 
   let tests =
     let gen_dal_config : levels QCheck2.Gen.t =
-      QCheck2.Gen.(
+      let open QCheck2 in
+      let gen_pkh =
+        let pkh, _, _ = Signature.generate_key ~algo:Ed25519 () in
+        Gen.return pkh
+      in
+      Gen.(
         let nb_slots = 0 -- Parameters.(dal_parameters.number_of_slots) in
         let nb_levels = 4 -- 30 in
         let* start_level =
@@ -224,7 +232,11 @@ struct
           (* skip level 0 by adding 1 *)
         in
         (* The slot is confirmed iff the boolean is true *)
-        let slot = bool in
+        let slot =
+          let* slot_flag = bool in
+          let* slot_publisher = gen_pkh in
+          Gen.return (slot_flag, slot_publisher)
+        in
         let slots = list_size nb_slots slot in
         (* For each level, we generate the gap/delta w.r.t. the previous level,
            and the slots' flags (confirmed or not). *)

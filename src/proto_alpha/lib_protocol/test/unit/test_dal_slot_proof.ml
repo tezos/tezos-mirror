@@ -70,7 +70,7 @@ struct
       Hist.update_skip_list_no_cache
         skip_list
         level
-        [(slot, mk_attested)]
+        [(slot, Signature.Public_key_hash.zero, mk_attested)]
         ~number_of_slots:Parameters.dal_parameters.number_of_slots
     in
     check_result result
@@ -196,7 +196,7 @@ struct
         genesis_history
         genesis_history_cache
         level
-        [(slot, mk_attested)]
+        [(slot, Signature.Public_key_hash.zero, mk_attested)]
     in
     let* page_info, page_id = mk_page_info slot polynomial in
     produce_and_verify_proof

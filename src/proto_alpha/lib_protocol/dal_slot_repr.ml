@@ -564,8 +564,11 @@ module History = struct
       let mk_unattested index =
         Content.Unattested Header.{published_level; index}
       in
-      (* TODO: Follow-up MR: Take the value of _s_status into account. *)
-      let attested_slot_headers = List.map fst slot_headers_with_statuses in
+      (* TODO: Follow-up MR: Take the value of _s_status and _s_publisher into
+         account. *)
+      let attested_slot_headers =
+        List.map (fun (slot, _pub, _status) -> slot) slot_headers_with_statuses
+      in
       (* Hypothesis: both lists are sorted in increasing order w.r.t. slots
          indices. *)
       let rec aux indices slots =
@@ -594,7 +597,7 @@ module History = struct
       let open Result_syntax in
       let* () =
         List.iter_e
-          (fun (slot_header, _status) ->
+          (fun (slot_header, _slot_publisher, _status) ->
             error_unless
               Raw_level_repr.(
                 published_level = slot_header.Header.id.published_level)

@@ -278,7 +278,10 @@ module History : sig
     History_cache.t ->
     Raw_level_repr.t ->
     number_of_slots:int ->
-    (Header.t * Dal_attestation_repr.Accountability.attestation_status) list ->
+    (Header.t
+    * Signature.public_key_hash
+    * Dal_attestation_repr.Accountability.attestation_status)
+    list ->
     (t * History_cache.t) tzresult
 
   (** Similiar to {!update_skip_list}, but no cache is provided or
@@ -287,7 +290,10 @@ module History : sig
     t ->
     Raw_level_repr.t ->
     number_of_slots:int ->
-    (Header.t * Dal_attestation_repr.Accountability.attestation_status) list ->
+    (Header.t
+    * Signature.public_key_hash
+    * Dal_attestation_repr.Accountability.attestation_status)
+    list ->
     t tzresult
 
   (** [equal a b] returns true iff a is equal to b. *)
