@@ -38,7 +38,7 @@ let check_grace_period ~loc src_name =
   let grace =
     Cycle.add
       src.last_seen_activity
-      (state.State.constants.consensus_rights_delay + 1)
+      state.State.constants.tolerated_inactivity_period
   in
   let* rpc_grace = Context.Delegate.grace_period (B block) src.pkh in
   Assert.equal
@@ -58,7 +58,8 @@ let test_simple_scenario_with_ai =
   --> check_balance_field "delegate" `Staked (Tez.of_mutez 200_000_000_000L)
   --> set_baker "baker"
   --> wait_n_cycles_f (fun (_, state) ->
-          (2 * state.State.constants.consensus_rights_delay) + 1)
+          state.State.constants.consensus_rights_delay
+          + state.State.constants.tolerated_inactivity_period)
   --> check_balance_field "delegate" `Staked (Tez.of_mutez 200_000_000_000L)
   --> check_is_active ~loc:__LOC__ "delegate"
   --> next_cycle
@@ -84,7 +85,8 @@ let test_baking_deactivation =
   --> begin_test ["delegate"; "baker"]
   --> unstake "delegate" All
   --> wait_n_cycles_f (fun (_, state) ->
-          (2 * state.State.constants.consensus_rights_delay) + 1)
+          state.State.constants.consensus_rights_delay
+          + state.State.constants.tolerated_inactivity_period)
   --> check_is_active ~loc:__LOC__ "delegate"
   --> next_cycle
   --> check_is_not_active ~loc:__LOC__ "delegate"
@@ -112,7 +114,7 @@ let test_baking_deactivation =
   (* Get deactivated by doing nothing *)
   --> set_baker "baker"
   --> wait_n_cycles_f (fun (_, state) ->
-          state.State.constants.consensus_rights_delay + 1)
+          state.State.constants.tolerated_inactivity_period)
   --> check_is_active ~loc:__LOC__ "delegate"
   --> next_cycle
   --> check_is_not_active ~loc:__LOC__ "delegate"

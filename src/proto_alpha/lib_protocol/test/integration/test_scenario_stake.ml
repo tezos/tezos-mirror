@@ -615,9 +615,9 @@ let test_deactivation =
   (* We wait until the delegate is completely deactivated *)
   --> check_is_not_deactivated ~loc:__LOC__ "delegate"
   (* We already waited for [consensus_rights_delay] + 1 cycles since 0 stake,
-     we must wait for [consensus_rights_delay] more. *)
+     we must wait for [tolerated_inactivity_period - 1] more. *)
   --> wait_n_cycles_f (fun (_, state) ->
-          state.State.constants.consensus_rights_delay)
+          state.State.constants.tolerated_inactivity_period - 1)
   --> check_is_not_deactivated ~loc:__LOC__ "delegate"
   --> next_cycle
   --> check_is_deactivated ~loc:__LOC__ "delegate"
