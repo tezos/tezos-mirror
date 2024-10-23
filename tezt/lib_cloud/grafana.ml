@@ -103,6 +103,8 @@ let run () =
      secured but this should prevent easy attacks if the grafana port is opened. *)
   let password = generate_password () in
   Log.info "Grafana admin password: %s" password ;
+  (* This is the last version supporting api keys *)
+  let grafana_docker_tag = "grafana/grafana:11.2.3" in
   let args =
     [
       "run";
@@ -122,7 +124,7 @@ let run () =
       Format.asprintf "%s:/etc/grafana/provisioning" provisioning_directory;
       "-v";
       Format.asprintf "%s:/var/lib/grafana/dashboards" dashboard_directory;
-      "grafana/grafana";
+      grafana_docker_tag;
     ]
   in
   let* status = Process.spawn cmd args |> Process.wait in
