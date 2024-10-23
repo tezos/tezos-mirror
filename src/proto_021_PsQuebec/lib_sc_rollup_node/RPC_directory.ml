@@ -320,6 +320,13 @@ let () =
     ~log_kernel_debug_file
     messages
 
+let () =
+  Block_directory.register0 Sc_rollup_services.Block.committed_status
+  @@ fun (node_ctxt, block) () () ->
+  let open Lwt_result_syntax in
+  let* block = Node_context.get_l2_block node_ctxt block in
+  Publisher.Helpers.committed_status node_ctxt block
+
 let block_directory (node_ctxt : _ Node_context.t) =
   let module PVM = (val Pvm_rpc.of_kind node_ctxt.kind) in
   List.fold_left
