@@ -265,11 +265,32 @@ let new_connections_handler px_cache gs_worker p2p_layer peer_id conn =
 
 (** This handler forwards information about P2P disconnections to the Gossipsub
     worker. *)
-let disconnections_handler gs_worker _peer =
-  (* Will be fixed in the next commit. The diff of this commit will
-     already be quite difficult to review. *)
-  let peer = assert false in
-  Worker.(Disconnection {peer} |> p2p_input gs_worker)
+let disconnections_handler gs_worker peer_id =
+  let open GS.Introspection in
+  (* When this callback is called, we only have the [peer_id] and not
+     the [maybe_reachable_point].
+
+     It can be reconstructed in many ways:
+
+     - We could do it via the octez-p2p
+
+     - We can find it in the automaton state (choosen option)
+
+     Last option does not have the good complexity but is simple enough.
+  *)
+  let view = Worker.state gs_worker in
+  let {connections; _} = view in
+  (* Complexity is wrong, but the number of connections should not be
+     too large, so it should be ok in practice. *)
+  let bindings = Connections.bindings connections in
+  let value =
+    List.find_opt
+      (fun (peer, _) -> P2p_peer.Id.equal peer.Types.Peer.peer_id peer_id)
+      bindings
+  in
+  match value with
+  | None -> (* Something is off, we should log something probably. *) ()
+  | Some (peer, _) -> Worker.(Disconnection {peer} |> p2p_input gs_worker)
 
 (* This function translates a Worker p2p_message to the type of messages sent
    via the P2P layer. The two types don't coincide because of Prune. *)
