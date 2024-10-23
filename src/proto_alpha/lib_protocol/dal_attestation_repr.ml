@@ -135,6 +135,25 @@ module Accountability = struct
     let number_of_attested_shards = iter 0 t.number_of_attested_shards in
     {t with number_of_attested_shards}
 
+  (* Given a slot encoded as [number_of_shards] shards and for which
+     [number_of_attested_shards] are attested by the bakers. The slot is
+     declated as attested_slots IFF at least [threshold] % of the total shards
+     are attested by bakers.
+
+     On rationals, the condition above means:
+
+     number_of_attested_shards / number_of_shards >= threshold / 100,
+
+     which is equivalent, on rationals, to:
+
+     number_of_attested_shards >= (threshold * number_of_shards) / 100
+
+     Note that the last reformulation translates to integers. *)
+  let compute_proto_attestation_status ~number_of_attested_shards ~threshold
+      ~number_of_shards =
+    Compare.Int.(
+      number_of_attested_shards >= threshold * number_of_shards / 100)
+
   let is_slot_attested t ~threshold ~number_of_shards slot_index =
     let index = Dal_slot_index_repr.to_int slot_index in
     let number_of_attested_shards =
@@ -143,8 +162,10 @@ module Accountability = struct
       | Some v -> v
     in
     let is_proto_attested =
-      Compare.Int.(
-        number_of_attested_shards >= threshold * number_of_shards / 100)
+      compute_proto_attestation_status
+        ~number_of_attested_shards
+        ~threshold
+        ~number_of_shards
     in
     {
       is_proto_attested;
