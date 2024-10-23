@@ -59,6 +59,10 @@ val has_observer : t -> bool
     and no producer, not observer roles. *)
 val attester_only : t -> bool
 
+(** [attesters operator] returns the set of attesters registered within the
+    attester profile, if any. *)
+val attesters : t -> Signature.Public_key_hash.Set.t
+
 (** [producer_slot_out_of_bounds n op] returns the first slot index that for
     producer that is not between 0 and n - 1; it returns [None] if no slot
     index was outside these bounds *)

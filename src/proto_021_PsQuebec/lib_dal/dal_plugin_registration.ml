@@ -33,7 +33,7 @@ module Plugin = struct
 
   type block_info = Protocol_client_context.Alpha_block_services.block_info
 
-  type attested_indices = Bitset.t
+  type dal_attestation = Bitset.t
 
   let parametric_constants chain block ctxt =
     let cpctxt = new Protocol_client_context.wrap_rpc_context ctxt in
@@ -112,6 +112,39 @@ module Plugin = struct
            let slot_index = Dal.Slot_index.to_int slot_index in
            return Dal_plugin.({published_level; slot_index; commitment}, status))
 
+  let get_dal_content_of_attestations (block : block_info) =
+    let open Protocol.Alpha_context in
+    match List.hd block.operations with
+    | None ->
+        (* that should be unreachable, as there are 4 operation passes *) []
+    | Some consensus_ops ->
+        List.filter_map
+          (fun Protocol_client_context.Alpha_block_services.
+                 {receipt; protocol_data; _} ->
+            let delegate_opt =
+              match receipt with
+              | Receipt (Operation_metadata {contents; _}) -> (
+                  match contents with
+                  | Single_result (Attestation_result {delegate; _}) ->
+                      Some delegate
+                  | _ -> None)
+              | Empty | Too_large | Receipt No_operation_metadata -> None
+            in
+            match protocol_data with
+            | Operation_data
+                {
+                  contents =
+                    Single (Attestation {consensus_content; dal_content; _});
+                  _;
+                } ->
+                Some
+                  ( Slot.to_int consensus_content.slot,
+                    delegate_opt,
+                    (Option.map (fun d -> d.attestation) dal_content
+                      :> Bitset.t option) )
+            | _ -> None)
+          consensus_ops
+
   let get_committee ctxt ~level =
     let open Lwt_result_syntax in
     let cpctxt = new Protocol_client_context.wrap_rpc_context ctxt in
@@ -125,7 +158,7 @@ module Plugin = struct
       Signature.Public_key_hash.Map.empty
       pkh_to_shards
 
-  let attested_slot_headers (block : block_info) =
+  let dal_attestation (block : block_info) =
     let open Result_syntax in
     let* metadata =
       Option.to_result

@@ -39,7 +39,7 @@ type slot_index = int
 type slot_header = {
   published_level : int32;
   slot_index : slot_index;
-  commitment : Tezos_crypto_dal.Cryptobox.Verifier.commitment;
+  commitment : Cryptobox.Verifier.commitment;
 }
 
 type proto_parameters = {
@@ -48,7 +48,7 @@ type proto_parameters = {
   number_of_slots : int;
   attestation_lag : int;
   attestation_threshold : int;
-  cryptobox_parameters : Tezos_crypto_dal.Cryptobox.Verifier.parameters;
+  cryptobox_parameters : Cryptobox.Verifier.parameters;
   sc_rollup_challenge_window_in_blocks : int;
   commitment_period_in_blocks : int;
   dal_attested_slots_validity_lag : int;
@@ -62,7 +62,7 @@ module type T = sig
 
   type block_info
 
-  type attested_indices
+  type dal_attestation
 
   (** [block_info ?chain ?block ~metadata ctxt] returns the information of the
       [block] in [ctxt] for the given [chain]. Block's metadata are included or
@@ -85,26 +85,32 @@ module type T = sig
     block_info ->
     (slot_header * operation_application_result) list tzresult Lwt.t
 
+  (** For a given block, returns for each included attestation, as a list, its
+      Tenderbake slot, its attester (if available in the operation receipt), and
+      its DAL attestation. *)
+  val get_dal_content_of_attestations :
+    block_info ->
+    (int * Signature.Public_key_hash.t option * dal_attestation option) list
+
   (** [get_committee ctxt ~level] retrieves the DAL committee at [level] from L1 as a
       map that associates to the public key hash [pkh] of the member of
       the committee its assigned shard indexes. *)
   val get_committee :
     Tezos_rpc.Context.generic ->
     level:int32 ->
-    int list Tezos_crypto.Signature.Public_key_hash.Map.t tzresult Lwt.t
+    int list Signature.Public_key_hash.Map.t tzresult Lwt.t
 
-  (** [attested_slot_headers block_info] reads the metadata of the
-      given [block_info] and constructs the list of attested slot
-      indices as an abstract value of type [attested_indices] to be
-      passed to the [is_attested] function.
+  (** [dal_attestation block_info] returns the metadata of the given
+      [block_info] as an abstract value of type [dal_attestation] to be passed
+      to the [is_attested] function.
 
       Fails with [Cannot_read_block_metadata] if [block_info]'s metadata are
       stripped.  *)
-  val attested_slot_headers : block_info -> attested_indices tzresult
+  val dal_attestation : block_info -> dal_attestation tzresult
 
-  (** [is_attested attested_indices index] returns [true] if [index]
-      is one of the [attested_indices] and [false] otherwise.  *)
-  val is_attested : attested_indices -> slot_index -> bool
+  (** [is_attested dal_attestation index] returns [true] if [index]
+      is one of the [dal_attestation] and [false] otherwise.  *)
+  val is_attested : dal_attestation -> slot_index -> bool
 
   (** [get_round fitness] returns the block round contained in [fitness]. *)
   val get_round : Fitness.t -> int32 tzresult

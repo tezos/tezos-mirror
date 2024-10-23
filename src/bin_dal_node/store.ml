@@ -169,8 +169,14 @@ module Shards = struct
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4973
      Make storage more resilient to DAL parameters change. *)
-  let are_shards_available store slot_id shard_indexes =
-    List.for_all_es (KVS.value_exists store file_layout slot_id) shard_indexes
+  let number_of_shards_available store slot_id shard_indexes =
+    let open Lwt_result_syntax in
+    List.fold_left_es
+      (fun count shard_index ->
+        let+ exists = KVS.value_exists store file_layout slot_id shard_index in
+        if exists then count + 1 else count)
+      0
+      shard_indexes
 
   let write_all shards_store slot_id shards =
     let open Lwt_result_syntax in
@@ -367,7 +373,7 @@ module Statuses = struct
       KVS.read_value t file_layout slot_id.slot_level slot_id.slot_index
     in
     match res with
-    | Ok slot -> return slot
+    | Ok status -> return status
     | Error [KVS.Missing_stored_kvs_data _] -> fail Errors.not_found
     | Error err ->
         let data_kind = Types.Store.Header_status in

@@ -255,6 +255,92 @@ module Profile_handlers = struct
   let get_assigned_shard_indices ctxt pkh level () () =
     Node_context.fetch_assigned_shard_indices ctxt ~level ~pkh
 
+  let warn_missing_shards store attester published_level
+      expected_number_of_shards number_of_stored_shards_per_slot =
+    let open Lwt_syntax in
+    let statuses_store = Store.slot_header_statuses store in
+    let* problems =
+      List.filter_map_s
+        (fun (slot_index, num_stored) ->
+          if num_stored = expected_number_of_shards then
+            Lwt.return_some (`Ok (slot_index, num_stored))
+          else
+            let* res =
+              Store.Statuses.get_slot_status
+                statuses_store
+                ~slot_id:{slot_level = published_level; slot_index}
+            in
+            match res with
+            | Error `Not_found ->
+                (* that is, it was not published *)
+                Lwt.return_none
+            | Error (`Other tztrace) ->
+                let* () =
+                  Event.(
+                    emit
+                      slot_header_status_storage_error
+                      (published_level, slot_index, tztrace))
+                in
+                Lwt.return_none
+            | Ok res -> (
+                match res with
+                | `Waiting_attestation ->
+                    Lwt.return_some (`Not_ok (slot_index, num_stored))
+                | status ->
+                    let* () =
+                      Event.(
+                        emit
+                          unexpected_slot_header_status
+                          ( published_level,
+                            slot_index,
+                            `Waiting_attestation,
+                            status ))
+                    in
+                    Lwt.return_none))
+        number_of_stored_shards_per_slot
+    in
+    let ok, not_ok =
+      List.partition (function `Ok _ -> true | `Not_ok _ -> false) problems
+    in
+    let* () =
+      if List.is_empty ok then Lwt.return_unit
+      else
+        let ok =
+          List.filter_map (function `Ok v -> Some v | `Not_ok _ -> None) ok
+        in
+        (* TODO: improve (do not go twice through the list)  *)
+        let indexes, _ = List.split ok in
+        Event.(
+          emit
+            get_attestable_slots_ok_notice
+            (attester, published_level, indexes))
+    in
+    let* () =
+      if List.is_empty not_ok then Lwt.return_unit
+      else
+        let count_received_incomplete_shards_per_slot =
+          List.filter_map
+            (function
+              | `Ok _ -> None
+              | `Not_ok (idx, stored) ->
+                  Some (idx, stored, expected_number_of_shards))
+            not_ok
+        in
+        let indexes =
+          List.map
+            (fun (idx, _, _) -> idx)
+            count_received_incomplete_shards_per_slot
+        in
+        Event.(
+          emit
+            get_attestable_slots_not_ok_warning
+            ( attester,
+              published_level,
+              indexes,
+              count_received_incomplete_shards_per_slot ))
+    in
+    Lwt.return_unit
+
   let get_attestable_slots ctxt pkh attested_level () () =
     let get_attestable_slots ~shard_indices store proto_parameters
         ~attested_level =
@@ -271,18 +357,40 @@ module Profile_handlers = struct
               attested_level
               (of_int proto_parameters.Dal_plugin.attestation_lag))
         in
+        let shards_store = Store.shards store in
         let are_shards_stored slot_index =
           let slot_id : Types.slot_id =
             {slot_level = published_level; slot_index}
           in
-          let shards_store = Store.shards store in
-          Store.Shards.are_shards_available shards_store slot_id shard_indices
-          |> lwt_map_error (fun e -> `Other e)
+          let+ number_stored_shards =
+            Store.Shards.number_of_shards_available
+              shards_store
+              slot_id
+              shard_indices
+            |> lwt_map_error (fun e -> `Other e)
+          in
+          (slot_index, number_stored_shards)
         in
         let all_slot_indexes =
           Utils.Infix.(0 -- (proto_parameters.number_of_slots - 1))
         in
-        let* flags = List.map_es are_shards_stored all_slot_indexes in
+        let* number_of_stored_shards_per_slot =
+          List.map_es are_shards_stored all_slot_indexes
+        in
+        let flags =
+          List.map
+            (fun (_slot_index, stored) -> stored = expected_number_of_shards)
+            number_of_stored_shards_per_slot
+        in
+        Lwt.dont_wait
+          (fun () ->
+            warn_missing_shards
+              store
+              pkh
+              published_level
+              expected_number_of_shards
+              number_of_stored_shards_per_slot)
+          (fun _exn -> ()) ;
         return (Types.Attestable_slots {slots = flags; published_level})
     in
     call_handler1 (fun () ->

@@ -320,6 +320,33 @@ let removed_status =
     ~level:Debug
     ("level", Data_encoding.int32)
 
+let slot_header_status_storage_error =
+  declare_3
+    ~section
+    ~name:"slot_header_status_storage_error"
+    ~msg:
+      "slot header status storage error for level {published_level}, slot \
+       index {slot_index}: {error}"
+    ~level:Error
+    ("published_level", Data_encoding.int32)
+    ("slot_index", Data_encoding.int31)
+    ("error", Error_monad.trace_encoding)
+
+let unexpected_slot_header_status =
+  declare_4
+    ~section
+    ~name:"unexpected_slot_header_status"
+    ~msg:
+      "Internal error: unexpected slot header status {got_status}, expected \
+       {expected_status}, for level {published_level}, slot index {slot_index}"
+    ~level:Error
+    ("published_level", Data_encoding.int32)
+    ("slot_index", Data_encoding.int31)
+    ("expected_status", Types.header_status_encoding)
+    ("got_status", Types.header_status_encoding)
+    ~pp3:Types.pp_header_status
+    ~pp4:Types.pp_header_status
+
 let removed_skip_list_cells =
   declare_1
     ~section
@@ -607,3 +634,73 @@ let main_process_enqueue_query =
     ~msg:"main process: enqueue query #{query_id}."
     ~level:Info
     ("query_id", Data_encoding.int31)
+
+let pp_int_list fmt l =
+  Format.pp_print_list
+    ~pp_sep:(fun fmt () -> Format.pp_print_string fmt ", ")
+    Format.pp_print_int
+    fmt
+    l
+
+let get_attestable_slots_ok_notice =
+  declare_3
+    ~section
+    ~name:"get_attestable_slots_ok_notice"
+    ~msg:
+      "For slots {slots_indices} published at level {published_level}, \
+       {attester} got all its shards."
+    ~level:Notice
+    ("attester", Signature.Public_key_hash.encoding)
+    ("published_level", Data_encoding.int32)
+    ("slots_indices", Data_encoding.(list int31))
+    ~pp1:Signature.Public_key_hash.pp_short
+    ~pp3:pp_int_list
+
+let get_attestable_slots_not_ok_warning =
+  declare_4
+    ~section
+    ~name:"get_attestable_slots_warning"
+    ~msg:
+      "For slots {slots_indices} published at level {published_level}, \
+       {attester} missed shards:\n\
+       {slot_indexes_with_details}"
+    ~level:Warning
+    ("attester", Signature.Public_key_hash.encoding)
+    ("published_level", Data_encoding.int32)
+    ("slots_indices", Data_encoding.(list int31))
+    ("slot_indexes_with_details", Data_encoding.(list (tup3 int31 int31 int31)))
+    ~pp1:Signature.Public_key_hash.pp_short
+    ~pp3:pp_int_list
+    ~pp4:
+      (Format.pp_print_list
+         ~pp_sep:(fun fmt () -> Format.fprintf fmt "\n")
+         (fun fmt (slot_index, stored_shards, expected_shards) ->
+           Format.fprintf
+             fmt
+             " For slot index %d, %d shards out of %d were received"
+             slot_index
+             stored_shards
+             expected_shards))
+
+let warn_attester_not_dal_attesting =
+  declare_2
+    ~section
+    ~name:"attester_not_dal_attesting"
+    ~msg:"Expected {attester} to include DAL content for level {attested_level}"
+    ~level:Warning
+    ("attester", Signature.Public_key_hash.encoding)
+    ("attested_level", Data_encoding.int32)
+    ~pp1:Signature.Public_key_hash.pp_short
+
+let warn_attester_did_not_attest_slot =
+  declare_3
+    ~section
+    ~name:"attester_did_not_attest_slot"
+    ~msg:
+      "At level {attested_level}, slot index {slot_index} was attested but \
+       shards from {attester} are missing"
+    ~level:Warning
+    ("attester", Signature.Public_key_hash.encoding)
+    ("slot_index", Data_encoding.int31)
+    ("attested_level", Data_encoding.int32)
+    ~pp1:Signature.Public_key_hash.pp_short

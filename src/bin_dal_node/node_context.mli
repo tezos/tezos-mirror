@@ -145,10 +145,7 @@ val level_to_gc :
     indices assigned to [pkh] at [level].  It internally caches the DAL
     committee with [level] as the key with FIFO strategy. *)
 val fetch_assigned_shard_indices :
-  t ->
-  level:int32 ->
-  pkh:Tezos_crypto.Signature.Public_key_hash.t ->
-  int list tzresult Lwt.t
+  t -> level:int32 -> pkh:Signature.Public_key_hash.t -> int list tzresult Lwt.t
 
 (** [get_fetched_assigned_shard_indices] is a pure variant of
     {!fetch_assigned_shard_indices} that doesn't fetch the committee from L1 if

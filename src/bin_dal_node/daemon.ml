@@ -426,6 +426,103 @@ module Handler = struct
       ~attested_level:block_level
       cells_of_level
 
+  (* This functions counts, for each slot, the number of shards attested by the bakers. *)
+  let get_attestable_slots attestations committee ~number_of_slots is_attested =
+    let count_per_slot = Array.make number_of_slots 0 in
+    List.iter
+      (fun (_tb_slot, delegate_opt, dal_attestation_opt) ->
+        match (delegate_opt, dal_attestation_opt) with
+        | Some delegate, Some dal_attestation -> (
+            match Signature.Public_key_hash.Map.find delegate committee with
+            | None -> ()
+            | Some shard_indexes ->
+                let num_shards = List.length shard_indexes in
+                for i = 0 to number_of_slots - 1 do
+                  if is_attested dal_attestation i then
+                    count_per_slot.(i) <- count_per_slot.(i) + num_shards
+                done)
+        | _ -> ())
+      attestations ;
+    count_per_slot
+
+  let check_attesters_attested node_ctxt parameters ~block_level
+      get_attestations is_attested =
+    let open Lwt_result_syntax in
+    let attesters =
+      match
+        Profile_manager.get_profiles @@ Node_context.get_profile_ctxt node_ctxt
+      with
+      | Operator profile -> Operator_profile.attesters profile
+      | _ -> Signature.Public_key_hash.Set.empty
+    in
+    if Signature.Public_key_hash.Set.is_empty attesters then return_unit
+    else
+      let attested_level = Int32.pred block_level in
+      let* committee =
+        Node_context.fetch_committee node_ctxt ~level:attested_level
+      in
+      let attestations = get_attestations () in
+      let attestable_slots =
+        get_attestable_slots
+          attestations
+          committee
+          ~number_of_slots:parameters.Dal_plugin.number_of_slots
+          is_attested
+      in
+      let threshold =
+        parameters.cryptobox_parameters.number_of_shards
+        / parameters.cryptobox_parameters.redundancy_factor
+      in
+      let should_be_attested index =
+        let num_attested_shards = attestable_slots.(index) in
+        num_attested_shards >= threshold
+      in
+      let*! () =
+        List.iter_s
+          (fun (_tb_slot, delegate_opt, bitset_opt) ->
+            match delegate_opt with
+            | Some delegate
+              when Signature.Public_key_hash.Set.mem delegate attesters -> (
+                match bitset_opt with
+                | None ->
+                    let in_committee =
+                      match
+                        Signature.Public_key_hash.Map.find delegate committee
+                      with
+                      | Some (_ :: _) -> true
+                      | _ -> false
+                    in
+                    if in_committee then
+                      Event.(
+                        emit
+                          warn_attester_not_dal_attesting
+                          (delegate, attested_level))
+                    else (* no assigned shards... *)
+                      Lwt.return_unit
+                | Some bitset ->
+                    List.iter_s
+                      (fun index ->
+                        if
+                          should_be_attested index
+                          && not (is_attested bitset index)
+                        then
+                          Event.(
+                            emit
+                              warn_attester_did_not_attest_slot
+                              (delegate, index, attested_level))
+                        else Lwt.return_unit)
+                      (0 -- (parameters.number_of_slots - 1)))
+            | None | Some _ ->
+                (* None = the receipt does not contain the delegate (which
+                   probably should not happen; if it can happen, we should use
+                   the Tenderbake slot instead)...
+                   Some _ = the delegate who signed the operation is not among
+                   the registered attesters *)
+                Lwt.return_unit)
+          attestations
+      in
+      return_unit
+
   let process_block ctxt cctxt proto_parameters finalized_shell_header =
     let open Lwt_result_syntax in
     let store = Node_context.get_store ctxt in
@@ -486,13 +583,13 @@ module Handler = struct
               | Dal_plugin.Failed -> return_unit)
             slot_headers
         in
-        let*? attested_slots = Plugin.attested_slot_headers block_info in
+        let*? dal_attestation = Plugin.dal_attestation block_info in
         let* () =
           Slot_manager.update_selected_slot_headers_statuses
             ~block_level
             ~attestation_lag:proto_parameters.attestation_lag
             ~number_of_slots:proto_parameters.number_of_slots
-            (Plugin.is_attested attested_slots)
+            (Plugin.is_attested dal_attestation)
             store
         in
         let*! () =
@@ -501,9 +598,20 @@ module Handler = struct
             ctxt
             ~published_level:
               Int32.(sub block_level (of_int proto_parameters.attestation_lag))
-            (Plugin.is_attested attested_slots)
+            (Plugin.is_attested dal_attestation)
         in
         let* () = may_update_topics ctxt proto_parameters ~block_level in
+        let* () =
+          let get_attestations () =
+            Plugin.get_dal_content_of_attestations block_info
+          in
+          check_attesters_attested
+            ctxt
+            proto_parameters
+            ~block_level
+            get_attestations
+            Plugin.is_attested
+        in
         return_unit
       else return_unit
     in
