@@ -32,22 +32,7 @@ module Types = Tezos_dal_node_services.Types
 module P2p_message_V1 = struct
   type px_peer = Types.Peer.t
 
-  type p2p_message =
-    | Graft of {topic : Types.Topic.t}
-    | Prune of {
-        topic : Types.Topic.t;
-        px : px_peer Seq.t;
-        backoff : Types.Span.t;
-      }
-    | IHave of {topic : Types.Topic.t; message_ids : Types.Message_id.t list}
-    | IWant of {message_ids : Types.Message_id.t list}
-    | Subscribe of {topic : Types.Topic.t}
-    | Unsubscribe of {topic : Types.Topic.t}
-    | Message_with_header of {
-        message : Types.Message.t;
-        topic : Types.Topic.t;
-        message_id : Types.Message_id.t;
-      }
+  type p2p_message = Gs_interface.Worker_instance.p2p_message
 
   let px_peer_encoding =
     let open Data_encoding in
@@ -64,6 +49,7 @@ module P2p_message_V1 = struct
      DAL/GS: bound the lists/seqs in exchanged p2p messages. *)
   let p2p_message_app_encoding =
     let open Data_encoding in
+    let open Gs_interface.Worker_instance in
     let case ?max_length ~tag ~title encoding unwrap wrap =
       P2p_params.Encoding {tag; title; encoding; wrap; unwrap; max_length}
     in
@@ -153,7 +139,9 @@ module P2p_message_V1 = struct
   let pp_list pp_elt =
     Format.pp_print_list ~pp_sep:(fun fmt () -> Format.fprintf fmt "; ") pp_elt
 
-  let pp_p2p_message fmt = function
+  let pp_p2p_message fmt =
+    let open Gs_interface.Worker_instance in
+    function
     | Graft {topic} -> Format.fprintf fmt "Graft{topic=%a}" Types.Topic.pp topic
     | Prune {topic; px; backoff} ->
         Format.fprintf

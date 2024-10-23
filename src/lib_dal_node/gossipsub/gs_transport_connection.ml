@@ -175,36 +175,6 @@ let disconnections_handler gs_worker peer_id =
   | None -> (* Something is off, we should log something probably. *) ()
   | Some (peer, _) -> Worker.(Disconnection {peer} |> p2p_input gs_worker)
 
-(* This function translates a Worker p2p_message to the type of messages sent
-   via the P2P layer. The two types don't coincide because of Prune. *)
-let wrap_p2p_message _p2p_layer =
-  let module W = Worker in
-  let open Transport_layer_interface in
-  function
-  | W.Graft {topic} -> Graft {topic}
-  | W.Prune {topic; px; backoff} -> Prune {topic; px; backoff}
-  | W.IHave {topic; message_ids} -> IHave {topic; message_ids}
-  | W.IWant {message_ids} -> IWant {message_ids}
-  | W.Subscribe {topic} -> Subscribe {topic}
-  | W.Unsubscribe {topic} -> Unsubscribe {topic}
-  | W.Message_with_header {message; topic; message_id} ->
-      Message_with_header {message; topic; message_id}
-
-(* This function translates a message received via the P2P layer to a Worker
-   p2p_message. The two types don't coincide because of Prune. *)
-let unwrap_p2p_message _p2p_layer ~from_peer:_ =
-  let open Worker in
-  let module I = Transport_layer_interface in
-  function
-  | I.Graft {topic} -> Graft {topic}
-  | I.Prune {topic; px; backoff} -> Prune {topic; px; backoff}
-  | I.IHave {topic; message_ids} -> IHave {topic; message_ids}
-  | I.IWant {message_ids} -> IWant {message_ids}
-  | I.Subscribe {topic} -> Subscribe {topic}
-  | I.Unsubscribe {topic} -> Unsubscribe {topic}
-  | I.Message_with_header {message; topic; message_id} ->
-      Message_with_header {message; topic; message_id}
-
 let try_connect ?expected_peer_id p2p_layer point =
   let open Lwt_syntax in
   (* We don't wait for the promise to resolve here, because if the
@@ -255,13 +225,13 @@ let gs_worker_p2p_output_handler gs_worker p2p_layer =
               Events.(emit no_connection_for_peer to_peer.peer_id)
           | Some conn -> (
               let* (res : unit tzresult) =
-                let msg = wrap_p2p_message p2p_layer p2p_message in
                 let* () =
                   if log_sending_message p2p_message then
-                    Events.(emit send_p2p_message (to_peer.peer_id, msg))
+                    Events.(
+                      emit send_p2p_message (to_peer.peer_id, p2p_message))
                   else return_unit
                 in
-                P2p.send p2p_layer conn msg
+                P2p.send p2p_layer conn p2p_message
               in
               match res with
               | Ok () -> return_unit
@@ -289,12 +259,9 @@ let gs_worker_p2p_output_handler gs_worker p2p_layer =
 let transport_layer_inputs_handler gs_worker p2p_layer =
   let open Lwt_syntax in
   let rec loop () =
-    let* conn, msg = P2p.recv_any p2p_layer in
+    let* conn, p2p_message = P2p.recv_any p2p_layer in
     let from_peer = peer_of_connection p2p_layer conn in
-    Worker.(
-      In_message
-        {from_peer; p2p_message = unwrap_p2p_message p2p_layer ~from_peer msg}
-      |> p2p_input gs_worker) ;
+    Worker.(In_message {from_peer; p2p_message} |> p2p_input gs_worker) ;
     loop ()
   in
   loop ()
