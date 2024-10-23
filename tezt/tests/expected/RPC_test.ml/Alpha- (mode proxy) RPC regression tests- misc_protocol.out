@@ -11,7 +11,7 @@
   "smart_rollup_max_number_of_messages_per_level": "1000000",
   "consensus_rights_delay": 2, "blocks_preservation_cycles": 1,
   "delegate_parameters_activation_delay": 2,
-  "tolerated_inactivity_period": 3, "blocks_per_cycle": 8,
+  "tolerated_inactivity_period": 1, "blocks_per_cycle": 8,
   "blocks_per_commitment": 4, "nonce_revelation_threshold": 4,
   "cycles_per_voting_period": 8, "hard_gas_limit_per_operation": "1040000",
   "hard_gas_limit_per_block": "1386666",
