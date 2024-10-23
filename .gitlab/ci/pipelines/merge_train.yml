@@ -434,6 +434,7 @@ oc.build_arm64-released:
     - _build/default/src/lib_protocol_compiler/bin/main_native.exe
     - _build/default/tezt/tests/main.exe
     - _build/default/contrib/octez_injector_server/octez_injector_server.exe
+    - etherlink-governance-observer
     when: on_success
 
 oc.build_arm64-exp-dev-extra:
@@ -485,6 +486,7 @@ oc.build_arm64-exp-dev-extra:
     - _build/default/src/lib_protocol_compiler/bin/main_native.exe
     - _build/default/tezt/tests/main.exe
     - _build/default/contrib/octez_injector_server/octez_injector_server.exe
+    - etherlink-governance-observer
     when: on_success
 
 oc.build:static-x86_64-linux-binaries:
@@ -669,6 +671,7 @@ oc.build_x86_64-released:
     - _build/default/src/lib_protocol_compiler/bin/main_native.exe
     - _build/default/tezt/tests/main.exe
     - _build/default/contrib/octez_injector_server/octez_injector_server.exe
+    - etherlink-governance-observer
     when: on_success
 
 oc.build_x86_64-exp-dev-extra:
@@ -777,6 +780,7 @@ oc.build_x86_64-exp-dev-extra:
     - _build/default/src/lib_protocol_compiler/bin/main_native.exe
     - _build/default/tezt/tests/main.exe
     - _build/default/contrib/octez_injector_server/octez_injector_server.exe
+    - etherlink-governance-observer
     when: on_success
 
 wasm-runtime-check:

@@ -1,5 +1,6 @@
 injector_server: _build/default/contrib/octez_injector_server/octez_injector_server.exe
 dal_echo_kernel: dal_echo_kernel.wasm
+etherlink_governance_observer: etherlink-governance-observer
 debug_kernel: etherlink/kernel_evm/kernel/tests/resources/debug_kernel.wasm
 failed_migration: etherlink/kernel_evm/kernel/tests/resources/failed_migration.wasm
 ghostnet_evm_kernel: etherlink/kernel_evm/kernel/tests/resources/ghostnet_evm_kernel.wasm

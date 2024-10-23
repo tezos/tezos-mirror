@@ -10,6 +10,7 @@
   bls12-381.archive
   octez-libs.base
   octez-libs.base.unix
+  octez-version.value
   octez-libs.clic
   octez-libs.prometheus-app
   octez-libs.cohttp-lwt-unix
