@@ -126,12 +126,13 @@ let test_wait_rewards_with_ai_staker_variation =
   --> wait_n_cycles 4
   (* Staker restakes some *)
   --> stake "staker" Half
-  (* Reactivate another baker for allowing it to bake later *)
-  --> set_delegate "faucet" (Some "faucet")
   --> wait_n_cycles 4
   (* Add unstake requests in the mix *)
   --> unstake "staker" Half
-  --> next_cycle
+  (* Reactivate another baker to allow it to bake later *)
+  --> set_delegate "faucet" (Some "faucet")
+  --> wait_n_cycles_f (fun (_, state) ->
+          state.State.constants.consensus_rights_delay + 1)
   (* Double bake for the delegate *)
   --> set_baker "faucet"
   --> double_bake "delegate" --> make_denunciations ()
@@ -139,7 +140,9 @@ let test_wait_rewards_with_ai_staker_variation =
   --> wait_n_cycles 10
   (* Reactivate it, make it bake, and see everything is as before *)
   --> set_delegate "delegate" (Some "delegate")
-  --> wait_n_cycles 4 --> set_baker "delegate" --> wait_n_cycles 10
+  --> wait_n_cycles_f (fun (_, state) ->
+          state.State.constants.consensus_rights_delay + 1)
+  --> set_baker "delegate" --> wait_n_cycles 10
 
 (** Tests reward distribution under AI for one baker and two stakers,
     and the baker changes its limit parameter while being overstaked.

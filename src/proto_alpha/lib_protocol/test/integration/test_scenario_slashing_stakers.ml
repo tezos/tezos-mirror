@@ -81,6 +81,7 @@ let init_with_stakers () =
   init_constants () --> activate_ai `Force
   --> branch_flag S.Adaptive_issuance.ns_enable
   --> begin_test
+        ~force_attest_all:true
         [
           first_slashed_delegate;
           second_slashed_delegate;

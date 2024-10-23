@@ -320,7 +320,7 @@ let test_slash_timing =
   init_constants ~blocks_per_cycle:8l ()
   --> activate_ai `No
   --> branch_flag S.Adaptive_issuance.ns_enable
-  --> begin_test ["delegate"; "bootstrap1"]
+  --> begin_test ~force_attest_all:true ["delegate"; "bootstrap1"]
   --> next_cycle
   --> (Tag "stake" --> stake "delegate" Half
       |+ Tag "unstake" --> unstake "delegate" Half)
