@@ -1,4 +1,5 @@
 # SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
+# SPDX-FileCopyrightText: 2024 TriliTech <contact@trili.tech>
 #
 # SPDX-License-Identifier: MIT
 
@@ -68,6 +69,10 @@ test: build
 	@cargo test --workspace
 	@make -C dummy_kernel test
 	@make -C jstz test
+
+.PHONY: test-long
+test-long: 
+	@cargo test --release -- test_jstz_determinism --nocapture --ignored
 
 .PHONY: check
 check:
