@@ -814,6 +814,23 @@ let jobs pipeline_type =
         Debian_repository.child_pipeline_full
     in
 
+    (* rpm counterpart of the debian tests *)
+    let job_rpm_repository_trigger_auto =
+      trigger_job
+        ~__POS__
+        ~rules:(make_rules ~manual:No ~changes:changeset_rpm_packages ())
+        ~stage:Stages.test
+        ~dependencies:dependencies_needs_start
+        Rpm_repository.child_pipeline_partial_auto
+    in
+    let job_rpm_repository_trigger_full : tezos_job =
+      trigger_job
+        ~__POS__
+        ~dependencies:(Dependent [])
+        ~stage:Stages.test
+        Rpm_repository.child_pipeline_full
+    in
+
     (* check that ksy files are still up-to-date with octez *)
     let job_kaitai_checks : tezos_job =
       job
@@ -1595,8 +1612,10 @@ let jobs pipeline_type =
     in
     let jobs_debian =
       match pipeline_type with
-      | Before_merging | Merge_train -> [job_debian_repository_trigger_auto]
-      | Schedule_extended_test -> [job_debian_repository_trigger_full]
+      | Before_merging | Merge_train ->
+          [job_debian_repository_trigger_auto; job_rpm_repository_trigger_auto]
+      | Schedule_extended_test ->
+          [job_debian_repository_trigger_full; job_rpm_repository_trigger_full]
     in
     jobs_debian @ jobs_misc @ jobs_kernels @ jobs_unit @ jobs_install_octez
     @ jobs_tezt
@@ -1781,6 +1800,17 @@ let jobs pipeline_type =
         ~stage:Stages.manual
         Debian_repository.child_pipeline_partial
     in
+    let job_rpm_repository_trigger_partial : tezos_job =
+      (* Same as [job_rpm_repository_trigger_auto] but manual,
+         so that one can trigger it without triggering the whole main pipeline.
+         See comment near the definition of [job_rpm_repository_trigger_auto]. *)
+      trigger_job
+        ~__POS__
+        ~rules:(make_rules ~manual:Yes ())
+        ~dependencies:(Dependent [])
+        ~stage:Stages.manual
+        Rpm_repository.child_pipeline_partial
+    in
     match pipeline_type with
     | Before_merging | Merge_train ->
         (* Note: manual jobs in stage [manual] (which is the final
@@ -1858,7 +1888,9 @@ let jobs pipeline_type =
           @ [job_docker_verify_test_arm64; job_docker_verify_test_amd64]
         in
         if pipeline_type = Merge_train then jobs
-        else job_debian_repository_trigger_partial :: jobs
+        else
+          job_rpm_repository_trigger_partial
+          :: job_debian_repository_trigger_partial :: jobs
     (* No manual jobs on the scheduled pipeline *)
     | Schedule_extended_test -> []
   in

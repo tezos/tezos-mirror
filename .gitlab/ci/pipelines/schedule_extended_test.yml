@@ -1499,6 +1499,12 @@ trigger:debian_repository_full:
   trigger:
     include: .gitlab/ci/pipelines/debian_repository_full.yml
 
+trigger:rpm_repository_full:
+  stage: test
+  needs: []
+  trigger:
+    include: .gitlab/ci/pipelines/rpm_repository_full.yml
+
 kaitai_checks:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test

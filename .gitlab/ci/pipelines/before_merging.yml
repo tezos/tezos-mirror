@@ -2074,12 +2074,14 @@ trigger:debian_repository_partial_auto:
     - debian-deps-build.Dockerfile
     - docs/introduction/install-bin-deb.sh
     - docs/introduction/upgrade-bin-deb.sh
-    - scripts/ci/build-debian-packages-dependencies.sh
     - scripts/ci/build-debian-packages.sh
     - scripts/ci/build-debian-packages_current.sh
+    - scripts/ci/build-packages-dependencies.sh
     - scripts/ci/create_debian_repo.sh
     - scripts/ci/prepare-apt-repo.sh
-    - scripts/packaging/**/*
+    - scripts/packaging/Release.conf
+    - scripts/packaging/build-deb-local.sh
+    - scripts/packaging/octez/debian/*
     when: on_success
   needs:
   - job: trigger
@@ -2105,6 +2107,44 @@ trigger:debian_repository_partial_auto:
     optional: true
   trigger:
     include: .gitlab/ci/pipelines/debian_repository_partial_auto.yml
+
+trigger:rpm_repository_partial_auto:
+  stage: test
+  rules:
+  - changes:
+    - rpm-deps-build.Dockerfile
+    - scripts/ci/build-packages-dependencies.sh
+    - scripts/ci/build-rpm-packages.sh
+    - scripts/ci/create_rpm_repo.sh
+    - scripts/ci/prepare-apt-rpm-repo.sh
+    - scripts/packaging/build-deb-local.sh
+    - scripts/packaging/octez/rpm/*
+    - scripts/packaging/tests/rpm/*
+    when: on_success
+  needs:
+  - job: trigger
+  - job: sanity_ci
+    optional: true
+  - job: docker:hadolint
+    optional: true
+  - job: oc.ocaml_fmt
+    optional: true
+  - job: oc.semgrep
+    optional: true
+  - job: oc.misc_checks
+    optional: true
+  - job: check_jsonnet
+    optional: true
+  - job: check_rust_fmt
+    optional: true
+  - job: documentation:rst-check
+    optional: true
+  - job: nix
+    optional: true
+  - job: commit_titles
+    optional: true
+  trigger:
+    include: .gitlab/ci/pipelines/rpm_repository_partial_auto.yml
 
 kaitai_checks:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -4634,6 +4674,15 @@ documentation:linkcheck:
   script:
   - make -C docs redirectcheck
   - make -C docs linkcheck
+
+trigger:rpm_repository_partial:
+  stage: manual
+  rules:
+  - when: manual
+    allow_failure: true
+  needs: []
+  trigger:
+    include: .gitlab/ci/pipelines/rpm_repository_partial.yml
 
 trigger:debian_repository_partial:
   stage: manual

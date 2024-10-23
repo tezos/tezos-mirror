@@ -19,12 +19,12 @@ open Gitlab_ci.Types
 open Gitlab_ci.Util
 open Tezos_ci
 
-(* types for the debian repository pipelines.
+(* types for the repositories pipelines.
    - Release: we run all the release jobs, but no tests
    - Partial: we run only a subset of the tests jobs
    - Full: we run the complete test matrix
 *)
-type debian_repository_pipeline = Full | Partial | Release
+type repository_pipeline = Full | Partial | Release
 
 let cargo_home =
   (* Note:
@@ -110,6 +110,8 @@ module Images_external = struct
   let fedora_37 = Image.mk_external ~image_path:"fedora:37"
 
   let fedora_39 = Image.mk_external ~image_path:"fedora:39"
+
+  let rockylinux_93 = Image.mk_external ~image_path:"rockylinux:9.3"
 
   let opam_ubuntu_jammy =
     Image.mk_external ~image_path:"ocaml/opam:ubuntu-22.04"
@@ -343,6 +345,70 @@ let enable_dune_cache ?key ?(path = "$CI_PROJECT_DIR/_dune_cache")
   |> append_after_script
        ["eval $(opam env)"; "dune cache trim --size=" ^ cache_size]
 
+(** {2 Child repositories pipelines} *)
+
+(** Return a tuple (ARCHITECTURES, <archs>) based on the type
+    of repository pipeline. *)
+let archs_variables pipeline =
+  let amd64 = List.map Tezos_ci.arch_to_string_alt [Amd64] in
+  let all = List.map Tezos_ci.arch_to_string_alt [Amd64; Arm64] in
+  match pipeline with
+  | Partial -> [("ARCHITECTURES", String.concat " " amd64)]
+  | Full | Release -> [("ARCHITECTURES", String.concat " " all)]
+
+let make_job_build_packages ~__POS__ ~name ~matrix ~script ~dependencies
+    ~variables ~image =
+  job
+    ~__POS__
+    ~name
+    ~image
+    ~stage:Stages.build
+    ~variables
+    ~parallel:(Matrix matrix)
+    ~dependencies
+    ~tag:Dynamic
+    ~retry:Gitlab_ci.Types.{max = 1; when_ = [Stuck_or_timeout_failure]}
+    ~artifacts:(artifacts ["packages/$DISTRIBUTION/$RELEASE"])
+    [
+      (* This is a hack to enable Cargo networking for jobs in child pipelines.
+
+         Global variables of the parent pipeline
+         are passed to the child pipeline. Inside the child
+         pipeline, variables received from the parent pipeline take
+         precedence over job-level variables. It's bit strange. So
+         to override the default [CARGO_NET_OFFLINE=true], we cannot
+         just set it in the job-level variables of this job.
+
+         [enable_sccache] adds the cache directive for [$CI_PROJECT_DIR/_sccache].
+
+         See
+         {{:https://docs.gitlab.com/ee/ci/variables/index.html#cicd-variable-precedence}here}
+         for more info. *)
+      "export CARGO_NET_OFFLINE=false";
+      script;
+    ]
+  |> enable_sccache ~idle_timeout:"0"
+
+(* Push .rpm artifacts to storagecloud rpm repository. *)
+let make_job_repo ?rules ~__POS__ ~name ?(stage = Stages.publishing)
+    ?(prefix = false) ?dependencies ~variables ~image ~before_script script :
+    tezos_job =
+  let variables =
+    variables
+    @ [("GNUPGHOME", "$CI_PROJECT_DIR/.gnupg")]
+    @ if prefix then [("PREFIX", "next")] else []
+  in
+  job
+    ?rules
+    ?dependencies
+    ~__POS__
+    ~stage
+    ~name
+    ~image
+    ~before_script
+    ~variables
+    script
+
 (** {2 Changesets} *)
 
 (** Modifying these files will unconditionally execute all conditional jobs.
@@ -431,15 +497,31 @@ let changeset_debian_packages =
   Changeset.(
     make
       [
-        "scripts/packaging/**/*";
+        "scripts/packaging/build-deb-local.sh";
+        "scripts/packaging/Release.conf";
+        "scripts/packaging/octez/debian/*";
         "debian-deps-build.Dockerfile";
         "scripts/ci/build-debian-packages_current.sh";
-        "scripts/ci/build-debian-packages-dependencies.sh";
+        "scripts/ci/build-packages-dependencies.sh";
         "scripts/ci/build-debian-packages.sh";
         "scripts/ci/prepare-apt-repo.sh";
         "scripts/ci/create_debian_repo.sh";
         "docs/introduction/install-bin-deb.sh";
         "docs/introduction/upgrade-bin-deb.sh";
+      ])
+
+let changeset_rpm_packages =
+  Changeset.(
+    make
+      [
+        "scripts/packaging/build-deb-local.sh";
+        "scripts/packaging/octez/rpm/*";
+        "scripts/packaging/tests/rpm/*";
+        "rpm-deps-build.Dockerfile";
+        "scripts/ci/build-packages-dependencies.sh";
+        "scripts/ci/build-rpm-packages.sh";
+        "scripts/ci/prepare-apt-rpm-repo.sh";
+        "scripts/ci/create_rpm_repo.sh";
       ])
 
 (** The set of [changes:] that select opam jobs.
