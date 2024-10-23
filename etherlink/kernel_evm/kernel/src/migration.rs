@@ -8,6 +8,7 @@ use crate::block_storage;
 use crate::error::Error;
 use crate::error::StorageError;
 use crate::error::UpgradeProcessError;
+use crate::storage::DELAYED_BRIDGE;
 use crate::storage::ENABLE_FA_BRIDGE;
 use crate::storage::{
     read_chain_id, read_storage_version, store_storage_version, StorageVersion,
@@ -34,9 +35,18 @@ pub enum MigrationStatus {
 // /!\ the following functions are migratin helpers, do not remove them /!\
 
 #[allow(dead_code)]
-fn is_etherlink_ghostnet(host: &impl Runtime) -> Result<bool, Error> {
+const TESTNET_CHAIN_ID: u64 = 128123;
+
+#[allow(dead_code)]
+const MAINNET_CHAIN_ID: u64 = 42793;
+
+#[allow(dead_code)]
+fn is_etherlink_network(
+    host: &impl Runtime,
+    expected_chain_id: u64,
+) -> Result<bool, Error> {
     match read_chain_id(host) {
-        Ok(chain_id) => Ok(chain_id == 128123.into()),
+        Ok(chain_id) => Ok(chain_id == expected_chain_id.into()),
         Err(Error::Storage(StorageError::Runtime(RuntimeError::PathNotFound))) => {
             Ok(false)
         }
@@ -72,7 +82,7 @@ fn migrate_to<Host: Runtime>(
         }
         StorageVersion::V13 => Ok(MigrationStatus::Done),
         StorageVersion::V14 => {
-            if is_etherlink_ghostnet(host)? {
+            if is_etherlink_network(host, TESTNET_CHAIN_ID)? {
                 host.store_write_all(&ENABLE_FA_BRIDGE, &[1u8])?;
                 Ok(MigrationStatus::Done)
             } else {
@@ -146,6 +156,24 @@ fn migrate_to<Host: Runtime>(
                 withdrawal_precompiled.balance_remove(host, balance)?;
             }
             Ok(MigrationStatus::Done)
+        }
+        StorageVersion::V21 => {
+            if is_etherlink_network(host, MAINNET_CHAIN_ID)? {
+                host.store_write_all(
+                    &DELAYED_BRIDGE,
+                    b"KT1Vocor3bL5ZSgsYH9ztt42LNhqFK64soR4",
+                )?;
+                Ok(MigrationStatus::Done)
+            } else if is_etherlink_network(host, TESTNET_CHAIN_ID)? {
+                host.store_write_all(
+                    &DELAYED_BRIDGE,
+                    b"KT1X1M4ywyz9cHvUgBLTUUdz3GTiYJhPcyPh",
+                )?;
+                Ok(MigrationStatus::Done)
+            } else {
+                // Not applicable for other networks
+                Ok(MigrationStatus::None)
+            }
         }
     }
 }
