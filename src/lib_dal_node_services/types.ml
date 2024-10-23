@@ -180,7 +180,7 @@ module Message = struct
          (req "shard_proof" Cryptobox.shard_proof_encoding))
 end
 
-module Connection = struct
+module Peer = struct
   type t = {peer_id : P2p_peer.Id.t; maybe_reachable_point : P2p_point.Id.t}
 
   module Cmp = struct
@@ -217,8 +217,6 @@ module Connection = struct
       P2p_point.Id.pp
       maybe_reachable_point
 end
-
-module Peer = P2p_peer.Id
 
 module Point = struct
   type t = P2p_point.Id.t

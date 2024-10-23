@@ -41,7 +41,7 @@ module Types = Tezos_dal_node_services.Types
 (** Peers exchanged via PX. [point] represents the (address, port) pair of the
     exchanged peer, while [peer] represents the cryptographic identity of the
     peer. *)
-type px_peer = {point : P2p_point.Id.t; peer : P2p_peer.Id.t}
+type px_peer = Types.Peer.t
 
 (** Without piggybacking, {!p2p_message} is almost identical to
     {!Gs_interface.p2p_message}, except that for the [Prune] case,
