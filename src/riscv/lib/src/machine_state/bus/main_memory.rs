@@ -294,8 +294,10 @@ impl<L: MainMemoryLayout, M: backend::ManagerClone> Clone for MainMemory<L, M> {
     }
 }
 
-impl<L: MainMemoryLayout, M: backend::ManagerRead> PartialEq for MainMemory<L, M> {
-    fn eq(&self, other: &Self) -> bool {
+impl<L: MainMemoryLayout, M: backend::ManagerRead, N: backend::ManagerRead>
+    PartialEq<MainMemory<L, N>> for MainMemory<L, M>
+{
+    fn eq(&self, other: &MainMemory<L, N>) -> bool {
         (0..L::BYTES)
             .all(|i| L::data_read::<u8, _>(&self.data, i) == L::data_read::<u8, _>(&other.data, i))
     }
