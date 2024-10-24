@@ -5462,6 +5462,63 @@ let test_trace_transaction_call_trace_certain_depth =
   let* _ = check_and_get_subcalls "CALL" 0 (List.hd depth_3_2) in
   unit
 
+let test_trace_transaction_call_revert =
+  register_all
+    ~kernels:[Latest]
+    ~tags:["evm"; "rpc"; "trace"; "call_trace"; "revert"; "propagate"]
+    ~title:
+      "debug_traceTransaction with calltracer to see how propagated revert is \
+       handled"
+    ~da_fee:Wei.zero
+    ~time_between_blocks:Nothing
+  @@ fun {sequencer; _} _protocol ->
+  let endpoint = Evm_node.endpoint sequencer in
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let* call_revert = Solidity_contracts.call_revert () in
+  let* () = Eth_cli.add_abi ~label:call_revert.label ~abi:call_revert.abi () in
+  let* contract_address, _ =
+    send_transaction_to_sequencer
+      (fun () ->
+        Eth_cli.deploy
+          ~source_private_key:sender.Eth_account.private_key
+          ~endpoint
+          ~abi:call_revert.label
+          ~bin:call_revert.bin)
+      sequencer
+  in
+  let* _ = produce_block sequencer in
+  let* txn =
+    Cast.craft_tx
+      ~chain_id:1337
+      ~source_private_key:sender.private_key
+      ~nonce:1
+      ~gas_price:1_000_000_000
+      ~gas:30_000
+      ~value:Wei.zero
+      ~address:contract_address
+      ~signature:"callerFunction()"
+      ()
+  in
+  let*@ txn_hash = Rpc.send_raw_transaction ~raw_tx:txn sequencer in
+  let* _ = produce_block sequencer in
+  let*@ trace_result =
+    Rpc.trace_transaction
+      ~tracer:"callTracer"
+      ~transaction_hash:txn_hash
+      ~tracer_config:[("withLog", `Bool false); ("onlyTopCall", `Bool false)]
+      sequencer
+  in
+  Check.(
+    (JSON.(trace_result |-> "error" |> as_string) = "execution reverted")
+      string
+      ~error_msg:"Unexpected error") ;
+  Check.(
+    (JSON.(trace_result |-> "revertReason" |> as_string)
+    = "This function reverts")
+      string
+      ~error_msg:"Unexpected revert reason") ;
+  unit
+
 let test_trace_transaction_call_trace_revert =
   register_all
     ~kernels:[Latest]
@@ -6802,6 +6859,7 @@ let () =
   test_batch_limit_size_rpc protocols ;
   test_trace_transaction_calltracer_all_types protocols ;
   test_trace_transaction_call_tracer_with_logs protocols ;
+  test_trace_transaction_call_revert protocols ;
   test_trace_transaction_call_trace_certain_depth protocols ;
   test_trace_transaction_call_trace_revert protocols ;
   test_trace_transaction_calltracer_multiple_txs protocols ;

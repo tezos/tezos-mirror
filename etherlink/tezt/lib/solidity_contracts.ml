@@ -360,6 +360,13 @@ let call_tracer_revert () =
     ~contract:"ErrorContract"
     ~evm_version:"shanghai"
 
+let call_revert () =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/call_revert.sol")
+    ~label:"call_revert"
+    ~contract:"CallRevert"
+    ~evm_version:"shanghai"
+
 let precompiles () =
   compile_contract
     ~source:(solidity_contracts_path ^ "/precompiles.sol")
