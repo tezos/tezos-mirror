@@ -20,6 +20,8 @@ let chain_validator_profiler = unplugged ()
 
 let block_validator_profiler = unplugged ()
 
+let peer_validator_profiler = unplugged ()
+
 let rpc_server_profiler = unplugged ()
 
 let create_reset_block_section =
@@ -35,6 +37,7 @@ let all_profilers =
     ("store", store_profiler);
     ("chain_validator", chain_validator_profiler);
     ("block_validator", block_validator_profiler);
+    ("peer_validator", peer_validator_profiler);
     ("merge", merge_profiler);
     ("p2p_reader", p2p_reader_profiler);
     ("requester", requester_profiler);

@@ -28,7 +28,7 @@
 
 open Peer_validator_worker_state
 
-module Profiler = (val Profiler.wrap Shell_profiling.chain_validator_profiler)
+module Profiler = (val Profiler.wrap Shell_profiling.peer_validator_profiler)
 
 module Name = struct
   type t = Chain_id.t * P2p_peer.Id.t
