@@ -57,11 +57,14 @@ val apply_attestation : t -> Dal.Attestation.t -> power:int -> t tzresult
 val validate_publish_commitment :
   t -> Dal.Operations.Publish_commitment.t -> unit tzresult
 
-(** [apply_publish_commitment ctxt slot_header] applies the publication of
-   slot header [slot_header] on top of [ctxt]. Fails if the slot contains
-   already a slot header. *)
+(** [apply_publish_commitment ctxt slot_header ~source] applies the publication
+    of slot header [slot_header] signed by [source] on top of [ctxt]. Fails if
+    the slot already contains a slot header. *)
 val apply_publish_commitment :
-  t -> Dal.Operations.Publish_commitment.t -> (t * Dal.Slot.Header.t) tzresult
+  t ->
+  Dal.Operations.Publish_commitment.t ->
+  source:public_key_hash ->
+  (t * Dal.Slot.Header.t) tzresult
 
 (** [finalisation ctxt] should be executed at block finalisation
    time. A set of slots attested at level [ctxt.current_level - lag]

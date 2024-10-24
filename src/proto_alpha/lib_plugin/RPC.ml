@@ -3117,7 +3117,7 @@ module Dal = struct
     let level = Option.value level ~default:(Level.current ctxt).level in
     let* result = Dal.Slot.find_slot_headers ctxt level in
     match result with
-    | Some l -> return l
+    | Some l -> return @@ List.map fst l
     | None ->
         Environment.Error_monad.tzfail
         @@ Published_slot_headers_not_initialized level

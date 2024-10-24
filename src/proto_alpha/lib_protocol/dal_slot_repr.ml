@@ -218,7 +218,10 @@ module Slot_market = struct
 
   module Slot_index_map = Map.Make (Dal_slot_index_repr)
 
-  type t = {length : int; slot_headers : Header.t Slot_index_map.t}
+  type t = {
+    length : int;
+    slot_headers : (Header.t * Signature.public_key_hash) Slot_index_map.t;
+  }
 
   let init ~length =
     if Compare.Int.(length < 0) then
@@ -228,7 +231,7 @@ module Slot_market = struct
 
   let length {length; _} = length
 
-  let register t new_slot_header =
+  let register t new_slot_header ~source =
     let open Header in
     if
       not
@@ -241,7 +244,7 @@ module Slot_market = struct
       let update = function
         | None ->
             has_changed := true ;
-            Some new_slot_header
+            Some (new_slot_header, source)
         | Some x -> Some x
       in
       let slot_headers =
@@ -561,8 +564,11 @@ module History = struct
       let mk_unattested index =
         Content.Unattested Header.{published_level; index}
       in
-      (* TODO: Follow-up MR: Take the value of _s_status into account. *)
-      let attested_slot_headers = List.map fst slot_headers_with_statuses in
+      (* TODO: Follow-up MR: Take the value of _s_status and _s_publisher into
+         account. *)
+      let attested_slot_headers =
+        List.map (fun (slot, _pub, _status) -> slot) slot_headers_with_statuses
+      in
       (* Hypothesis: both lists are sorted in increasing order w.r.t. slots
          indices. *)
       let rec aux indices slots =
@@ -591,7 +597,7 @@ module History = struct
       let open Result_syntax in
       let* () =
         List.iter_e
-          (fun (slot_header, _status) ->
+          (fun (slot_header, _slot_publisher, _status) ->
             error_unless
               Raw_level_repr.(
                 published_level = slot_header.Header.id.published_level)

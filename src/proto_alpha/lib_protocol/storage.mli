@@ -1015,7 +1015,8 @@ module Dal : sig
       Non_iterable_indexed_data_storage
         with type t = Raw_context.t
          and type key = Raw_level_repr.t
-         and type value = Dal_slot_repr.Header.t list
+         and type value =
+          (Dal_slot_repr.Header.t * Signature.public_key_hash) list
 
     (** This is a permanent storage for slot headers confirmed by the L1. *)
     module History :

@@ -2144,12 +2144,13 @@ module Dal = struct
     in
     {ctxt with back = {ctxt.back with dal_attestation_slot_accountability}}
 
-  let register_slot_header ctxt slot_header =
+  let register_slot_header ctxt slot_header ~source =
     let open Result_syntax in
     match
       Dal_slot_repr.Slot_market.register
         ctxt.back.dal_slot_fee_market
         slot_header
+        ~source
     with
     | None ->
         let length =

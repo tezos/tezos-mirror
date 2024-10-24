@@ -229,30 +229,31 @@ let gen_slot_header_with_status =
     let attested_shards = if status then total_shards else 0 in
     Dal.Attestation.{total_shards; attested_shards; is_proto_attested = status}
   in
+  let* publisher = gen_pkh in
   let+ header = gen_slot_header in
-  (header, status)
+  (header, publisher, status)
 
 let gen_slot_headers_with_statuses =
   let open QCheck2.Gen in
   let size = int_bound 50 in
   let+ l = list_size size gen_slot_header_with_status in
   List.sort
-    (fun ((h1 : Octez_smart_rollup.Dal.Slot_header.t), _status1)
-         ((h2 : Octez_smart_rollup.Dal.Slot_header.t), _status2) ->
+    (fun ((h1 : Octez_smart_rollup.Dal.Slot_header.t), _publisher, _status1)
+         ((h2 : Octez_smart_rollup.Dal.Slot_header.t), _publisher, _status2) ->
       compare_slot_header_id h1.id h2.id)
     l
   |> fun l ->
   match l with
   | [] -> []
-  | ((h : Octez_smart_rollup.Dal.Slot_header.t), _status) :: _ ->
+  | ((h : Octez_smart_rollup.Dal.Slot_header.t), _publisher, _status) :: _ ->
       let min_level = h.id.published_level in
       (* smallest level *)
       List.mapi
-        (fun i ((h : Octez_smart_rollup.Dal.Slot_header.t), status) ->
+        (fun i ((h : Octez_smart_rollup.Dal.Slot_header.t), publisher, status) ->
           (* patch the published level to comply with the invariants *)
           let published_level = Int32.(add min_level (of_int i)) in
           let h = {h with id = {h.id with published_level}} in
-          (published_level, [(h, status)]))
+          (published_level, [(h, publisher, status)]))
         l
 
 let gen_slot_history =
@@ -264,8 +265,9 @@ let gen_slot_history =
       (fun (lvl, h) ->
         ( Raw_level.of_int32_exn lvl,
           List.map
-            (fun (h, status) ->
+            (fun (h, publisher, status) ->
               ( Sc_rollup_proto_types.Dal.Slot_header.of_octez ~number_of_slots h,
+                publisher,
                 status ))
             h ))
       l
@@ -294,8 +296,9 @@ let gen_slot_history_cache =
       (fun (lvl, h) ->
         ( Raw_level.of_int32_exn lvl,
           List.map
-            (fun (h, status) ->
+            (fun (h, publisher, status) ->
               ( Sc_rollup_proto_types.Dal.Slot_header.of_octez ~number_of_slots h,
+                publisher,
                 status ))
             h ))
       l

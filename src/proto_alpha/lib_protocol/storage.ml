@@ -2181,9 +2181,14 @@ module Dal = struct
           (* The size of the list below is at most equal to the
              [number_of_slots] as declared in the DAL parameters of the
              protocol. *)
-          type t = Dal_slot_repr.Header.t list
+          type t = (Dal_slot_repr.Header.t * Signature.public_key_hash) list
 
-          let encoding = Data_encoding.(list Dal_slot_repr.Header.encoding)
+          let encoding =
+            let open Data_encoding in
+            list
+              (obj2
+                 (req "slot_header" Dal_slot_repr.Header.encoding)
+                 (req "publisher" Signature.Public_key_hash.encoding))
         end)
 
     module History =

@@ -35,10 +35,11 @@ let finalize_current_slot_headers ctxt =
 
 let compute_slot_headers_statuses ~is_slot_attested seen_slot_headers =
   let open Dal_slot_repr in
-  let fold_attested_slots (rev_attested_slot_headers, attestation) slot =
+  let fold_attested_slots (rev_attested_slot_headers, attestation)
+      (slot, slot_publisher) =
     let attestation_status = is_slot_attested slot in
     let rev_attested_slot_headers =
-      (slot, attestation_status) :: rev_attested_slot_headers
+      (slot, slot_publisher, attestation_status) :: rev_attested_slot_headers
     in
     let attestation =
       if
@@ -96,6 +97,11 @@ let finalize_pending_slot_headers ctxt ~number_of_slots =
   match Raw_level_repr.(sub raw_level dal.attestation_lag) with
   | None -> return (ctxt, Dal_attestation_repr.empty)
   | Some level_attested ->
+      (* TODO/DAL: https://gitlab.com/tezos/tezos/-/issues/7563
+
+         rename a level_attested into a published_level. The name level_attested
+         is misteading as it's equal to (current_)level - attestation_lag, which
+         rather corresponds to the publication level of slot headers. *)
       let* seen_slots = find_slot_headers ctxt level_attested in
       let*! ctxt = Storage.Dal.Slot.Headers.remove ctxt level_attested in
       let* ctxt, attestation, slot_headers_statuses =

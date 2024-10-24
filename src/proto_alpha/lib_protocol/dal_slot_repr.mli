@@ -187,15 +187,18 @@ module Slot_market : sig
      (see {!val:init}). *)
   val length : t -> int
 
-  (** [register t index fees] updates the candidate associated to
-     index [index]. Returns [Some (_, true)] if the candidate is
-     registered. Returns [Some (_, false)] otherwise. Returns [None]
-     if the [index] is not in the interval [0;length] where [length]
-     is the value provided to the [init] function. *)
-  val register : t -> Header.t -> (t * bool) option
+  (** [register t slot_header ~source] possibly updates the candidate associated
+      to [slot_header.id] with the [slot_header] published by [source].
 
-  (** [candidates t] returns a list of slot header candidates. *)
-  val candidates : t -> Header.t list
+      The function returns [Some (_, true)] if the candidate is
+      registered. Returns [Some (_, false)] otherwise. Returns [None] if
+      [slot_header.id] is not a valid slot id. *)
+  val register :
+    t -> Header.t -> source:Signature.public_key_hash -> (t * bool) option
+
+  (** [candidates t] returns a list of slot header candidates associated to the
+      public key hashes of the managers who published them. *)
+  val candidates : t -> (Header.t * Signature.public_key_hash) list
 end
 
 (** This module provides an abstract data structure (type {!History.t}) that
@@ -275,7 +278,10 @@ module History : sig
     History_cache.t ->
     Raw_level_repr.t ->
     number_of_slots:int ->
-    (Header.t * Dal_attestation_repr.Accountability.attestation_status) list ->
+    (Header.t
+    * Signature.public_key_hash
+    * Dal_attestation_repr.Accountability.attestation_status)
+    list ->
     (t * History_cache.t) tzresult
 
   (** Similiar to {!update_skip_list}, but no cache is provided or
@@ -284,7 +290,10 @@ module History : sig
     t ->
     Raw_level_repr.t ->
     number_of_slots:int ->
-    (Header.t * Dal_attestation_repr.Accountability.attestation_status) list ->
+    (Header.t
+    * Signature.public_key_hash
+    * Dal_attestation_repr.Accountability.attestation_status)
+    list ->
     t tzresult
 
   (** [equal a b] returns true iff a is equal to b. *)
