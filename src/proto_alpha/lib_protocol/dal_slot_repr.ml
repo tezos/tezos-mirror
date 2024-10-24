@@ -718,7 +718,7 @@ module History = struct
     module History_cache =
       Bounded_history_repr.Make
         (struct
-          let name = "dal_slots_cache_v2"
+          let name = "dal_slots_cache"
         end)
         (Pointer_hash)
         (struct
@@ -979,7 +979,7 @@ module History = struct
     let () =
       register_error_kind
         `Permanent
-        ~id:"Dal_slot_repr.invalid_proof_serialization_"
+        ~id:"Dal_slot_repr.invalid_proof_serialization"
         ~title:"Dal invalid proof serialization"
         ~description:"Error occured during dal proof serialization"
         Data_encoding.unit
@@ -997,7 +997,7 @@ module History = struct
     let () =
       register_error_kind
         `Permanent
-        ~id:"Dal_slot_repr.invalid_proof_deserialization_"
+        ~id:"Dal_slot_repr.invalid_proof_deserialization"
         ~title:"Dal invalid proof deserialization"
         ~description:"Error occured during dal proof deserialization"
         Data_encoding.unit
@@ -1051,7 +1051,7 @@ module History = struct
       let open Data_encoding in
       register_error_kind
         `Permanent
-        ~id:"dal_slot_repr.slots_history.dal_proof_error_"
+        ~id:"dal_slot_repr.slots_history.dal_proof_error"
         ~title:"Dal proof error"
         ~description:"Error occurred during Dal proof production or validation"
         ~pp:(fun ppf e -> Format.fprintf ppf "Dal proof error: %s" e)
@@ -1063,7 +1063,7 @@ module History = struct
       let open Data_encoding in
       register_error_kind
         `Permanent
-        ~id:"dal_slot_repr.slots_history.unexpected_page_size_"
+        ~id:"dal_slot_repr.slots_history.unexpected_page_size"
         ~title:"Unexpected page size"
         ~description:
           "The size of the given page content doesn't match the expected one."
