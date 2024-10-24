@@ -5157,10 +5157,10 @@ let test_trace_transaction_call_trace =
       string
       ~error_msg:"Wrong value, expected %R but got %L") ;
   Check.(
-    (JSON.(trace_result |-> "gas_used" |> as_string)
+    (JSON.(trace_result |-> "gasUsed" |> as_string)
     = Format.sprintf "0x%02x" (Int64.to_int transaction_receipt.gasUsed))
       string
-      ~error_msg:"Wrong gas_used, expected %R but got %L") ;
+      ~error_msg:"Wrong gasUsed, expected %R but got %L") ;
   Check.(
     (JSON.(trace_result |-> "output" |> as_string) = "0x")
       string
@@ -5521,7 +5521,7 @@ let test_trace_transaction_call_trace_revert =
     match revert_reason with
     | None -> ()
     | Some revert_reason ->
-        let revert_reason_call = JSON.(call |-> "revert_reason" |> as_string) in
+        let revert_reason_call = JSON.(call |-> "revertReason" |> as_string) in
         Check.(
           (revert_reason_call = revert_reason)
             string
