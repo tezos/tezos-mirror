@@ -60,18 +60,32 @@ pub struct BlockInProgress {
 
 impl Encodable for BlockInProgress {
     fn rlp_append(&self, stream: &mut rlp::RlpStream) {
+        let BlockInProgress {
+            number,
+            tx_queue,
+            valid_txs,
+            delayed_txs,
+            cumulative_gas,
+            index,
+            parent_hash,
+            estimated_ticks_in_run: _,
+            estimated_ticks_in_block,
+            logs_bloom,
+            logs_offset,
+            timestamp,
+        } = self;
         stream.begin_list(11);
-        stream.append(&self.number);
-        append_queue(stream, &self.tx_queue);
-        append_txs(stream, &self.valid_txs);
-        append_txs(stream, &self.delayed_txs);
-        stream.append(&self.cumulative_gas);
-        stream.append(&self.index);
-        stream.append(&self.parent_hash);
-        stream.append(&self.estimated_ticks_in_block);
-        stream.append(&self.logs_bloom);
-        stream.append(&self.logs_offset);
-        append_timestamp(stream, self.timestamp);
+        stream.append(number);
+        append_queue(stream, tx_queue);
+        append_txs(stream, valid_txs);
+        append_txs(stream, delayed_txs);
+        stream.append(cumulative_gas);
+        stream.append(index);
+        stream.append(parent_hash);
+        stream.append(estimated_ticks_in_block);
+        stream.append(logs_bloom);
+        stream.append(logs_offset);
+        append_timestamp(stream, *timestamp);
     }
 }
 
