@@ -876,11 +876,13 @@ impl<ML: main_memory::MainMemoryLayout, CL: CacheLayouts, M: backend::ManagerBas
     where
         M: backend::ManagerReadWrite,
     {
+        self.block_cache
+            .complete_current_block(&mut self.core, steps, max_steps)?;
+
         while *steps < max_steps {
             let current_mode = self.core.hart.mode.read();
 
-            // Try to take an interrupt if available, and then
-            // obtain the pc for the next instruction to be executed
+            // Obtain the pc for the next instruction to be executed
             let instr_pc = self.core.hart.pc.read();
             let satp: CSRRepr = self.core.hart.csregisters.read(CSRegister::satp);
 
@@ -890,7 +892,17 @@ impl<ML: main_memory::MainMemoryLayout, CL: CacheLayouts, M: backend::ManagerBas
                         block.run_block(&mut self.core, instr_pc, steps)?;
                         continue;
                     }
-                    _ => self.run_instr_at(current_mode, satp, instr_pc, phys_addr),
+                    Some(_) => {
+                        self.block_cache.run_block_partial(
+                            &mut self.core,
+                            phys_addr,
+                            steps,
+                            max_steps,
+                        )?;
+                        // We may not consume all the steps, particularly if we encountered a jump or exception
+                        continue;
+                    }
+                    None => self.run_instr_at(current_mode, satp, instr_pc, phys_addr),
                 },
                 Err(e) => Err(e),
             };
@@ -1695,7 +1707,7 @@ mod tests {
             InstrCacheable::CJ(CJTypeArgs { imm: 128 - 4 }),
         ];
 
-        let overwrite = InstrCacheable::CJ(CJTypeArgs { imm: 1024 });
+        // InstrCacheable::CJ(CJTypeArgs { imm: 1024 })
         let overwrite_bytes = 0xa101;
 
         let clui_bytes: u16 = 0x65a9;
@@ -1781,34 +1793,10 @@ mod tests {
 
         state.step_max(Bound::Included(block_a.len()));
 
-        state_step.step_max(Bound::Included(1));
-        assert_eq!(
-            Some(&overwrite),
-            state_step.instruction_cache.fetch_instr(phys_addr)
-        );
+        for _ in 0..block_a.len() {
+            state_step.step_max(Bound::Included(1));
+        }
 
-        state_step.step_max(Bound::Included(1));
-        assert_eq!(
-            Some(&overwrite),
-            state_step.instruction_cache.fetch_instr(phys_addr + 1024)
-        );
-
-        // TODO RV-229 - there is an inconsistency between stepping 'through' the block here
-        // vs across the block. As stepwise we fall back to fetching from memory, which is a
-        // different instruction!
-        //
-        // The states should agree here (step is the one to aim for)
-        assert_eq!(
-            block_b_addr,
-            state.core.hart.pc.read(),
-            "Execution ran the block"
-        );
-        assert_eq!(
-            phys_addr + 1024 * 2,
-            state_step.core.hart.pc.read(),
-            "Divergence: instr re-fetched"
-        );
-
-        // assert_eq_struct!(state.struct_ref(), stepwise.struct_ref());
+        assert_eq_struct(&state.struct_ref(), &state_step.struct_ref());
     });
 }

@@ -55,7 +55,7 @@ fn test_jstz_regression() {
         (result, hash)
     };
 
-    matches!(result, StepperStatus::Exited { .. });
+    assert!(matches!(result, StepperStatus::Exited { .. }));
 
     let mut result_capture = mint.new_goldenfile("result").unwrap();
     writeln!(result_capture, "{result:#?}").unwrap();
