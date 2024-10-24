@@ -14,6 +14,9 @@ description = "Hook for capturing kernel panics & printing to debug log."
 keywords = ["tezos", "smart", "rollup"]
 categories = ["no-std", "no-std::no-alloc", "api-bindings", "wasm"]
 
+[dependencies]
+rustversion = "1.0"
+
 [dependencies.tezos-smart-rollup-core]
 path = "../core"
 version = "0.2.2"
