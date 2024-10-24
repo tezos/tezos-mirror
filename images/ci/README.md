@@ -15,13 +15,13 @@ The images defined in this directory are used in the CI pipelines of
 All images except `e2etest`, are built on top of each
 other, such that the contents of image N is also in N+1[^1]. The image
 `e2etest` is built on top of
-`dependencies` and additionally copies some binaries from
+`runtime` and additionally copies some binaries from
 `build`:
 
 ```mermaid
 graph TB
-  dependencies -->|FROM| prebuild
-  dependencies -->|FROM| e2etest
+  runtime -->|FROM| prebuild
+  runtime -->|FROM| e2etest
   prebuild -->|FROM| build
   build -->|FROM| test
   test -.->|COPY bisect-ppx-report, ocamlformat| e2etest
@@ -29,13 +29,13 @@ graph TB
 
 The images, their content and intended usage, are:
 
-| Image          | Contents                           | Usage                             |
-|----------------|------------------------------------|-----------------------------------|
-| `dependencies` | run-time libraries + zcash-params  | distributing Octez executables    |
-| `prebuild`     | OCaml + opam package cache + Cargo | CI: OPAM installability tests     |
-| `build`        | opam packages                      | CI: Building Octez                |
-| `test`         | Python + NVM + ShellCheck          | CI: Octez tests and documentation |
-| `e2etest`      | `eth-cli` + cast                   | CI: Octez integration tests       |
+| Image      | Contents                           | Usage                             |
+|------------|------------------------------------|-----------------------------------|
+| `runtime`  | runtime libraries + zcash-params   | distributing Octez executables    |
+| `prebuild` | OCaml + opam package cache + Cargo | CI: OPAM installability tests     |
+| `build`    | opam packages                      | CI: Building Octez                |
+| `test`     | Python + NVM + ShellCheck          | CI: Octez tests and documentation |
+| `e2etest`  | `eth-cli` + cast                   | CI: Octez integration tests       |
 
 For more details on the contents and usage of each image, see the
 header comment of each corresponding layer in the Dockerfile.
