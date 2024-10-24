@@ -60,7 +60,7 @@ oc.docker-build-debian-dependencies:
   before_script:
   - ./scripts/ci/docker_initialize.sh
   script:
-  - ./scripts/ci/build-debian-packages-dependencies.sh
+  - ./scripts/ci/build-packages-dependencies.sh debian-deps-build.Dockerfile
   services:
   - docker:${DOCKER_VERSION}-dind
   variables:
@@ -284,7 +284,7 @@ oc.docker-build-ubuntu-dependencies:
   before_script:
   - ./scripts/ci/docker_initialize.sh
   script:
-  - ./scripts/ci/build-debian-packages-dependencies.sh
+  - ./scripts/ci/build-packages-dependencies.sh debian-deps-build.Dockerfile
   services:
   - docker:${DOCKER_VERSION}-dind
   variables:

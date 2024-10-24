@@ -37,12 +37,14 @@ RUN apt-get update && \
     cp "sccache-v0.8.1-$ARCH-unknown-linux-musl/sccache" /usr/local/bin/sccache && \
     rm -Rf sccache*
 
+COPY --link scripts/version.sh /root/tezos/scripts/
+
 #hadolint ignore=SC2154
-ARG RECOMMENDED_RUST_VERSION=
-RUN curl -s https://sh.rustup.rs > rustup-init.sh && \
+RUN . /root/tezos/scripts/version.sh && \
+    curl -s https://sh.rustup.rs > rustup-init.sh && \
     chmod +x rustup-init.sh && \
     ./rustup-init.sh --profile minimal \
-      --default-toolchain "$RECOMMENDED_RUST_VERSION" -y
+      --default-toolchain "$recommended_rust_version" -y
 
 RUN opam init --bare --disable-sandboxing
 
@@ -52,7 +54,6 @@ RUN opam init --bare --disable-sandboxing
 COPY --link scripts/install_build_deps.sh /root/tezos/scripts/
 COPY --link scripts/install_build_deps.rust.sh /root/tezos/scripts/
 COPY --link scripts/install_dal_trusted_setup.sh /root/tezos/scripts/
-COPY --link scripts/version.sh /root/tezos/scripts/
 COPY --link Makefile /root/tezos/
 COPY --link opam/virtual/octez-deps.opam.locked /root/tezos/opam/virtual/
 COPY --link opam /root/tezos/

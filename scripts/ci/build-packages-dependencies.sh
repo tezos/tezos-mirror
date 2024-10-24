@@ -4,6 +4,8 @@
 
 set -e
 
+DOCKERFILE=${1:-debian-deps-build.Dockerfile}
+
 . scripts/version.sh
 
 # Determine platform based on runner's tags
@@ -34,10 +36,9 @@ docker build \
   --label "com.tezos.build-job-id"="${CI_JOB_ID}" \
   --label "com.tezos.build-job-url"="${CI_JOB_URL}" \
   --label "com.tezos.build-tezos-revision"="${CI_COMMIT_SHA}" \
-  -f debian-deps-build.Dockerfile \
+  -f "$DOCKERFILE" \
   --build-arg=BUILDKIT_INLINE_CACHE=1 \
   --build-arg IMAGE="$DISTRIBUTION:$RELEASE" \
-  --build-arg RECOMMENDED_RUST_VERSION="$recommended_rust_version" \
   --cache-from="${DEP_IMAGE}:${ARCHITECTURE}-${CI_COMMIT_REF_SLUG}" \
   --cache-from="${DEP_IMAGE_PROTECTED}:master" \
   -t "$LOCAL_IMAGE_NAME" \
