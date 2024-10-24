@@ -204,6 +204,8 @@ mod test {
             0,
             timestamp.into(),
             U256::zero(),
+            &vec![0; 32],
+            &vec![0; 32],
         );
         bip.estimated_ticks_in_block = TOLERANCE;
 

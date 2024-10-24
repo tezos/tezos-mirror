@@ -29,6 +29,7 @@ use evm_execution::precompiles::PrecompileBTreeMap;
 use evm_execution::trace::TracerInput;
 use primitive_types::{H160, H256, U256};
 use tezos_ethereum::block::L2Block;
+use tezos_ethereum::eth_gen::OwnedHash;
 use tezos_ethereum::transaction::TransactionHash;
 use tezos_evm_logging::{log, Level::*, Verbosity};
 use tezos_evm_runtime::runtime::Runtime;
@@ -256,6 +257,8 @@ fn next_bip_from_blueprints<Host: Runtime>(
     config: &mut Configuration,
     kernel_upgrade: &Option<KernelUpgrade>,
     minimum_base_fee_per_gas: U256,
+    receipts_root: &OwnedHash,
+    transactions_root: &OwnedHash,
 ) -> Result<BlueprintParsing, anyhow::Error> {
     let (blueprint, size) = read_blueprint(
         host,
@@ -287,6 +290,8 @@ fn next_bip_from_blueprints<Host: Runtime>(
                 current_block_parent_hash,
                 tick_counter.c,
                 gas_price,
+                receipts_root,
+                transactions_root,
             );
 
             tezos_evm_logging::log!(
@@ -515,6 +520,8 @@ pub fn produce<Host: Runtime>(
                     config,
                     &kernel_upgrade,
                     minimum_base_fee_per_gas,
+                    &previous_receipts_root,
+                    &previous_transactions_root,
                 )? {
                     BlueprintParsing::Next(bip) => bip,
                     BlueprintParsing::None => {
@@ -1322,6 +1329,8 @@ mod tests {
             U256::from(1),
             transactions,
             block_constants.block_fees.base_fee_per_gas(),
+            &vec![0; 32],
+            &vec![0; 32],
         );
         // run is almost full wrt ticks
         let limits = Limits::default();
