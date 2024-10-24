@@ -371,8 +371,6 @@ module History = struct
   end
 
   module Content_v2 = struct
-    [@@@warning "-32"]
-
     (** Each cell of the skip list is either a slot id (i.e. a published level
         and a slot index) for which no slot header is published or a published
         slot header associated to the address which signed the L1 operation, the
@@ -658,6 +656,8 @@ module History = struct
   end
 
   module V1 = struct
+    [@@@warning "-32"]
+
     module Content = Content_v1
     module Skip_list = Mk_skip_list (Content)
 
@@ -1197,7 +1197,8 @@ module History = struct
                    "The page ID's slot is not confirmed, but page content and \
                     proof are provided.")
 
-    let produce_proof dal_params page_id ~page_info ~get_history slots_hist =
+    let produce_proof dal_params page_id ~page_info ~get_history slots_hist :
+        (proof * proof option, error trace) result Lwt.t =
       let open Lwt_result_syntax in
       let* proof_repr, page_data =
         produce_proof_repr dal_params page_id ~page_info ~get_history slots_hist
@@ -1301,7 +1302,7 @@ module History = struct
         | Unattested of Header.id
         | Attested of Header.t
 
-      let content = Skip_list.content
+      let content cell : cell_content = Skip_list.content cell
 
       let proof_statement_is serialized_proof expected =
         match deserialize_proof serialized_proof with
@@ -1315,8 +1316,6 @@ module History = struct
   end
 
   module V2 = struct
-    [@@@warning "-32"]
-
     module Content = Content_v2
     module Skip_list = Mk_skip_list (Content)
 
@@ -1997,5 +1996,5 @@ module History = struct
     end
   end
 
-  include V1
+  include V2
 end

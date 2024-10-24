@@ -69,7 +69,8 @@ let derive_dal_parameters (reference : Cryptobox.parameters) ~redundancy_factor
   }
 
 let content_slot_id = function
-  | Hist.Internal_for_tests.Unattested id | Attested {id; _} -> id
+  | Hist.Internal_for_tests.Unpublished id | Published {header = {id; _}; _} ->
+      id
 
 module Make (Parameters : sig
   val dal_parameters : Alpha_context.Constants.Parametric.dal
