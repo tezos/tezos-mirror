@@ -974,12 +974,12 @@ module CallTracer = struct
                 (opt "to" Ethereum_types.address_encoding)
                 (req "value" uint_as_hex_encoding)
                 (opt "gas" uint_as_hex_encoding)
-                (req "gas_used" uint_as_hex_encoding))
+                (req "gasUsed" uint_as_hex_encoding))
              (obj6
                 (req "input" Ethereum_types.hex_encoding)
                 (opt "output" Ethereum_types.hex_encoding)
                 (opt "error" string)
-                (opt "revert_reason" string)
+                (opt "revertReason" string)
                 (opt "logs" (list logs_encoding))
                 (req "calls" (list enc)))))
 
