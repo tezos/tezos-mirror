@@ -1900,7 +1900,7 @@ module History = struct
            ~target_ptr
            path)
         (dal_proof_error "verify_proof_repr: invalid inclusion Dal proof.")
-    (*
+
     let verify_proof_repr dal_params page_id snapshot proof =
       let open Result_syntax in
       let Page.{slot_id = Header.{published_level; index}; page_index = _} =
@@ -1950,16 +1950,19 @@ module History = struct
         verify_inclusion_proof inc_proof ~src:snapshot ~dest:target_cell
       in
       match (page_proof_check, cell_content) with
-      | None, Unattested _ -> return_none
-      | Some page_proof_check, Attested {commitment; _} ->
+      | None, (Unpublished _ | Published {is_proto_attested = false; _}) ->
+          return_none
+      | ( Some page_proof_check,
+          Published {header = {commitment; id = _}; is_proto_attested = true; _}
+        ) ->
           let* page_data = page_proof_check commitment in
           return_some page_data
-      | Some _, Unattested _ ->
+      | Some _, (Unpublished _ | Published {is_proto_attested = false; _}) ->
           error
           @@ dal_proof_error
                "verify_proof_repr: the unconfirmation proof contains the \
                 target slot."
-      | None, Attested _ ->
+      | None, Published {is_proto_attested = true; _} ->
           error
           @@ dal_proof_error
                "verify_proof_repr: the confirmation proof doesn't contain the \
@@ -1969,7 +1972,7 @@ module History = struct
       let open Result_syntax in
       let* proof_repr = deserialize_proof serialized_proof in
       verify_proof_repr dal_params page_id snapshot proof_repr
-
+    (*
     module Internal_for_tests = struct
       type cell_content = Content.t =
         | Unattested of Header.id
