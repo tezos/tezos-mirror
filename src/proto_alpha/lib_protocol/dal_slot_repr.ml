@@ -1317,8 +1317,7 @@ module History = struct
   module V2 = struct
     [@@@warning "-32"]
 
-    (*
-    module Content = Content_v1
+    module Content = Content_v2
     module Skip_list = Mk_skip_list (Content)
 
     type content = Content.t
@@ -1434,6 +1433,8 @@ module History = struct
       let new_head_hash = hash new_head in
       let* cache = History_cache.remember new_head_hash new_head cache in
       return (new_head, cache)
+
+    (*
 
     (* Given a list [attested_slot_headers] of well-ordered (wrt slots indices)
        (attested) slot headers, this function builds an extension [l] of
