@@ -1972,13 +1972,19 @@ module History = struct
       let open Result_syntax in
       let* proof_repr = deserialize_proof serialized_proof in
       verify_proof_repr dal_params page_id snapshot proof_repr
-    (*
+
     module Internal_for_tests = struct
       type cell_content = Content.t =
-        | Unattested of Header.id
-        | Attested of Header.t
+        | Unpublished of Header.id
+        | Published of {
+            header : Header.t;
+            publisher : Signature.public_key_hash;
+            is_proto_attested : bool;
+            attested_shards : int;
+            total_shards : int;
+          }
 
-      let content = Skip_list.content
+      let content cell : cell_content = Skip_list.content cell
 
       let proof_statement_is serialized_proof expected =
         match deserialize_proof serialized_proof with
@@ -1989,7 +1995,6 @@ module History = struct
                 true
             | _ -> false)
     end
-   *)
   end
 
   include V1
