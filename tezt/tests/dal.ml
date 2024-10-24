@@ -4939,18 +4939,25 @@ module History_rpcs = struct
                int
                ~error_msg:"Unexpected cell index: got %L, expected %R")) ;
         let cell_kind = JSON.(content |-> "kind" |> as_string) in
+        (* ADAL/TODO: https://gitlab.com/tezos/tezos/-/issues/7554
+
+           Remove the legacy cases below once migration from Q to R is done. See
+           issue above for more details. *)
+        let content_is_legacy =
+          cell_kind = "attested" || cell_kind = "unattested"
+        in
         let expected_kind =
           if cell_level <= first_level || cell_slot_index != slot_index then
-            "unattested"
+            if content_is_legacy then "unattested" else "unpublished"
           else (
             at_least_one_attested_status := true ;
-            "attested")
+            if content_is_legacy then "attested" else "published")
         in
         Check.(
           (cell_kind = expected_kind)
             string
             ~error_msg:"Unexpected cell kind: got %L, expected %R") ;
-        (if cell_kind = "attested" then
+        (if cell_kind = "published" || cell_kind = "attested" then
            let commitment = JSON.(content |-> "commitment" |> as_string) in
            Check.(
              (commitment = commitments.(cell_level - (first_level + 1)))
