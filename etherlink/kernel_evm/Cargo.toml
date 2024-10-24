@@ -67,7 +67,8 @@ tezos-indexable-storage = { path = "./indexable_storage" }
 tezos-storage = { path = "./storage" }
 
 # SDK
-tezos-smart-rollup = { path = "../../src/kernel_sdk/sdk" }
+# we disable BLS, because we don’t need it and it is a roadblock for the native execution
+tezos-smart-rollup = { path = "../../src/kernel_sdk/sdk", default-features = false, features = ["std", "crypto", "dlmalloc", "panic-hook", "data-encoding", "storage", "testing"]  }
 tezos-smart-rollup-core = { path = "../../src/kernel_sdk/core" }
 tezos-smart-rollup-host = { path = "../../src/kernel_sdk/host" }
 tezos-smart-rollup-panic-hook = { path = "../../src/kernel_sdk/panic-hook" }
