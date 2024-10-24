@@ -159,18 +159,12 @@ let set_delegate src_name delegate_name_opt : (t, t) scenarios =
           State.apply_finalize src_name state
       in
       let state = State.update_delegate src_name delegate_name_opt state in
-      let pred_level = block.header.shell.level in
-      let level = Int32.(succ pred_level) in
-      let activity_cycle =
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/7362
-           Use delegate_parameters_activation_delay - Protocol.Constants_storage.tolerated_inactivity_period *)
-        Cycle.add current_cycle state.State.constants.consensus_rights_delay
-      in
       (* update delegate activation status *)
       let state =
         (* if self delegating *)
         if Option.equal String.equal delegate_name_opt (Some src_name) then
           let src = State.find_account src_name state in
+          let activity_cycle = current_cycle in
           State.update_map
             ~f:(fun acc_map ->
               String.Map.add
@@ -178,7 +172,6 @@ let set_delegate src_name delegate_name_opt : (t, t) scenarios =
                 (Account_helpers.update_activity
                    src
                    state.constants
-                   ~level
                    activity_cycle)
                 acc_map)
             state

@@ -37,7 +37,7 @@ let check_grace_period ~loc src_name =
   let src = State.find_account src_name state in
   let grace =
     Cycle.add
-      src.last_active_cycle
+      src.last_seen_activity
       (state.State.constants.consensus_rights_delay + 1)
   in
   let* rpc_grace = Context.Delegate.grace_period (B block) src.pkh in
@@ -90,6 +90,10 @@ let test_baking_deactivation =
   --> check_is_not_active ~loc:__LOC__ "delegate"
   (* Reactivate and wait for rights *)
   --> stake "delegate" Half
+  --> (Tag "Reactivate in next block" --> Empty
+      |+ Tag "Reactivate in next cycle" --> exec bake_until_dawn_of_next_cycle
+      |+ Tag "Reactivate in last block"
+         --> exec bake_until_next_cycle_end_but_one)
   --> set_delegate "delegate" (Some "delegate")
   (* No rights yet, but active *)
   --> assert_failure

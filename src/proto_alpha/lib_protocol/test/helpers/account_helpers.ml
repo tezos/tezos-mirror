@@ -50,7 +50,15 @@ type account_state = {
           is unmodified if at that time, the account is not a delegate
           or is a deactivated delegate. *)
   slashed_cycles : Cycle.t list;
-  last_active_cycle : Cycle.t;
+  (* Note that [last_seen_activity] is different from the
+     [last_active_cycle] variable used in
+     [lib_protocol/delegate_activation_storage.ml] and represents the
+     last cycle when we have witnessed the activity from the delegate.
+
+     When a delegate is initialized or reactivated, we lie on this and
+     put extra [consensus_rights_delay] cycles in the future to
+     account for its extended grace period *)
+  last_seen_activity : Cycle.t;
 }
 
 let init_account ~name ?delegate ~pkh ~contract ~parameters ?(liquid = Tez.zero)
@@ -59,7 +67,7 @@ let init_account ~name ?delegate ~pkh ~contract ~parameters ?(liquid = Tez.zero)
     ?(unstaked_finalizable = Unstaked_finalizable.zero)
     ?(staking_delegator_numerator = Z.zero)
     ?(staking_delegate_denominator = Z.zero) ?(frozen_rights = CycleMap.empty)
-    ?(slashed_cycles = []) ?(last_active_cycle = Cycle.root) () =
+    ?(slashed_cycles = []) ?(last_seen_activity = Cycle.root) () =
   let frozen_deposits =
     Option.value frozen_deposits ~default:(Frozen_tez.init Tez.zero name name)
   in
@@ -77,7 +85,7 @@ let init_account ~name ?delegate ~pkh ~contract ~parameters ?(liquid = Tez.zero)
     staking_delegate_denominator;
     frozen_rights;
     slashed_cycles;
-    last_active_cycle;
+    last_seen_activity;
   }
 
 type account_map = account_state String.Map.t
@@ -122,7 +130,7 @@ let balance_of_account account_name (account_map : account_map) =
         staking_delegate_denominator;
         frozen_rights = _;
         slashed_cycles = _;
-        last_active_cycle = _;
+        last_seen_activity = _;
       } ->
       let balance =
         {
@@ -543,10 +551,24 @@ let current_total_frozen_deposits_with_limits account_state =
       account_state.parameters.limit_of_staking_over_baking
     account_state.frozen_deposits
 
-let update_activity account constants ~level current_cycle =
-  if not (Block.last_level_of_cycle constants ~level) then
-    {account with last_active_cycle = current_cycle}
-  else {account with last_active_cycle = Cycle.succ current_cycle}
+let update_activity account constants current_cycle =
+  if Cycle.(account.last_seen_activity >= current_cycle) then account
+  else if
+    (* When a delegate is initialized or reactivated (either from
+       [set_delegate] or participating in the consensus again), we put
+       extra [consensus_rights_delay] cycles in the future to account
+       for its extended grace period *)
+    Cycle.(succ account.last_seen_activity < current_cycle)
+  then
+    {
+      account with
+      last_seen_activity =
+        Cycle.add
+          current_cycle
+          constants
+            .Protocol.Alpha_context.Constants.Parametric.consensus_rights_delay;
+    }
+  else {account with last_seen_activity = current_cycle}
 
 let assert_balance_evolution ~loc ~for_accounts ~part ~name ~old_balance
     ~new_balance compare =

@@ -141,6 +141,24 @@ let check_misc block state : unit tzresult Lwt.t =
               ufd_rpc
           in
           let*! r = Assert.join_errors r1 r2 in
+          let* deactivated_rpc =
+            Context.Delegate.deactivated (B block) account.pkh
+          in
+          let current_cycle = Block.current_cycle block in
+          let ctxt_cycle =
+            if not (Block.last_block_of_cycle block) then current_cycle
+            else Cycle.succ current_cycle
+          in
+          let deactivated =
+            Cycle.add
+              account.last_seen_activity
+              (state.constants.consensus_rights_delay + 1)
+            < ctxt_cycle
+          in
+          let*! r3 =
+            Assert.equal_bool ~loc:__LOC__ deactivated deactivated_rpc
+          in
+          let*! r = Assert.join_errors r r3 in
           Assert.join_errors r acc
       | _ -> Lwt.return acc)
     account_map
@@ -308,7 +326,6 @@ let bake ?baker : t -> t tzresult Lwt.t =
     Account_helpers.update_activity
       delegate_account
       state.constants
-      ~level:block.header.shell.level
       (Block.current_cycle block)
   in
   let* attesters =
