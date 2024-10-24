@@ -169,9 +169,10 @@ let produce_batches state ~only_full =
         Batcher_events.(emit batched)
           (List.length batches, List.length to_remove)
       in
-      let inject_timestamp = Time.System.now () in
-      Metrics.Batcher.set_inject_time
-      @@ Ptime.diff inject_timestamp get_timestamp ;
+      Metrics.wrap (fun () ->
+          let inject_timestamp = Time.System.now () in
+          Metrics.Batcher.set_inject_time
+          @@ Ptime.diff inject_timestamp get_timestamp) ;
       List.iter
         (fun tr_hash -> Message_queue.remove state.messages tr_hash)
         to_remove ;

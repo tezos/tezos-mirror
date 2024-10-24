@@ -141,13 +141,14 @@ let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
     Pvm_patches.make kind rollup_address configuration.unsafe_pvm_patches
   in
   let sync = create_sync_info () in
-  Metrics.Info.set_lcc_level_l1 lcc.level ;
-  Metrics.Info.set_lcc_level_local lcc.level ;
-  Option.iter
-    (fun {Commitment.inbox_level = l; _} ->
-      Metrics.Info.set_lpc_level_l1 l ;
-      Metrics.Info.set_lpc_level_local l)
-    lpc ;
+  Metrics.wrap (fun () ->
+      Metrics.Info.set_lcc_level_l1 lcc.level ;
+      Metrics.Info.set_lcc_level_local lcc.level ;
+      Option.iter
+        (fun {Commitment.inbox_level = l; _} ->
+          Metrics.Info.set_lpc_level_l1 l ;
+          Metrics.Info.set_lpc_level_local l)
+        lpc) ;
   let node_ctxt =
     {
       config = configuration;
