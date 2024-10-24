@@ -23,10 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [download ?runner url filename] downloads the file at [url],
-    stores it in a temporary file named [filename], and returns the
-    complete path to the downloaded file. *)
-val download : ?runner:Runner.t -> string -> string -> string Lwt.t
+(** [fetch ?runner src filename] Makes [src] available at a temporary file
+    named [filename], and returns the complete path to the file.
+    If [src] is the path to a file on disk, then a symbolic is created without
+    any download or copy, else [src] is treated as a url, and is downloaded. *)
+val fetch : ?runner:Runner.t -> string -> string -> string Lwt.t
 
 (** [wait_for_funded_key node client amount key] will not return
     before [key] has been funded with [amount] tez. *)
