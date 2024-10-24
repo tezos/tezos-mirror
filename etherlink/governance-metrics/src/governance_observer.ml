@@ -58,17 +58,17 @@ let contract_storage_state_process ~config ~contract ~chain_id ~level =
   in
   let*! () =
     let type_ =
-      match voting_state.current_period.type_ with
+      match voting_state.voting_context.current_period.type_ with
       | Proposal -> 0
       | Promotion -> 1
     in
-    GovernanceMetrics.Storage.set_remaining_blocks
-      contract
-      voting_state.remaining_blocks ;
+    Contract_type.apply_mainnet
+      (GovernanceMetrics.Storage.set_remaining_blocks contract)
+      voting_state.voting_context.remaining_blocks ;
     GovernanceMetrics.Storage.set_current_period_type contract type_ ;
     GovernanceMetrics.Storage.set_current_period_index
       contract
-      voting_state.current_period.index ;
+      voting_state.voting_context.current_period.index ;
     Event.contract_metrics @@ "voting state for "
     ^ governance_to_string contract
   in
