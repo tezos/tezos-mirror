@@ -14,7 +14,7 @@ type content =
   | Other of Ppxlib.expression
 
 type t = {
-  level_of_detail : string option;
+  verbosity : string option;
   profiler_module : string option;
   content : content;
 }
@@ -26,8 +26,8 @@ let rec embed_list loc = function
   | [e] -> [%expr [[%e e]]]
   | a :: q -> [%expr [%e a] :: [%e embed_list loc q]]
 
-let get_level_of_detail loc {level_of_detail; _} =
-  match level_of_detail with
+let get_level_of_detail loc {verbosity; _} =
+  match verbosity with
   | Some name ->
       Ppxlib.Ast_builder.Default.(
         econstruct
@@ -87,7 +87,7 @@ let pp ppf t =
   Format.fprintf
     ppf
     "%s %s %a"
-    (Option.value ~default:"No lvl of detail" t.level_of_detail)
+    (Option.value ~default:"No verbosity" t.verbosity)
     (Option.value ~default:"No Profiler module" t.profiler_module)
     pp_content
     t

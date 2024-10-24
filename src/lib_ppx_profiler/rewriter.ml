@@ -390,13 +390,11 @@ end = struct
     | exception Not_found -> None
 
   let extract_from_record loc record =
-    let level_of_detail =
-      extract_field_from_record loc record "level_of_detail"
-    in
+    let verbosity = extract_field_from_record loc record "verbosity" in
     let profiler_module =
       extract_field_from_record loc record "profiler_module"
     in
-    (level_of_detail, profiler_module)
+    (verbosity, profiler_module)
 
   let extract_key_from_payload loc payload =
     match payload with
@@ -413,13 +411,13 @@ end = struct
               }]];
         ] ->
         (* [@ppx {<other infos>} ...] *)
-        let level_of_detail, profiler_module = extract_from_record loc record in
-        (match (level_of_detail, profiler_module) with
+        let verbosity, profiler_module = extract_from_record loc record in
+        (match (verbosity, profiler_module) with
         | None, None -> Error.error loc Error.(Improper_record record)
         | _ -> ()) ;
         Key.
           {
-            level_of_detail;
+            verbosity;
             profiler_module;
             content = extract_content_from_structure loc structure;
           }
@@ -427,14 +425,13 @@ end = struct
         (* [@ppx ...] *)
         Key.
           {
-            level_of_detail = None;
+            verbosity = None;
             profiler_module = None;
             content = extract_content_from_structure loc structure;
           }
     | Ppxlib.PStr [] ->
         (* [@ppx] *)
-        Key.
-          {level_of_detail = None; profiler_module = None; content = Key.Empty}
+        Key.{verbosity = None; profiler_module = None; content = Key.Empty}
     | _ -> Error.error loc Invalid_payload
 
   let of_attribute ({Ppxlib.attr_payload; attr_loc; _} as attribute) =

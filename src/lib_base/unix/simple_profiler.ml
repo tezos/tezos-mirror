@@ -96,10 +96,10 @@ and merge_maps amap bmap =
     amap
     bmap
 
-let rec apply_verbosity_to_aggregated verbosity aggregated =
+let rec filter_verbosity_to_aggregated verbosity aggregated =
   StringMap.fold
     (fun id node acc ->
-      let children = apply_verbosity_to_aggregated verbosity node.children in
+      let children = filter_verbosity_to_aggregated verbosity node.children in
       if node.node_verbosity <= verbosity then
         StringMap.add id {node with children} acc
       else merge_maps acc children)
@@ -117,16 +117,17 @@ let rec aggregate_report {aggregated; recorded} =
     aggregated
     recorded
 
-let rec apply_verbosity verbosity {aggregated; recorded} =
-  let aggregated = apply_verbosity_to_aggregated verbosity aggregated in
+let rec filter_verbosity verbosity {aggregated; recorded} =
+  let aggregated = filter_verbosity_to_aggregated verbosity aggregated in
   let aggregated, recorded =
     List.fold_left
       (fun (aggregated, recorded) (id, item) ->
+        let filtered_contents = filter_verbosity verbosity item.contents in
         if item.item_verbosity <= verbosity then
           ( aggregated,
-            (id, {item with contents = apply_verbosity verbosity item.contents})
-            :: recorded )
-        else (merge_maps aggregated (aggregate_report item.contents), recorded))
+            (id, {item with contents = filtered_contents}) :: recorded )
+        else
+          (merge_maps aggregated (aggregate_report filtered_contents), recorded))
       (aggregated, [])
       recorded
   in
@@ -339,7 +340,7 @@ struct
       when StringMap.cardinal aggregated > 0 || recorded <> [] ->
         P.set_state t @@ empty (P.get_state t).max_verbosity ;
         let report = {aggregated; recorded = List.rev recorded} in
-        Some (apply_verbosity (P.get_state t).max_verbosity report)
+        Some (filter_verbosity (P.get_state t).max_verbosity report)
     | _ -> None
 
   let may_output =
