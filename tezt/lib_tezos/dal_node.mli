@@ -34,6 +34,13 @@ type t
     [Custom (i)] : keeps the shards during [i] blocks *)
 type history_mode = Full | Auto | Custom of int
 
+(** Configure the DAL node store for the storage backend to use
+    [Legacy] : use the legacy storage backend
+    [SQLite3] : use the SQLite3 storage backend *)
+type skip_list_storage_backend = Legacy | SQLite3
+
+val string_of_skip_list_storage_backend : skip_list_storage_backend -> string
+
 (** Creates a DAL node *)
 
 val create :
@@ -147,6 +154,7 @@ val init_config :
   ?observer_profiles:int list ->
   ?bootstrap_profile:bool ->
   ?history_mode:history_mode ->
+  ?skip_list_storage_backend:skip_list_storage_backend ->
   t ->
   unit Lwt.t
 

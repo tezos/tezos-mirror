@@ -49,6 +49,8 @@ let hooks = Tezos_regression.hooks
 
 let rpc_hooks = Tezos_regression.rpc_hooks
 
+let skip_list_sqlite3_tag = "dal_skip_list_sqlite3"
+
 module Dal = Dal_common
 module Helpers = Dal.Helpers
 module Cryptobox = Dal.Cryptobox
@@ -540,7 +542,7 @@ let with_fresh_rollup ?(pvm_name = "arith") ?dal_node f tezos_node tezos_client
   f rollup_address sc_rollup_node
 
 let make_dal_node ?name ?peers ?attester_profiles ?producer_profiles
-    ?bootstrap_profile ?history_mode tezos_node =
+    ?bootstrap_profile ?history_mode ?skip_list_storage_backend tezos_node =
   let dal_node = Dal_node.create ?name ~node:tezos_node () in
   let* () =
     Dal_node.init_config
@@ -549,13 +551,15 @@ let make_dal_node ?name ?peers ?attester_profiles ?producer_profiles
       ?producer_profiles
       ?bootstrap_profile
       ?history_mode
+      ?skip_list_storage_backend
       dal_node
   in
   let* () = Dal_node.run ~event_level:`Debug dal_node ~wait_ready:true in
   return dal_node
 
 let with_dal_node ?peers ?attester_profiles ?producer_profiles
-    ?bootstrap_profile ?history_mode tezos_node f key =
+    ?bootstrap_profile ?history_mode ?skip_list_storage_backend tezos_node f key
+    =
   let* dal_node =
     make_dal_node
       ?peers
@@ -563,6 +567,7 @@ let with_dal_node ?peers ?attester_profiles ?producer_profiles
       ?producer_profiles
       ?bootstrap_profile
       ?history_mode
+      ?skip_list_storage_backend
       tezos_node
   in
   f key dal_node
@@ -612,7 +617,7 @@ let scenario_with_layer1_and_dal_nodes ?regression ?(tags = [])
     ?number_of_slots ?attestation_lag ?attestation_threshold ?commitment_period
     ?challenge_window ?(dal_enable = true) ?activation_timestamp
     ?bootstrap_profile ?producer_profiles ?history_mode ?prover ?l1_history_mode
-    variant scenario =
+    ?skip_list_storage_backend variant scenario =
   let description = "Testing DAL node" in
   let tags = if List.mem team tags then tags else team :: tags in
   let tags =
@@ -650,7 +655,12 @@ let scenario_with_layer1_and_dal_nodes ?regression ?(tags = [])
         ~protocol
         ~dal_enable
       @@ fun parameters cryptobox node client ->
-      with_dal_node ?bootstrap_profile ?producer_profiles ?history_mode node
+      with_dal_node
+        ?bootstrap_profile
+        ?producer_profiles
+        ?history_mode
+        ?skip_list_storage_backend
+        node
       @@ fun _key dal_node ->
       scenario protocol parameters cryptobox node client dal_node)
 
@@ -4324,7 +4334,7 @@ let test_peers_reconnection _protocol _parameters _cryptobox node client
 let test_l1_migration_scenario ?(tags = []) ~migrate_from ~migrate_to
     ~migration_level ~scenario ~description ?producer_profiles ?attestation_lag
     ?number_of_slots ?number_of_shards ?slot_size ?page_size ?redundancy_factor
-    ?consensus_committee_size () =
+    ?consensus_committee_size ?skip_list_storage_backend () =
   let tags =
     Tag.tezos2 :: "dal" :: Protocol.tag migrate_from :: Protocol.tag migrate_to
     :: "migration" :: tags
@@ -4370,7 +4380,9 @@ let test_l1_migration_scenario ?(tags = []) ~migrate_from ~migrate_to
   let* () = Node.wait_for_ready node in
 
   let dal_node = Dal_node.create ~node () in
-  let* () = Dal_node.init_config ?producer_profiles dal_node in
+  let* () =
+    Dal_node.init_config ?producer_profiles ?skip_list_storage_backend dal_node
+  in
   let* () = Dal_node.run dal_node ~wait_ready:true in
 
   scenario ~migration_level dal_parameters client node dal_node
@@ -4988,23 +5000,55 @@ module History_rpcs = struct
         ~error_msg:"No cell with the 'attested' status has been visited") ;
     unit
 
-  let test_commitments_history_rpcs protocol dal_parameters _cryptobox node
-      client dal_node =
-    scenario
-      ~slot_index:3
-      ~first_cell_level:0
-      ~first_dal_level:1
-      ~last_confirmed_published_level:3
-      ~initial_blocks_to_bake:0
-      protocol
-      dal_parameters
-      client
-      node
-      dal_node
+  (** [test_commitments_history_rpcs] is registered with both backends
+      ([Legacy] and [SQLite3]) as it concerns skip lists and must
+      remain valid for the [SQLite3] storage. Also, running the test
+      with both backends provide additional guarantees that they
+      exhibit identical behavior. *)
+  let test_commitments_history_rpcs protocols =
+    let register skip_list_storage_backend =
+      let scenario protocol dal_parameters _ client node dal_node =
+        scenario
+          ~slot_index:3
+          ~first_cell_level:0
+          ~first_dal_level:1
+          ~last_confirmed_published_level:3
+          ~initial_blocks_to_bake:0
+          protocol
+          dal_parameters
+          node
+          client
+          dal_node
+      in
+      let tags = ["rpc"; "skip_list"] in
+      let tags =
+        if skip_list_storage_backend = Dal_node.SQLite3 then
+          skip_list_sqlite3_tag :: tags
+        else tags
+      in
+      let description =
+        Format.sprintf
+          "commitments history RPCs (storage_backend = %s)"
+          (Dal_node.string_of_skip_list_storage_backend
+             skip_list_storage_backend)
+      in
+      scenario_with_layer1_and_dal_nodes
+        ~tags
+        ~producer_profiles:[3; 15]
+        ~skip_list_storage_backend
+        description
+        scenario
+        protocols
+    in
+    List.iter register [Legacy; SQLite3]
 
-  let test_commitments_history_rpcs_with_migration ~migrate_from ~migrate_to =
-    let tags = ["rpc"; "skip_list"; Tag.memory_3k] in
-    let description = "test commitments history with migration" in
+  (** [test_commitments_history_rpcs_with_migration] is registered
+      with both backends ([Legacy] and [SQLite3]) as it concerns skip
+      lists and must remain valid for the [SQLite3] storage. Also,
+      running the test with both backends provide additional
+      guarantees that they exhibit identical behavior. *)
+  let test_commitments_history_rpcs_with_migration ~migrate_from ~migrate_to
+      ~migration_level =
     let slot_index = 3 in
     let scenario ~migrate_to ~migration_level dal_parameters =
       let lag = dal_parameters.Dal.Parameters.attestation_lag in
@@ -5028,22 +5072,39 @@ module History_rpcs = struct
         migrate_to
         dal_parameters
     in
-    test_l1_migration_scenario
-      ~migrate_from
-      ~migrate_to
-      ~scenario:(fun ~migration_level dal_parameters ->
-        scenario ~migrate_to ~migration_level dal_parameters)
-      ~tags
-      ~description
-      ~producer_profiles:[slot_index] (* use the same parameters as Alpha *)
-      ~consensus_committee_size:512
-      ~attestation_lag:8
-      ~number_of_slots:32
-      ~number_of_shards:512
-      ~slot_size:126944
-      ~redundancy_factor:8
-      ~page_size:3967
-      ()
+    let register_test_l1_migration_scenario skip_list_storage_backend =
+      let description =
+        Format.sprintf
+          "test commitments history with migration (storage_backend = %s)"
+          (Dal_node.string_of_skip_list_storage_backend
+             skip_list_storage_backend)
+      in
+      let tags = ["rpc"; "skip_list"; Tag.memory_3k] in
+      let tags =
+        if skip_list_storage_backend = Dal_node.SQLite3 then
+          skip_list_sqlite3_tag :: tags
+        else tags
+      in
+      test_l1_migration_scenario
+        ~migrate_from
+        ~migrate_to
+        ~migration_level
+        ~scenario:(fun ~migration_level ->
+          scenario ~migrate_to ~migration_level)
+        ~tags
+        ~description
+        ~producer_profiles:[slot_index] (* use the same parameters as Alpha *)
+        ~consensus_committee_size:512
+        ~attestation_lag:8
+        ~number_of_slots:32
+        ~number_of_shards:512
+        ~slot_size:126944
+        ~redundancy_factor:8
+        ~page_size:3967
+        ~skip_list_storage_backend
+        ()
+    in
+    List.iter register_test_l1_migration_scenario Dal_node.[Legacy; SQLite3]
 end
 
 (* This test sets up a migration and starts the DAL around the migration
@@ -6341,12 +6402,23 @@ module Garbage_collection = struct
     Log.info "End of test" ;
     unit
 
-  let test_gc_skip_list_cells ~protocols =
+  let test_gc_skip_list_cells ~protocols ~skip_list_storage_backend =
+    let title =
+      Format.sprintf
+        "garbage collection of skip list cells (storage_backend = %s)"
+        (Dal_node.string_of_skip_list_storage_backend skip_list_storage_backend)
+    in
+    let tags = Tag.[tezos2; memory_3k; "dal"; "gc"; "skip_list"] in
+    let tags =
+      if skip_list_storage_backend = Dal_node.SQLite3 then
+        skip_list_sqlite3_tag :: tags
+      else tags
+    in
     Protocol.register_test
       ~__FILE__
-      ~tags:[Tag.tezos2; Tag.memory_3k; "dal"; "gc"; "skip_list"]
+      ~tags
       ~uses:(fun _protocol -> [Constant.octez_dal_node])
-      ~title:"garbage collection of skip list cells"
+      ~title
       ~supports:(Protocol.From_protocol 19)
       (fun protocol ->
         (* We choose some arbitrary, small values *)
@@ -6380,7 +6452,12 @@ module Garbage_collection = struct
         let number_of_slots = dal_parameters.Dal.Parameters.number_of_slots in
         let lag = dal_parameters.attestation_lag in
         let dal_node = Dal_node.create ~node () in
-        let* () = Dal_node.init_config ~producer_profiles:[1] dal_node in
+        let* () =
+          Dal_node.init_config
+            ~producer_profiles:[1]
+            ~skip_list_storage_backend
+            dal_node
+        in
         let* () = Dal_node.run dal_node ~wait_ready:true in
         Log.info
           "The first level with stored cells is 1 + lag = %d. We bake till \
@@ -7308,19 +7385,26 @@ module Refutations = struct
   *)
   let scenario_with_two_rollups_a_faulty_dal_node_and_a_correct_one
       ~refute_operations_priority _protocol parameters _dal_node _sc_rollup_node
-      _sc_rollup_address node client pvm_name =
+      _sc_rollup_address ?honest_storage_backend ?faulty_storage_backend node
+      client pvm_name =
     (* Initializing the real SRS. *)
     let faulty_operator_key = Constant.bootstrap4.public_key_hash in
     let honest_operator_key = Constant.bootstrap5.public_key_hash in
     (* We have two DAL nodes in producer mode *)
     let* honest_dal_node =
-      make_dal_node ~name:"dal-honest" ~peers:[] ~producer_profiles:[0; 1] node
+      make_dal_node
+        ~name:"dal-honest"
+        ~peers:[]
+        ~producer_profiles:[0; 1]
+        ?skip_list_storage_backend:honest_storage_backend
+        node
     in
     let* faulty_dal_node =
       make_dal_node
         ~name:"dal-faulty"
         ~peers:[Dal_node.listen_addr honest_dal_node]
         ~producer_profiles:[0; 1]
+        ?skip_list_storage_backend:faulty_storage_backend
         node
     in
 
@@ -7486,6 +7570,55 @@ module Refutations = struct
       faulty_sc_rollup_node
       ~exit_code:1
       ~msg:(rex "lost the refutation game")
+
+  (** [register_scenario_with_two_rollups_a_faulty_dal_node_and_a_correct_one]
+      is registered with both backends ([Legacy] and [SQLite3]) as it
+      concerns refutations that rely on skip lists and must remain
+      valid for the [SQLite3] storage. Also, running the test with
+      both backends provide additional guarantees that they exhibit
+      identical behavior. *)
+  let register_scenario_with_two_rollups_a_faulty_dal_node_and_a_correct_one
+      ~refute_operations_priority name protocols =
+    let backends = Dal_node.[Legacy; SQLite3] in
+    let modes =
+      let open List in
+      (* We take the cartesian product of the storage backends. *)
+      concat (map (fun x -> map (fun y -> (x, y)) backends) backends)
+    in
+    List.iter
+      (fun (honest_storage_backend, faulty_storage_backend) ->
+        let new_name =
+          Format.sprintf
+            "%s (storage backends: honest=%s, faulty=%s)"
+            name
+            (Dal_node.string_of_skip_list_storage_backend
+               honest_storage_backend)
+            (Dal_node.string_of_skip_list_storage_backend
+               faulty_storage_backend)
+        in
+        let scenario =
+          scenario_with_two_rollups_a_faulty_dal_node_and_a_correct_one
+            ~honest_storage_backend
+            ~faulty_storage_backend
+        in
+        let tags =
+          match (honest_storage_backend, faulty_storage_backend) with
+          | SQLite3, _ | _, SQLite3 -> skip_list_sqlite3_tag :: [Tag.slow]
+          | _ -> [Tag.slow]
+        in
+        scenario_with_all_nodes
+          new_name
+          ~regression:false
+          ~uses:(fun _protocol ->
+            [Constant.smart_rollup_installer; Constant.WASM.dal_echo_kernel])
+          ~pvm_name:"wasm_2_0_0"
+          ~commitment_period:5
+          ~smart_rollup_timeout_period_in_blocks:20
+          ~l1_history_mode:Default_with_refutation
+          ~tags
+          (scenario ~refute_operations_priority)
+          protocols)
+      modes
 end
 
 (** This test injects a DAL slot to (DAL and L1) network(s) via the rollup node
@@ -8238,12 +8371,7 @@ let register ~protocols =
     "attestation through p2p"
     test_attestation_through_p2p
     protocols ;
-  scenario_with_layer1_and_dal_nodes
-    ~tags:["rpc"; "skip_list"]
-    ~producer_profiles:[3; 15]
-    "commitments history RPCs"
-    History_rpcs.test_commitments_history_rpcs
-    protocols ;
+  History_rpcs.test_commitments_history_rpcs protocols ;
   scenario_with_layer1_and_dal_nodes
     ~tags:["amplification"; Tag.memory_4k]
     ~bootstrap_profile:true
@@ -8289,7 +8417,11 @@ let register ~protocols =
     "garbage collection of shards for all profiles"
     Garbage_collection.test_gc_with_all_profiles
     protocols ;
-  Garbage_collection.test_gc_skip_list_cells ~protocols ;
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7561
+     Adapt the test for the SQLite3 backend. *)
+  Garbage_collection.test_gc_skip_list_cells
+    ~protocols
+    ~skip_list_storage_backend:Legacy ;
   scenario_with_layer1_and_dal_nodes
     ~tags:["crawler"; "reconnection"]
     "DAL node crawler reconnects to L1 without crashing"
@@ -8373,32 +8505,16 @@ let register ~protocols =
   (* Register tutorial test *)
   scenario_tutorial_dal_baker protocols ;
 
-  scenario_with_all_nodes
+  Refutations
+  .register_scenario_with_two_rollups_a_faulty_dal_node_and_a_correct_one
     "Refutation where the faulty node timeouts"
-    ~regression:false
-    ~uses:(fun _protocol ->
-      [Constant.smart_rollup_installer; Constant.WASM.dal_echo_kernel])
-    ~pvm_name:"wasm_2_0_0"
-    ~commitment_period:5
-    (Refutations.scenario_with_two_rollups_a_faulty_dal_node_and_a_correct_one
-       ~refute_operations_priority:`Faulty_first)
-    ~smart_rollup_timeout_period_in_blocks:20
-    ~l1_history_mode:Default_with_refutation
-    ~tags:[Tag.slow]
+    ~refute_operations_priority:`Faulty_first
     protocols ;
 
-  scenario_with_all_nodes
+  Refutations
+  .register_scenario_with_two_rollups_a_faulty_dal_node_and_a_correct_one
     "Refutation where the honest node makes final move"
-    ~regression:false
-    ~uses:(fun _protocol ->
-      [Constant.smart_rollup_installer; Constant.WASM.dal_echo_kernel])
-    ~pvm_name:"wasm_2_0_0"
-    ~commitment_period:5
-    (Refutations.scenario_with_two_rollups_a_faulty_dal_node_and_a_correct_one
-       ~refute_operations_priority:`Honest_first)
-    ~smart_rollup_timeout_period_in_blocks:20
-    ~l1_history_mode:Default_with_refutation
-    ~tags:[Tag.slow]
+    ~refute_operations_priority:`Honest_first
     protocols ;
 
   scenario_with_all_nodes
