@@ -366,3 +366,15 @@ end
     allowing to use the [profiler] functions without having to provide it
     as a parameter *)
 val wrap : profiler -> (module GLOBAL_PROFILER)
+
+type 'a section_maker = 'a * metadata -> unit
+
+(** [section_maker equal to_string profiler]
+    Creates a function to open a new section (and close the one opened before) using [record] function
+    when a new entity is encountered.
+
+    @param equal is used for entities comparison.
+    @param to_string is used for labeling the entity when using the [record] function.
+    @param profiler - profiler instance used to track sections and record profiling data. *)
+val section_maker :
+  ('a -> 'a -> bool) -> ('a -> string) -> profiler -> 'a section_maker
