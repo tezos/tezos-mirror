@@ -1434,8 +1434,6 @@ module History = struct
       let* cache = History_cache.remember new_head_hash new_head cache in
       return (new_head, cache)
 
-    (*
-
     (* Given a list [attested_slot_headers] of well-ordered (wrt slots indices)
        (attested) slot headers, this function builds an extension [l] of
        [attested_slot_headers] such that:
@@ -1453,32 +1451,42 @@ module History = struct
       let* all_indices =
         I.slots_range ~number_of_slots ~lower:0 ~upper:(number_of_slots - 1)
       in
-      let mk_unattested index =
-        Content.Unattested Header.{published_level; index}
-      in
-      (* TODO: Follow-up MR: Take the value of _s_status and _s_publisher into
-         account. *)
-      let attested_slot_headers =
-        List.map (fun (slot, _pub, _status) -> slot) slot_headers_with_statuses
+      let mk_unpublished index =
+        Content.Unpublished Header.{published_level; index}
       in
       (* Hypothesis: both lists are sorted in increasing order w.r.t. slots
          indices. *)
       let rec aux indices slots =
         match (indices, slots) with
-        | _, [] -> List.map mk_unattested indices |> ok
+        | _, [] -> List.map mk_unpublished indices |> ok
         | [], _s :: _ -> tzfail Add_element_in_slots_skip_list_violates_ordering
-        | i :: indices', s :: slots' ->
+        | i :: indices', (s, publisher, status) :: slots' ->
             if I.(i = s.Header.id.index) then
               let* res = aux indices' slots' in
-              Content.Attested s :: res |> ok
+              let Dal_attestation_repr.Accountability.
+                    {is_proto_attested; attested_shards; total_shards} =
+                status
+              in
+              let content =
+                Content.(
+                  Published
+                    {
+                      header = s;
+                      publisher;
+                      is_proto_attested;
+                      attested_shards;
+                      total_shards;
+                    })
+              in
+              content :: res |> ok
             else if I.(i < s.Header.id.index) then
               let* res = aux indices' slots in
-              mk_unattested i :: res |> ok
+              mk_unpublished i :: res |> ok
             else
               (* i > s.Header.id.index *)
               tzfail Add_element_in_slots_skip_list_violates_ordering
       in
-      aux all_indices attested_slot_headers
+      aux all_indices slot_headers_with_statuses
 
     (* Assuming a [number_of_slots] per L1 level, we will ensure below that we
        insert exactly [number_of_slots] cells in the skip list per level. This
@@ -1518,6 +1526,7 @@ module History = struct
         in
         cell
 
+    (*
     (* Dal proofs section *)
 
     (** An inclusion proof is a sequence (list) of cells from the Dal skip list,
