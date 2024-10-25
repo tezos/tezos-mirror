@@ -285,6 +285,9 @@ val spawn_run : ?extra_arguments:string list -> t -> Process.t
     Default [timeout] is 30 seconds, after which SIGKILL is sent. *)
 val terminate : ?timeout:float -> t -> unit Lwt.t
 
+val resolve_or_timeout :
+  ?timeout:float -> t -> name:string -> 'a Lwt.t -> 'a Lwt.t
+
 (** The same exact behavior as {!Sc_rollup_node.wait_for} but for the EVM node. *)
 val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
 
