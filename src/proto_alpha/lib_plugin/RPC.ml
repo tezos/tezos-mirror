@@ -2383,6 +2383,31 @@ module Big_map = struct
       unparsing_mode
 end
 
+module Protocol = struct
+  module S = struct
+    let path : RPC_context.t RPC_path.context =
+      RPC_path.(open_root / "context" / "protocol")
+
+    let first_level =
+      let output = Raw_level.encoding in
+      RPC_service.get_service
+        ~description:
+          "Returns the level at which the current protocol was activated."
+        ~query:RPC_query.empty
+        ~output
+        RPC_path.(path / "first_level")
+  end
+
+  let register_first_level () =
+    Registration.register0 ~chunked:false S.first_level (fun context () () ->
+        Alpha_context.First_level_of_protocol.get context)
+
+  let register () = register_first_level ()
+
+  let first_level ctxt block =
+    RPC_context.make_call0 S.first_level ctxt block () ()
+end
+
 module Sc_rollup = struct
   open Data_encoding
 
@@ -4066,6 +4091,7 @@ let register () =
   Baking_rights.register () ;
   Attestation_rights.register () ;
   Validators.register () ;
+  Protocol.register () ;
   Sc_rollup.register () ;
   Dal.register () ;
   Registration.register0 ~chunked:false S.current_level (fun ctxt q () ->
