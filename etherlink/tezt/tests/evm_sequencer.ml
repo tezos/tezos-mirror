@@ -6805,7 +6805,7 @@ let test_tx_pool_replacing_transactions_on_limit () =
 let test_da_fees_after_execution =
   register_all
     ~time_between_blocks:Nothing
-    ~tags:["evm"; "da_fees"; "foo"]
+    ~tags:["evm"; "da_fees"]
     ~da_fee:(Wei.of_string "4_000_000_000_000")
     ~title:"da fees test"
   @@ fun {sequencer; _} _protocol ->
