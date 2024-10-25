@@ -61,9 +61,6 @@ echo "Remove all packages which are not needed by the packages we actually want.
 # - ocaml-base-compiler has to be explicitely listed for the solver
 #   to not prefer the "variant" `system` of the compiler
 # - odoc is used by the CI to generate the doc.
-#   TODO: https://gitlab.com/tezos/tezos/-/issues/7085
-#   remove restriction to odoc 2.2.0 once the issue above is
-#   resolved.
 # - ledgerwallet-tezos is an optional dependency of signer-services
 #   we want to have when building released binaries
 # - caqti-driver-postgresq is needed by tps measurement software to
@@ -83,7 +80,7 @@ esac
 
 cd opam-repository
 OPAMSOLVERTIMEOUT=600 opam admin filter --yes --resolve \
-  "octez-deps,ocaml,ocaml-base-compiler,odoc<2.3.0,ledgerwallet-tezos,caqti-driver-postgresql,$dummy_pkg" \
+  "octez-deps,ocaml,ocaml-base-compiler,odoc,ledgerwallet-tezos,caqti-driver-postgresql,$dummy_pkg" \
   --environment "os=linux,arch=$arch,os-family=alpine"
 
 # Clean up: remove packages that we do not actually want to install.
