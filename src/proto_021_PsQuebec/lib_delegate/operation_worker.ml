@@ -607,6 +607,7 @@ let create ?(monitor_node_operations = true)
             op_stream_stopper () [@profiler.record_f "stream stopped"] ;
             cancel_monitoring
               state [@profiler.record_f "cancel monitoring state"] ;
+            () [@profiler.stop] ;
             return_unit) ;
         update_operations_pool
           state
