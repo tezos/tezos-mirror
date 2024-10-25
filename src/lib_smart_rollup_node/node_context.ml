@@ -765,11 +765,11 @@ let protocol_activation_level node_ctxt protocol_hash =
 let save_protocol_info node_ctxt (block : Layer1.header)
     ~(predecessor : Layer1.header) =
   let open Lwt_result_syntax in
-  let* last_protocol = Store.Protocols.last node_ctxt.store in
-  match last_protocol with
-  | Some {proto_level; _}
-    when proto_level = block.header.proto_level
-         && block.header.proto_level = predecessor.header.proto_level ->
+  let* pred_proto =
+    Store.Protocols.proto_of_level node_ctxt.store predecessor.level
+  in
+  match pred_proto with
+  | Some {proto_level; _} when proto_level = block.header.proto_level ->
       (* Nominal case, no protocol change. Nothing to do. *)
       return_unit
   | None ->
@@ -824,27 +824,41 @@ let save_protocol_info node_ctxt (block : Layer1.header)
       in
       List.iter_es (Store.Protocols.store node_ctxt.store) protocols
   | Some _ ->
-      (* block.header.proto_level <> last_proto_level or head is a migration
-         block, i.e. there is a protocol change w.r.t. last registered one. *)
+      (* There is protocol change in what we know of the predecessor and the
+         head. *)
       let is_head_migration_block =
         block.header.proto_level <> predecessor.header.proto_level
       in
-      let* proto_info =
-        let+ {next_protocol = protocol; _} =
-          Tezos_shell_services.Shell_services.Blocks.protocols
-            node_ctxt.cctxt
-            ~block:(`Hash (block.hash, 0))
-            ()
-        in
-        let level =
-          if is_head_migration_block then
-            Store.Protocols.Activation_level block.level
-          else First_known block.level
-        in
-        Store.Protocols.
-          {level; proto_level = block.header.proto_level; protocol}
+      let* {next_protocol = protocol; _} =
+        Tezos_shell_services.Shell_services.Blocks.protocols
+          node_ctxt.cctxt
+          ~block:(`Hash (block.hash, 0))
+          ()
       in
-      Store.Protocols.store node_ctxt.store proto_info
+      let* cur_proto_info = Store.Protocols.find node_ctxt.store protocol in
+      let to_save =
+        (* Save the protocol information if we are looking at a migration block,
+           or if we had protocol information that we missed (e.g. in degraded
+           mode). *)
+        is_head_migration_block
+        ||
+        match cur_proto_info with
+        | None -> true
+        | Some {level = First_known fl | Activation_level fl; _} ->
+            block.header.level < fl
+      in
+      if not to_save then return_unit
+      else
+        let proto_info =
+          let level =
+            if is_head_migration_block then
+              Store.Protocols.Activation_level block.level
+            else First_known block.level
+          in
+          Store.Protocols.
+            {level; proto_level = block.header.proto_level; protocol}
+        in
+        Store.Protocols.store node_ctxt.store proto_info
 
 let get_slot_header {store; _} ~published_in_block_hash slot_index =
   Error.trace_lwt_result_with

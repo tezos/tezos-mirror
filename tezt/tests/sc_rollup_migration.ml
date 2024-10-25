@@ -922,6 +922,7 @@ let test_l2_migration_scenario_event ?parameters_ty
       ?parameters_ty
       ~kind
       ~mode
+      ~allow_degraded:true
       ?boot_sector
       ~operator
       ?rollup_node_name
@@ -987,6 +988,7 @@ let test_refutation_migration ~migrate_from ~migrate_to =
           ~loser_modes:["3 4 0"]
           (inputs_for 10)
           ~final_level:80
+          ~allow_degraded:true
           ~priority:`Priority_loser );
       ( "pvm_proof_2",
         7,
@@ -995,6 +997,7 @@ let test_refutation_migration ~migrate_from ~migrate_to =
           ~loser_modes:["7 7 22_000_002_000"]
           (inputs_for 10)
           ~final_level:80
+          ~allow_degraded:true
           ~priority:`Priority_loser );
     ]
   in
