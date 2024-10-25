@@ -248,7 +248,9 @@ let get_profiler file_name =
   let profiler = unplugged () in
   let test_profiler_instance =
     Profiler.instance
-      Tezos_base_unix.Simple_profiler.auto_write_to_txt_file
+      (* The default driver is a text driver writing to a file
+         without suffixing it *)
+      Tezos_base_unix.Simple_profiler.default_driver
       (file_name, Profiler.Info)
   in
   plug profiler test_profiler_instance ;
@@ -261,7 +263,7 @@ let run_test_with_profiler test_name test_fn =
   test_fn profiler ;
   Log.info "\nProfiling result for %s" test_name ;
   Log.info "==================================" ;
-  check_file_content (file_name ^ ".txt")
+  check_file_content file_name
 
 let () =
   Tezt_core.Regression.register

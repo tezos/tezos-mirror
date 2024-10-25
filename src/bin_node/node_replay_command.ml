@@ -638,8 +638,8 @@ let run ?verbosity ~singleprocess ~strict ~repeat ~stats_output
         Shell_profiling.activate_all ~profiler_maker ;
         let context_instance =
           Profiler.instance
-            Tezos_base_unix.Simple_profiler.auto_write_to_txt_file
-            Filename.Infix.(output_dir // "context_profiling.txt", max_verbosity)
+            Tezos_base_unix.Simple_profiler.default_driver
+            Filename.Infix.(output_dir // "context_profiling", max_verbosity)
         in
         Tezos_protocol_environment.Environment_profiler.Context_ops_profiler
         .plug

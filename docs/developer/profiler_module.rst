@@ -84,9 +84,15 @@ Octez already provides two ``Drivers``:
 
 .. code-block:: OCaml
 
-   val auto_write_to_txt_file : (string * Profiler.verbosity) Profiler.driver
+   val auto_write_as_txt_to_file
 
-   val auto_write_to_json_file : (string * Profiler.verbosity) Profiler.driver
+   val auto_write_as_json_to_file
+
+They are hidden behind the variable:
+
+.. code-blocl::OCaml
+
+   val default_driver: (string * Profiler.verbosity) Profiler.driver
 
 These ``Drivers`` are specifically crafted to write text or JSON files in a Unix
 filesystem. As you can see, they expect two 'arguments', a ``string`` (where to
@@ -98,8 +104,8 @@ We can now easily create an instance for a ``Driver``:
 
    let read_instance =
      Tezos_base.Profiler.instance
-       Tezos_base_unix.Simple_profiler.auto_write_to_txt_file
-       ("read_profiling.txt", Profiler.Info)
+       Tezos_base_unix.Simple_profiler.default_driver
+       ("read_profiling", Profiler.Info)
 
 We just need one last thing. We have a ``read_profiler`` and a ``read_instance`` that
 writes in ``read_profiling.txt`` but they are not connected. That's where the
@@ -172,8 +178,8 @@ monitor our functions more precisely:
 
    let instance =
      Tezos_base.Profiler.instance
-       Tezos_base_unix.Simple_profiler.auto_write_to_txt_file
-       ("/tmp/test_profiler.txt", Profiler.Info)
+       Tezos_base_unix.Simple_profiler.default_driver
+       ("/tmp/test_profiler", Profiler.Info)
 
    let read_int ic =
      let rec aux acc =
