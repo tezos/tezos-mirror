@@ -128,12 +128,12 @@ let begin_test ?(burn_rewards = false) ?(force_attest_all = false)
       let n = List.length delegates_name_list in
       let* block, delegates = Context.init_with_constants_n constants n in
       let*? init_level = Context.get_level (B block) in
-      let init_staked = Tez.of_mutez 200_000_000_000L in
       let*? account_map =
         List.fold_left2
           ~when_different_lengths:[Inconsistent_number_of_bootstrap_accounts]
           (fun account_map name contract ->
-            let liquid = Tez.(Account.default_initial_balance -! init_staked) in
+            let liquid = Account.default_initial_spendable_balance in
+            let init_staked = Account.default_initial_staked_balance in
             let frozen_deposits = Frozen_tez.init init_staked name name in
             let frozen_rights =
               List.fold_left

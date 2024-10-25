@@ -172,7 +172,7 @@ let test_basic_baking_reward () =
   Assert.equal_tez
     ~loc:__LOC__
     expected_initial_balance
-    Account.default_initial_balance
+    Account.default_initial_full_balance
 
 let get_contract_for_pkh contracts pkh =
   let open Lwt_result_syntax in
@@ -250,7 +250,7 @@ let test_rewards_block_and_payload_producer () =
      plus the fee for the transaction [tx]. *)
   let expected_balance =
     let open Tez_helpers in
-    Account.default_initial_balance -! frozen_deposit +! baking_reward
+    Account.default_initial_full_balance -! frozen_deposit +! baking_reward
     +! bonus_reward +! reward_for_b1 +! fee
   in
   let* () = Assert.equal_tez ~loc:__LOC__ bal expected_balance in
@@ -292,7 +292,7 @@ let test_rewards_block_and_payload_producer () =
   in
   let expected_balance =
     let open Tez_helpers in
-    Account.default_initial_balance +! baking_reward -! frozen_deposit
+    Account.default_initial_full_balance +! baking_reward -! frozen_deposit
     +! reward_for_b1 +! fee
   in
   let* () = Assert.equal_tez ~loc:__LOC__ bal expected_balance in
@@ -310,7 +310,7 @@ let test_rewards_block_and_payload_producer () =
   in
   let expected_balance' =
     let open Tez_helpers in
-    Account.default_initial_balance +! bonus_reward +! reward_for_b1'
+    Account.default_initial_full_balance +! bonus_reward +! reward_for_b1'
     -! frozen_deposits'
   in
   Assert.equal_tez ~loc:__LOC__ bal' expected_balance'

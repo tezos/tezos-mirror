@@ -86,7 +86,7 @@ let test_origination_balances ~loc:_ ?(fee = Tez.zero) ?(credit = Tez.zero) () =
       ~loc:__LOC__
       (B b)
       source
-      Account.default_initial_balance
+      Account.default_initial_full_balance
       total_fee_plus_deposits
   in
   (* check the balance of the originate contract is equal to credit *)
@@ -116,7 +116,7 @@ let register_origination ?(fee = Tez.zero) ?(credit = Tez.zero) () =
       ~loc:__LOC__
       (B b)
       source
-      Account.default_initial_balance
+      Account.default_initial_full_balance
       total_fee_plus_deposits
   in
   (* originated contract has been credited *)

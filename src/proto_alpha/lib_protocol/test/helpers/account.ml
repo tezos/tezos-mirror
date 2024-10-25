@@ -85,7 +85,27 @@ let dummy_account =
   in
   new_account ~seed ()
 
-let default_initial_balance = Tez.of_mutez_exn 4_000_000_000_000L
+let default_initial_full_balance =
+  Default_parameters.Internal_for_tests.bootstrap_balance
+
+let default_initial_staked_balance =
+  (* Cf [init_account] in {!Protocol.Bootstrap_storage}. *)
+  let constants = Default_parameters.constants_test in
+  let minimal_staked =
+    Tez.min constants.minimal_stake constants.minimal_frozen_stake
+  in
+  let minimal_to_not_be_overdelegated =
+    Tez.div_exn
+      default_initial_full_balance
+      (constants.limit_of_delegation_over_baking + 1)
+  in
+  Tez.(
+    min
+      default_initial_full_balance
+      (max minimal_staked minimal_to_not_be_overdelegated))
+
+let default_initial_spendable_balance =
+  Tez_helpers.(default_initial_full_balance -! default_initial_staked_balance)
 
 let generate_accounts ?rng_state n : t list tzresult =
   Signature.Public_key_hash.Table.clear known_accounts ;
@@ -110,7 +130,7 @@ let pkh_of_contract_exn = function
   | Contract.Implicit pkh -> pkh
   | Originated _ -> assert false
 
-let make_bootstrap_account ?(balance = default_initial_balance)
+let make_bootstrap_account ?(balance = default_initial_full_balance)
     ?(delegate_to = None) ?(consensus_key = None) account =
   Parameters.
     {
