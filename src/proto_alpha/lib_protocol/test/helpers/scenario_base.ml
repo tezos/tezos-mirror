@@ -218,10 +218,16 @@ let rec loop_action n : ('a -> 'a tzresult Lwt.t) -> ('a, 'a) scenarios =
   else loop_action (n - 1) f --> exec f
 
 (** Check a specific balance field for a specific account is equal to a specific amount *)
-let check_balance_field src_name field amount : (t, t) scenarios =
+let check_balance_field ?(loc = __LOC__) src_name field amount :
+    (t, t) scenarios =
   let open Lwt_result_syntax in
-  let check = Assert.equal_tez ~loc:__LOC__ amount in
-  let check' a = check (Partial_tez.to_tez ~round:`Down a) in
+  let check field_name =
+    let loc = sf "%s - unexpected %s for %S" loc field_name src_name in
+    Assert.equal_tez ~loc amount
+  in
+  let check' field_name a =
+    check field_name (Partial_tez.to_tez ~round:`Down a)
+  in
   exec_unit (fun (block, state) ->
       let src = State.find_account src_name state in
       let src_balance, src_total =
@@ -233,23 +239,31 @@ let check_balance_field src_name field amount : (t, t) scenarios =
       let* () =
         match field with
         | `Liquid ->
-            let* () = check rpc_balance.liquid_b in
-            check src_balance.liquid_b
+            let* () = check "spendable_balance" rpc_balance.liquid_b in
+            check "spendable_balance" src_balance.liquid_b
         | `Bonds ->
-            let* () = check rpc_balance.bonds_b in
-            check src_balance.bonds_b
+            let* () = check "frozen_bonds" rpc_balance.bonds_b in
+            check "frozen_bonds" src_balance.bonds_b
         | `Staked ->
-            let* () = check' rpc_balance.staked_b in
-            check' src_balance.staked_b
+            let* () = check' "staked_balance" rpc_balance.staked_b in
+            check' "staked_balance" src_balance.staked_b
         | `Unstaked_frozen_total ->
-            let* () = check rpc_balance.unstaked_frozen_b in
-            check src_balance.unstaked_frozen_b
+            let* () =
+              check "unstaked_frozen_total" rpc_balance.unstaked_frozen_b
+            in
+            check "unstaked_frozen_total" src_balance.unstaked_frozen_b
         | `Unstaked_finalizable ->
-            let* () = check rpc_balance.unstaked_finalizable_b in
-            check src_balance.unstaked_finalizable_b
+            let* () =
+              check
+                "unstaked_finalizable_total"
+                rpc_balance.unstaked_finalizable_b
+            in
+            check
+              "unstaked_finalizable_total"
+              src_balance.unstaked_finalizable_b
         | `Total ->
-            let* () = check rpc_total in
-            check src_total
+            let* () = check "full_balance" rpc_total in
+            check "full_balance" src_total
       in
       return_unit)
 
@@ -262,8 +276,17 @@ let assert_failure_in_check_balance_field ~loc src_name field amount =
         errs)
     (check_balance_field src_name field amount)
 
-let check_balance_fields src_name ~liquid ~staked
-    ?(unstaked_frozen_total = Tez.zero) () =
-  check_balance_field src_name `Staked staked
-  --> check_balance_field src_name `Liquid liquid
-  --> check_balance_field src_name `Unstaked_frozen_total unstaked_frozen_total
+let check_balance_fields ?(loc = __LOC__) src_name ~liquid ~staked
+    ?(unstaked_frozen_total = Tez.zero) ?(unstaked_finalizable = Tez.zero) () =
+  check_balance_field ~loc src_name `Staked staked
+  --> check_balance_field ~loc src_name `Liquid liquid
+  --> check_balance_field
+        ~loc
+        src_name
+        `Unstaked_frozen_total
+        unstaked_frozen_total
+  --> check_balance_field
+        ~loc
+        src_name
+        `Unstaked_finalizable
+        unstaked_finalizable
