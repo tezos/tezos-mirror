@@ -23,7 +23,7 @@
   octez-libs.tezos-context.disk
   octez-libs.tezos-context.encoding
   octez-libs.scoru-wasm
-  octez-l2-libs.scoru-wasm-helpers
+  octez-l2-libs.scoru-wasm-helpers-functor
   octez-smart-rollup-wasm-debugger-lib
   octez-l2-libs.layer2_store
   octez-l2-libs.irmin_context
@@ -44,7 +44,7 @@
   -open Octez_sqlite
   -open Tezos_client_base
   -open Evm_node_config
-  -open Tezos_scoru_wasm_helpers
+  -open Tezos_scoru_wasm_helpers_functor
   -open Octez_smart_rollup_wasm_debugger_lib
   -open Tezos_layer2_store
   -open Tezos_layer2_irmin_context

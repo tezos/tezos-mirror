@@ -24,10 +24,18 @@ module Bare_context = struct
   let empty index = Irmin_context.empty index
 end
 
+(* We mostly need the utils, execution is last resort: we normally use the
+   runtime rather than the PVM for execution.
+
+   The default [Wasm_utils] implementation has an explicit dependency on Wasmer
+   because it relies on the Fast Exec backend to speed-up execution. In our
+   case, this speed-up is implemented by the WASM Runtime.
+
+   To avoid introducing a dependency to Wasmer, we redefine a `Wasm_utils`
+   module which uses the (slow) PVM both for fast and slow execution. *)
 module Ctx = Tezos_tree_encoding.Encodings_util.Make (Bare_context)
-module Wasm_utils =
-  Wasm_utils.Make_with_pvms (Ctx) (Tezos_scoru_wasm.Wasm_pvm.Make (Ctx.Tree))
-    (Tezos_scoru_wasm.Wasm_pvm.Make (Ctx.Tree))
+module Slow_pvm = Tezos_scoru_wasm.Wasm_pvm.Make (Ctx.Tree)
+module Wasm_utils = Wasm_utils_functor.Make (Ctx) (Slow_pvm) (Slow_pvm)
 
 module Wasm =
   Octez_smart_rollup_wasm_debugger_lib.Wasm_debugger.Make (Wasm_utils)

@@ -9,7 +9,7 @@ let patch_kernel ~kernel_path evm_state =
   let open Lwt_result_syntax in
   let* content, binary = Wasm_debugger.read_kernel_from_file kernel_path in
   let*! kernel =
-    if binary then Lwt.return content else Wasm_utils.wat2wasm content
+    if binary then Lwt.return content else Wasm_utils_functor.wat2wasm content
   in
   let*! evm_state =
     Evm_state.modify ~key:"/kernel/boot.wasm" ~value:kernel evm_state
