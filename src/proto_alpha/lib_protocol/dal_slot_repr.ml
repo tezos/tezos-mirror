@@ -696,10 +696,10 @@ module History = struct
 
     let equal : t -> t -> bool = equal_history
 
-    let hash cell =
+    let hash ?with_migration cell =
       let current_slot = Skip_list.content cell in
       let back_pointers_hashes = Skip_list.back_pointers cell in
-      Content.to_bytes current_slot
+      Content.to_bytes ?with_migration current_slot
       :: List.map Pointer_hash.to_bytes back_pointers_hashes
       |> Pointer_hash.hash_bytes
 
@@ -1289,6 +1289,8 @@ module History = struct
       let open Result_syntax in
       let* proof_repr = deserialize_proof serialized_proof in
       verify_proof_repr dal_params page_id snapshot proof_repr
+
+    let hash = hash ?with_migration:None
 
     module Internal_for_tests = struct
       type cell_content = Content.t =
