@@ -333,15 +333,15 @@ module Make_s
               Events.(emit ban_operation_encountered) (origin, oph))) ;
        true)
      else if Classification.is_in_mempool oph shell.classification <> None then
-       true [@profiler.mark ["is_classified"]]
+       true [@profiler.mark {verbosity = Debug} ["is_classified"]]
      else if Operation_hash.Set.mem oph shell.live_operations then true
-       [@profiler.mark ["is_live_operation"]]
+       [@profiler.mark {verbosity = Debug} ["is_live_operation"]]
      else if Pending_ops.mem oph shell.pending then true
-       [@profiler.mark ["is_pending"]]
+       [@profiler.mark {verbosity = Debug} ["is_pending"]]
      else if Classification.is_known_unparsable oph shell.classification then
-       true [@profiler.mark ["is_known_unparsable"]]
-     else false [@profiler.mark ["not already handled"]])
-    [@profiler.aggregate_f "already_handled"]
+       true [@profiler.mark {verbosity = Debug} ["is_known_unparsable"]]
+     else false [@profiler.mark {verbosity = Debug} ["not already handled"]])
+    [@profiler.aggregate_f {verbosity = Debug} "already_handled"]
 
   let advertise (shell : ('operation_data, _) types_state_shell) mempool =
     let open Lwt_syntax in
@@ -470,26 +470,40 @@ module Make_s
              match
                (status_and_priority.status, status_and_priority.priority)
              with
-             | Fresh, _ -> true [@profiler.mark ["freshly validated operation"]]
+             | Fresh, _ ->
+                 true
+                 [@profiler.mark
+                   {verbosity = Debug} ["freshly validated operation"]]
              | Reclassified, High ->
-                 true [@profiler.mark ["reclassified high priority operation"]]
+                 true
+                 [@profiler.mark
+                   {verbosity = Debug} ["reclassified high priority operation"]]
              | Reclassified, Medium ->
                  false
-                 [@profiler.mark ["reclassified medium priority operation"]]
+                 [@profiler.mark
+                   {verbosity = Debug}
+                     ["reclassified medium priority operation"]]
              | Reclassified, Low _ ->
                  (* Reclassified operations with medium and low priority are not
                     reclassified *)
                  false
-                 [@profiler.mark ["reclassified low priority operation"]]
+                 [@profiler.mark
+                   {verbosity = Debug} ["reclassified low priority operation"]]
            in
            Some (op.hash, is_advertisable)
-       | `Branch_refused _ -> None [@profiler.mark ["branch_refused operation"]]
-       | `Branch_delayed _ -> None [@profiler.mark ["branch_delayed operation"]]
-       | `Refused _ -> None [@profiler.mark ["refused operation"]]
-       | `Outdated _ -> None [@profiler.mark ["outdated operation"]]
+       | `Branch_refused _ ->
+           None
+           [@profiler.mark {verbosity = Debug} ["branch_refused operation"]]
+       | `Branch_delayed _ ->
+           None
+           [@profiler.mark {verbosity = Debug} ["branch_delayed operation"]]
+       | `Refused _ ->
+           None [@profiler.mark {verbosity = Debug} ["refused operation"]]
+       | `Outdated _ ->
+           None [@profiler.mark {verbosity = Debug} ["outdated operation"]]
      in
      return (v_state, validated_operation, to_handle))
-    [@profiler.aggregate_s section]
+    [@profiler.aggregate_s {verbosity = Info} section]
 
   (* Classify pending operations into either:
      [Refused | Outdated | Branch_delayed | Branch_refused | Validated].
@@ -574,7 +588,8 @@ module Make_s
         (* We only advertise newly classified operations. *)
         advertise
           pv_shell
-          advertisable_mempool [@profiler.aggregate_f "advertise mempool"] ;
+          advertisable_mempool
+        [@profiler.aggregate_f {verbosity = Debug} "advertise mempool"] ;
       if Mempool.is_empty validated_mempool then Lwt.return_unit
       else
         let our_mempool =
@@ -582,21 +597,25 @@ module Make_s
             (Operation_hash.Set.union
                validated_mempool.known_valid
                pv_shell.mempool.known_valid
-             [@profiler.aggregate_f "union validated hashes"])
+             [@profiler.aggregate_f
+               {verbosity = Debug} "union validated hashes"])
           in
           let pending =
             (Pending_ops.hashes
-               pv_shell.pending [@profiler.aggregate_f "pending hashes"])
+               pv_shell.pending
+             [@profiler.aggregate_f {verbosity = Debug} "pending hashes"])
           in
           {Mempool.known_valid; pending}
         in
         let* _res =
           (set_mempool
              pv_shell
-             our_mempool [@profiler.aggregate_s "set mempool"])
+             our_mempool
+           [@profiler.aggregate_s {verbosity = Debug} "set mempool"])
         in
         Lwt.pause ())
-    [@profiler.aggregate_s "update_advertised_mempool_fields"])
+    [@profiler.aggregate_s
+      {verbosity = Notice} "update_advertised_mempool_fields"])
 
   let handle_unprocessed pv =
     let open Lwt_syntax in
@@ -610,7 +629,8 @@ module Make_s
            pv.shell
            pv.config
            pv.validation_state
-         [@profiler.aggregate_s "classify pending operations"])
+         [@profiler.aggregate_s
+           {verbosity = Notice} "classify pending operations"])
       in
       pv.validation_state <- validation_state ;
       update_advertised_mempool_fields
@@ -675,11 +695,12 @@ module Make_s
           any case, the initial fetching thread will still be resolved
           and push an arrived worker request. *)
        spawn_fetch_operation
-         ~notify_arrival:false [@profiler.mark ["already fetching"]]
+         ~notify_arrival:false
+       [@profiler.mark {verbosity = Debug} ["already fetching"]]
      else if not (already_handled ~origin shell oph) then (
        shell.fetching <- Operation_hash.Set.add oph shell.fetching ;
        spawn_fetch_operation ~notify_arrival:true))
-    [@profiler.aggregate_f "may_fetch_operation"]
+    [@profiler.aggregate_f {verbosity = Info} "may_fetch_operation"]
 
   (** Module containing functions that are the internal transitions
       of the mempool. These functions are called by the {!Worker} when
@@ -872,7 +893,8 @@ module Make_s
         (pv.shell.parameters.flush
            ~head:new_predecessor
            ~timestamp
-           pv.validation_state [@profiler.aggregate_s "flush state"])
+           pv.validation_state
+         [@profiler.aggregate_s {verbosity = Info} "flush state"])
       in
       pv.validation_state <- validation_state ;
       let*! new_pending_operations =
@@ -910,7 +932,7 @@ module Make_s
                  Lwt.return
                    ( Pending_ops.add op {status; priority} pending,
                      nb_pending + 1 ))
-            [@profiler.aggregate_s "flushed operations"])
+            [@profiler.aggregate_s {verbosity = Info} "flushed operations"])
           new_pending_operations
           (Pending_ops.empty, 0)
       in
@@ -1418,7 +1440,9 @@ module Make
        fun r ->
         let open Lwt_syntax in
         let* () =
-          (handle_unprocessed pv [@profiler.aggregate_s "handle_unprocessed"])
+          (handle_unprocessed
+             pv
+           [@profiler.aggregate_s {verbosity = Notice} "handle_unprocessed"])
         in
         r
       in
@@ -1428,7 +1452,9 @@ module Make
       | Request.Flush (hash, event, live_blocks, live_operations) -> (
           ()
           [@profiler.stop]
-          [@profiler.record Format.sprintf "%s" (Block_hash.to_b58check hash)] ;
+          [@profiler.record
+            {verbosity = Notice}
+              (Format.sprintf "%s" (Block_hash.to_b58check hash))] ;
           Requests.on_advertise pv.shell ;
           (* TODO: https://gitlab.com/tezos/tezos/-/issues/1727
              Rebase the advertisement instead. *)
@@ -1446,26 +1472,36 @@ module Make
              pv
              block
              live_blocks
-             live_operations [@profiler.aggregate_s "on_flush"]))
+             live_operations
+           [@profiler.aggregate_s {verbosity = Notice} "on_flush"]))
       | Request.Notify (peer, mempool) ->
           Requests.on_notify
             pv.shell
             peer
-            mempool [@profiler.aggregate_f "on_notify"] ;
+            mempool [@profiler.aggregate_f {verbosity = Notice} "on_notify"] ;
           return_unit
       | Request.Leftover ->
-          () [@profiler.mark ["leftover"]] ;
+          () [@profiler.mark {verbosity = Notice} ["leftover"]] ;
           (* unprocessed ops are handled just below *)
           return_unit
       | Request.Inject {op; force} ->
-          Requests.on_inject pv ~force op [@profiler.aggregate_s "on_inject"]
+          Requests.on_inject
+            pv
+            ~force
+            op [@profiler.aggregate_s {verbosity = Notice} "on_inject"]
       | Request.Arrived (oph, op) ->
-          Requests.on_arrived pv oph op [@profiler.aggregate_s "on_arrived"]
+          Requests.on_arrived
+            pv
+            oph
+            op [@profiler.aggregate_s {verbosity = Notice} "on_arrived"]
       | Request.Advertise ->
-          Requests.on_advertise pv.shell [@profiler.aggregate_f "on_advertise"] ;
+          Requests.on_advertise
+            pv.shell [@profiler.aggregate_f {verbosity = Notice} "on_advertise"] ;
           return_unit
       | Request.Ban oph ->
-          Requests.on_ban pv oph [@profiler.aggregate_s "on_ban"]
+          Requests.on_ban
+            pv
+            oph [@profiler.aggregate_s {verbosity = Notice} "on_ban"]
 
     let on_close w =
       let pv = Worker.state w in
@@ -1489,7 +1525,8 @@ module Make
       let*! head = Store.Chain.current_head chain_store in
       ()
       [@profiler.record
-        Format.sprintf "%s" (Block_hash.to_b58check (Store.Block.hash head))] ;
+        {verbosity = Notice}
+          (Format.sprintf "%s" (Block_hash.to_b58check (Store.Block.hash head)))] ;
 
       let*! mempool = Store.Chain.mempool chain_store in
       let*! live_blocks, live_operations =
