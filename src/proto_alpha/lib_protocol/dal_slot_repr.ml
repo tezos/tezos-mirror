@@ -555,13 +555,13 @@ module History = struct
             let attested_level =
               Raw_level_repr.add published_level attestation_lag
             in
-            if Raw_level_repr.(attested_level >= migration_level) then
-              (* If attested_level is at least equal to migration_level, this
+            if Raw_level_repr.(attested_level > migration_level) then
+              (* If attested_level is higher than the migration_level, this
                  means that the content has always been hashed using the new
                  encoding. So, we continue doing so. *)
               to_new_bytes current_slot
             else
-              (* if attested_level < migration_level, this means that this
+              (* if attested_level <= migration_level, this means that this
                  content has already been hashed with the representation of
                  cells' content in the previous protocol. To keep getting the
                  same hash used as a backpointer, we rehash using the same
