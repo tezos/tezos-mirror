@@ -262,7 +262,7 @@ let monitor_operations (cctxt : #Protocol_client_context.full) =
        ~branch_delayed:true
        ~branch_refused:false
        ~refused:false
-       () [@profiler.record_s "monitor_operations RPC"])
+       () [@profiler.record_s {verbosity = Info} "monitor_operations RPC"])
   in
   let operation_stream =
     Lwt_stream.map
@@ -274,7 +274,7 @@ let monitor_operations (cctxt : #Protocol_client_context.full) =
        cctxt
        ~chain:cctxt#chain
        ~block:(`Head 0)
-       () [@profiler.record_s "shell_header RPC"])
+       () [@profiler.record_s {verbosity = Info} "shell_header RPC"])
   in
   let round =
     match Fitness.(round_from_raw shell_header.fitness) with
@@ -606,11 +606,12 @@ let run ?(monitor_node_operations = true)
   let state =
     (make_initial_state
        ~monitor_node_operations
-       () [@profiler.record_f "make initial state"])
+       () [@profiler.record_f {verbosity = Notice} "make initial state"])
   in
   let rec worker_loop () =
     let* result =
-      (monitor_operations cctxt [@profiler.record_s "monitor operations"])
+      (monitor_operations
+         cctxt [@profiler.record_s {verbosity = Notice} "monitor operations"])
     in
     match result with
     | Error err -> Events.(emit loop_failed err)
@@ -618,21 +619,25 @@ let run ?(monitor_node_operations = true)
         ()
         [@profiler.stop]
         [@profiler.record
-          Format.sprintf
-            "level : %ld, round : %s"
-            (fst head)
-            (Int32.to_string @@ Round.to_int32 @@ snd head)] ;
+          {verbosity = Notice}
+            (Format.sprintf
+               "level : %ld, round : %s"
+               (fst head)
+               (Int32.to_string @@ Round.to_int32 @@ snd head))] ;
         let* () = Events.(emit starting_new_monitoring ()) in
         state.canceler <- Lwt_canceler.create () ;
         Lwt_canceler.on_cancel state.canceler (fun () ->
-            op_stream_stopper () [@profiler.record_f "stream stopped"] ;
+            op_stream_stopper
+              () [@profiler.record_f {verbosity = Notice} "stream stopped"] ;
             cancel_monitoring
-              state [@profiler.record_f "cancel monitoring state"] ;
+              state
+            [@profiler.record_f {verbosity = Notice} "cancel monitoring state"] ;
             () [@profiler.stop] ;
             return_unit) ;
         flush_operation_pool
           state
-          head [@profiler.record_f "update operations pool"] ;
+          head
+        [@profiler.record_f {verbosity = Notice} "update operations pool"] ;
         let rec loop () =
           let* ops = Lwt_stream.get operation_stream in
           match ops with
@@ -640,25 +645,31 @@ let run ?(monitor_node_operations = true)
               (* When the stream closes, it means a new head has been set,
                  we reset the monitoring and flush current operations *)
               let* () = Events.(emit end_of_stream ()) in
-              op_stream_stopper () [@profiler.record_f "stream stopped"] ;
+              op_stream_stopper
+                () [@profiler.record_f {verbosity = Info} "stream stopped"] ;
               let* () =
                 (reset_monitoring
-                   state [@profiler.record_s "reset monitoring state"])
+                   state
+                 [@profiler.record_s
+                   {verbosity = Info} "reset monitoring state"])
               in
               () [@profiler.stop] ;
               worker_loop ()
           | Some ops ->
               (state.operation_pool <-
                 Operation_pool.add_operations state.operation_pool ops)
-              [@profiler.aggregate_f "add operations"] ;
+              [@profiler.aggregate_f {verbosity = Info} "add operations"] ;
               let* () =
                 (update_monitoring
                    state
-                   ops [@profiler.aggregate_f "update monitoring state"])
+                   ops
+                 [@profiler.aggregate_f
+                   {verbosity = Info} "update monitoring state"])
               in
               loop ()
         in
-        (loop () [@profiler.record_s "operations processing"])
+        (loop
+           () [@profiler.record_s {verbosity = Notice} "operations processing"])
   in
   Lwt.dont_wait
     (fun () ->
