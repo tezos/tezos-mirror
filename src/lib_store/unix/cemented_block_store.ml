@@ -728,7 +728,7 @@ let cement_blocks ?(check_consistency = true) (cemented_store : t)
                metadata_offset
                (total_block_length - metadata_offset) ;
              finish ())
-           () [@profiler.record_s "finalize metadata"])
+           () [@profiler.aggregate_f "metadata_writer"])
       in
       let metadata_finalizer () =
         (let*! () = Lwt_preemptive.detach Zip.close_out out_file in
@@ -738,7 +738,7 @@ let cement_blocks ?(check_consistency = true) (cemented_store : t)
          in
          let*! () = Lwt_unix.rename tmp_metadata_file_path metadata_file_path in
          return_unit)
-        [@profiler.record_s "finalize metadata"]
+        [@profiler.aggregate_s "metadata_finalizer"]
       in
       return (metadata_writer, metadata_finalizer)
     else return ((fun _ -> Lwt.return_unit), fun () -> return_unit)
@@ -797,16 +797,15 @@ let cement_blocks ?(check_consistency = true) (cemented_store : t)
                      else return_unit)
                in
                (* We also populate the indexes *)
-               ((Cemented_block_level_index.replace
-                   cemented_store.cemented_block_level_index
-                   block_hash
-                   block_level ;
-                 Cemented_block_hash_index.replace
-                   cemented_store.cemented_block_hash_index
-                   block_level
-                   block_hash ;
-                 return (succ i, current_offset + pruned_block_length))
-               [@profiler.record_s "write cemented cycle"]))
+               Cemented_block_level_index.replace
+                 cemented_store.cemented_block_level_index
+                 block_hash
+                 block_level ;
+               Cemented_block_hash_index.replace
+                 cemented_store.cemented_block_hash_index
+                 block_level
+                 block_hash ;
+               return (succ i, current_offset + pruned_block_length))
              (0, first_offset)
              reading_sequence [@profiler.record_s "write cemented cycle"])
         in

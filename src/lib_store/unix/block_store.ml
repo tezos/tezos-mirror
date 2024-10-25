@@ -1445,9 +1445,7 @@ let merge_stores ?(cycle_size_limit = default_cycle_size_limit) block_store
   let* () = fail_when block_store.readonly Cannot_write_in_readonly in
   (* Do not allow multiple merges: force waiting for a potential
      previous merge. *)
-  ()
-  [@profiler.reset_block_section Block_repr.hash new_head]
-  [@profiler.record "merge store"] ;
+  () [@profiler.reset_block_section Block_repr.hash new_head] ;
   let*! () = Lwt_mutex.lock block_store.merge_mutex in
   protect
     ~on_error:(fun err ->
@@ -1467,7 +1465,7 @@ let merge_stores ?(cycle_size_limit = default_cycle_size_limit) block_store
           (fun () ->
             (let*! () = lock block_store.stored_data_lockfile in
              Block_store_status.set_merge_status block_store.status_data)
-            [@profiler.span_s ["write status"]])
+            [@profiler.record_s "write status"])
           (fun () -> unlock block_store.stored_data_lockfile)
       in
       let new_head_lpbl =
@@ -1484,9 +1482,7 @@ let merge_stores ?(cycle_size_limit = default_cycle_size_limit) block_store
       in
       let merge_start = Time.System.now () in
       let* () =
-        () [@profiler.record "waiting for lock (start)"] ;
         Lwt_idle_waiter.force_idle block_store.merge_scheduler (fun () ->
-            () [@profiler.stop] ;
             (* Move the rw in the ro stores and create a new tmp *)
             let* old_ro_store, old_rw_store, _new_rw_store =
               Lwt.finalize
@@ -1507,101 +1503,107 @@ let merge_stores ?(cycle_size_limit = default_cycle_size_limit) block_store
             (* Clean-up on cancel/exn *)
             let merging_thread : unit tzresult Lwt.t =
               let* () =
-                Lwt.finalize
-                  (fun () ->
-                    protect
-                      ~on_error:(fun err ->
-                        (* Failures should be handled using [get_merge_status] *)
-                        let msg = Format.asprintf "%a" pp_print_trace err in
-                        let*! () =
-                          Store_events.(emit merge_error)
-                            (cementing_highwatermark, new_head_lpbl, msg)
-                        in
-                        on_error (Merge_error :: err))
-                      (fun () ->
-                        let* new_ro_store, new_savepoint, new_caboose =
-                          (create_merging_thread
-                             block_store
-                             ~cycle_size_limit
-                             ~history_mode
-                             ~old_ro_store
-                             ~old_rw_store
-                             ~new_head
-                             ~new_head_lpbl
-                             ~lowest_bound_to_preserve_in_floating
-                             ~cementing_highwatermark
-                           [@profiler.record_s "merging thread"])
-                        in
-                        let* () =
-                          () [@profiler.record "waiting for lock (end)"] ;
-                          Lwt_idle_waiter.force_idle
-                            block_store.merge_scheduler
-                            (fun () ->
-                              Lwt.finalize
-                                (fun () ->
-                                  (* Lock the block store to avoid RO
-                                     instances to open the state while
-                                     the file descriptors are being
-                                     updated. *)
-                                  let*! () = lock block_store.lockfile in
-                                  (* Critical section: update on-disk values *)
-                                  let* () =
-                                    (move_all_floating_stores
-                                       block_store
-                                       ~new_ro_store
-                                     [@profiler.record_s
-                                       "move all floating stores"])
-                                  in
-                                  let*! () =
-                                    lock block_store.stored_data_lockfile
-                                  in
-                                  (let* () =
-                                     write_caboose block_store new_caboose
+                (Lwt.finalize
+                   (fun () ->
+                     protect
+                       ~on_error:(fun err ->
+                         (* Failures should be handled using [get_merge_status] *)
+                         let msg = Format.asprintf "%a" pp_print_trace err in
+                         let*! () =
+                           Store_events.(emit merge_error)
+                             (cementing_highwatermark, new_head_lpbl, msg)
+                         in
+                         on_error (Merge_error :: err))
+                       (fun () ->
+                         let* new_ro_store, new_savepoint, new_caboose =
+                           (create_merging_thread
+                              block_store
+                              ~cycle_size_limit
+                              ~history_mode
+                              ~old_ro_store
+                              ~old_rw_store
+                              ~new_head
+                              ~new_head_lpbl
+                              ~lowest_bound_to_preserve_in_floating
+                              ~cementing_highwatermark
+                            [@profiler.record_s "create_merging_thread"])
+                         in
+                         let* () =
+                           Lwt_idle_waiter.force_idle
+                             block_store.merge_scheduler
+                             (fun () ->
+                               Lwt.finalize
+                                 (fun () ->
+                                   (* Lock the block store to avoid RO
+                                      instances to open the state while
+                                      the file descriptors are being
+                                      updated. *)
+                                   let*! () = lock block_store.lockfile in
+                                   (* Critical section: update on-disk values *)
+                                   let* () =
+                                     (move_all_floating_stores
+                                        block_store
+                                        ~new_ro_store
+                                      [@profiler.record_s
+                                        "move_all_floating_stores"])
+                                   in
+                                   let*! () =
+                                     lock block_store.stored_data_lockfile
                                    in
                                    let* () =
-                                     write_savepoint block_store new_savepoint
+                                     (write_caboose
+                                        block_store
+                                        new_caboose
+                                      [@profiler.record_s "write_caboose"])
+                                   in
+                                   let* () =
+                                     (write_savepoint
+                                        block_store
+                                        new_savepoint
+                                      [@profiler.record_s "write_savepoint"])
                                    in
                                    return_unit)
-                                  [@profiler.span_s ["write new checkpoints"]])
-                                (fun () ->
-                                  let*! () =
-                                    unlock block_store.stored_data_lockfile
-                                  in
-                                  unlock block_store.lockfile))
-                        in
-                        (* We can now trigger the context GC: if the
-                           GC is performed, this call will block until
-                           its end. *)
-                        let* () =
-                          (may_trigger_gc
-                             ~disable_context_pruning
-                             block_store
-                             history_mode
-                             ~previous_savepoint
-                             ~new_savepoint [@profiler.span_s ["performing GC"]])
-                        in
-                        (* Don't call the finalizer in the critical
-                           section, in case it needs to access the block
-                           store. *)
-                        let* () = finalizer new_head_lpbl in
-                        (* The merge operation succeeded, the store is
-                           now idle. *)
-                        block_store.merging_thread <- None ;
-                        let* () =
-                          Lwt.finalize
-                            (fun () ->
-                              let*! () =
-                                lock block_store.stored_data_lockfile
-                              in
-                              (Block_store_status.set_idle_status
-                                 block_store.status_data
-                               [@profiler.record_s "set idle status"]))
-                            (fun () -> unlock block_store.stored_data_lockfile)
-                        in
-                        return_unit))
-                  (fun () ->
-                    Lwt_mutex.unlock block_store.merge_mutex ;
-                    Lwt.return_unit)
+                                 (fun () ->
+                                   let*! () =
+                                     unlock block_store.stored_data_lockfile
+                                   in
+                                   unlock block_store.lockfile))
+                         in
+                         (* We can now trigger the context GC: if the
+                            GC is performed, this call will block until
+                            its end. *)
+                         let* () =
+                           (may_trigger_gc
+                              ~disable_context_pruning
+                              block_store
+                              history_mode
+                              ~previous_savepoint
+                              ~new_savepoint
+                            [@profiler.record_s "performing GC"])
+                         in
+                         (* Don't call the finalizer in the critical
+                            section, in case it needs to access the block
+                            store. *)
+                         let* () = finalizer new_head_lpbl in
+                         (* The merge operation succeeded, the store is
+                            now idle. *)
+                         block_store.merging_thread <- None ;
+                         let* () =
+                           (Lwt.finalize
+                              (fun () ->
+                                let*! () =
+                                  lock block_store.stored_data_lockfile
+                                in
+                                Block_store_status.set_idle_status
+                                  block_store.status_data)
+                              (fun () ->
+                                unlock block_store.stored_data_lockfile)
+                            [@profiler.record_s "set idle status"])
+                         in
+                         return_unit))
+                   (fun () ->
+                     Lwt_mutex.unlock block_store.merge_mutex ;
+                     Lwt.return_unit) [@profiler.record_s "merging thread"])
               in
               let merge_end = Time.System.now () in
               let merging_time = Ptime.diff merge_end merge_start in
@@ -1609,7 +1611,6 @@ let merge_stores ?(cycle_size_limit = default_cycle_size_limit) block_store
               Prometheus.Gauge.set
                 Store_metrics.metrics.last_store_merge_time
                 (Ptime.Span.to_float_s merging_time) ;
-              () [@profiler.stop] ;
               return_unit
             in
             block_store.merging_thread <- Some (new_head_lpbl, merging_thread) ;
