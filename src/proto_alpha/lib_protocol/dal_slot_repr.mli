@@ -257,10 +257,10 @@ module History : sig
   module History_cache :
     Bounded_history_repr.S with type key = hash and type value = t
 
-  (** [update_skip_list hist cache published_level ~number_of_slots
-      slot_headers_with_statuses] updates the given structure [hist] with the
-      list of [slot_headers_with_statuses]. The given [cache] is also updated to
-      add successive values of [cell] to it.
+  (** [update_skip_list hist cache ?with_migration published_level
+      ~number_of_slots slot_headers_with_statuses] updates the given structure
+      [hist] with the list of [slot_headers_with_statuses]. The given [cache] is
+      also updated to add successive values of [cell] to it.
 
 
       This function checks the following pre-conditions before updating the
@@ -272,10 +272,15 @@ module History : sig
       - [published_level] is the successor the last inserted cell's level.
 
       - [slot_headers_with_statuses] is sorted in increasing order w.r.t. slots
-      indices. *)
+      indices.
+
+      [with_migration] is used to choose whether to use this protocol's hashing
+      function or the previous protocol to compute backpointers, based on which
+      protocol constructed the cell to be hashed the first time. *)
   val update_skip_list :
     t ->
     History_cache.t ->
+    ?with_migration:Raw_level_repr.t * int ->
     Raw_level_repr.t ->
     number_of_slots:int ->
     (Header.t
@@ -288,6 +293,7 @@ module History : sig
       updated. *)
   val update_skip_list_no_cache :
     t ->
+    ?with_migration:Raw_level_repr.t * int ->
     Raw_level_repr.t ->
     number_of_slots:int ->
     (Header.t

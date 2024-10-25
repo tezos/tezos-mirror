@@ -730,9 +730,9 @@ module History = struct
        Note that if the given skip list contains the genesis cell, its content is
        reset with the given content. This ensures the invariant that
        there are no gaps in the successive cells of the list. *)
-    let add_cell (t, cache) next_cell_content ~number_of_slots =
+    let add_cell ?with_migration (t, cache) next_cell_content ~number_of_slots =
       let open Result_syntax in
-      let prev_cell_ptr = hash t in
+      let prev_cell_ptr = hash ?with_migration t in
       let Header.{published_level; _} =
         Skip_list.content t |> Content.content_id
       in
@@ -747,7 +747,7 @@ module History = struct
             next_cell_content
             ~number_of_slots
       in
-      let new_head_hash = hash new_head in
+      let new_head_hash = hash ?with_migration new_head in
       let* cache = History_cache.remember new_head_hash new_head cache in
       return (new_head, cache)
 
@@ -809,8 +809,8 @@ module History = struct
        insert exactly [number_of_slots] cells in the skip list per level. This
        will simplify the shape of proofs and help bounding the history cache
        required for their generation. *)
-    let update_skip_list (t : t) cache published_level ~number_of_slots
-        slot_headers_with_statuses =
+    let update_skip_list (t : t) cache ?with_migration published_level
+        ~number_of_slots slot_headers_with_statuses =
       let open Result_syntax in
       let* () =
         List.iter_e
@@ -827,14 +827,22 @@ module History = struct
           ~published_level
           slot_headers_with_statuses
       in
-      List.fold_left_e (add_cell ~number_of_slots) (t, cache) slot_headers
+      List.fold_left_e
+        (add_cell ?with_migration ~number_of_slots)
+        (t, cache)
+        slot_headers
 
     let update_skip_list_no_cache =
       let empty_cache = History_cache.empty ~capacity:0L in
-      fun t published_level ~number_of_slots slot_headers_with_statuses ->
+      fun t
+          ?with_migration
+          published_level
+          ~number_of_slots
+          slot_headers_with_statuses ->
         let open Result_syntax in
         let+ cell, (_ : History_cache.t) =
           update_skip_list
+            ?with_migration
             t
             empty_cache
             published_level

@@ -65,10 +65,13 @@ let get_slot_headers_history ctxt =
   | Some slots_history -> slots_history
 
 let update_skip_list ctxt ~slot_headers_statuses ~level_attested
-    ~number_of_slots =
+    ~number_of_slots ~attestation_lag =
   let open Lwt_result_syntax in
   let open Dal_slot_repr.History in
   let* slots_history = get_slot_headers_history ctxt in
+  let* proto_migration_level =
+    Storage.Tenderbake.First_level_of_protocol.get ctxt
+  in
   let*? slots_history, cache =
     (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/7126
 
@@ -76,7 +79,9 @@ let update_skip_list ctxt ~slot_headers_statuses ~level_attested
     *)
     (* We expect to put exactly [number_of_slots] cells in the cache. *)
     let cache = History_cache.empty ~capacity:(Int64.of_int number_of_slots) in
+
     update_skip_list
+      ~with_migration:(proto_migration_level, attestation_lag)
       ~number_of_slots
       slots_history
       cache
@@ -124,5 +129,6 @@ let finalize_pending_slot_headers ctxt ~number_of_slots =
           ~slot_headers_statuses
           ~level_attested
           ~number_of_slots
+          ~attestation_lag:dal.attestation_lag
       in
       return (ctxt, attestation)
