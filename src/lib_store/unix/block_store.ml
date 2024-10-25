@@ -423,7 +423,7 @@ let cement_blocks ?(check_consistency = true) ~write_metadata block_store
        ~check_consistency
        cemented_store
        ~write_metadata
-       chunk_iterator [@profiler.record_s "cement blocks"])
+       chunk_iterator [@profiler.record_s {verbosity = Debug} "cement blocks"])
   in
   let*! () = Store_events.(emit end_cementing_blocks) () in
   return_unit
@@ -925,7 +925,7 @@ let update_floating_stores block_store ~history_mode ~ro_store ~rw_store
     (read_predecessor_block_by_level
        block_store
        ~head:new_head
-       new_head_lpbl [@profiler.record_s "read lpbl block"])
+       new_head_lpbl [@profiler.record_s {verbosity = Debug} "read lpbl block"])
   in
   let final_hash, final_level = Block_repr.descriptor lpbl_block in
   (* 1. Append to the new RO [new_store] blocks between
@@ -948,12 +948,13 @@ let update_floating_stores block_store ~history_mode ~ro_store ~rw_store
        floating_stores
        final_hash
        max_nb_blocks_to_retrieve
-     [@profiler.record_s "retrieve N lpbl's predecessors"])
+     [@profiler.record_s {verbosity = Debug} "retrieve N lpbl's predecessors"])
   in
   (* [min_level_to_preserve] is the lowest block that we want to keep
      in the floating stores. *)
   let*! min_level_to_preserve =
-    match[@profiler.record_s "read min level block to preserve"]
+    match[@profiler.record_s
+           {verbosity = Debug} "read min level block to preserve"]
       lpbl_predecessors
     with
     | [] -> Lwt.return new_head_lpbl
@@ -976,7 +977,7 @@ let update_floating_stores block_store ~history_mode ~ro_store ~rw_store
        ~src_floating_stores:floating_stores
        ~block_hashes:lpbl_predecessors
        ~dst_floating_store:new_store
-     [@profiler.record_s "copy all lpbl predecessors"])
+     [@profiler.record_s {verbosity = Debug} "copy all lpbl predecessors"])
   in
   (* 2. Retrieve ALL cycles (potentially more than one) *)
   (* 2.1. We write back to the new store all the blocks from
@@ -1037,7 +1038,8 @@ let update_floating_stores block_store ~history_mode ~ro_store ~rw_store
                       (Floating_block_store.find_info
                          store
                          block_hash
-                       [@profiler.aggregate_s "find block index info"])
+                       [@profiler.aggregate_s
+                         {verbosity = Debug} "find block index info"])
                     in
                     Lwt.return (WithExceptions.Option.get ~loc:__LOC__ pred_opt)
                   in
@@ -1048,13 +1050,16 @@ let update_floating_stores block_store ~history_mode ~ro_store ~rw_store
                        total_block_length,
                        predecessors,
                        resulting_context_hash )
-                   [@profiler.aggregate_s "raw append block"]))
+                   [@profiler.aggregate_s
+                     {verbosity = Debug} "raw append block"]))
                 else return_unit)
             store
           [@profiler.record_s
-            Printf.sprintf "iterate over floating store '%s'" kind]))
+            {verbosity = Debug}
+              (Printf.sprintf "iterate over floating store '%s'" kind)]))
        [ro_store; rw_store]
-     [@profiler.record_s "iterate and prune floating stores"])
+     [@profiler.record_s
+       {verbosity = Debug} "iterate and prune floating stores"])
   in
   let is_cementing_highwatermark_genesis =
     Compare.Int32.(
@@ -1086,7 +1091,8 @@ let update_floating_stores block_store ~history_mode ~ro_store ~rw_store
       (loop
          []
          initial_pred
-         sorted_lpbl [@profiler.record_s "retrieve cycle to cement"])
+         sorted_lpbl
+       [@profiler.record_s {verbosity = Debug} "retrieve cycle to cement"])
     in
     return (may_shrink_cycles cycles ~cycle_size_limit)
   in
@@ -1097,7 +1103,8 @@ let update_floating_stores block_store ~history_mode ~ro_store ~rw_store
        ~new_store
        ~min_level_to_preserve
        ~new_head
-       ~cycles_to_cement [@profiler.record_s "compute new savepoint"])
+       ~cycles_to_cement
+     [@profiler.record_s {verbosity = Debug} "compute new savepoint"])
   in
   let* new_caboose =
     (compute_new_caboose
@@ -1105,7 +1112,7 @@ let update_floating_stores block_store ~history_mode ~ro_store ~rw_store
        history_mode
        ~new_savepoint
        ~min_level_to_preserve
-       ~new_head [@profiler.record_s "compute new caboose"])
+       ~new_head [@profiler.record_s {verbosity = Debug} "compute new caboose"])
   in
   return (cycles_to_cement, new_savepoint, new_caboose)
 
@@ -1167,14 +1174,18 @@ let move_all_floating_stores block_store ~new_ro_store =
         (move_floating_store
            block_store
            ~src:new_ro_store
-           ~dst_kind:RO [@profiler.record_s "promote new ro floating as ro"])
+           ~dst_kind:RO
+         [@profiler.record_s
+           {verbosity = Debug} "promote new ro floating as ro"])
       in
       (* ...and [new_rw] to [rw]  *)
       let* () =
         (move_floating_store
            block_store
            ~src:block_store.rw_floating_block_store
-           ~dst_kind:RW [@profiler.record_s "promote new rw floating as rw"])
+           ~dst_kind:RW
+         [@profiler.record_s
+           {verbosity = Debug} "promote new rw floating as rw"])
       in
       (* Load the swapped stores *)
       (let*! ro = Floating_block_store.init chain_dir ~readonly:false RO in
@@ -1182,7 +1193,7 @@ let move_all_floating_stores block_store ~new_ro_store =
        let*! rw = Floating_block_store.init chain_dir ~readonly:false RW in
        block_store.rw_floating_block_store <- rw ;
        return_unit)
-      [@profiler.record_s "open new floating stores"])
+      [@profiler.record_s {verbosity = Debug} "open new floating stores"])
 
 let check_store_consistency block_store ~cementing_highwatermark =
   let open Lwt_result_syntax in
@@ -1259,7 +1270,8 @@ let instantiate_temporary_floating_store block_store =
            (Floating_block_store.init
               block_store.chain_dir
               ~readonly:false
-              RW_TMP [@profiler.record_s "initializing RW TMP"])
+              RW_TMP
+            [@profiler.record_s {verbosity = Debug} "initializing RW TMP"])
          in
          block_store.rw_floating_block_store <- new_rw_store ;
          return (ro_store, rw_store, new_rw_store)))
@@ -1288,7 +1300,9 @@ let create_merging_thread block_store ~history_mode ~old_ro_store ~old_rw_store
     (Floating_block_store.init
        block_store.chain_dir
        ~readonly:false
-       RO_TMP [@profiler.record_s "initializing RO TMP floating store"])
+       RO_TMP
+     [@profiler.record_s
+       {verbosity = Debug} "initializing RO TMP floating store"])
   in
   let* new_savepoint, new_caboose =
     Lwt.catch
@@ -1304,7 +1318,8 @@ let create_merging_thread block_store ~history_mode ~old_ro_store ~old_rw_store
              ~new_head_lpbl
              ~lowest_bound_to_preserve_in_floating
              ~cementing_highwatermark
-             ~cycle_size_limit [@profiler.record_s "update floating stores"])
+             ~cycle_size_limit
+           [@profiler.record_s {verbosity = Debug} "update floating stores"])
         in
         let*! () =
           Store_events.(emit cementing_block_ranges) cycles_interval_to_cement
@@ -1445,7 +1460,9 @@ let merge_stores ?(cycle_size_limit = default_cycle_size_limit) block_store
   let* () = fail_when block_store.readonly Cannot_write_in_readonly in
   (* Do not allow multiple merges: force waiting for a potential
      previous merge. *)
-  () [@profiler.reset_block_section Block_repr.hash new_head] ;
+  ()
+  [@profiler.reset_block_section
+    {verbosity = Notice} (Block_repr.hash new_head)] ;
   let*! () = Lwt_mutex.lock block_store.merge_mutex in
   protect
     ~on_error:(fun err ->
@@ -1465,7 +1482,7 @@ let merge_stores ?(cycle_size_limit = default_cycle_size_limit) block_store
           (fun () ->
             (let*! () = lock block_store.stored_data_lockfile in
              Block_store_status.set_merge_status block_store.status_data)
-            [@profiler.record_s "write status"])
+            [@profiler.record_s {verbosity = Notice} "write status"])
           (fun () -> unlock block_store.stored_data_lockfile)
       in
       let new_head_lpbl =
@@ -1493,7 +1510,8 @@ let merge_stores ?(cycle_size_limit = default_cycle_size_limit) block_store
 
                   (instantiate_temporary_floating_store
                      block_store
-                   [@profiler.record_s "instanciate tmp floating stores"]))
+                   [@profiler.record_s
+                     {verbosity = Notice} "instanciate tmp floating stores"]))
                 (fun () -> unlock block_store.lockfile)
             in
             (* Important: do not clean-up the temporary stores on
@@ -1526,7 +1544,8 @@ let merge_stores ?(cycle_size_limit = default_cycle_size_limit) block_store
                               ~new_head_lpbl
                               ~lowest_bound_to_preserve_in_floating
                               ~cementing_highwatermark
-                            [@profiler.record_s "create_merging_thread"])
+                            [@profiler.record_s
+                              {verbosity = Info} "create_merging_thread"])
                          in
                          let* () =
                            Lwt_idle_waiter.force_idle
@@ -1545,7 +1564,8 @@ let merge_stores ?(cycle_size_limit = default_cycle_size_limit) block_store
                                         block_store
                                         ~new_ro_store
                                       [@profiler.record_s
-                                        "move_all_floating_stores"])
+                                        {verbosity = Info}
+                                          "move_all_floating_stores"])
                                    in
                                    let*! () =
                                      lock block_store.stored_data_lockfile
@@ -1554,13 +1574,15 @@ let merge_stores ?(cycle_size_limit = default_cycle_size_limit) block_store
                                      (write_caboose
                                         block_store
                                         new_caboose
-                                      [@profiler.record_s "write_caboose"])
+                                      [@profiler.record_s
+                                        {verbosity = Info} "write_caboose"])
                                    in
                                    let* () =
                                      (write_savepoint
                                         block_store
                                         new_savepoint
-                                      [@profiler.record_s "write_savepoint"])
+                                      [@profiler.record_s
+                                        {verbosity = Info} "write_savepoint"])
                                    in
                                    return_unit)
                                  (fun () ->
@@ -1579,7 +1601,8 @@ let merge_stores ?(cycle_size_limit = default_cycle_size_limit) block_store
                               history_mode
                               ~previous_savepoint
                               ~new_savepoint
-                            [@profiler.record_s "performing GC"])
+                            [@profiler.record_s
+                              {verbosity = Info} "performing GC"])
                          in
                          (* Don't call the finalizer in the critical
                             section, in case it needs to access the block
@@ -1598,12 +1621,14 @@ let merge_stores ?(cycle_size_limit = default_cycle_size_limit) block_store
                                   block_store.status_data)
                               (fun () ->
                                 unlock block_store.stored_data_lockfile)
-                            [@profiler.record_s "set idle status"])
+                            [@profiler.record_s
+                              {verbosity = Info} "set idle status"])
                          in
                          return_unit))
                    (fun () ->
                      Lwt_mutex.unlock block_store.merge_mutex ;
-                     Lwt.return_unit) [@profiler.record_s "merging thread"])
+                     Lwt.return_unit)
+                 [@profiler.record_s {verbosity = Notice} "merging thread"])
               in
               let merge_end = Time.System.now () in
               let merging_time = Ptime.diff merge_end merge_start in
