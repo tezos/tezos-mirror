@@ -395,8 +395,8 @@ let find_and_execute_withdrawal ?(outbox_lookup_depth = 10) ~withdrawal_level
   in
   return withdrawal_level
 
-let init_sequencer_sandbox ?tx_pool_tx_per_addr_limit ?set_account_code
-    ?da_fee_per_byte ?minimum_base_fee_per_gas ?patch_config
+let init_sequencer_sandbox ?genesis_timestamp ?tx_pool_tx_per_addr_limit
+    ?set_account_code ?da_fee_per_byte ?minimum_base_fee_per_gas ?patch_config
     ?(kernel = Constant.WASM.evm_kernel)
     ?(bootstrap_accounts =
       List.map
@@ -429,7 +429,7 @@ let init_sequencer_sandbox ?tx_pool_tx_per_addr_limit ?set_account_code
         preimage_dir = Some preimages_dir;
         private_rpc_port = Some (Port.fresh ());
         time_between_blocks = Some Nothing;
-        genesis_timestamp = None;
+        genesis_timestamp;
         max_number_of_chunks = None;
         wallet_dir = Some wallet_dir;
         tx_pool_timeout_limit = None;

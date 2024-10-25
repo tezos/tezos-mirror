@@ -243,6 +243,11 @@ end
     with arguments found in the state. *)
 val spawn_init_config : ?extra_arguments:string list -> t -> Process.t
 
+type garbage_collector = {
+  split_frequency_in_seconds : int;
+  history_to_keep_in_seconds : int;
+}
+
 (** [patch_config_with_experimental_feature
     ?node_transaction_validation ?drop_duplicate_when_injection
     ?block_storage_sqlite3 ?next_wasm_runtime json_config] patches a
@@ -253,6 +258,7 @@ val patch_config_with_experimental_feature :
   ?node_transaction_validation:bool ->
   ?block_storage_sqlite3:bool ->
   ?next_wasm_runtime:bool ->
+  ?garbage_collector:garbage_collector ->
   unit ->
   JSON.t ->
   JSON.t
@@ -335,6 +341,16 @@ val wait_for_tx_pool_add_transaction : ?timeout:float -> t -> string Lwt.t
     [can_terminate] is `true` and the node was already terminated, returns
     `None`. *)
 val wait_for_shutdown_event : ?can_terminate:bool -> t -> int option Lwt.t
+
+(** [wait_for_split ?level evm_node] waits untils the node terminates
+    splitting its irmin context at level [level] if provided. *)
+val wait_for_split : ?level:int -> t -> int Lwt.t
+
+(** [wait_for_gc_finished ?gc_level ?head_level evm_node] waits untils
+    the node terminates garbage collecting its context on head
+    [head_level] at gc level [gc_level] if provided. *)
+val wait_for_gc_finished :
+  ?gc_level:int -> ?head_level:int -> t -> (int * int) Lwt.t
 
 (** [rpc_endpoint ?local ?private_ evm_node] returns the endpoint to communicate with the
     [evm_node]. If [private_] is true, the endpoint for the private
