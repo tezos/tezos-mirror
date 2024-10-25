@@ -176,9 +176,10 @@ let validate_new_head w hash (header : Block_header.t) =
                 header.shell.operations_hash))
         (0 -- (header.shell.validation_passes - 1))
       [@profiler.span_s
-        profiling_new_head_prefix
-          hash
-          ["validate_new_head"; "operation fetching"]])
+        {verbosity = Debug}
+          (profiling_new_head_prefix
+             hash
+             ["validate_new_head"; "operation fetching"])])
    in
    (* We redo a check for the fitness here because while waiting for the
       operations, a new head better than this block might be validated. *)
@@ -194,9 +195,10 @@ let validate_new_head w hash (header : Block_header.t) =
           (0 -- (header.shell.validation_passes - 1)) ;
         return_unit)
        [@profiler.span_s
-         profiling_new_head_prefix
-           hash
-           ["validate_new_head"; "fitness does not increase"]]
+         {verbosity = Debug}
+           (profiling_new_head_prefix
+              hash
+              ["validate_new_head"; "fitness does not increase"])]
    | `Ok -> (
        (let*! () =
           Events.(emit requesting_new_head_validation) block_received
@@ -211,9 +213,14 @@ let validate_new_head w hash (header : Block_header.t) =
              header
              operations
            [@profiler.span_s
-             profiling_new_head_prefix
-               hash
-               ["validate_new_head"; "fitness increases"; "validate_and_apply"]])
+             {verbosity = Debug}
+               (profiling_new_head_prefix
+                  hash
+                  [
+                    "validate_new_head";
+                    "fitness increases";
+                    "validate_and_apply";
+                  ])])
         in
         match v with
         | Invalid errs ->
@@ -238,10 +245,12 @@ let validate_new_head w hash (header : Block_header.t) =
             Peer_metadata.incr meta Valid_blocks ;
             return_unit)
        [@profiler.span_s
-         profiling_new_head_prefix
-           hash
-           ["validate_new_head"; "fitness increases"]]))
-  [@profiler.span_s profiling_new_head_prefix hash ["validate_new_head"]]
+         {verbosity = Debug}
+           (profiling_new_head_prefix
+              hash
+              ["validate_new_head"; "fitness increases"])]))
+  [@profiler.span_s
+    {verbosity = Info} (profiling_new_head_prefix hash ["validate_new_head"])]
 
 let assert_acceptable_head w hash (header : Block_header.t) =
   let open Lwt_result_syntax in
@@ -271,11 +280,15 @@ let may_validate_new_head w hash (header : Block_header.t) =
     let*! () =
       Events.(emit ignoring_previously_validated_block) block_received
     in
-    () [@profiler.mark profiling_new_head_prefix hash ["valid block"]] ;
+    ()
+    [@profiler.mark
+      {verbosity = Info} (profiling_new_head_prefix hash ["valid block"])] ;
     return_unit)
   else if invalid_block then (
     let*! () = Events.(emit ignoring_invalid_block) block_received in
-    () [@profiler.mark profiling_new_head_prefix hash ["invalid block"]] ;
+    ()
+    [@profiler.mark
+      {verbosity = Info} (profiling_new_head_prefix hash ["invalid block"])] ;
     tzfail Validation_errors.Known_invalid)
   else if invalid_predecessor then
     let*! () = Events.(emit ignoring_invalid_block) block_received in
@@ -286,14 +299,16 @@ let may_validate_new_head w hash (header : Block_header.t) =
          header
          [Validation_errors.Known_invalid]
        [@profiler.span_s
-         profiling_new_head_prefix hash ["commit invalid block"]])
+         {verbosity = Info}
+           (profiling_new_head_prefix hash ["commit invalid block"])])
     in
     tzfail Validation_errors.Known_invalid
   else if not valid_predecessor then (
     let*! () = Events.(emit missing_new_head_predecessor) block_received in
     ()
     [@profiler.mark
-      profiling_new_head_prefix hash ["missing new head predecessor"]] ;
+      {verbosity = Info}
+        (profiling_new_head_prefix hash ["missing new head predecessor"])] ;
 
     Distributed_db.Request.current_branch pv.parameters.chain_db pv.peer_id ;
     return_unit)
@@ -314,10 +329,12 @@ let may_validate_new_branch w locator =
   in
   only_if_fitness_increases w distant_header distant_hash @@ function
   | `Known_valid | `Lower_fitness ->
-      () [@profiler.mark ["New branch"; "fitness does not increase"]] ;
+      ()
+      [@profiler.mark
+        {verbosity = Info} ["New branch"; "fitness does not increase"]] ;
       return_unit
   | `Ok -> (
-      () [@profiler.mark ["New branch"; "fitness increases"]] ;
+      () [@profiler.mark {verbosity = Info} ["New branch"; "fitness increases"]] ;
       let* () = assert_acceptable_head w distant_hash distant_header in
       let chain_store = Distributed_db.chain_store pv.parameters.chain_db in
       (* TODO: should we consider level as well ? Rolling could have
@@ -371,13 +388,16 @@ let on_request (type a b) w (req : (a, b) Request.t) : (a, b) result Lwt.t =
          hash
          header
        [@profiler.span_s
-         [Format.sprintf "New head : %s" (Block_hash.to_short_b58check hash)]])
+         {verbosity = Notice}
+           [Format.sprintf "New head : %s" (Block_hash.to_short_b58check hash)]])
   | Request.New_branch (locator, _seed) ->
       (* TODO penalize empty locator... ?? *)
       let* () =
         Events.(emit processing_new_branch) (pv.peer_id, locator.head_hash)
       in
-      (may_validate_new_branch w locator [@profiler.span_s ["New branch"]])
+      (may_validate_new_branch
+         w
+         locator [@profiler.span_s {verbosity = Notice} ["New branch"]])
 
 let on_completion (type a request_error) _w (r : (a, request_error) Request.t) _
     st =
