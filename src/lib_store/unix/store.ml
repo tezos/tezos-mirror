@@ -510,7 +510,7 @@ module Block = struct
     let open Lwt_result_syntax in
     let bytes = Block_header.to_bytes block_header in
     let hash = Block_header.hash_raw bytes in
-    () [@profiler.reset_block_section hash] ;
+    () [@profiler.reset_block_section {verbosity = Notice} hash] ;
     (let {
        Block_validation.validation_store =
          {
@@ -700,7 +700,7 @@ module Block = struct
            chain_store.global_store.global_block_watcher
            (chain_store, block) ;
          return_some block)
-    [@profiler.record_s "store_block"]
+    [@profiler.record_s {verbosity = Notice} "store_block"]
 
   let store_validated_block chain_store ~hash ~block_header ~operations =
     let open Lwt_result_syntax in
@@ -1315,7 +1315,8 @@ module Chain = struct
                  pred = Some (last_block, last_ops);
                } ;
              return (diffed_new_live_blocks, diffed_new_live_operations))
-        [@profiler.record_s "compute live blocks with new head"])
+        [@profiler.record_s
+          {verbosity = Debug} "compute live blocks with new head"])
     | Some live_data, Some _
       when Block_hash.equal
              (Block.predecessor block)
@@ -1333,7 +1334,8 @@ module Chain = struct
           live_operations
           ~new_head:block
           ~cache_expected_capacity:expected_capacity
-        [@profiler.record_s "compute live blocks with alternative head"]
+        [@profiler.record_s
+          {verbosity = Debug} "compute live blocks with alternative head"]
     | _ when update_cache ->
         (* The block candidate is not on top of the current head. It is
            likely to be an alternate branch. We recompute the whole live
@@ -1356,7 +1358,8 @@ module Chain = struct
                (Block_hash.Set.add bh bhs, Operation_hash.Set.union ops opss))
          in
          return (live_blocks, live_ops))
-        [@profiler.record_s "compute live blocks with alternative branch"]
+        [@profiler.record_s
+          {verbosity = Debug} "compute live blocks with alternative branch"]
     | _ ->
         (* The block candidate is not on top of the current head. It
            is likely to be an alternate head. We recompute the whole
@@ -1365,7 +1368,8 @@ module Chain = struct
           (Chain_traversal.live_blocks
              chain_store
              block
-             expected_capacity [@profiler.record_s "compute whole live blocks"])
+             expected_capacity
+           [@profiler.record_s {verbosity = Debug} "compute whole live blocks"])
         in
         return new_live_blocks
 
@@ -1398,14 +1402,17 @@ module Chain = struct
            ~current_head
            live_blocks
            live_operations
-           ~pred_cache [@profiler.record_s "rollback livedata"])
+           ~pred_cache
+         [@profiler.record_s {verbosity = Debug} "rollback livedata"])
       else
         locked_compute_live_blocks_with_cache
           ~update_cache
           chain_store
           chain_state
           block
-          metadata [@profiler.record_s "locked compute live blocks with cache"]
+          metadata
+        [@profiler.record_s
+          {verbosity = Debug} "locked compute live blocks with cache"]
     in
     return res
 
@@ -1422,7 +1429,7 @@ module Chain = struct
              metadata
          in
          return r)
-    [@profiler.aggregate_s "compute_live_blocks"])
+    [@profiler.aggregate_s {verbosity = Notice} "compute_live_blocks"])
 
   let is_ancestor chain_store ~head:(hash, lvl) ~ancestor:(hash', lvl') =
     let open Lwt_syntax in
@@ -1937,7 +1944,7 @@ module Chain = struct
                       ~loc:__LOC__
                       cementing_highwatermark)
                  ~disable_context_pruning:chain_store.disable_context_pruning
-               [@profiler.mark ["merge_stores"]])
+               [@profiler.mark {verbosity = Notice} ["merge_stores"]])
             in
             (* The new memory highwatermark is new_head_lpbl, the disk
                value will be updated after the merge completion. *)
@@ -1973,11 +1980,13 @@ module Chain = struct
           let* () =
             (Stored_data.write
                chain_state.current_head_data
-               new_head_descr [@profiler.record_s "write_new_head"])
+               new_head_descr
+             [@profiler.record_s {verbosity = Debug} "write_new_head"])
           in
           (Stored_data.write
              chain_state.target_data
-             new_target [@profiler.record_s "write_new_target"]))
+             new_target
+           [@profiler.record_s {verbosity = Debug} "write_new_target"]))
         (fun () -> unlock chain_store.stored_data_lockfile)
     in
     (* Update live_data *)
@@ -1987,7 +1996,8 @@ module Chain = struct
          chain_store
          chain_state
          new_head
-         new_head_metadata [@profiler.record_s "updating live blocks"])
+         new_head_metadata
+       [@profiler.record_s {verbosity = Debug} "updating live blocks"])
     in
     let new_chain_state =
       {chain_state with live_blocks; live_operations; current_head = new_head}
@@ -2024,7 +2034,7 @@ module Chain = struct
                  Block.get_block_metadata chain_store pred_block
                in
                Block.get_block_metadata chain_store new_head)
-            [@profiler.record_s "get_pred_block"])
+            [@profiler.record_s {verbosity = Info} "get_pred_block"])
          in
          let*! target = Stored_data.get chain_state.target_data in
          let new_head_lpbl =
@@ -2035,7 +2045,8 @@ module Chain = struct
               ~disable_context_pruning:chain_store.disable_context_pruning
               chain_store
               new_head_lpbl
-              previous_head [@profiler.record_s "may_split_context"])
+              previous_head
+            [@profiler.record_s {verbosity = Info} "may_split_context"])
          in
          let* lfbl_block_opt =
            match chain_state.last_finalized_block_level with
@@ -2101,10 +2112,11 @@ module Chain = struct
               ~new_head
               ~new_head_metadata
               ~new_head_descr
-              ~new_target [@profiler.record_s "finalize_set_head"])
+              ~new_target
+            [@profiler.record_s {verbosity = Info} "finalize_set_head"])
          in
          return (new_chain_state, previous_head))
-    [@profiler.record_s "set_head"])
+    [@profiler.record_s {verbosity = Notice} "set_head"])
 
   let set_target chain_store new_target =
     let open Lwt_result_syntax in
