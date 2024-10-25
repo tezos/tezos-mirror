@@ -128,6 +128,9 @@ Smart Rollup node
   of the store data. (MRs :gl:`!15053`, :gl:`!15026`, :gl:`!15059`,
   :gl:`!15073`, :gl:`!15218`, :gl:`!15257`)
 
+- Allow to import snaphosts for older stores by migrating the data on import.
+  (MR :gl:`!15422`)
+
 Smart Rollup WASM Debugger
 --------------------------
 
