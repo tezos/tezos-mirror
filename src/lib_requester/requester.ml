@@ -200,7 +200,8 @@ end = struct
 
     let send p peer keys =
       List.iter
-        (fun _k -> (() [@profiler.aggregate_f "p2p requests sent"]))
+        (fun _k ->
+          (() [@profiler.aggregate_f {verbosity = Info} "p2p requests sent"]))
         keys ;
       send p peer keys
   end
@@ -650,17 +651,23 @@ module Make
 
   let fetch s ?peer ?timeout k param =
     let open Lwt_syntax in
-    match[@profiler.span_s ["fetch"]] Memory_table.find s.memory k with
+    match[@profiler.span_s {verbosity = Notice} ["fetch"]]
+      Memory_table.find s.memory k
+    with
     | None -> (
         (let* o = Disk_table.read_opt s.disk k in
          match o with
          | Some v ->
-             return_ok v [@profiler.span_s ["fetch"; "cache miss"; "disk hit"]]
+             return_ok
+               v
+             [@profiler.span_s
+               {verbosity = Info} ["fetch"; "cache miss"; "disk hit"]]
          | None -> (
              match(* It is necessary to check the memory-table again in case another
                      promise has altered it whilst this one was waiting for the
                      disk-table query. *)
-                  [@profiler.span_s ["fetch"; "cache miss"; "disk miss"]]
+                  [@profiler.span_s
+                    {verbosity = Info} ["fetch"; "cache miss"; "disk miss"]]
                Memory_table.find s.memory k
              with
              | None ->
@@ -672,15 +679,17 @@ module Make
                   Scheduler.request s.scheduler peer k ;
                   wrap s k ?timeout waiter)
                  [@profiler.span_s
-                   [
-                     "fetch";
-                     "cache miss";
-                     "disk miss";
-                     "cache miss : request creation";
-                   ]]
+                   {verbosity = Info}
+                     [
+                       "fetch";
+                       "cache miss";
+                       "disk miss";
+                       "cache miss : request creation";
+                     ]]
              | Some status -> (
                  match[@profiler.span_s
-                        ["fetch"; "cache miss"; "disk miss"; "cache hit"]]
+                        {verbosity = Info}
+                          ["fetch"; "cache miss"; "disk miss"; "cache hit"]]
                    status
                  with
                  | Pending data ->
@@ -688,30 +697,42 @@ module Make
                       data.waiters <- data.waiters + 1 ;
                       wrap s k ?timeout data.waiter)
                      [@profiler.span_s
-                       [
-                         "fetch";
-                         "cache miss";
-                         "disk miss";
-                         "cache hit";
-                         "pending : add peer";
-                       ]]
+                       {verbosity = Info}
+                         [
+                           "fetch";
+                           "cache miss";
+                           "disk miss";
+                           "cache hit";
+                           "pending : add peer";
+                         ]]
                  | Found v ->
                      return_ok
                        v
                      [@profiler.span_s
-                       [
-                         "fetch"; "cache miss"; "disk miss"; "cache hit"; "found";
-                       ]])))
-        [@profiler.span_s ["fetch"; "cache miss"]])
+                       {verbosity = Info}
+                         [
+                           "fetch";
+                           "cache miss";
+                           "disk miss";
+                           "cache hit";
+                           "found";
+                         ]])))
+        [@profiler.span_s {verbosity = Notice} ["fetch"; "cache miss"]])
     | Some status -> (
-        match[@profiler.span_s ["fetch"; "cache hit"]] status with
+        match[@profiler.span_s {verbosity = Notice} ["fetch"; "cache hit"]]
+          status
+        with
         | Pending data ->
             (Scheduler.request s.scheduler peer k ;
              data.waiters <- data.waiters + 1 ;
              wrap s k ?timeout data.waiter)
-            [@profiler.span_s ["fetch"; "cache hit"; "pending : add peer"]]
+            [@profiler.span_s
+              {verbosity = Info} ["fetch"; "cache hit"; "pending : add peer"]]
         | Found v ->
-            return_ok v [@profiler.span_s ["fetch"; "cache hit"; "found"]])
+            return_ok
+              v
+            [@profiler.span_s
+              {verbosity = Info} ["fetch"; "cache hit"; "found"]])
 
   let notify_when_pending s p k w param v =
     let open Lwt_syntax in
@@ -766,32 +787,38 @@ module Make
     | Some (Pending _) | Some (Found _) -> Lwt.return_false
 
   let clear_or_cancel s k =
-    match[@profiler.span_f ["clear_or_cancel"]]
+    match[@profiler.span_f {verbosity = Notice} ["clear_or_cancel"]]
       Memory_table.find s.memory k
     with
-    | None -> () [@profiler.span_f ["clear_or_cancel"; "no data"]]
+    | None ->
+        ()
+        [@profiler.span_f {verbosity = Notice} ["clear_or_cancel"; "no data"]]
     | Some (Pending status) ->
         (if status.waiters <= 1 then (
            (Scheduler.notify_cancellation s.scheduler k ;
             Memory_table.remove s.memory k ;
             Lwt.wakeup_later status.wakener (Result_syntax.tzfail (Canceled k)))
-           [@profiler.span_f ["clear_or_cancel"; "pending"; "no more waiters"]])
+           [@profiler.span_f
+             {verbosity = Info}
+               ["clear_or_cancel"; "pending"; "no more waiters"]])
          else
            status.waiters <-
              (status.waiters - 1)
              [@profiler.span_f
-               ["clear_or_cancel"; "pending"; "existing waiters"]])
-        [@profiler.span_f ["clear_or_cancel"; "pending"]]
+               {verbosity = Info}
+                 ["clear_or_cancel"; "pending"; "existing waiters"]])
+        [@profiler.span_f {verbosity = Notice} ["clear_or_cancel"; "pending"]]
     | Some (Found _) ->
         Memory_table.remove
           s.memory
-          k [@profiler.span_f ["clear_or_cancel"; "completed"]]
+          k
+        [@profiler.span_f {verbosity = Notice} ["clear_or_cancel"; "completed"]]
 
   let watch s = Lwt_watcher.create_stream s.input
 
   let[@warning "-32"] init_profiler () =
     if not !profiler_init then (
-      () [@profiler.record "start"] ;
+      () [@profiler.record {verbosity = Notice} "start"] ;
       profiler_init := true)
 
   let create ?random_table:random ?global_input request_param disk =
