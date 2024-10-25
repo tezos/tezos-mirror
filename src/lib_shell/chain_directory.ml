@@ -155,7 +155,31 @@ let rpc_directory_with_validator dir validator =
       | None -> Lwt.fail Not_found
       | Some {level; errors} -> return {hash; level; errors}) ;
   register1 S.Invalid_blocks.delete (fun chain_store hash () () ->
-      Store.Block.unmark_invalid chain_store hash)
+      Store.Block.unmark_invalid chain_store hash) ;
+  (* protocols *)
+  register0 dir S.Protocols.list (fun chain_store () () ->
+      let*! protocols = Store.Chain.protocol_levels chain_store in
+      Store_types.Protocol_levels.fold
+        (fun proto_level
+             Store_types.Protocol_levels.{protocol; activation_block; _}
+             acc -> {protocol; proto_level; activation_block} :: acc)
+        protocols
+        []
+      |> List.sort (fun p1 p2 ->
+             Compare.Int.compare p1.proto_level p2.proto_level)
+      |> return) ;
+  register1 S.Protocols.get (fun chain_store hash () () ->
+      let*! protocols = Store.Chain.protocol_levels chain_store in
+      let exception Found of protocol_info in
+      try
+        Store_types.Protocol_levels.iter
+          (fun proto_level
+               Store_types.Protocol_levels.{protocol; activation_block; _} ->
+            if Protocol_hash.equal protocol hash then
+              raise (Found {protocol; proto_level; activation_block}))
+          protocols ;
+        raise Not_found
+      with Found info -> return info)
 
 (* This RPC directory is agnostic to the node internal
    resources. However, theses RPCs can access a data subset by reading

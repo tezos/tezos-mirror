@@ -2722,6 +2722,8 @@ module Chain = struct
 
   (* Protocols *)
 
+  let protocol_levels chain_store = protocol_levels chain_store
+
   let find_protocol_info chain_store ~protocol_level =
     find_protocol_info chain_store ~protocol_level
 
