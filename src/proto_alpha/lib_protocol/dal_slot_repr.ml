@@ -704,14 +704,7 @@ module History = struct
       |> Pointer_hash.hash_bytes
 
     let pp_history fmt (history : history) =
-      let history_hash = hash history in
-      Format.fprintf
-        fmt
-        "@[hash : %a@;%a@]"
-        Pointer_hash.pp
-        history_hash
-        (Skip_list.pp ~pp_content:Content.pp ~pp_ptr:Pointer_hash.pp)
-        history
+      Skip_list.pp ~pp_content:Content.pp ~pp_ptr:Pointer_hash.pp fmt history
 
     let pp = pp_history
 
