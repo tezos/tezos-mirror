@@ -612,6 +612,12 @@ let changeset_test_evm_compatibility =
           "etherlink/kernel_evm/evm_evaluation/**/*";
         ])
 
+let changeset_mir =
+  Changeset.(
+    changeset_base
+    @ changeset_images (* Run if the [rust-toolchain] image is updated *)
+    @ make ["contrib/mir/**/*"])
+
 (** {2 Job makers} *)
 
 (** Helper to create jobs that uses the Docker daemon.
