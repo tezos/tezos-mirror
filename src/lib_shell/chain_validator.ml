@@ -614,17 +614,22 @@ let on_request (type a b) w start_testchain active_chains spawn_child
         start_testchain
         active_chains
         spawn_child
-        block [@profiler.span_s ["on_validation_request"]]
+        block [@profiler.span_s {verbosity = Notice} ["on_validation_request"]]
   | Request.Notify_branch (peer_id, locator) ->
-      on_notify_branch w peer_id locator [@profiler.span_s ["on_notify_branch"]]
+      on_notify_branch
+        w
+        peer_id
+        locator [@profiler.span_s {verbosity = Notice} ["on_notify_branch"]]
   | Request.Notify_head (peer_id, hash, header, mempool) ->
       on_notify_head
         w
         peer_id
         (hash, header)
-        mempool [@profiler.span_s ["on_notify_head"]]
+        mempool [@profiler.span_s {verbosity = Notice} ["on_notify_head"]]
   | Request.Disconnection peer_id ->
-      on_disconnection w peer_id [@profiler.span_s ["on_disconnection"]]
+      on_disconnection
+        w
+        peer_id [@profiler.span_s {verbosity = Notice} ["on_disconnection"]]
 
 let collect_proto ~metrics (chain_store, block) =
   let open Lwt_syntax in
