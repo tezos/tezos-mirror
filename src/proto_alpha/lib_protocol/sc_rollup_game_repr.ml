@@ -743,9 +743,9 @@ let check_proof_refute_stop_state ~stop_state input input_request proof =
 
 (** Returns the validity of the first final move on top of a dissection. *)
 let validity_final_move ~pvm ~dal_parameters ~dal_activation_level
-    ~dal_attestation_lag ~dal_number_of_slots ~first_move ~metadata ~proof ~game
-    ~start_chunk ~stop_chunk ~is_reveal_enabled ~dal_attested_slots_validity_lag
-    =
+    ~protocol_activation_level ~dal_attestation_lag ~dal_number_of_slots
+    ~first_move ~metadata ~proof ~game ~start_chunk ~stop_chunk
+    ~is_reveal_enabled ~dal_attested_slots_validity_lag =
   let open Lwt_result_syntax in
   let*! res =
     let {inbox_snapshot; inbox_level; dal_snapshot; _} = game in
@@ -756,6 +756,7 @@ let validity_final_move ~pvm ~dal_parameters ~dal_activation_level
       Sc_rollup_proof_repr.valid
         ~pvm
         ~metadata
+        ~protocol_activation_level
         inbox_snapshot
         inbox_level
         dal_snapshot
@@ -811,10 +812,11 @@ let validity_final_move ~pvm ~dal_parameters ~dal_activation_level
     - The proof stop on the state different than the refuted one.
     - The proof is correctly verified.
 *)
-let validity_first_final_move ~pvm ~dal_parameters ~dal_activation_level
-    ~dal_attestation_lag ~dal_number_of_slots ~metadata ~proof ~game
-    ~start_chunk ~stop_chunk =
+let validity_first_final_move ~protocol_activation_level ~pvm ~dal_parameters
+    ~dal_activation_level ~dal_attestation_lag ~dal_number_of_slots ~metadata
+    ~proof ~game ~start_chunk ~stop_chunk =
   validity_final_move
+    ~protocol_activation_level
     ~pvm
     ~dal_parameters
     ~dal_activation_level
@@ -899,9 +901,9 @@ let cost_play ~step ~choice =
       scale10 @@ Gas_limit_repr.atomic_step_cost
       @@ Michelson_v1_gas_costs.cost_N_IBlake2b overapproximated_hashing_size
 
-let play kind dal_parameters ~dal_activation_level ~dal_attestation_lag
-    ~dal_number_of_slots ~stakers metadata game ~step ~choice ~is_reveal_enabled
-    ~dal_attested_slots_validity_lag =
+let play kind dal_parameters ~protocol_activation_level ~dal_activation_level
+    ~dal_attestation_lag ~dal_number_of_slots ~stakers metadata game ~step
+    ~choice ~is_reveal_enabled ~dal_attested_slots_validity_lag =
   let open Lwt_result_syntax in
   let (Packed ((module PVM) as pvm)) = Sc_rollups.Kind.pvm_of kind in
   let mk_loser loser =
@@ -940,6 +942,7 @@ let play kind dal_parameters ~dal_activation_level ~dal_attestation_lag
       let proof = {proof with pvm_step} in
       let*! player_result =
         validity_first_final_move
+          ~protocol_activation_level
           ~pvm
           ~dal_parameters
           ~dal_activation_level
@@ -977,6 +980,7 @@ let play kind dal_parameters ~dal_activation_level ~dal_attestation_lag
       let proof = {proof with pvm_step} in
       let*! player_result =
         validity_second_final_move
+          ~protocol_activation_level
           ~pvm
           ~dal_parameters
           ~dal_activation_level

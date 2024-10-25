@@ -461,10 +461,15 @@ let game_move ctxt rollup ~player ~opponent ~step ~choice =
   | Some game_result -> return (Some game_result, ctxt)
   | None -> (
       let play_cost = Sc_rollup_game_repr.cost_play ~step ~choice in
+      let* protocol_activation_level =
+        Storage.Tenderbake.First_level_of_protocol.get ctxt
+      in
       let*? ctxt = Raw_context.consume_gas ctxt play_cost in
+
       let* move_result =
         Sc_rollup_game_repr.play
           kind
+          ~protocol_activation_level
           dal.cryptobox_parameters
           ~dal_activation_level
           ~dal_attestation_lag:dal.attestation_lag

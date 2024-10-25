@@ -1207,16 +1207,17 @@ module History = struct
     (* Given a starting cell [snapshot] and a (final) [target], this function
        checks that the provided [inc_proof] encodes a minimal path from
        [snapshot] to [target]. *)
-    let verify_inclusion_proof inc_proof ~src:snapshot ~dest:target =
-      let assoc = List.map (fun c -> (hash c, c)) inc_proof in
+    let verify_inclusion_proof ?with_migration inc_proof ~src:snapshot
+        ~dest:target =
+      let assoc = List.map (fun c -> (hash ?with_migration c, c)) inc_proof in
       let path = List.split assoc |> fst in
       let deref =
         let open Map.Make (Pointer_hash) in
         let map = of_seq (List.to_seq assoc) in
         fun ptr -> find_opt ptr map
       in
-      let snapshot_ptr = hash snapshot in
-      let target_ptr = hash target in
+      let snapshot_ptr = hash ?with_migration snapshot in
+      let target_ptr = hash ?with_migration target in
       error_unless
         (Skip_list.valid_back_path
            ~equal_ptr:Pointer_hash.equal
@@ -1226,7 +1227,7 @@ module History = struct
            path)
         (dal_proof_error "verify_proof_repr: invalid inclusion Dal proof.")
 
-    let verify_proof_repr dal_params page_id snapshot proof =
+    let verify_proof_repr ?with_migration dal_params page_id snapshot proof =
       let open Result_syntax in
       let Page.{slot_id = Header.{published_level; index}; page_index = _} =
         page_id
@@ -1272,7 +1273,11 @@ module History = struct
       (* We check that the given inclusion proof indeed links our L1 snapshot to
          the target cell. *)
       let* () =
-        verify_inclusion_proof inc_proof ~src:snapshot ~dest:target_cell
+        verify_inclusion_proof
+          ?with_migration
+          inc_proof
+          ~src:snapshot
+          ~dest:target_cell
       in
       match (page_proof_check, cell_content) with
       | None, (Unpublished _ | Published {is_proto_attested = false; _}) ->
@@ -1293,10 +1298,11 @@ module History = struct
                "verify_proof_repr: the confirmation proof doesn't contain the \
                 attested slot."
 
-    let verify_proof dal_params page_id snapshot serialized_proof =
+    let verify_proof ?with_migration dal_params page_id snapshot
+        serialized_proof =
       let open Result_syntax in
       let* proof_repr = deserialize_proof serialized_proof in
-      verify_proof_repr dal_params page_id snapshot proof_repr
+      verify_proof_repr ?with_migration dal_params page_id snapshot proof_repr
 
     let hash = hash ?with_migration:None
 

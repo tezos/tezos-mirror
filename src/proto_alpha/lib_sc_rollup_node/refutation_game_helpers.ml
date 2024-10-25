@@ -292,7 +292,13 @@ let generate_proof (node_ctxt : _ Node_context.t)
   in
   let unserialized_proof = {proof with pvm_step} in
   let*! result =
+    (* ADAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/7579
+
+       Provide the right [protocol_activation_level] here once the RPC that
+       reads it from [Storage.Tenderbake.First_level_of_protocol] is
+       implemented. *)
     Sc_rollup.Proof.valid
+      ~protocol_activation_level:Raw_level.root
       ~metadata
       snapshot
       (Raw_level.of_int32_exn game.inbox_level)

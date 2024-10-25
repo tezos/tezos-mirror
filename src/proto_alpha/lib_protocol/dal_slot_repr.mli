@@ -274,7 +274,7 @@ module History : sig
       - [slot_headers_with_statuses] is sorted in increasing order w.r.t. slots
       indices.
 
-      [with_migration] is used to choose whether to use this protocol's hashing
+      - [with_migration] is used to choose whether to use this protocol's hashing
       function or the previous protocol to compute backpointers, based on which
       protocol constructed the cell to be hashed the first time. *)
   val update_skip_list :
@@ -369,18 +369,28 @@ module History : sig
     t ->
     (proof * Page.content option) tzresult Lwt.t
 
-  (** [verify_proof dal_params page_id snapshot proof] verifies that the given
-      [proof] is a valid proof to show that either:
+  (** [verify_proof ?with_migration dal_params page_id snapshot proof] verifies
+      that the given [proof] is a valid proof to show that either:
+
       - the page identified by [page_id] belongs to a confirmed slot stored in
       the skip list whose head is [snapshot], or
+
       - there is not confirmed slot in the skip list (whose head is) [snapshot]
       that could contain the page identified by [page_id].
 
       [dal_parameters] is used when verifying that/if the page is part of
       the candidate slot (if any).
-  *)
+
+      [with_migration] is used to choose whether to use this protocol's hashing
+      function or the previous protocol to compute backpointers, based on which
+      protocol constructed the cell to be hashed the first time. *)
   val verify_proof :
-    parameters -> Page.t -> t -> proof -> Page.content option tzresult
+    ?with_migration:Raw_level_repr.t * int ->
+    parameters ->
+    Page.t ->
+    t ->
+    proof ->
+    Page.content option tzresult
 
   type error += Add_element_in_slots_skip_list_violates_ordering
 

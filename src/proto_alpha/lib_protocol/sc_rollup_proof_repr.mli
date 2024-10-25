@@ -162,10 +162,16 @@ val stop_of_pvm_step :
       - The level at which DAL is activated (None if the DAL is not enabled).
     It also returns the optional input executed during the proof and the
     input_request for the state at the beginning of the proof.
+
+    [protocol_activation_level] refers to the level at which the current
+    protocol has been activated. Its default value is [Raw_level_repr.root]. Its
+    value is typically provided by
+    {!Storage.Tenderbake.First_level_of_protocol.get}.
 *)
 val valid :
   pvm:('state, 'proof, 'output) Sc_rollups.PVM.implementation ->
   metadata:Sc_rollup_metadata_repr.t ->
+  ?protocol_activation_level:Raw_level_repr.t ->
   Sc_rollup_inbox_repr.history_proof ->
   Raw_level_repr.t ->
   Dal_slot_repr.History.t ->
