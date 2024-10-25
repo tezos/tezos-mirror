@@ -32,6 +32,10 @@ Node
   --status`` command. It now returns the exit code 1 when an upgrade
   is availalbe. 0 is returned when the storage is up to date. (MR :gl:`!TBD`)
 
+- New RPCs ``/chain/{chain_id}/protocols`` (and
+  ``/chain/{chain_id}/protocols/{protocol_hash}``) to retrieve protocol
+  activation levels of the chain. (MR :gl:`!15447`)
+
 Client
 ------
 
