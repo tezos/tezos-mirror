@@ -1315,7 +1315,7 @@ module Chain = struct
                  pred = Some (last_block, last_ops);
                } ;
              return (diffed_new_live_blocks, diffed_new_live_operations))
-        [@profiler.record_s "Compute live blocks with new head"])
+        [@profiler.record_s "compute live blocks with new head"])
     | Some live_data, Some _
       when Block_hash.equal
              (Block.predecessor block)
@@ -1422,7 +1422,7 @@ module Chain = struct
              metadata
          in
          return r)
-    [@profiler.record_s "compute live blocks"])
+    [@profiler.aggregate_s "compute_live_blocks"])
 
   let is_ancestor chain_store ~head:(hash, lvl) ~ancestor:(hash', lvl') =
     let open Lwt_syntax in
@@ -1937,7 +1937,7 @@ module Chain = struct
                       ~loc:__LOC__
                       cementing_highwatermark)
                  ~disable_context_pruning:chain_store.disable_context_pruning
-               [@profiler.span_s ["start merge store"]])
+               [@profiler.mark ["merge_stores"]])
             in
             (* The new memory highwatermark is new_head_lpbl, the disk
                value will be updated after the merge completion. *)
@@ -2093,15 +2093,15 @@ module Chain = struct
                  | Some h -> Lwt.return (h, new_cementing_highwatermark))
          in
          let* new_chain_state =
-           finalize_set_head
-             chain_store
-             chain_state
-             ~checkpoint
-             ~new_checkpoint
-             ~new_head
-             ~new_head_metadata
-             ~new_head_descr
-             ~new_target
+           (finalize_set_head
+              chain_store
+              chain_state
+              ~checkpoint
+              ~new_checkpoint
+              ~new_head
+              ~new_head_metadata
+              ~new_head_descr
+              ~new_target [@profiler.record_s "finalize_set_head"])
          in
          return (new_chain_state, previous_head))
     [@profiler.record_s "set_head"])
