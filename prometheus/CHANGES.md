@@ -1,6 +1,7 @@
 ## Next
 
 - Add a `clear` function to clean all instance of a metric (@rodibozman).
+- Add a `clear_specific` function to clean a specific metric (@antoine.lanco).
 
 ## v1.2 (2022-06-16)
 
