@@ -39,4 +39,4 @@ let gas_for_fees ?da_fee_per_byte ~gas_price ?access_list tx_data =
     Z.mul da_fee_per_byte size
   in
   let fees = da_fee ?access_list da_fee_per_byte tx_data in
-  Z.div fees gas_price
+  Z.cdiv fees gas_price
