@@ -123,7 +123,7 @@ pub trait ManagerRead: ManagerBase {
 /// Manager with write capabilities
 pub trait ManagerWrite: ManagerBase {
     /// Update an element in the region.
-    fn region_write<E: Copy, const LEN: usize>(
+    fn region_write<E: 'static, const LEN: usize>(
         region: &mut Self::Region<E, LEN>,
         index: usize,
         value: E,
