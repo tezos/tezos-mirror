@@ -2877,7 +2877,7 @@ module Dal : sig
     val find_slot_headers :
       context ->
       Raw_level.t ->
-      (Header.t * Signature.public_key_hash) list option tzresult Lwt.t
+      (Header.t * Contract.t) list option tzresult Lwt.t
 
     val finalize_current_slot_headers : context -> context Lwt.t
 
@@ -2931,10 +2931,7 @@ module Dal : sig
       ?with_migration:Raw_level.t * int ->
       published_level:Raw_level.t ->
       number_of_slots:int ->
-      (Slot.Header.t
-      * Signature.public_key_hash
-      * Attestation.attestation_status)
-      list ->
+      (Slot.Header.t * Contract.t * Attestation.attestation_status) list ->
       t tzresult
 
     val update_skip_list :
@@ -2943,10 +2940,7 @@ module Dal : sig
       ?with_migration:Raw_level.t * int ->
       published_level:Raw_level.t ->
       number_of_slots:int ->
-      (Slot.Header.t
-      * Signature.public_key_hash
-      * Attestation.attestation_status)
-      list ->
+      (Slot.Header.t * Contract.t * Attestation.attestation_status) list ->
       (t * History_cache.t) tzresult
 
     type proof

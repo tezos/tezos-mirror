@@ -197,8 +197,8 @@ module Slot_market : sig
     t -> Header.t -> source:Signature.public_key_hash -> (t * bool) option
 
   (** [candidates t] returns a list of slot header candidates associated to the
-      public key hashes of the managers who published them. *)
-  val candidates : t -> (Header.t * Signature.public_key_hash) list
+      contract address who published them. *)
+  val candidates : t -> (Header.t * Contract_repr.t) list
 end
 
 (** This module provides an abstract data structure (type {!History.t}) that
@@ -284,7 +284,7 @@ module History : sig
     published_level:Raw_level_repr.t ->
     number_of_slots:int ->
     (Header.t
-    * Signature.public_key_hash
+    * Contract_repr.t
     * Dal_attestation_repr.Accountability.attestation_status)
     list ->
     (t * History_cache.t) tzresult
@@ -297,7 +297,7 @@ module History : sig
     published_level:Raw_level_repr.t ->
     number_of_slots:int ->
     (Header.t
-    * Signature.public_key_hash
+    * Contract_repr.t
     * Dal_attestation_repr.Accountability.attestation_status)
     list ->
     t tzresult

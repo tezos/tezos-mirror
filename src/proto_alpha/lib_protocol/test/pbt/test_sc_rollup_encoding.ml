@@ -124,7 +124,7 @@ let pack_slots_headers_by_level list =
   let module SSH = Set.Make (struct
     type t =
       Dal_slot_repr.Header.t
-      * Signature.public_key_hash
+      * Contract_repr.t
       * Dal_attestation_repr.Accountability.attestation_status
 
     let compare (a, _, _) (b, _, _) =
@@ -196,7 +196,7 @@ let gen_dal_slots_history () =
           |> Option.value ~default:Index.zero
         in
         ( Header.{id = {published_level; index}; commitment = Commitment.zero},
-          publisher,
+          Contract_repr.Implicit publisher,
           attestation_status ))
       list
   in

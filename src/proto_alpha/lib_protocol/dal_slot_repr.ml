@@ -220,7 +220,7 @@ module Slot_market = struct
 
   type t = {
     length : int;
-    slot_headers : (Header.t * Signature.public_key_hash) Slot_index_map.t;
+    slot_headers : (Header.t * Contract_repr.t) Slot_index_map.t;
   }
 
   let init ~length =
@@ -244,7 +244,7 @@ module Slot_market = struct
       let update = function
         | None ->
             has_changed := true ;
-            Some (new_slot_header, source)
+            Some (new_slot_header, Contract_repr.Implicit source)
         | Some x -> Some x
       in
       let slot_headers =
@@ -427,8 +427,7 @@ module History = struct
               Published
                 {
                   header = slot_header;
-                  publisher =
-                    Contract_repr.Implicit Signature.Public_key_hash.zero;
+                  publisher = Contract_repr.zero;
                   is_proto_attested = true;
                   attested_shards = 1;
                   total_shards = 1;
@@ -798,7 +797,7 @@ module History = struct
                   Published
                     {
                       header = s;
-                      publisher = Contract_repr.Implicit publisher;
+                      publisher;
                       is_proto_attested;
                       attested_shards;
                       total_shards;

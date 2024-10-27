@@ -454,8 +454,7 @@ module Dal : sig
 
   (** [candidates ctxt] returns the current list of slot for which there is at
       least one candidate alongside the addresses that published them. *)
-  val candidates :
-    t -> (Dal_slot_repr.Header.t * Signature.public_key_hash) list
+  val candidates : t -> (Dal_slot_repr.Header.t * Contract_repr.t) list
 
   (** [is_slot_index_attested ctxt slot_index] returns [true] if the
       [slot_index] is declared available by the protocol. [false] otherwise. If
