@@ -410,7 +410,7 @@ module History : sig
       | Unpublished of Header.id
       | Published of {
           header : Header.t;
-          publisher : Signature.public_key_hash;
+          publisher : Contract_repr.t;
           is_proto_attested : bool;
           attested_shards : int;
           total_shards : int;

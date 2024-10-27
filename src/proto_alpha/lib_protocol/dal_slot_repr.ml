@@ -358,14 +358,22 @@ module History = struct
   module Content_v2 = struct
     (** Each cell of the skip list is either a slot id (i.e. a published level
         and a slot index) for which no slot header is published or a published
-        slot header associated to the address which signed the L1 operation, the
-        attestation status from the protocol point of view, the number of
-        attested shards and the total number of shards. *)
+        slot header associated to the address which published the operation
+        (implicit account or smart contract), the attestation status from the
+        protocol point of view, the number of attested shards and the total
+        number of shards.
+
+        In fact, we take the opportunity of this skip list upgrade to allow the
+        publisher to be a smart contract, even if it's not currently
+        implemented. In case we decide to publish commitments via smart
+        contracts (combined with Adaptive DAL, this would allow implementing a
+        kind of DAC using the DAL infra), the skip list will not require a
+        migration. *)
     type t =
       | Unpublished of Header.id
       | Published of {
           header : Header.t;
-          publisher : Signature.public_key_hash;
+          publisher : Contract_repr.t;
           is_proto_attested : bool;
           attested_shards : int;
           total_shards : int;
@@ -419,7 +427,8 @@ module History = struct
               Published
                 {
                   header = slot_header;
-                  publisher = Signature.Public_key_hash.zero;
+                  publisher =
+                    Contract_repr.Implicit Signature.Public_key_hash.zero;
                   is_proto_attested = true;
                   attested_shards = 1;
                   total_shards = 1;
@@ -440,7 +449,7 @@ module History = struct
             (merge_objs
                (obj5
                   (req "kind" (constant "published"))
-                  (req "publisher" Signature.Public_key_hash.encoding)
+                  (req "publisher" Contract_repr.encoding)
                   (req "is_proto_attested" bool)
                   (req "attested_shards" uint16)
                   (req "total_shards" uint16))
@@ -491,7 +500,7 @@ module History = struct
             },
           Published sh ) ->
           Header.equal header sh.header
-          && Signature.Public_key_hash.equal publisher sh.publisher
+          && Contract_repr.equal publisher sh.publisher
           && Compare.Bool.equal is_proto_attested sh.is_proto_attested
           && Compare.Int.equal attested_shards sh.attested_shards
           && Compare.Int.equal total_shards sh.total_shards
@@ -516,7 +525,7 @@ module History = struct
              @[total_shards: %d@@] }"
             Header.pp
             header
-            Signature.Public_key_hash.pp
+            Contract_repr.pp
             publisher
             is_proto_attested
             attested_shards
@@ -789,7 +798,7 @@ module History = struct
                   Published
                     {
                       header = s;
-                      publisher;
+                      publisher = Contract_repr.Implicit publisher;
                       is_proto_attested;
                       attested_shards;
                       total_shards;
@@ -1311,7 +1320,7 @@ module History = struct
         | Unpublished of Header.id
         | Published of {
             header : Header.t;
-            publisher : Signature.public_key_hash;
+            publisher : Contract_repr.t;
             is_proto_attested : bool;
             attested_shards : int;
             total_shards : int;
