@@ -291,14 +291,15 @@ let generate_proof (node_ctxt : _ Node_context.t)
     |> Environment.wrap_tzresult
   in
   let unserialized_proof = {proof with pvm_step} in
+  let Node_context.{cctxt; _} = node_ctxt in
+  let* protocol_activation_level =
+    Plugin.RPC.Protocol.first_level
+      (new Protocol_client_context.wrap_full cctxt)
+      (cctxt#chain, `Head 0)
+  in
   let*! result =
-    (* ADAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/7579
-
-       Provide the right [protocol_activation_level] here once the RPC that
-       reads it from [Storage.Tenderbake.First_level_of_protocol] is
-       implemented. *)
     Sc_rollup.Proof.valid
-      ~protocol_activation_level:Raw_level.root
+      ~protocol_activation_level
       ~metadata
       snapshot
       (Raw_level.of_int32_exn game.inbox_level)
