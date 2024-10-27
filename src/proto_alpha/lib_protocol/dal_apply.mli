@@ -58,12 +58,12 @@ val validate_publish_commitment :
   t -> Dal.Operations.Publish_commitment.t -> unit tzresult
 
 (** [apply_publish_commitment ctxt slot_header ~source] applies the publication
-    of slot header [slot_header] signed by [source] on top of [ctxt]. Fails if
-    the slot already contains a slot header. *)
+    of slot header [slot_header] associated to [source] on top of [ctxt]. Fails
+    if the slot already contains a slot header. *)
 val apply_publish_commitment :
   t ->
   Dal.Operations.Publish_commitment.t ->
-  source:public_key_hash ->
+  source:Contract.t ->
   (t * Dal.Slot.Header.t) tzresult
 
 (** [finalisation ctxt] should be executed at block finalisation

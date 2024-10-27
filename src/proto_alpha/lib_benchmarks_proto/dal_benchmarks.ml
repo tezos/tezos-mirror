@@ -111,7 +111,9 @@ module Publish_commitment : Benchmark.S = struct
           Dal_apply.apply_publish_commitment
             ctxt
             op
-            ~source:Environment.Signature.Public_key_hash.zero
+            ~source:
+              (Protocol.Alpha_context.Contract.Implicit
+                 Environment.Signature.Public_key_hash.zero)
         with
         | Error errs ->
             Format.eprintf "%a@." Environment.Error_monad.pp_trace errs ;

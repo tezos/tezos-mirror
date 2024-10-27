@@ -244,7 +244,7 @@ module Slot_market = struct
       let update = function
         | None ->
             has_changed := true ;
-            Some (new_slot_header, Contract_repr.Implicit source)
+            Some (new_slot_header, source)
         | Some x -> Some x
       in
       let slot_headers =

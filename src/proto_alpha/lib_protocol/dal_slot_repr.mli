@@ -193,8 +193,7 @@ module Slot_market : sig
       The function returns [Some (_, true)] if the candidate is
       registered. Returns [Some (_, false)] otherwise. Returns [None] if
       [slot_header.id] is not a valid slot id. *)
-  val register :
-    t -> Header.t -> source:Signature.public_key_hash -> (t * bool) option
+  val register : t -> Header.t -> source:Contract_repr.t -> (t * bool) option
 
   (** [candidates t] returns a list of slot header candidates associated to the
       contract address who published them. *)

@@ -447,10 +447,7 @@ module Dal : sig
       candidate is registered. [Some (ctxt,false)] if another candidate was
       already registered previously. Returns an error if the slot is invalid. *)
   val register_slot_header :
-    t ->
-    Dal_slot_repr.Header.t ->
-    source:Signature.public_key_hash ->
-    t tzresult
+    t -> Dal_slot_repr.Header.t -> source:Contract_repr.t -> t tzresult
 
   (** [candidates ctxt] returns the current list of slot for which there is at
       least one candidate alongside the addresses that published them. *)

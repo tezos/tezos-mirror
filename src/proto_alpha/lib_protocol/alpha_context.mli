@@ -2872,7 +2872,7 @@ module Dal : sig
     end
 
     val register_slot_header :
-      context -> Header.t -> source:public_key_hash -> context tzresult
+      context -> Header.t -> source:Contract.t -> context tzresult
 
     val find_slot_headers :
       context ->
