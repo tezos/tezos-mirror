@@ -28,18 +28,10 @@
     of being included in external reports or manipulated directly. *)
 val headless : Profiler.verbosity Profiler.driver
 
-(** [default_driver] returns the unix driver that was chosen according
-    to the [PROFILING_BACKEND] environment variable.
+(** Driver printing its report in plain text to a file whenever a toplevel
+    section ends. *)
+val auto_write_as_txt_to_file : (string * Profiler.verbosity) Profiler.driver
 
-    The possible values are:
-    - ["json", "json+ext"]
-    - ["txt", "text", "txt+ext", "text+ext"]
-
-    The [+ext] asks the backend to automatically add a suffix
-    corresponding to the chosen format to the given file
-*)
-val default_driver : (string * Profiler.verbosity) Profiler.driver
-
-(** Create a [Profiler.instance] using the {!default_driver} *)
-val instantiate_default_driver :
-  string * Profiler.verbosity -> Profiler.instance
+(** Driver printing its report in JSON to a file whenever a toplevel
+    section ends. *)
+val auto_write_as_json_to_file : (string * Profiler.verbosity) Profiler.driver
