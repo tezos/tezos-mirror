@@ -146,7 +146,7 @@ let () =
   (* Matches smart rollup node release tags, e.g. [octez-smart-rollup-node-v1.2]
      or [rollup-node-v1.2-rc4]. *)
   let octez_smart_rollup_node_release_tag_re =
-    "/^(?:octez-smart-)?rollup-node-v\\d+\\.\\d+(?:\\-rc\\d+)?$/"
+    "/^octez-smart-rollup-node-v\\d+\\.\\d+(?:\\-rc\\d+)?$/"
   in
   let open Rules in
   let open Pipeline in
