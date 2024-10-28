@@ -6104,13 +6104,7 @@ let test_finalized_view =
       (Sc_rollup_node.endpoint sc_rollup_node)
   in
   let* finalized_observer =
-    run_new_observer_node
-      ~patch_config:
-        JSON.(
-          fun json ->
-            put ("finalized_view", annotate ~origin:"" (`Bool true)) json)
-      ~sc_rollup_node
-      sequencer
+    run_new_observer_node ~finalized_view:true ~sc_rollup_node sequencer
   in
   (* Produce a few EVM blocks *)
   let* _ =
@@ -6164,6 +6158,87 @@ let test_finalized_view =
     ~error_msg:
       "Finalized observer head should be equal to sequencer head (%R), but is \
        %L instead" ;
+  unit
+
+let test_finalized_view_forward_txn =
+  let raw_transfer nonce =
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~chain_id:1337
+      ~nonce
+      ~gas_price:1_000_000_000
+      ~gas:23_300
+      ~value:(Wei.of_eth_int 1)
+      ~address:Eth_account.bootstrap_accounts.(1).address
+      ()
+  in
+  let nb_transactions = 3 in
+  register_all
+    ~kernels:
+      [
+        Latest
+        (* This test focuses on a feature that purely relies on the node, it does not makes sense to register it for every protocols *);
+      ]
+    ~tags:["evm"; "finalized_view"; "forward"]
+    ~time_between_blocks:Nothing
+    ~title:
+      "--finalized-view forwards transactions to the sequencer without waiting"
+    ~da_fee:Wei.zero
+      (* This test depends on the number of blocks produced until the
+         rollup node synchronizes with the sequencer and proxy. When
+         DAL is activated, bake_until_sync would need to produce more
+         blocks than usual. Consequently, this would finalize the
+         blocks posted on-chain. The finalized proxy does have a head,
+         and the RPC does not fail, which is not the expected result
+         when running this test without DAL activation. *)
+    ~use_dal:Register_without_feature
+  @@ fun {sc_rollup_node; client; sequencer; _} _protocol ->
+  (* Start a proxy node with --finalized-view enabled *)
+  let* finalized_observer =
+    run_new_observer_node ~finalized_view:true ~sc_rollup_node sequencer
+  in
+  (* Produce a few EVM blocks *)
+  let* _ =
+    repeat 4 @@ fun () ->
+    let* _ = produce_block sequencer in
+    unit
+  in
+  (* Produces two L1 blocks to ensure the L2 blocks are posted onchain by the sequencer *)
+  let* () =
+    bake_until_sync
+      ~__LOC__
+      ~sc_rollup_node
+      ~proxy:finalized_observer
+      ~sequencer
+      ~client
+      ()
+  in
+
+  (* Craft a given number of consecutive transactions. We will prove they are
+     injected in blocks without the need to create new L1 blocks. *)
+  let* txns =
+    fold nb_transactions [] (fun i txns ->
+        let* tx = raw_transfer i in
+        return (tx :: txns))
+  in
+
+  (* Inject the transactions. *)
+  let* _ = batch_n_transactions ~evm_node:finalized_observer txns in
+
+  (* Create as many blocks as we have created transactions, check they all
+     contain one transaction. This should not be flaky because the
+     `eth_sendRawTransaction` implementation of the observer (in finalized
+     view) is blocked until the sequencer accepts the transaction. *)
+  let* _ =
+    repeat nb_transactions @@ fun () ->
+    let*@ txns_in_block = produce_block sequencer in
+    Check.(
+      (txns_in_block = 1)
+        int
+        ~error_msg:"Expected one transaction even without producing L1 blocks") ;
+    unit
+  in
+
   unit
 
 let test_finalized_block_param =
@@ -6717,6 +6792,7 @@ let () =
   test_trace_call protocols ;
   test_patch_kernel protocols ;
   test_finalized_view protocols ;
+  test_finalized_view_forward_txn protocols ;
   test_finalized_block_param protocols ;
   test_regression_block_hash_gen protocols ;
   test_sequencer_sandbox () ;

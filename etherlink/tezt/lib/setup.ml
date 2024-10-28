@@ -129,9 +129,19 @@ let run_new_rpc_endpoint evm_node =
   let* () = Evm_node.run rpc_node in
   return rpc_node
 
-let run_new_observer_node ?(patch_config = Fun.id) ~sc_rollup_node evm_node =
+let run_new_observer_node ?(finalized_view = false) ?(patch_config = Fun.id)
+    ~sc_rollup_node evm_node =
   let preimages_dir = Evm_node.preimages_dir evm_node in
   let initial_kernel = Evm_node.initial_kernel evm_node in
+  let patch_config =
+    if finalized_view then
+      JSON.(
+        fun json ->
+          put
+            ("finalized_view", annotate ~origin:"" (`Bool true))
+            (patch_config json))
+    else patch_config
+  in
   let* observer_mode =
     if Evm_node.supports_threshold_encryption evm_node then
       let bundler =
