@@ -4,6 +4,13 @@
 
 ### Features
 
+#### RPCs
+
+- Forward transactions to the upstream EVM node without delay when running in
+  observer mode with the finalized view option enabled. This improves the UX of
+  the users of said node without sacrificing the security provided by the
+  finalized view. (!15453)
+
 ### Bug fixes
 
 ### Internals

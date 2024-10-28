@@ -44,6 +44,7 @@ val run_new_rpc_endpoint : Evm_node.t -> Evm_node.t Lwt.t
 (**[run_new_rpc_endpoint ~sc_rollup_node node] starts a new observer following
    the setup. *)
 val run_new_observer_node :
+  ?finalized_view:bool ->
   ?patch_config:(Tezt_wrapper.JSON.t -> Tezt_wrapper.JSON.t) ->
   sc_rollup_node:Sc_rollup_node.t ->
   Evm_node.t ->

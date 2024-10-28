@@ -90,6 +90,18 @@ let main ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync () =
     Evm_ro_context.ro_backend ro_ctxt config ~evm_node_endpoint
   in
 
+  let mode =
+    if config.finalized_view then
+      Tx_pool.Forward
+        {
+          injector =
+            Injector.send_raw_transaction
+              ~keep_alive:config.keep_alive
+              ~base:evm_node_endpoint;
+        }
+    else Tx_pool.Relay
+  in
+
   let* () =
     Tx_pool.start
       {
@@ -97,7 +109,7 @@ let main ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync () =
         smart_rollup_address =
           Tezos_crypto.Hashed.Smart_rollup_address.to_b58check
             smart_rollup_address;
-        mode = Relay;
+        mode;
         tx_timeout_limit = config.tx_pool_timeout_limit;
         tx_pool_addr_limit = Int64.to_int config.tx_pool_addr_limit;
         tx_pool_tx_per_addr_limit =
