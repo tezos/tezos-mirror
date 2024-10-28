@@ -766,7 +766,7 @@ let export_snapshot ?(compress_on_the_fly = false) ?(compact = false)
   Runnable.{value = process; run = parse}
 
 let import_snapshot ?(apply_unsafe_patches = false) ?(force = false)
-    sc_rollup_node ~snapshot_file =
+    ?(no_check = false) sc_rollup_node ~snapshot_file =
   let process =
     spawn_command
       sc_rollup_node
@@ -778,7 +778,8 @@ let import_snapshot ?(apply_unsafe_patches = false) ?(force = false)
          data_dir sc_rollup_node;
        ]
       @ (if apply_unsafe_patches then make_argument Apply_unsafe_patches else [])
-      @ Cli_arg.optional_switch "force" force)
+      @ Cli_arg.optional_switch "force" force
+      @ Cli_arg.optional_switch "no-check" no_check)
   in
   Runnable.{value = process; run = Process.check}
 

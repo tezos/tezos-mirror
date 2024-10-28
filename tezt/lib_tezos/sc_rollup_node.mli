@@ -378,6 +378,7 @@ val export_snapshot :
 val import_snapshot :
   ?apply_unsafe_patches:bool ->
   ?force:bool ->
+  ?no_check:bool ->
   t ->
   snapshot_file:string ->
   unit Runnable.process

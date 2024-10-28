@@ -100,6 +100,7 @@ let run_and_bootstrap_rollup_node ~rollup_node_snapshot ~rollup network
     Sc_rollup_node.import_snapshot
       rollup_node
       ~snapshot_file:rollup_node_snapshot
+      ~no_check:true
   in
   let* () = Process.check process in
   (* Bootstrap until the node level with an archive endpoint. *)
