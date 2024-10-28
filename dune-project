@@ -65,6 +65,7 @@
 (package (name octez-protocol-021-PsQuebec-libs))
 (package (name octez-protocol-alpha-libs))
 (package (name octez-protocol-compiler))
+(package (name octez-protocol-compiler-compat))
 (package (name octez-requester-tests)(allow_empty))
 (package (name octez-riscv-api))
 (package (name octez-riscv-pvm))

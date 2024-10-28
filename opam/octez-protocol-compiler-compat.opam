@@ -10,18 +10,10 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
-  "octez-libs" { = version }
-  "octez-proto-libs" { = version }
-  "bls12-381" { = version }
-  "octez-protocol-compiler-compat" { = version }
-  "lwt" { >= "5.7.0" }
-  "ocp-ocamlres" { >= "0.4" }
-  "base-unix"
-  "octez-version" { = version }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tezos: economic-protocol compiler"
+synopsis: "Octez Protocol Compiler compatibility layer with OCaml versions"

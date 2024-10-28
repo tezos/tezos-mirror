@@ -6,7 +6,7 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   bls12-381.archive
-  compiler-libs.common)
+  octez-protocol-compiler-compat)
  (modules cmis_of_cma))
 
 (executable

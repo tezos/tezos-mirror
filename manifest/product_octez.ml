@@ -3370,40 +3370,13 @@ let octez_protocol_compiler_registerer =
       [octez_base |> open_ ~m:"TzPervasives"; tezos_protocol_environment_sigs]
     ~flags:(Flags.standard ~opaque:true ())
 
-let _octez_protocol_compiler_cmis_of_cma =
-  private_exe
-    "cmis_of_cma"
-    ~path:"src/lib_protocol_compiler/bin"
-    ~opam:"octez-protocol-compiler"
-    ~deps:[bls12_381_archive; compiler_libs_common]
-    ~modules:["cmis_of_cma"]
-
-let octez_protocol_compiler_lib =
+let octez_protocol_compiler_compat =
   public_lib
-    "octez-protocol-compiler"
-    ~path:"src/lib_protocol_compiler"
-    ~synopsis:"Tezos: economic-protocol compiler"
-    ~deps:
-      [
-        octez_base |> open_ ~m:"TzPervasives";
-        octez_base_unix |> open_;
-        tezos_protocol_environment_sigs;
-        octez_stdlib_unix |> open_;
-        compiler_libs_common;
-        lwt_unix;
-        ocplib_ocamlres;
-        unix;
-      ]
-    ~opam_only_deps:[octez_protocol_environment]
-    ~modules:
-      [
-        "Embedded_cmis_env";
-        "Embedded_cmis_register";
-        "Packer";
-        "Compiler";
-        "Defaults";
-        "Protocol_compiler_env";
-      ]
+    "octez-protocol-compiler-compat"
+    ~path:"src/lib_protocol_compiler/compat"
+    ~opam:"octez-protocol-compiler-compat"
+    ~synopsis:"Octez Protocol Compiler compatibility layer with OCaml versions"
+    ~deps:[compiler_libs_common; compiler_libs_optcomp; compiler_libs_toplevel]
     ~dune:
       Dune.
         [
@@ -3425,6 +3398,58 @@ let octez_protocol_compiler_lib =
                 S "%{target}";
               ]
             ~enabled_if:[S ">="; S "%{ocaml_version}"; S "5"];
+          target_rule
+            "compiler_libs.ml"
+            ~action:
+              [
+                S "copy"; S "compat_files/compiler_libs_ocaml4.ml"; S "%{target}";
+              ]
+            ~enabled_if:[S "<"; S "%{ocaml_version}"; S "5"];
+          target_rule
+            "compiler_libs.ml"
+            ~action:
+              [
+                S "copy"; S "compat_files/compiler_libs_ocaml5.ml"; S "%{target}";
+              ]
+            ~enabled_if:[S ">="; S "%{ocaml_version}"; S "5"];
+        ]
+
+let _octez_protocol_compiler_cmis_of_cma =
+  private_exe
+    "cmis_of_cma"
+    ~path:"src/lib_protocol_compiler/bin"
+    ~opam:"octez-protocol-compiler"
+    ~deps:[bls12_381_archive; octez_protocol_compiler_compat]
+    ~modules:["cmis_of_cma"]
+
+let octez_protocol_compiler_lib =
+  public_lib
+    "octez-protocol-compiler"
+    ~path:"src/lib_protocol_compiler"
+    ~synopsis:"Tezos: economic-protocol compiler"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_base_unix |> open_;
+        tezos_protocol_environment_sigs;
+        octez_stdlib_unix |> open_;
+        octez_protocol_compiler_compat |> open_;
+        lwt_unix;
+        ocplib_ocamlres;
+        unix;
+      ]
+    ~opam_only_deps:[octez_protocol_environment]
+    ~modules:
+      [
+        "Embedded_cmis_env";
+        "Embedded_cmis_register";
+        "Packer";
+        "Compiler";
+        "Defaults";
+      ]
+    ~dune:
+      Dune.
+        [
           targets_rule
             ["embedded-interfaces-env"]
             ~deps:[Dune.(H [[S "package"; S "octez-proto-libs"]])]
@@ -3496,6 +3521,7 @@ let octez_protocol_compiler_native =
       [
         octez_base |> open_ ~m:"TzPervasives";
         octez_protocol_compiler_lib |> open_;
+        octez_protocol_compiler_compat |> open_;
         compiler_libs_optcomp;
       ]
     ~modules:["Native"]

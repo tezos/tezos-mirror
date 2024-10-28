@@ -2059,6 +2059,7 @@ opam:all_7:
       - octez-rustzcash-deps
       - octez-rust-deps
       - octez-riscv-api
+      - octez-protocol-compiler-compat
       - octez-libs
       - octez-internal-libs
       - octez-distributed-lwt-internal
