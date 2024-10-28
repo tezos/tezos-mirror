@@ -564,17 +564,16 @@ let init (node_ctxt : _ Node_context.t) =
       else return_unit
 
 (* This is a publisher worker for a single scoru *)
-let worker =
+let worker () =
   let open Result_syntax in
-  lazy
-    (match Lwt.state worker_promise with
-    | Lwt.Return worker -> return worker
-    | Lwt.Fail exn -> fail (Error_monad.error_of_exn exn)
-    | Lwt.Sleep -> Error Rollup_node_errors.No_publisher)
+  match Lwt.state worker_promise with
+  | Lwt.Return worker -> return worker
+  | Lwt.Fail exn -> tzfail (Error_monad.error_of_exn exn)
+  | Lwt.Sleep -> tzfail Rollup_node_errors.No_publisher
 
 let worker_add_request condition ~request =
   let open Lwt_result_syntax in
-  match Lazy.force worker with
+  match worker () with
   | Ok w ->
       let node_ctxt = Worker.state w in
       (* Bailout does not publish any commitment it only cement them. *)
@@ -584,8 +583,8 @@ let worker_add_request condition ~request =
       @@ fun () ->
       let*! (_pushed : bool) = Worker.Queue.push_request w request in
       return_unit
-  | Error Rollup_node_errors.No_publisher -> return_unit
-  | Error e -> tzfail e
+  | Error (Rollup_node_errors.No_publisher :: _) -> return_unit
+  | Error e -> fail e
 
 let publish_commitments () =
   worker_add_request ~request:Request.Publish (fun node_ctxt ->
@@ -600,7 +599,7 @@ let execute_outbox () =
       Configuration.can_inject node_ctxt.config.mode Execute_outbox_message)
 
 let shutdown () =
-  match Lazy.force worker with
+  match worker () with
   | Error _ ->
       (* There is no publisher, nothing to do *)
       Lwt.return_unit
