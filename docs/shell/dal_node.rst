@@ -151,7 +151,13 @@ Storage
 
 The DAL node essentially stores slots and shards. Slots are injected into the node through an RPC (see details at :ref:`slots_lifetime`), at which moment the corresponding commitment is computed and stored. Shards and their proofs are computed and stored via another RPC. It is important to also compute the shards’ proofs, because shards can be exchanged over the P2P network only if they are accompanied by their proof. Shards received over the P2P network are also stored. The node also tracks and stores the status of commitments by monitoring the L1 chain, connecting to this end to an L1 node specified at startup.
 
-The size of the node’s storage depends on its profile. A bootstrap node uses negligible storage. A DAL node with an operator profile stores in the order of tens MiB per slot, per level. Note that this translates to at least 100GiB per day per slot. A DAL node with an attester profile with the attester having a stake fraction of 1% stores an order of magnitude less data per level.
+The amount of storage space a DAL node needs depends on how long it keeps the data, and different profiles keep the data for different amounts of time:
+
+- Bootstrap nodes store no DAL data and therefore require negligible storage.
+- Attester and observer nodes store data in memory for a few blocks after the attestation delay by default.
+- Producer nodes store data on disk for 3 months by default because the data may be needed for the Smart Rollup refutation game.
+
+You can set how long the node stores data with the ``--history-mode`` option.
 
 L1 monitoring
 ^^^^^^^^^^^^^
