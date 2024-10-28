@@ -623,7 +623,7 @@ module Make (Proto : Protocol_plugin.T) = struct
             ~predecessor:predecessor_block_header.shell
             ~cache
           [@time.duration_lwt application_beginning]
-          [@profiler.record_s "begin_application"])
+          [@profiler.record_s {verbosity = Notice} "begin_application"])
        in
        let* state, ops_metadata =
          (List.fold_left_i_es
@@ -637,18 +637,20 @@ module Make (Proto : Protocol_plugin.T) = struct
                           oph
                           op
                         [@profiler.record_s
-                          "operation : " ^ Operation_hash.to_b58check oph])
+                          {verbosity = Info}
+                            ("operation : " ^ Operation_hash.to_b58check oph)])
                      in
                      return (state, op_metadata :: acc))
                    (state, [])
                    ops
                in
                return (state, List.rev ops_metadata :: acc))
-              [@profiler.record_s "operation_list(" ^ string_of_int i ^ ")"])
+              [@profiler.record_s
+                {verbosity = Info} ("operation_list(" ^ string_of_int i ^ ")")])
             (state, [])
             operations
           [@time.duration_lwt operations_application]
-          [@profiler.record_s "apply_operations"])
+          [@profiler.record_s {verbosity = Notice} "apply_operations"])
        in
        let ops_metadata = List.rev ops_metadata in
        let* validation_result, block_data =
@@ -656,7 +658,7 @@ module Make (Proto : Protocol_plugin.T) = struct
             state
             (Some block_header.shell)
           [@time.duration_lwt block_finalization]
-          [@profiler.record_s "finalize_application"])
+          [@profiler.record_s {verbosity = Notice} "finalize_application"])
        in
        return (validation_result, block_data, ops_metadata))
 
@@ -746,7 +748,7 @@ module Make (Proto : Protocol_plugin.T) = struct
              block_hash
              operations
            [@time.duration_lwt operations_parsing]
-           [@profiler.record_s "parse_operations"])
+           [@profiler.record_s {verbosity = Notice} "parse_operations"])
         in
         let* context =
           (prepare_context
@@ -754,7 +756,8 @@ module Make (Proto : Protocol_plugin.T) = struct
              predecessor_ops_metadata_hash
              block_header
              predecessor_context
-             predecessor_hash [@profiler.record_s "prepare_context"])
+             predecessor_hash
+           [@profiler.record_s {verbosity = Notice} "prepare_context"])
         in
         let* validation_result, block_metadata, ops_metadata =
           proto_apply_operations
@@ -809,7 +812,8 @@ module Make (Proto : Protocol_plugin.T) = struct
               new_protocol
               block_header
               block_hash
-              validation_result [@profiler.record_s "record_protocol"])
+              validation_result
+            [@profiler.record_s {verbosity = Info} "record_protocol"])
          in
          let max_operations_ttl =
            max
@@ -822,7 +826,8 @@ module Make (Proto : Protocol_plugin.T) = struct
               ~operation_metadata_size_limit
               new_protocol_env_version
               block_metadata
-              ops_metadata [@profiler.record_s "compute_metadata"])
+              ops_metadata
+            [@profiler.record_s {verbosity = Info} "compute_metadata"])
          in
          let (Context {cache; _}) = validation_result.context in
          let context = validation_result.context in
@@ -838,7 +843,7 @@ module Make (Proto : Protocol_plugin.T) = struct
                 ~time:block_header.shell.timestamp
                 ?message:validation_result.message
                 context [@time.duration_lwt context_commitment] [@time.flush])
-           [@profiler.record_s "commit"]
+           [@profiler.record_s {verbosity = Info} "commit"]
          in
          let* () =
            let is_context_consistent =
@@ -881,7 +886,7 @@ module Make (Proto : Protocol_plugin.T) = struct
                };
              cache;
            })
-        [@profiler.record_s "post_validation"]
+        [@profiler.record_s {verbosity = Notice} "post_validation"]
 
   let recompute_metadata chain_id ~cache
       ~(predecessor_block_header : Block_header.t)
@@ -943,13 +948,15 @@ module Make (Proto : Protocol_plugin.T) = struct
                  ~check_signature:op.check_signature
                  pv.validation_state
                  op.hash
-                 operation [@profiler.record_s "validate_operation"])
+                 operation
+               [@profiler.record_s {verbosity = Notice} "validate_operation"])
             in
             let* application_state, receipt =
               (Proto.apply_operation
                  pv.application_state
                  op.hash
-                 operation [@profiler.record_s "apply_operations"])
+                 operation
+               [@profiler.record_s {verbosity = Notice} "apply_operations"])
             in
             return (validation_state, application_state, receipt))
       in
@@ -1057,7 +1064,7 @@ module Make (Proto : Protocol_plugin.T) = struct
          chain_id
          mode
          ~predecessor:predecessor_shell_header
-         ~cache [@profiler.record_s "begin_validation"])
+         ~cache [@profiler.record_s {verbosity = Notice} "begin_validation"])
     in
     let* application_state =
       (Proto.begin_application
@@ -1065,7 +1072,7 @@ module Make (Proto : Protocol_plugin.T) = struct
          chain_id
          mode
          ~predecessor:predecessor_shell_header
-         ~cache [@profiler.record_s "begin_application"])
+         ~cache [@profiler.record_s {verbosity = Notice} "begin_application"])
     in
     let preapply_state =
       {
@@ -1177,7 +1184,8 @@ module Make (Proto : Protocol_plugin.T) = struct
     let* validation_result, block_header_metadata =
       (Proto.finalize_application
          preapply_state.application_state
-         (Some shell_header) [@profiler.record_s "finalize_application"])
+         (Some shell_header)
+       [@profiler.record_s {verbosity = Notice} "finalize_application"])
     in
     let*! validation_result =
       may_patch_protocol
@@ -1258,7 +1266,8 @@ module Make (Proto : Protocol_plugin.T) = struct
          ~operation_metadata_size_limit
          new_protocol_env_version
          block_header_metadata
-         applied_ops_metadata [@profiler.record_s "compute_metadata"])
+         applied_ops_metadata
+       [@profiler.record_s {verbosity = Info} "compute_metadata"])
     in
     let max_operations_ttl =
       max
@@ -1315,7 +1324,7 @@ module Make (Proto : Protocol_plugin.T) = struct
     let* operations =
       (parse_operations
          block_hash
-         operations [@profiler.record_s "parse_operations"])
+         operations [@profiler.record_s {verbosity = Notice} "parse_operations"])
     in
     let* state =
       (Proto.begin_validation
@@ -1323,7 +1332,7 @@ module Make (Proto : Protocol_plugin.T) = struct
          chain_id
          (Application block_header)
          ~predecessor:predecessor_block_header.shell
-         ~cache [@profiler.record_s "begin_validation"])
+         ~cache [@profiler.record_s {verbosity = Notice} "begin_validation"])
     in
     let* state =
       (List.fold_left_i_es
@@ -1336,15 +1345,19 @@ module Make (Proto : Protocol_plugin.T) = struct
                    oph
                    op
                  [@profiler.record_s
-                   "operation : " ^ Operation_hash.to_b58check oph]))
+                   {verbosity = Info}
+                     ("operation : " ^ Operation_hash.to_b58check oph)]))
               state
-              ops [@profiler.record_s "operation_list(" ^ string_of_int i ^ ")"]))
+              ops
+            [@profiler.record_s
+              {verbosity = Info} ("operation_list(" ^ string_of_int i ^ ")")]))
          state
-         operations [@profiler.record_s "validate_operations"])
+         operations
+       [@profiler.record_s {verbosity = Notice} "validate_operations"])
     in
     let* () =
       (Proto.finalize_validation
-         state [@profiler.record_s "finalize_validation"])
+         state [@profiler.record_s {verbosity = Notice} "finalize_validation"])
     in
     return_unit
 

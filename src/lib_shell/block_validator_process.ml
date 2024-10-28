@@ -676,7 +676,8 @@ let apply_block ?(simulate = false) ?(should_validate = true)
   let* metadata =
     (Store.Block.get_block_metadata
        chain_store
-       predecessor [@profiler.record_s "get_predecessor_metadata"])
+       predecessor
+     [@profiler.record_s {verbosity = Notice} "get_predecessor_metadata"])
   in
   let max_operations_ttl = Store.Block.max_operations_ttl metadata in
   VP.apply_block
@@ -695,14 +696,15 @@ let validate_block (E {validator_process = (module VP); validator}) chain_store
   let* live_blocks, live_operations =
     (Store.Chain.compute_live_blocks
        chain_store
-       ~block:predecessor [@profiler.record_s "compute_live_blocks"])
+       ~block:predecessor
+     [@profiler.record_s {verbosity = Notice} "compute_live_blocks"])
   in
   let*? () =
     (Block_validation.check_liveness
        ~live_operations
        ~live_blocks
        block_hash
-       operations [@profiler.record_f "check_liveness"])
+       operations [@profiler.record_f {verbosity = Notice} "check_liveness"])
   in
   VP.validate_block
     validator
@@ -718,7 +720,8 @@ let context_garbage_collection (E {validator_process = (module VP); validator})
      validator
      context_index
      context_hash
-     ~gc_lockfile_path [@profiler.record_s "context_garbage_collection"])
+     ~gc_lockfile_path
+   [@profiler.record_s {verbosity = Notice} "context_garbage_collection"])
 
 let context_split (E {validator_process = (module VP); validator}) context_index
     =
@@ -738,7 +741,8 @@ let preapply_block (E {validator_process = (module VP); validator} : t)
   let* live_blocks, live_operations =
     (Store.Chain.compute_live_blocks
        chain_store
-       ~block:predecessor [@profiler.record_s "compute_live_blocks"])
+       ~block:predecessor
+     [@profiler.record_s {verbosity = Notice} "compute_live_blocks"])
   in
   let predecessor_shell_header = Store.Block.shell_header predecessor in
   let predecessor_hash = Store.Block.hash predecessor in
@@ -751,7 +755,8 @@ let preapply_block (E {validator_process = (module VP); validator} : t)
   let* metadata =
     (Store.Block.get_block_metadata
        chain_store
-       predecessor [@profiler.record_s "get_block_metadata"])
+       predecessor
+     [@profiler.record_s {verbosity = Notice} "get_block_metadata"])
   in
   let predecessor_max_operations_ttl =
     Store.Block.max_operations_ttl metadata
@@ -759,7 +764,8 @@ let preapply_block (E {validator_process = (module VP); validator} : t)
   let* predecessor_resulting_context_hash =
     (Store.Block.resulting_context_hash
        chain_store
-       predecessor [@profiler.record_s "resulting_context_hash"])
+       predecessor
+     [@profiler.record_s {verbosity = Notice} "resulting_context_hash"])
   in
   VP.preapply_block
     validator

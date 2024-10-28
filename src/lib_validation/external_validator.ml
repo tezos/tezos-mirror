@@ -192,7 +192,9 @@ module Processing = struct
           should_validate;
           simulate;
         } ->
-        () [@profiler.record "external_validator : apply_block"] ;
+        ()
+        [@profiler.record
+          {verbosity = Notice} "external_validator : apply_block"] ;
         let*! block_application_result =
           let* predecessor_context =
             Error_monad.catch_es (fun () ->
@@ -274,7 +276,9 @@ module Processing = struct
           predecessor_resulting_context_hash;
           operations;
         } ->
-        () [@profiler.record "external_validator : preapply_block"] ;
+        ()
+        [@profiler.record
+          {verbosity = Notice} "external_validator : preapply_block"] ;
         let*! block_preapplication_result =
           let* predecessor_context =
             Error_monad.catch_es (fun () ->
@@ -338,7 +342,9 @@ module Processing = struct
           operations;
           _;
         } ->
-        () [@profiler.record "external_validator : validate_block"] ;
+        ()
+        [@profiler.record
+          {verbosity = Notice} "external_validator : validate_block"] ;
         let*! block_validate_result =
           let* predecessor_context =
             Error_monad.catch_es (fun () ->

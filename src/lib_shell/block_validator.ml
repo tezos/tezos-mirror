@@ -339,7 +339,9 @@ let on_validation_request w
   | true ->
       return
         Already_committed
-      [@profiler.mark profiling_validation_prefix hash ["already commited"]]
+      [@profiler.mark
+        {verbosity = Notice}
+          (profiling_validation_prefix hash ["already commited"])]
   | false -> (
       (* This check might be redundant as operation paths are already
          checked when each pass is received from the network. However,
@@ -351,7 +353,8 @@ let on_validation_request w
            header
            operations
          [@profiler.span_f
-           profiling_validation_prefix hash ["check_operations_merkle_root"]])
+           {verbosity = Notice}
+             (profiling_validation_prefix hash ["check_operations_merkle_root"])])
       in
       match
         Block_hash_ring.find_opt bv.inapplicable_blocks_after_validation hash
@@ -371,7 +374,8 @@ let on_validation_request w
                    chain_store
                    header.shell.predecessor
                  [@profiler.span_s
-                   profiling_validation_prefix hash ["read predecessor"]])
+                   {verbosity = Notice}
+                     (profiling_validation_prefix hash ["read predecessor"])])
               in
               let*! mempool = Store.Chain.mempool chain_store in
               let bv_operations =
@@ -395,7 +399,8 @@ let on_validation_request w
                    operations
                    bv_operations
                  [@profiler.span_s
-                   profiling_validation_prefix hash ["validate_block"]])
+                   {verbosity = Notice}
+                     (profiling_validation_prefix hash ["validate_block"])])
               in
               match r with
               | Validation_error errs ->
@@ -419,7 +424,8 @@ let on_validation_request w
                        hash
                        bv_operations
                      [@profiler.span_s
-                       profiling_validation_prefix hash ["apply_block"]])
+                       {verbosity = Notice}
+                         (profiling_validation_prefix hash ["apply_block"])])
                   in
                   match r with
                   | Application_error errs ->
@@ -454,9 +460,10 @@ let on_validation_request w
                         operations
                         application_result
                       [@profiler.span_s
-                        profiling_validation_prefix
-                          hash
-                          ["commit_and_notify_block"]]))))
+                        {verbosity = Notice}
+                          (profiling_validation_prefix
+                             hash
+                             ["commit_and_notify_block"])]))))
 
 let on_preapplication_request w
     {
@@ -505,15 +512,16 @@ let on_request :
         w
         r
       [@profiler.span_s
-        [
-          Format.sprintf
-            "on_validation_request : %s"
-            (Block_hash.to_short_b58check r.hash);
-        ]]
+        {verbosity = Notice}
+          [
+            Format.sprintf
+              "on_validation_request : %s"
+              (Block_hash.to_short_b58check r.hash);
+          ]]
   | Request.Request_preapplication r ->
       on_preapplication_request
         w
-        r [@profiler.span_s ["on_preapplication_request"]]
+        r [@profiler.span_s {verbosity = Notice} ["on_preapplication_request"]]
 
 type launch_error = |
 
@@ -709,7 +717,8 @@ let validate_and_apply w ?canceler ?peer ?(notify_new_block = fun _ -> ())
           (check_chain_liveness chain_db hash header
           |> Lwt_result.map_error (fun e -> Worker.Request_error e))
           [@profiler.span_s
-            profiling_validation_prefix hash ["check_chain_liveness"]]
+            {verbosity = Notice}
+              (profiling_validation_prefix hash ["check_chain_liveness"])]
         in
         Worker.Queue.push_request_and_wait
           w
