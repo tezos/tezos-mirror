@@ -831,12 +831,16 @@ let[@warning "-32"] may_reset_profiler =
       match !prev_head with
       | None ->
           ()
-          [@profiler.record {metadata} (Block_hash.to_b58check curr_head_hash)] ;
+          [@profiler.record
+            {metadata; verbosity = Notice}
+              (Block_hash.to_b58check curr_head_hash)] ;
           prev_head := Some curr_head_hash
       | Some prev_head_hash when prev_head_hash <> curr_head_hash ->
           ()
           [@profiler.stop]
-          [@profiler.record {metadata} (Block_hash.to_b58check curr_head_hash)] ;
+          [@profiler.record
+            {metadata; verbosity = Notice}
+              (Block_hash.to_b58check curr_head_hash)] ;
           prev_head := Some curr_head_hash
       | _ -> ())
   | _ -> ()
@@ -855,7 +859,8 @@ let rec automaton_loop ?(stop_on_event = fun _ -> false) ~config ~on_error
      (State_transitions.step
         state
         event
-      [@profiler.record_s Format.asprintf "Step : %a" pp_short_event event])
+      [@profiler.record_s
+        {verbosity = Notice} (Format.asprintf "Step : %a" pp_short_event event)])
    in
    let* state'' =
      let*! state_res =
@@ -864,7 +869,8 @@ let rec automaton_loop ?(stop_on_event = fun _ -> false) ~config ~on_error
             state'
             action
           [@profiler.record_s
-            Format.asprintf "Action : %a" Baking_actions.pp_action action])
+            {verbosity = Notice}
+              (Format.asprintf "Action : %a" Baking_actions.pp_action action)])
        in
        let* () =
          may_record_new_state ~previous_state:state ~new_state:state''
@@ -882,14 +888,15 @@ let rec automaton_loop ?(stop_on_event = fun _ -> false) ~config ~on_error
    in
    let* next_timeout =
      (compute_next_timeout
-        state'' [@profiler.record_s "Timeout : compute next timeout"])
+        state''
+      [@profiler.record_s {verbosity = Notice} "Timeout : compute next timeout"])
    in
    let* event_opt =
      (wait_next_event
         ~timeout:
           (let*! e = next_timeout in
            Lwt.return (`Timeout e))
-        loop_state [@profiler.record_s "Wait : next event"])
+        loop_state [@profiler.record_s {verbosity = Notice} "Wait : next event"])
    in
    () [@profiler.stop] ;
    match event_opt with
@@ -906,7 +913,7 @@ let rec automaton_loop ?(stop_on_event = fun _ -> false) ~config ~on_error
            loop_state
            state''
            event)
-  [@profiler.record_s "Scheduler loop"]
+  [@profiler.record_s {verbosity = Notice} "Scheduler loop"]
 
 let perform_sanity_check cctxt ~chain_id =
   let open Lwt_result_syntax in
