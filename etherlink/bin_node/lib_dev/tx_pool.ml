@@ -81,45 +81,82 @@ module Pool = struct
       (Ethereum_types.AddressMap.empty, Ethereum_types.AddressMap.empty)
 
   (** Add a transaction to the pool. *)
-  let add {transactions; global_index} pkey raw_tx
+  let add ~must_replace {transactions; global_index} pkey raw_tx
       (transaction_object : Ethereum_types.transaction_object) =
-    let open Result_syntax in
     let (Qty nonce) = transaction_object.nonce in
     let (Qty gas_price) = transaction_object.gasPrice in
     let (Qty gas_limit) = transaction_object.gas in
     let inclusion_timestamp = Misc.now () in
+
     (* Add the transaction to the user's transaction map *)
-    let transactions =
-      let transaction =
-        {
-          index = global_index;
-          raw_tx;
-          gas_price;
-          gas_limit;
-          inclusion_timestamp;
-          transaction_object;
-        }
-      in
-      Pkey_map.update
-        pkey
-        (function
-          | None ->
-              (* User has no transactions in the pool *)
-              Some (Nonce_map.singleton nonce transaction)
-          | Some user_transactions ->
-              Some
-                (Nonce_map.update
-                   nonce
-                   (function
-                     | None -> Some transaction
-                     | Some user_transaction ->
-                         if gas_price > user_transaction.gas_price then
-                           Some transaction
-                         else Some user_transaction)
-                   user_transactions))
-        transactions
+    let transaction =
+      {
+        index = global_index;
+        raw_tx;
+        gas_price;
+        gas_limit;
+        inclusion_timestamp;
+        transaction_object;
+      }
     in
-    return {transactions; global_index = Int64.(add global_index one)}
+    let add_transaction transactions =
+      let replaced = ref false in
+      let transactions =
+        Pkey_map.update
+          pkey
+          (function
+            | None ->
+                (* User has no transactions in the pool *)
+                Some (Nonce_map.singleton nonce transaction)
+            | Some user_transactions ->
+                Some
+                  (Nonce_map.update
+                     nonce
+                     (function
+                       | None -> Some transaction
+                       | Some user_transaction ->
+                           if gas_price > user_transaction.gas_price then (
+                             replaced := true ;
+                             Some transaction)
+                           else Some user_transaction)
+                     user_transactions))
+          transactions
+      in
+      (transactions, !replaced)
+    in
+    match must_replace with
+    | `Replace_existing ->
+        let transactions, replaced = add_transaction transactions in
+        if replaced then
+          Ok {transactions; global_index = Int64.(add global_index one)}
+        else
+          Error
+            "Limit of transactions for a user was reached. Transaction is \
+             rejected as it did not replace an existing one."
+    | `No ->
+        let transactions, _replaced = add_transaction transactions in
+        Ok {transactions; global_index = Int64.(add global_index one)}
+    | `Replace_shift max_nonce ->
+        let transactions =
+          Pkey_map.update
+            pkey
+            (function
+              | None ->
+                  (* The list of user transactions cannot be empty,
+                     otherwise we wouldn't need to replace anything. *)
+                  assert false
+              | Some user_transactions ->
+                  (* Shift by removing the maximum nonce. *)
+                  let user_transactions =
+                    Nonce_map.remove max_nonce user_transactions
+                  in
+                  (* Add the new nonce. *)
+                  Some (Nonce_map.add nonce transaction user_transactions))
+            transactions
+        in
+        Ok {transactions; global_index = Int64.(add global_index one)}
+
+  (* return {transactions; global_index = Int64.(add global_index one)} *)
 
   (** Returns all the addresses of the pool *)
   let addresses {transactions; _} =
@@ -387,7 +424,7 @@ let check_address_boundaries ~pool ~address ~tx_pool_addr_limit
           Tx_pool_events.txs_per_user_threshold_reached
             ~address:(Ethereum_types.Address.to_string address)
         in
-        fail `MaxPerUser
+        fail (`MaxPerUser txs)
 
 let insert_valid_transaction state tx_raw
     (transaction_object : Ethereum_types.transaction_object) =
@@ -410,6 +447,30 @@ let insert_valid_transaction state tx_raw
     let*! () = Tx_pool_events.tx_data_size_limit_reached () in
     return @@ Error "Transaction data exceeded the allowed size."
   else
+    let add_transaction ~must_replace =
+      (* Add the transaction to the pool *)
+      (* Compute the hash *)
+      let hash = Ethereum_types.hash_raw_tx tx_raw in
+      (* This is a temporary fix until the hash computation is fixed on the
+         kernel side. *)
+      let transaction_object = {transaction_object with hash} in
+      match
+        Pool.add
+          ~must_replace
+          pool
+          transaction_object.from
+          tx_raw
+          transaction_object
+      with
+      | Ok pool ->
+          let*! () =
+            Tx_pool_events.add_transaction
+              ~transaction:(Ethereum_types.hash_to_string hash)
+          in
+          state.pool <- pool ;
+          return (Ok hash)
+      | Error msg -> return (Error msg)
+    in
     let*! res_boundaries =
       check_address_boundaries
         ~pool
@@ -423,27 +484,30 @@ let insert_valid_transaction state tx_raw
           (Error
              "The transaction pool has reached its maximum threshold for user \
               transactions. Transaction is rejected.")
-    | Error `MaxPerUser ->
-        return
-          (Error
-             "Limit of transaction for a user was reached. Transaction is \
-              rejected.")
-    | Ok () ->
-        (* Add the transaction to the pool *)
-        (* Compute the hash *)
-        let hash = Ethereum_types.hash_raw_tx tx_raw in
-        (* This is a temporary fix until the hash computation is fixed on the
-           kernel side. *)
-        let transaction_object = {transaction_object with hash} in
-        let*? pool =
-          Pool.add pool transaction_object.from tx_raw transaction_object
+    | Error (`MaxPerUser transactions) ->
+        let (Qty nonce) = transaction_object.nonce in
+        let max_nonce, nonce_exists =
+          Pool.Nonce_map.fold
+            (fun nonce' _tx (max_nonce, nonce_exists) ->
+              (Z.max max_nonce nonce', nonce_exists || nonce = nonce'))
+            transactions
+            (Z.zero, false)
         in
-        let*! () =
-          Tx_pool_events.add_transaction
-            ~transaction:(Ethereum_types.hash_to_string hash)
-        in
-        state.pool <- pool ;
-        return (Ok hash)
+        if nonce_exists then
+          (* It must replace an existing one, otherwise it'll be above
+             the limit. *)
+          add_transaction ~must_replace:`Replace_existing
+        else if nonce < max_nonce then
+          (* If the nonce is smaller than the mmax nonce, we must shift the
+             list and drop one transaction. *)
+          add_transaction ~must_replace:(`Replace_shift max_nonce)
+        else
+          (* Otherwise we have just reached the limit of transactions. *)
+          return
+            (Error
+               "Limit of transaction for a user was reached. Transaction is \
+                rejected.")
+    | Ok () -> add_transaction ~must_replace:`No
 
 let on_normal_transaction state transaction_object tx_raw =
   insert_valid_transaction state tx_raw transaction_object
