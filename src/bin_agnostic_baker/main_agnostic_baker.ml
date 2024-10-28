@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
-(* Copyright (c) 2018-2024 Nomadic Labs, <contact@nomadic-labs.com>          *)
+(* Copyright (c) 2024 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -72,13 +72,30 @@ module Events = struct
       ("proto", Protocol_hash.encoding)
       ~pp1:Protocol_hash.pp_short
 
+  let stopping_baker =
+    declare_1
+      ~section
+      ~level:Notice
+      ~name:"stopping_baker"
+      ~msg:"stopping baker for protocol {proto}"
+      ("proto", Protocol_hash.encoding)
+      ~pp1:Protocol_hash.pp_short
+
   let starting_daemon =
     declare_0
       ~section
       ~alternative_color
       ~level:Notice
       ~name:"starting_daemon"
-      ~msg:"starting agnostic daemon"
+      ~msg:"agnostic baker started"
+      ()
+
+  let stopping_daemon =
+    declare_0
+      ~section
+      ~level:Notice
+      ~name:"stopping_daemon"
+      ~msg:"stopping agnostic daemon"
       ()
 
   let protocol_encountered =
@@ -87,7 +104,8 @@ module Events = struct
       ~level:Notice
       ~name:"protocol_encountered"
       ~msg:"the {status} protocol {proto_hash} was encountered"
-      ("status", string)
+      ("status", Parameters.status_encoding)
+      ~pp1:Parameters.pp_status
       ("proto_hash", Protocol_hash.encoding)
       ~pp2:Protocol_hash.pp_short
 
@@ -112,73 +130,13 @@ module Events = struct
       ("remaining", int31)
 end
 
-module Parameters = struct
-  let default_node_addr = "http://127.0.0.1:8732"
-
-  let default_daily_logs_path = Some "octez-agnostic-baker"
-
-  let log_config ~base_dir =
-    let base_dir : string =
-      match base_dir with
-      | Some p -> p
-      | None -> Tezos_client_base_unix.Client_config.Cfg_file.default.base_dir
-    in
-    let daily_logs_path =
-      default_daily_logs_path
-      |> Option.map Filename.Infix.(fun logdir -> base_dir // "logs" // logdir)
-    in
-    Tezos_base_unix.Internal_event_unix.make_with_defaults
-      ?enable_default_daily_logs_at:daily_logs_path
-      ~log_cfg:Tezos_base_unix.Logs_simple_config.default_cfg
-      ()
-
-  type status = Active | Frozen
-
-  let pp_status fmt status =
-    Format.fprintf
-      fmt
-      "%s"
-      (match status with Active -> "active" | Frozen -> "frozen")
-
-  (* From Manifest/Product_octez/Protocol*)
-  let protocol_info = function
-    | ( "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im"
-      | "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P"
-      | "PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY"
-      | "PsYLVpVvgbLhAhoqAkMFUo6gudkJ9weNXhUYCiLDzcUpFpkk8Wt"
-      | "PsddFKi32cMJ2qPjf43Qv5GDWLDPZb3T3bF6fLKiF5HtvHNU7aP"
-      | "Pt24m4xiPbLDhVgVfABUjirbmda3yohdN82Sp9FeuAXJ4eV9otd"
-      | "PsBABY5HQTSkA4297zNHfsZNKtxULfL18y95qb3m53QJiXGmrbU"
-      | "PsBabyM1eUXZseaJdmXFApDSBqj8YBfwELoxZHHW77EMcAbbwAS"
-      | "PsCARTHAGazKbHtnKfLzQg3kms52kSRpgnDY982a9oYsSXRLQEb"
-      | "PsDELPH1Kxsxt8f9eWbxQeRxkjfbxoqM52jvs5Y5fBxWWh4ifpo"
-      | "PtEdoTezd3RHSC31mpxxo1npxFjoWWcFgQtxapi51Z8TLu6v6Uq"
-      | "PtEdo2ZkT9oKpimTah6x2embF25oss54njMuPzkJTEi5RqfdZFA"
-      | "PsFLorenaUUuikDWvMDr6fGBRG8kt3e3D3fHoXK1j1BFRxeSH4i"
-      | "PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV"
-      | "PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx"
-      | "Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A"
-      | "PtJakart2xVj7pYXJBXrqHgd82rdkLey5ZeeGwDgPp9rhQUbSqY"
-      | "PtKathmankSpLLDALzWw7CGD2j2MtyveTwboEYokqUCP4a1LxMg"
-      | "PtLimaPtLMwfNinJi9rCfDPWea8dFgTZ1MeJ9f1m2SRic6ayiwW"
-      | "PtMumbai2TmsJHNGRkD8v8YDbtao7BLUC3wjASn1inAKLFCjaH1"
-      | "PtNairobiyssHuh87hEhfVBGCVrK3WnS8Z2FT4ymB5tAa4r1nQf"
-      | "ProxfordYmVfjWnRcgjWH36fW6PArwqykTFzotUxRs6gmTcZDuH"
-      | "PtParisBxoLz5gzMmn3d9WBQNoPSZakgnkMC2VNuQ3KXfUtUQeZ" ) as full_hash ->
-        (String.sub full_hash 0 8, Frozen)
-    | ( "PsParisCZo7KAh1Z1smVd9ZMZ1HHn5gkzbM94V3PLCpknFWhUAi"
-      | "PsquebeCaYyvBEESCaXL8B8Tn8BcEhps2Zke1xMVtyr7X4qMfxT" ) as full_hash ->
-        (String.sub full_hash 0 8, Active)
-    | "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK" -> ("alpha", Active)
-    | _ -> (*We assume that unmatched protocols are beta ones*) ("beta", Active)
-
-  let protocol_short_hash h = fst (protocol_info h)
-
-  let protocol_status h = snd (protocol_info h)
-end
-
 module Baker = struct
-  type t = Lwt_process.process_none option
+  type t = {
+    protocol_hash : Protocol_hash.t;
+    binary_path : string;
+    process : Lwt_process.process_none;
+    ccid : Lwt_exit.clean_up_callback_id;
+  }
 
   let baker_path ?(user_path = "./") proto_hash =
     let short_name =
@@ -186,9 +144,13 @@ module Baker = struct
     in
     Format.sprintf "%soctez-baker-%s" user_path short_name
 
-  let _shutdown p = p#terminate
+  let shutdown protocol_hash process =
+    let open Lwt_syntax in
+    let* () = Events.(emit stopping_baker) protocol_hash in
+    process#terminate ;
+    Lwt.return_unit
 
-  let spawn_baker proto_hash ~binaries_directory ~baker_args =
+  let spawn_baker protocol_hash ~binaries_directory ~baker_args =
     let open Lwt_result_syntax in
     let args_as_string =
       Format.asprintf
@@ -198,18 +160,23 @@ module Baker = struct
            Format.pp_print_string)
         baker_args
     in
-    let*! () = Events.(emit starting_baker) (proto_hash, args_as_string) in
-    let path = baker_path ?user_path:binaries_directory proto_hash in
-    let baker_args = path :: baker_args in
+    let*! () = Events.(emit starting_baker) (protocol_hash, args_as_string) in
+    let binary_path = baker_path ?user_path:binaries_directory protocol_hash in
+    let baker_args = binary_path :: baker_args in
     let baker_args = Array.of_list baker_args in
-    let p =
+    let process =
       Lwt_process.open_process_none
         ~stdout:`Keep
         ~stderr:`Keep
-        (path, baker_args)
+        (binary_path, baker_args)
     in
-    let*! () = Events.(emit baker_running) proto_hash in
-    return p
+    let*! () = Events.(emit baker_running) protocol_hash in
+    let ccid =
+      Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
+          let*! () = shutdown protocol_hash process in
+          Lwt.return_unit)
+    in
+    return {protocol_hash; binary_path; process; ccid}
 end
 
 module RPC = struct
@@ -265,15 +232,6 @@ module RPC = struct
     in
     let uri = Format.sprintf "%s/chains/main/blocks/head/metadata" node_addr in
     call_and_wrap_rpc ~node_addr ~uri ~f
-end
-
-module Daemon = struct
-  type state = {
-    binaries_directory : string option;
-    node_endpoint : string;
-    baker_args : string list;
-    mutable current_baker : Baker.t;
-  }
 
   let get_current_proposal ~node_addr =
     let open Lwt_result_syntax in
@@ -288,7 +246,7 @@ module Daemon = struct
         "%s/chains/main/blocks/head/votes/current_proposal"
         node_addr
     in
-    RPC.call_and_wrap_rpc ~node_addr ~uri ~f
+    call_and_wrap_rpc ~node_addr ~uri ~f
 
   let get_current_period ~node_addr =
     let open Lwt_result_syntax in
@@ -331,7 +289,16 @@ module Daemon = struct
     let uri =
       Format.sprintf "%s/chains/main/blocks/head/votes/current_period" node_addr
     in
-    RPC.call_and_wrap_rpc ~node_addr ~uri ~f
+    call_and_wrap_rpc ~node_addr ~uri ~f
+end
+
+module Daemon = struct
+  type state = {
+    binaries_directory : string option;
+    node_endpoint : string;
+    baker_args : string list;
+    mutable current_baker : Baker.t option;
+  }
 
   let monitor_heads ~node_addr =
     let open Lwt_result_syntax in
@@ -357,14 +324,53 @@ module Daemon = struct
     ignore (loop () : unit Lwt.t) ;
     return stream
 
-  let monitor_voting_periods ~node_addr head_stream =
+  let hot_swap_baker ~state ~next_protocol_hash =
     let open Lwt_result_syntax in
+    let next_proto_status =
+      Parameters.protocol_status (Protocol_hash.to_b58check next_protocol_hash)
+    in
+    let*! () =
+      Events.(emit protocol_encountered) (next_proto_status, next_protocol_hash)
+    in
+    let*! () =
+      match state.current_baker with
+      | None -> Lwt.return_unit (* Could be assert false*)
+      | Some b ->
+          let*! () = Baker.shutdown b.protocol_hash b.process in
+          let () = Lwt_exit.unregister_clean_up_callback b.ccid in
+          state.current_baker <- None ;
+          Lwt.return_unit
+    in
+    let* new_baker =
+      Baker.spawn_baker
+        next_protocol_hash
+        ~binaries_directory:state.binaries_directory
+        ~baker_args:state.baker_args
+    in
+    state.current_baker <- Some new_baker ;
+    return_unit
+
+  let monitor_voting_periods ~state head_stream =
+    let open Lwt_result_syntax in
+    let node_addr = state.node_endpoint in
     let rec loop () =
       let*! v = Lwt_stream.get head_stream in
       match v with
       | Some _tick ->
-          let* period_kind, remaining = get_current_period ~node_addr in
+          let* period_kind, remaining = RPC.get_current_period ~node_addr in
           let*! () = Events.(emit period_status) (period_kind, remaining) in
+          let* next_protocol_hash = RPC.get_next_protocol_hash ~node_addr in
+          let current_protocol_hash =
+            match state.current_baker with
+            | None -> assert false
+            | Some v -> v.protocol_hash
+          in
+          let* () =
+            if
+              not (Protocol_hash.equal current_protocol_hash next_protocol_hash)
+            then hot_swap_baker ~state ~next_protocol_hash
+            else return_unit
+          in
           loop ()
       | None -> return_unit
     in
@@ -390,9 +396,7 @@ module Daemon = struct
         | None -> Lwt.return_unit
         | Some h ->
             if not (Protocol_hash.equal h protocol_hash) then
-              Events.(emit protocol_encountered)
-                ( Format.asprintf "%a" Parameters.pp_status proto_status,
-                  protocol_hash )
+              Events.(emit protocol_encountered) (proto_status, protocol_hash)
             else Lwt.return_unit
       in
       match proto_status with
@@ -412,8 +416,7 @@ module Daemon = struct
             | None ->
                 let*! () =
                   Events.(emit protocol_encountered)
-                    ( Format.asprintf "%a" Parameters.pp_status proto_status,
-                      protocol_hash )
+                    (proto_status, protocol_hash)
                 in
                 let*! () = Events.(emit waiting_for_active_protocol) () in
                 monitor_heads ~node_addr:state.node_endpoint
@@ -433,12 +436,17 @@ module Daemon = struct
     let open Lwt_result_syntax in
     let node_addr = state.node_endpoint in
     let*! () = Events.(emit starting_daemon) () in
+    let _ccid =
+      Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
+          let*! () = Events.(emit stopping_daemon) () in
+          Lwt.return_unit)
+    in
     let* () = may_start_initial_baker state in
-    let* _protocol_proposal = get_current_proposal ~node_addr in
+    let* _protocol_proposal = RPC.get_current_proposal ~node_addr in
     let* head_stream = monitor_heads ~node_addr in
     (* Monitoring voting periods through heads monitoring to avoid
        missing UAUs. *)
-    let* () = monitor_voting_periods ~node_addr head_stream in
+    let* () = monitor_voting_periods ~state head_stream in
     return_unit
 end
 
@@ -553,15 +561,15 @@ let run () =
 
 let () =
   let open Lwt_result_syntax in
-  let main_promise () = run () in
+  let main_promise =
+    Lwt.catch run (function
+        | Failure msg -> failwith "%s" msg
+        | exn -> failwith "%s" (Printexc.to_string exn))
+  in
   Stdlib.exit
     (Lwt_main.run
        (let*! retcode =
-          let*! r =
-            Lwt.catch main_promise (function
-                | Failure msg -> failwith "%s" msg
-                | exn -> failwith "%s" (Printexc.to_string exn))
-          in
+          let*! r = Lwt_exit.wrap_and_exit main_promise in
           match r with
           | Ok () -> Lwt.return 0
           | Error errs ->

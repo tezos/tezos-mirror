@@ -29,6 +29,9 @@
 
 let () =
   (* Since manual tests do not run in the CI, we do not care about [~uses]. *)
+  Agnostic_baking.register
+    ~migrate_from:(Option.get @@ Protocol.previous_protocol Protocol.Alpha)
+    ~migrate_to:Protocol.Alpha ;
   Tezt_wrapper.error_mode_for_missing_use := Ignore ;
   Tezt_wrapper.error_mode_for_useless_use := Ignore ;
   Stresstest_command.register ~protocols:Protocol.all ;

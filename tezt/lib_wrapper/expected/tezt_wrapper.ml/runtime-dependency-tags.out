@@ -10,6 +10,7 @@ accuser_psparisc: octez-accuser-PsParisC
 accuser_psquebec: octez-accuser-PsQuebec
 accuser_alpha: octez-accuser-alpha
 admin_client: octez-admin-client
+agnostic_baker: octez-agnostic-baker
 baker_psparisc: octez-baker-PsParisC
 baker_psquebec: octez-baker-PsQuebec
 baker_alpha: octez-baker-alpha
