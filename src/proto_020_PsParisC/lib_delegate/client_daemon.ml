@@ -56,7 +56,7 @@ let await_protocol_start (cctxt : #Protocol_client_context.full) ~chain =
   in
   Node_rpc.await_protocol_activation cctxt ~chain ()
 
-let may_start_profiler baking_dir =
+let[@warning "-32"] may_start_profiler baking_dir =
   match Tezos_base.Profiler.parse_profiling_vars baking_dir with
   | Some max_verbosity, output_dir ->
       let profiler_maker ~name =
@@ -146,7 +146,7 @@ module Baker = struct
             let*! _ = Lwt_canceler.cancel canceler in
             Lwt.return_unit)
       in
-      let () = may_start_profiler cctxt#get_base_dir in
+      () [@profiler.custom may_start_profiler cctxt#get_base_dir] ;
       let consumer = Protocol_logging.make_log_message_consumer () in
       Lifted_protocol.set_log_message_consumer consumer ;
       Baking_scheduling.run cctxt ~canceler ~chain ~constants config delegates

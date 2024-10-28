@@ -470,8 +470,8 @@ let make_driver ~file_format ?(suffix = false) () =
     let close ({output; _} as state) =
       match output with
       | Open (fn, fp, ppf) ->
-          close_out fp ;
           Format.pp_print_newline ppf () ;
+          close_out fp ;
           state.output <- Closed fn
       | Closed _ -> ()
   end : DRIVER
