@@ -12,7 +12,7 @@ pub mod pvm;
 pub mod test;
 
 /// Status of a stepper
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum StepperStatus {
     /// Stepper is still running.
     Running { steps: usize },
@@ -30,6 +30,17 @@ pub enum StepperStatus {
         cause: String,
         message: String,
     },
+}
+
+impl StepperStatus {
+    /// Get the number of steps taken so far.
+    pub fn steps(&self) -> usize {
+        *match self {
+            StepperStatus::Running { steps } => steps,
+            StepperStatus::Exited { steps, .. } => steps,
+            StepperStatus::Errored { steps, .. } => steps,
+        }
+    }
 }
 
 impl Default for StepperStatus {
