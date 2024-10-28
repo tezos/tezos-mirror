@@ -17,6 +17,12 @@
 
 - Fixes the `callTracer`’s output containing invalid UTF8 string on reverted
   calls. (!15421)
+- The transaction pool has a limit of transactions per user, if the
+  limit is reached, the submitted must replace an existing transaction, that is
+  either a transaction with the same nonce, or replace the "largest" nonce
+  found in the transaction pool. It fixes the issue where the limit is reached
+  and the user cannot unlock the situation by itself as the node refuses
+  all transactions. (!15465)
 
 ### Internals
 

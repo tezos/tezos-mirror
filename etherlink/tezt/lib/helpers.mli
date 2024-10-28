@@ -220,6 +220,7 @@ val find_and_execute_withdrawal :
 (** Runs a sequencer in mode sandbox, with no connection needed to a
     rollup node. *)
 val init_sequencer_sandbox :
+  ?tx_pool_tx_per_addr_limit:int ->
   ?set_account_code:(string * string) list ->
   ?da_fee_per_byte:Wei.t ->
   ?minimum_base_fee_per_gas:Wei.t ->

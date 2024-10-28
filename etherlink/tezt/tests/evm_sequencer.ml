@@ -204,6 +204,33 @@ let default_dal_registration =
 let ci_enabled_dal_registration =
   Register_both {extra_tags_with = []; extra_tags_without = []}
 
+let register_sandbox ?tx_pool_tx_per_addr_limit ~title ?set_account_code
+    ?da_fee_per_byte ?minimum_base_fee_per_gas ~tags ?patch_config body =
+  Test.register
+    ~__FILE__
+    ~title
+    ~tags
+    ~uses_admin_client:false
+    ~uses_client:false
+    ~uses_node:false
+    ~uses:
+      [
+        Constant.octez_evm_node;
+        Constant.WASM.evm_kernel;
+        Constant.smart_rollup_installer;
+      ]
+  @@ fun () ->
+  let* sequencer =
+    Helpers.init_sequencer_sandbox
+      ?tx_pool_tx_per_addr_limit
+      ?set_account_code
+      ?da_fee_per_byte
+      ?minimum_base_fee_per_gas
+      ?patch_config
+      ()
+  in
+  body sequencer
+
 (* Register all variants of a test. *)
 let register_all ?block_storage_sqlite3 ?sequencer_rpc_port
     ?sequencer_private_rpc_port ?genesis_timestamp ?time_between_blocks
@@ -6691,6 +6718,85 @@ let test_tx_pool_replacing_transactions =
     ~error_msg:"Second transaction should have replaced the previous one" ;
   unit
 
+let test_tx_pool_replacing_transactions_on_limit () =
+  register_sandbox
+    ~tags:["evm"; "tx_pool"]
+    ~title:"Transactions can be replaced even when limit is reached"
+    ~tx_pool_tx_per_addr_limit:3
+  @@ fun sequencer ->
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let* gas_price = Rpc.get_gas_price sequencer in
+  let gas_price = Int32.to_int gas_price in
+  let craft_tx ?(gas = 21_000) ?(gas_price = gas_price) nonce =
+    Cast.craft_tx
+      ~source_private_key:sender.private_key
+      ~chain_id:1337
+      ~nonce
+      ~gas_price
+      ~gas
+      ~value:(Wei.of_eth_int 10)
+      ~address:"0x0000000000000000000000000000000000000000"
+      ()
+  in
+  let txpool_content () =
+    let*@ pending, queued = Rpc.txpool_content sequencer in
+    let sender = String.lowercase_ascii sender.address in
+    let pending =
+      List.find_map
+        (fun Rpc.{address; transactions} ->
+          if String.lowercase_ascii address = sender then
+            Some (List.map fst transactions |> List.sort compare)
+          else None)
+        pending
+    in
+    let queued =
+      List.find_map
+        (fun Rpc.{address; transactions} ->
+          if String.lowercase_ascii address = sender then
+            Some (List.map fst transactions |> List.sort compare)
+          else None)
+        queued
+    in
+    return @@ Option.value ~default:[] pending @ Option.value ~default:[] queued
+  in
+  (* Craft transactions. *)
+  let* tx_0 = craft_tx 0 in
+  let* tx_2 = craft_tx 2 in
+  let* tx_4 = craft_tx 4 in
+  let* tx_6 = craft_tx 6 in
+  let* tx_8 = craft_tx 8 in
+  (* Inject 3 transactions. *)
+  let*@ _tx_hash_2 = Rpc.send_raw_transaction ~raw_tx:tx_2 sequencer in
+  let*@ _tx_hash_4 = Rpc.send_raw_transaction ~raw_tx:tx_4 sequencer in
+  let*@ _tx_hash_6 = Rpc.send_raw_transaction ~raw_tx:tx_6 sequencer in
+  let* txpool = txpool_content () in
+  Check.((txpool = [2L; 4L; 6L]) (list int64))
+    ~error_msg:"Expected a transaction pool with %R, got %L" ;
+  (* Injecting tx_8 will fail as the limit is 3 transactions per address. *)
+  let*@? err = Rpc.send_raw_transaction ~raw_tx:tx_8 sequencer in
+  Check.(
+    (err.message
+   = "Limit of transaction for a user was reached. Transaction is rejected.")
+      string)
+    ~error_msg:"Expected error %R got %L" ;
+  (* Sending tx_0 should replace tx_6 as the nonce is smaller. *)
+  let*@ _tx_hash_0 = Rpc.send_raw_transaction ~raw_tx:tx_0 sequencer in
+  let* txpool = txpool_content () in
+  Check.((txpool = [0L; 2L; 4L]) (list int64))
+    ~error_msg:"Expected a transaction pool with %R, got %L" ;
+  (* Re-sending tx_0 is legal as long as it replace a transaction. *)
+  let* tx_0 = craft_tx ~gas:30_000 0 in
+  let*@? err = Rpc.send_raw_transaction ~raw_tx:tx_0 sequencer in
+  Check.(
+    (err.message
+   = "Limit of transactions for a user was reached. Transaction is rejected as \
+      it did not replace an existing one.")
+      string)
+    ~error_msg:"Expected error %R got %L" ;
+  let* tx_0 = craft_tx ~gas_price:(gas_price * 2) 0 in
+  let*@ _new_tx_0 = Rpc.send_raw_transaction ~raw_tx:tx_0 sequencer in
+  unit
+
 let test_da_fees_after_execution =
   register_all
     ~time_between_blocks:Nothing
@@ -6873,6 +6979,7 @@ let () =
   test_outbox_size_limit_resilience ~slow:false protocols ;
   test_proxy_node_can_forward_to_evm_endpoint protocols ;
   test_tx_pool_replacing_transactions protocols ;
+  test_tx_pool_replacing_transactions_on_limit () ;
   test_da_fees_after_execution protocols ;
   test_trace_transaction_calltracer_failed_create protocols ;
   test_configuration_service [Protocol.Alpha] ;
