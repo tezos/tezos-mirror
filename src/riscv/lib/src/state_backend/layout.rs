@@ -253,3 +253,29 @@ where
         space
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{backend_test, default::ConstDefault};
+
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    struct MyFoo(u64);
+
+    impl ConstDefault for MyFoo {
+        const DEFAULT: Self = MyFoo(42);
+    }
+
+    // Test that the Atom layout initialises the underlying Cell correctly.
+    backend_test!(test_cell_init, F, {
+        assert_eq!(F::allocate::<Atom<MyFoo>>().read(), MyFoo::DEFAULT);
+    });
+
+    // Test that the Array layout initialises the underlying Cells correctly.
+    backend_test!(test_cells_init, F, {
+        assert_eq!(
+            F::allocate::<Array<MyFoo, 1337>>().read_all(),
+            [MyFoo::DEFAULT; 1337]
+        );
+    });
+}
