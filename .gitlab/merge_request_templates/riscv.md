@@ -66,12 +66,14 @@ make -C src/riscv all
 /assign @felix.puscasu1
 /assign @anastasia.courtney
 /assign @emturner
+/assign @santnr
 
 /assign_reviewer @ole.kruger
 /assign_reviewer @victor-dumitrescu
 /assign_reviewer @felix.puscasu1
 /assign_reviewer @anastasia.courtney
 /assign_reviewer @emturner
+/assign_reviewer @santnr
 
 /unassign me
 /unassign_reviewer me
