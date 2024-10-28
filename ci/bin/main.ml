@@ -148,7 +148,8 @@ let () =
   let octez_minor_release_tag_re = "/^octez-v\\d+\\.[1-9][0-9]*$/" in
   (* Matches Octez beta release tags, e.g. [octez-v1.2-beta5]. *)
   let octez_beta_release_tag_re = "/^octez-v\\d+\\.\\d+\\-beta\\d*$/" in
-  (* Matches Etherlink release tags, e.g. [etherlink-v1.2] or [etherlink-v1.2-rc4]. *)
+  (* Matches EVM node release tags, e.g. [octez-evm-node-v1.2] or
+     [octez-evm-node-v1.2-rc4]. *)
   let octez_evm_node_release_tag_re =
     "/^octez-evm-node-v\\d+\\.\\d+(?:\\-rc\\d+)?$/"
   in
@@ -156,6 +157,12 @@ let () =
   let grafazos_release_tag_re = "/^grafazos-v\\d+\\.\\d+$/" in
   (* Matches Teztale release tags, e.g. [teztale-v1.2]. *)
   let teztale_release_tag_re = "/^teztale-v\\d+\\.\\d+$/" in
+  (* Matches smart rollup node release tags,
+     e.g. [octez-smart-rollup-node-v1.2], [octez-smart-rollup-node-v20250625] or
+     [octez-smart-rollup-node-v1.2-rc4]. *)
+  let octez_smart_rollup_node_release_tag_re =
+    "/^octez-smart-rollup-node-v\\d+(\\.\\d+)?(?:\\-(rc|beta)\\d+)?$/"
+  in
   let open Rules in
   let open Pipeline in
   (* Matches either Octez release tags or Octez beta release tags,
@@ -182,6 +189,7 @@ let () =
           octez_evm_node_release_tag_re;
           grafazos_release_tag_re;
           teztale_release_tag_re;
+          octez_smart_rollup_node_release_tag_re;
         ]
       @ !Hooks.release_tags
     in
@@ -300,6 +308,16 @@ let () =
         octez-evm-node-vX.Y(-rcN). Creates and publishes a release on GitLab \
         with associated etherlink artifacts (static binaries and Docker \
         image)." ^ release_description) ;
+  register
+    "octez_smart_rollup_node_release_tag"
+    If.(push && has_tag_match octez_smart_rollup_node_release_tag_re)
+    ~jobs:(Release_tag.octez_smart_rollup_node_jobs ())
+    ~description:
+      ("Release tag pipelines for the Smart Rollup node.\n\n\
+        Created when the release manager pushes a tag in the format \
+        octez-smart-rollup-node-vX.Y(-rcN|betaN). Creates and publishes a \
+        release on GitLab with associated artifacts for the smart rollup node \
+        (static binaries and Docker image)." ^ release_description) ;
   register
     "non_release_tag"
     If.(on_tezos_namespace && push && has_non_release_tag)
