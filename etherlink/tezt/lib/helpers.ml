@@ -395,8 +395,9 @@ let find_and_execute_withdrawal ?(outbox_lookup_depth = 10) ~withdrawal_level
   in
   return withdrawal_level
 
-let init_sequencer_sandbox ?set_account_code ?da_fee_per_byte
-    ?minimum_base_fee_per_gas ?patch_config ?(kernel = Constant.WASM.evm_kernel)
+let init_sequencer_sandbox ?tx_pool_tx_per_addr_limit ?set_account_code
+    ?da_fee_per_byte ?minimum_base_fee_per_gas ?patch_config
+    ?(kernel = Constant.WASM.evm_kernel)
     ?(bootstrap_accounts =
       List.map
         (fun account -> account.Eth_account.address)
@@ -433,7 +434,7 @@ let init_sequencer_sandbox ?set_account_code ?da_fee_per_byte
         wallet_dir = Some wallet_dir;
         tx_pool_timeout_limit = None;
         tx_pool_addr_limit = None;
-        tx_pool_tx_per_addr_limit = None;
+        tx_pool_tx_per_addr_limit;
       }
   in
   Evm_node.init ?patch_config ~mode:sequencer_mode Uri.(empty |> to_string)
