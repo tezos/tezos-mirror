@@ -151,11 +151,11 @@ let stop t =
   Lwt.wakeup t.stopper (0, Lwt_unix.WSTOPPED 0) ;
   shutdown t
 
-let run_server t () =
+let run_process t ~process_name () =
   let open Lwt_result_syntax in
   let socket_dir = Tezos_base_unix.Socket.get_temporary_socket_dir () in
   let socket_dir_arg = ["--socket-dir"; socket_dir] in
-  let args = "octez-rpc-process" :: socket_dir_arg in
+  let args = process_name :: socket_dir_arg in
   let process =
     Lwt_process.open_process_none
       ~stdout:(`FD_copy Unix.stdout)
@@ -203,10 +203,11 @@ let run_server t () =
   t.server <- Some process ;
   return t
 
-(* Evaluates [f]. If [f] fails, the error is caught, printed as an
-   error event, and [f] is re-evaluated after a [backoff] delay. The
-   delay increases at each failing try. *)
-let rec may_start backoff f =
+(* [run_with_backoff ~backoff f] evaluates [f]. If [f] fails, the
+   error is caught, printed as an error event, and [f] is re-evaluated
+   after a [backoff] delay. The delay increases at each failing
+   try. *)
+let rec run_with_backoff ~backoff ~f =
   let open Lwt_result_syntax in
   let timestamp, sleep = backoff in
   let now = Time.System.now () in
@@ -222,20 +223,22 @@ let rec may_start backoff f =
                   cannot_start_rpc_process
                   (Format.asprintf "%a" pp_print_trace errs))
             in
-            may_start (Time.System.now (), sleep *. 1.2) f)
+            run_with_backoff ~backoff:(Time.System.now (), sleep *. 1.2) ~f)
   else
     let*! () = Event.(emit waiting_for_rpc_process_restart sleep) in
     let*! () = Lwt_unix.sleep sleep in
-    may_start (timestamp, sleep) f
+    run_with_backoff ~backoff:(timestamp, sleep) ~f
 
-(* Watch_dog make sure that the RPC process is restarted as soon as it
+(* [watch_dog ~start_new_server] make sure that the RPC process is restarted as soon as it
    dies. *)
-let watch_dog run_server =
+let watch_dog ~start_new_server =
   let open Lwt_result_syntax in
   let rec loop t =
     match t.server with
     | None ->
-        let* new_server = may_start (Time.System.epoch, 0.5) run_server in
+        let* new_server =
+          run_with_backoff ~backoff:(Time.System.epoch, 0.5) ~f:start_new_server
+        in
         loop new_server
     | Some process -> (
         let wait_pid_t =
@@ -260,13 +263,18 @@ let watch_dog run_server =
             let*! () =
               Event.(emit rpc_process_exited_abnormally) (process#pid, status)
             in
-            let* new_server = may_start (Time.System.epoch, 0.5) run_server in
+            let* new_server =
+              run_with_backoff
+                ~backoff:(Time.System.epoch, 0.5)
+                ~f:start_new_server
+            in
             loop new_server)
   in
   loop
 
-let start server =
+let start parameters =
   let open Lwt_result_syntax in
-  let* new_server = run_server server () in
-  let _ = watch_dog (run_server server) new_server in
+  let run_process = run_process parameters ~process_name:"octez-rpc-process" in
+  let* new_server = run_process () in
+  let _ = watch_dog ~start_new_server:run_process new_server in
   return_unit
