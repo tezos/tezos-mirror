@@ -11,6 +11,7 @@
   octez-proto-libs.protocol-environment.sigs
   octez-libs.stdlib-unix
   octez-protocol-compiler-compat
+  octez-protocol-compiler.alternative-hashes
   lwt.unix
   ocplib-ocamlres
   unix)
@@ -19,7 +20,8 @@
   -open Tezos_base.TzPervasives
   -open Tezos_base_unix
   -open Tezos_stdlib_unix
-  -open Octez_protocol_compiler_compat)
+  -open Octez_protocol_compiler_compat
+  -open Octez_protocol_alternative_hashes)
  (modules Embedded_cmis_env Embedded_cmis_register Packer Compiler Defaults))
 
 (rule

@@ -217,7 +217,10 @@ let main {compile_ml; pack_objects; link_shared} version =
     | None -> computed_hash
     | Some stored_hash
       when !check_protocol_hash
-           && not (Protocol_hash.equal computed_hash stored_hash) ->
+           && not
+                (Protocol_hash_representative.equivalent
+                   computed_hash
+                   stored_hash) ->
         Format.eprintf
           "Inconsistent hash for protocol in TEZOS_PROTOCOL.@\n\
            Computed hash: %a@\n\

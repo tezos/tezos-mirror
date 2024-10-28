@@ -165,7 +165,14 @@ let store_known_protocols store =
           | None -> Node_event.(emit store_protocol_missing_files) protocol_hash
           | Some protocol -> (
               let hash = Protocol.hash protocol in
-              if not (Protocol_hash.equal hash protocol_hash) then
+              if
+                not
+                  (Octez_protocol_alternative_hashes
+                   .Protocol_hash_representative
+                   .equivalent
+                     hash
+                     protocol_hash)
+              then
                 if
                   List.mem
                     ~equal:Protocol_hash.equal
