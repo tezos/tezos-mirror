@@ -513,7 +513,7 @@ let launch_rpc_server ?middleware (config : Config_file.t) dir rpc_server_kind
    - No_server: the node is not responding to any RPC. *)
 type rpc_server_kind =
   | Local_rpc_server of RPC_server.server list
-  | External_rpc_server of (RPC_server.server * Rpc_process_worker.t) list
+  | External_rpc_server of (RPC_server.server * Rpc_process_worker.process) list
   | No_server
 
 (* Initializes an RPC server handled by the node main process. *)

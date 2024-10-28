@@ -109,12 +109,17 @@ module Event = struct
 end
 
 (* State of the worker. *)
-type t = {
+type 'a t = {
   mutable server : Lwt_process.process_none option;
+  (* Promise that aims to be resolved as soon as the server is
+     shutting down. *)
   stop : (int * Unix.process_status) Lwt.t;
+  (* Resolver that will wakeup the above stop promise. *)
   stopper : (int * Unix.process_status) Lwt.u;
-  external_process_parameters : Parameters.t;
+  parameters : 'a;
 }
+
+type process = Parameters.t t
 
 let create ~comm_socket_path (config : Config_file.t) node_version events_config
     =
@@ -123,13 +128,14 @@ let create ~comm_socket_path (config : Config_file.t) node_version events_config
     server = None;
     stop;
     stopper;
-    external_process_parameters =
-      {
-        internal_events = events_config;
-        config;
-        rpc_comm_socket_path = comm_socket_path;
-        node_version;
-      };
+    parameters =
+      Parameters.
+        {
+          internal_events = events_config;
+          config;
+          rpc_comm_socket_path = comm_socket_path;
+          node_version;
+        };
   }
 
 let shutdown t =
@@ -173,10 +179,7 @@ let run_server t () =
   in
   let* () = Tezos_base_unix.Socket.handshake init_socket_fd Main.socket_magic in
   let* () =
-    Socket.send
-      init_socket_fd
-      Parameters.parameters_encoding
-      t.external_process_parameters
+    Socket.send init_socket_fd Parameters.parameters_encoding t.parameters
   in
   (* FIXME: https://gitlab.com/tezos/tezos/-/issues/6579
      Workaround: increase default timeout. If the timeout is still not
