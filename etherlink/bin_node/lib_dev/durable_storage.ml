@@ -316,6 +316,16 @@ let storage_version read =
     Durable_storage_path.storage_version
     (fun bytes -> decode_number_le bytes |> un_qty |> Z.to_int)
 
+let maximum_gas_per_transaction read =
+  (* In future iterations of the kernel, the default value will be
+     written to the storage. This default value will no longer need to
+     be declared here. *)
+  inspect_durable_and_decode_default
+    ~default:(Qty (Z.of_string "30_000_000"))
+    read
+    Durable_storage_path.maximum_gas_per_transaction
+    decode_number_le
+
 module Make (Reader : READER) = struct
   let read = Reader.read
 

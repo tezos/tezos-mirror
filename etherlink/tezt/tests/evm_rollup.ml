@@ -5503,10 +5503,8 @@ let test_check_estimateGas_enforces_limits =
     Rpc.estimate_gas (("gas", `String "100000000") :: call_params) evm_node
   in
   Check.(
-    (estimated.message =~ rex "execution reverted")
-      ~error_msg:
-        "Expected a revert, as the transaction shouldn't have more than 30M \
-         available") ;
+    (estimated.message =~ rex "Maximum allowed gas per transaction is 30000000")
+      ~error_msg:"Expected %R error but got %L") ;
   unit
 
 let test_reveal_storage =

@@ -6,6 +6,8 @@
 
 ### Internal
 
+- Maximum gas per transaction is stored in the durable storage. (!15468)
+
 ### Bug fixes
 
 ## Version 7386d0bc63f3589525bdfbd3cc0544076231b813

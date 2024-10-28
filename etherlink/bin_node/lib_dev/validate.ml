@@ -46,20 +46,7 @@ let validate_gas_limit (module Backend_rpc : Services_backend_sig.S)
   let gas_limit = transaction.gas_limit in
   let* state = Backend_rpc.Reader.get_state () in
   let* (Qty maximum_gas_limit) =
-    let default_maximum_gas_per_transaction =
-      Ethereum_types.quantity_of_z (Z.of_string "30_000_000")
-    in
-    let+ bytes =
-      Backend_rpc.Reader.read
-        state
-        Durable_storage_path.maximum_gas_per_transaction
-    in
-    let kernel_maximum_gas_per_transaction =
-      Option.map Ethereum_types.decode_number_le bytes
-    in
-    Option.value
-      kernel_maximum_gas_per_transaction
-      ~default:default_maximum_gas_per_transaction
+    Durable_storage.maximum_gas_per_transaction (Backend_rpc.Reader.read state)
   in
   let* da_fee_per_byte =
     let+ bytes =
