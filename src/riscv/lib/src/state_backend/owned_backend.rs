@@ -107,7 +107,7 @@ impl ManagerRead for Owned {
 }
 
 impl ManagerWrite for Owned {
-    fn region_write<E: StaticCopy, const LEN: usize>(
+    fn region_write<E: 'static, const LEN: usize>(
         region: &mut Self::Region<E, LEN>,
         index: usize,
         value: E,
