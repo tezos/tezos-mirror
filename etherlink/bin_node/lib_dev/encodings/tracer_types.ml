@@ -912,12 +912,11 @@ module CallTracer = struct
     let str = Bytes.sub data (position + 32) size in
     Bytes.to_string str
 
-  let try_to_string (Ethereum_types.Hex str) =
-    let bytes = Ethereum_types.hex_to_real_bytes (Hex str) in
-    if Bytes.is_valid_utf_8 bytes then Bytes.to_string bytes else str
+  let try_to_string bytes =
+    if Bytes.is_valid_utf_8 bytes then Bytes.unsafe_to_string bytes
+    else Hex.(of_bytes bytes |> show)
 
-  let revert_reason_decoding output =
-    let output_b = Ethereum_types.hex_to_real_bytes output in
+  let revert_reason_bytes_decoding output_b =
     let selector_output = Bytes.sub output_b 0 4 in
     if solidity_revert_selector = selector_output then
       (* This is a solidity revert, we can decode the output as
@@ -929,7 +928,11 @@ module CallTracer = struct
       (* When it's a solidity revert, the common error is
          execution reverted *)
       (Some "execution reverted", Some revert_reason)
-    else (Some (try_to_string output), None)
+    else (Some (try_to_string output_b), None)
+
+  let revert_reason_decoding output =
+    let output_b = Ethereum_types.hex_to_real_bytes output in
+    revert_reason_bytes_decoding output_b
 
   let output_encoding =
     let open Data_encoding in
@@ -1026,6 +1029,9 @@ module CallTracer = struct
           match (output, error) with
           | Some output, Some err when err = "Reverted" ->
               revert_reason_decoding output
+          | _, Some err when not (String.is_valid_utf_8 err) ->
+              (* We probably are propagating the error found in another call *)
+              revert_reason_bytes_decoding (Bytes.unsafe_of_string err)
           | _ -> (error, None)
         in
         let* logs = Rlp.decode_option (Rlp.decode_list decode_logs) logs in

@@ -13,6 +13,11 @@
 
 ### Bug fixes
 
+#### RPCs
+
+- Fixes the `callTracer`’s output containing invalid UTF8 string on reverted
+  calls. (!15421)
+
 ### Internals
 
 ## Version 0.6 (2024-10-21)
