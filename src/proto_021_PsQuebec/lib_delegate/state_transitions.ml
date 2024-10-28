@@ -120,13 +120,14 @@ let prepare_consensus_votes_action state proposal =
        state
        proposal
        Baking_state.Preattestation
-     [@profiler.record_f "prepare preattestations"])
+     [@profiler.record_f {verbosity = Debug} "prepare preattestations"])
   in
   let attestations : unsigned_consensus_vote_batch =
     (make_consensus_vote_batch
        state
        proposal
-       Baking_state.Attestation [@profiler.record_f "prepare attestations"])
+       Baking_state.Attestation
+     [@profiler.record_f {verbosity = Debug} "prepare attestations"])
   in
   Prepare_consensus_votes {preattestations; attestations}
 
@@ -301,7 +302,8 @@ let rec handle_proposal ~is_proposal_applied state (new_proposal : proposal) =
     let* () =
       Events.(emit baker_is_ahead_of_node (current_level, new_proposal_level))
     in
-    (do_nothing state [@profiler.record_s "baker ahead of node"])
+    (do_nothing
+       state [@profiler.record_s {verbosity = Debug} "baker ahead of node"])
   else if Compare.Int32.(current_level = new_proposal_level) then
     if
       (* The received head is a new proposal for the current level:
@@ -318,7 +320,8 @@ let rec handle_proposal ~is_proposal_applied state (new_proposal : proposal) =
       (may_switch_branch
          ~is_proposal_applied
          state
-         new_proposal [@profiler.record_s "may switch branch"])
+         new_proposal
+       [@profiler.record_s {verbosity = Debug} "may switch branch"])
     else
       let* proposal_acceptance =
         is_acceptable_proposal_for_current_level state new_proposal
@@ -327,7 +330,9 @@ let rec handle_proposal ~is_proposal_applied state (new_proposal : proposal) =
       | Invalid ->
           (* The proposal is invalid: we ignore it *)
           let* () = Events.(emit skipping_invalid_proposal ()) in
-          (do_nothing state [@profiler.record_s "skipping invalid proposal"])
+          (do_nothing
+             state
+           [@profiler.record_s {verbosity = Debug} "skipping invalid proposal"])
       | Outdated_proposal ->
           (* Check whether we need to update our attestable payload  *)
           let state =
@@ -341,7 +346,8 @@ let rec handle_proposal ~is_proposal_applied state (new_proposal : proposal) =
                ~is_proposal_applied
                state
                new_proposal
-             [@profiler.record_s "outdated proposal : may update proposal"])
+             [@profiler.record_s
+               {verbosity = Debug} "outdated proposal : may update proposal"])
           in
           do_nothing state
       | Valid_proposal -> (
@@ -355,7 +361,8 @@ let rec handle_proposal ~is_proposal_applied state (new_proposal : proposal) =
                ~is_proposal_applied
                new_state
                new_proposal
-             [@profiler.record_s "valid proposal : may update proposal"])
+             [@profiler.record_s
+               {verbosity = Debug} "valid proposal : may update proposal"])
           in
           (* We invalidate early attestations *)
           let new_round_state =
@@ -373,7 +380,9 @@ let rec handle_proposal ~is_proposal_applied state (new_proposal : proposal) =
                    [locked_round], we accept it and vote for it *)
                 may_vote
                   new_state
-                  new_proposal [@profiler.record_s "same payload : may vote"]
+                  new_proposal
+                [@profiler.record_s
+                  {verbosity = Debug} "same payload : may vote"]
               else
                 (* The payload is different *)
                 match new_proposal.block.prequorum with
@@ -382,7 +391,8 @@ let rec handle_proposal ~is_proposal_applied state (new_proposal : proposal) =
                     may_vote
                       new_state
                       new_proposal
-                    [@profiler.record_s "different payload : may vote"]
+                    [@profiler.record_s
+                      {verbosity = Debug} "different payload : may vote"]
                 | _ ->
                     (* We shouldn't vote for proposal, but we
                        should at least watch (pre)quorums events on it
@@ -396,7 +406,10 @@ let rec handle_proposal ~is_proposal_applied state (new_proposal : proposal) =
           | None ->
               (* Otherwise, we did not lock on any payload, thus we can
                  vote for it it *)
-              may_vote new_state new_proposal [@profiler.record_s "may vote"])
+              may_vote
+                new_state
+                new_proposal [@profiler.record_s {verbosity = Debug} "may vote"]
+          )
   else
     (* Last case: new_proposal_level > current_level *)
     (* Possible scenarios:
@@ -435,7 +448,7 @@ let rec handle_proposal ~is_proposal_applied state (new_proposal : proposal) =
       (handle_proposal
          ~is_proposal_applied
          {state with level_state; round_state}
-         new_proposal [@profiler.record_s "handle proposal"])
+         new_proposal [@profiler.record_s {verbosity = Debug} "handle proposal"])
     in
     let action =
       Update_to_level {new_level_proposal = new_proposal; compute_new_state}
@@ -543,7 +556,7 @@ let prepare_block_to_bake ~attestations ?last_proposal
          ~attestation_filter
          ~preattestation_filter:None
          current_mempool.consensus
-       [@profiler.record_f "filter consensus operations"])
+       [@profiler.record_f {verbosity = Debug} "filter consensus operations"])
     in
     let filtered_mempool =
       {current_mempool with consensus = relevant_consensus_operations}
@@ -691,7 +704,8 @@ let end_of_round state current_round =
     (round_proposer
        new_state
        ~level:`Current
-       new_state.round_state.current_round [@profiler.record_f "round proposer"])
+       new_state.round_state.current_round
+     [@profiler.record_f {verbosity = Debug} "round proposer"])
   in
   match round_proposer_opt with
   | None ->
@@ -729,7 +743,8 @@ let end_of_round state current_round =
              consensus_key_and_delegate
              new_round
              ~last_proposal:state.level_state.latest_proposal
-           [@profiler.record_s "create propose block action"])
+           [@profiler.record_s
+             {verbosity = Debug} "create propose block action"])
         in
         return (new_state, action)
 
@@ -743,7 +758,7 @@ let time_to_prepare_next_level_block state at_round =
     (round_proposer
        state
        ~level:`Next
-       at_round [@profiler.record_f "round proposer"])
+       at_round [@profiler.record_f {verbosity = Debug} "round proposer"])
   in
   match (state.level_state.elected_block, round_proposer_opt) with
   | None, _ | _, None ->
@@ -762,7 +777,9 @@ let time_to_prepare_next_level_block state at_round =
            ~predecessor:elected_block.proposal.block
            new_state
            consensus_key_and_delegate
-           at_round [@profiler.record_s "create propose fresh block action"])
+           at_round
+         [@profiler.record_s
+           {verbosity = Debug} "create propose fresh block action"])
       in
       return (new_state, action)
 
@@ -927,25 +944,28 @@ let prequorum_reached_when_awaiting_preattestations state candidate
          new_state
          latest_proposal.block.round
          latest_proposal.block.payload_hash
-       [@profiler.record_f "update locked round"])
+       [@profiler.record_f {verbosity = Debug} "update locked round"])
     in
     let new_state =
       (update_current_phase
          new_state
          Awaiting_attestations
-       [@profiler.record_f "update current phase: Awaiting attestations"])
+       [@profiler.record_f
+         {verbosity = Debug} "update current phase: Awaiting attestations"])
     in
     if new_state.round_state.awaiting_unlocking_pqc then
       (* We were locked and did not trigger preemptive
          consensus votes: we need to start attesting now. *)
       return
         (new_state, prepare_attest_action new_state latest_proposal)
-      [@profiler.record_s "prepare attest action"]
+      [@profiler.record_s {verbosity = Debug} "prepare attest action"]
     else
       (* We already triggered preemptive attestation forging, we
          either have those already or we are waiting for them. *)
       may_inject_early_forged_attestations
-        new_state [@profiler.record_s "may inject early forged attestations"]
+        new_state
+      [@profiler.record_s
+        {verbosity = Debug} "may inject early forged attestations"]
 
 let quorum_reached_when_waiting_attestations state candidate attestation_qc =
   let open Lwt_syntax in
@@ -1033,7 +1053,8 @@ let handle_expected_applied_proposal (state : Baking_state.t) =
   let new_state =
     (update_current_phase
        new_state
-       Idle [@profiler.record_f "update current phase: Idle"])
+       Idle
+     [@profiler.record_f {verbosity = Debug} "update current phase: Idle"])
   in
   do_nothing new_state
 
@@ -1084,7 +1105,7 @@ let handle_forged_preattestation state signed_preattestation =
   in
   (check_payload state signed_preattestation
   @@ Lwt.return (state, Inject_preattestation {signed_preattestation}))
-  [@profiler.record_s "check payload"]
+  [@profiler.record_s {verbosity = Debug} "check payload"]
 
 let handle_forged_attestation state signed_attestation =
   let open Lwt_syntax in
@@ -1114,7 +1135,8 @@ let handle_forged_attestation state signed_attestation =
     let* () =
       Events.(emit discarding_attestation (delegate, att_level, att_round))
     in
-    (do_nothing state [@profiler.record_s "discarding attestation"])
+    (do_nothing
+       state [@profiler.record_s {verbosity = Debug} "discarding attestation"])
   else
     match state.round_state.current_phase with
     | Awaiting_preattestations ->
@@ -1128,7 +1150,9 @@ let handle_forged_attestation state signed_attestation =
           }
         in
         let new_state = {state with round_state = new_round_state} in
-        (do_nothing new_state [@profiler.record_s "prequorum not yet reached"])
+        (do_nothing
+           new_state
+         [@profiler.record_s {verbosity = Debug} "prequorum not yet reached"])
     | Idle | Awaiting_attestations | Awaiting_application ->
         (* For these three phases, we should have already reached the prequorum.
            If this is not the case, the attestations will not be injected. *)
@@ -1136,7 +1160,7 @@ let handle_forged_attestation state signed_attestation =
           state
           ~first_signed_attestation:signed_attestation
           ~other_signed_attestations:[]
-        [@profiler.record_s "may inject attestations"]
+        [@profiler.record_s {verbosity = Debug} "may inject attestations"]
 
 let handle_forge_event state forge_event =
   match forge_event with
@@ -1173,13 +1197,16 @@ let step (state : Baking_state.t) (event : Baking_state.event) :
   | _, Timeout (End_of_round {ending_round}) ->
       (* If the round is ending, stop everything currently going on and
          increment the round. *)
-      end_of_round state ending_round [@profiler.record_s "end of round"]
+      end_of_round
+        state
+        ending_round [@profiler.record_s {verbosity = Info} "end of round"]
   | _, Timeout (Time_to_prepare_next_level_block {at_round}) ->
       (* If it is time to bake the next level, stop everything currently
          going on and propose the next level block *)
       time_to_prepare_next_level_block
         state
-        at_round [@profiler.record_s "prepare next level block"]
+        at_round
+      [@profiler.record_s {verbosity = Info} "prepare next level block"]
   | Idle, New_head_proposal proposal ->
       let* () =
         Events.(
@@ -1192,7 +1219,8 @@ let step (state : Baking_state.t) (event : Baking_state.event) :
       (handle_proposal
          ~is_proposal_applied:true
          state
-         proposal [@profiler.record_s "handle new head proposal"])
+         proposal
+       [@profiler.record_s {verbosity = Info} "handle new head proposal"])
   | Awaiting_application, New_head_proposal proposal ->
       if
         Block_hash.(
@@ -1212,13 +1240,16 @@ let step (state : Baking_state.t) (event : Baking_state.event) :
         (handle_proposal
            ~is_proposal_applied:true
            state
-           proposal [@profiler.record_s "handle new head proposal"])
+           proposal
+         [@profiler.record_s {verbosity = Info} "handle new head proposal"])
       else
         let* () =
           Events.(emit applied_expected_proposal_received proposal.block.hash)
         in
         (handle_expected_applied_proposal
-           state [@profiler.record_s "handle expected applied proposal"])
+           state
+         [@profiler.record_s
+           {verbosity = Info} "handle expected applied proposal"])
   | Awaiting_attestations, New_head_proposal proposal
   | Awaiting_preattestations, New_head_proposal proposal ->
       let* () =
@@ -1233,7 +1264,8 @@ let step (state : Baking_state.t) (event : Baking_state.event) :
       (handle_proposal
          ~is_proposal_applied:true
          state
-         proposal [@profiler.record_s "handle new head proposal"])
+         proposal
+       [@profiler.record_s {verbosity = Info} "handle new head proposal"])
   | Idle, New_valid_proposal proposal ->
       let* () =
         Events.(
@@ -1246,12 +1278,14 @@ let step (state : Baking_state.t) (event : Baking_state.event) :
       (handle_proposal
          ~is_proposal_applied:false
          state
-         proposal [@profiler.record_s "handle new valid proposal"])
+         proposal
+       [@profiler.record_s {verbosity = Info} "handle new valid proposal"])
   | _, New_forge_event (forge_event : forge_event) ->
       let* () = Events.(emit new_forge_event forge_event) in
       (handle_forge_event
          state
-         forge_event [@profiler.record_s "handle forge event"])
+         forge_event
+       [@profiler.record_s {verbosity = Info} "handle forge event"])
   | Awaiting_application, New_valid_proposal proposal
   | Awaiting_attestations, New_valid_proposal proposal
   | Awaiting_preattestations, New_valid_proposal proposal ->
@@ -1265,26 +1299,29 @@ let step (state : Baking_state.t) (event : Baking_state.event) :
       in
       if has_already_been_handled state proposal then
         let* () = Events.(emit valid_proposal_received_after_application ()) in
-        (do_nothing state [@profiler.record_s "do nothing"])
+        (do_nothing state [@profiler.record_s {verbosity = Info} "do nothing"])
       else
         let* () = Events.(emit new_valid_proposal_while_waiting_for_qc ()) in
         (handle_proposal
            ~is_proposal_applied:false
            state
-           proposal [@profiler.record_s "handle new valid proposal"])
+           proposal
+         [@profiler.record_s {verbosity = Info} "handle new valid proposal"])
   | Awaiting_preattestations, Prequorum_reached (candidate, preattestation_qc)
     ->
       prequorum_reached_when_awaiting_preattestations
         state
         candidate
         preattestation_qc
-      [@profiler.record_s "prequorum reached when awaiting preattestations"]
+      [@profiler.record_s
+        {verbosity = Info} "prequorum reached when awaiting preattestations"]
   | Awaiting_attestations, Quorum_reached (candidate, attestation_qc) ->
       quorum_reached_when_waiting_attestations
         state
         candidate
         attestation_qc
-      [@profiler.record_s "quorum reached when awaiting attestations"]
+      [@profiler.record_s
+        {verbosity = Info} "quorum reached when awaiting attestations"]
   (* Unreachable cases modulo concurrency. *)
   | ( (Idle | Awaiting_application | Awaiting_attestations),
       Prequorum_reached (candidate, _operations_pqc) ) ->
@@ -1293,7 +1330,9 @@ let step (state : Baking_state.t) (event : Baking_state.event) :
         Events.(
           emit discarding_unexpected_prequorum_reached (candidate.hash, phase))
       in
-      (do_nothing state [@profiler.record_s "unexpected quorum reached"])
+      (do_nothing
+         state
+       [@profiler.record_s {verbosity = Info} "unexpected quorum reached"])
   | ( (Idle | Awaiting_preattestations | Awaiting_application),
       Quorum_reached (candidate, _operations_qc) ) ->
       (* Unexpected quorum reached, we discard it. *)
@@ -1301,4 +1340,6 @@ let step (state : Baking_state.t) (event : Baking_state.event) :
         Events.(
           emit discarding_unexpected_quorum_reached (candidate.hash, phase))
       in
-      (do_nothing state [@profiler.record_s "unexpected quorum reached"])
+      (do_nothing
+         state
+       [@profiler.record_s {verbosity = Info} "unexpected quorum reached"])
