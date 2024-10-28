@@ -9,7 +9,16 @@
 Welcome to the Octez and Protocol Documentation!
 ================================================
 
-To start browsing, either follow one of the guided paths below, or directly pick any topics in the documentation menu.
+This documentation describes an implementation of the `Tezos blockchain <https://tezos.com>`__ consisting of the Octez toolsuite and the Tezos protocol, for technical users of various kinds, including Tezos application developers, bakers, and Octez/protocol developers.
+
+.. note::
+
+  For documentation of the whole Tezos ecosystem, including software beyond the Octez & protocol platform, such as smart contracts languages, developer tools, or web3 libraries, see https://docs.tezos.com.
+
+  Learning material about the Tezos ecosystem, consisting of training modules with exercises, can be found at https://opentezos.tezos.com.
+
+To start browsing the Octez & Protocol documentation, either follow one of the guided paths below, or directly pick any topics in the menu on the left.
+
 
 .. raw:: html
 
