@@ -25,7 +25,7 @@
 
 (** [fetch ?runner src filename] Makes [src] available at a temporary file
     named [filename], and returns the complete path to the file.
-    If [src] is the path to a file on disk, then a symbolic is created without
+    If [src] is the path to a file on disk, then a symbolic link is created without
     any download or copy, else [src] is treated as a url, and is downloaded. *)
 val fetch : ?runner:Runner.t -> string -> string -> string Lwt.t
 
