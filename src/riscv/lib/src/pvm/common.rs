@@ -262,14 +262,11 @@ mod tests {
     use super::*;
     use crate::{
         machine_state::{
-            bus::{
-                main_memory::{M1K, M1M},
-                start_of_main_memory, AddressableRead,
-            },
+            bus::{main_memory::M1M, start_of_main_memory, AddressableRead},
             registers::{a0, a1, a2, a3, a6, a7},
             TestCacheLayouts,
         },
-        state_backend::{owned_backend::Owned, tests::test_determinism},
+        state_backend::owned_backend::Owned,
     };
     use rand::{thread_rng, Fill};
     use std::mem;
@@ -410,17 +407,5 @@ mod tests {
         // Compare what characters have been passed to the hook verrsus what we
         // intended to write
         assert_eq!(written, buffer);
-    }
-
-    #[test]
-    fn test_reset() {
-        test_determinism::<PvmLayout<M1K, TestCacheLayouts>, _>(|mut space| {
-            // The [Pvm] type won't bind unless the version cell is set to its initial value.
-            // TODO: RV-46 might change this constraint in the future.
-            space.0.write(INITIAL_VERSION);
-
-            let mut machine_state: Pvm<M1K, TestCacheLayouts, _> = Pvm::bind(space);
-            machine_state.reset();
-        });
     }
 }

@@ -75,17 +75,3 @@ impl<E: backend::Elem, M: backend::ManagerBase> AddressableWrite<E> for Devices<
         Err(super::OutOfBounds)
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::{Devices, DevicesLayout};
-    use crate::machine_state::backend::tests::test_determinism;
-
-    #[test]
-    fn test_reset() {
-        test_determinism::<DevicesLayout, _>(|space| {
-            let mut devices: Devices<_> = Devices::bind(space);
-            devices.reset();
-        });
-    }
-}

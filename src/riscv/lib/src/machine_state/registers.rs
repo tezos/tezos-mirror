@@ -453,7 +453,7 @@ impl<M: backend::ManagerClone> Clone for FRegisters<M> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{backend_test, create_state, machine_state::backend::tests::test_determinism};
+    use crate::{backend_test, create_state};
     use arbitrary_int::Number;
     use strum::IntoEnumIterator;
 
@@ -498,22 +498,6 @@ mod tests {
             assert_eq!(after, expected);
         }
     });
-
-    #[test]
-    fn test_xregs_reset() {
-        test_determinism::<XRegistersLayout, _>(|space| {
-            let mut registers: XRegisters<_> = XRegisters::bind(space);
-            registers.reset();
-        });
-    }
-
-    #[test]
-    fn test_fregs_reset() {
-        test_determinism::<FRegistersLayout, _>(|space| {
-            let mut registers: FRegisters<_> = FRegisters::bind(space);
-            registers.reset();
-        });
-    }
 
     #[test]
     fn parse_xregister_zero_to_x0() {

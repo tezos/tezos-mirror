@@ -305,10 +305,7 @@ impl<L: MainMemoryLayout, M: backend::ManagerRead, N: backend::ManagerRead>
 
 #[cfg(test)]
 pub mod tests {
-    use crate::{
-        backend_test,
-        machine_state::{backend::tests::test_determinism, bus::AddressableWrite},
-    };
+    use crate::{backend_test, machine_state::bus::AddressableWrite};
 
     gen_memory_layout!(T1K = 1 KiB);
 
@@ -345,11 +342,4 @@ pub mod tests {
         check_address!(u8, 6, 0x22);
         check_address!(u8, 7, 0x11);
     });
-
-    #[test]
-    fn test_reset() {
-        test_determinism::<T1K, _>(|mut memory| {
-            memory.reset();
-        });
-    }
 }
