@@ -268,3 +268,70 @@ let octez_evm_node_jobs ?(test = false) () =
     job_docker_merge;
     job_gitlab_release;
   ]
+
+let octez_smart_rollup_node_jobs ?(test = false) () =
+  let job_docker_amd64 =
+    job_docker_build
+      ~__POS__
+      ~arch:Amd64
+      (if test then Test else Octez_smart_rollup_node_release)
+  in
+  let job_docker_arm64 =
+    job_docker_build
+      ~__POS__
+      ~arch:Arm64
+      (if test then Test else Octez_smart_rollup_node_release)
+  in
+  let job_docker_merge =
+    job_docker_merge_manifests
+      ~__POS__
+      ~ci_docker_hub:(not test)
+      ~job_docker_amd64
+      ~job_docker_arm64
+  in
+  let job_static_x86_64_release =
+    job_build_static_binaries
+      ~__POS__
+      ~arch:Amd64
+      ~executable_files:"script-inputs/smart-rollup-node-executable"
+      ~release:true
+      ~version_executable:"octez-smart-rollup-node"
+      ()
+  in
+  let job_static_arm64_release =
+    job_build_static_binaries
+      ~__POS__
+      ~arch:Arm64
+      ~executable_files:"script-inputs/smart-rollup-node-executable"
+      ~release:true
+      ~version_executable:"octez-smart-rollup-node"
+      ()
+  in
+
+  let job_gitlab_release : Tezos_ci.tezos_job =
+    let dependencies =
+      Dependent
+        [
+          Artifacts job_static_x86_64_release; Artifacts job_static_arm64_release;
+        ]
+    in
+    job
+      ~__POS__
+      ~image:Images.ci_release
+      ~stage:Stages.publish_release_gitlab
+      ~interruptible:false
+      ~dependencies
+      ~name:"gitlab:octez-smart-rollup-node-release"
+      ["./scripts/ci/create_gitlab_octez_smart-rollup_node_release.sh"]
+  in
+  [
+    (* Stage: sanity *)
+    job_datadog_pipeline_trace;
+    (* Stage: build *)
+    job_static_arm64_release;
+    job_static_x86_64_release;
+    job_docker_amd64;
+    job_docker_arm64;
+    job_docker_merge;
+    job_gitlab_release;
+  ]

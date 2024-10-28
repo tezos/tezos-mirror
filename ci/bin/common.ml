@@ -857,6 +857,7 @@ type docker_build_type =
   | Experimental
   | Release
   | Octez_evm_node_release
+  | Octez_smart_rollup_node_release
   | Test
   | Test_manual
 
@@ -866,7 +867,9 @@ let job_docker_build ?rules ?dependencies ~__POS__ ~arch docker_build_type :
   let arch_string = arch_to_string_alt arch in
   let ci_docker_hub =
     match docker_build_type with
-    | Release | Octez_evm_node_release | Experimental -> true
+    | Release | Octez_evm_node_release | Octez_smart_rollup_node_release
+    | Experimental ->
+        true
     | Test | Test_manual -> false
   in
   (* Whether to include evm artifacts.
@@ -898,6 +901,8 @@ let job_docker_build ?rules ?dependencies ~__POS__ ~arch docker_build_type :
         match docker_build_type with
         | Release -> "script-inputs/released-executables"
         | Octez_evm_node_release -> "script-inputs/octez-evm-node-executable"
+        | Octez_smart_rollup_node_release ->
+            "script-inputs/smart-rollup-node-executable"
         | Test | Test_manual | Experimental ->
             "script-inputs/released-executables \
              script-inputs/experimental-executables" );
