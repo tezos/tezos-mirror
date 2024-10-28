@@ -5,7 +5,7 @@ use crate::{
         dal_slots, enable_dal, evm_node_flag, is_enable_fa_bridge,
         max_blueprint_lookahead_in_seconds, read_admin, read_delayed_transaction_bridge,
         read_kernel_governance, read_kernel_security_governance,
-        read_maximum_allowed_ticks, read_maximum_gas_per_transaction,
+        read_maximum_allowed_ticks, read_or_set_maximum_gas_per_transaction,
         read_sequencer_governance, sequencer,
     },
     tick_model::constants::{MAXIMUM_GAS_LIMIT, MAX_ALLOWED_TICKS},
@@ -174,7 +174,7 @@ pub fn fetch_limits(host: &mut impl Runtime) -> Limits {
         read_maximum_allowed_ticks(host).unwrap_or(MAX_ALLOWED_TICKS);
 
     let maximum_gas_limit =
-        read_maximum_gas_per_transaction(host).unwrap_or(MAXIMUM_GAS_LIMIT);
+        read_or_set_maximum_gas_per_transaction(host).unwrap_or(MAXIMUM_GAS_LIMIT);
 
     Limits {
         maximum_allowed_ticks,

@@ -8,6 +8,7 @@
 use crate::block_in_progress::BlockInProgress;
 use crate::event::Event;
 use crate::simulation::SimulationResult;
+use crate::tick_model::constants::MAXIMUM_GAS_LIMIT;
 use anyhow::Context;
 use evm_execution::trace::{
     CallTracerInput, StructLoggerInput, TracerInput, CALL_TRACER_CONFIG_PREFIX,
@@ -636,8 +637,19 @@ pub fn read_maximum_allowed_ticks<Host: Runtime>(host: &mut Host) -> Option<u64>
     read_u64_le(host, &MAXIMUM_ALLOWED_TICKS).ok()
 }
 
-pub fn read_maximum_gas_per_transaction<Host: Runtime>(host: &mut Host) -> Option<u64> {
-    read_u64_le(host, &MAXIMUM_GAS_PER_TRANSACTION).ok()
+/// Reads the maximum gas per transaction. If the value cannot found in the storage,
+/// we write the kernel default value in the storage. The value becomes accessible
+/// from outside the kernel.
+pub fn read_or_set_maximum_gas_per_transaction<Host: Runtime>(
+    host: &mut Host,
+) -> anyhow::Result<u64> {
+    match read_u64_le(host, &MAXIMUM_GAS_PER_TRANSACTION) {
+        Ok(gas_limit) => Ok(gas_limit),
+        Err(_) => {
+            write_u64_le(host, &MAXIMUM_GAS_PER_TRANSACTION, MAXIMUM_GAS_LIMIT)?;
+            Ok(MAXIMUM_GAS_LIMIT)
+        }
+    }
 }
 
 pub fn store_storage_version<Host: Runtime>(
