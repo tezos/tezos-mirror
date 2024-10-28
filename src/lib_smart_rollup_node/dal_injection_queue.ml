@@ -562,12 +562,12 @@ let init (node_ctxt : _ Node_context.t) =
           else return_unit)
 
 (* This is a DAL injection worker for a single scoru *)
-let worker =
-  lazy
-    (match Lwt.state worker_promise with
-    | Lwt.Return worker -> Ok worker
-    | Lwt.Fail exn -> Error (Error_monad.error_of_exn exn)
-    | Lwt.Sleep -> Error Rollup_node_errors.No_dal_injector)
+let worker () =
+  let open Result_syntax in
+  match Lwt.state worker_promise with
+  | Lwt.Return worker -> return worker
+  | Lwt.Fail exn -> tzfail (Error_monad.error_of_exn exn)
+  | Lwt.Sleep -> tzfail Rollup_node_errors.No_dal_injector
 
 let handle_request_error rq =
   let open Lwt_syntax in
@@ -585,35 +585,35 @@ let register_dal_message w message =
 
 let register_dal_messages ~messages =
   let open Lwt_result_syntax in
-  let* w = lwt_map_error TzTrace.make (Lwt.return (Lazy.force worker)) in
+  let*? w = worker () in
   List.iter_es (register_dal_message w) messages
 
 let produce_dal_slots ~level =
   let open Lwt_result_syntax in
-  match Lazy.force worker with
-  | Error Rollup_node_errors.No_dal_injector ->
+  match worker () with
+  | Error (Rollup_node_errors.No_dal_injector :: _) ->
       (* There is no batcher, nothing to do *)
       return_unit
-  | Error e -> tzfail e
+  | Error e -> fail e
   | Ok w ->
       Worker.Queue.push_request_and_wait w Request.(Produce_dal_slots level)
       |> handle_request_error
 
 let set_dal_slot_indices idx =
   let open Lwt_result_syntax in
-  let* w = lwt_map_error TzTrace.make (Lwt.return (Lazy.force worker)) in
+  let*? w = worker () in
   Worker.Queue.push_request_and_wait w Request.(Set_dal_slot_indices idx)
   |> handle_request_error
 
 let get_injection_ids () =
   let open Result_syntax in
-  let+ w = Result.map_error TzTrace.make (Lazy.force worker) in
+  let+ w = worker () in
   let state = Worker.state w in
   Recent_dal_injections.keys state.recent_dal_injections
 
 let forget_injection_id id =
   let open Result_syntax in
-  let+ w = Result.map_error TzTrace.make (Lazy.force worker) in
+  let+ w = worker () in
   let state = Worker.state w in
   let () = Recent_dal_injections.remove state.recent_dal_injections id in
   Metrics.DAL_batcher.set_dal_injections_queue_length
