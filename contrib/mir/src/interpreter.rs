@@ -6495,15 +6495,15 @@ mod interpreter_tests {
 
     #[test]
     fn contract_address_computation() {
-        use tezos_crypto_rs::hash::OperationListHash;
+        use tezos_crypto_rs::hash::OperationHash;
 
         assert_eq!(
             compute_contract_address(
-                &OperationListHash::from_base58_check(
+                &OperationHash::from_base58_check(
                     "onvsLP3JFZia2mzZKWaFuFkWg2L5p3BDUhzh5Kr6CiDDN3rtQ1D"
                 )
                 .unwrap()
-                .0
+                .as_ref()
                 .try_into()
                 .unwrap(),
                 0

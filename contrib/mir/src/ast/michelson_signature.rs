@@ -9,7 +9,6 @@
 
 use tezos_crypto_rs::{
     base58::*,
-    blake2b,
     hash::{self, HashTrait},
     hash::{BlsSignature, FromBytesError},
     PublicKeySignatureVerifier,
@@ -68,7 +67,6 @@ pub trait SignatureTrait: Sized + AsRef<[u8]> {
         hash.extend_from_slice(Self::BASE58_PREFIX);
         hash.extend_from_slice(data);
         hash.to_base58check()
-            .expect("should always be convertible to base58")
     }
 
     /// Try to construct a signature from its base58-check representation.
@@ -97,13 +95,15 @@ macro_rules! defsignature {
     ($(#[$meta:meta])* $name:ident, $size:literal, $prefix:expr) => {
         $(#[$meta])*
         #[derive(Debug, Clone, Eq, PartialOrd, Ord, PartialEq)]
-        pub struct $name(hash::Signature);
+        pub struct $name(hash::UnknownSignature);
 
         impl SignatureTrait for $name {
             const BYTE_SIZE: usize = $size;
             const BASE58_PREFIX: &'static [u8] = &$prefix; // spsig1(99)
+            // We can unwrap here, as this is supposed to be an unsafe function
+            // with an alternative to check the size before calling, guaranteeing correctness.
             fn from_bytes(bs: &[u8]) -> Self {
-                $name(hash::Signature(bs.to_vec()))
+                $name(hash::UnknownSignature::try_from(bs.to_vec()).unwrap())
             }
         }
 
@@ -161,7 +161,7 @@ macro_rules! key_type_and_impls {
         impl AsRef<[u8]> for Signature {
             fn as_ref(&self) -> &[u8] {
                 match self {
-                    $(Signature::$con($ty(h)) => h.as_ref()),*
+                    $(Signature::$con(h) => h.as_ref(),)*
                 }
             }
         }
@@ -169,7 +169,7 @@ macro_rules! key_type_and_impls {
         impl From<Signature> for Vec<u8> {
             fn from(value: Signature) -> Self {
                 match value {
-                    $(Signature::$con($ty(h)) => h.into()),*
+                    $(Signature::$con(h) => h.as_ref().to_vec(),)*
                 }
             }
         }
@@ -256,7 +256,7 @@ impl ByteReprTrait for Signature {
             // BLS signatures are broken in tezos_crypto_rs
             let raw_bytes = from_b58check(data)?;
             let bytes = &raw_bytes[4..]; // strip 4-byte prefix
-            Bls(BlsSignature(bytes.to_vec()))
+            Bls(BlsSignature::try_from(bytes)?)
         } else if data.starts_with("sig") {
             Generic(SignatureTrait::from_b58check(data)?)
         } else {
@@ -316,24 +316,20 @@ impl Signature {
     pub fn check(&self, key: &super::michelson_key::Key, msg: &[u8]) -> bool {
         use super::michelson_key::Key;
         use Signature::*;
-        fn hash_msg(data: &[u8]) -> Vec<u8> {
-            // error is, in fact, impossible
-            blake2b::digest_256(data).unwrap()
-        }
         match key {
             Key::Ed25519(key) => match self {
-                Ed25519(sig) => key.verify_signature(&sig.0, &hash_msg(msg)),
-                Generic(sig) => key.verify_signature(&sig.0, &hash_msg(msg)),
+                Ed25519(sig) => key.verify_signature(&sig.0.clone().into(), msg),
+                Generic(sig) => key.verify_signature(&sig.0.clone().into(), msg),
                 P256(..) | Secp256k1(..) | Bls(..) => Ok(false),
             },
             Key::Secp256k1(key) => match self {
-                Secp256k1(sig) => key.verify_signature(&sig.0, &hash_msg(msg)),
-                Generic(sig) => key.verify_signature(&sig.0, &hash_msg(msg)),
+                Secp256k1(sig) => key.verify_signature(&sig.0.clone().into(), msg),
+                Generic(sig) => key.verify_signature(&sig.0.clone().into(), msg),
                 P256(..) | Ed25519(..) | Bls(..) => Ok(false),
             },
             Key::P256(key) => match self {
-                P256(sig) => key.verify_signature(&sig.0, &hash_msg(msg)),
-                Generic(sig) => key.verify_signature(&sig.0, &hash_msg(msg)),
+                P256(sig) => key.verify_signature(&sig.0.clone().into(), msg),
+                Generic(sig) => key.verify_signature(&sig.0.clone().into(), msg),
                 Ed25519(..) | Secp256k1(..) | Bls(..) => Ok(false),
             },
             Key::Bls(key) => match self {

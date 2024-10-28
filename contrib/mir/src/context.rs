@@ -15,7 +15,7 @@ use crate::ast::michelson_key_hash::KeyHash;
 use crate::gas::Gas;
 use num_bigint::{BigInt, BigUint};
 use std::collections::HashMap;
-use tezos_crypto_rs::hash::OperationListHash;
+use tezos_crypto_rs::hash::OperationHash;
 
 /// [Ctx] includes "outer context" required for typechecking and interpreting
 /// Michelson.
@@ -139,7 +139,7 @@ impl Default for Ctx<'_> {
             now: 0i32.into(),
             min_block_time: 1u32.into(),
             // the default chain id is NetXynUjJNZm7wi, which is also the default chain id of octez-client in mockup mode
-            chain_id: tezos_crypto_rs::hash::ChainId(vec![0xf3, 0xd4, 0x85, 0x54]),
+            chain_id: tezos_crypto_rs::hash::ChainId::try_from(vec![0xf3, 0xd4, 0x85, 0x54]).unwrap(),
             self_address: "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi".try_into().unwrap(),
             sender: "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi".try_into().unwrap(),
             source: "tz1TSbthBCECxmnABv73icw7yyyvUWFLAoSP".try_into().unwrap(),
@@ -148,12 +148,12 @@ impl Default for Ctx<'_> {
             total_voting_power: 0u32.into(),
             big_map_storage: Box::new(InMemoryLazyStorage::new()),
             operation_counter: 0,
-            operation_group_hash: OperationListHash::from_base58_check(
+            operation_group_hash: OperationHash::from_base58_check(
                 "onvsLP3JFZia2mzZKWaFuFkWg2L5p3BDUhzh5Kr6CiDDN3rtQ1D",
+                // "2EouXpxkPGxAvVKCpdCJnfp2wEMWR7Up5DERRZ1Yo99xCLjkCVuq",
             )
             .unwrap()
-            .0
-            .as_slice()
+            .as_ref()
             .try_into()
             .unwrap(),
             origination_counter: 0,

@@ -14,7 +14,7 @@ use crate::ast::michelson_key_hash::KeyHash;
 use super::{ByteReprError, ByteReprTrait};
 
 use tezos_crypto_rs::hash::{
-    ContractKt1Hash, ContractTz1Hash, ContractTz2Hash, ContractTz3Hash, ContractTz4Hash, Hash,
+    ContractKt1Hash, ContractTz1Hash, ContractTz2Hash, ContractTz3Hash, ContractTz4Hash,
     HashTrait, SmartRollupHash,
 };
 
@@ -184,7 +184,7 @@ impl ByteReprTrait for AddressHash {
 
     fn to_bytes(&self, out: &mut Vec<u8>) {
         use AddressHash::*;
-        fn originated_account(out: &mut Vec<u8>, tag: u8, hash: impl AsRef<Hash>) {
+        fn originated_account(out: &mut Vec<u8>, tag: u8, hash: impl AsRef<[u8]>) {
             out.push(tag);
             out.extend_from_slice(hash.as_ref());
             out.extend_from_slice(PADDING_ORIGINATED);

@@ -1048,7 +1048,7 @@ mod tests {
 
     #[test]
     fn create_contract() {
-        use tezos_crypto_rs::hash::OperationListHash;
+        use tezos_crypto_rs::hash::OperationHash;
         let mut ctx = Ctx::default();
         let cs_mich =
             parse("{ parameter unit; storage unit; code { DROP; UNIT; NIL operation; PAIR; }}")
@@ -1085,12 +1085,11 @@ mod tests {
                 let mut ctx = Ctx::default();
                 ctx.set_operation_counter(100);
                 ctx.set_origination_counter(0);
-                ctx.operation_group_hash = OperationListHash::from_base58_check(
+                ctx.operation_group_hash = OperationHash::from_base58_check(
                     "onvsLP3JFZia2mzZKWaFuFkWg2L5p3BDUhzh5Kr6CiDDN3rtQ1D",
                 )
                 .unwrap()
-                .0
-                .as_slice()
+                .as_ref()
                 .try_into()
                 .unwrap();
                 ctx
@@ -1182,7 +1181,7 @@ mod multisig_tests {
     fn make_ctx<'a>() -> Ctx<'a> {
         let mut ctx = Ctx::default();
         ctx.self_address = "KT1BFATQpdP5xJGErJyk2vfL46dvFanWz87H".try_into().unwrap();
-        ctx.chain_id = tezos_crypto_rs::hash::ChainId(hex::decode("f3d48554").unwrap());
+        ctx.chain_id = tezos_crypto_rs::hash::ChainId::try_from(hex::decode("f3d48554").unwrap()).unwrap();
         ctx
     }
 

@@ -54,7 +54,7 @@ pub enum TcError {
     /// Failed to interpret a number as a value of some type due to a numeric
     /// conversion error.
     #[error("numeric conversion failed: {0}")]
-    NumericConversion(#[from] TryFromBigIntError<()>),
+    NumericConversion(TryFromBigIntError<()>),
     /// Types are not equal when they should be.
     #[error(transparent)]
     TypesNotEqual(#[from] TypesNotEqual),
@@ -160,6 +160,12 @@ pub enum TcError {
     /// All branches of a `MAP` instruction's code block are failing.
     #[error("all branches of a MAP block use FAILWITH, its type cannot be inferred")]
     MapBlockFail,
+}
+
+impl From<TryFromBigIntError<()>> for TcError {
+    fn from(error: TryFromBigIntError<()>) -> Self {
+        TcError::NumericConversion(error)
+    }
 }
 
 /// Errors happening when typechecking a value of type `chain_id`.
@@ -6068,9 +6074,13 @@ mod typecheck_tests {
                 &exp
             );
         }
-        fn hex<T: Into<AddressHash>>(con: fn(Vec<u8>) -> T, hex: &str, ep: &str) -> addr::Address {
+        fn hex<T: Into<AddressHash>>(
+            con: fn(Vec<u8>) -> Result<T, FromBytesError>,
+            hex: &str,
+            ep: &str,
+        ) -> addr::Address {
             addr::Address {
-                hash: con(hex::decode(hex).unwrap()).into(),
+                hash: con(hex::decode(hex).unwrap()).unwrap().into(),
                 entrypoint: Entrypoint::try_from(ep).unwrap(),
             }
         }
@@ -6080,7 +6090,7 @@ mod typecheck_tests {
             r#""tz1WrbkDrzKVqcGXkjw4Qk4fXkjXpAJuNP1j""#,
             "0x00007b09f782e0bcd67739510afa819d85976119d5ef",
             hex(
-                ContractTz1Hash,
+                ContractTz1Hash::try_from,
                 "7b09f782e0bcd67739510afa819d85976119d5ef",
                 "default",
             ),
@@ -6089,7 +6099,7 @@ mod typecheck_tests {
             r#""tz29EDhZ4D3XueHxm5RGZsJLHRtj3qSA2MzH""#,
             "0x00010a053e3d8b622a993d3182e3f6cc5638ff5f12fe",
             hex(
-                ContractTz2Hash,
+                ContractTz2Hash::try_from,
                 "0a053e3d8b622a993d3182e3f6cc5638ff5f12fe",
                 "default",
             ),
@@ -6098,7 +6108,7 @@ mod typecheck_tests {
             r#""tz3UoffC7FG7zfpmvmjUmUeAaHvzdcUvAj6r""#,
             "0x00025cfa532f50de3e12befc0ad21603835dd7698d35",
             hex(
-                ContractTz3Hash,
+                ContractTz3Hash::try_from,
                 "5cfa532f50de3e12befc0ad21603835dd7698d35",
                 "default",
             ),
@@ -6107,7 +6117,7 @@ mod typecheck_tests {
             r#""tz4J46gb6DxDFYxkex8k9sKiYZwjuiaoNSqN""#,
             "0x00036342f30484dd46b6074373aa6ddca9dfb70083d6",
             hex(
-                ContractTz4Hash,
+                ContractTz4Hash::try_from,
                 "6342f30484dd46b6074373aa6ddca9dfb70083d6",
                 "default",
             ),
@@ -6116,7 +6126,7 @@ mod typecheck_tests {
             r#""KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye""#,
             "0x011f2d825fdd9da219235510335e558520235f4f5400",
             hex(
-                ContractKt1Hash,
+                ContractKt1Hash::try_from,
                 "1f2d825fdd9da219235510335e558520235f4f54",
                 "default",
             ),
@@ -6125,7 +6135,7 @@ mod typecheck_tests {
             r#""sr1RYurGZtN8KNSpkMcCt9CgWeUaNkzsAfXf""#,
             "0x03d601f22256d2ad1faec0c64374e527c6e62f2e5a00",
             hex(
-                SmartRollupHash,
+                SmartRollupHash::try_from,
                 "d601f22256d2ad1faec0c64374e527c6e62f2e5a",
                 "default",
             ),
@@ -6135,7 +6145,7 @@ mod typecheck_tests {
             r#""tz1WrbkDrzKVqcGXkjw4Qk4fXkjXpAJuNP1j%foo""#,
             "0x00007b09f782e0bcd67739510afa819d85976119d5ef666f6f",
             hex(
-                ContractTz1Hash,
+                ContractTz1Hash::try_from,
                 "7b09f782e0bcd67739510afa819d85976119d5ef",
                 "foo",
             ),
@@ -6144,7 +6154,7 @@ mod typecheck_tests {
             r#""tz29EDhZ4D3XueHxm5RGZsJLHRtj3qSA2MzH%foo""#,
             "0x00010a053e3d8b622a993d3182e3f6cc5638ff5f12fe666f6f",
             hex(
-                ContractTz2Hash,
+                ContractTz2Hash::try_from,
                 "0a053e3d8b622a993d3182e3f6cc5638ff5f12fe",
                 "foo",
             ),
@@ -6153,7 +6163,7 @@ mod typecheck_tests {
             r#""tz3UoffC7FG7zfpmvmjUmUeAaHvzdcUvAj6r%foo""#,
             "0x00025cfa532f50de3e12befc0ad21603835dd7698d35666f6f",
             hex(
-                ContractTz3Hash,
+                ContractTz3Hash::try_from,
                 "5cfa532f50de3e12befc0ad21603835dd7698d35",
                 "foo",
             ),
@@ -6162,7 +6172,7 @@ mod typecheck_tests {
             r#""tz4J46gb6DxDFYxkex8k9sKiYZwjuiaoNSqN%foo""#,
             "0x00036342f30484dd46b6074373aa6ddca9dfb70083d6666f6f",
             hex(
-                ContractTz4Hash,
+                ContractTz4Hash::try_from,
                 "6342f30484dd46b6074373aa6ddca9dfb70083d6",
                 "foo",
             ),
@@ -6171,7 +6181,7 @@ mod typecheck_tests {
             r#""KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye%foo""#,
             "0x011f2d825fdd9da219235510335e558520235f4f5400666f6f",
             hex(
-                ContractKt1Hash,
+                ContractKt1Hash::try_from,
                 "1f2d825fdd9da219235510335e558520235f4f54",
                 "foo",
             ),
@@ -6180,7 +6190,7 @@ mod typecheck_tests {
             r#""sr1RYurGZtN8KNSpkMcCt9CgWeUaNkzsAfXf%foo""#,
             "0x03d601f22256d2ad1faec0c64374e527c6e62f2e5a00666f6f",
             hex(
-                SmartRollupHash,
+                SmartRollupHash::try_from,
                 "d601f22256d2ad1faec0c64374e527c6e62f2e5a",
                 "foo",
             ),
@@ -6292,7 +6302,7 @@ mod typecheck_tests {
     fn test_push_chain_id() {
         let bytes = "f3d48554";
         let exp = hex::decode(bytes).unwrap();
-        let exp = Ok(Push(TypedValue::ChainId(super::ChainId(exp))));
+        let exp = Ok(Push(TypedValue::ChainId(super::ChainId::try_from(exp).unwrap())));
         let lit = "NetXynUjJNZm7wi";
         assert_eq!(
             &typecheck_instruction(

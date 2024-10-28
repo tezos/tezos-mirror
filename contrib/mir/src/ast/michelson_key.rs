@@ -8,7 +8,7 @@
 //! Representation for typed Michelson `key` values.
 
 use tezos_crypto_rs::{
-    hash::{Hash, HashTrait, PublicKeyBls, PublicKeyEd25519, PublicKeyP256, PublicKeySecp256k1},
+    hash::{HashTrait, PublicKeyBls, PublicKeyEd25519, PublicKeyP256, PublicKeySecp256k1},
     PublicKeyWithHash,
 };
 
@@ -34,7 +34,7 @@ macro_rules! key_type_and_impls {
         impl AsRef<[u8]> for Key {
             fn as_ref(&self) -> &[u8] {
                 match self {
-                    $(Key::$con($ty(h)))|* => h,
+                    $(Key::$con(h) => h.as_ref(),)*
                 }
             }
         }
@@ -42,7 +42,7 @@ macro_rules! key_type_and_impls {
         impl From<Key> for Vec<u8> {
             fn from(value: Key) -> Self {
                 match value {
-                    $(Key::$con($ty(h)))|* => h,
+                    $(Key::$con(h) => h.as_ref().to_vec(),)*
                 }
             }
         }
@@ -99,13 +99,11 @@ impl Key {
     /// Construct a [KeyHash] from the key. Essentially hashes the key.
     pub fn hash(&self) -> KeyHash {
         use Key::*;
-        // unwrap because errors should be literally impossible, any bytestring
-        // can be hashed, and hash size is constant.
         match self {
-            Ed25519(hash) => KeyHash::Tz1(hash.pk_hash().unwrap()),
-            Secp256k1(hash) => KeyHash::Tz2(hash.pk_hash().unwrap()),
-            P256(hash) => KeyHash::Tz3(hash.pk_hash().unwrap()),
-            Bls(hash) => KeyHash::Tz4(hash.pk_hash().unwrap()),
+            Ed25519(hash) => KeyHash::Tz1(hash.pk_hash()),
+            Secp256k1(hash) => KeyHash::Tz2(hash.pk_hash()),
+            P256(hash) => KeyHash::Tz3(hash.pk_hash()),
+            Bls(hash) => KeyHash::Tz4(hash.pk_hash()),
         }
     }
 }
@@ -156,7 +154,7 @@ impl ByteReprTrait for Key {
 
     fn to_bytes(&self, out: &mut Vec<u8>) {
         use Key::*;
-        fn go(out: &mut Vec<u8>, tag: u8, hash: impl AsRef<Hash>) {
+        fn go(out: &mut Vec<u8>, tag: u8, hash: impl AsRef<[u8]>) {
             out.push(tag);
             out.extend_from_slice(hash.as_ref());
         }
