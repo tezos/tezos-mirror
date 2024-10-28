@@ -1526,7 +1526,6 @@ module History = struct
         in
         cell
 
-    (*
     (* Dal proofs section *)
 
     (** An inclusion proof is a sequence (list) of cells from the Dal skip list,
@@ -1830,7 +1829,10 @@ module History = struct
       | Found target_cell -> (
           let inc_proof = List.rev search_result.Skip_list.rev_path in
           match (page_info, Skip_list.content target_cell) with
-          | Some (page_data, page_proof), Attested {commitment; id = _} ->
+          | ( Some (page_data, page_proof),
+              Published
+                {header = {commitment; id = _}; is_proto_attested = true; _} )
+            ->
               (* The case where the slot to which the page is supposed to belong
                  is found and the page's information are given. *)
               let*? () =
@@ -1846,20 +1848,21 @@ module History = struct
               return
                 ( Page_confirmed {target_cell; inc_proof; page_data; page_proof},
                   Some page_data )
-          | None, Unattested _ ->
+          | None, (Unpublished _ | Published {is_proto_attested = false; _}) ->
               (* The slot corresponding to the given page's index is not found in
                  the attested slots of the page's level, and no information is
                  given for that page. So, we produce a proof that the page is not
                  attested. *)
               return (Page_unconfirmed {target_cell; inc_proof}, None)
-          | None, Attested _ ->
+          | None, Published {is_proto_attested = true; _} ->
               (* Mismatch: case where no page information are given, but the
                  slot is attested. *)
               tzfail
               @@ dal_proof_error
                    "The page ID's slot is confirmed, but no page content and \
                     proof are provided."
-          | Some _, Unattested _ ->
+          | Some _, (Unpublished _ | Published {is_proto_attested = false; _})
+            ->
               (* Mismatch: case where page information are given, but the slot
                  is not attested. *)
               tzfail
@@ -1867,7 +1870,8 @@ module History = struct
                    "The page ID's slot is not confirmed, but page content and \
                     proof are provided.")
 
-    let produce_proof dal_params page_id ~page_info ~get_history slots_hist =
+    let produce_proof dal_params page_id ~page_info ~get_history slots_hist :
+        (proof * Page.content option) tzresult Lwt.t =
       let open Lwt_result_syntax in
       let* proof_repr, page_data =
         produce_proof_repr dal_params page_id ~page_info ~get_history slots_hist
@@ -1946,16 +1950,19 @@ module History = struct
         verify_inclusion_proof inc_proof ~src:snapshot ~dest:target_cell
       in
       match (page_proof_check, cell_content) with
-      | None, Unattested _ -> return_none
-      | Some page_proof_check, Attested {commitment; _} ->
+      | None, (Unpublished _ | Published {is_proto_attested = false; _}) ->
+          return_none
+      | ( Some page_proof_check,
+          Published {header = {commitment; id = _}; is_proto_attested = true; _}
+        ) ->
           let* page_data = page_proof_check commitment in
           return_some page_data
-      | Some _, Unattested _ ->
+      | Some _, (Unpublished _ | Published {is_proto_attested = false; _}) ->
           error
           @@ dal_proof_error
                "verify_proof_repr: the unconfirmation proof contains the \
                 target slot."
-      | None, Attested _ ->
+      | None, Published {is_proto_attested = true; _} ->
           error
           @@ dal_proof_error
                "verify_proof_repr: the confirmation proof doesn't contain the \
@@ -1965,7 +1972,7 @@ module History = struct
       let open Result_syntax in
       let* proof_repr = deserialize_proof serialized_proof in
       verify_proof_repr dal_params page_id snapshot proof_repr
-
+    (*
     module Internal_for_tests = struct
       type cell_content = Content.t =
         | Unattested of Header.id
