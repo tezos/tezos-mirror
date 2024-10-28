@@ -23,12 +23,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let download ?runner url filename =
-  Log.info "Download %s" url ;
+let fetch ?runner src filename =
   let path = Tezt.Temp.file filename in
-  let*! _ = Curl.get_raw ?runner ~args:["--output"; path] url in
-  Log.info "%s downloaded" url ;
-  Lwt.return path
+  if Sys.file_exists src then (
+    Log.info "Using %s" src ;
+    Unix.symlink src path ;
+    Lwt.return path)
+  else (
+    Log.info "Download %s" src ;
+    let*! _ = Curl.get_raw ?runner ~args:["--output"; path] src in
+    Log.info "%s downloaded" src ;
+    Lwt.return path)
 
 let rec wait_for_funded_key node client expected_amount key =
   let* balance = Client.get_balance_for ~account:key.Account.alias client in
@@ -77,7 +82,7 @@ let setup_octez_node ~(testnet : Testnet.t) ?runner ?metrics_port () =
     match testnet.snapshot with
     | Some snapshot ->
         Log.info "Import snapshot" ;
-        let* snapshot = download ?runner snapshot "snapshot" in
+        let* snapshot = fetch ?runner snapshot "snapshot" in
         let* () = Node.snapshot_import node snapshot in
         Log.info "Snapshot imported" ;
         unit

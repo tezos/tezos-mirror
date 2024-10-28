@@ -9,6 +9,9 @@
      Invocation :
         - dune exec src/bin_testnet_scenarios/main.exe -- -f upgrade_etherlink.ml -a network=mainnet --verbose --keep-temp -a upgrade-kernel=<NEW_KERNEL>
         - dune exec src/bin_testnet_scenarios/main.exe -- -f upgrade_etherlink.ml -a network=mainnet --verbose --keep-temp -a upgrade-kernel=<NEW_KERNEL> -a node-snapshot=<OCTEZ_NODE_ROLLING_SNAPSHOT> -a rollup-node-snapshot=<ROLLUP_NODE_FULL_SNAPSHOT>
+
+     Note : <..._SNAPSHOT> can either be a URL (the snapshot will be downloaded)
+     or the path to a file (a symlink will be created).
 *)
 
 open Rpc.Syntax
@@ -94,7 +97,7 @@ let run_and_bootstrap_rollup_node ~rollup_node_snapshot ~rollup network
   in
   (* Import the snapshot. *)
   let* rollup_node_snapshot =
-    Scenario_helpers.download rollup_node_snapshot "rollup_node.snapshot"
+    Scenario_helpers.fetch rollup_node_snapshot "rollup_node.snapshot"
   in
   let*? process =
     Sc_rollup_node.import_snapshot
