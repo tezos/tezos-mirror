@@ -627,30 +627,24 @@ module Make (Proto : Protocol_plugin.T) = struct
        in
        let* state, ops_metadata =
          (List.fold_left_i_es
-            (fun i (state, acc) ops ->
-              let[@warning "-26"] sec =
-                "operation_list(" ^ string_of_int i ^ ")"
-              in
+            (fun [@warning "-27"] i (state, acc) ops ->
               (let* state, ops_metadata =
                  List.fold_left_es
                    (fun (state, acc) (oph, op, _check_signature) ->
                      let* state, op_metadata =
-                       let[@warning "-26"] sec =
-                         "operation(" ^ Operation_hash.to_b58check oph ^ ")"
-                       in
                        (Proto.apply_operation
                           state
                           oph
                           op
-                        [@profiler.record_s sec]
-                        (* TODO: Add a ~verbosity:info payload *))
+                        [@profiler.record_s
+                          "operation : " ^ Operation_hash.to_b58check oph])
                      in
                      return (state, op_metadata :: acc))
                    (state, [])
                    ops
                in
                return (state, List.rev ops_metadata :: acc))
-              [@profiler.record_s sec])
+              [@profiler.record_s "operation_list(" ^ string_of_int i ^ ")"])
             (state, [])
             operations
           [@time.duration_lwt operations_application]
@@ -1333,22 +1327,18 @@ module Make (Proto : Protocol_plugin.T) = struct
     in
     let* state =
       (List.fold_left_i_es
-         (fun i state ops ->
-           let[@warning "-26"] sec =
-             "operation_list(" ^ string_of_int i ^ ")"
-           in
+         (fun [@warning "-27"] i state ops ->
            (List.fold_left_es
               (fun state (oph, op, check_signature) ->
-                let[@warning "-26"] sec =
-                  "operation(" ^ Operation_hash.to_b58check oph ^ ")"
-                in
                 (Proto.validate_operation
                    ~check_signature
                    state
                    oph
-                   op [@profiler.record_s {verbosity = Info} sec]))
+                   op
+                 [@profiler.record_s
+                   "operation : " ^ Operation_hash.to_b58check oph]))
               state
-              ops [@profiler.record_s sec]))
+              ops [@profiler.record_s "operation_list(" ^ string_of_int i ^ ")"]))
          state
          operations [@profiler.record_s "validate_operations"])
     in
