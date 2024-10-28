@@ -35,12 +35,11 @@ let assert_not_equal_int ~loc n (pct : Percentage.t tzresult Lwt.t) =
   let pct_q = Percentage.to_q pct in
   Assert.not_equal ~loc Q.equal "Values are equal" Q.pp_print Q.(n // 100) pct_q
 
-let raw_context ~max_slashing_threshold ~max_slashing_per_block ~ns_enable () =
+let raw_context ~max_slashing_threshold ~max_slashing_per_block () =
   let open Constants_helpers in
   let constants =
     Default_parameters.constants_test
     |> Set.Adaptive_issuance.force_activation true
-    |> Set.Adaptive_issuance.ns_enable ns_enable
     |> Set.max_slashing_threshold max_slashing_threshold
     |> Set.max_slashing_per_block max_slashing_per_block
   in
@@ -61,21 +60,15 @@ let make_fake_culprits_with_rights_from_int_list il =
   in
   return (map, pkh_list)
 
-let get_pct ~ns_enable ~max_slashing_threshold ~max_slashing_per_block int_list
-    =
+let get_pct ~max_slashing_threshold ~max_slashing_per_block int_list =
   let open Lwt_result_syntax in
-  let* ctxt =
-    raw_context ~max_slashing_threshold ~max_slashing_per_block ~ns_enable ()
-  in
+  let* ctxt = raw_context ~max_slashing_threshold ~max_slashing_per_block () in
   let*? map, pkh_list = make_fake_culprits_with_rights_from_int_list int_list in
   return
   @@ Protocol.Slash_percentage.Internal_for_tests.for_double_attestation
        ctxt
        map
        pkh_list
-
-(** We set ns_enable = true for the following tests *)
-let get_pct = get_pct ~ns_enable:true
 
 (** Tests that the slashing amount for several delegates is the same as long
     as the sum of their rights is the same *)

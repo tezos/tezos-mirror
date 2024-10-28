@@ -39,7 +39,6 @@ let never_slashed_delegate2 = "bootstrap3"
    - potentialy three stakers (2 delegating to first_slashed_delegate and 1 to
      never_slashed_delegate1 respectively)
    - AI enabled
-   - ns_enable enabled/disabled
    - alternative parameters for first_slashed_delegate and
      never_slashed_delegate1
 *)
@@ -78,7 +77,6 @@ let init_with_stakers () =
     |+ Empty
   in
   init_constants () --> activate_ai `Force
-  --> set S.Adaptive_issuance.ns_enable true
   --> begin_test
         ~force_attest_all:true
         [
