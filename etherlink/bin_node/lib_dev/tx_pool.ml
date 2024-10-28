@@ -372,29 +372,22 @@ let tx_data_size_limit_reached ~max_number_of_chunks ~tx_data =
 let check_address_boundaries ~pool ~address ~tx_pool_addr_limit
     ~tx_pool_tx_per_addr_limit =
   let open Lwt_result_syntax in
-  let boundaries_are_not_reached = return (false, "") in
   match Pool.Pkey_map.find address pool.Pool.transactions with
   | None ->
       if Pool.Pkey_map.cardinal pool.Pool.transactions < tx_pool_addr_limit then
-        boundaries_are_not_reached
+        return_unit
       else
         let*! () = Tx_pool_events.users_threshold_reached () in
-        return
-          ( true,
-            "The transaction pool has reached its maximum threshold for user \
-             transactions. Transaction is rejected." )
+        fail `MaxUsers
   | Some txs ->
       if Pool.Nonce_map.cardinal txs < tx_pool_tx_per_addr_limit then
-        boundaries_are_not_reached
+        return_unit
       else
         let*! () =
           Tx_pool_events.txs_per_user_threshold_reached
             ~address:(Ethereum_types.Address.to_string address)
         in
-        return
-          ( true,
-            "Limit of transaction for a user was reached. Transaction is \
-             rejected." )
+        fail `MaxPerUser
 
 let insert_valid_transaction state tx_raw
     (transaction_object : Ethereum_types.transaction_object) =
@@ -417,30 +410,40 @@ let insert_valid_transaction state tx_raw
     let*! () = Tx_pool_events.tx_data_size_limit_reached () in
     return @@ Error "Transaction data exceeded the allowed size."
   else
-    let* address_boundaries_are_reached, error_msg =
+    let*! res_boundaries =
       check_address_boundaries
         ~pool
         ~address:transaction_object.from
         ~tx_pool_addr_limit
         ~tx_pool_tx_per_addr_limit
     in
-    if address_boundaries_are_reached then return @@ Error error_msg
-    else
-      (* Add the transaction to the pool *)
-      (* Compute the hash *)
-      let hash = Ethereum_types.hash_raw_tx tx_raw in
-      (* This is a temporary fix until the hash computation is fixed on the
-         kernel side. *)
-      let transaction_object = {transaction_object with hash} in
-      let*? pool =
-        Pool.add pool transaction_object.from tx_raw transaction_object
-      in
-      let*! () =
-        Tx_pool_events.add_transaction
-          ~transaction:(Ethereum_types.hash_to_string hash)
-      in
-      state.pool <- pool ;
-      return (Ok hash)
+    match res_boundaries with
+    | Error `MaxUsers ->
+        return
+          (Error
+             "The transaction pool has reached its maximum threshold for user \
+              transactions. Transaction is rejected.")
+    | Error `MaxPerUser ->
+        return
+          (Error
+             "Limit of transaction for a user was reached. Transaction is \
+              rejected.")
+    | Ok () ->
+        (* Add the transaction to the pool *)
+        (* Compute the hash *)
+        let hash = Ethereum_types.hash_raw_tx tx_raw in
+        (* This is a temporary fix until the hash computation is fixed on the
+           kernel side. *)
+        let transaction_object = {transaction_object with hash} in
+        let*? pool =
+          Pool.add pool transaction_object.from tx_raw transaction_object
+        in
+        let*! () =
+          Tx_pool_events.add_transaction
+            ~transaction:(Ethereum_types.hash_to_string hash)
+        in
+        state.pool <- pool ;
+        return (Ok hash)
 
 let on_normal_transaction state transaction_object tx_raw =
   insert_valid_transaction state tx_raw transaction_object
