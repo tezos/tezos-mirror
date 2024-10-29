@@ -879,6 +879,11 @@ module Chain : sig
 
   (** {2 Chain's protocols} *)
 
+  (** [protol_levels chain_store] return all protocols with their activation
+      levels. *)
+  val protocol_levels :
+    t -> Protocol_levels.protocol_info Protocol_levels.t Lwt.t
+
   (** [find_protocol_info chain_store ~protocol_level] returns the
      protocol info associated to the given [protocol_level]. *)
   val find_protocol_info :

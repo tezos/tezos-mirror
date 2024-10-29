@@ -36,6 +36,15 @@ type invalid_block = {hash : Block_hash.t; level : Int32.t; errors : error list}
 
 type prefix = unit * chain
 
+type protocol_info = {
+  protocol : Protocol_hash.t;
+  proto_level : int;
+      (* Level of protocol in the sequence of protocol activations. *)
+  activation_block : Block_hash.t * int32;
+      (* The activation block for a protocol is the migration block, i.e. the
+         last level of the previous protocol. *)
+}
+
 val path : (unit, prefix) Tezos_rpc.Path.path
 
 open Tezos_rpc.Context
@@ -88,6 +97,14 @@ module Invalid_blocks : sig
     #simple -> ?chain:chain -> Block_hash.t -> invalid_block tzresult Lwt.t
 
   val delete : #simple -> ?chain:chain -> Block_hash.t -> unit tzresult Lwt.t
+end
+
+module Protocols : sig
+  val list :
+    #simple -> ?chain:chain -> unit -> protocol_info list tzresult Lwt.t
+
+  val get :
+    #simple -> ?chain:chain -> Protocol_hash.t -> protocol_info tzresult Lwt.t
 end
 
 module S : sig
@@ -176,6 +193,26 @@ module S : sig
         unit,
         unit,
         unit )
+      Tezos_rpc.Service.t
+  end
+
+  module Protocols : sig
+    val list :
+      ( [`GET],
+        prefix,
+        prefix,
+        unit,
+        unit,
+        protocol_info list )
+      Tezos_rpc.Service.t
+
+    val get :
+      ( [`GET],
+        prefix,
+        prefix * Protocol_hash.t,
+        unit,
+        unit,
+        protocol_info )
       Tezos_rpc.Service.t
   end
 end

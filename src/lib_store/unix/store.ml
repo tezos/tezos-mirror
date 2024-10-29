@@ -187,11 +187,14 @@ let locked_is_acceptable_block chain_state (hash, level) =
 
 (* Shared protocols accessors *)
 
+let protocol_levels chain_store =
+  Shared.use chain_store.chain_state (fun {protocol_levels_data; _} ->
+      Stored_data.get protocol_levels_data)
+
 let find_protocol_info chain_store ~protocol_level =
   let open Lwt_syntax in
-  Shared.use chain_store.chain_state (fun {protocol_levels_data; _} ->
-      let* protocol_levels = Stored_data.get protocol_levels_data in
-      return (Protocol_levels.find protocol_level protocol_levels))
+  let* protocol_levels = protocol_levels chain_store in
+  return (Protocol_levels.find protocol_level protocol_levels)
 
 let find_activation_block chain_store ~protocol_level =
   let open Lwt_syntax in
@@ -2718,6 +2721,8 @@ module Chain = struct
         | None -> return_ok (None, ()))
 
   (* Protocols *)
+
+  let protocol_levels chain_store = protocol_levels chain_store
 
   let find_protocol_info chain_store ~protocol_level =
     find_protocol_info chain_store ~protocol_level

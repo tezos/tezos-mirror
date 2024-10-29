@@ -38,6 +38,12 @@ type invalid_block = {hash : Block_hash.t; level : Int32.t; errors : error list}
 
 type prefix = Block_services.chain_prefix
 
+type protocol_info = {
+  protocol : Protocol_hash.t;
+  proto_level : int;
+  activation_block : Block_hash.t * int32;
+}
+
 let path = Block_services.chain_path
 
 let block_descriptor_encoding =
@@ -56,6 +62,26 @@ let bootstrap_encoding =
   obj2
     (req "bootstrapped" Encoding.bool)
     (req "sync_state" Chain_validator_worker_state.sync_status_encoding)
+
+let protocol_info_encoding =
+  conv
+    (fun {protocol; proto_level; activation_block} ->
+      (protocol, proto_level, activation_block))
+    (fun (protocol, proto_level, activation_block) ->
+      {protocol; proto_level; activation_block})
+  @@ obj3
+       (req "protocol" Protocol_hash.encoding)
+       (req
+          "proto_level"
+          int31
+          ~description:
+            "Level of protocol in the sequence of protocol activations.")
+       (req
+          "activation_block"
+          block_descriptor_encoding
+          ~description:
+            "The activation block for a protocol is the migration block, i.e. \
+             the last level of the previous protocol.")
 
 module S = struct
   let path : prefix Tezos_rpc.Path.context = Tezos_rpc.Path.open_root
@@ -189,6 +215,24 @@ module S = struct
         ~output:Data_encoding.empty
         Tezos_rpc.Path.(path /: Block_hash.rpc_arg)
   end
+
+  module Protocols = struct
+    let path = Tezos_rpc.Path.(path / "protocols")
+
+    let list =
+      Tezos_rpc.Service.get_service
+        ~description:"Lists protocols of the chain."
+        ~query:Tezos_rpc.Query.empty
+        ~output:(list protocol_info_encoding)
+        path
+
+    let get =
+      Tezos_rpc.Service.get_service
+        ~description:"Information about a protocol of the chain."
+        ~query:Tezos_rpc.Query.empty
+        ~output:protocol_info_encoding
+        Tezos_rpc.Path.(path /: Protocol_hash.rpc_arg)
+  end
 end
 
 let make_call0 s ctxt chain q p =
@@ -254,4 +298,14 @@ module Invalid_blocks = struct
   let delete ctxt =
     let f = make_call1 S.Invalid_blocks.delete ctxt in
     fun ?(chain = `Main) block -> f chain block () ()
+end
+
+module Protocols = struct
+  let list ctxt =
+    let f = make_call0 S.Protocols.list ctxt in
+    fun ?(chain = `Main) () -> f chain () ()
+
+  let get ctxt =
+    let f = make_call1 S.Protocols.get ctxt in
+    fun ?(chain = `Main) proto -> f chain proto () ()
 end
