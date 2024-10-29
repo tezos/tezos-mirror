@@ -305,6 +305,50 @@ let run_kvs store actions = List.iter_es (perform_kvs store) actions
 
 let run_sqlite3 store actions = List.iter_es (perform_sqlite store) actions
 
+(** [handshake state kvs_store sql_store] ensures that each hash
+    generated during the run is either available or not found in each
+    store. *)
+let handshake state kvs_store sql_store =
+  let open Lwt_result_syntax in
+  let must_exist_hashes =
+    LevelMap.fold
+      (fun _level -> HashSet.union)
+      state.State.registered_hashes
+      HashSet.empty
+  in
+  let must_not_exist_hashes = state.State.removed_hashes in
+  let* () =
+    HashSet.iter_es
+      (fun hash ->
+        (* The hash must exist in the stores and the associated cell must be the same. *)
+        let* kvs_cell = Kvs_skip_list_cells_store.find kvs_store hash in
+        let* sql_cell = Dal_store_sqlite3.Skip_list_cells.find sql_store hash in
+        assert (Skip_list_cell.equal kvs_cell sql_cell) ;
+        return_unit)
+      must_exist_hashes
+  in
+  let* () =
+    HashSet.iter_es
+      (fun hash ->
+        (* The hash must not exist in the stores, the lookup must return false. *)
+        let* kvs_lookup =
+          Kvs_skip_list_cells_store.Internal_for_tests.skip_list_hash_exists
+            kvs_store
+            hash
+        in
+        let* sql_lookup =
+          Dal_store_sqlite3.Skip_list_cells.Internal_for_tests
+          .skip_list_hash_exists
+            sql_store
+            hash
+        in
+        assert (not kvs_lookup) ;
+        assert (not sql_lookup) ;
+        return_unit)
+      must_not_exist_hashes
+  in
+  return_unit
+
 (* As found in bin_dal_node/store.ml *)
 let init_skip_list_cells_store node_store_dir =
   let padded_encoded_cell_size = 64 * (32 + 1) in
@@ -324,7 +368,7 @@ let () = Value_size_hooks.set_number_of_slots number_of_slots
    w.r.t to the cell hashes generated during the run. *)
 let consistency_test =
   let open Lwt_result_syntax in
-  let property {state = _; actions} =
+  let property {state; actions} =
     let run =
       (* Initialize the KVS and the SQLite stores. *)
       let data_dir = Tezt.Temp.dir "data-dir" in
@@ -333,6 +377,8 @@ let consistency_test =
       (* Run the actions both for the KVS and the SQL backends. *)
       let* () = run_kvs kvs_store actions in
       let* () = run_sqlite3 sql_store actions in
+      (* Perform the handshake. *)
+      let* () = handshake state kvs_store sql_store in
       (* We are done with this run. *)
       let* () = Kvs_skip_list_cells_store.close kvs_store in
       return_unit
