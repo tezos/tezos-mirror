@@ -130,13 +130,11 @@ module Make (SimulationBackend : SimulationBackend) = struct
     in
     let* da_fee_per_byte = read_qty Durable_storage_path.da_fee_per_byte in
     let* (Qty gas_price) =
-      let path = Durable_storage_path.base_fee_per_gas in
+      let path = Durable_storage_path.minimum_base_fee_per_gas in
       let* gas_price_opt = read_qty path in
       match gas_price_opt with
       | None ->
-          (* Base fee per gas is supposed to be updated in the storage after
-             every block. *)
-          failwith "Internal error: base fee per gas is not found at %s" path
+          return (Ethereum_types.quantity_of_z (Z.of_string "1_000_000_000"))
       | Some gas_price -> return gas_price
     in
     let da_fee = Fees.gas_for_fees ?da_fee_per_byte ~gas_price tx_data in

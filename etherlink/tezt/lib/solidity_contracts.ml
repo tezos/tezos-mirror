@@ -387,3 +387,10 @@ let state_override_tester_readable () =
     ~label:"state_override_tester_readable"
     ~contract:"StateOverrideTester"
     ~evm_version:"shanghai"
+
+let batcher () =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/batcher.sol")
+    ~label:"batcher"
+    ~contract:"Batcher"
+    ~evm_version:"shanghai"

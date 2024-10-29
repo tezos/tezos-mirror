@@ -6805,7 +6805,7 @@ let test_tx_pool_replacing_transactions_on_limit () =
 let test_da_fees_after_execution =
   register_all
     ~time_between_blocks:Nothing
-    ~tags:["evm"; "da_fees"; "foo"]
+    ~tags:["evm"; "da_fees"]
     ~da_fee:(Wei.of_string "4_000_000_000_000")
     ~title:"da fees test"
   @@ fun {sequencer; _} _protocol ->
@@ -6887,6 +6887,78 @@ let test_configuration_service =
   Regression.capture (JSON.encode (remove_public_rpc_port @@ sequencer_config)) ;
   Regression.capture (JSON.encode (remove_public_rpc_port @@ observer_config)) ;
 
+  unit
+
+let test_inconsistent_da_fees =
+  register_all
+    ~kernels:Kernel.all
+    ~tags:["evm"; "rpc"; "estimate_gas"; "da_fees"]
+    ~title:"Regression: da fees are inconsistent if gas price is provided"
+    ~time_between_blocks:Nothing
+    ~da_fee:(Wei.of_string "4_000_000_000")
+  @@ fun {sequencer; _} _protocol ->
+  (* There is an inconsistency in the gas estimation observed when the fee model
+     kicks in, i.e. minimum_base_fee_per_gas and base_fee_per_gas are different.
+
+     The test serves as a non regression test.
+  *)
+  let* batcher = Solidity_contracts.batcher () in
+  let* () = Eth_cli.add_abi ~label:batcher.label ~abi:batcher.abi () in
+  let* batcher_contract, _tx_hash =
+    send_transaction_to_sequencer
+      (fun () ->
+        Eth_cli.deploy
+          ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+          ~endpoint:(Evm_node.endpoint sequencer)
+          ~abi:batcher.abi
+          ~bin:batcher.bin)
+      sequencer
+  in
+  let* _tx =
+    send_transaction_to_sequencer
+      (Eth_cli.contract_send
+         ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+         ~endpoint:(Evm_node.endpoint sequencer)
+         ~abi_label:batcher.label
+         ~address:batcher_contract
+         ~method_call:"batchXTZ(565, 0)")
+      sequencer
+  in
+
+  let wait_for =
+    (* This event is emitted on invalid node DA fees. *)
+    Evm_node.(
+      resolve_or_timeout ~timeout:10. sequencer ~name:"wait_for_node_da_fees"
+      @@ wait_for sequencer "node_da_fees.v0"
+      @@ Fun.const (Some ()))
+  in
+
+  let*@ _ =
+    Rpc.estimate_gas
+      [
+        ( "data",
+          `String
+            "0x0b7d796e00000000000000000000000000000000000000000000000000000000000186a0"
+        );
+        ("to", `String "0xCF02B9Ca488f8F6F4E28e37AA1bDD16b3F1b2aD8");
+      ]
+      sequencer
+  in
+  let timeout = ref false in
+  let* () =
+    Lwt.catch
+      (fun () ->
+        let* () = wait_for in
+        unit)
+      (fun _exn ->
+        timeout := true ;
+        unit)
+  in
+  Check.is_true
+    !timeout
+    ~error_msg:
+      "The event should not be emitted, the wait_for_event is supposed to \
+       timeout" ;
   unit
 
 let protocols = Protocol.all
@@ -6988,4 +7060,5 @@ let () =
   test_da_fees_after_execution protocols ;
   test_trace_transaction_calltracer_failed_create protocols ;
   test_configuration_service [Protocol.Alpha] ;
-  test_overwrite_simulation_tick_limit protocols
+  test_overwrite_simulation_tick_limit protocols ;
+  test_inconsistent_da_fees protocols
