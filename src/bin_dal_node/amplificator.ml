@@ -434,7 +434,6 @@ let amplify node_store commitment (slot_id : Types.slot_id)
     ~number_of_already_stored_shards ~number_of_shards ~number_of_needed_shards
     proto_parameters amplificator =
   let open Lwt_result_syntax in
-  Dal_metrics.reconstruction_started () ;
   let reconstruction_start_time = Unix.gettimeofday () in
   Dal_metrics.reconstruction_started () ;
   let*! () =
