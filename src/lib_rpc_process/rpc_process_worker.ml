@@ -117,6 +117,7 @@ type 'a t = {
   (* Resolver that will wakeup the above stop promise. *)
   stopper : (int * Unix.process_status) Lwt.u;
   parameters : 'a;
+  parameters_encoding : 'a Data_encoding.t;
 }
 
 type process = Parameters.t t
@@ -136,6 +137,7 @@ let create ~comm_socket_path (config : Config_file.t) node_version events_config
           rpc_comm_socket_path = comm_socket_path;
           node_version;
         };
+    parameters_encoding = Parameters.parameters_encoding;
   }
 
 let shutdown t =
@@ -151,7 +153,20 @@ let stop t =
   Lwt.wakeup t.stopper (0, Lwt_unix.WSTOPPED 0) ;
   shutdown t
 
-let run_process t ~process_name () =
+let get_init_socket_path ~socket_dir ?socket_prefix ~pid () =
+  let socket_prefix =
+    match socket_prefix with
+    | Some v -> v
+    | None -> Filename.(temp_file ~temp_dir:"" "" "")
+  in
+  let filename = Format.sprintf "%s-%d" socket_prefix pid in
+  Filename.concat socket_dir filename
+
+let rpc_process_socket_magic = Bytes.of_string "TEZOS_RPC_SERVER_MAGIC_0"
+
+let rpc_process_socket_prefix = "init-rpc-socket"
+
+let run_process t ~process_name ?socket_prefix ~handshake () =
   let open Lwt_result_syntax in
   let socket_dir = Tezos_base_unix.Socket.get_temporary_socket_dir () in
   let socket_dir_arg = ["--socket-dir"; socket_dir] in
@@ -163,7 +178,9 @@ let run_process t ~process_name () =
       (Sys.executable_name, Array.of_list args)
   in
   let pid = process#pid in
-  let init_socket_path = Main.get_init_socket_path socket_dir pid in
+  let init_socket_path =
+    get_init_socket_path ~socket_dir ?socket_prefix ~pid ()
+  in
   let* init_socket_fd =
     let* fds = Tezos_base_unix.Socket.bind (Unix init_socket_path) in
     match fds with
@@ -177,10 +194,8 @@ let run_process t ~process_name () =
            when binding Unix sockets. *)
         assert false
   in
-  let* () = Tezos_base_unix.Socket.handshake init_socket_fd Main.socket_magic in
-  let* () =
-    Socket.send init_socket_fd Parameters.parameters_encoding t.parameters
-  in
+  let* () = Tezos_base_unix.Socket.handshake init_socket_fd handshake in
+  let* () = Socket.send init_socket_fd t.parameters_encoding t.parameters in
   (* FIXME: https://gitlab.com/tezos/tezos/-/issues/6579
      Workaround: increase default timeout. If the timeout is still not
      enough and an Lwt_unix.Timeout is triggered, we display a
@@ -274,7 +289,13 @@ let watch_dog ~start_new_server =
 
 let start parameters =
   let open Lwt_result_syntax in
-  let run_process = run_process parameters ~process_name:"octez-rpc-process" in
+  let run_process =
+    run_process
+      parameters
+      ~socket_prefix:rpc_process_socket_prefix
+      ~process_name:"octez-rpc-process"
+      ~handshake:rpc_process_socket_magic
+  in
   let* new_server = run_process () in
   let _ = watch_dog ~start_new_server:run_process new_server in
   return_unit
