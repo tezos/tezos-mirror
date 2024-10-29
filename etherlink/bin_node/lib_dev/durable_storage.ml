@@ -326,6 +326,12 @@ let maximum_gas_per_transaction read =
     Durable_storage_path.maximum_gas_per_transaction
     decode_number_le
 
+let da_fee_per_byte read =
+  inspect_durable_and_decode
+    read
+    Durable_storage_path.da_fee_per_byte
+    decode_number_le
+
 module Make (Reader : READER) = struct
   let read = Reader.read
 

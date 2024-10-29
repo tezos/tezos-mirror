@@ -49,17 +49,14 @@ let validate_gas_limit (module Backend_rpc : Services_backend_sig.S)
     Durable_storage.maximum_gas_per_transaction (Backend_rpc.Reader.read state)
   in
   let* da_fee_per_byte =
-    let+ bytes =
-      Backend_rpc.Reader.read state Durable_storage_path.da_fee_per_byte
-    in
-    Option.map Ethereum_types.decode_number_le bytes
+    Durable_storage.da_fee_per_byte (Backend_rpc.Reader.read state)
   in
   let* (Qty gas_price) =
     Durable_storage.base_fee_per_gas (Backend_rpc.Reader.read state)
   in
   let gas_for_da_fees =
     Fees.gas_for_fees
-      ?da_fee_per_byte
+      ~da_fee_per_byte
       ~access_list:transaction.access_list
       ~gas_price
       transaction.data
