@@ -26,6 +26,9 @@
 
 ### Internals
 
+- Adds more information to the `blueprint_applied` event, including block
+  timestamp, number of transactions and gas used. (!15402)
+
 ## Version 0.6 (2024-10-21)
 
 This release introduces a new, still experimental runtime to execute Etherlink

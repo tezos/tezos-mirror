@@ -888,7 +888,7 @@ module State = struct
         return
           ( evm_state,
             context,
-            block.hash,
+            block,
             applied_kernel_upgrade,
             split_info,
             gc_info )
@@ -897,13 +897,13 @@ module State = struct
         tzfail (Cannot_apply_blueprint {local_state_level = Z.pred next})
 
   let on_new_head ?split_info ?gc_info ctxt ~applied_upgrade evm_state context
-      block_hash blueprint_with_events =
+      block blueprint_with_events =
     let open Lwt_syntax in
     let (Qty level) = ctxt.session.next_blueprint_number in
     ctxt.session.evm_state <- evm_state ;
     ctxt.session.context <- context ;
     ctxt.session.next_blueprint_number <- Qty (Z.succ level) ;
-    ctxt.session.current_block_hash <- block_hash ;
+    ctxt.session.current_block_hash <- Ethereum_types.(block.hash) ;
     Option.iter
       (fun (split_level, split_timestamp) ->
         ctxt.session.last_split_block <- Some (split_level, split_timestamp))
@@ -916,13 +916,13 @@ module State = struct
     let* head_info in
     head_info := session_to_head_info ctxt.session ;
     Metrics.set_level ~level ;
-    Blueprint_events.blueprint_applied (level, block_hash)
+    Blueprint_events.blueprint_applied block
 
   let apply_blueprint ctxt timestamp payload delayed_transactions =
     let open Lwt_result_syntax in
     let* ( evm_state,
            context,
-           current_block_hash,
+           current_block,
            applied_kernel_upgrade,
            split_info,
            gc_info ) =
@@ -950,7 +950,7 @@ module State = struct
         ~applied_upgrade:applied_kernel_upgrade
         evm_state
         context
-        current_block_hash
+        current_block
         {
           delayed_transactions;
           kernel_upgrade;
