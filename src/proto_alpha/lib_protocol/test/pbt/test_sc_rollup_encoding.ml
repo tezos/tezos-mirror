@@ -202,7 +202,7 @@ let gen_dal_slots_history () =
   in
   let rec loop history = function
     | [] -> return history
-    | (level, slot_headers) :: llist -> (
+    | (published_level, slot_headers) :: llist -> (
         let slot_headers =
           (* Sort the list in the right ordering before adding slots to slots_history. *)
           List.sort_uniq
@@ -215,7 +215,11 @@ let gen_dal_slots_history () =
             slot_headers
         in
         History.(
-          update_skip_list_no_cache ~number_of_slots history level slot_headers)
+          update_skip_list_no_cache
+            ~number_of_slots
+            history
+            ~published_level
+            slot_headers)
         |> function
         | Ok history -> loop history llist
         | Error e ->

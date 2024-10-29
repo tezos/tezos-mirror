@@ -2929,7 +2929,7 @@ module Dal : sig
     val update_skip_list_no_cache :
       t ->
       ?with_migration:Raw_level.t * int ->
-      Raw_level.t ->
+      published_level:Raw_level.t ->
       number_of_slots:int ->
       (Slot.Header.t
       * Signature.public_key_hash
@@ -2941,7 +2941,7 @@ module Dal : sig
       t ->
       History_cache.t ->
       ?with_migration:Raw_level.t * int ->
-      Raw_level.t ->
+      published_level:Raw_level.t ->
       number_of_slots:int ->
       (Slot.Header.t
       * Signature.public_key_hash

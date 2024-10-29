@@ -84,7 +84,7 @@ struct
     let*? commitment = dal_commit cryptobox polynomial in
     (* Insert the slots of a level. *)
     let add_slots (cell, cache, slots_info) (level, slots_data) =
-      let curr_level = Raw_level_repr.of_int32_exn (Int32.of_int level) in
+      let published_level = Raw_level_repr.of_int32_exn (Int32.of_int level) in
       let slots_headers =
         List.mapi
           (fun sindex (skip_slot, slot_publisher) ->
@@ -95,8 +95,7 @@ struct
                    sindex)
                 ~default:(fun () -> assert false)
             in
-            ( Dal_slot_repr.Header.
-                {id = {published_level = curr_level; index}; commitment},
+            ( Dal_slot_repr.Header.{id = {published_level; index}; commitment},
               slot_publisher,
               skip_slot ))
           slots_data
@@ -121,7 +120,7 @@ struct
           ~number_of_slots:Parameters.dal_parameters.number_of_slots
           cell
           cache
-          curr_level
+          ~published_level
           slots_headers
       in
       let slots_info =

@@ -257,7 +257,7 @@ module History : sig
   module History_cache :
     Bounded_history_repr.S with type key = hash and type value = t
 
-  (** [update_skip_list hist cache ?with_migration published_level
+  (** [update_skip_list hist cache ?with_migration ~published_level
       ~number_of_slots slot_headers_with_statuses] updates the given structure
       [hist] with the list of [slot_headers_with_statuses]. The given [cache] is
       also updated to add successive values of [cell] to it.
@@ -281,7 +281,7 @@ module History : sig
     t ->
     History_cache.t ->
     ?with_migration:Raw_level_repr.t * int ->
-    Raw_level_repr.t ->
+    published_level:Raw_level_repr.t ->
     number_of_slots:int ->
     (Header.t
     * Signature.public_key_hash
@@ -294,7 +294,7 @@ module History : sig
   val update_skip_list_no_cache :
     t ->
     ?with_migration:Raw_level_repr.t * int ->
-    Raw_level_repr.t ->
+    published_level:Raw_level_repr.t ->
     number_of_slots:int ->
     (Header.t
     * Signature.public_key_hash

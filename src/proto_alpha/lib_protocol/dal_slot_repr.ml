@@ -809,7 +809,7 @@ module History = struct
        insert exactly [number_of_slots] cells in the skip list per level. This
        will simplify the shape of proofs and help bounding the history cache
        required for their generation. *)
-    let update_skip_list (t : t) cache ?with_migration published_level
+    let update_skip_list (t : t) cache ?with_migration ~published_level
         ~number_of_slots slot_headers_with_statuses =
       let open Result_syntax in
       let* () =
@@ -836,7 +836,7 @@ module History = struct
       let empty_cache = History_cache.empty ~capacity:0L in
       fun t
           ?with_migration
-          published_level
+          ~published_level
           ~number_of_slots
           slot_headers_with_statuses ->
         let open Result_syntax in
@@ -845,7 +845,7 @@ module History = struct
             ?with_migration
             t
             empty_cache
-            published_level
+            ~published_level
             ~number_of_slots
             slot_headers_with_statuses
         in
