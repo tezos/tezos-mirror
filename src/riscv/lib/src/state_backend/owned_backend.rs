@@ -31,8 +31,11 @@ impl ManagerBase for Owned {
 }
 
 impl ManagerAlloc for Owned {
-    fn allocate_region<E: 'static, const LEN: usize>(&mut self) -> Self::Region<E, LEN> {
-        unsafe { std::mem::zeroed() }
+    fn allocate_region<E: 'static, const LEN: usize>(
+        &mut self,
+        value: [E; LEN],
+    ) -> Self::Region<E, LEN> {
+        value
     }
 
     fn allocate_dyn_region<const LEN: usize>(&mut self) -> Self::DynRegion<LEN> {
@@ -367,5 +370,14 @@ pub mod test_helpers {
         let json_value = serde_json::to_value(cell).unwrap();
         let expected_json_value = serde_json::json!(42);
         assert_eq!(json_value, expected_json_value);
+    }
+
+    /// Check that regions are properly initialised.
+    #[test]
+    fn region_init() {
+        proptest::proptest!(|(init_value: [u64; 17])| {
+            let region = Owned.allocate_region(init_value);
+            proptest::prop_assert_eq!(region, init_value);
+        });
     }
 }

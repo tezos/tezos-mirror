@@ -4,6 +4,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::{
+    default::ConstDefault,
     interpreter::float::RoundingMode,
     machine_state::{
         csregisters::CSRegister,
@@ -451,6 +452,10 @@ pub enum InstrCacheable {
 
     Unknown { instr: u32 },
     UnknownCompressed { instr: u16 },
+}
+
+impl ConstDefault for InstrCacheable {
+    const DEFAULT: Self = Self::Unknown { instr: 0 };
 }
 
 /// Uncacheable instructions are those that may result in a

@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::machine_state::csregisters::Privilege;
+use crate::{default::ConstDefault, machine_state::csregisters::Privilege};
 
 /// Modes the hardware state can be in when running code
 #[derive(
@@ -33,11 +33,8 @@ impl Mode {
     }
 }
 
-impl Default for Mode {
-    #[inline]
-    fn default() -> Self {
-        Self::Machine
-    }
+impl ConstDefault for Mode {
+    const DEFAULT: Self = Self::Machine;
 }
 
 impl From<Mode> for u8 {

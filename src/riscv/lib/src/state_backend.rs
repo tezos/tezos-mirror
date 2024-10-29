@@ -80,7 +80,10 @@ pub trait ManagerBase {
 /// Manager with allocation capabilities
 pub trait ManagerAlloc: ManagerBase {
     /// Allocate a region in the state storage.
-    fn allocate_region<E, const LEN: usize>(&mut self) -> Self::Region<E, LEN>;
+    fn allocate_region<E, const LEN: usize>(
+        &mut self,
+        init_value: [E; LEN],
+    ) -> Self::Region<E, LEN>;
 
     /// Allocate a dynamic region in the state storage.
     fn allocate_dyn_region<const LEN: usize>(&mut self) -> Self::DynRegion<LEN>;

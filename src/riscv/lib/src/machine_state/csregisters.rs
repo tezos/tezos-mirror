@@ -1674,7 +1674,6 @@ mod tests {
         bits::Bits64,
         create_state,
         machine_state::{
-            backend::tests::test_determinism,
             csregisters::{
                 values::CSRValue, xstatus::MStatus, CSRRepr, CSRegister, CSRegisters,
                 CSRegistersLayout, Exception,
@@ -1993,14 +1992,6 @@ mod tests {
         assert_eq!(csrs.read::<CSRRepr>(CSRegister::mie), stip | seip);
         assert_eq!(csrs.read::<CSRRepr>(CSRegister::sie), stip | seip);
     });
-
-    #[test]
-    fn test_reset() {
-        test_determinism::<CSRegistersLayout, _>(|space| {
-            let mut csregs: CSRegisters<_> = CSRegisters::bind(space);
-            csregs.reset();
-        });
-    }
 
     backend_test!(test_fcsr, F, {
         let mut csrs = create_state!(CSRegisters, CSRegistersLayout, F);

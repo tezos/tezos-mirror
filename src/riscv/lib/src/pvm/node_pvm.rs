@@ -50,17 +50,6 @@ impl<M: state_backend::ManagerBase> State<M> {
             self.tick.struct_ref(),
         )
     }
-
-    pub fn reset(&mut self)
-    where
-        M: state_backend::ManagerWrite,
-    {
-        self.pvm.reset();
-        self.level_is_set.write(false);
-        self.level.write(0);
-        self.message_counter.write(0);
-        self.tick.write(0);
-    }
 }
 
 impl<M: state_backend::ManagerClone> Clone for State<M> {
@@ -124,8 +113,7 @@ impl NodePvm {
 
     pub fn empty() -> Self {
         let space = Owned::allocate::<StateLayout>();
-        let mut state = State::bind(space);
-        state.reset();
+        let state = State::bind(space);
         Self {
             state: Box::new(state),
         }

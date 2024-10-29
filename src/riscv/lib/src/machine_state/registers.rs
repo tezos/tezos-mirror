@@ -6,7 +6,7 @@
 // specification.
 #![allow(non_upper_case_globals)]
 
-use crate::machine_state::backend;
+use crate::{default::ConstDefault, machine_state::backend};
 use arbitrary_int::u5;
 use std::fmt;
 
@@ -372,6 +372,10 @@ impl fmt::Display for FRegister {
 )]
 pub struct FValue(u64);
 
+impl ConstDefault for FValue {
+    const DEFAULT: Self = Self(0);
+}
+
 impl backend::Elem for FValue {
     #[inline(always)]
     fn store(&mut self, source: &Self) {
@@ -449,7 +453,7 @@ impl<M: backend::ManagerClone> Clone for FRegisters<M> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{backend_test, create_state, machine_state::backend::tests::test_determinism};
+    use crate::{backend_test, create_state};
     use arbitrary_int::Number;
     use strum::IntoEnumIterator;
 
@@ -494,22 +498,6 @@ mod tests {
             assert_eq!(after, expected);
         }
     });
-
-    #[test]
-    fn test_xregs_reset() {
-        test_determinism::<XRegistersLayout, _>(|space| {
-            let mut registers: XRegisters<_> = XRegisters::bind(space);
-            registers.reset();
-        });
-    }
-
-    #[test]
-    fn test_fregs_reset() {
-        test_determinism::<FRegistersLayout, _>(|space| {
-            let mut registers: FRegisters<_> = FRegisters::bind(space);
-            registers.reset();
-        });
-    }
 
     #[test]
     fn parse_xregister_zero_to_x0() {

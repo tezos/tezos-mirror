@@ -1064,10 +1064,7 @@ pub enum MachineError {
 mod tests {
     use std::ops::Bound;
 
-    use super::{
-        backend::tests::test_determinism, bus, bus::main_memory::tests::T1K, MachineState,
-        MachineStateLayout,
-    };
+    use super::{bus, bus::main_memory::tests::T1K, MachineState, MachineStateLayout};
     use crate::{
         backend_test,
         bits::{u16, Bits64, FixedWidthBits},
@@ -1103,14 +1100,6 @@ mod tests {
     };
     use crate::{bits::u64, machine_state::bus::main_memory::M1K};
     use proptest::{prop_assert_eq, proptest};
-
-    #[test]
-    fn test_machine_state_reset() {
-        test_determinism::<MachineStateLayout<T1K, TestCacheLayouts>, _>(|space| {
-            let mut machine: MachineState<T1K, TestCacheLayouts, _> = MachineState::bind(space);
-            machine.reset();
-        });
-    }
 
     backend_test!(test_step, F, {
         let state = create_state!(MachineState, MachineStateLayout<T1K, TestCacheLayouts>, F, T1K, TestCacheLayouts);
@@ -1276,15 +1265,6 @@ mod tests {
             assert_eq!(state.core.hart.csregisters.read::<CSRRepr>(CSRegister::scause), 1);
         });
     });
-
-    #[test]
-    fn test_reset() {
-        test_determinism::<MachineStateLayout<M1K, TestCacheLayouts>, _>(|space| {
-            let mut machine_state: MachineState<M1K, TestCacheLayouts, _> =
-                MachineState::bind(space);
-            machine_state.reset();
-        });
-    }
 
     // Test that the machine state does not behave differently when potential ephermeral state is
     // reset that may impact instruction caching.

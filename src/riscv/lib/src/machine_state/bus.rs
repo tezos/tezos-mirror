@@ -209,17 +209,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{main_memory::tests::T1K, AddressSpace, Bus, BusLayout};
-    use crate::machine_state::backend::tests::test_determinism;
+    use super::{main_memory::tests::T1K, AddressSpace};
     use strum::IntoEnumIterator;
-
-    #[test]
-    fn test_reset() {
-        test_determinism::<BusLayout<T1K>, _>(|space| {
-            let mut bus: Bus<T1K, _> = Bus::bind(space);
-            bus.reset();
-        });
-    }
 
     #[test]
     fn test_addr_spaces_start() {
