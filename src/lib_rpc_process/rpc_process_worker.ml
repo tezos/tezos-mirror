@@ -22,28 +22,44 @@ let () =
     (function RPC_process_init_too_slow -> Some () | _ -> None)
     (fun () -> RPC_process_init_too_slow)
 
-module Event = struct
+module type NAME = sig
+  val base : string list
+
+  val component : string list
+end
+
+module Name : NAME = struct
+  let base = ["node"; "main"]
+
+  let component = ["rpc"; "process"]
+end
+
+module MakeEvent (N : NAME) = struct
   include Internal_event.Simple
 
-  let section = ["node"; "main"]
+  let section = N.base
 
-  let shutting_down_rpc_process =
+  let component_base_name = String.concat "_" N.component
+
+  let component_name = String.concat " " N.component
+
+  let shutting_down_process =
     declare_0
       ~section
-      ~name:"shutting_down_rpc_process"
-      ~msg:"shutting down the RPC process"
+      ~name:(Format.sprintf "shutting_down_%s" component_base_name)
+      ~msg:(Format.sprintf "shutting down the %s" component_name)
       ~level:Notice
       ()
 
-  let rpc_process_started =
+  let process_started =
     declare_1
       ~section
-      ~name:"rpc_process_started"
-      ~msg:"RPC process was started on pid {pid}"
+      ~name:(Format.sprintf "%s_started" component_base_name)
+      ~msg:(Format.sprintf "%s was started on pid {pid}" component_name)
       ~level:Notice
       ("pid", Data_encoding.int31)
 
-  let rpc_process_exited_abnormally =
+  let process_exited_abnormally =
     let open Unix in
     let exit_status_encoding =
       let open Data_encoding in
@@ -72,8 +88,8 @@ module Event = struct
     declare_2
       ~section
       ~level:Error
-      ~name:"rpc_process_exited_status"
-      ~msg:"rpc process (pid {pid}) {status_msg}"
+      ~name:(Format.sprintf "%s_exited_status" component_base_name)
+      ~msg:(Format.sprintf "%s (pid {pid}) {status_msg}" component_name)
       ("pid", Data_encoding.int31)
       ~pp2:(fun fmt status ->
         match status with
@@ -91,22 +107,24 @@ module Event = struct
               (Lwt_exit.signal_name i))
       ("status_msg", exit_status_encoding)
 
-  let cannot_start_rpc_process =
+  let cannot_start_process =
     declare_1
       ~section
-      ~name:"cannot_start_rpc_process"
+      ~name:(Format.sprintf "cannot_start_%s" component_base_name)
       ~level:Error
-      ~msg:"cannot start rpc process: {trace}"
+      ~msg:(Format.sprintf "cannot start %s: {trace}" component_name)
       ("trace", Data_encoding.string)
 
-  let waiting_for_rpc_process_restart =
+  let waiting_for_process_restart =
     declare_1
       ~section
-      ~name:"waiting_for_rpc_process_restart"
+      ~name:(Format.sprintf "waiting_for_%s_restart" component_base_name)
       ~level:Error
-      ~msg:"restarting RPC process in {sleep} seconds"
+      ~msg:(Format.sprintf "restarting %s in {sleep} seconds" component_name)
       ("sleep", Data_encoding.float)
 end
+
+module Event = MakeEvent (Name)
 
 (* State of the worker. *)
 type 'a t = {
@@ -145,7 +163,7 @@ let shutdown t =
   match t.server with
   | None -> return_unit
   | Some process ->
-      let* () = Event.(emit shutting_down_rpc_process) () in
+      let* () = Event.(emit shutting_down_process) () in
       process#terminate ;
       return_unit
 
@@ -214,7 +232,7 @@ let run_process t ~process_name ?socket_prefix ~handshake () =
         | e -> fail e)
   in
   let*! () = Lwt_unix.close init_socket_fd in
-  let*! () = Event.(emit rpc_process_started) pid in
+  let*! () = Event.(emit process_started) pid in
   t.server <- Some process ;
   return t
 
@@ -235,12 +253,12 @@ let rec run_with_backoff ~backoff ~f =
             let*! () =
               Event.(
                 emit
-                  cannot_start_rpc_process
+                  cannot_start_process
                   (Format.asprintf "%a" pp_print_trace errs))
             in
             run_with_backoff ~backoff:(Time.System.now (), sleep *. 1.2) ~f)
   else
-    let*! () = Event.(emit waiting_for_rpc_process_restart sleep) in
+    let*! () = Event.(emit waiting_for_process_restart sleep) in
     let*! () = Lwt_unix.sleep sleep in
     run_with_backoff ~backoff:(timestamp, sleep) ~f
 
@@ -276,7 +294,7 @@ let watch_dog ~start_new_server =
         | `Wait_pid status ->
             t.server <- None ;
             let*! () =
-              Event.(emit rpc_process_exited_abnormally) (process#pid, status)
+              Event.(emit process_exited_abnormally) (process#pid, status)
             in
             let* new_server =
               run_with_backoff
