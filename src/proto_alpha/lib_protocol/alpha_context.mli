@@ -263,14 +263,14 @@ module Raw_level : sig
 
   val of_int32_exn : int32 -> raw_level
 
+  val sub : raw_level -> int -> raw_level option
+
   module Set : Set.S with type elt = raw_level
 
   module Map : Map.S with type key = raw_level
 
   module Internal_for_tests : sig
     val add : raw_level -> int -> raw_level
-
-    val sub : raw_level -> int -> raw_level option
 
     val from_repr : Raw_level_repr.t -> raw_level
 

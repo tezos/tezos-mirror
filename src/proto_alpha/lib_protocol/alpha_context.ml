@@ -224,8 +224,6 @@ module Raw_level = struct
   module Internal_for_tests = struct
     let add = add
 
-    let sub = sub
-
     let from_repr (level : raw_level) = level
 
     let to_repr (level : raw_level) = level
