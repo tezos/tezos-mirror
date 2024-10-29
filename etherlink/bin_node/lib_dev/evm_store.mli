@@ -212,6 +212,12 @@ module Metadata : sig
     conn -> Tezos_crypto.Hashed.Smart_rollup_address.t option tzresult Lwt.t
 end
 
-(** [reset conn ~l2_level] clear the table that has information related to l2
-    level that after [l2_level] *)
-val reset : conn -> l2_level:Ethereum_types.quantity -> unit tzresult Lwt.t
+(** [reset_after conn ~l2_level] clear the table that has information related to l2
+    level after [l2_level] *)
+val reset_after :
+  conn -> l2_level:Ethereum_types.quantity -> unit tzresult Lwt.t
+
+(** [reset_before conn ~l2_level] clear the table that has information related to l2
+    level before [l2_level] *)
+val reset_before :
+  conn -> l2_level:Ethereum_types.quantity -> unit tzresult Lwt.t

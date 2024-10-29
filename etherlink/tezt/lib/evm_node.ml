@@ -537,6 +537,30 @@ let wait_for_tx_pool_add_transaction ?timeout evm_node =
   wait_for_event ?timeout evm_node ~event:"tx_pool_add_transaction.v0"
   @@ JSON.as_string_opt
 
+let wait_for_split ?level evm_node =
+  wait_for_event evm_node ~event:"evm_context_gc_split.v0" @@ fun json ->
+  let event_level = JSON.(json |-> "level" |> as_int) in
+  match level with
+  | Some level -> if event_level = level then Some event_level else None
+  | None -> Some event_level
+
+let wait_for_gc_finished ?gc_level ?head_level evm_node =
+  wait_for_event evm_node ~event:"evm_context_gc_finished.v0" @@ fun json ->
+  let event_gc_level = JSON.(json |-> "gc_level" |> as_int) in
+  let event_head_level = JSON.(json |-> "head_level" |> as_int) in
+  match (gc_level, head_level) with
+  | Some gc_level, Some head_level ->
+      if event_gc_level = gc_level && head_level = event_head_level then
+        Some (event_gc_level, gc_level)
+      else None
+  | Some gc_level, None ->
+      if event_gc_level = gc_level then Some (event_gc_level, gc_level)
+      else None
+  | None, Some head_level ->
+      if event_gc_level = head_level then Some (event_gc_level, event_gc_level)
+      else None
+  | None, None -> Some (event_gc_level, event_gc_level)
+
 let create ?(path = Uses.path Constant.octez_evm_node) ?name ?runner
     ?(mode = Proxy) ?data_dir ?rpc_addr ?rpc_port ?restricted_rpcs endpoint =
   let arguments, rpc_addr, rpc_port =
@@ -995,10 +1019,15 @@ let rpc_endpoint ?(local = false) ?(private_ = false) (evm_node : t) =
 
 let endpoint = rpc_endpoint ?local:None
 
+type garbage_collector = {
+  split_frequency_in_seconds : int;
+  history_to_keep_in_seconds : int;
+}
+
 let patch_config_with_experimental_feature
     ?(drop_duplicate_when_injection = false)
     ?(node_transaction_validation = false) ?(block_storage_sqlite3 = true)
-    ?(next_wasm_runtime = true) () =
+    ?(next_wasm_runtime = true) ?garbage_collector () =
   let conditional_json_put ~name cond value_json json =
     if cond then
       JSON.put
@@ -1008,7 +1037,17 @@ let patch_config_with_experimental_feature
         json
     else json
   in
-
+  let optional_json_put ~name v f json =
+    match v with
+    | None -> json
+    | Some v ->
+        let value_json = f v in
+        JSON.put
+          ( name,
+            JSON.annotate ~origin:"evm_node.experimental_config_patch"
+            @@ value_json )
+          json
+  in
   JSON.update "experimental_features" @@ fun json ->
   conditional_json_put
     drop_duplicate_when_injection
@@ -1027,6 +1066,17 @@ let patch_config_with_experimental_feature
        next_wasm_runtime
        ~name:"next_wasm_runtime"
        (`Bool true)
+  |> optional_json_put
+       ~name:"garbage_collector"
+       garbage_collector
+       (fun {split_frequency_in_seconds; history_to_keep_in_seconds} ->
+         `O
+           [
+             ( "split_frequency_in_seconds",
+               `Float (Int.to_float split_frequency_in_seconds) );
+             ( "history_to_keep_in_seconds",
+               `Float (Int.to_float history_to_keep_in_seconds) );
+           ])
 
 let init ?patch_config ?name ?runner ?mode ?data_dir ?rpc_addr ?rpc_port
     ?restricted_rpcs rollup_node =

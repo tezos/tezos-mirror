@@ -471,6 +471,7 @@ module State = struct
                     ]
                   hash
               in
+              let* () = Evm_store.reset_before conn ~l2_level:last_gc_level in
               let*! () = Irmin_context.gc ctxt.index hash in
               let* () = Evm_store.GC.update_last_gc conn level timestamp in
               let gc_waiter () =
@@ -1164,7 +1165,7 @@ module State = struct
     let* store = Evm_store.init ~data_dir ~perm:`Read_write () in
     Evm_store.use store @@ fun conn ->
     Evm_store.with_transaction conn @@ fun store ->
-    Evm_store.reset store ~l2_level
+    Evm_store.reset_after store ~l2_level
 
   let last_produced_blueprint (ctxt : t) =
     let open Lwt_result_syntax in
