@@ -73,7 +73,7 @@ val expected_size_in_bits : max_index:Dal_slot_index_repr.t -> int
     slots in an attestation. *)
 val number_of_attested_slots : t -> int
 
-(** A shard_index aims to be a positive number. *)
+(** A shard_index is a positive number. *)
 type shard_index = int
 
 module Shard_map : Map.S with type key = shard_index
