@@ -5,22 +5,22 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type error += RPC_process_init_too_slow
+type error += Process_init_too_slow
 
 let () =
   register_error_kind
     `Permanent
-    ~id:"rpc_process_worker.RPC_process_init_too_slow"
-    ~title:"RPC process init too slow"
-    ~description:"RPC process init too slow"
+    ~id:"process_worker.Process_init_too_slow"
+    ~title:"Process init too slow"
+    ~description:"Process init too slow"
     ~pp:(fun ppf () ->
       Format.fprintf
         ppf
-        "RPC process init timeout: too slow to start. This is certainly due to \
-         the slow DAL initialization.")
+        "Process init timeout: too slow to start. This is certainly due to the \
+         slow DAL initialization.")
     Data_encoding.unit
-    (function RPC_process_init_too_slow -> Some () | _ -> None)
-    (fun () -> RPC_process_init_too_slow)
+    (function Process_init_too_slow -> Some () | _ -> None)
+    (fun () -> Process_init_too_slow)
 
 module type NAME = sig
   val base : string list
@@ -228,7 +228,7 @@ let run_process t ~process_name ?socket_prefix ~handshake () =
           when List.exists
                  (function Exn Lwt_unix.Timeout -> true | _ -> false)
                  err ->
-            tzfail RPC_process_init_too_slow
+            tzfail Process_init_too_slow
         | e -> fail e)
   in
   let*! () = Lwt_unix.close init_socket_fd in
