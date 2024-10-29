@@ -436,36 +436,3 @@ let wrap profiler =
     let span_s ?verbosity ids f = span_s ?verbosity profiler ids f
   end in
   (module Wrapped : GLOBAL_PROFILER)
-
-let profiler_file_suffix = "_profiling"
-
-let parse_profiling_vars (default_dir : string) =
-  let max_verbosity =
-    match Sys.getenv_opt "PROFILING" |> Option.map String.lowercase_ascii with
-    | Some "debug" -> Some Debug
-    | Some "info" -> Some Info
-    | Some ("true" | "on" | "yes" | "notice") -> Some Notice
-    | Some invalid_value ->
-        Printf.eprintf
-          "Warning: Invalid PROFILING value '%s', disabling profiling.\n"
-          invalid_value ;
-        None
-    | None ->
-        Option.map (fun _ -> Notice) (Sys.getenv_opt "PROFILING_OUTPUT_DIR")
-  in
-  let output_dir =
-    match Sys.getenv_opt "PROFILING_OUTPUT_DIR" with
-    | None -> default_dir
-    | Some output_dir -> (
-        match Sys.is_directory output_dir with
-        | true -> output_dir
-        | false ->
-            Stdlib.failwith
-              (Printf.sprintf
-                 "Error: Profiling output directory '%s' is not a directory."
-                 output_dir)
-        | exception Sys_error _ ->
-            Sys.mkdir output_dir 0o777 ;
-            output_dir)
-  in
-  (max_verbosity, output_dir)

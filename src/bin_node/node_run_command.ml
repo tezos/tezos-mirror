@@ -715,20 +715,13 @@ let init_rpc (config : Config_file.t) (node : Node.t) internal_events =
   return (local_rpc_server :: [rpc_server])
 
 let[@warning "-32"] may_start_profiler data_dir =
-  match Tezos_base.Profiler.parse_profiling_vars data_dir with
-  | Some max_verbosity, output_dir ->
-      let profiler_maker =
-        Tezos_shell.Profiler_directory.profiler_maker output_dir max_verbosity
-      in
+  match Tezos_base_unix.Profiler_instance.selected_backend () with
+  | Some profiler_maker ->
+      let profiler_maker = profiler_maker ~directory:data_dir in
       Shell_profiling.activate_all ~profiler_maker ;
-      let context_instance =
-        Tezos_base.Profiler.instance
-          Tezos_base_unix.Simple_profiler.default_driver
-          Filename.Infix.(output_dir // "context_profiling", max_verbosity)
-      in
       Tezos_protocol_environment.Environment_profiler.Context_ops_profiler.plug
-        context_instance
-  | _ -> ()
+        (profiler_maker ~name:"context")
+  | None -> ()
 
 let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
     ?ignore_testchain_warning ~singleprocess ~force_history_mode_switch

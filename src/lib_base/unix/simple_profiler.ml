@@ -410,7 +410,7 @@ type (_, _) Profiler.kind +=
 
 type file_format = Plain_text | Json
 
-let make_driver ~file_format ?(suffix = false) () =
+let make_driver ~file_format =
   (module struct
     type nonrec state = auto_writer_state
 
@@ -421,11 +421,6 @@ let make_driver ~file_format ?(suffix = false) () =
     let kind = Auto_write_to_file
 
     let create (file_name, verbosity) =
-      let file_name =
-        match file_format with
-        | Plain_text -> if suffix then file_name ^ ".txt" else file_name
-        | Json -> if suffix then file_name ^ ".js" else file_name
-      in
       {
         profiler_state = empty verbosity;
         time = time ();
@@ -480,13 +475,3 @@ let make_driver ~file_format ?(suffix = false) () =
 let auto_write_as_txt_to_file = make_driver ~file_format:Plain_text
 
 let auto_write_as_json_to_file = make_driver ~file_format:Json
-
-let default_driver =
-  match Sys.getenv "PROFILING_BACKEND" |> String.lowercase_ascii with
-  | "json" -> auto_write_as_json_to_file ()
-  | "json+ext" -> auto_write_as_json_to_file ~suffix:true ()
-  | "text" | "txt" -> auto_write_as_txt_to_file ()
-  | "text+ext" | "txt+ext" -> auto_write_as_txt_to_file ~suffix:true ()
-  | _ | (exception Not_found) -> auto_write_as_txt_to_file ()
-
-let instantiate_default_driver = Profiler.instance default_driver

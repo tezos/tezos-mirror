@@ -250,7 +250,7 @@ let get_profiler file_name =
     Profiler.instance
       (* The default driver is a text driver writing to a file
          without suffixing it *)
-      Tezos_base_unix.Simple_profiler.default_driver
+      Tezos_base_unix.Simple_profiler.auto_write_as_txt_to_file
       (file_name, Profiler.Info)
   in
   plug profiler test_profiler_instance ;

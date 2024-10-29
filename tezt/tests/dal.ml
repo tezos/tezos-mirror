@@ -7015,7 +7015,7 @@ let dal_crypto_benchmark () =
     ~tags:["dal"; "benchmark"; "crypto"; Tag.slow; team]
   @@ fun () ->
   let open Dal.Cryptobox in
-  let driver = Tezos_base_unix.Simple_profiler.default_driver in
+  let driver = Tezos_base_unix.Simple_profiler.auto_write_as_txt_to_file in
   let file =
     match Cli.Logs.level with
     | Info | Debug -> "/dev/stdout"
