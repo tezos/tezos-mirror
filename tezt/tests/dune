@@ -99,6 +99,7 @@
   src_lib_hacl_test_tezt_lib
   src_lib_gossipsub_test_tezt_lib
   src_lib_error_monad_test_tezt_lib
+  src_lib_dal_node_test__tezt_lib
   src_lib_crypto_dal_test_tezt_lib
   src_lib_crypto_test_unix_tezt_lib
   src_lib_crypto_test_tezt_lib

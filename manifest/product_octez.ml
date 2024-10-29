@@ -4689,6 +4689,24 @@ let octez_dal_node_lib =
         octez_sqlite |> open_;
       ]
 
+let _octez_dal_node_lib_test =
+  tezt
+    ["test_storage"]
+    ~path:"src/lib_dal_node/test/"
+    ~opam:"tezos-dal-node-lib"
+    ~preprocess:(ppses [ppx_hash; bam_ppx])
+    ~deps:
+      [
+        octez_rustzcash_deps;
+        octez_sapling;
+        octez_stdlib |> open_;
+        octez_stdlib_unix |> open_;
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_error_monad |> open_ |> open_ ~m:"TzLwtreslib";
+        octez_dal_node_lib |> open_;
+        tezt_bam;
+      ]
+
 let octez_dal_node_gossipsub_lib =
   public_lib
     "tezos-dal-node-lib.gossipsub"
