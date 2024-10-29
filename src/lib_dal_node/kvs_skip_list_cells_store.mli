@@ -88,3 +88,9 @@ val find :
     from the [store]. *)
 val remove :
   t -> attested_level:int32 -> (unit, Error_monad.tztrace) result Lwt.t
+
+(** Internal functions for testing purpose.  *)
+module Internal_for_tests : sig
+  val skip_list_hash_exists :
+    t -> Dal_proto_types.Skip_list_hash.t -> bool tzresult Lwt.t
+end

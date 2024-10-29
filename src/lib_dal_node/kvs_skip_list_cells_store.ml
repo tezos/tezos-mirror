@@ -228,3 +228,9 @@ let remove {cells_store; hashes_store} ~attested_level =
       (0 -- (number_of_slots - 1))
   in
   Hashes.remove_file hashes_store attested_level
+
+module Internal_for_tests = struct
+  let skip_list_hash_exists {cells_store; hashes_store = _} hash =
+    let {Cells.store; file_layout; _} = cells_store in
+    KVS.value_exists store file_layout hash ()
+end

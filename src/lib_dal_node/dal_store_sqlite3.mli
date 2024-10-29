@@ -57,4 +57,10 @@ module Skip_list_cells : sig
       [attested_level] from the [store]. Uses the [conn] if provided
       (defaults to [None]). *)
   val remove : ?conn:conn -> t -> attested_level:int32 -> unit tzresult Lwt.t
+
+  (** Internal functions for testing purpose.  *)
+  module Internal_for_tests : sig
+    val skip_list_hash_exists :
+      ?conn:conn -> t -> Dal_proto_types.Skip_list_hash.t -> bool tzresult Lwt.t
+  end
 end
