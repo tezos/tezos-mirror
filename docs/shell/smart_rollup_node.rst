@@ -178,6 +178,8 @@ If everything went well, the origination command results in:
 The address ``sr1RYurGZtN8KNSpkMcCt9CgWeUaNkzsAfXf`` is the smart rollup address.
 Let's write it ``${SR_ADDR}`` from now on.
 
+.. _deploying_a_rollup_node:
+
 Deploying a rollup node
 -----------------------
 
@@ -678,13 +680,113 @@ Triggering the execution of an outbox message
 """""""""""""""""""""""""""""""""""""""""""""
 
 Once an outbox message has been pushed to the outbox by the kernel at
-some level ``${L}``, the user needs to wait for the commitment that
-includes this level to be cemented. On Weeklynet, the cementation
+some level ``${L}``, it becomes executable when the commitment that
+includes this level is cemented. On Weeklynet, the cementation
 process of a non-disputed commitment is 40 blocks long while on
 Mainnet, it is 2 weeks long.
 
-When the commitment is cemented, one can observe that the outbox is
-populated as follows:
+Executing outbox messages automatically
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The rollup node can be configured to execute outbox messages automatically as
+soon as they become executable (it will not do so by default). For this, it is
+strongly recommended to declare a distinct signing key for this purpose (see
+:ref:`operators and purposes <deploying_a_rollup_node>`).
+
+The configuration file must contain a key for the purpose ``executing_outbox``
+and potentially some "fee parameters" to control what the rollup node accepts to
+pay as fees for injecting these operations on L1.
+
+.. code:: json
+
+   {
+     "smart-rollup-node-operator": {
+       "executing_outbox": "tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX"
+     },
+     "fee-parameters" : {
+       "execute_outbox_message" : {
+         "fee-cap" : "1000000",
+         "burn-cap" : "1000000"
+       }
+     }
+   }
+
+In this snippet, the rollup node will accept to inject outbox message execution
+operations which do not consume more than 1 tez in fees and 1 tez in storage
+burn (these are the default values). They can be tweaked depending on the use
+case (e.g. increased if the outbox messages call smart contracts on L1 which are
+known to be costly, or decreased to limit abuse and better control funds
+allocated for this purpose).
+
+To decide which outbox messages the rollup node should execute, the
+configuration file must contain a filter. An example is given below:
+
+.. code:: json
+
+   {
+      "execute-outbox-messages-filter": [
+        {
+          "transaction": {
+            "destination" : ["KT1Wj8SUGmnEPFqyahHAcjcNQwe6YGhEXJb5"],
+            "entrypoint" : ["mint", "burn"]
+          }
+        },
+        {
+          "transaction": {
+            "destination" : [
+              "tz1QQAPf4v6ApPx9AteMa3ZV2kTiBT6x16Ps",
+              "tz2WtKth6KCGDT79gQkVovQiDFDa5wFPzmYq"
+            ],
+            "entrypoint" : "any"
+          }
+        },
+        {
+          "transaction": {
+            "destination" : "any",
+            "entrypoint" : ["default"]
+          }
+        }
+      ]
+   }
+
+In this case, the rollup node will execute outbox messages which are transactions
+that either:
+
+1. Call the entry points ``mint`` or ``burn`` on the smart contract
+   ``KT1Wj8SUGmnEPFqyahHAcjcNQwe6YGhEXJb5``.
+2. Call any entry point on the destinations
+   ``tz1QQAPf4v6ApPx9AteMa3ZV2kTiBT6x16Ps`` or
+   ``tz2WtKth6KCGDT79gQkVovQiDFDa5wFPzmYq``
+3. Call the entry point ``default`` on any destination.
+
+It is advised to define filters with both restricted sets of entry points and
+destinations to prevent misuse of this feature. In some cases (in test
+sandboxes, or if outbox messages are restricted/controlled by the kernel), it
+may be desirable to allow the rollup node to execute every outbox messages it
+sees.
+
+The following entry in the configuration file makes the rollup node execute all
+outbox messages for its rollup indiscriminately.
+
+.. code:: json
+
+   {
+      "execute-outbox-messages-filter": [
+        {
+          "transaction": { "destination" : "any", "entrypoint" : "any"}
+        }
+      ]
+   }
+
+Executing outbox messages manually
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+If the rollup node is not configured to execute outbox messages automatically,
+messages have to be executed manually by users (anyone can execute an outbox
+message once it becomes executable).
+
+When the commitment that includes level ``${L}`` is cemented, one can observe
+that the outbox is populated as follows:
 
 .. code:: sh
 
