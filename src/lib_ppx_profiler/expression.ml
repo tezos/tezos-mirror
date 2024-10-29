@@ -42,13 +42,13 @@ let add_wrapping_function expr fun_name loc key =
       ]}
 
     [VERBOSITY] being present as [~verbosity:(Notice | Info | Debug)] only
-    if [~verbosity] as been set to true.
+    if [~verbosity] has been set to true.
     [KEY] being [(key, metadata)] if [~metadata] is set to true (which is
     default) and just [key] otherwise.
 
     Typically, [Profiler.stop ()] does not take metadata nor verbosity as argument,
     while [Profiler.stamp ?verbosity ("key", [])] does need metadata and can take
-    an optionnal argument [verbosity]. Both of these constructions use the same  *)
+    an optional argument [verbosity]. *)
 let add_unit_function ?(metadata = true) ~verbosity expr fun_name loc key =
   let key_expr =
     let e = [%expr [%e Key.to_expression loc key]] in

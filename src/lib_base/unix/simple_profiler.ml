@@ -238,14 +238,15 @@ let pp_delta_t ppf t =
 
 let pp_line ?toplevel_timestamp nindent ppf (id, metadata) n t t0 =
   let id =
-    match metadata with
+    match
+      List.filter_map (function "text", v -> Some v | _ -> None) metadata
+    with
     | [] -> (* format: id *) id
-    | _ ->
-        (* format: id(k1=v1;k2=v2) *)
+    | metadata ->
+        (* format: id(m1;m2) *)
         let pp_sep fmt () = Format.pp_print_char fmt ';' in
-        let pp_kv fmt (k, v) = Format.fprintf fmt "%s=%s" k v in
         let pp_metadata fmt metadata =
-          Format.pp_print_list ~pp_sep pp_kv fmt metadata
+          Format.pp_print_list ~pp_sep Format.pp_print_string fmt metadata
         in
         Format.asprintf "%s(%a)" id pp_metadata metadata
   in
