@@ -3208,7 +3208,7 @@ let test_force_kernel_upgrade_too_early =
     ~upgrade_to:(fun _ -> Ghostnet)
     ~genesis_timestamp
     ~time_between_blocks:Nothing
-    ~tags:["evm"; "sequencer"; "upgrade"; "force"; Tag.ci_disabled]
+    ~tags:["evm"; "sequencer"; "upgrade"; "force"]
     ~title:"Force kernel upgrade fail too early"
   @@ fun _from
              to_
@@ -3266,23 +3266,22 @@ let test_force_kernel_upgrade =
   let genesis_timestamp =
     Client.(At (Time.of_notation_exn "2020-01-10T00:00:00Z"))
   in
-  register_upgrade_all
+  register_all
+    ~time_between_blocks:Nothing
     ~kernels:[Latest]
-    ~upgrade_to:(fun _ -> Ghostnet)
-    ~tags:["evm"; "sequencer"; "upgrade"; "force"; Tag.ci_disabled]
+    ~tags:["evm"; "sequencer"; "upgrade"; "force"]
     ~genesis_timestamp
     ~title:"Force kernel upgrade"
-  @@ fun _from
-             to_
-             {
-               sc_rollup_node;
-               l1_contracts;
-               sc_rollup_address;
-               client;
-               sequencer;
-               proxy;
-               _;
-             }
+    ~additional_uses:[Constant.WASM.debug_kernel]
+  @@ fun {
+           sc_rollup_node;
+           l1_contracts;
+           sc_rollup_address;
+           client;
+           sequencer;
+           proxy;
+           _;
+         }
              _protocol ->
   (* Wait for the sequencer to publish its genesis block. *)
   let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
@@ -3300,7 +3299,6 @@ let test_force_kernel_upgrade =
      be forced immediatly. *)
   let activation_timestamp = "2020-01-09T00:00:00Z" in
   (* Sends the upgrade to L1 and sequencer. *)
-  let _, to_use = Kernel.to_uses_and_tags to_ in
   let* _root_hash =
     upgrade
       ~sc_rollup_node
@@ -3308,7 +3306,7 @@ let test_force_kernel_upgrade =
       ~admin:Constant.bootstrap2.public_key_hash
       ~admin_contract:l1_contracts.admin
       ~client
-      ~upgrade_to:to_use
+      ~upgrade_to:Constant.WASM.debug_kernel
       ~activation_timestamp
   in
 
@@ -3332,12 +3330,19 @@ let test_force_kernel_upgrade =
 
   (* Assert the kernel version are now different, it shows that only the rollup
      node upgraded. *)
-  let*@ sequencer_kernelVersion = Rpc.tez_kernelVersion sequencer in
-  let*@ new_proxy_kernelVersion = Rpc.tez_kernelVersion proxy in
-  Check.((sequencer_kernelVersion <> new_proxy_kernelVersion) string)
-    ~error_msg:"Kernel versions should be different after forced upgrade" ;
-  Check.((sequencer_kernelVersion = proxy_kernelVersion) string)
-    ~error_msg:"Sequencer should be on the previous version" ;
+  let*@ sequencer_kernel =
+    Rpc.state_value sequencer Durable_storage_path.kernel_boot_wasm
+  in
+  let* rollup_node_kernel =
+    Sc_rollup_node.RPC.call sc_rollup_node ~rpc_hooks:Tezos_regression.rpc_hooks
+    @@ Sc_rollup_rpc.get_global_block_durable_state_value
+         ~pvm_kind:"wasm_2_0_0"
+         ~operation:Sc_rollup_rpc.Value
+         ~key:Durable_storage_path.kernel_boot_wasm
+         ()
+  in
+  Check.((sequencer_kernel <> rollup_node_kernel) (option string))
+    ~error_msg:"Rollup node should have forced the upgrade" ;
   unit
 
 let test_external_transaction_to_delayed_inbox_fails =
