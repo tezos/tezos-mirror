@@ -63,7 +63,7 @@ impl<T: 'static, const LEN: usize> Layout for Array<T, LEN> {
 /// struct_layout!(
 ///     pub struct ExampleLayout {
 ///         satp_ppn: Atom<CSRRepr>,
-///         mode: EnumCellLayout<u8>,
+///         mode: Atom<u8>,
 ///         cached: Atom<bool>,
 ///     }
 /// );

@@ -19,7 +19,7 @@ use crate::{
     machine_state::mode::Mode,
 };
 
-#[derive(PartialEq, Clone, Copy, Debug, Default)]
+#[derive(PartialEq, Eq, Clone, Copy, Debug, Default, serde::Serialize, serde::Deserialize)]
 #[repr(u8)]
 pub enum MPPValue {
     User = 0b00,
@@ -68,7 +68,7 @@ impl Bits64 for MPPValue {
     }
 }
 
-#[derive(PartialEq, Clone, Copy, Debug, Default)]
+#[derive(PartialEq, Eq, Clone, Copy, Debug, Default, serde::Serialize, serde::Deserialize)]
 #[repr(u8)]
 pub enum SPPValue {
     User = 0b0,
@@ -104,7 +104,7 @@ impl Bits64 for SPPValue {
     }
 }
 
-#[derive(PartialEq, Clone, Copy, Debug, Default)]
+#[derive(PartialEq, Eq, Clone, Copy, Debug, Default, serde::Serialize, serde::Deserialize)]
 #[repr(u64)]
 pub enum XLenValue {
     #[default]
@@ -137,7 +137,7 @@ impl Bits64 for XLenValue {
     }
 }
 
-#[derive(PartialEq, Clone, Copy, Debug, Default)]
+#[derive(PartialEq, Eq, Clone, Copy, Debug, Default, serde::Serialize, serde::Deserialize)]
 #[repr(u64)]
 pub enum ExtensionValue {
     Off = 0b00,
