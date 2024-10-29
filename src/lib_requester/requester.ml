@@ -651,6 +651,12 @@ module Make
 
   let fetch s ?peer ?timeout k param =
     let open Lwt_syntax in
+    let[@warning "-26"] debug_p2p_message =
+      (match peer with
+      | None -> []
+      | Some peer -> [Format.asprintf "Peer : %a" P2p_peer.Id.pp peer])
+      @ [Format.asprintf "Hash : %a" Hash.pp k]
+    in
     match[@profiler.span_s {verbosity = Notice} ["fetch"]]
       Memory_table.find s.memory k
     with
@@ -663,6 +669,9 @@ module Make
              [@profiler.span_s
                {verbosity = Info} ["fetch"; "cache miss"; "disk hit"]]
          | None -> (
+             let[@warning "-26"] profiling_prefix info =
+               ["fetch"; "cache miss"; "disk miss"] @ info
+             in
              match(* It is necessary to check the memory-table again in case another
                      promise has altered it whilst this one was waiting for the
                      disk-table query. *)
@@ -679,17 +688,12 @@ module Make
                   Scheduler.request s.scheduler peer k ;
                   wrap s k ?timeout waiter)
                  [@profiler.span_s
-                   {verbosity = Info}
-                     [
-                       "fetch";
-                       "cache miss";
-                       "disk miss";
-                       "cache miss : request creation";
-                     ]]
+                   {verbosity = Debug}
+                     (profiling_prefix
+                        (["cache miss : request creation"] @ debug_p2p_message))]
              | Some status -> (
                  match[@profiler.span_s
-                        {verbosity = Info}
-                          ["fetch"; "cache miss"; "disk miss"; "cache hit"]]
+                        {verbosity = Info} (profiling_prefix ["cache hit"])]
                    status
                  with
                  | Pending data ->
@@ -697,26 +701,16 @@ module Make
                       data.waiters <- data.waiters + 1 ;
                       wrap s k ?timeout data.waiter)
                      [@profiler.span_s
-                       {verbosity = Info}
-                         [
-                           "fetch";
-                           "cache miss";
-                           "disk miss";
-                           "cache hit";
-                           "pending : add peer";
-                         ]]
+                       {verbosity = Debug}
+                         (profiling_prefix
+                            (["cache hit"; "pending : add peer"]
+                            @ debug_p2p_message))]
                  | Found v ->
                      return_ok
                        v
                      [@profiler.span_s
                        {verbosity = Info}
-                         [
-                           "fetch";
-                           "cache miss";
-                           "disk miss";
-                           "cache hit";
-                           "found";
-                         ]])))
+                         (profiling_prefix ["cache hit"; "found"])])))
         [@profiler.span_s {verbosity = Notice} ["fetch"; "cache miss"]])
     | Some status -> (
         match[@profiler.span_s {verbosity = Notice} ["fetch"; "cache hit"]]
@@ -727,12 +721,15 @@ module Make
              data.waiters <- data.waiters + 1 ;
              wrap s k ?timeout data.waiter)
             [@profiler.span_s
-              {verbosity = Info} ["fetch"; "cache hit"; "pending : add peer"]]
+              {verbosity = Debug}
+                (["fetch"; "cache hit"; "pending : add peer"]
+                @ debug_p2p_message)]
         | Found v ->
             return_ok
               v
             [@profiler.span_s
-              {verbosity = Info} ["fetch"; "cache hit"; "found"]])
+              {verbosity = Debug}
+                (["fetch"; "cache hit"; "found"] @ debug_p2p_message)])
 
   let notify_when_pending s p k w param v =
     let open Lwt_syntax in
