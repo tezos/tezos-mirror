@@ -83,8 +83,8 @@ depends: [
   "tezos-sapling-parameters" { >= "1.1.0" }
   "octez-rustzcash-deps" { with-test & = version }
   "bigstring" {with-test}
-  "bam-ppx" {with-test}
-  "tezt-bam" {with-test}
+  "bam-ppx" { with-test & >= "0.3" }
+  "tezt-bam" { with-test & >= "0.3" }
 ]
 x-opam-monorepo-opam-provided: [
   "tezos-sapling-parameters"
