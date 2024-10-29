@@ -69,7 +69,7 @@ struct
     let@ result =
       Hist.update_skip_list_no_cache
         skip_list
-        level
+        ~published_level:level
         [(slot, Signature.Public_key_hash.zero, mk_attested)]
         ~number_of_slots:Parameters.dal_parameters.number_of_slots
     in
@@ -195,7 +195,7 @@ struct
         ~number_of_slots:Parameters.dal_parameters.number_of_slots
         genesis_history
         genesis_history_cache
-        level
+        ~published_level:level
         [(slot, Signature.Public_key_hash.zero, mk_attested)]
     in
     let* page_info, page_id = mk_page_info slot polynomial in

@@ -277,7 +277,7 @@ let gen_slot_history =
       Dal.Slots_history.update_skip_list_no_cache
         ~number_of_slots
         hist
-        published_level
+        ~published_level
         attested_slots)
     Dal.Slots_history.genesis
     l
@@ -309,7 +309,7 @@ let gen_slot_history_cache =
         ~number_of_slots
         hist
         cache
-        published_level
+        ~published_level
         attested_slots)
     (Dal.Slots_history.genesis, cache)
     l

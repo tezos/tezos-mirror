@@ -85,7 +85,7 @@ let update_skip_list ctxt ~slot_headers_statuses ~level_attested
       ~number_of_slots
       slots_history
       cache
-      level_attested
+      ~published_level:level_attested
       slot_headers_statuses
   in
   let*! ctxt = Storage.Dal.Slot.History.add ctxt slots_history in
