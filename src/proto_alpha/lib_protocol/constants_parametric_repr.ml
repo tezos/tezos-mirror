@@ -25,6 +25,23 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let q_encoding cond error_msg =
+  Data_encoding.(
+    conv_with_guard
+      (fun Q.{num; den} -> (num, den))
+      (fun (num, den) ->
+        if Compare.Z.(den > Z.zero) && cond num den then Ok (Q.make num den)
+        else Error error_msg)
+      (obj2 (req "numerator" z) (req "denominator" z)))
+
+let positive_q_encoding = q_encoding (fun num _den -> Compare.Z.(num > Z.zero))
+
+let non_negative_q_encoding =
+  q_encoding (fun num _den -> Compare.Z.(num >= Z.zero))
+
+let between_zero_and_one_q_encoding =
+  q_encoding (fun num den -> Compare.Z.(num >= Z.zero && num <= den))
+
 type dal = {
   feature_enable : bool;
   incentives_enable : bool;
@@ -355,48 +372,20 @@ let zk_rollup_encoding =
        (req "zk_rollup_max_ticket_payload_size" int31))
 
 let extremum_encoding =
-  Data_encoding.(
-    conv_with_guard
-      (fun Q.{num; den} -> (num, den))
-      (fun (num, den) ->
-        if Compare.Z.(num > Z.zero && den > Z.zero) then Ok (Q.make num den)
-        else
-          Error
-            "Invalid Reward Extremum Parameter: only positive values allowed")
-      (obj2 (req "numerator" z) (req "denominator" z)))
+  positive_q_encoding
+    "Invalid Reward Extremum Parameter: only positive values allowed"
 
 let center_encoding =
-  Data_encoding.(
-    conv_with_guard
-      (fun Q.{num; den} -> (num, den))
-      (fun (num, den) ->
-        if Compare.Z.(num >= Z.zero && den > Z.zero && num <= den) then
-          Ok (Q.make num den)
-        else
-          Error
-            "Invalid Reward Parameter: dead zone center can only be between 0 \
-             and 1")
-      (obj2 (req "numerator" z) (req "denominator" z)))
+  between_zero_and_one_q_encoding
+    "Invalid Reward Parameter: dead zone center can only be between 0 and 1"
 
 let radius_encoding =
-  Data_encoding.(
-    conv_with_guard
-      (fun Q.{num; den} -> (num, den))
-      (fun (num, den) ->
-        if Compare.Z.(num >= Z.zero && den > Z.zero) then Ok (Q.make num den)
-        else
-          Error
-            "Invalid Reward Parameter: dead zone radius must be non-negative")
-      (obj2 (req "numerator" z) (req "denominator" z)))
+  non_negative_q_encoding
+    "Invalid Reward Parameter: dead zone radius must be non-negative"
 
 let growth_rate_encoding =
-  Data_encoding.(
-    conv_with_guard
-      (fun Q.{num; den} -> (num, den))
-      (fun (num, den) ->
-        if Compare.Z.(num >= Z.zero && den > Z.zero) then Ok (Q.make num den)
-        else Error "Invalid Reward Parameter: growth rate must be non-negative")
-      (obj2 (req "numerator" z) (req "denominator" z)))
+  non_negative_q_encoding
+    "Invalid Reward Parameter: growth rate must be non-negative"
 
 let adaptive_rewards_params_encoding =
   let open Data_encoding in
