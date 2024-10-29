@@ -73,13 +73,56 @@ Follow these steps to run a DAL node along with a layer 1 node and a baker.
 
 #. In a new terminal window, verify that the DAL node is running properly:
 
-   #. Verify that the node is connected to the DAL by running this command:
+   #. Verify that the node is connected to other DAL nodes by running this command:
 
       .. code-block:: shell
 
-         curl http://localhost:10732/p2p/gossipsub/connections
+         curl http://localhost:10732/p2p/points/info?connected
 
-      This command should show a list of other DAL nodes that the node is connected to.
+      This command should show a list of other DAL nodes that the node is connected to, as in this example:
+
+      .. code-block:: json
+
+         [
+           {
+             "point": "46.137.127.32:11732",
+             "info": {
+               "trusted": true,
+               "state": {
+                 "event_kind": "running",
+                 "p2p_peer_id": "idrpUzezw7VJ4NU6phQYuxh88RiU1t"
+               },
+               "p2p_peer_id": "idrpUzezw7VJ4NU6phQYuxh88RiU1t",
+               "last_established_connection": [
+                 "idrpUzezw7VJ4NU6phQYuxh88RiU1t",
+                 "2024-10-24T15:02:31.549-00:00"
+               ],
+               "last_seen": [
+                 "idrpUzezw7VJ4NU6phQYuxh88RiU1t",
+                 "2024-10-24T15:02:31.549-00:00"
+               ]
+             }
+           },
+           {
+             "point": "52.31.26.230:11732",
+             "info": {
+               "trusted": true,
+               "state": {
+                 "event_kind": "running",
+                 "p2p_peer_id": "idqrcQybXbKwWk42bn1XjeZ33xgduC"
+               },
+               "p2p_peer_id": "idqrcQybXbKwWk42bn1XjeZ33xgduC",
+               "last_established_connection": [
+                 "idqrcQybXbKwWk42bn1XjeZ33xgduC",
+                 "2024-10-24T15:02:31.666-00:00"
+               ],
+               "last_seen": [
+                 "idqrcQybXbKwWk42bn1XjeZ33xgduC",
+                 "2024-10-24T15:02:31.666-00:00"
+               ]
+             }
+           }
+         ]
 
    #. Verify that the node is connected to topics by running this command:
 
