@@ -231,7 +231,7 @@ let create_init_socket socket_dir =
   in
   let pid = Unix.getpid () in
   let init_socket_path =
-    Rpc_process_worker.get_init_socket_path
+    Lwt_process_watchdog.get_init_socket_path
       ~socket_dir
       ~socket_prefix:Rpc_process_worker.rpc_process_socket_prefix
       ~pid

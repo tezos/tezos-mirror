@@ -58,14 +58,6 @@ val start : process -> unit tzresult Lwt.t
 (** Stops gracefully the RPC process worker*)
 val stop : process -> unit Lwt.t
 
-(** [get_init_socket_path ~socket_dir ?socket_prefix ~pid ()]
-    generates the socket path in which the socket will be created. The
-    socket will be named from the [?socket_prefix] (a random filename
-    is generated if none) and the [pid] and will be located in
-    [socket_dir]. *)
-val get_init_socket_path :
-  socket_dir:string -> ?socket_prefix:string -> pid:int -> unit -> string
-
 (** Magic bytes used for the external RPC process handshake. *)
 val rpc_process_socket_magic : bytes
 
