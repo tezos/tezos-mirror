@@ -3,3 +3,4 @@
 // SPDX-License-Identifier: MIT
 
 pub mod merkle;
+mod proof;
