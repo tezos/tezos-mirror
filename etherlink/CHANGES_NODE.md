@@ -4,17 +4,27 @@
 
 ### Features
 
+### Bug fixes
+
+### Internals
+
+## Version 0.7 (2024-10-28)
+
+This is a bug fixes release, notably improving how the observer mode deals with
+many transactions coming from the same source when the finalized view is
+enabled.
+
+This release will not apply any migration to the node’s store (version 13),
+meaning it is possible to downgrade to the previous version.
+
+### Bug fixes
+
 #### RPCs
 
 - Forward transactions to the upstream EVM node without delay when running in
   observer mode with the finalized view option enabled. This improves the UX of
   the users of said node without sacrificing the security provided by the
   finalized view. (!15453)
-
-### Bug fixes
-
-#### RPCs
-
 - Fixes the `callTracer`’s output containing invalid UTF8 string on reverted
   calls. (!15421)
 - The transaction pool has a limit of transactions per user, if the
