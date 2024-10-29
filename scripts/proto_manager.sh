@@ -550,7 +550,7 @@ function copy_source() {
       "src/proto_${version}/lib_protocol/raw_context.ml" \
       "src/proto_${version}/lib_client/proxy.ml"
   else
-    sed -i.old.old -e "s/let version_value = \"${protocol_source}*\"/let version_value = \"${protocol_target}\"/" \
+    sed -i.old.old -e "s/let version_value = \"${protocol_source}.*\"/let version_value = \"${protocol_target}\"/" \
       "src/proto_${version}/lib_protocol/constants_repr.ml" \
       "src/proto_${version}/lib_protocol/raw_context.ml" \
       "src/proto_${version}/lib_client/proxy.ml"
