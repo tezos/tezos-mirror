@@ -4,6 +4,18 @@
 
 ### Features
 
+### Internal
+
+### Bug fixes
+
+## Version 7386d0bc63f3589525bdfbd3cc0544076231b813
+
+This kernel has not been activated on Etherlink Testnet or Mainnet yet.
+
+Its storage version is 22.
+
+### Features
+
 #### Stable
 
 - The kernel is able to trace calls for the `callTracer` configuration. (!14290)
