@@ -289,9 +289,10 @@ module Dal_helpers = struct
          ~published_level
          ~dal_attested_slots_validity_lag
 
-  let verify ~metadata ~dal_activation_level ~dal_attestation_lag
-      ~dal_number_of_slots ~commit_inbox_level dal_parameters page_id
-      dal_snapshot proof ~dal_attested_slots_validity_lag =
+  let verify ~protocol_activation_level ~metadata ~dal_activation_level
+      ~dal_attestation_lag ~dal_number_of_slots ~commit_inbox_level
+      dal_parameters page_id dal_snapshot proof ~dal_attested_slots_validity_lag
+      =
     let open Result_syntax in
     if
       page_id_is_valid
@@ -306,6 +307,7 @@ module Dal_helpers = struct
     then
       let* input =
         Dal_slot_repr.History.verify_proof
+          ~with_migration:(protocol_activation_level, dal_attestation_lag)
           dal_parameters
           page_id
           dal_snapshot
@@ -345,9 +347,10 @@ end
 
 let valid (type state proof output)
     ~(pvm : (state, proof, output) Sc_rollups.PVM.implementation) ~metadata
-    snapshot commit_inbox_level dal_snapshot dal_parameters
-    ~dal_activation_level ~dal_attestation_lag ~dal_number_of_slots
-    ~is_reveal_enabled ~dal_attested_slots_validity_lag (proof : proof t) =
+    ?(protocol_activation_level = Raw_level_repr.root) snapshot
+    commit_inbox_level dal_snapshot dal_parameters ~dal_activation_level
+    ~dal_attestation_lag ~dal_number_of_slots ~is_reveal_enabled
+    ~dal_attested_slots_validity_lag (proof : proof t) =
   let open Lwt_result_syntax in
   let (module P) = pvm in
   let origination_level = metadata.Sc_rollup_metadata_repr.origination_level in
@@ -375,6 +378,7 @@ let valid (type state proof output)
         return_some (Sc_rollup_PVM_sig.Reveal (Metadata metadata))
     | Some (Reveal_proof (Dal_page_proof {proof; page_id})) ->
         Dal_helpers.verify
+          ~protocol_activation_level
           ~dal_number_of_slots
           ~metadata
           ~dal_activation_level

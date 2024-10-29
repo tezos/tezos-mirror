@@ -555,13 +555,13 @@ module History = struct
             let attested_level =
               Raw_level_repr.add published_level attestation_lag
             in
-            if Raw_level_repr.(attested_level >= migration_level) then
-              (* If attested_level is at least equal to migration_level, this
+            if Raw_level_repr.(attested_level > migration_level) then
+              (* If attested_level is higher than the migration_level, this
                  means that the content has always been hashed using the new
                  encoding. So, we continue doing so. *)
               to_new_bytes current_slot
             else
-              (* if attested_level < migration_level, this means that this
+              (* if attested_level <= migration_level, this means that this
                  content has already been hashed with the representation of
                  cells' content in the previous protocol. To keep getting the
                  same hash used as a backpointer, we rehash using the same
@@ -696,22 +696,15 @@ module History = struct
 
     let equal : t -> t -> bool = equal_history
 
-    let hash cell =
+    let hash ?with_migration cell =
       let current_slot = Skip_list.content cell in
       let back_pointers_hashes = Skip_list.back_pointers cell in
-      Content.to_bytes current_slot
+      Content.to_bytes ?with_migration current_slot
       :: List.map Pointer_hash.to_bytes back_pointers_hashes
       |> Pointer_hash.hash_bytes
 
     let pp_history fmt (history : history) =
-      let history_hash = hash history in
-      Format.fprintf
-        fmt
-        "@[hash : %a@;%a@]"
-        Pointer_hash.pp
-        history_hash
-        (Skip_list.pp ~pp_content:Content.pp ~pp_ptr:Pointer_hash.pp)
-        history
+      Skip_list.pp ~pp_content:Content.pp ~pp_ptr:Pointer_hash.pp fmt history
 
     let pp = pp_history
 
@@ -737,9 +730,9 @@ module History = struct
        Note that if the given skip list contains the genesis cell, its content is
        reset with the given content. This ensures the invariant that
        there are no gaps in the successive cells of the list. *)
-    let add_cell (t, cache) next_cell_content ~number_of_slots =
+    let add_cell ?with_migration (t, cache) next_cell_content ~number_of_slots =
       let open Result_syntax in
-      let prev_cell_ptr = hash t in
+      let prev_cell_ptr = hash ?with_migration t in
       let Header.{published_level; _} =
         Skip_list.content t |> Content.content_id
       in
@@ -754,7 +747,7 @@ module History = struct
             next_cell_content
             ~number_of_slots
       in
-      let new_head_hash = hash new_head in
+      let new_head_hash = hash ?with_migration new_head in
       let* cache = History_cache.remember new_head_hash new_head cache in
       return (new_head, cache)
 
@@ -816,8 +809,8 @@ module History = struct
        insert exactly [number_of_slots] cells in the skip list per level. This
        will simplify the shape of proofs and help bounding the history cache
        required for their generation. *)
-    let update_skip_list (t : t) cache published_level ~number_of_slots
-        slot_headers_with_statuses =
+    let update_skip_list (t : t) cache ?with_migration published_level
+        ~number_of_slots slot_headers_with_statuses =
       let open Result_syntax in
       let* () =
         List.iter_e
@@ -834,14 +827,22 @@ module History = struct
           ~published_level
           slot_headers_with_statuses
       in
-      List.fold_left_e (add_cell ~number_of_slots) (t, cache) slot_headers
+      List.fold_left_e
+        (add_cell ?with_migration ~number_of_slots)
+        (t, cache)
+        slot_headers
 
     let update_skip_list_no_cache =
       let empty_cache = History_cache.empty ~capacity:0L in
-      fun t published_level ~number_of_slots slot_headers_with_statuses ->
+      fun t
+          ?with_migration
+          published_level
+          ~number_of_slots
+          slot_headers_with_statuses ->
         let open Result_syntax in
         let+ cell, (_ : History_cache.t) =
           update_skip_list
+            ?with_migration
             t
             empty_cache
             published_level
@@ -1206,16 +1207,17 @@ module History = struct
     (* Given a starting cell [snapshot] and a (final) [target], this function
        checks that the provided [inc_proof] encodes a minimal path from
        [snapshot] to [target]. *)
-    let verify_inclusion_proof inc_proof ~src:snapshot ~dest:target =
-      let assoc = List.map (fun c -> (hash c, c)) inc_proof in
+    let verify_inclusion_proof ?with_migration inc_proof ~src:snapshot
+        ~dest:target =
+      let assoc = List.map (fun c -> (hash ?with_migration c, c)) inc_proof in
       let path = List.split assoc |> fst in
       let deref =
         let open Map.Make (Pointer_hash) in
         let map = of_seq (List.to_seq assoc) in
         fun ptr -> find_opt ptr map
       in
-      let snapshot_ptr = hash snapshot in
-      let target_ptr = hash target in
+      let snapshot_ptr = hash ?with_migration snapshot in
+      let target_ptr = hash ?with_migration target in
       error_unless
         (Skip_list.valid_back_path
            ~equal_ptr:Pointer_hash.equal
@@ -1225,7 +1227,7 @@ module History = struct
            path)
         (dal_proof_error "verify_proof_repr: invalid inclusion Dal proof.")
 
-    let verify_proof_repr dal_params page_id snapshot proof =
+    let verify_proof_repr ?with_migration dal_params page_id snapshot proof =
       let open Result_syntax in
       let Page.{slot_id = Header.{published_level; index}; page_index = _} =
         page_id
@@ -1271,7 +1273,11 @@ module History = struct
       (* We check that the given inclusion proof indeed links our L1 snapshot to
          the target cell. *)
       let* () =
-        verify_inclusion_proof inc_proof ~src:snapshot ~dest:target_cell
+        verify_inclusion_proof
+          ?with_migration
+          inc_proof
+          ~src:snapshot
+          ~dest:target_cell
       in
       match (page_proof_check, cell_content) with
       | None, (Unpublished _ | Published {is_proto_attested = false; _}) ->
@@ -1292,10 +1298,13 @@ module History = struct
                "verify_proof_repr: the confirmation proof doesn't contain the \
                 attested slot."
 
-    let verify_proof dal_params page_id snapshot serialized_proof =
+    let verify_proof ?with_migration dal_params page_id snapshot
+        serialized_proof =
       let open Result_syntax in
       let* proof_repr = deserialize_proof serialized_proof in
-      verify_proof_repr dal_params page_id snapshot proof_repr
+      verify_proof_repr ?with_migration dal_params page_id snapshot proof_repr
+
+    let hash = hash ?with_migration:None
 
     module Internal_for_tests = struct
       type cell_content = Content.t =

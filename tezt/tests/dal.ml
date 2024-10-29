@@ -5086,9 +5086,7 @@ module History_rpcs = struct
           (Dal_node.string_of_skip_list_storage_backend
              skip_list_storage_backend)
       in
-      (* TODO: This test will be re-enabled in MR:
-         https://gitlab.com/tezos/tezos/-/merge_requests/15448 *)
-      let tags = ["rpc"; "skip_list"; Tag.memory_3k; Tag.ci_disabled] in
+      let tags = ["rpc"; "skip_list"; Tag.memory_3k] in
       let tags =
         if skip_list_storage_backend = Dal_node.SQLite3 then
           skip_list_sqlite3_tag :: tags
