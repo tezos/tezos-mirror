@@ -279,6 +279,32 @@ end
 
 open Helpers
 
+let perform_kvs store action =
+  let open Lwt_result_syntax in
+  let open Kvs_skip_list_cells_store in
+  match action with
+  | Action.Insert {attested_level; payload} ->
+      insert store ~attested_level payload
+  | Find {skip_list_hash} ->
+      let* _cell = find store skip_list_hash in
+      return_unit
+  | Remove {attested_level} -> remove store ~attested_level
+
+let perform_sqlite store action =
+  let open Lwt_result_syntax in
+  let open Dal_store_sqlite3.Skip_list_cells in
+  match action with
+  | Action.Insert {attested_level; payload} ->
+      insert store ~attested_level payload
+  | Find {skip_list_hash} ->
+      let* _cell = find store skip_list_hash in
+      return_unit
+  | Remove {attested_level} -> remove store ~attested_level
+
+let run_kvs store actions = List.iter_es (perform_kvs store) actions
+
+let run_sqlite3 store actions = List.iter_es (perform_sqlite store) actions
+
 (* As found in bin_dal_node/store.ml *)
 let init_skip_list_cells_store node_store_dir =
   let padded_encoded_cell_size = 64 * (32 + 1) in
@@ -298,12 +324,15 @@ let () = Value_size_hooks.set_number_of_slots number_of_slots
    w.r.t to the cell hashes generated during the run. *)
 let consistency_test =
   let open Lwt_result_syntax in
-  let property _ =
+  let property {state = _; actions} =
     let run =
       (* Initialize the KVS and the SQLite stores. *)
       let data_dir = Tezt.Temp.dir "data-dir" in
       let* kvs_store = init_skip_list_cells_store data_dir in
-      let* _sql_store = Dal_store_sqlite3.init ~data_dir ~perm:`Read_write () in
+      let* sql_store = Dal_store_sqlite3.init ~data_dir ~perm:`Read_write () in
+      (* Run the actions both for the KVS and the SQL backends. *)
+      let* () = run_kvs kvs_store actions in
+      let* () = run_sqlite3 sql_store actions in
       (* We are done with this run. *)
       let* () = Kvs_skip_list_cells_store.close kvs_store in
       return_unit
