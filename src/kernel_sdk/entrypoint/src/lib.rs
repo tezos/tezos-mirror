@@ -8,6 +8,12 @@
 #![deny(rustdoc::broken_intra_doc_links)]
 #![cfg_attr(not(feature = "std"), no_std)]
 
+mod kernel_entrypoint;
+mod panic_protection;
+
+#[cfg(all(feature = "experimental-host-in-memory-store", target_arch = "riscv64"))]
+pub(crate) mod host_in_memory_store;
+
 #[cfg(all(feature = "dlmalloc", not(target_arch = "riscv64")))]
 mod allocator {
     use dlmalloc::GlobalDlmalloc;
@@ -59,17 +65,15 @@ macro_rules! kernel_entry {
 }
 
 #[doc(hidden)]
-#[cfg(not(feature = "experimental-host-in-memory-store"))]
+#[cfg(not(all(
+    feature = "experimental-host-in-memory-store",
+    target_arch = "riscv64"
+)))]
 pub use tezos_smart_rollup_core::rollup_host::RollupHost;
 
-pub(crate) mod host;
-
 #[doc(hidden)]
-#[cfg(feature = "experimental-host-in-memory-store")]
-pub use host::RollupHostWithInMemoryStorage as RollupHost;
-
-mod kernel_entrypoint;
-mod panic_protection;
+#[cfg(all(feature = "experimental-host-in-memory-store", target_arch = "riscv64"))]
+pub use host_in_memory_store::RollupHostWithInMemoryStorage as RollupHost;
 
 #[doc(hidden)]
 #[allow(unused_imports)]
