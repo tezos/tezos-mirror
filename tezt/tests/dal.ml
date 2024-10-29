@@ -4834,6 +4834,23 @@ module History_rpcs = struct
     let client = Client.with_dal_node client ~dal_node in
     let slot_size = dal_parameters.Dal.Parameters.cryptobox.slot_size in
 
+    let rec publish ~max_level level commitments =
+      (* Try to publish a slot at each level *)
+      if level > max_level then return @@ List.rev commitments
+      else
+        let* commitment =
+          Helpers.publish_and_store_slot
+            client
+            dal_node
+            Constant.bootstrap1
+            ~index:slot_index
+            ~force:true
+          @@ Helpers.make_slot ~slot_size ("slot " ^ string_of_int level)
+        in
+        let* () = bake_for client in
+        let* _level = Node.wait_for_level node (level + 1) in
+        publish ~max_level (level + 1) (commitment :: commitments)
+    in
     (* [bake_for ~count] doesn't work across the migration block, so we bake in
        two steps *)
     let* () =
@@ -4860,24 +4877,10 @@ module History_rpcs = struct
     let* first_level = Client.level client in
     Log.info "No slot published at level %d" first_level ;
     Log.info "Publishing slots and baking up to level %d" max_level ;
-    let rec publish level commitments =
-      (* Try to publish a slot at each level *)
-      if level > max_level then return @@ List.rev commitments
-      else
-        let* commitment =
-          Helpers.publish_and_store_slot
-            client
-            dal_node
-            Constant.bootstrap1
-            ~index:slot_index
-            ~force:true
-          @@ Helpers.make_slot ~slot_size ("slot " ^ string_of_int level)
-        in
-        let* () = bake_for client in
-        let* _level = Node.wait_for_level node (level + 1) in
-        publish (level + 1) (commitment :: commitments)
+
+    let* commitments =
+      publish ~max_level:(last_attested_level + 2) first_level []
     in
-    let* commitments = publish first_level [] in
     let commitments = Array.of_list commitments in
 
     let module SeenIndexes = Set.Make (struct
