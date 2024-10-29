@@ -383,11 +383,22 @@ module History : sig
     | Unexpected_page_size of {expected_size : int; page_size : int}
 
   module Internal_for_tests : sig
-    (** The content of a cell in the DAL skip list. We don't store the slot
-        headers directly to refactor the common [published_level] and save
-        space. This is important for refutation proofs, as they have to fit in
-        an L1 operation. *)
-    type cell_content = Unattested of Header.id | Attested of Header.t
+    (** The content of a cell in the DAL skip list. We have [number_of_slots]
+        new cells per level (one per slot index). For a given slot index in
+        [0..number_of_slots-1], the commitment is either [Unpublished] or
+        [Published]. In this second case, we attach extra information in
+        addition to the id such as the commitment, the publisher, the number of
+        attested shards and whether the commitment is attested from the point of
+        view of the protocol. *)
+    type cell_content =
+      | Unpublished of Header.id
+      | Published of {
+          header : Header.t;
+          publisher : Signature.public_key_hash;
+          is_proto_attested : bool;
+          attested_shards : int;
+          total_shards : int;
+        }
 
     (** Returns the content of the last cell in the given skip list. *)
     val content : t -> cell_content

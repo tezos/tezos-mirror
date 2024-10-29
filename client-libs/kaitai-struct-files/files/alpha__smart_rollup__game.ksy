@@ -74,6 +74,12 @@ types:
     - id: attested
       type: attested
       if: (content_tag == content_tag::attested)
+    - id: unpublished
+      type: unpublished
+      if: (content_tag == content_tag::unpublished)
+    - id: published
+      type: published
+      if: (content_tag == content_tag::published)
   dal_snapshot:
     seq:
     - id: dal_snapshot_tag
@@ -152,6 +158,41 @@ types:
       type: b1be
     - id: payload
       type: b7be
+  public_key_hash:
+    seq:
+    - id: public_key_hash_tag
+      type: u1
+      enum: public_key_hash_tag
+    - id: ed25519
+      size: 20
+      if: (public_key_hash_tag == public_key_hash_tag::ed25519)
+    - id: secp256k1
+      size: 20
+      if: (public_key_hash_tag == public_key_hash_tag::secp256k1)
+    - id: p256
+      size: 20
+      if: (public_key_hash_tag == public_key_hash_tag::p256)
+    - id: bls
+      size: 20
+      if: (public_key_hash_tag == public_key_hash_tag::bls)
+  published:
+    seq:
+    - id: publisher
+      type: public_key_hash
+      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+    - id: is_proto_attested
+      type: u1
+      enum: bool
+    - id: attested_shards
+      type: u2be
+    - id: total_shards
+      type: u2be
+    - id: published_tag
+      type: u1
+      enum: published_tag
+    - id: v0
+      type: v0
+      if: (published_tag == published_tag::v0)
   refuted_stop_chunk:
     seq:
     - id: state_tag
@@ -176,6 +217,12 @@ types:
       type: s4be
     - id: index
       type: u1
+  unpublished:
+    seq:
+    - id: level
+      type: s4be
+    - id: index
+      type: u1
   v0:
     seq:
     - id: level
@@ -193,12 +240,21 @@ enums:
   content_tag:
     0: unattested
     1: attested
+    2: unpublished
+    3: published
   dal_snapshot_tag:
     0: dal_skip_list_legacy
     1: dal_skip_list
   game_state_tag:
     0: dissecting
     1: final_move
+  public_key_hash_tag:
+    0: ed25519
+    1: secp256k1
+    2: p256
+    3: bls
+  published_tag:
+    0: v0
   turn_tag:
     0: alice
     1: bob
