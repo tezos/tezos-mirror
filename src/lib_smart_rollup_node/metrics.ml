@@ -45,6 +45,19 @@ let set_gauge help name f =
   let m = v_gauge ~help name in
   fun x -> Gauge.set m @@ f x
 
+let v_label_gauge ~label_names ~help name =
+  Gauge.v_labels
+    ~registry:sc_rollup_node_registry
+    ~namespace
+    ~subsystem
+    ~label_names
+    ~help
+    name
+
+(** Registers a labeled gauge in [sc_rollup_node_registry] *)
+let set_labeled_gauge ~family f ?(labels = []) x =
+  Gauge.set (Gauge.labels family labels) (f x)
+
 let process_metrics = ref false
 
 let wrap f = if !process_metrics then f ()
@@ -133,6 +146,40 @@ let print_csv_metrics ppf metrics =
         v.MetricInfo.label_names)
     (MetricFamilyMap.to_list metrics) ;
   Format.fprintf ppf "@]@."
+
+module Refutation = struct
+  type state = OurTurn | TheirTurn | Timeout
+
+  let state_to_float = function
+    | OurTurn -> 0.
+    | TheirTurn -> 1.
+    | Timeout -> -1.
+
+  let set_number_of_conflict =
+    set_gauge "Number of conflicts" "number_of_conflicts" Int.to_float
+
+  let family_state_of_refutation_game =
+    v_label_gauge
+      ~label_names:["opponent"; "start_level"]
+      ~help:"State of refutation game"
+      "state_of_refutation_game"
+
+  let family_set_block_timeout =
+    v_label_gauge
+      ~label_names:["opponent"; "start_level"]
+      ~help:"Number of block before player timeout"
+      "block_timeout"
+
+  let set_state_refutation_game =
+    set_labeled_gauge ~family:family_state_of_refutation_game state_to_float
+
+  let set_block_timeout =
+    set_labeled_gauge ~family:family_set_block_timeout Int.to_float
+
+  let clear_state_refutation_game labels =
+    Gauge.clear_specific family_state_of_refutation_game labels ;
+    Gauge.clear_specific family_set_block_timeout labels
+end
 
 module Info = struct
   open Tezos_version

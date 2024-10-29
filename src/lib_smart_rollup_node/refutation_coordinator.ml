@@ -90,6 +90,9 @@ let on_process Layer1.{level; _} state =
               config.sc_rollup_address
               self
           in
+          Metrics.wrap (fun () ->
+              Metrics.Refutation.set_number_of_conflict
+                (List.length ongoing_games)) ;
           (* Map between opponents and their corresponding games *)
           let ongoing_game_map = make_game_map self ongoing_games in
           (* Launch new players for new conflicts, and play one step *)

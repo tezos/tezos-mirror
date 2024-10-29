@@ -40,6 +40,23 @@ val metrics_serve : string option -> (unit, tztrace) result Lwt.t
 val print_csv_metrics :
   Format.formatter -> 'a Prometheus.MetricFamilyMap.t -> unit
 
+module Refutation : sig
+  type state = OurTurn | TheirTurn | Timeout
+
+  (** Set the number of current conflict for this rollup node *)
+  val set_number_of_conflict : int -> unit
+
+  (** Set the state of a refutation game whether it's our turn
+      or the opponent *)
+  val set_state_refutation_game : ?labels:string list -> state -> unit
+
+  (** Set the number of block before the player timeout in the game *)
+  val set_block_timeout : ?labels:string list -> int -> unit
+
+  (** Clear the state of a refutation game *)
+  val clear_state_refutation_game : string list -> unit
+end
+
 (** The node info metrics *)
 module Info : sig
   (** Initializes the metric for rollup info
