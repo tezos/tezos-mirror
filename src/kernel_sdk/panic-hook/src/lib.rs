@@ -21,13 +21,20 @@ extern crate std;
 
 extern crate alloc;
 
-use core::panic::PanicInfo;
+/// Argument type for the panic hook
+#[rustversion::before(1.81)]
+pub type PanicHookArg<'a> = core::panic::PanicInfo<'a>;
+
+/// Argument type for the panic hook
+// From 1.81 onwards, panic hooks take [`std::panic::PanicHookInfo`] instead.
+#[rustversion::since(1.81)]
+pub type PanicHookArg<'a> = std::panic::PanicHookInfo<'a>;
 
 /// Prints the panic info to the host's *debug log*, and then aborts.
 ///
 /// When targeting WASM, this will be the *global* panic handler.
 #[allow(unused)]
-pub fn panic_handler(info: &PanicInfo) {
+pub fn panic_handler(info: &PanicHookArg) {
     #[cfg(feature = "debug")]
     {
         let message = if let Some(message) =
