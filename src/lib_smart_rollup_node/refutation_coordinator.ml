@@ -219,28 +219,27 @@ let init (node_ctxt : _ Node_context.t) =
       else return_unit
 
 (* This is a refutation coordinator for a single scoru *)
-let worker =
+let worker () =
   let open Result_syntax in
-  lazy
-    (match Lwt.state worker_promise with
-    | Lwt.Return worker -> return worker
-    | Lwt.Fail exn -> fail (Error_monad.error_of_exn exn)
-    | Lwt.Sleep -> Error Rollup_node_errors.No_refutation_coordinator)
+  match Lwt.state worker_promise with
+  | Lwt.Return worker -> return worker
+  | Lwt.Fail exn -> tzfail (Error_monad.error_of_exn exn)
+  | Lwt.Sleep -> tzfail Rollup_node_errors.No_refutation_coordinator
 
 let process b =
   let open Lwt_result_syntax in
-  match Lazy.force worker with
+  match worker () with
   | Ok w ->
       let*! (_pushed : bool) =
         Worker.Queue.push_request w (Request.Process b)
       in
       return_unit
-  | Error Rollup_node_errors.No_refutation_coordinator -> return_unit
-  | Error e -> tzfail e
+  | Error (Rollup_node_errors.No_refutation_coordinator :: _) -> return_unit
+  | Error e -> fail e
 
 let shutdown () =
   let open Lwt_syntax in
-  match Lazy.force worker with
+  match worker () with
   | Error _ ->
       (* There is no refutation coordinator, nothing to do *)
       return_unit
