@@ -155,6 +155,13 @@ module Anonymous : sig
         level : Raw_level.t;
         last_cycle : Cycle.t;
       }
+    | Too_early_dal_denunciation of {level : Raw_level.t; current : Raw_level.t}
+    | Outdated_dal_denunciation of {level : Raw_level.t; last_cycle : Cycle.t}
+    | Invalid_shard_index of {given : int; min : int; max : int}
+    | Dal_already_denounced of {
+        delegate : Signature.Public_key_hash.t;
+        level : Level.t;
+      }
     | Conflicting_dal_entrapment of operation_conflict
     | Conflicting_nonce_revelation of operation_conflict
     | Conflicting_vdf_revelation of operation_conflict
