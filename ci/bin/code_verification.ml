@@ -1333,6 +1333,7 @@ let jobs pipeline_type =
         Tezt.job
           ~__POS__
           ~name:"tezt-memory-3k"
+          ~tag:Gcp_tezt_memory_3k
           ~tezt_tests:(Tezt.tests_tag_selector ~memory_3k:true [])
           ~tezt_variant:"-memory_3k"
           ~parallel:(Vector 6)
@@ -1346,6 +1347,7 @@ let jobs pipeline_type =
         Tezt.job
           ~__POS__
           ~name:"tezt-memory-4k"
+          ~tag:Gcp_tezt_memory_4k
           ~tezt_tests:(Tezt.tests_tag_selector ~memory_4k:true [])
           ~tezt_variant:"-memory_4k"
           ~parallel:(Vector 4)

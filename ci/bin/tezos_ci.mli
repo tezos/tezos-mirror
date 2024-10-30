@@ -236,6 +236,14 @@ type tag =
       (** GCP prod AMD64 runner, suitable for tezt jobs (more RAM and CPU) *)
   | Gcp_tezt_dev
       (** GCP dev AMD64 runner, suitable for tezt jobs (more RAM and CPU) *)
+  | Gcp_tezt_memory_3k
+      (** GCP prod AMD64 runner, suitable for tezt memory 3k jobs (more RAM and CPU) *)
+  | Gcp_tezt_memory_3k_dev
+      (** GCP dev AMD64 runner, suitable for tezt memory 3k jobs (more RAM and CPU) *)
+  | Gcp_tezt_memory_4k
+      (** GCP prod AMD64 runner, suitable for tezt memory 4k jobs (more RAM and CPU) *)
+  | Gcp_tezt_memory_4k_dev
+      (** GCP dev AMD64 runner, suitable for tezt memory 4k jobs (more RAM and CPU) *)
   | Aws_specific
       (** AWS runners, in cases where a CI is legacy or not suitable for GCP. *)
   | Dynamic
