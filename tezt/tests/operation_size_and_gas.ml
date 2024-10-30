@@ -151,6 +151,25 @@ let create_account_and_reveal ?source ~node ~amount ~alias client =
   let* () = Client.bake_for_and_wait ~node client in
   return fresh_account
 
+let originate_contract ?init ~node protocol script_name client =
+  Log.info
+    ~color:Log.Color.FG.green
+    "Originate contract %s."
+    Michelson_script.(find script_name protocol |> name_s) ;
+  let* _alias_contract, hash_contract =
+    Client.originate_contract_at
+      ?init
+      ~amount:Tez.zero
+      ~src:Constant.bootstrap1.alias
+      ~burn_cap:(Tez.of_int 10)
+      client
+      script_name
+      protocol
+  in
+  let* () = Client.bake_for_and_wait ~node client in
+  Log.info ~color:Log.Color.FG.gray "Contract address is %s." hash_contract ;
+  return hash_contract
+
 let test_reveal =
   Protocol.register_regression_test
     ~__FILE__
@@ -201,9 +220,57 @@ let test_delegation =
   in
   operation_size_and_gas ~source:delegator ~node op_delegate client
 
+let name_concat name = String.concat "/" name
+
+let test_contract_call =
+  Protocol.register_regression_test
+    ~__FILE__
+    ~title:"operation size and gas for contract call operation"
+    ~tags:(operation_size_and_gas_tags @ ["contract"; "call"])
+  @@ fun protocol ->
+  let test ?gas_limit ?storage_limit ~script_name ?init ~arg
+      ~(source : Account.key) ~node client =
+    let* contract =
+      originate_contract ?init ~node protocol script_name client
+    in
+    Log.info
+      ~color:Log.Color.FG.green
+      "[%s] calls the [%s] contract."
+      source.alias
+      contract ;
+    let* arg = Client.convert_data_to_json ~data:arg client in
+    let op_contract_call = Operation.Manager.call ~arg ~dest:contract () in
+    operation_size_and_gas
+      ~name:(name_concat script_name)
+      ?gas_limit
+      ?storage_limit
+      ~source
+      ~node
+      op_contract_call
+      client
+  in
+  Log.info ~color:Log.Color.FG.green "Initialize a node and a client." ;
+  let* node, client = Client.init_with_protocol ~protocol `Client () in
+  let account = Constant.bootstrap1 in
+
+  let script_name = ["mini_scenarios"; "check_signature"] in
+  let msg = "0x" ^ Hex.show (Hex.of_string "Message to sign") in
+  let* signature = Client.sign_bytes ~signer:account.alias ~data:msg client in
+  let data = sf "Pair %S %S %s" account.public_key signature msg in
+  test
+    ~gas_limit:1460
+    ~storage_limit:161
+    ~script_name
+    ~arg:data
+    ~source:account
+    ~node
+    client
+
+
 let register ~protocols:_ =
   (* We run tests only for proto_alpha atm *)
   let protocols = [Protocol.Alpha] in
   test_reveal protocols ;
   test_simple_transfer protocols ;
-  test_delegation protocols
+  test_delegation protocols ;
+  test_contract_call protocols
