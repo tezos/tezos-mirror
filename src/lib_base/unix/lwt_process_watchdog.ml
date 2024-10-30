@@ -151,6 +151,10 @@ type 'a t = {
   parameters_encoding : 'a Data_encoding.t;
 }
 
+let create ~parameters ~parameters_encoding =
+  let stop, stopper = Lwt.wait () in
+  {server = None; stop; stopper; parameters; parameters_encoding}
+
 (** [get_init_socket_path ~socket_dir ?socket_prefix ~pid ()]
     generates the socket path in which the socket will be created. The
     socket will be named from the [?socket_prefix] (a random filename

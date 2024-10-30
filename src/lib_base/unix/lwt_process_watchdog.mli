@@ -29,16 +29,11 @@ end
 
 module MakeEvent : functor (N : NAME) -> EVENTS
 
-type 'a t = {
-  mutable server : Lwt_process.process_none option;
-  (* Promise that aims to be resolved as soon as the server is
-     shutting down. *)
-  stop : (int * Unix.process_status) Lwt.t;
-  (* Resolver that will wakeup the above stop promise. *)
-  stopper : (int * Unix.process_status) Lwt.u;
-  parameters : 'a;
-  parameters_encoding : 'a Data_encoding.t;
-}
+type 'a t
+
+(** [create ~parameters ~parameters_encoding] creates a watchdog
+    state, ready to be passed to the [Daemon] runner. *)
+val create : parameters:'a -> parameters_encoding:'a encoding -> 'a t
 
 val get_init_socket_path :
   socket_dir:string -> ?socket_prefix:string -> pid:int -> unit -> string

@@ -18,22 +18,18 @@ type process = Parameters.t Lwt_process_watchdog.t
 
 let create ~comm_socket_path (config : Config_file.t) node_version events_config
     =
-  let stop, stopper = Lwt.wait () in
-  Lwt_process_watchdog.
-    {
-      server = None;
-      stop;
-      stopper;
-      parameters =
-        Parameters.
-          {
-            internal_events = events_config;
-            config;
-            rpc_comm_socket_path = comm_socket_path;
-            node_version;
-          };
-      parameters_encoding = Parameters.parameters_encoding;
-    }
+  let parameters =
+    Parameters.
+      {
+        internal_events = events_config;
+        config;
+        rpc_comm_socket_path = comm_socket_path;
+        node_version;
+      }
+  in
+  Lwt_process_watchdog.create
+    ~parameters
+    ~parameters_encoding:Parameters.parameters_encoding
 
 let rpc_process_socket_magic = Bytes.of_string "TEZOS_RPC_SERVER_MAGIC_0"
 
