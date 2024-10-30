@@ -47,7 +47,7 @@ debug = []
 testing = [
   "rand",
   "proptest",
-  "tezos-smart-rollup-core/testing",
+  "tezos-smart-rollup-core/mock-core-trait",
   "tezos-smart-rollup-host/testing",
   "tezos-smart-rollup-entrypoint/testing",
   "tezos-smart-rollup-encoding/testing",

@@ -25,5 +25,5 @@ optional = true
 path = "../constants"
 
 [features]
-"testing" = ["mockall"]
+"mock-core-trait" = ["dep:mockall"]
 "proto-alpha" = []

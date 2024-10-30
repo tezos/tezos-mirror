@@ -5,7 +5,7 @@
 // SPDX-License-Identifier: MIT
 
 #![doc = include_str!("../README.md")]
-#![cfg_attr(not(any(test, feature = "testing")), no_std)]
+#![cfg_attr(not(feature = "mock-core-trait"), no_std)]
 #![deny(rustdoc::broken_intra_doc_links)]
 
 pub mod rollup_host;

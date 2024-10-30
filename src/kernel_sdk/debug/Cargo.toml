@@ -25,7 +25,7 @@ default-features = false
 [features]
 default = ["alloc"]
 alloc = []
-testing = ["tezos-smart-rollup-core/testing"]
+testing = ["tezos-smart-rollup-core/mock-core-trait"]
 proto-alpha = [
   "tezos-smart-rollup-core/proto-alpha",
   "tezos-smart-rollup-host/proto-alpha",

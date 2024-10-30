@@ -25,6 +25,7 @@
 - Implement the generic `reveal` host function in the `MockHost`, this allows in particular to use the DAL host functions in the mockup.
 - Bump `tezos_crypto_rs`/`tezos_data_encoding` to `0.6.0` release.
 - Allow overriding of the `debug_log` sink when using `MockHost`.
+- Rename `testing` feature flag to `mock-core-trait` on `core` crate.
 
 ### Installer client/kernel
 

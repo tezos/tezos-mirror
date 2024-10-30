@@ -168,7 +168,7 @@ extern "C" {
 /// A full list of error codes is given in the [top-level](./lib.rs).
 ///
 /// [`RollupHost`]: crate::rollup_host::RollupHost
-#[cfg_attr(feature = "testing", mockall::automock)]
+#[cfg_attr(feature = "mock-core-trait", mockall::automock)]
 pub unsafe trait SmartRollupCore {
     /// See [read_input].
     ///
