@@ -4263,9 +4263,12 @@ let spawn_finalize_unstake ?(wait = "none") ~staker client =
 let finalize_unstake ?wait ~staker client =
   spawn_finalize_unstake ?wait ~staker client |> Process.check
 
-let spawn_set_delegate_parameters ~delegate ~limit ~edge client =
+let spawn_set_delegate_parameters ?(wait = "none") ~delegate ~limit ~edge client
+    =
   spawn_command client
   @@ [
+       "--wait";
+       wait;
        "set";
        "delegate";
        "parameters";
@@ -4277,8 +4280,9 @@ let spawn_set_delegate_parameters ~delegate ~limit ~edge client =
        edge;
      ]
 
-let set_delegate_parameters ~delegate ~limit ~edge client =
-  spawn_set_delegate_parameters ~delegate ~limit ~edge client |> Process.check
+let set_delegate_parameters ?wait ~delegate ~limit ~edge client =
+  spawn_set_delegate_parameters ?wait ~delegate ~limit ~edge client
+  |> Process.check
 
 (* Keep an alias to external RPC module to allow RPC calls *)
 module R = RPC

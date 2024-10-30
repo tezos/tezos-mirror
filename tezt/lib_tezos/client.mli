@@ -3104,11 +3104,21 @@ val spawn_finalize_unstake : ?wait:string -> staker:string -> t -> Process.t
 
 (** Run [octez-client set delegate parameters for <delegate> --limit-of-staking-over-baking <limit> --edge-of-baking-over-staking <edge>]. *)
 val set_delegate_parameters :
-  delegate:string -> limit:string -> edge:string -> t -> unit Lwt.t
+  ?wait:string ->
+  delegate:string ->
+  limit:string ->
+  edge:string ->
+  t ->
+  unit Lwt.t
 
 (** Same as [set_delegate_parameters], but do not wait for the process to exit. *)
 val spawn_set_delegate_parameters :
-  delegate:string -> limit:string -> edge:string -> t -> Process.t
+  ?wait:string ->
+  delegate:string ->
+  limit:string ->
+  edge:string ->
+  t ->
+  Process.t
 
 module RPC : sig
   (** Perform RPC calls using [octez-client]. *)

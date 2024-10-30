@@ -416,6 +416,81 @@ let test_sc_rollup_refute =
   (*   let* () = test ~kind:"wasm_2_0_0" in *)
   unit
 
+(* with self-delegate staker *)
+let test_staking_operations =
+  Protocol.register_regression_test
+    ~__FILE__
+    ~title:"operation size and gas for staking operations"
+    ~tags:
+      (operation_size_and_gas_tags @ ["stake"; "unstake"; "finalize_unstake"])
+  @@ fun protocol ->
+  let* parameter_file =
+    Protocol.write_parameter_file
+      ~base:(Left (Protocol.parameter_file protocol))
+      [(["adaptive_issuance_force_activation"], `Bool true)]
+  in
+  Log.info ~color:Log.Color.FG.green "Initialize a node and a client." ;
+  let* node, client =
+    Client.init_with_protocol ~parameter_file ~protocol `Client ()
+  in
+  Log.info ~color:Log.Color.FG.green "Create and reveal pkh of [baker]." ;
+  let* baker =
+    create_account_and_reveal ~node ~amount:10_000_000 ~alias:"baker" client
+  in
+  Log.info ~color:Log.Color.FG.green "Register [baker] as a delegate." ;
+  let* _baker = Client.register_delegate ~delegate:baker.alias client in
+  let* () = Client.bake_for_and_wait client in
+
+  Log.info ~color:Log.Color.FG.green "Set delegate parameters for [baker]." ;
+  let set_delegate_parameters =
+    Client.spawn_set_delegate_parameters
+      ~delegate:baker.alias
+      ~limit:"5"
+      ~edge:"0.5"
+      client
+  in
+  let* op_gas = estimated_gas_consumption set_delegate_parameters in
+  print_op_size_and_gas_in_file ~name:"set_delegate_parameters" ~op_gas () ;
+  let* () = Client.bake_for_and_wait client in
+  let* () = Process.check set_delegate_parameters in
+
+  Log.info ~color:Log.Color.FG.green "[baker] stakes 1 tez." ;
+  let stake = Client.spawn_stake (Tez.of_int 1) ~staker:baker.alias client in
+  let* op_gas = estimated_gas_consumption stake in
+  print_op_size_and_gas_in_file ~name:"stake" ~op_gas () ;
+  let* () = Client.bake_for_and_wait client in
+  let* () = Process.check stake in
+
+  Log.info ~color:Log.Color.FG.green "[baker] unstakes 1 tez." ;
+  let unstake =
+    Client.spawn_unstake (Tez.of_int 1) ~staker:baker.alias client
+  in
+  let* op_gas = estimated_gas_consumption unstake in
+  print_op_size_and_gas_in_file ~name:"unstake" ~op_gas () ;
+  let* () = Client.bake_for_and_wait client in
+  let* () = Process.check unstake in
+  (* Bake consensus_rights_delay + max_slashing_period for
+     finalize_unstake, max_slashing_period = 2. *)
+  let parameters = JSON.parse_file parameter_file in
+  let consensus_rights_delay =
+    JSON.(get "consensus_rights_delay" parameters |> as_int)
+  in
+  let blocks_per_cycle = JSON.(get "blocks_per_cycle" parameters |> as_int) in
+  let* () =
+    repeat
+      ((consensus_rights_delay + 2) * blocks_per_cycle)
+      (fun () -> Client.bake_for_and_wait client)
+  in
+
+  Log.info ~color:Log.Color.FG.green "[baker] finalizes unstake of 1 tez." ;
+  let finalize_unstake =
+    Client.spawn_finalize_unstake ~staker:baker.alias client
+  in
+  let* op_gas = estimated_gas_consumption finalize_unstake in
+  print_op_size_and_gas_in_file ~name:"finalize_unstake" ~op_gas () ;
+  let* () = Client.bake_for_and_wait client in
+  let* () = Process.check finalize_unstake in
+  unit
 
 let register ~protocols:_ =
   (* We run tests only for proto_alpha atm *)
@@ -426,4 +501,5 @@ let register ~protocols:_ =
   test_contract_call protocols ;
   test_origination protocols ;
   test_dal_publish_commitment protocols ;
-  test_sc_rollup_refute protocols
+  test_sc_rollup_refute protocols ;
+  test_staking_operations protocols
