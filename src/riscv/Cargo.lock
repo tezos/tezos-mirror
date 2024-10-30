@@ -2212,7 +2212,6 @@ dependencies = [
  "tezos-smart-rollup-entrypoint",
  "tezos-smart-rollup-host",
  "tezos-smart-rollup-macros",
- "tezos-smart-rollup-mock",
  "tezos-smart-rollup-storage",
  "tezos-smart-rollup-utils",
  "tezos_crypto_rs",

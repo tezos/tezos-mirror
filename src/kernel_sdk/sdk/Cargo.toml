@@ -92,7 +92,6 @@ default = [
     "data-encoding",
     "storage",
     "bls",
-    "testing",
 ]
 crypto = ["dep:tezos_crypto_rs"]
 bls = ["tezos-smart-rollup-encoding/bls"]

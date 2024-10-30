@@ -29,6 +29,7 @@
 - Remove redundant `testing` feature flag from `debug` crate.
 - Remove redundant `testing` feature flag from `entrypoint` crate.
 - Remove redundant `testing` feature flag from `host` crate.
+- Disable `testing` as default features of the main `sdk` crate.
 
 ### Installer client/kernel
 
