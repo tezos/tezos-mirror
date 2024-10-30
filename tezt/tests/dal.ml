@@ -4827,9 +4827,11 @@ let test_attestation_through_p2p _protocol dal_parameters _cryptobox node client
   unit
 
 module History_rpcs = struct
-  let scenario ~slot_index ~first_cell_level ~first_dal_level
-      ~last_confirmed_published_level ~initial_blocks_to_bake protocol
-      dal_parameters client node dal_node =
+  (* In the following function, no migration is performed (expect from genesis
+     to alpha) when [migration_level] is equal to or smaller than 1. *)
+  let scenario ?(migration_level = 1) ~slot_index ~first_cell_level
+      ~first_dal_level ~last_confirmed_published_level protocol dal_parameters
+      client node dal_node =
     let module Map_int = Map.Make (Int) in
     Log.info "slot_index = %d" slot_index ;
     let client = Client.with_dal_node client ~dal_node in
@@ -4856,15 +4858,7 @@ module History_rpcs = struct
           (level + 1)
           (Map_int.add published_level commitment commitments)
     in
-    (* [bake_for ~count] doesn't work across the migration block, so we bake in
-       two steps *)
-    let* () =
-      if initial_blocks_to_bake > 0 then
-        bake_for ~count:initial_blocks_to_bake client
-      else unit
-    in
-    let* () = bake_for client in
-
+    let* () = repeat migration_level (fun () -> bake_for client) in
     let* dal_parameters = Dal.Parameters.from_client client in
     let lag = dal_parameters.attestation_lag in
     let number_of_slots = dal_parameters.number_of_slots in
@@ -5027,7 +5021,6 @@ module History_rpcs = struct
           ~first_cell_level:0
           ~first_dal_level:1
           ~last_confirmed_published_level:3
-          ~initial_blocks_to_bake:0
           protocol
           dal_parameters
           node
@@ -5076,13 +5069,12 @@ module History_rpcs = struct
          doesn't have the DAL activated. *)
       (* We'll have 3 levels with a published and attested slot. *)
       let last_confirmed_published_level = migration_level + 3 in
-      let initial_blocks_to_bake = migration_level - 1 in
       scenario
         ~slot_index
         ~first_cell_level:0
         ~first_dal_level:1
         ~last_confirmed_published_level
-        ~initial_blocks_to_bake
+        ~migration_level
         migrate_to
         dal_parameters
     in
