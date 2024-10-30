@@ -72,7 +72,7 @@ add_sandboxed_bootstrap_identities() {
 
 add_liquidity_baking_default_file() {
 
-  echo '{ "liquidity_baking_toggle_vote": "pass" }' > ${client_dir}/per_block_votes.json
+  echo '{ "liquidity_baking_toggle_vote": "pass" }' > "${client_dir}"/per_block_votes.json
 
 }
 
@@ -85,8 +85,9 @@ usage() {
 
 main() {
 
-  local bin_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)")"
-  if [ $(basename "$bin_dir") = "bin_client" ]; then
+  local bin_dir
+  bin_dir="$(cd "$(dirname "$0")" && pwd -P)"
+  if [ "$(basename "$bin_dir")" = "bin_client" ]; then
     local_client="${local_client:-$bin_dir/../../_build/default/src/bin_client/main_client.exe}"
     local_admin_client="${local_admin_client:-$bin_dir/../../_build/default/src/bin_client/main_admin.exe}"
     local_signer="${local_signer:-$bin_dir/../../_build/default/src/bin_signer/main_signer.exe}"
@@ -114,19 +115,23 @@ main() {
 
   add_liquidity_baking_default_file
 
-  mkdir -p $client_dir/bin
+  mkdir -p "$client_dir"/bin
 
-  echo '#!/bin/sh' > $client_dir/bin/octez-client
-  echo "exec $client \"\$@\"" >> $client_dir/bin/octez-client
-  chmod +x $client_dir/bin/octez-client
+  echo '#!/bin/sh' > "$client_dir"/bin/octez-client
+  echo "exec $client \"\$@\"" >> "$client_dir"/bin/octez-client
+  chmod +x "$client_dir"/bin/octez-client
 
-  echo '#!/bin/sh' > $client_dir/bin/octez-admin-client
-  echo "exec $admin_client \"\$@\"" >> $client_dir/bin/octez-admin-client
-  chmod +x $client_dir/bin/octez-admin-client
+  echo '#!/bin/sh' > "$client_dir"/bin/octez-admin-client
+  echo "exec $admin_client \"\$@\"" >> "$client_dir"/bin/octez-admin-client
+  chmod +x "$client_dir"/bin/octez-admin-client
 
-  for protocol in $(cat $bin_dir/../../script-inputs/active_protocol_versions); do
-    protocol_underscore=$(echo $protocol | tr -- - _)
-    protocol_without_number=$(echo $protocol | tr -d "\-[0-9]")
+  echo '#!/bin/sh' > "$client_dir"/bin/octez-protocol-compiler
+  echo "exec $compiler \"\$@\"" >> "$client_dir"/bin/octez-protocol-compiler
+  chmod +x "$client_dir"/bin/octez-protocol-compiler
+
+  while IFS= read -r protocol; do
+    protocol_underscore=$(echo "$protocol" | tr -- - _)
+    protocol_without_number=$(echo "$protocol" | tr -d "\-[0-9]")
     local_baker="$bin_dir/../../_build/default/src/proto_$protocol_underscore/bin_baker/main_baker_$protocol_underscore.exe"
     local_accuser="$bin_dir/../../_build/default/src/proto_$protocol_underscore/bin_accuser/main_accuser_$protocol_underscore.exe"
     local_sc_rollup_node="$bin_dir/../../_build/default/src/proto_$protocol_underscore/bin_sc_rollup_node/main_sc_rollup_node_$protocol_underscore.exe"
@@ -141,22 +146,22 @@ main() {
     accuser="$local_accuser -base-dir $client_dir -endpoint $endpoint"
     sc_rollup_node="$local_sc_rollup_node -base-dir $client_dir -endpoint $endpoint"
 
-    echo '#!/bin/sh' > $client_dir/bin/octez-baker-$protocol_without_number
-    echo "exec $baker \"\$@\"" >> $client_dir/bin/octez-baker-$protocol_without_number
-    chmod +x $client_dir/bin/octez-baker-$protocol_without_number
+    echo '#!/bin/sh' > "$client_dir"/bin/octez-baker-"$protocol_without_number"
+    echo "exec $baker \"\$@\"" >> "$client_dir"/bin/octez-baker-"$protocol_without_number"
+    chmod +x "$client_dir"/bin/octez-baker-"$protocol_without_number"
 
-    echo '#!/bin/sh' > $client_dir/bin/octez-smart-rollup-node-$protocol_without_number
-    echo "exec $sc_rollup_node \"\$@\" -data-dir $rollup_node_dir" >> $client_dir/bin/octez-smart-rollup-node-$protocol_without_number
-    chmod +x $client_dir/bin/octez-smart-rollup-node-$protocol_without_number
+    echo '#!/bin/sh' > "$client_dir"/bin/octez-smart-rollup-node-"$protocol_without_number"
+    echo "exec $sc_rollup_node \"\$@\" -data-dir $rollup_node_dir" >> "$client_dir"/bin/octez-smart-rollup-node-"$protocol_without_number"
+    chmod +x "$client_dir"/bin/octez-smart-rollup-node-"$protocol_without_number"
 
-    echo '#!/bin/sh' > $client_dir/bin/octez-accuser-$protocol_without_number
-    echo "exec $accuser \"\$@\"" >> $client_dir/bin/octez-accuser-$protocol_without_number
-    chmod +x $client_dir/bin/octez-accuser-$protocol_without_number
-  done
+    echo '#!/bin/sh' > "$client_dir"/bin/octez-accuser-"$protocol_without_number"
+    echo "exec $accuser \"\$@\"" >> "$client_dir"/bin/octez-accuser-"$protocol_without_number"
+    chmod +x "$client_dir"/bin/octez-accuser-"$protocol_without_number"
+  done < "$bin_dir"/../../script-inputs/active_protocol_versions
 
-  echo '#!/bin/sh' > $client_dir/bin/octez-signer
-  echo "exec $signer \"\$@\"" >> $client_dir/bin/octez-signer
-  chmod +x $client_dir/bin/octez-signer
+  echo '#!/bin/sh' > "$client_dir"/bin/octez-signer
+  echo "exec $signer \"\$@\"" >> "$client_dir"/bin/octez-signer
+  chmod +x "$client_dir"/bin/octez-signer
 
   echo '#!/bin/sh' > "$client_dir"/bin/octez-protocol-compiler
   echo "exec $compiler \"\$@\"" >> "$client_dir"/bin/octez-protocol-compiler
@@ -199,6 +204,6 @@ EOF
 
 }
 
-if [ "$0" == "$BASH_SOURCE" ]; then
+if [ "$0" == "${BASH_SOURCE[0]}" ]; then
   main "$@"
 fi
