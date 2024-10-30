@@ -4830,14 +4830,16 @@ module History_rpcs = struct
   let scenario ~slot_index ~first_cell_level ~first_dal_level
       ~last_confirmed_published_level ~initial_blocks_to_bake protocol
       dal_parameters client node dal_node =
+    let module Map_int = Map.Make (Int) in
     Log.info "slot_index = %d" slot_index ;
     let client = Client.with_dal_node client ~dal_node in
     let slot_size = dal_parameters.Dal.Parameters.cryptobox.slot_size in
 
     let rec publish ~max_level level commitments =
       (* Try to publish a slot at each level *)
-      if level > max_level then return @@ List.rev commitments
+      if level > max_level then return commitments
       else
+        let published_level = level + 1 in
         let* commitment =
           Helpers.publish_and_store_slot
             client
@@ -4849,7 +4851,10 @@ module History_rpcs = struct
         in
         let* () = bake_for client in
         let* _level = Node.wait_for_level node (level + 1) in
-        publish ~max_level (level + 1) (commitment :: commitments)
+        publish
+          ~max_level
+          (level + 1)
+          (Map_int.add published_level commitment commitments)
     in
     (* [bake_for ~count] doesn't work across the migration block, so we bake in
        two steps *)
@@ -4879,9 +4884,8 @@ module History_rpcs = struct
     Log.info "Publishing slots and baking up to level %d" max_level ;
 
     let* commitments =
-      publish ~max_level:(last_attested_level + 2) first_level []
+      publish ~max_level:(last_attested_level + 2) first_level Map_int.empty
     in
-    let commitments = Array.of_list commitments in
 
     let module SeenIndexes = Set.Make (struct
       type t = int
@@ -4963,7 +4967,7 @@ module History_rpcs = struct
         (if cell_kind = "published" || cell_kind = "attested" then
            let commitment = JSON.(content |-> "commitment" |> as_string) in
            Check.(
-             (commitment = commitments.(cell_level - (first_level + 1)))
+             (commitment = Map_int.find cell_level commitments)
                string
                ~error_msg:"Unexpected commitment: got %L, expected %R")) ;
         let back_pointers =
