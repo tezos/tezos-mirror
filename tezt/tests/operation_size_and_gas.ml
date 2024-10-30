@@ -156,7 +156,24 @@ let test_reveal =
   let op_reveal = Operation.Manager.reveal fresh_account in
   operation_size_and_gas ~source:fresh_account ~node op_reveal client
 
+let test_simple_transfer =
+  Protocol.register_regression_test
+    ~__FILE__
+    ~title:"operation size and gas for simple transfer operation"
+    ~tags:(operation_size_and_gas_tags @ ["transfer"])
+  @@ fun protocol ->
+  Log.info ~color:Log.Color.FG.green "Initialize a node and a client." ;
+  let* node, client = Client.init_with_protocol ~protocol `Client () in
+  Log.info
+    ~color:Log.Color.FG.green
+    "Transfer 10_000_000 mutez from [bootstrap1] to [bootstrap2]." ;
+  let op_transfer =
+    Operation.Manager.transfer ~dest:Constant.bootstrap2 ~amount:10_000_000 ()
+  in
+  operation_size_and_gas ~source:Constant.bootstrap1 ~node op_transfer client
+
 let register ~protocols:_ =
   (* We run tests only for proto_alpha atm *)
   let protocols = [Protocol.Alpha] in
-  test_reveal protocols
+  test_reveal protocols ;
+  test_simple_transfer protocols
