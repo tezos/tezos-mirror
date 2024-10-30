@@ -76,7 +76,6 @@ panic-hook-debug = [
   "tezos-smart-rollup-debug/default",
 ]
 panic-hook-abort = ["panic-hook", "tezos-smart-rollup-panic-hook/abort"]
-testing = []
 proto-alpha = [
   "tezos-smart-rollup-core/proto-alpha",
   "tezos-smart-rollup-host/proto-alpha",

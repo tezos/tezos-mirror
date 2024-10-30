@@ -27,6 +27,7 @@
 - Allow overriding of the `debug_log` sink when using `MockHost`.
 - Rename `testing` feature flag to `mock-core-trait` on `core` crate.
 - Remove redundant `testing` feature flag from `debug` crate.
+- Remove redundant `testing` feature flag from `entrypoint` crate.
 
 ### Installer client/kernel
 
