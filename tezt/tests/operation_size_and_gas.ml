@@ -124,4 +124,39 @@ let operation_size_and_gas ?name ?gas_limit ?storage_limit ~node ~source
   print_op_size_and_gas_in_file ~name ~op_size ~op_gas () ;
   unit
 
-let register ~protocols:_ = ()
+let create_account ?(source = Constant.bootstrap2) ~node ~amount ~alias client =
+  Log.info
+    ~color:Log.Color.FG.green
+    "Create a [%s] account: generate a key, inject a transaction that funds \
+     it, and bake a block to apply the transaction."
+    alias ;
+  let* fresh_account = Client.gen_and_show_keys ~alias client in
+  let* _oph =
+    Operation.Manager.inject_single_transfer
+      client
+      ~source
+      ~dest:fresh_account
+      ~amount
+  in
+  let* () = Client.bake_for_and_wait ~node client in
+  return fresh_account
+
+let test_reveal =
+  Protocol.register_regression_test
+    ~__FILE__
+    ~title:"operation size and gas for reveal operation"
+    ~tags:(operation_size_and_gas_tags @ ["reveal"])
+  @@ fun protocol ->
+  Log.info ~color:Log.Color.FG.green "Initialize a node and a client." ;
+  let* node, client = Client.init_with_protocol ~protocol `Client () in
+  let* fresh_account =
+    create_account ~node ~amount:10_000_000 ~alias:"fresh_account" client
+  in
+  Log.info ~color:Log.Color.FG.green "Reveal pkh of [fresh_account]." ;
+  let op_reveal = Operation.Manager.reveal fresh_account in
+  operation_size_and_gas ~source:fresh_account ~node op_reveal client
+
+let register ~protocols:_ =
+  (* We run tests only for proto_alpha atm *)
+  let protocols = [Protocol.Alpha] in
+  test_reveal protocols
