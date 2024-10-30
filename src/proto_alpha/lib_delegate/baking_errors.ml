@@ -211,6 +211,23 @@ let () =
       | _ -> None)
     (fun (timeout, request) -> Signature_timeout (timeout, request))
 
+type error += Deterministic_nonce_timeout of float
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"Deterministic_nonce_timeout"
+    ~title:"Deterministic timeout"
+    ~description:"Deterministic nonce call reached a timeout."
+    ~pp:(fun ppf timeout ->
+      Format.fprintf
+        ppf
+        "@[A deterministic nonce call has reached the timeout of %f seconds.@]"
+        timeout)
+    Data_encoding.(obj1 (req "timeout" float))
+    (function Deterministic_nonce_timeout timeout -> Some timeout | _ -> None)
+    (fun timeout -> Deterministic_nonce_timeout timeout)
+
 type error += Block_vote_file_not_found of string
 
 type error += Block_vote_file_invalid of string

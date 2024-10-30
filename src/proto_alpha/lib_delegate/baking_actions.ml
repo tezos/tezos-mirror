@@ -171,11 +171,12 @@ let pp_action fmt = function
   | Watch_prequorum -> Format.fprintf fmt "watch prequorum"
   | Watch_quorum -> Format.fprintf fmt "watch quorum"
 
-let generate_seed_nonce_hash config delegate level =
+let generate_seed_nonce_hash ?timeout config delegate level =
   let open Lwt_result_syntax in
   if level.Level.expected_commitment then
     let* seed_nonce =
       (Baking_nonces.generate_seed_nonce
+         ?timeout
          config
          delegate
          level.level
@@ -346,6 +347,7 @@ let prepare_block (global_state : global_state) (block_to_bake : block_to_bake)
   in
   let* seed_nonce_opt =
     (generate_seed_nonce_hash
+       ?timeout:global_state.config.remote_calls_timeout
        global_state.config.Baking_configuration.nonce
        consensus_key
        injection_level

@@ -1296,6 +1296,24 @@ module Nonces = struct
       ~msg:"revealed nonce for block {block_hash} is safe to delete"
       ~pp1:Block_hash.pp
       ("block_hash", Block_hash.encoding)
+
+  let deterministic_nonce_timeout =
+    declare_1
+      ~section
+      ~name:"deterministic_nonce_timeout"
+      ~level:Error
+      ~msg:
+        "Call to generate a deterministic nonce reached a timeout of {timeout}"
+      ("timeout", Data_encoding.float)
+
+  let deterministic_nonce_error =
+    declare_1
+      ~section
+      ~name:"deterministic_nonce_error"
+      ~level:Error
+      ~msg:"Call to deterministic nonce failed with {errors}"
+      ~pp1:pp_print_top_error_of_trace
+      ("errors", Error_monad.(TzTrace.encoding error_encoding))
 end
 
 module Per_block_votes = struct

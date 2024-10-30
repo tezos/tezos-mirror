@@ -379,17 +379,43 @@ let partition_unrevealed_nonces {cctxt; chain; _} nonces
 
 (* Nonce creation *)
 
-let generate_seed_nonce (nonce_config : Baking_configuration.nonce_config)
+let generate_deterministic_nonce ?timeout secret_key_uri data =
+  let open Lwt_result_syntax in
+  let*! result =
+    match timeout with
+    | None ->
+        let*! res = Client_keys.deterministic_nonce secret_key_uri data in
+        Lwt.return (`Nonce_result res)
+    | Some timeout ->
+        Lwt.pick
+          [
+            (let*! () = Lwt_unix.sleep timeout in
+             Lwt.return (`Nonce_timeout timeout));
+            (let*! nonce =
+               Client_keys.deterministic_nonce secret_key_uri data
+             in
+             Lwt.return (`Nonce_result nonce));
+          ]
+  in
+  match result with
+  | `Nonce_timeout timeout ->
+      let*! () = Events.(emit deterministic_nonce_timeout timeout) in
+      tzfail (Baking_errors.Deterministic_nonce_timeout timeout)
+  | `Nonce_result (Error errs) ->
+      let*! () = Events.(emit deterministic_nonce_error errs) in
+      Lwt.return (Error errs)
+  | `Nonce_result (Ok nonce) ->
+      return (Data_encoding.Binary.of_bytes_exn Nonce.encoding nonce)
+
+let generate_seed_nonce ?timeout
+    (nonce_config : Baking_configuration.nonce_config)
     (delegate : Baking_state.consensus_key) level =
   let open Lwt_result_syntax in
   let* nonce =
     match nonce_config with
     | Deterministic ->
         let data = Data_encoding.Binary.to_bytes_exn Raw_level.encoding level in
-        let* nonce =
-          Client_keys.deterministic_nonce delegate.secret_key_uri data
-        in
-        return (Data_encoding.Binary.of_bytes_exn Nonce.encoding nonce)
+        generate_deterministic_nonce ?timeout delegate.secret_key_uri data
     | Random -> (
         match
           Nonce.of_bytes (Tezos_crypto.Rand.generate Constants.nonce_length)
