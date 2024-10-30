@@ -266,6 +266,63 @@ let test_contract_call =
     ~node
     client
 
+let test_origination =
+  Protocol.register_regression_test
+    ~__FILE__
+    ~title:"operation size and gas for contract origination operation"
+    ~tags:(operation_size_and_gas_tags @ ["contract"; "origination"])
+  @@ fun protocol ->
+  let test ?gas_limit ?storage_limit ~script_name ~init_storage
+      ~(source : Account.key) ~node client =
+    let* init_storage = Client.convert_data_to_json ~data:init_storage client in
+    let script_path = Michelson_script.(find script_name protocol |> path) in
+    let* code = Client.convert_script_to_json ~script:script_path client in
+    let name = name_concat script_name in
+    Log.info ~color:Log.Color.FG.green "Originate contract %s." name ;
+    let op_origination = Operation.Manager.origination ~init_storage ~code () in
+    operation_size_and_gas
+      ~name
+      ?gas_limit
+      ?storage_limit
+      ~source
+      ~node
+      op_origination
+      client
+  in
+  Log.info ~color:Log.Color.FG.green "Initialize a node and a client." ;
+  let* node, client = Client.init_with_protocol ~protocol `Client () in
+  let account = Constant.bootstrap1 in
+
+  let script_name = ["mini_scenarios"; "check_signature"] in
+  let* () =
+    test
+      ~gas_limit:700
+      ~storage_limit:500
+      ~script_name
+      ~init_storage:"Unit"
+      ~source:account
+      ~node
+      client
+  in
+
+  let script_name = ["mini_scenarios"; "big_map_all"] in
+  let all_values = List.init 10 Fun.id in
+  let entries : (string * int) list =
+    List.map (fun i -> (Format.sprintf "\"%04i\"" i, i)) all_values
+  in
+  let entries_s =
+    List.map (fun (k, v) -> sf "Elt %s %s " k @@ Int.to_string v) entries
+  in
+  let init_storage = "{" ^ String.concat ";" entries_s ^ "}" in
+  test
+    ~gas_limit:3009
+    ~storage_limit:1032
+    ~script_name
+    ~init_storage
+    ~source:account
+    ~node
+    client
+
 
 let register ~protocols:_ =
   (* We run tests only for proto_alpha atm *)
@@ -273,4 +330,5 @@ let register ~protocols:_ =
   test_reveal protocols ;
   test_simple_transfer protocols ;
   test_delegation protocols ;
-  test_contract_call protocols
+  test_contract_call protocols ;
+  test_origination protocols
