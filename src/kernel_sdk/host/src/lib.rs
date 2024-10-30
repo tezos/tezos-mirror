@@ -6,7 +6,7 @@
 // SPDX-License-Identifier: MIT
 
 #![doc = include_str!("../README.md")]
-#![cfg_attr(not(any(feature = "testing", feature = "std")), no_std)]
+#![cfg_attr(not(any(feature = "std")), no_std)]
 #![deny(missing_docs)]
 #![deny(rustdoc::broken_intra_doc_links)]
 

@@ -28,6 +28,7 @@
 - Rename `testing` feature flag to `mock-core-trait` on `core` crate.
 - Remove redundant `testing` feature flag from `debug` crate.
 - Remove redundant `testing` feature flag from `entrypoint` crate.
+- Remove redundant `testing` feature flag from `host` crate.
 
 ### Installer client/kernel
 

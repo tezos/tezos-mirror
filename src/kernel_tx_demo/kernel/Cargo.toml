@@ -48,7 +48,6 @@ testing = [
   "rand",
   "proptest",
   "tezos-smart-rollup-core/mock-core-trait",
-  "tezos-smart-rollup-host/testing",
   "tezos-smart-rollup-encoding/testing",
   "tezos_crypto_rs/std",
 ]
