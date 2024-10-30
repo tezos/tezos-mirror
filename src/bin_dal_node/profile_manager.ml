@@ -214,10 +214,7 @@ let get_attested_data_default_store_period t proto_parameters =
   let attestation_period = 2 * proto_parameters.attestation_lag in
   let supports_refutations_bis, period =
     match get_profiles t with
-    (* For observer & Producer, we keep the data long enough for rollups to work
-       correctly; for attester & other profiles, we only want to keep the data
-       during attestation lag period *)
-    | Random_observer -> (true, refutation_game_period)
+    | Random_observer -> (false, attestation_period)
     | Operator op ->
         let has_producer = Operator_profile.(has_producer op) in
         let period =
