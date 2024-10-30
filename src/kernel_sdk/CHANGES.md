@@ -26,6 +26,7 @@
 - Bump `tezos_crypto_rs`/`tezos_data_encoding` to `0.6.0` release.
 - Allow overriding of the `debug_log` sink when using `MockHost`.
 - Rename `testing` feature flag to `mock-core-trait` on `core` crate.
+- Remove redundant `testing` feature flag from `debug` crate.
 
 ### Installer client/kernel
 
