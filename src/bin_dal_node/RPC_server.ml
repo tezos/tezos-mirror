@@ -461,20 +461,20 @@ module P2P = struct
       let open Lwt_result_syntax in
       return
       @@ Node_context.P2P.Gossipsub.get_topics_peers
-           ~subscribed:q#subscribed
+           ~subscribed:(not q#all)
            ctxt
 
     let get_slot_indexes_peers ctxt q () =
       let open Lwt_result_syntax in
       return
       @@ Node_context.P2P.Gossipsub.get_slot_indexes_peers
-           ~subscribed:q#subscribed
+           ~subscribed:(not q#all)
            ctxt
 
     let get_pkhs_peers ctxt q () =
       let open Lwt_result_syntax in
       return
-      @@ Node_context.P2P.Gossipsub.get_pkhs_peers ~subscribed:q#subscribed ctxt
+      @@ Node_context.P2P.Gossipsub.get_pkhs_peers ~subscribed:(not q#all) ctxt
 
     let get_connections ?ignore_bootstrap_topics ctxt () () =
       let open Lwt_result_syntax in

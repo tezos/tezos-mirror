@@ -284,19 +284,24 @@ module RPC : sig
   (** Call RPC "GET /p2p/gossipsub/topics" to list the topics *)
   val get_topics : unit -> topic list RPC_core.t
 
-  (** Call RPC "GET /p2p/gossipsub/topics/peers" to list the peers on
-     each (subscribed) topic. *)
+  (** Call RPC "GET /p2p/gossipsub/topics/peers" to list the peers on each
+      subscribed topic. If [all] is [true] (the default is [false]) then list
+      the peers on each known topic (not only the subscribed ones). *)
   val get_topics_peers :
-    subscribed:bool -> (topic * string list) list RPC_core.t
+    ?all:bool -> unit -> (topic * string list) list RPC_core.t
 
-  (** Call RPC "GET /p2p/gossipsub/slot_indexes/peers" to list the peers on
-      each slot index part of a (subscribed) topic. *)
+  (** Call RPC "GET /p2p/gossipsub/slot_indexes/peers" to list the peers on each
+      slot index part of a subscribed topic. If [all] is [true] (the default is
+      [false]) then list the peers on each known topic (not only the subscribed
+      ones). *)
   val get_slot_indexes_peers :
-    subscribed:bool -> (int * string list) list RPC_core.t
+    ?all:bool -> unit -> (int * string list) list RPC_core.t
 
   (** Call RPC "GET /p2p/gossipsub/pkhs/peers" to list the peers on
-     each pkh part of a (subscribed) topic. *)
-  val get_pkhs_peers : subscribed:bool -> (string * string list) list RPC_core.t
+     each pkh part of a (all) topic. If [all] is [true] (the default is [false]) then list
+      the peers on each known topic (not only the subscribed ones). *)
+  val get_pkhs_peers :
+    ?all:bool -> unit -> (string * string list) list RPC_core.t
 
   val get_gossipsub_connections : unit -> JSON.t RPC_core.t
 

@@ -155,6 +155,12 @@ DAL node
   (``0.0.0.0:11733``). The new default value is ``None``, so no metrics are
   exported by default.
 
+- **Breaking change** For the RPCs ``/p2p/gossipsub/topics/peers``,
+  ``/p2p/gossipsub/pkhs/peers``, and ``/p2p/gossipsub/slot_indexes/peers``, the
+  flag ``subscribed`` is removed and a new flag ``all`` is introduced. The
+  default behavior is now to list peers only for topics the current peer is
+  subscribed to, while the ``all`` flag can be used to recover the previous
+  behavior. (MR :gl:`!14518`)
 
 Miscellaneous
 -------------
