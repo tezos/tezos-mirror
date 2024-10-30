@@ -42,7 +42,7 @@ let stop (t : process) = Watchdog.stop t
 let start parameters =
   let open Lwt_result_syntax in
   let run_process =
-    Watchdog.run_process
+    Watchdog.run_process_with_sockets
       parameters
       ~socket_prefix:rpc_process_socket_prefix
       ~process_name:"octez-rpc-process"

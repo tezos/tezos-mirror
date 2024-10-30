@@ -41,10 +41,25 @@ val get_init_socket_path :
 module Daemon : functor (Event : EVENTS) -> sig
   val stop : 'a t -> unit Lwt.t
 
-  val run_process :
+  (** [run_process_with_sockets t ~process_name ?socket_prefix
+      ?executable_name ~handshake ()] starts a
+      [Lwt_process.process_none] depending on the given [process_name]
+      and [executable_name] parameters. If [executable_name] is
+      passed, then the process will be run thanks to the path to this
+      binary. Otherwise, the current binary name will be used as a
+      forked process. [process_name] aims to be the entry point of the
+      binary, that may differ from the [executable_name] in case of
+      fork. The [stdout] and [stderr] are redirected to the default
+      Unix streams.
+
+      [socket_prefix] and [handshake] are used to setup the
+      communication, through a socket, with the created process. The
+      values ares expected to be defined accordingly to both parts. *)
+  val run_process_with_sockets :
     'a t ->
     process_name:string ->
     ?socket_prefix:string ->
+    ?executable_name:string ->
     handshake:bytes ->
     unit ->
     'a t tzresult Lwt.t

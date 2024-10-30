@@ -183,16 +183,20 @@ module Daemon (Event : EVENTS) = struct
     Lwt.wakeup t.stopper (0, Lwt_unix.WSTOPPED 0) ;
     shutdown t
 
-  let run_process t ~process_name ?socket_prefix ~handshake () =
+  let run_process_with_sockets t ~process_name ?socket_prefix ?executable_name
+      ~handshake () =
     let open Lwt_result_syntax in
     let socket_dir = Socket.get_temporary_socket_dir () in
     let socket_dir_arg = ["--socket-dir"; socket_dir] in
     let args = process_name :: socket_dir_arg in
+    let executable_name =
+      Option.value executable_name ~default:Sys.executable_name
+    in
     let process =
       Lwt_process.open_process_none
         ~stdout:(`FD_copy Unix.stdout)
         ~stderr:(`FD_copy Unix.stderr)
-        (Sys.executable_name, Array.of_list args)
+        (executable_name, Array.of_list args)
     in
     let pid = process#pid in
     let init_socket_path =
