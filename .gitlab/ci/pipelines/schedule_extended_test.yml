@@ -2507,7 +2507,7 @@ tezt-memory-3k:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
   stage: test
   tags:
-  - gcp_tezt
+  - gcp_tezt_memory_3k
   rules:
   - when: on_success
   needs:
@@ -2568,7 +2568,7 @@ tezt-memory-4k:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
   stage: test
   tags:
-  - gcp_tezt
+  - gcp_tezt_memory_4k
   rules:
   - when: on_success
   needs:
