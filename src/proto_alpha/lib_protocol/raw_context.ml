@@ -1004,6 +1004,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
                  attestation_threshold;
                  cryptobox_parameters;
                  minimal_participation_ratio;
+                 rewards_ratio;
                }
                 : Previous.dal) =
             c.dal
@@ -1016,6 +1017,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             attestation_threshold;
             cryptobox_parameters;
             minimal_participation_ratio;
+            rewards_ratio;
           }
         in
         let reveal_activation_level =
@@ -1306,6 +1308,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             attestation_threshold;
             cryptobox_parameters;
             minimal_participation_ratio = Q.(64 // 100);
+            rewards_ratio = Q.zero;
           }
         in
         let reveal_activation_level =

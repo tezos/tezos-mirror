@@ -42,6 +42,9 @@ let non_negative_q_encoding =
 let between_zero_and_one_q_encoding =
   q_encoding (fun num den -> Compare.Z.(num >= Z.zero && num <= den))
 
+let between_zero_and_excluding_one_q_encoding =
+  q_encoding (fun num den -> Compare.Z.(num >= Z.zero && num < den))
+
 type dal = {
   feature_enable : bool;
   incentives_enable : bool;
@@ -50,11 +53,17 @@ type dal = {
   attestation_threshold : int;
   cryptobox_parameters : Dal.parameters;
   minimal_participation_ratio : Q.t;
+  rewards_ratio : Q.t;
 }
 
 let minimal_participation_ratio_encoding =
   between_zero_and_one_q_encoding
     "dal.minimal_participation_ratio must be a value between zero and one"
+
+let rewards_ratio_encoding =
+  between_zero_and_excluding_one_q_encoding
+    "dal.rewards_ratio must be a value between zero (inclusive) and one \
+     (exclusive)"
 
 let dal_encoding =
   let open Data_encoding in
@@ -67,20 +76,23 @@ let dal_encoding =
            attestation_threshold;
            cryptobox_parameters;
            minimal_participation_ratio;
+           rewards_ratio;
          } ->
       ( ( feature_enable,
           incentives_enable,
           number_of_slots,
           attestation_lag,
           attestation_threshold,
-          minimal_participation_ratio ),
+          minimal_participation_ratio,
+          rewards_ratio ),
         cryptobox_parameters ))
     (fun ( ( feature_enable,
              incentives_enable,
              number_of_slots,
              attestation_lag,
              attestation_threshold,
-             minimal_participation_ratio ),
+             minimal_participation_ratio,
+             rewards_ratio ),
            cryptobox_parameters ) ->
       {
         feature_enable;
@@ -90,9 +102,10 @@ let dal_encoding =
         attestation_threshold;
         cryptobox_parameters;
         minimal_participation_ratio;
+        rewards_ratio;
       })
     (merge_objs
-       (obj6
+       (obj7
           (req "feature_enable" bool)
           (req "incentives_enable" bool)
           (req "number_of_slots" uint16)
@@ -100,7 +113,8 @@ let dal_encoding =
           (req "attestation_threshold" uint8)
           (req
              "minimal_participation_ratio"
-             minimal_participation_ratio_encoding))
+             minimal_participation_ratio_encoding)
+          (req "rewards_ratio" rewards_ratio_encoding))
        Dal.parameters_encoding)
 
 (* The encoded representation of this type is stored in the context as

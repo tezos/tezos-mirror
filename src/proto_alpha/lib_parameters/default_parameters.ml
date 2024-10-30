@@ -157,6 +157,7 @@ let default_dal =
          that we have x = a/b with a and b smallest such that they are relatively
          prime, and (a+1, b+1) are relatively prime as well. The value x = 63%
          works as well. *)
+      rewards_ratio = Q.zero;
     }
 
 let constants_mainnet : Constants.Parametric.t =

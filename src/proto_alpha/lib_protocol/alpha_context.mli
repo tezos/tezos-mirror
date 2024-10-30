@@ -830,6 +830,7 @@ module Constants : sig
       attestation_threshold : int;
       cryptobox_parameters : Dal.parameters;
       minimal_participation_ratio : Q.t;
+      rewards_ratio : Q.t;
     }
 
     val dal_encoding : dal Data_encoding.t
