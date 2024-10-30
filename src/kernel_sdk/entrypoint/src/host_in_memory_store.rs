@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: MIT
 
-#![cfg(feature = "experimental-host-in-memory-store")]
-
 use std::cell::RefCell;
 use tezos_smart_rollup_core::rollup_host::RollupHost;
 use tezos_smart_rollup_core::smart_rollup_core::{ReadInputMessageInfo, SmartRollupCore};
