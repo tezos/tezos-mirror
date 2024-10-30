@@ -158,6 +158,59 @@ let () =
     (function Broken_locked_values_invariant -> Some () | _ -> None)
     (fun () -> Broken_locked_values_invariant)
 
+type signing_request = [`Preattestation | `Attestation | `Block_header]
+
+let signing_request_encoding : signing_request Data_encoding.t =
+  let open Data_encoding in
+  union
+    [
+      case
+        ~title:"preattestation"
+        (Tag 0)
+        (constant "preattestation")
+        (function `Preattestation -> Some () | _ -> None)
+        (function () -> `Preattestation);
+      case
+        ~title:"attestation"
+        (Tag 1)
+        (constant "attestation")
+        (function `Attestation -> Some () | _ -> None)
+        (function () -> `Attestation);
+      case
+        ~title:"block_header"
+        (Tag 2)
+        (constant "block_header")
+        (function `Block_header -> Some () | _ -> None)
+        (function () -> `Block_header);
+    ]
+
+let pp_signing_request fmt = function
+  | `Preattestation -> Format.fprintf fmt "a preattestation"
+  | `Attestation -> Format.fprintf fmt "an attestation"
+  | `Block_header -> Format.fprintf fmt "a block header"
+
+type error += Signature_timeout of (float * signing_request)
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"Signature_timeout"
+    ~title:"Signature timeout"
+    ~description:"Signature call reached a timeout."
+    ~pp:(fun ppf (timeout, request) ->
+      Format.fprintf
+        ppf
+        "@[A call for signing %a has reached the timeout of %f seconds.@]"
+        pp_signing_request
+        request
+        timeout)
+    Data_encoding.(
+      obj2 (req "timeout" float) (req "request" signing_request_encoding))
+    (function
+      | Signature_timeout (timeout, request) -> Some (timeout, request)
+      | _ -> None)
+    (fun (timeout, request) -> Signature_timeout (timeout, request))
+
 type error += Block_vote_file_not_found of string
 
 type error += Block_vote_file_invalid of string

@@ -192,6 +192,33 @@ let round_of_shell_header shell_header =
   in
   return (Fitness.round fitness)
 
+let sign ?timeout ?watermark ~signing_request cctxt secret_key_uri msg =
+  let open Lwt_result_syntax in
+  let*! result =
+    match timeout with
+    | None ->
+        let*! res = Client_keys.sign cctxt secret_key_uri ?watermark msg in
+        Lwt.return (`Signature_result res)
+    | Some timeout ->
+        Lwt.pick
+          [
+            (let*! () = Lwt_unix.sleep timeout in
+             Lwt.return (`Signature_timeout timeout));
+            (let*! signature =
+               Client_keys.sign cctxt secret_key_uri ?watermark msg
+             in
+             Lwt.return (`Signature_result signature));
+          ]
+  in
+  match result with
+  | `Signature_timeout timeout ->
+      let*! () = Events.(emit signature_timeout timeout) in
+      tzfail (Baking_errors.Signature_timeout (timeout, signing_request))
+  | `Signature_result (Error errs) ->
+      let*! () = Events.(emit signature_error errs) in
+      Lwt.return (Error errs)
+  | `Signature_result (Ok res) -> Lwt.return (Ok res)
+
 let sign_block_header global_state proposer unsigned_block_header =
   let open Lwt_result_syntax in
   let cctxt = global_state.cctxt in
@@ -240,7 +267,9 @@ let sign_block_header global_state proposer unsigned_block_header =
   | false -> tzfail (Block_previously_baked {level; round})
   | true ->
       let* signature =
-        (Client_keys.sign
+        (sign
+           ?timeout:global_state.config.remote_calls_timeout
+           ~signing_request:`Block_header
            cctxt
            proposer.secret_key_uri
            ~watermark:Block_header.(to_watermark (Block_header chain_id))
@@ -652,6 +681,11 @@ let forge_and_sign_consensus_vote global_state ~branch unsigned_consensus_vote :
              (Attestation
                 {consensus_content = vote_consensus_content; dal_content}))
   in
+  let signing_request =
+    match vote_kind with
+    | Preattestation -> `Preattestation
+    | Attestation -> `Attestation
+  in
   let unsigned_operation = (shell, Contents_list contents) in
   let unsigned_operation_bytes =
     Data_encoding.Binary.to_bytes_exn
@@ -660,7 +694,13 @@ let forge_and_sign_consensus_vote global_state ~branch unsigned_consensus_vote :
   in
   let sk_uri = ck.secret_key_uri in
   let* signature =
-    Client_keys.sign cctxt ~watermark sk_uri unsigned_operation_bytes
+    sign
+      ?timeout:global_state.config.remote_calls_timeout
+      ~signing_request
+      cctxt
+      ~watermark
+      sk_uri
+      unsigned_operation_bytes
   in
   let protocol_data = Operation_data {contents; signature = Some signature} in
   let signed_operation : Operation.packed = {shell; protocol_data} in

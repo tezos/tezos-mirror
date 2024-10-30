@@ -1052,6 +1052,23 @@ module Actions = struct
         "DAL feature enabled, but no DAL node specified: cannot fetch \
          attestations"
       ()
+
+  let signature_timeout =
+    declare_1
+      ~section
+      ~name:"signature_timeout"
+      ~level:Error
+      ~msg:"Signature call reached a timeout of {timeout}"
+      ("timeout", Data_encoding.float)
+
+  let signature_error =
+    declare_1
+      ~section
+      ~name:"signature_error"
+      ~level:Error
+      ~msg:"Signature call failed with {errors}"
+      ~pp1:pp_print_top_error_of_trace
+      ("errors", Error_monad.(TzTrace.encoding error_encoding))
 end
 
 module VDF = struct
