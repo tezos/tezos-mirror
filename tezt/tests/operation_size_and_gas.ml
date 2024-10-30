@@ -141,6 +141,16 @@ let create_account ?(source = Constant.bootstrap2) ~node ~amount ~alias client =
   let* () = Client.bake_for_and_wait ~node client in
   return fresh_account
 
+let create_account_and_reveal ?source ~node ~amount ~alias client =
+  let* fresh_account = create_account ?source ~node ~amount ~alias client in
+  Log.info ~color:Log.Color.FG.green "Reveal pkh of [%s] account." alias ;
+  let op_reveal =
+    Operation.Manager.(make ~source:fresh_account (reveal fresh_account))
+  in
+  let* _oph = Operation.Manager.inject [op_reveal] client in
+  let* () = Client.bake_for_and_wait ~node client in
+  return fresh_account
+
 let test_reveal =
   Protocol.register_regression_test
     ~__FILE__
@@ -172,8 +182,28 @@ let test_simple_transfer =
   in
   operation_size_and_gas ~source:Constant.bootstrap1 ~node op_transfer client
 
+let test_delegation =
+  Protocol.register_regression_test
+    ~__FILE__
+    ~title:"operation size and gas for delegation operation"
+    ~tags:(operation_size_and_gas_tags @ ["delegation"])
+  @@ fun protocol ->
+  Log.info ~color:Log.Color.FG.green "Initialize a node and a client." ;
+  let* node, client = Client.init_with_protocol ~protocol `Client () in
+  let* delegator =
+    create_account_and_reveal ~node ~amount:10_000_000 ~alias:"delegator" client
+  in
+  Log.info
+    ~color:Log.Color.FG.green
+    "Set delegate for [delegator] to [bootstrap1]." ;
+  let op_delegate =
+    Operation.Manager.delegation ~delegate:Constant.bootstrap1 ()
+  in
+  operation_size_and_gas ~source:delegator ~node op_delegate client
+
 let register ~protocols:_ =
   (* We run tests only for proto_alpha atm *)
   let protocols = [Protocol.Alpha] in
   test_reveal protocols ;
-  test_simple_transfer protocols
+  test_simple_transfer protocols ;
+  test_delegation protocols
