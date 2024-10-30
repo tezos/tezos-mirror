@@ -147,7 +147,10 @@ type 'a t = {
   stop : (int * Unix.process_status) Lwt.t;
   (* Resolver that will wakeup the above stop promise. *)
   stopper : (int * Unix.process_status) Lwt.u;
+  (* The parameters that will be passed to the process after the
+     handshake.*)
   parameters : 'a;
+  (* The parameters encoding associated to the above field. *)
   parameters_encoding : 'a Data_encoding.t;
 }
 

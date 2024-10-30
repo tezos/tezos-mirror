@@ -39,6 +39,8 @@ val get_init_socket_path :
   socket_dir:string -> ?socket_prefix:string -> pid:int -> unit -> string
 
 module Daemon : functor (Event : EVENTS) -> sig
+  (** [stop t] stops the process handled by the watchdog daemon as
+      soon as it is called. *)
   val stop : 'a t -> unit Lwt.t
 
   (** [run_process_with_sockets t ~process_name ?socket_prefix
@@ -64,11 +66,9 @@ module Daemon : functor (Event : EVENTS) -> sig
     unit ->
     'a t tzresult Lwt.t
 
-  val run_with_backoff :
-    backoff:Ptime.t * float ->
-    f:(unit -> 'a tzresult Lwt.t) ->
-    'a tzresult Lwt.t
-
+  (** [watch_dog ~start_new_server t] takes a running process [t] and
+      make sure it runs well. If it crashed, it will restart the
+      process using the given [start_new_server] callback. *)
   val watch_dog :
     start_new_server:(unit -> 'a t tzresult Lwt.t) ->
     'a t ->
