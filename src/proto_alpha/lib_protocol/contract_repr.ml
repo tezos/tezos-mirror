@@ -233,3 +233,5 @@ end
 (* Renamed exports. *)
 
 let of_b58data = contract_of_b58data
+
+let zero = Implicit Signature.Public_key_hash.zero

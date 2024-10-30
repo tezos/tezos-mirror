@@ -267,7 +267,7 @@ let gen_slot_history =
           List.map
             (fun (h, publisher, status) ->
               ( Sc_rollup_proto_types.Dal.Slot_header.of_octez ~number_of_slots h,
-                publisher,
+                Contract.Implicit publisher,
                 status ))
             h ))
       l
@@ -298,7 +298,7 @@ let gen_slot_history_cache =
           List.map
             (fun (h, publisher, status) ->
               ( Sc_rollup_proto_types.Dal.Slot_header.of_octez ~number_of_slots h,
-                publisher,
+                Contract.Implicit publisher,
                 status ))
             h ))
       l

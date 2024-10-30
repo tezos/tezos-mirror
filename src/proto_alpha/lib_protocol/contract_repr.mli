@@ -101,3 +101,7 @@ val cases : ('a -> t option) -> (t -> 'a) -> 'a Data_encoding.case list
 val rpc_arg : t RPC_arg.arg
 
 module Index : Storage_description.INDEX with type t = t
+
+(** A value [zero] for type {!t}. It's equal to [Implicit
+    Signature.Public_key_hash.zero]. *)
+val zero : t

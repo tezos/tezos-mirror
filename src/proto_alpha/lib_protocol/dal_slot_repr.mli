@@ -193,12 +193,11 @@ module Slot_market : sig
       The function returns [Some (_, true)] if the candidate is
       registered. Returns [Some (_, false)] otherwise. Returns [None] if
       [slot_header.id] is not a valid slot id. *)
-  val register :
-    t -> Header.t -> source:Signature.public_key_hash -> (t * bool) option
+  val register : t -> Header.t -> source:Contract_repr.t -> (t * bool) option
 
   (** [candidates t] returns a list of slot header candidates associated to the
-      public key hashes of the managers who published them. *)
-  val candidates : t -> (Header.t * Signature.public_key_hash) list
+      contract address who published them. *)
+  val candidates : t -> (Header.t * Contract_repr.t) list
 end
 
 (** This module provides an abstract data structure (type {!History.t}) that
@@ -284,7 +283,7 @@ module History : sig
     published_level:Raw_level_repr.t ->
     number_of_slots:int ->
     (Header.t
-    * Signature.public_key_hash
+    * Contract_repr.t
     * Dal_attestation_repr.Accountability.attestation_status)
     list ->
     (t * History_cache.t) tzresult
@@ -297,7 +296,7 @@ module History : sig
     published_level:Raw_level_repr.t ->
     number_of_slots:int ->
     (Header.t
-    * Signature.public_key_hash
+    * Contract_repr.t
     * Dal_attestation_repr.Accountability.attestation_status)
     list ->
     t tzresult
@@ -410,7 +409,7 @@ module History : sig
       | Unpublished of Header.id
       | Published of {
           header : Header.t;
-          publisher : Signature.public_key_hash;
+          publisher : Contract_repr.t;
           is_proto_attested : bool;
           attested_shards : int;
           total_shards : int;

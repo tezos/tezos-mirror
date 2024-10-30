@@ -112,7 +112,9 @@ struct
                 }
             in
             if skip_slot then None
-            else Some (slot, slot_publisher, attestation_status))
+            else
+              Some
+                (slot, Contract_repr.Implicit slot_publisher, attestation_status))
           slots_headers
       in
       let*?@ cell, cache =

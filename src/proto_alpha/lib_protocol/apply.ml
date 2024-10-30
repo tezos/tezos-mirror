@@ -1438,7 +1438,10 @@ let apply_manager_operation :
             [] )
     | Dal_publish_commitment slot_header ->
         let*? ctxt, slot_header =
-          Dal_apply.apply_publish_commitment ctxt slot_header ~source
+          Dal_apply.apply_publish_commitment
+            ctxt
+            slot_header
+            ~source:(Contract.Implicit source)
         in
         let consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt in
         let result =
