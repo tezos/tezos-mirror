@@ -358,6 +358,64 @@ let test_dal_publish_commitment =
   Dal.with_dal_node ~producer_profiles:[0] node @@ fun _key dal_node ->
   test protocol parameters cryptobox node client dal_node
 
+(* inspired by test_cont_refute_pre_migration from tests/sc_rollup_migration.ml *)
+let test_sc_rollup_refute =
+  Protocol.register_regression_test
+    ~__FILE__
+    ~title:"operation size and gas for SC rollup refutation operation"
+    ~tags:(operation_size_and_gas_tags @ ["rollup"; "refutation"])
+  @@ fun protocol ->
+  let test ~kind =
+    let* tezos_node, tezos_client =
+      Sc_rollup_helpers.setup_l1
+        ~commitment_period:10
+        ~challenge_window:10
+        ~timeout:10
+        protocol
+    in
+    let* sc_rollup =
+      Sc_rollup_helpers.originate_sc_rollup
+        ~kind
+        ~src:Constant.bootstrap1.alias
+        tezos_client
+    in
+    let* commitment1, player_commitment_hash =
+      Sc_rollup_helpers.bake_period_then_publish_commitment
+        ~sc_rollup
+        ~number_of_ticks:1
+        ~src:Constant.bootstrap1.public_key_hash
+        tezos_client
+    in
+    let* _commitment2, opponent_commitment_hash =
+      Sc_rollup_helpers.forge_and_publish_commitment
+        ~inbox_level:commitment1.inbox_level
+        ~predecessor:commitment1.predecessor
+        ~sc_rollup
+        ~number_of_ticks:2
+        ~src:Constant.bootstrap2.public_key_hash
+        tezos_client
+    in
+    let refutation =
+      Operation.Manager.Start {player_commitment_hash; opponent_commitment_hash}
+    in
+    let op_sc_rollup_refute =
+      Operation.Manager.sc_rollup_refute
+        ~sc_rollup
+        ~opponent:Constant.bootstrap2.public_key_hash
+        ~refutation
+        ()
+    in
+    operation_size_and_gas
+      ~source:Constant.bootstrap1
+      ~node:tezos_node
+      op_sc_rollup_refute
+      tezos_client
+  in
+  let* () = test ~kind:"arith" in
+  (* it seems there is no diff in gas & size *)
+  (*   let* () = test ~kind:"wasm_2_0_0" in *)
+  unit
+
 
 let register ~protocols:_ =
   (* We run tests only for proto_alpha atm *)
@@ -367,4 +425,5 @@ let register ~protocols:_ =
   test_delegation protocols ;
   test_contract_call protocols ;
   test_origination protocols ;
-  test_dal_publish_commitment protocols
+  test_dal_publish_commitment protocols ;
+  test_sc_rollup_refute protocols
