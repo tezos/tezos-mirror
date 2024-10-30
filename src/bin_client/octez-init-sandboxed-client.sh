@@ -36,35 +36,6 @@ init_sandboxed_client() {
   fi
 }
 
-cleanup_clients() {
-  rm -rf "${client_dirs[@]}"
-}
-
-## Waiter ##################################################################
-
-wait_for_the_node_to_be_ready() {
-  local count=0
-  if $client rpc get /chains/main/blocks/head/hash > /dev/null 2>&1; then return; fi
-  printf "Waiting for the node to initialize..."
-  sleep 1
-  while ! $client rpc get /chains/main/blocks/head/hash > /dev/null 2>&1; do
-    count=$((count + 1))
-    if [ "$count" -ge 30 ]; then
-      echo " timeout."
-      exit 2
-    fi
-    printf "."
-    sleep 1
-  done
-  echo " done."
-}
-
-wait_for_the_node_to_be_bootstrapped() {
-  wait_for_the_node_to_be_ready
-  echo "Waiting for the node to synchronize with the network..."
-  $client bootstrapped
-}
-
 ## Sandboxed client ########################################################
 
 # key pairs from $src_dir/test/sandbox.json
@@ -106,20 +77,6 @@ add_liquidity_baking_default_file() {
 
   echo '{ "liquidity_baking_toggle_vote": "pass" }' > ${client_dir}/per_block_votes.json
 
-}
-
-activate_alpha() {
-
-  # Calling `date` with 'AAA+1' is a small tweak to speed-up
-  # the block baking process. Having a one-hour back timestamp
-  # avoids having to wait for at least [time_between_block] to
-  # produce new blocks.
-  ${client} \
-    -block genesis \
-    activate protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK \
-    with fitness 1 \
-    and key activator \
-    and parameters "${parameters_file}"
 }
 
 usage() {
