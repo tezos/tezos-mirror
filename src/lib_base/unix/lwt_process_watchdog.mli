@@ -43,6 +43,19 @@ module Daemon : functor (Event : EVENTS) -> sig
       soon as it is called. *)
   val stop : 'a t -> unit Lwt.t
 
+  (** [run_process t ~binary_path ~arguments ()] starts a
+      [Lwt_process.process_none] thanks to the given [binary_path] and
+      its [arguments].
+      Note that the arguments are taken directly from the argument,
+      thus, the [binary_path] is not added to the argument list. Refer
+      to the [Lwt_process] documentation for more details. *)
+  val run_process :
+    'a t ->
+    binary_path:string ->
+    arguments:string array ->
+    unit ->
+    'a t tzresult Lwt.t
+
   (** [run_process_with_sockets t ~process_name ?socket_prefix
       ?executable_name ~handshake ()] starts a
       [Lwt_process.process_none] depending on the given [process_name]
