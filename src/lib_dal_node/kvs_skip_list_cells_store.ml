@@ -229,6 +229,12 @@ let remove {cells_store; hashes_store} ~attested_level =
   in
   Hashes.remove_file hashes_store attested_level
 
+let close {cells_store; hashes_store} =
+  let open Lwt_result_syntax in
+  let* () = KVS.close cells_store.store in
+  let* () = KVS.close hashes_store.store in
+  return_unit
+
 module Internal_for_tests = struct
   let skip_list_hash_exists {cells_store; hashes_store = _} hash =
     let {Cells.store; file_layout; _} = cells_store in

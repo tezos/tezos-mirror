@@ -89,6 +89,10 @@ val find :
 val remove :
   t -> attested_level:int32 -> (unit, Error_monad.tztrace) result Lwt.t
 
+(** [close store] waits until all pending reads and writes are
+    completed and closes the store. *)
+val close : t -> (unit, Error_monad.tztrace) result Lwt.t
+
 (** Internal functions for testing purpose.  *)
 module Internal_for_tests : sig
   val skip_list_hash_exists :
