@@ -101,7 +101,6 @@ type argument =
   | Metrics_addr of string
   | Injector_attempts of int
   | Boot_sector_file of string
-  | Dac_observer of Dac_node.t
   | Loser_mode of string
   | No_degraded
   | Gc_frequency of int
@@ -123,7 +122,6 @@ let make_argument = function
   | Metrics_addr addr -> ["--metrics-addr"; addr]
   | Injector_attempts n -> ["--injector-attempts"; string_of_int n]
   | Boot_sector_file file -> ["--boot-sector-file"; file]
-  | Dac_observer dac_node -> ["--dac-observer"; Dac_node.endpoint dac_node]
   | Loser_mode loser -> ["--loser-mode"; loser]
   | No_degraded -> ["--no-degraded"]
   | Gc_frequency freq -> ["--gc-frequency"; string_of_int freq]
@@ -145,7 +143,6 @@ let is_redundant = function
   | Log_kernel_debug_file _, Log_kernel_debug_file _
   | Injector_attempts _, Injector_attempts _
   | Boot_sector_file _, Boot_sector_file _
-  | Dac_observer _, Dac_observer _
   | Loser_mode _, Loser_mode _
   | No_degraded, No_degraded
   | Gc_frequency _, Gc_frequency _
@@ -167,7 +164,6 @@ let is_redundant = function
   | Log_kernel_debug_file _, _
   | Injector_attempts _, _
   | Boot_sector_file _, _
-  | Dac_observer _, _
   | Loser_mode _, _
   | No_degraded, _
   | Gc_frequency _, _

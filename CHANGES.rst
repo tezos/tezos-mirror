@@ -149,6 +149,9 @@ Smart Rollup WASM Debugger
 Data Availability Committee (DAC)
 ---------------------------------
 
+- **Breaking_change** DAC node and client have been removed to
+  simplify the codebase. (MR :gl:`!14862`)
+
 Data Availability Layer (DAL)
 -----------------------------
 

@@ -256,7 +256,6 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
           | Some fuel ->
               let* data =
                 get_reveal
-                  ~dac_client:node_ctxt.dac_client
                   ~pre_images_endpoint:node_ctxt.config.pre_images_endpoint
                   ~data_dir:node_ctxt.data_dir
                   ~pvm_kind:node_ctxt.kind
