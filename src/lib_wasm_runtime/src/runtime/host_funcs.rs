@@ -200,6 +200,11 @@ fn store_copy(
     let to = read_from_memory(&memory_view, to_ptr, to_len)?;
     trace!("store_copy(from: {}, to: {})", from.as_str(), to.as_str());
 
+    if to.as_str() == "/kernel/boot.wasm" {
+        // If we change the kernel, we need to reload the runtime accordingly.
+        runtime_env.mut_host().request_kernel_reload();
+    }
+
     match bindings::store_copy(&runtime_env.host().tree(), from, to) {
         Ok(evm_tree) => {
             runtime_env.mut_host().set_tree(evm_tree);
@@ -223,6 +228,11 @@ fn store_move(
     let from = read_from_memory(&memory_view, from_ptr, from_len)?;
     let to = read_from_memory(&memory_view, to_ptr, to_len)?;
     trace!("store_move(from: {}, to: {})", from.as_str(), to.as_str());
+
+    if to.as_str() == "/kernel/boot.wasm" {
+        // If we change the kernel, we need to reload the runtime accordingly.
+        runtime_env.mut_host().request_kernel_reload();
+    }
 
     match bindings::store_move(&runtime_env.host().tree(), from, to) {
         Ok(evm_tree) => {
@@ -453,11 +463,6 @@ fn reveal_preimage(
 
     let to_write = std::cmp::min(res.len(), max_bytes as usize);
     memory_view.write(dst_ptr as u64, &res[..to_write])?;
-
-    // The only use case we have for revealing a preimage in the kernel at the moment is upgrading
-    // the kernel. So after a `kernel_run` call that used `reveal_preimage`, we will need to start
-    // using the new kernel. This is what this function call signals.
-    runtime_env.mut_host().request_kernel_reload();
 
     Ok(res.len() as i32)
 }
