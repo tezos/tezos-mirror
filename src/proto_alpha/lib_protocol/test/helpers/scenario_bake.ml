@@ -152,7 +152,7 @@ let check_misc block state : unit tzresult Lwt.t =
           let deactivated =
             Cycle.add
               account.last_seen_activity
-              (state.constants.consensus_rights_delay + 1)
+              state.constants.tolerated_inactivity_period
             < ctxt_cycle
           in
           let*! r3 =

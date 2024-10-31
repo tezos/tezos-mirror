@@ -100,6 +100,10 @@ let test_update_consensus_key =
       (["cache_stake_distribution_cycles"], `Int (consensus_rights_delay + 3));
       (["adaptive_issuance_force_activation"], `Bool true);
     ]
+    @
+    if Protocol.(number protocol > number Quebec) then
+      [(["tolerated_inactivity_period"], `Int (consensus_rights_delay + 1))]
+    else []
   in
   let* parameter_file =
     Protocol.write_parameter_file ~base:(Right (protocol, None)) parameters
@@ -628,6 +632,10 @@ let register ?(regression = true) title test =
       (["cache_stake_distribution_cycles"], `Int (consensus_rights_delay + 3));
       (["adaptive_issuance_force_activation"], `Bool true);
     ]
+    @
+    if Protocol.(number protocol > number Quebec) then
+      [(["tolerated_inactivity_period"], `Int (consensus_rights_delay + 1))]
+    else []
   in
   let* parameter_file =
     Protocol.write_parameter_file ~base:(Right (protocol, None)) parameters

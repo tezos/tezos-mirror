@@ -1,7 +1,8 @@
 
 ./octez-client rpc get /chains/main/blocks/head/context/constants/parametric
 { "consensus_rights_delay": 2, "blocks_preservation_cycles": 1,
-  "delegate_parameters_activation_delay": 3, "blocks_per_cycle": 200,
+  "delegate_parameters_activation_delay": 3,
+  "tolerated_inactivity_period": 3, "blocks_per_cycle": 200,
   "blocks_per_commitment": 25, "nonce_revelation_threshold": 50,
   "cycles_per_voting_period": 1, "hard_gas_limit_per_operation": "1040000",
   "hard_gas_limit_per_block": "3328000", "proof_of_work_threshold": "-1",

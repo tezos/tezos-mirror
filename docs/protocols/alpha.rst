@@ -60,6 +60,9 @@ Protocol parameters
 - Lower the number of blocks per cycle (``blocks_per_cycle``) for
   ghostnet to 10800 (~12 hours). (MR :gl:`!15196`)
 
+- Make ``tolerated_inactivity_period`` a protocol constant. (MR
+  :gl:`!15390`)
+
 Bug Fixes
 ---------
 

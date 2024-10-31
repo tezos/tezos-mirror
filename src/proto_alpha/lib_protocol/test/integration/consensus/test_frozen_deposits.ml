@@ -441,7 +441,7 @@ let test_deposits_after_stake_removal () =
   in
   Assert.equal_tez ~loc:__LOC__ frozen_deposits_2 initial_frozen_deposits_2
 
-let test_deposits_unfrozen_after_deactivation () =
+let test_frozen_deposits_with_deactivation () =
   let open Lwt_result_syntax in
   let* genesis, contracts = Context.init_with_constants2 constants in
   let (_contract1, account1), (_contract2, account2) =
@@ -454,8 +454,8 @@ let test_deposits_unfrozen_after_deactivation () =
      expected last cycles at which it is considered active and at
      which it has non-zero deposits *)
   let last_active_cycle =
-    1 + (2 * constants.consensus_rights_delay)
-    (* according to [Delegate_storage.set_active] *)
+    constants.tolerated_inactivity_period + constants.consensus_rights_delay
+    (* according to [Delegate_activation_storage.set_active] *)
   in
   let last_cycle_with_deposits =
     last_active_cycle + constants.consensus_rights_delay
@@ -468,16 +468,6 @@ let test_deposits_unfrozen_after_deactivation () =
   let rec loop b n =
     if n = 0 then return b
     else
-      let* ai_activation_cycle =
-        Context.get_adaptive_issuance_launch_cycle (B b)
-      in
-      let frozen_deposits_when_deactivated =
-        match ai_activation_cycle with
-        | None -> Tez.zero
-        | Some cycle ->
-            if Cycle.(cycle > add root last_active_cycle) then Tez.zero
-            else initial_frozen_deposits
-      in
       let* b = Block.bake_until_cycle_end ~policy:(By_account account2) b in
       let* is_deactivated = Context.Delegate.deactivated (B b) account1 in
       let* frozen_deposits =
@@ -490,13 +480,8 @@ let test_deposits_unfrozen_after_deactivation () =
           is_deactivated
           (new_cycle > last_active_cycle)
       in
-      (* deposits are automatically unfrozen for deactivated delegates only *)
       let* () =
-        Assert.equal_tez
-          ~loc:__LOC__
-          frozen_deposits
-          (if is_deactivated then frozen_deposits_when_deactivated
-           else initial_frozen_deposits)
+        Assert.equal_tez ~loc:__LOC__ frozen_deposits initial_frozen_deposits
       in
       loop b (pred n)
   in
@@ -769,9 +754,9 @@ let tests =
         `Quick
         test_deposits_after_stake_removal;
       tztest
-        "deposits are unfrozen after deactivation"
+        "frozen deposits with deactivation"
         `Quick
-        test_deposits_unfrozen_after_deactivation;
+        test_frozen_deposits_with_deactivation;
       tztest
         "frozen deposits with delegation"
         `Quick

@@ -177,6 +177,7 @@ type t = {
   (* Number of cycles after which submitted delegate parameters are being
      used. *)
   delegate_parameters_activation_delay : int;
+  tolerated_inactivity_period : int;
   blocks_per_cycle : int32;
   blocks_per_commitment : int32;
   nonce_revelation_threshold : int32;
