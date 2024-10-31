@@ -77,8 +77,13 @@ let mk_consensus_content_signer_and_branch ?delegate ?slot ?level ?round
         | None -> return (del, [])
         | Some slots -> return (del, slots))
   in
-  let slot =
-    match slot with None -> Stdlib.List.hd slots | Some slot -> slot
+  let* slot =
+    match slot with
+    | None -> (
+        match List.hd slots with
+        | Some s -> return s
+        | None -> tzfail (Block.No_slots_found_for delegate_pkh))
+    | Some slot -> return slot
   in
   let* level =
     match level with

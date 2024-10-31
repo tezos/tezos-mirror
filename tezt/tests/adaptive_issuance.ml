@@ -498,12 +498,18 @@ let test_staking =
       ]
     ~uses:(fun protocol -> [Protocol.accuser protocol])
   @@ fun protocol ->
+  let parameters =
+    let overrides =
+      (["adaptive_issuance_force_activation"], `Bool true) :: default_overrides
+    in
+    if Protocol.number protocol > Protocol.number Protocol.Quebec then
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/7576 use a
+         default value for [tolerated_inactivity_period] *)
+      (["tolerated_inactivity_period"], `Int 3) :: overrides
+    else overrides
+  in
   let* _proto_hash, endpoint, client_1, node_1 =
-    init
-      ~overrides:
-        ((["adaptive_issuance_force_activation"], `Bool true)
-        :: default_overrides)
-      protocol
+    init ~overrides:parameters protocol
   in
 
   let* eosod = edge_of_staking_over_delegation client_1 in

@@ -31,7 +31,7 @@ This sequence of operations was run:
     { "expected_cycle_activity": 204, "minimal_cycle_activity": 136,
       "missed_slots": 0, "missed_levels": 0,
       "remaining_allowed_missed_slots": 68,
-      "expected_attesting_rewards": "531216" }, "grace_period": 3,
+      "expected_attesting_rewards": "531216" }, "grace_period": 2,
   "active_staking_parameters":
     { "limit_of_staking_over_baking_millionth": 0,
       "edge_of_baking_over_staking_billionth": 1000000000 },
@@ -66,7 +66,7 @@ This sequence of operations was run:
     { "expected_cycle_activity": 204, "minimal_cycle_activity": 136,
       "missed_slots": 0, "missed_levels": 0,
       "remaining_allowed_missed_slots": 68,
-      "expected_attesting_rewards": "531216" }, "grace_period": 3,
+      "expected_attesting_rewards": "531216" }, "grace_period": 2,
   "active_staking_parameters":
     { "limit_of_staking_over_baking_millionth": 0,
       "edge_of_baking_over_staking_billionth": 1000000000 },
@@ -104,7 +104,7 @@ This sequence of operations was run:
     { "expected_cycle_activity": 204, "minimal_cycle_activity": 136,
       "missed_slots": 0, "missed_levels": 0,
       "remaining_allowed_missed_slots": 68,
-      "expected_attesting_rewards": "531216" }, "grace_period": 3,
+      "expected_attesting_rewards": "531216" }, "grace_period": 2,
   "active_staking_parameters":
     { "limit_of_staking_over_baking_millionth": 0,
       "edge_of_baking_over_staking_billionth": 1000000000 },

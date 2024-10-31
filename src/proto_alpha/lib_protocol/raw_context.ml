@@ -1516,7 +1516,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             blocks_preservation_cycles;
             delegate_parameters_activation_delay;
             blocks_per_cycle;
-            tolerated_inactivity_period = consensus_rights_delay + 1;
+            tolerated_inactivity_period = 1;
             blocks_per_commitment;
             nonce_revelation_threshold;
             cycles_per_voting_period;

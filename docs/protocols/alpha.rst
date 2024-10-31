@@ -57,11 +57,12 @@ Protocol parameters
   with old cycle duration) to 14 cycles (~14 days with new cycle
   duration). (MR :gl:`!15196`)
 
+- Make ``tolerated_inactivity_period`` a protocol constant, and lower
+  from 3 cycles (~8.5 days with old cycle duration) to 1 cycle (~1 day
+  with new cycle duration). (MRs :gl:`!15390`, :gl:`!15199`)
+
 - Lower the number of blocks per cycle (``blocks_per_cycle``) for
   ghostnet to 10800 (~12 hours). (MR :gl:`!15196`)
-
-- Make ``tolerated_inactivity_period`` a protocol constant. (MR
-  :gl:`!15390`)
 
 Bug Fixes
 ---------
