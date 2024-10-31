@@ -59,6 +59,14 @@ pub struct DebugOptions {
     /// Path to the initrd
     #[arg(long)]
     pub initrd: Option<Box<Path>>,
+
+    /// Demangle function symbols (True by default unless `--no-demangle` is passed)
+    #[arg(
+        long = "no-demangle",
+        default_value_t = true,
+        action(clap::ArgAction::SetFalse)
+    )]
+    pub demangle: bool,
 }
 
 #[derive(Clone, ValueEnum, Debug)]

@@ -30,6 +30,7 @@ tezos-smart-rollup-encoding.workspace = true
 tezos-smart-rollup.workspace = true
 tezos_crypto_rs.workspace = true
 vm-fdt.workspace = true
+rustc-demangle.workspace = true
 
 [dependencies.octez-riscv]
 path = "../lib"

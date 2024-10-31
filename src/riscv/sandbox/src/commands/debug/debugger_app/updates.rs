@@ -15,7 +15,7 @@ use octez_riscv::{
     state_backend::{ManagerRead, ManagerReadWrite},
     stepper::{Stepper, StepperStatus},
 };
-use std::{collections::HashMap, ops::Range};
+use std::{borrow::Cow, collections::HashMap, ops::Range};
 
 impl<'a, S> DebuggerApp<'a, S>
 where
@@ -131,7 +131,7 @@ where
     fn get_range_instructions(
         &self,
         range: Range<u64>,
-        symbols: &HashMap<u64, &str>,
+        symbols: &HashMap<u64, Cow<str>>,
     ) -> Vec<Instruction>
     where
         S::Manager: ManagerRead,
