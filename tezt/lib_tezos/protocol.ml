@@ -59,6 +59,10 @@ let hash = function
   | Quebec -> "PsQuebecnLByd3JwTiGadoG4nGWi3HYiLXUjkibeFV8dCFeVMUg"
 (* DO NOT REMOVE, AUTOMATICALLY ADD STABILISED PROTOCOL HASH HERE *)
 
+let short_hash protocol_hash =
+  let long_hash = hash protocol_hash in
+  String.sub long_hash 0 12
+
 let genesis_hash = "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im"
 
 let demo_noops_hash = "ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp"
