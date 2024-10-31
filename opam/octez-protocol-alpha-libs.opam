@@ -29,8 +29,6 @@ depends: [
   "lwt-exit"
   "octez-protocol-compiler" { = version }
   "tezos-dal-node-lib" { = version }
-  "tezos-dac-lib" { = version }
-  "tezos-dac-client-lib" { = version }
   "octez-injector" { = version }
   "octez-l2-libs" { = version }
   "octez-alcotezt" { with-test & = version }

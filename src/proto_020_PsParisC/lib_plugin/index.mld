@@ -8,7 +8,6 @@ It contains the following libraries:
 - {{!module-Tezos_baking_020_PsParisC}Tezos_baking_020_PsParisC}: Base library for `tezos-baker/accuser`
 - {{!module-Tezos_baking_020_PsParisC_commands}Tezos_baking_020_PsParisC_commands}: Protocol-specific commands for baking
 - {{!module-Tezos_client_020_PsParisC}Tezos_client_020_PsParisC}: Protocol specific library for `octez-client`
-- {{!module-Tezos_dac_020_PsParisC}Tezos_dac_020_PsParisC}: Protocol specific library for the Data availability Committee
 - {{!module-Tezos_dal_020_PsParisC}Tezos_dal_020_PsParisC}: Protocol specific library for the Data availability Layer
 - {{!module-Tezos_layer2_utils_020_PsParisC}Tezos_layer2_utils_020_PsParisC}: Protocol specific library for Layer 2 utils
 - {{!module-Tezos_protocol_plugin_020_PsParisC}Tezos_protocol_plugin_020_PsParisC}: Protocol plugin
