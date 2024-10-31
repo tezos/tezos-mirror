@@ -461,7 +461,8 @@ module Make (Client : Resto_cohttp_client.Client.CALL) = struct
      in
      handle accept ans)
     [@profiler.span_s
-      ["Call_streamed_service: " ^ Uri.to_string base ^ service_path]]
+      {verbosity = Notice}
+        ["Call_streamed_service: " ^ Uri.to_string base ^ service_path]]
 
   let call_service (type p q i o) accept ?logger ?headers ~base
       (service : (_, _, p, q, i, o) Tezos_rpc.Service.t) (params : p)
@@ -484,7 +485,9 @@ module Make (Client : Resto_cohttp_client.Client.CALL) = struct
          body
      in
      handle accept ans)
-    [@profiler.span_s ["Call_service: " ^ Uri.to_string base ^ service_path]]
+    [@profiler.span_s
+      {verbosity = Notice}
+        ["Call_service: " ^ Uri.to_string base ^ service_path]]
 
   type config = {
     media_type : Media_type.Command_line.t;
