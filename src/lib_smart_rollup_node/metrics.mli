@@ -26,6 +26,9 @@
 (** The collector registry for the rollup node metrics. *)
 val sc_rollup_node_registry : Prometheus.CollectorRegistry.t
 
+(** Enables the wrapper variable *)
+val active_metrics : Configuration.t -> unit
+
 (** Wrap a function to be processed if a metrics address is set up in the configuration. *)
 val wrap : (unit -> unit) -> unit
 

@@ -60,6 +60,9 @@ let set_labeled_gauge ~family f ?(labels = []) x =
 
 let process_metrics = ref false
 
+let active_metrics (configuration : Configuration.t) =
+  process_metrics := Option.is_some configuration.metrics_addr
+
 let wrap f = if !process_metrics then f ()
 
 let wrap_lwt f =
@@ -211,7 +214,6 @@ module Info = struct
 
   let init_rollup_node_info (configuration : Configuration.t) ~genesis_level
       ~genesis_hash ~pvm_kind ~history_mode =
-    process_metrics := configuration.metrics_addr <> None ;
     let addr =
       Tezos_crypto.Hashed.Smart_rollup_address.to_b58check
         configuration.sc_rollup_address

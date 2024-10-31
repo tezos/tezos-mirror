@@ -646,6 +646,8 @@ let run ({node_ctxt; configuration; plugin; _} as state) =
   let module Plugin = (val state.plugin) in
   let current_protocol = Reference.get node_ctxt.current_protocol in
   let* history_mode = Node_context.get_history_mode node_ctxt in
+  (* Do not wrap active_metrics *)
+  Metrics.active_metrics configuration ;
   Metrics.wrap (fun () ->
       Metrics.Info.init_rollup_node_info
         configuration
