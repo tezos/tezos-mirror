@@ -158,6 +158,10 @@ main() {
   echo "exec $signer \"\$@\"" >> $client_dir/bin/octez-signer
   chmod +x $client_dir/bin/octez-signer
 
+  echo '#!/bin/sh' > "$client_dir"/bin/octez-protocol-compiler
+  echo "exec $compiler \"\$@\"" >> "$client_dir"/bin/octez-protocol-compiler
+  chmod +x "$client_dir"/bin/octez-protocol-compiler
+
   cat << EOF
 if type octez-client-reset >/dev/null 2>&1 ; then octez-client-reset; fi ;
 PATH="$client_dir/bin:\$PATH" ; export PATH ;
