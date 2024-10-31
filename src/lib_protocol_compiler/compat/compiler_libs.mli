@@ -28,3 +28,7 @@ val make_persistent_signature :
 
 (** [compunit_name cu] returns the name of the compilation unit *)
 val compunit_name : Cmo_format.compilation_unit -> string
+
+(** [mark_attribute_used attr] marks the attribute used, so that it doesn't
+    trigger warning 53. See [Packer.check_syntax]. *)
+val mark_attribute_used : Parsetree.attribute -> unit
