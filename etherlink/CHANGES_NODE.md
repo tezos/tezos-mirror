@@ -8,6 +8,9 @@
 
 ### Internals
 
+- Adds the duration of the blueprint application to the
+  `blueprint_applied` event. (!15505)
+
 ## Version 0.7 (2024-10-28)
 
 This is a bug fixes release, notably improving how the observer mode deals with
