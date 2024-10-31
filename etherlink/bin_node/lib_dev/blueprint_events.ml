@@ -34,6 +34,7 @@ let blueprint_application =
        {txs_nb} transactions for {gas_used} gas leading to creating block \
        {block_hash} in {process_time}."
     ~level:Notice
+    ~pp6:Time.System.Span.pp_hum
     ("level", Data_encoding.n)
     ("timestamp", Time.Protocol.rfc_encoding)
     ("txs_nb", Data_encoding.int31)
