@@ -194,7 +194,7 @@
               "model": {
                 "datasource": {
                   "type": "prometheus",
-                  "uid": "fdweemrvggiyof"
+                  "uid": "${datasourceUid}"
                 },
                 "editorMode": "code",
                 "expr": "octez_sc_rollup_node_performance_cpu_percentage{instance=\"${instance}\"}",
@@ -328,6 +328,82 @@
           "noDataState": "OK",
           "execErrState": "Error",
           "for": "1m",
+          "annotations": {},
+          "labels": {},
+          "isPaused": false,
+          "notification_settings": {
+            "receiver": "${receiver}"
+          }
+        },
+        {
+          "uid": "ce1mwe7kfpwjkc",
+          "title": "Refutation game start",
+          "condition": "Condition",
+          "data": [
+            {
+              "refId": "NUM_CONFLICTS",
+              "relativeTimeRange": {
+                "from": 600,
+                "to": 0
+              },
+              "datasourceUid": "${datasourceUid}",
+              "model": {
+                "editorMode": "code",
+                "expr": "octez_sc_rollup_node_number_of_conflicts{instance=\"${instance}\"}",
+                "instant": true,
+                "intervalMs": 1000,
+                "legendFormat": "__auto",
+                "maxDataPoints": 43200,
+                "range": false,
+                "refId": "NUM_CONFLICTS"
+              }
+            },
+            {
+              "refId": "Condition",
+              "relativeTimeRange": {
+                "from": 600,
+                "to": 0
+              },
+              "datasourceUid": "__expr__",
+              "model": {
+                "conditions": [
+                  {
+                    "evaluator": {
+                      "params": [
+                        0
+                      ],
+                      "type": "gt"
+                    },
+                    "operator": {
+                      "type": "and"
+                    },
+                    "query": {
+                      "params": [
+                        "C"
+                      ]
+                    },
+                    "reducer": {
+                      "params": [],
+                      "type": "last"
+                    },
+                    "type": "query"
+                  }
+                ],
+                "datasource": {
+                  "type": "__expr__",
+                  "uid": "__expr__"
+                },
+                "expression": "NUM_CONFLICTS",
+                "intervalMs": 1000,
+                "maxDataPoints": 43200,
+                "refId": "Condition",
+                "type": "threshold"
+              }
+            }
+          ],
+          "noDataState": "NoData",
+          "execErrState": "Error",
+          "for": "0s",
           "annotations": {},
           "labels": {},
           "isPaused": false,
