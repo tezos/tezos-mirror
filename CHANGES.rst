@@ -138,6 +138,9 @@ Smart Rollup node
 - Fixed a bug which would make injection of messages in the batcher with the RPC
   ``/local/batcher/injection`` fail if called too early. (MR :gl:`!15459`)
 
+- Improved error messages for RPC
+  ``/global/block/<block_id>/helpers/proofs/outbox/<outbox_level>/messages?index=<message_index>``. (MR :gl:`!15507`)
+
 Smart Rollup WASM Debugger
 --------------------------
 
