@@ -17,9 +17,10 @@ val publisher_is_ready : unit -> unit Lwt.t
     will not accept requests anymore. *)
 val publisher_shutdown : unit -> unit Lwt.t
 
-(** [blueprint_applied block] advertizes that a blueprint leading to [block]
-    has been applied onto the local state. *)
-val blueprint_applied : Ethereum_types.block -> unit Lwt.t
+(** [blueprint_applied block duration] advertizes that a blueprint
+    leading to [block] has been applied in [duration] time onto the
+    local state. *)
+val blueprint_applied : Ethereum_types.block -> Time.System.Span.t -> unit Lwt.t
 
 (** [blueprint_injected level] advertizes that a blueprint for level
     [level] has been forwarded to a rollup node  *)
