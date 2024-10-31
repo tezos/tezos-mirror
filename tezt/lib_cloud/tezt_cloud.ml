@@ -87,15 +87,20 @@ let register_create_dns_zone ~tags =
     ~title:"Create a new DNS zone"
     ~tags:("create" :: "dns" :: "zone" :: tags)
   @@ fun _cloud ->
-  let domain =
-    match Env.dns_domain with
-    | None ->
-        Test.fail "You must specify the domain to use via --dns-domain option."
-    | Some domain -> domain
-  in
-  let* () = Gcloud.DNS.create_zone ~domain ~zone:"tezt-cloud" () in
-  let* _ = Gcloud.DNS.describe ~zone:"tezt-cloud" () in
-  unit
+  match Env.dns_domains with
+  | [] ->
+      Test.fail "You must specify the domains to use via --dns-domain option."
+  | domains ->
+      Lwt_list.iter_p
+        (fun domain ->
+          let* res = Gcloud.DNS.find_zone_for_subdomain domain in
+          match res with
+          | Some (zone, _) ->
+              let* () = Gcloud.DNS.create_zone ~domain ~zone () in
+              let* _ = Gcloud.DNS.describe ~zone () in
+              unit
+          | None -> unit)
+        domains
 
 let register_describe_dns_zone ~tags =
   Cloud.register

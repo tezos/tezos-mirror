@@ -99,12 +99,30 @@ module DNS = struct
         description;
       ]
 
+  let list_zones () =
+    let* output =
+      Process.run_and_read_stdout
+        "gcloud"
+        ["dns"; "managed-zones"; "list"; "--format"; "csv(name, dns_name)"]
+    in
+    let lines = String.trim output |> String.split_on_char '\n' |> List.tl in
+    let res =
+      List.fold_left
+        (fun acc line ->
+          match String.trim line |> String.split_on_char ',' with
+          | [zone; dnsname] -> (zone, dnsname) :: acc
+          | _ -> acc)
+        []
+        lines
+    in
+    Lwt.return res
+
   let describe ~zone () =
     Process.run_and_read_stdout
       "gcloud"
       ["dns"; "managed-zones"; "describe"; zone]
 
-  let list ?name_filter ~zone () =
+  let list_entries ?name_filter ~zone () =
     let name_filter =
       match name_filter with
       | None -> []
@@ -169,15 +187,12 @@ module DNS = struct
     match line with
     | None -> Test.fail "Unable to find a managed zone. Have you create it?"
     | Some line ->
-        Lwt.return
-          (Format.asprintf
-             "%s.%s"
-             name
-             (String.split_on_char ' ' line |> Fun.flip List.nth 1))
+        let parent = String.split_on_char ' ' line |> Fun.flip List.nth 1 in
+        if String.ends_with name ~suffix:parent then Lwt.return name
+        else Lwt.return (Format.asprintf "%s.%s" name parent)
 
   let get_value ~zone ~domain =
-    let* domain = get_fqdn ~zone ~name:domain in
-    let* output = list ~name_filter:domain ~zone () in
+    let* output = list_entries ~name_filter:domain ~zone () in
     (* Example of output
        NAME                           TYPE  TTL  DATA
        user.nl-dal.domain.com.        A     300  35.187.31.38
@@ -192,8 +207,23 @@ module DNS = struct
         | _ -> assert false)
     | _ -> Lwt.return_none
 
+  let find_zone_for_subdomain domain =
+    (* list_zone will always return domain name with a final dot *)
+    let domain =
+      if String.ends_with ~suffix:"." domain then domain else domain ^ "."
+    in
+    let* zones = list_zones () in
+    let zone =
+      List.find_opt
+        (fun (_, zone_domain) -> String.ends_with ~suffix:zone_domain domain)
+        zones
+    in
+    return zone
+
   let add_subdomain ~zone ~name ~value =
+    Log.report "add_subdomain: name=%s" name ;
     let* name = get_fqdn ~zone ~name in
+    Log.report "add_subdomain: fqdn=%s" name ;
     Transaction.(try_update ~zone @@ add ~zone ~name ~value) ()
 
   let remove_subdomain ~zone ~name ~value =

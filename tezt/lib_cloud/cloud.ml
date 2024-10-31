@@ -322,7 +322,7 @@ let attach agent =
     if !has_sigint then on_sigint
     else
       let* uri =
-        if Env.dns then
+        if Env.dns_domains <> [] then
           let* domain =
             Gcloud.DNS.get_fqdn ~name:Env.tezt_cloud ~zone:"tezt-cloud"
           in
@@ -333,7 +333,7 @@ let attach agent =
                "http://%s"
                (Agent.point agent |> Option.get |> fst))
       in
-      Log.info "Deployement website can be accessed here: %s" uri ;
+      Log.info "Deployment website can be accessed here: %s" uri ;
       Lwt.return_unit
   in
   Log.Style.set_prefix Log.Style.Hidden ;

@@ -205,26 +205,14 @@ let tezt_cloud =
     ~description:"Overwrite the TEZT_CLOUD variable"
     ()
 
-let dns_domain =
-  Clap.optional_string
-    ~section
-    ~long:"dns-domain"
-    ~description:"DNS domain to use for the website"
-    ()
-
-let dns =
-  Clap.flag
-    ~section
-    ~set_long:"dns"
-    ~unset_long:"no-dns"
-    ~description:"Associate a domain name with the website"
-    (proxy && website)
-
-let dns_zones =
+let dns_domains =
   Clap.list_string
     ~section
-    ~long:"dns-zone"
-    ~description:"DNS zones to register the entries into"
+    ~long:"dns-domain"
+    ~description:
+      "Register the specified domain name for the proxy node. Relies on gcloud\n\
+      \      in order to add the specified entry in an authorized zone. Multiple\n\
+      \      occurrences allowed."
     ()
 
 let octez_release =

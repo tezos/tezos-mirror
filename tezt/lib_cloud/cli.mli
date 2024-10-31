@@ -89,16 +89,9 @@ val proxy : bool
 
 val tezt_cloud : string option
 
-(** Associate a DNS domain to the proxy when the proxy mode is used. *)
-val dns : bool
-
-(** DNS entry to use for the proxy container.
-    This is the subdomain part of the fully qualified domain main, ie.
-    excluding the parent domain part attached to the zone.*)
-val dns_domain : string option
-
-(** DNS zones to register entries into *)
-val dns_zones : string list
+(** DNS entries to use for the proxy container. Used by gcloud command in user
+    authorized zones*)
+val dns_domains : string list
 
 (** OS used by the VM. *)
 val os : string

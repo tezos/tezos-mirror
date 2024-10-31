@@ -44,6 +44,15 @@ val get_ip_address_from_name : zone:string -> string -> string Lwt.t
 val list_vms : prefix:string -> string Lwt.t
 
 module DNS : sig
+  (** [list_zones] list available zones in google cloud project *)
+  val list_zones : unit -> (string * string) list Lwt.t
+
+  (** [find_zone_for_subdomain domain] finds a zone suitable to add a subdomain
+      into. It relies on gcloud credentials to find authorized zones.
+      returns [None] in case no zone is suitable, or [Some (zone, domain)] with
+      domain the parent domain attached to the zone *)
+  val find_zone_for_subdomain : string -> (string * string) option Lwt.t
+
   val create_zone : domain:string -> zone:string -> unit -> unit Lwt.t
 
   val describe : zone:string -> unit -> string Lwt.t

@@ -73,11 +73,7 @@ val max_run_duration : int
 
 val no_max_run_duration : bool
 
-val dns_domain : string option
-
-val dns : bool
-
-val dns_zones : string list
+val dns_domains : string list
 
 val os : string
 

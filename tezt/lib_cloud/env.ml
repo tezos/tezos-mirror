@@ -64,11 +64,7 @@ let max_run_duration = Cli.max_run_duration
 
 let no_max_run_duration = Cli.no_max_run_duration
 
-let dns_domain = Cli.dns_domain
-
-let dns = Cli.dns
-
-let dns_zones = Cli.dns_zones
+let dns_domains = Cli.dns_domains
 
 let os = Cli.os
 
@@ -91,7 +87,7 @@ let init () =
   if tezt_cloud = "" then
     Test.fail
       "The tezt-cloud value should be set. Either via the CLI or via the \
-       environement variable 'TEZT_CLOUD'" ;
+       environment variable 'TEZT_CLOUD'" ;
   match mode with
   | `Localhost | `Orchestrator -> Lwt.return_unit
   | `Host | `Cloud ->
