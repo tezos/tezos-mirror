@@ -376,7 +376,7 @@ module Generated = struct
 
   let generate ~consensus_committee_size =
     (* The weights are expressed in [(256 * 80)]th of the total
-       reward, because it is the smallest proportion used so far*)
+       reward, because it is the smallest proportion used so far *)
     (* let f = consensus_committee_size / 3 in *)
     let max_slashing_threshold = (consensus_committee_size / 3) + 1 in
     let consensus_threshold = (consensus_committee_size * 2 / 3) + 1 in
@@ -385,6 +385,25 @@ module Generated = struct
     let _reward_parts_whole = 20480 (* = 256 * 80 *) in
     let reward_parts_half = 10240 (* = reward_parts_whole / 2 *) in
     let reward_parts_quarter = 5120 (* = reward_parts_whole / 4 *) in
+    let baking_reward_fixed_portion_weight =
+      (* 1/4 or 1/2 *)
+      if Compare.Int.(bonus_committee_size <= 0) then
+        (* a fortiori, consensus_committee_size < 4 *)
+        reward_parts_half
+      else reward_parts_quarter
+    in
+    let baking_reward_bonus_weight =
+      (* 1/4 or 0 *)
+      if Compare.Int.(bonus_committee_size <= 0) then 0
+      else reward_parts_quarter
+    in
+    let attesting_reward_weight =
+      (* 1/2 *)
+      reward_parts_half
+    in
+    (* All block (baking + attesting) rewards sum to 1 ( *256*80 ) *)
+    let seed_nonce_revelation_tip_weight = (* 1/20480 *) 1 in
+    let vdf_revelation_tip_weight = (* 1/20480 *) 1 in
     {
       max_slashing_threshold;
       consensus_threshold;
@@ -392,23 +411,11 @@ module Generated = struct
         {
           base_total_issued_per_minute;
           (* 80.007812 tez/minute *)
-          baking_reward_fixed_portion_weight =
-            (* 1/4 or 1/2 *)
-            (if Compare.Int.(bonus_committee_size <= 0) then
-               (* a fortiori, consensus_committee_size < 4 *)
-               reward_parts_half
-             else reward_parts_quarter);
-          baking_reward_bonus_weight =
-            (* 1/4 or 0 *)
-            (if Compare.Int.(bonus_committee_size <= 0) then 0
-             else reward_parts_quarter);
-          attesting_reward_weight = reward_parts_half;
-          (* 1/2 *)
-          (* All block (baking + attesting)rewards sum to 1 ( *256*80 ) *)
-          seed_nonce_revelation_tip_weight = 1;
-          (* 1/20480 *)
-          vdf_revelation_tip_weight = 1;
-          (* 1/20480 *)
+          baking_reward_fixed_portion_weight;
+          baking_reward_bonus_weight;
+          attesting_reward_weight;
+          seed_nonce_revelation_tip_weight;
+          vdf_revelation_tip_weight;
         };
     }
 end
