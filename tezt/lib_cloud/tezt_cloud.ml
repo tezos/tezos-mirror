@@ -109,8 +109,12 @@ let register_describe_dns_zone ~tags =
     ~title:"Describe a new DNS zone"
     ~tags:("describe" :: "dns" :: "zone" :: tags)
   @@ fun _cloud ->
-  let* _ = Gcloud.DNS.describe ~zone:"tezt-cloud" () in
-  unit
+  let* zones = Gcloud.DNS.list_zones () in
+  Lwt_list.iter_s
+    (fun (zone, _) ->
+      let* _ = Gcloud.DNS.describe ~zone () in
+      unit)
+    zones
 
 let register_dns_add ~tags =
   Cloud.register
@@ -119,15 +123,24 @@ let register_dns_add ~tags =
     ~title:"Register a new DNS entry"
     ~tags:("dns" :: "add" :: tags)
   @@ fun _cloud ->
-  let tezt_cloud = Env.tezt_cloud in
-  let ip = Cli.get_string_opt "ip" in
-  match ip with
-  | None -> Test.fail "You must provide an IP address via -a ip=<ip>"
-  | Some ip ->
-      let* () =
-        Gcloud.DNS.add_subdomain ~name:tezt_cloud ~zone:"tezt-cloud" ~value:ip
-      in
-      unit
+  let ip =
+    match Cli.get_string_opt "ip" with
+    | None -> Test.fail "You must provide an IP address via -a ip=<ip>"
+    | Some ip -> ip
+  in
+  let domain =
+    match Cli.get_string_opt "dns-domain" with
+    | None ->
+        Test.fail "You must provide a domain name via -a dns-domain=<name>"
+    | Some domain -> domain
+  in
+  let* res = Gcloud.DNS.find_zone_for_subdomain domain in
+  let zone =
+    match res with
+    | None -> Test.fail "No suitable zone for %s" domain
+    | Some (zone, _) -> zone
+  in
+  Gcloud.DNS.add_subdomain ~zone ~name:domain ~value:ip
 
 let register_dns_remove ~tags =
   Cloud.register
@@ -136,14 +149,23 @@ let register_dns_remove ~tags =
     ~title:"Remove a DNS entry"
     ~tags:("dns" :: "remove" :: tags)
   @@ fun _cloud ->
-  let name = Env.tezt_cloud in
-  let* ip = Gcloud.DNS.get_value ~zone:"tezt-cloud" ~domain:name in
+  let domain =
+    match Cli.get_string_opt "dns-domain" with
+    | None ->
+        Test.fail "You must provide a domain name via -a dns-domain=<name>"
+    | Some domain -> domain
+  in
+  let* res = Gcloud.DNS.find_zone_for_subdomain domain in
+  let zone =
+    match res with
+    | None -> Test.fail "No suitable zone for %s" domain
+    | Some (zone, _) -> zone
+  in
+  let* ip = Gcloud.DNS.get_value ~zone ~domain in
   match ip with
   | None -> Test.fail "No record found for the current domain"
   | Some ip ->
-      let* () =
-        Gcloud.DNS.remove_subdomain ~name ~zone:"tezt-cloud" ~value:ip
-      in
+      let* () = Gcloud.DNS.remove_subdomain ~zone ~name:domain ~value:ip in
       unit
 
 let register ~tags =
