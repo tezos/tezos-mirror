@@ -19,15 +19,15 @@ let rpc_server_profiler = unplugged ()
 
 let create_reset_block_section profiler =
   let last_block = ref None in
-  fun b ->
+  fun (b, metadata) ->
     match !last_block with
     | None ->
-        record profiler (Block_hash.to_b58check b) ;
+        record profiler (Block_hash.to_b58check b, metadata) ;
         last_block := Some b
     | Some b' when Block_hash.equal b' b -> ()
     | Some _ ->
         stop profiler ;
-        record profiler (Block_hash.to_b58check b) ;
+        record profiler (Block_hash.to_b58check b, metadata) ;
         last_block := Some b
 
 let merge_profiler = unplugged ()

@@ -481,7 +481,7 @@ let reset_profilers block =
       (try Tezos_base.Profiler.stop profiler with _ -> ()) ;
       Tezos_base.Profiler.record
         profiler
-        (Block_hash.to_b58check (Store.Block.hash block)))
+        (Block_hash.to_b58check (Store.Block.hash block), []))
     profilers
 
 let on_validation_request w peer start_testchain active_chains spawn_child block

@@ -16,6 +16,7 @@ type content =
 type t = {
   verbosity : string option;
   profiler_module : string option;
+  metadata : Ppxlib.expression option;
   content : content;
 }
 
