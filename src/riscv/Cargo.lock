@@ -1780,6 +1780,7 @@ dependencies = [
  "octez-riscv",
  "quanta",
  "ratatui",
+ "rustc-demangle",
  "serde",
  "serde_json",
  "strum 0.26.2",

@@ -6,7 +6,7 @@
 use super::{errors, tui};
 use color_eyre::Result;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
-use goblin::{elf::header::ET_DYN, elf::section_header, elf::Elf};
+use goblin::{elf, elf::header::ET_DYN, elf::Elf};
 use octez_riscv::{
     bits::Bits64,
     kernel_loader::Error,
@@ -22,7 +22,9 @@ use octez_riscv::{
     stepper::{pvm::PvmStepper, test::TestStepper, StepResult, Stepper, StepperStatus},
 };
 use ratatui::{prelude::*, style::palette::tailwind, widgets::*};
+use rustc_demangle::demangle;
 use std::{
+    borrow::Cow,
     collections::{BTreeMap, HashMap, HashSet},
     ops::Bound,
 };
@@ -49,7 +51,7 @@ pub struct Instruction {
 }
 
 impl Instruction {
-    fn new(address: u64, text: String, symbols: &HashMap<u64, &str>) -> Self {
+    fn new(address: u64, text: String, symbols: &HashMap<u64, Cow<str>>) -> Self {
         let jump = match text
             .split(' ')
             .next()
@@ -147,7 +149,7 @@ struct ProgramView<'a> {
     instructions: Vec<Instruction>,
     next_instr: usize,
     breakpoints: HashSet<u64>,
-    symbols: HashMap<u64, &'a str>,
+    symbols: HashMap<u64, Cow<'a, str>>,
 }
 
 pub struct DebuggerApp<'a, S: Stepper> {
@@ -157,7 +159,10 @@ pub struct DebuggerApp<'a, S: Stepper> {
     state: DebuggerState,
 }
 
-fn get_elf_symbols<ML: MainMemoryLayout>(contents: &[u8]) -> Result<HashMap<u64, &str>, Error> {
+fn get_elf_symbols<ML: MainMemoryLayout>(
+    contents: &[u8],
+    demangle_symbols: bool,
+) -> Result<HashMap<u64, Cow<str>>, Error> {
     let mut symbols = HashMap::new();
     let elf = Elf::parse(contents)?;
 
@@ -170,12 +175,17 @@ fn get_elf_symbols<ML: MainMemoryLayout>(contents: &[u8]) -> Result<HashMap<u64,
     };
 
     for symbol in elf.syms.iter() {
-        let name = elf.strtab.get_at(symbol.st_name).expect("Symbol not found");
+        let name = Cow::Borrowed(elf.strtab.get_at(symbol.st_name).expect("Symbol not found"));
         if !name.is_empty()
             && u32::try_from(symbol.st_shndx).expect("Symbol not valid address")
-                != section_header::SHN_UNDEF
+                != elf::section_header::SHN_UNDEF
         {
-            symbols.insert(symbol.st_value + offset, name);
+            if demangle_symbols {
+                let demangled = demangle(&name).to_string();
+                symbols.insert(symbol.st_value + offset, Cow::Owned(demangled));
+            } else {
+                symbols.insert(symbol.st_value + offset, name);
+            }
         }
     }
     Ok(symbols)
@@ -187,10 +197,11 @@ impl<'a, ML: MainMemoryLayout> DebuggerApp<'a, TestStepper<ML>> {
         program: &[u8],
         initrd: Option<&[u8]>,
         exit_mode: Mode,
+        demangle_sybols: bool,
     ) -> Result<()> {
         let (mut interpreter, prog) =
             TestStepper::<ML>::new_with_parsed_program(program, initrd, exit_mode)?;
-        let symbols = get_elf_symbols::<ML>(program)?;
+        let symbols = get_elf_symbols::<ML>(program, demangle_sybols)?;
         errors::install_hooks()?;
         let terminal = tui::init()?;
         DebuggerApp::new(&mut interpreter, fname, &prog, symbols).run_debugger(terminal)?;
@@ -208,6 +219,7 @@ impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts> DebuggerApp<'_, PvmStepper<
         inbox: Inbox,
         rollup_address: [u8; 20],
         origination_level: u32,
+        demangle_sybols: bool,
     ) -> Result<()> {
         let hooks = PvmHooks::new(|_| {});
 
@@ -220,7 +232,7 @@ impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts> DebuggerApp<'_, PvmStepper<
             origination_level,
         )?;
 
-        let symbols = get_elf_symbols::<ML>(program)?;
+        let symbols = get_elf_symbols::<ML>(program, demangle_sybols)?;
         let program = Program::<ML>::from_elf(program)?.parsed();
 
         errors::install_hooks()?;
@@ -240,7 +252,7 @@ where
         stepper: &'a mut S,
         title: &'a str,
         program: &'a BTreeMap<u64, String>,
-        symbols: HashMap<u64, &'a str>,
+        symbols: HashMap<u64, Cow<'a, str>>,
     ) -> Self {
         Self {
             title,
@@ -382,7 +394,7 @@ where
 impl<'a> ProgramView<'a> {
     fn with_items(
         instructions: Vec<Instruction>,
-        symbols: HashMap<u64, &'a str>,
+        symbols: HashMap<u64, Cow<'a, str>>,
     ) -> ProgramView<'a> {
         ProgramView {
             state: ListState::default().with_selected(Some(0)),
