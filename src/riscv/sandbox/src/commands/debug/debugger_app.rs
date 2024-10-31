@@ -6,11 +6,12 @@
 use super::{errors, tui};
 use color_eyre::Result;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
+use goblin::{elf::header::ET_DYN, elf::section_header, elf::Elf};
 use octez_riscv::{
     bits::Bits64,
-    kernel_loader,
+    kernel_loader::Error,
     machine_state::{
-        bus::{main_memory::MainMemoryLayout, Address},
+        bus::{main_memory::MainMemoryLayout, start_of_main_memory, Address},
         csregisters::satp::{Satp, SvLength, TranslationAlgorithm},
         mode::Mode,
         AccessType, CacheLayouts, MachineCoreState,
@@ -156,6 +157,30 @@ pub struct DebuggerApp<'a, S: Stepper> {
     state: DebuggerState,
 }
 
+fn get_elf_symbols<ML: MainMemoryLayout>(contents: &[u8]) -> Result<HashMap<u64, &str>, Error> {
+    let mut symbols = HashMap::new();
+    let elf = Elf::parse(contents)?;
+
+    let offset = if elf.header.e_type == ET_DYN {
+        // Symbol addresses in relocatable executables are relative addresses. We need to offset
+        // them by the start address of the main memory where the executable is loaded.
+        start_of_main_memory::<ML>()
+    } else {
+        0
+    };
+
+    for symbol in elf.syms.iter() {
+        let name = elf.strtab.get_at(symbol.st_name).expect("Symbol not found");
+        if !name.is_empty()
+            && u32::try_from(symbol.st_shndx).expect("Symbol not valid address")
+                != section_header::SHN_UNDEF
+        {
+            symbols.insert(symbol.st_value + offset, name);
+        }
+    }
+    Ok(symbols)
+}
+
 impl<'a, ML: MainMemoryLayout> DebuggerApp<'a, TestStepper<ML>> {
     pub fn launch(
         fname: &str,
@@ -165,7 +190,7 @@ impl<'a, ML: MainMemoryLayout> DebuggerApp<'a, TestStepper<ML>> {
     ) -> Result<()> {
         let (mut interpreter, prog) =
             TestStepper::<ML>::new_with_parsed_program(program, initrd, exit_mode)?;
-        let symbols = kernel_loader::get_elf_symbols::<ML>(program)?;
+        let symbols = get_elf_symbols::<ML>(program)?;
         errors::install_hooks()?;
         let terminal = tui::init()?;
         DebuggerApp::new(&mut interpreter, fname, &prog, symbols).run_debugger(terminal)?;
@@ -195,7 +220,7 @@ impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts> DebuggerApp<'_, PvmStepper<
             origination_level,
         )?;
 
-        let symbols = kernel_loader::get_elf_symbols::<ML>(program)?;
+        let symbols = get_elf_symbols::<ML>(program)?;
         let program = Program::<ML>::from_elf(program)?.parsed();
 
         errors::install_hooks()?;
