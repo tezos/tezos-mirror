@@ -178,7 +178,13 @@ let produce_serialized_output_proof node_ctxt state ~outbox_level ~message_index
   let*! outbox = PVM.get_outbox outbox_level state in
   let output = List.nth outbox message_index in
   match output with
-  | None -> invalid_arg "invalid index"
+  | None ->
+      failwith
+        "No message at index %d in outbox at level %a registered in cemented \
+         state"
+        message_index
+        Raw_level.pp
+        outbox_level
   | Some output -> (
       let*! proof =
         PVM.produce_output_proof

@@ -284,7 +284,7 @@ let () =
   let+ commitment, proof =
     Outbox.proof_of_output_simple node_ctxt ~outbox_level ~message_index
   in
-  (Sc_rollup_proto_types.Commitment_hash.of_octez commitment, proof)
+  (commitment, proof)
 
 let () =
   Block_directory.register0 Sc_rollup_services.Block.simulate
