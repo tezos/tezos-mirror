@@ -256,15 +256,27 @@ module Helpers = struct
       (Format.pp_print_list Action.pp)
       actions
 
-  let gen_with_state state n =
+  (** [gen_with_state ?insert_dist ?find_dist ?remove_dist state n]
+      generates a [scenario] containing a list of [n] actions and a
+      [state] resulting from their interpretations. Actions are
+      selected according to the probability distribution defined by
+      [insert_dist], [find_dist], and [remove_dist] (each defaulting
+      to 1).
+
+      The sum of distribution weights must be non-zero. Additionally,
+      [insert_dist] must be non-zero since [find] and [remove] actions
+      operate on payloads introduced by prior [insert] actions. *)
+  let gen_with_state ?(insert_dist = 1) ?(find_dist = 1) ?(remove_dist = 1)
+      state n =
     let open Bam.Std.Syntax in
     assert (n >= 0) ;
     let rec loop acc state n =
       if n = 0 then return {state; actions = List.rev acc}
       else
         let choices =
-          (1, Action.gen_Insert) :: (1, Action.gen_Find)
-          :: [(1, Action.gen_Remove)]
+          (insert_dist, Action.gen_Insert)
+          :: (find_dist, Action.gen_Find)
+          :: [(remove_dist, Action.gen_Remove)]
         in
         let* choice = Bam.Std.oneof choices in
         let* res = choice state in
@@ -274,7 +286,8 @@ module Helpers = struct
     in
     loop [] state n
 
-  let gen = gen_with_state State.zero
+  let gen ?insert_dist ?find_dist ?remove_dist n =
+    gen_with_state ?insert_dist ?find_dist ?remove_dist State.zero n
 end
 
 open Helpers
