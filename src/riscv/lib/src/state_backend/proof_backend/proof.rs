@@ -5,7 +5,7 @@
 // TODO: RV-271 Allow unused code until functionality is exposed to the OCaml bindings.
 #![allow(dead_code)]
 
-use super::merkle::MerkleTree;
+use super::{merkle::MerkleTree, tree::Tree};
 use crate::state_backend::hash::Hash;
 use arbitrary_int::u2;
 use itertools::Itertools;
@@ -51,11 +51,12 @@ const TAG_READ: u8 = 0b11;
 /// The structure of the full [`MerkleTree`] is known statically (since it represents the whole state of the PVM)
 /// so the number of children of a node and the sizes of the leaves
 /// do not need to be stored in either the proof or its encoding.
+pub type MerkleProof = Tree<MerkleProofLeaf>;
+
+/// Type used to describe the leaves of a [`MerkleProof`].
+/// For more details see the documentation of [`MerkleProof`].
 #[derive(Clone)]
-pub enum MerkleProof {
-    /// A node which holds an amount of child nodes.
-    /// Hash not needed since it can be reconstructed from the children.
-    Node(Vec<Self>),
+pub enum MerkleProofLeaf {
     /// A leaf that is not read. It may be written.
     /// Contains the hash of the contents from initial state.
     ///
@@ -80,24 +81,9 @@ impl MerkleProof {
     pub fn to_raw_tag(&self) -> u2 {
         match self {
             MerkleProof::Node(_) => u2::new(TAG_NODE),
-            MerkleProof::Blind(_) => u2::new(TAG_BLIND),
-            MerkleProof::Read(_) => u2::new(TAG_READ),
+            MerkleProof::Leaf(MerkleProofLeaf::Blind(_)) => u2::new(TAG_BLIND),
+            MerkleProof::Leaf(MerkleProofLeaf::Read(_)) => u2::new(TAG_READ),
         }
-    }
-
-    /// Iterates over all subtrees in a [`MerkleProof`] in a DFS traversal.
-    fn subtree_iterator(&self) -> impl Iterator<Item = &Self> {
-        let mut stack = vec![self];
-
-        std::iter::from_fn(move || {
-            let subtree = stack.pop()?;
-
-            if let MerkleProof::Node(children) = subtree {
-                stack.extend(children.iter().rev());
-            }
-
-            Some(subtree)
-        })
     }
 }
 
@@ -124,8 +110,8 @@ fn serialise_proof_values(proof: &MerkleProof) -> impl Iterator<Item = u8> + '_ 
     proof
         .subtree_iterator()
         .flat_map(move |subtree| match subtree {
-            MerkleProof::Read(vec) => vec,
-            MerkleProof::Blind(hash) => hash.as_ref(),
+            MerkleProof::Leaf(MerkleProofLeaf::Read(vec)) => vec,
+            MerkleProof::Leaf(MerkleProofLeaf::Blind(hash)) => hash.as_ref(),
             MerkleProof::Node(_) => &[],
         })
         .copied()
@@ -149,7 +135,7 @@ pub fn serialise_proof(proof: &Proof) -> impl Iterator<Item = u8> + '_ {
 
 #[cfg(test)]
 mod tests {
-    use super::{serialise_proof, MerkleProof, TAG_BLIND, TAG_NODE, TAG_READ};
+    use super::{serialise_proof, MerkleProof, MerkleProofLeaf, TAG_BLIND, TAG_NODE, TAG_READ};
     use crate::{
         state_backend::proof_backend::proof::Proof,
         storage::{Hash, DIGEST_SIZE},
@@ -193,13 +179,13 @@ mod tests {
         fn from_merkle_leaf(leaf: &MerkleProof) -> Self {
             match leaf {
                 MerkleProof::Node(_) => panic!("Expected a merkle proof leaf"),
-                MerkleProof::Blind(hash) => Self {
+                MerkleProof::Leaf(MerkleProofLeaf::Blind(hash)) => Self {
                     nodes_count: 1,
                     content_size: hash.as_ref().len() as u64,
                 },
-                MerkleProof::Read(vec) => Self {
+                MerkleProof::Leaf(MerkleProofLeaf::Read(data)) => Self {
                     nodes_count: 1,
-                    content_size: vec.len() as u64,
+                    content_size: data.len() as u64,
                 },
             }
         }
@@ -214,8 +200,8 @@ mod tests {
         let blind_hash: Hash = Hash::blake2b_hash_bytes(&raw_array).unwrap();
 
         match is_leaf_read {
-            true => MerkleProof::Read(raw_array),
-            false => MerkleProof::Blind(blind_hash),
+            true => MerkleProof::Leaf(MerkleProofLeaf::Read(raw_array)),
+            false => MerkleProof::Leaf(MerkleProofLeaf::Blind(blind_hash)),
         }
     }
 
@@ -236,12 +222,12 @@ mod tests {
 
         let raw_array: [u8; 10] = rand::random();
 
-        let rleaf = MerkleProof::Read(raw_array.to_vec());
+        let rleaf = MerkleProof::Leaf(MerkleProofLeaf::Read(raw_array.to_vec()));
         check_serialisation(rleaf, &[&[TAG_READ << 6], raw_array.as_slice()].concat());
 
         let hash = Hash::blake2b_hash_bytes(&raw_array).unwrap();
         check_serialisation(
-            MerkleProof::Blind(hash),
+            MerkleProof::Leaf(MerkleProofLeaf::Blind(hash)),
             &[&[TAG_BLIND << 6], hash.as_ref()].concat(),
         );
     }
@@ -256,10 +242,10 @@ mod tests {
         let h1 = Hash::blake2b_hash_bytes(&[1, 2, 3]).unwrap();
         let h2 = Hash::blake2b_hash_bytes(&[20, 30, 1, 5, 6]).unwrap();
 
-        let n1 = MerkleProof::Read(vec![12, 15, 30, 40]);
-        let n2 = MerkleProof::Blind(h1);
-        let n3 = MerkleProof::Blind(h2);
-        let n4 = MerkleProof::Read(vec![123, 234, 42, 1, 2, 3]);
+        let n1 = MerkleProof::Leaf(MerkleProofLeaf::Read(vec![12, 15, 30, 40]));
+        let n2 = MerkleProof::Leaf(MerkleProofLeaf::Blind(h1));
+        let n3 = MerkleProof::Leaf(MerkleProofLeaf::Blind(h2));
+        let n4 = MerkleProof::Leaf(MerkleProofLeaf::Read(vec![123, 234, 42, 1, 2, 3]));
 
         let root = MerkleProof::Node(vec![n1.clone()]);
         check_serialisation(root, &[TAG_NODE << 6 | TAG_READ << 4, 12, 15, 30, 40]);
