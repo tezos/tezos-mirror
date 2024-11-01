@@ -351,7 +351,9 @@ where
             !self.program.breakpoints.contains(&pc)
         };
 
-        while should_continue(self.stepper.machine_state()) {
+        while should_continue(self.stepper.machine_state())
+            && matches!(result, StepperStatus::Running { .. })
+        {
             result += self
                 .stepper
                 .step_max(Bound::Included(1))
@@ -380,7 +382,9 @@ where
             !(self.program.breakpoints.contains(&pc) || self.program.symbols.contains_key(&pc))
         };
 
-        while should_continue(self.stepper.machine_state()) {
+        while should_continue(self.stepper.machine_state())
+            && matches!(result, StepperStatus::Running { .. })
+        {
             result += self
                 .stepper
                 .step_max(Bound::Included(1))
