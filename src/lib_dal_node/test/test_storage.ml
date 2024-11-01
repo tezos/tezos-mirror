@@ -412,3 +412,41 @@ let consistency_test =
     ~gen:(Helpers.gen 20)
     ~property
     ()
+
+(** Test skip list storage migrations.
+
+    This test validates the migration from the key-value store to
+    sqlite. More precisely, it
+    - initializes a kvs store,
+    - executes a sequence of insertions,
+    - initializes a sqlite store and migrates the data from the kvs one,
+    - performs a handshake to verify data consistency between the two stores. *)
+let migration_skip_list_test {state; actions} =
+  let open Lwt_result_syntax in
+  let data_dir = Tezt.Temp.dir "data-dir" in
+  let* kvs_store = init_skip_list_cells_store data_dir in
+  let* () = run_kvs kvs_store actions in
+  let* sql_store = Dal_store_sqlite3.init ~data_dir ~perm:`Read_write () in
+  let* () = Store_migrations.migrate_skip_list_store kvs_store sql_store in
+  let* () = handshake state kvs_store sql_store in
+  Kvs_skip_list_cells_store.close kvs_store
+
+let () =
+  let open Tezt_bam in
+  let open Lwt_result_syntax in
+  let title = "skip list storage migration test" in
+  Test.register ~seed:Random ~__FILE__ ~title ~tags:["kvs"; "sqlite"]
+  @@ fun () ->
+  (* [seed] and [get_state] as found in [Tezt_bam.Runner.register] *)
+  let seed = Random.full_int Int.max_int in
+  let state = Bam.Gen.Random.make [|seed|] in
+  let state = snd (Bam.Gen.Random.split state) in
+  let tree = Gen.run (gen 10 ~find_dist:0 ~remove_dist:0) state in
+  let*! res = migration_skip_list_test (Tree.root tree) in
+  match res with
+  | Ok () -> Lwt.return_unit
+  | Error err ->
+      Test.fail
+        "Test fails with the following errors: %a"
+        Error_monad.pp_print_trace
+        err
