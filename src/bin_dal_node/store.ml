@@ -589,6 +589,20 @@ module Skip_list_cells = struct
     | SQLite3 -> Dal_store_sqlite3.Skip_list_cells.remove t.sqlite3
 end
 
+let init_skip_list_cells_store base_dir =
+  (* We support at most 64 back-pointers, each of which takes 32 bytes.
+     The cells content itself takes less than 64 bytes. *)
+  let padded_encoded_cell_size = 64 * (32 + 1) in
+  (* A pointer hash is 32 bytes length, but because of the double
+     encoding in Dal_proto_types and then in skip_list_cells_store, we
+     have an extra 4 bytes for encoding the size. *)
+  let encoded_hash_size = 32 + 4 in
+  Kvs_skip_list_cells_store.init
+    ~node_store_dir:base_dir
+    ~skip_list_store_dir:Stores_dirs.skip_list_cells
+    ~padded_encoded_cell_size
+    ~encoded_hash_size
+
 let cache_entry node_store commitment slot shares shard_proofs =
   Commitment_indexed_cache.replace
     node_store.cache
@@ -714,20 +728,6 @@ let check_version_and_may_upgrade base_dir =
         tzfail
           (Version.Invalid_data_dir_version
              {actual = version; expected = Version.current_version})
-
-let init_skip_list_cells_store base_dir =
-  (* We support at most 64 back-pointers, each of which takes 32 bytes.
-     The cells content itself takes less than 64 bytes. *)
-  let padded_encoded_cell_size = 64 * (32 + 1) in
-  (* A pointer hash is 32 bytes length, but because of the double
-     encoding in Dal_proto_types and then in skip_list_cells_store, we
-     have an extra 4 bytes for encoding the size. *)
-  let encoded_hash_size = 32 + 4 in
-  Kvs_skip_list_cells_store.init
-    ~node_store_dir:base_dir
-    ~skip_list_store_dir:Stores_dirs.skip_list_cells
-    ~padded_encoded_cell_size
-    ~encoded_hash_size
 
 (** [init config] inits the store on the filesystem using the
     given [config]. *)
