@@ -5,7 +5,10 @@
 // TODO: RV-271 Allow unused code until functionality is exposed to the OCaml bindings.
 #![allow(dead_code)]
 
-use super::{merkle::MerkleTree, tree::Tree};
+use super::{
+    merkle::{CompressedAccessInfo, CompressedMerkleTree},
+    tree::Tree,
+};
 use crate::state_backend::hash::Hash;
 use arbitrary_int::u2;
 use itertools::Itertools;
@@ -55,7 +58,7 @@ pub type MerkleProof = Tree<MerkleProofLeaf>;
 
 /// Type used to describe the leaves of a [`MerkleProof`].
 /// For more details see the documentation of [`MerkleProof`].
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum MerkleProofLeaf {
     /// A leaf that is not read. It may be written.
     /// Contains the hash of the contents from initial state.
@@ -68,11 +71,19 @@ pub enum MerkleProofLeaf {
     Read(Vec<u8>),
 }
 
-impl From<MerkleTree> for MerkleProof {
-    /// Transform a [`MerkleTree`] to a [`MerkleProof`]
-    /// TODO: RV-240
-    fn from(_tree: MerkleTree) -> Self {
-        todo!("Not implemented")
+impl From<CompressedMerkleTree> for MerkleProof {
+    fn from(value: CompressedMerkleTree) -> Self {
+        // TODO: RV-290 iterative implementation to avoid overflowing the stack
+        use CompressedAccessInfo::*;
+        match value {
+            CompressedMerkleTree::Leaf(hash, access_info) => match access_info {
+                NoAccess | Write => MerkleProof::Leaf(MerkleProofLeaf::Blind(hash)),
+                Read(data) | ReadWrite(data) => MerkleProof::Leaf(MerkleProofLeaf::Read(data)),
+            },
+            CompressedMerkleTree::Node(_, vec) => {
+                MerkleProof::Node(vec.into_iter().map(MerkleProof::from).collect())
+            }
+        }
     }
 }
 
@@ -137,7 +148,10 @@ pub fn serialise_proof(proof: &Proof) -> impl Iterator<Item = u8> + '_ {
 mod tests {
     use super::{serialise_proof, MerkleProof, MerkleProofLeaf, TAG_BLIND, TAG_NODE, TAG_READ};
     use crate::{
-        state_backend::proof_backend::proof::Proof,
+        state_backend::proof_backend::{
+            merkle::CompressedAccessInfo,
+            proof::{CompressedMerkleTree, Proof},
+        },
         storage::{Hash, DIGEST_SIZE},
     };
     use proptest::proptest;
@@ -366,5 +380,67 @@ mod tests {
             let (root, bound) = &nodes[0];
             check_bounds(root.clone(), bound);
         });
+    }
+
+    #[test]
+    fn transform_merkle_tree_to_proof() {
+        use CompressedAccessInfo::*;
+
+        let check = |merkle_tree, merkle_proof| {
+            let proof_from_merkle = MerkleProof::from(merkle_tree);
+            assert_eq!(proof_from_merkle, merkle_proof);
+        };
+
+        let gen_hash_data = || {
+            let data = rand::random::<[u8; 12]>().to_vec();
+            let hash = Hash::blake2b_hash_bytes(&data).unwrap();
+            (data, hash)
+        };
+
+        let (data, hash) = gen_hash_data();
+
+        // Check leafs
+        check(
+            CompressedMerkleTree::Leaf(hash, NoAccess),
+            MerkleProof::Leaf(MerkleProofLeaf::Blind(hash)),
+        );
+        check(
+            CompressedMerkleTree::Leaf(hash, Write),
+            MerkleProof::Leaf(MerkleProofLeaf::Blind(hash)),
+        );
+        check(
+            CompressedMerkleTree::Leaf(hash, Read(data.clone())),
+            MerkleProof::Leaf(MerkleProofLeaf::Read(data.clone())),
+        );
+        check(
+            CompressedMerkleTree::Leaf(hash, ReadWrite(data.clone())),
+            MerkleProof::Leaf(MerkleProofLeaf::Read(data.clone())),
+        );
+
+        // Check nodes
+        let [d0, d1, d2, d3, d4, d5, d6, d7, d8] = [0; 9].map(|_| gen_hash_data());
+        let l0 = MerkleProof::Leaf(MerkleProofLeaf::Read(d0.0.clone()));
+        let l1 = MerkleProof::Leaf(MerkleProofLeaf::Read(d1.0.clone()));
+        let l2 = MerkleProof::Leaf(MerkleProofLeaf::Read(d2.0.clone()));
+        let l3 = MerkleProof::Leaf(MerkleProofLeaf::Blind(d3.1));
+        let l4 = MerkleProof::Leaf(MerkleProofLeaf::Blind(d4.1));
+        let l5 = MerkleProof::Leaf(MerkleProofLeaf::Blind(d5.1));
+
+        let n6 = MerkleProof::Node(vec![l0, l1, l3]);
+        let n7 = MerkleProof::Node(vec![l4, l2, l5]);
+        let root = MerkleProof::Node(vec![n6, n7]);
+
+        let t0 = CompressedMerkleTree::Leaf(d0.1, Read(d0.0));
+        let t1 = CompressedMerkleTree::Leaf(d1.1, ReadWrite(d1.0));
+        let t2 = CompressedMerkleTree::Leaf(d2.1, Read(d2.0));
+        let t3 = CompressedMerkleTree::Leaf(d3.1, Write);
+        let t4 = CompressedMerkleTree::Leaf(d4.1, NoAccess);
+        let t5 = CompressedMerkleTree::Leaf(d5.1, Write);
+
+        let t6 = CompressedMerkleTree::Node(d6.1, vec![t0, t1, t3]);
+        let t7 = CompressedMerkleTree::Node(d7.1, vec![t4, t2, t5]);
+        let t_root = CompressedMerkleTree::Node(d8.1, vec![t6, t7]);
+
+        check(t_root, root);
     }
 }

@@ -9,7 +9,7 @@
 
 /// Generic tree structure used to model the [`super::proof::MerkleProof`],
 /// as well as the full & partial shapes of a [`super::merkle::MerkleTree`].
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Tree<A> {
     Node(Vec<Self>),
     Leaf(A),
