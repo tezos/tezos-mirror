@@ -1,0 +1,48 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name src_lib_dal_node_test__tezt_lib)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezt.core
+  bls12-381.archive
+  octez-rustzcash-deps
+  octez-libs.tezos-sapling
+  octez-libs.stdlib
+  octez-libs.stdlib-unix
+  octez-libs.base
+  octez-libs.error-monad
+  tezos-dal-node-lib
+  tezt-bam)
+ (preprocess (pps ppx_hash bam-ppx))
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
+  -open Tezos_stdlib
+  -open Tezos_stdlib_unix
+  -open Tezos_base.TzPervasives
+  -open Tezos_error_monad
+  -open Tezos_error_monad.TzLwtreslib
+  -open Tezos_dal_node_lib)
+ (modules test_storage))
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (libraries
+  src_lib_dal_node_test__tezt_lib
+  tezt)
+ (modules main))
+
+(rule
+ (alias runtest)
+ (package tezos-dal-node-lib)
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run %{dep:./main.exe} /flaky /ci_disabled)))
+
+(rule
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))

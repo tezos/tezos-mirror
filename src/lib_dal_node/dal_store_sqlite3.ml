@@ -227,6 +227,28 @@ module Skip_list_cells = struct
         in
         Sqlite.Db.exec conn Q.insert_skip_list_cell (cell_hash, cell))
       items
+
+  module Internal_for_tests = struct
+    open Types
+
+    module Q = struct
+      open Dal_proto_types
+
+      let skip_list_hash_exists :
+          (Skip_list_hash.t, bool, [`One]) Caqti_request.t =
+        (skip_list_hash ->! bool)
+        @@ {sql|
+    SELECT EXISTS (
+      SELECT cell
+      FROM skip_list_cells
+      WHERE hash = $1
+    )|sql}
+    end
+
+    let skip_list_hash_exists ?conn store skip_list_hash =
+      with_connection store conn @@ fun conn ->
+      Sqlite.Db.find conn Q.skip_list_hash_exists skip_list_hash
+  end
 end
 
 let sqlite_file_name = "store.sqlite"
