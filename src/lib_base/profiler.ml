@@ -447,3 +447,18 @@ let wrap profiler =
     let span_s ?verbosity ids f = span_s ?verbosity profiler ids f
   end in
   (module Wrapped : GLOBAL_PROFILER)
+
+type 'a section_maker = 'a * metadata -> unit
+
+let section_maker equal to_string profiler : 'a section_maker =
+  let last = ref None in
+  fun (id, metadata) ->
+    match !last with
+    | None ->
+        record profiler (to_string id, metadata) ;
+        last := Some id
+    | Some id' when equal id' id -> ()
+    | Some _ ->
+        stop profiler ;
+        record profiler (to_string id, metadata) ;
+        last := Some id
