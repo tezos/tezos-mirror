@@ -589,6 +589,14 @@ let store_upgraded =
     ("old_version", Data_encoding.int31)
     ("new_version", Data_encoding.int31)
 
+let store_upgrade_error =
+  declare_0
+    ~section
+    ~name:"store_upgrade_error"
+    ~msg:"Failed to upgrade the store."
+    ~level:Error
+    ()
+
 let crypto_process_started =
   declare_1
     ~section:(section @ ["crypto"])
