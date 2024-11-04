@@ -3267,6 +3267,7 @@ module Sc_rollup : sig
         page_id : Dal.Page.t;
         min_attested_shards : int;
         expected_total_shards : int;
+        restricted_commitments_publishers : Contract.t list option;
       }
     | Reveal_dal_parameters
 

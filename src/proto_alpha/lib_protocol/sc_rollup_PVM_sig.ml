@@ -220,12 +220,16 @@ type reveal =
   | Request_dal_page of Dal_slot_repr.Page.t
   | Request_adal_page of {
       page_id : Dal_slot_repr.Page.t;
+          (* The id of the DAL page we want to import. *)
       min_attested_shards : int;
-      expected_total_shards : int;
+          (* The expected minimal number of attested shards of the slot. *)
+      expected_total_shards : int; (* The total number of shards of the slot. *)
+      restricted_commitments_publishers : Contract_repr.t list option;
+          (* If none, no filtering by commitments publishers is made. *)
     }
   | Reveal_dal_parameters
       (** Request DAL parameters that were used for the slots published at
-          the current inbox level. *)
+      the current inbox level. *)
 
 let reveal_encoding =
   let open Data_encoding in
@@ -269,18 +273,42 @@ let reveal_encoding =
     case
       ~title:"Request_adaptive_dal_page"
       (Tag 4)
-      (obj4
+      (obj5
          (kind "request_adaptive_dal_page")
          (req "page_id" Dal_slot_repr.Page.encoding)
          (req "min_attested_shards" Data_encoding.uint16)
-         (req "expected_total_shards" Data_encoding.uint16))
+         (req "expected_total_shards" Data_encoding.uint16)
+         (dft
+            "restricted_commitments_publishers"
+            (option (list ~max_length:10 Contract_repr.encoding))
+            None))
       (function
         | Request_adal_page
-            {page_id; min_attested_shards; expected_total_shards} ->
-            Some ((), page_id, min_attested_shards, expected_total_shards)
+            {
+              page_id;
+              min_attested_shards;
+              expected_total_shards;
+              restricted_commitments_publishers;
+            } ->
+            Some
+              ( (),
+                page_id,
+                min_attested_shards,
+                expected_total_shards,
+                restricted_commitments_publishers )
         | _ -> None)
-      (fun ((), page_id, min_attested_shards, expected_total_shards) ->
-        Request_adal_page {page_id; min_attested_shards; expected_total_shards})
+      (fun ( (),
+             page_id,
+             min_attested_shards,
+             expected_total_shards,
+             restricted_commitments_publishers ) ->
+        Request_adal_page
+          {
+            page_id;
+            min_attested_shards;
+            expected_total_shards;
+            restricted_commitments_publishers;
+          })
   in
   union
     [
@@ -376,14 +404,27 @@ let pp_reveal fmt = function
   | Reveal_raw_data hash -> Sc_rollup_reveal_hash.pp fmt hash
   | Reveal_metadata -> Format.pp_print_string fmt "Reveal metadata"
   | Request_dal_page id -> Format.fprintf fmt "DAL:%a" Dal_slot_repr.Page.pp id
-  | Request_adal_page {page_id; min_attested_shards; expected_total_shards} ->
+  | Request_adal_page
+      {
+        page_id;
+        min_attested_shards;
+        expected_total_shards;
+        restricted_commitments_publishers;
+      } ->
       Format.fprintf
         fmt
-        "ADAL:{page:%a; min_attested_shards:%d; expected_total_shards:%d}"
+        "ADAL:{page:%a; min_attested_shards:%d; expected_total_shards:%d; \
+         publishers:%a}"
         Dal_slot_repr.Page.pp
         page_id
         min_attested_shards
         expected_total_shards
+        (Format.pp_print_option
+           ~none:(fun fmt () -> Format.fprintf fmt "Any")
+           (Format.pp_print_list
+              ~pp_sep:(fun fmt () -> Format.pp_print_string fmt ", ")
+              Contract_repr.pp_short))
+        restricted_commitments_publishers
   | Reveal_dal_parameters -> Format.pp_print_string fmt "Reveal DAL parameters"
 
 (** [pp_input_request fmt i] pretty prints the given input [i] to the formatter
@@ -411,11 +452,21 @@ let reveal_equal p1 p2 =
   | Reveal_metadata, _ -> false
   | Request_dal_page a, Request_dal_page b -> Dal_slot_repr.Page.equal a b
   | Request_dal_page _, _ -> false
-  | ( Request_adal_page {page_id; min_attested_shards; expected_total_shards},
+  | ( Request_adal_page
+        {
+          page_id;
+          min_attested_shards;
+          expected_total_shards;
+          restricted_commitments_publishers;
+        },
       Request_adal_page b ) ->
       Dal_slot_repr.Page.equal page_id b.page_id
       && Compare.Int.equal min_attested_shards b.min_attested_shards
       && Compare.Int.equal expected_total_shards b.expected_total_shards
+      && Option.equal
+           (List.equal Contract_repr.equal)
+           restricted_commitments_publishers
+           b.restricted_commitments_publishers
   | Request_adal_page _, _ -> false
   | Reveal_dal_parameters, Reveal_dal_parameters -> true
   | Reveal_dal_parameters, _ -> false
