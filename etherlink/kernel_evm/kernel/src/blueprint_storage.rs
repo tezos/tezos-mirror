@@ -16,6 +16,8 @@ use crate::{delayed_inbox, DelayedInbox};
 use primitive_types::{H256, U256};
 use rlp::{Decodable, DecoderError, Encodable};
 use sha3::{Digest, Keccak256};
+use tezos_ethereum::block::L2Block;
+use tezos_ethereum::eth_gen::OwnedHash;
 use tezos_ethereum::rlp_helpers;
 use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_evm_logging::{log, Level::*};
@@ -82,6 +84,47 @@ impl Decodable for StoreBlueprint {
                 Ok(Self::InboxBlueprint(blueprint))
             }
             _ => Err(DecoderError::Custom("Unknown store blueprint tag.")),
+        }
+    }
+}
+
+// Part of the block header which is generic information because it is
+// about the blueprint from which the block was build. This part is
+// useful to validate the next blueprint.
+#[derive(PartialEq, Debug, Clone)]
+pub struct BlueprintHeader {
+    pub number: U256,
+    pub timestamp: Timestamp,
+}
+
+// Part of the block header which is specific of the EVM chain. All
+// fields are needed to build the next block. The hash is also needed
+// to validate the next blueprint (which commits on this hash).
+#[derive(PartialEq, Debug, Clone)]
+pub struct EVMBlockHeader {
+    pub hash: H256,
+    pub receipts_root: OwnedHash,
+    pub transactions_root: OwnedHash,
+}
+
+#[derive(PartialEq, Debug, Clone)]
+pub struct BlockHeader {
+    pub blueprint_header: BlueprintHeader,
+    pub evm_block_header: EVMBlockHeader,
+}
+
+impl From<L2Block> for BlockHeader {
+    fn from(block: L2Block) -> Self {
+        Self {
+            blueprint_header: BlueprintHeader {
+                number: block.number,
+                timestamp: block.timestamp,
+            },
+            evm_block_header: EVMBlockHeader {
+                hash: block.hash,
+                receipts_root: block.receipts_root,
+                transactions_root: block.transactions_root,
+            },
         }
     }
 }
