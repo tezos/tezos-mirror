@@ -5,7 +5,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_base.Profiler
+open Profiler
 
 let mempool_profiler = unplugged ()
 
@@ -24,12 +24,12 @@ let peer_validator_profiler = unplugged ()
 
 let rpc_server_profiler = unplugged ()
 
-let create_reset_block_section =
-  Profiler.section_maker Block_hash.equal Block_hash.to_b58check
-
 let p2p_reader_profiler = unplugged ()
 
 let requester_profiler = unplugged ()
+
+let create_reset_block_section =
+  section_maker Block_hash.equal Block_hash.to_b58check
 
 let all_profilers =
   [
@@ -46,16 +46,3 @@ let all_profilers =
 
 let activate_all ~profiler_maker =
   List.iter (fun (name, p) -> plug p (profiler_maker ~name)) all_profilers
-
-let deactivate_all () =
-  List.iter (fun (_name, p) -> close_and_unplug_all p) all_profilers
-
-let activate ~profiler_maker name =
-  List.assoc ~equal:( = ) name all_profilers |> function
-  | None -> Format.ksprintf invalid_arg "unknown '%s' profiler" name
-  | Some p -> plug p (profiler_maker ~name)
-
-let deactivate name =
-  List.assoc ~equal:( = ) name all_profilers |> function
-  | None -> Format.ksprintf invalid_arg "unknown '%s' profiler" name
-  | Some p -> close_and_unplug_all p
