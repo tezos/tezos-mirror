@@ -341,6 +341,12 @@ SHELL ["/bin/ash", "-euo", "pipefail", "-c"]
 RUN apk update \
  && apk add --no-cache curl npm git file make jq \
  gcc clang lld ca-certificates build-base musl-dev libusb-dev linux-headers \
+ # We need datadog-ci to send JUnit files to Datadog in tezt
+ # jobs. Cf. [scripts/ci/tezt.sh].
+ # Version number should be kept in sync with the one of the
+ # datadog/ci image used for the [datadog_ci] image
+ # (cf. ci/bin/common.ml)
+ && npm install -g "@datadog/datadog-ci@2.44.0" \
  # We need eth since e2e tests. This requires git as well.
  && npm install -g eth-cli@2.0.2 \
  # We need solc to compile solidity smart-contracts

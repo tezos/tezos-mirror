@@ -92,7 +92,11 @@ module Images_external = struct
       ~image_path:"${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0"
 
   (* Image used in initial pipeline job that sends to Datadog useful
-     info for CI visibility. *)
+     info for CI visibility.
+
+     The [datadog-ci] version should be consistent across all CI
+     images that use it. At the moment it is installed in the
+     external image below and the internal image [e2etest]. *)
   let datadog_ci = Image.mk_external ~image_path:"datadog/ci:v2.44.0"
 
   let debian_bookworm = Image.mk_external ~image_path:"debian:bookworm"
