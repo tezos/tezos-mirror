@@ -43,7 +43,8 @@ module Version = struct
   (* Version history:
      - 0: came with octez release v20; used Irmin for storing slots
      - 1: removed Irmin dependency; added slot and status stores; changed layout of shard
-       store by indexing on slot ids instead of commitments *)
+       store by indexing on slot ids instead of commitments
+     - 2: switch the KVS skip list store for a sqlite3 one. *)
   let current_version = 1
 
   type error += Could_not_read_data_dir_version of string
@@ -744,6 +745,12 @@ let upgradable old_version new_version :
         (fun ~base_dir ->
           let*! () = upgrade_from_v0_to_v1 ~base_dir in
           return_unit)
+  | 0, 2 ->
+      Some
+        (fun ~base_dir ->
+          let*! () = upgrade_from_v0_to_v1 ~base_dir in
+          upgrade_from_v1_to_v2 ~base_dir)
+  | 1, 2 -> Some (fun ~base_dir -> upgrade_from_v1_to_v2 ~base_dir)
   | _ -> None
 
 (* Checks the version of the store with the respect to the current
