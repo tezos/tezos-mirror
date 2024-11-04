@@ -27,7 +27,27 @@ open Protocol.Alpha_context
 module Events = Baking_events.Scheduling
 open Baking_state
 
-module Profiler = (val Profiler.wrap Baking_profiler.baker_profiler)
+module Profiler = struct
+  include (val Profiler.wrap Baking_profiler.baker_profiler)
+
+  let[@warning "-32"] reset_block_section =
+    (* The section_maker must be created here and not inside the pattern
+       matching because it instantiates a reference that needs to live the
+       whole lifetime of the profiler and will be used to test if the
+       section should be closed and re-opened or not. *)
+    let section =
+      Tezos_base.Profiler.section_maker
+        ~verbosity:Notice
+        ( = )
+        Block_hash.to_b58check
+        Baking_profiler.baker_profiler
+    in
+    function
+    | Baking_state.New_head_proposal proposal, metadata
+    | Baking_state.New_valid_proposal proposal, metadata ->
+        section (proposal.block.hash, metadata)
+    | _ -> ()
+end
 
 type loop_state = {
   heads_stream : Baking_state.proposal Lwt_stream.t;
@@ -818,33 +838,6 @@ let compute_bootstrap_event state =
     in
     return @@ Baking_state.Timeout (End_of_round {ending_round})
 
-let[@warning "-32"] may_reset_profiler =
-  let prev_head = ref None in
-  let () =
-    at_exit (fun () -> Option.iter (fun _ -> (() [@profiler.stop])) !prev_head)
-  in
-  let[@warning "-26"] metadata = [] in
-  function
-  | Baking_state.New_head_proposal proposal
-  | Baking_state.New_valid_proposal proposal -> (
-      let curr_head_hash = proposal.block.hash in
-      match !prev_head with
-      | None ->
-          ()
-          [@profiler.record
-            {metadata; verbosity = Notice}
-              (Block_hash.to_b58check curr_head_hash)] ;
-          prev_head := Some curr_head_hash
-      | Some prev_head_hash when prev_head_hash <> curr_head_hash ->
-          ()
-          [@profiler.stop]
-          [@profiler.record
-            {metadata; verbosity = Notice}
-              (Block_hash.to_b58check curr_head_hash)] ;
-          prev_head := Some curr_head_hash
-      | _ -> ())
-  | _ -> ()
-
 let rec automaton_loop ?(stop_on_event = fun _ -> false) ~config ~on_error
     loop_state state event =
   let open Lwt_result_syntax in
@@ -854,7 +847,7 @@ let rec automaton_loop ?(stop_on_event = fun _ -> false) ~config ~on_error
         Baking_state.may_record_new_state ~previous_state:state ~new_state
     | Baking_configuration.Memory -> return_unit
   in
-  () [@profiler.custom may_reset_profiler event] ;
+  () [@profiler.reset_block_section event] ;
   (let*! state', action =
      (State_transitions.step
         state
@@ -1077,9 +1070,9 @@ let run cctxt ?canceler ?(stop_on_event = fun _ -> false)
     on_error err
   in
   let*? initial_event = compute_bootstrap_event initial_state in
-  ()
-  [@profiler.stop]
-  [@profiler.custom may_reset_profiler (New_valid_proposal current_proposal)] ;
+  (* profiler_section is defined here because ocamlformat and ppx mix badly here *)
+  let[@warning "-26"] profiler_section = New_valid_proposal current_proposal in
+  () [@profiler.stop] [@profiler.reset_block_section profiler_section] ;
   protect
     ~on_error:(fun err ->
       let*! _ = Option.iter_es Lwt_canceler.cancel canceler in
