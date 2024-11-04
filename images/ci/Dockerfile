@@ -17,7 +17,7 @@ ARG BUILD_IMAGE
 LABEL org.opencontainers.image.base.name="${BUILD_IMAGE}"
 
 # Use alpine /bin/ash and set shell options
-# See https://docs.docker.com/develop/develop-images/dockerfile_best-practices/#run
+# See https://docs.docker.com/build/building/best-practices/#using-pipes
 SHELL ["/bin/ash", "-euo", "pipefail", "-c"]
 
 # Open Container Initiative
@@ -332,6 +332,10 @@ ENV NODE_OPTIONS="--dns-result-order=ipv4first"
 
 # We need curl since a bunch of tezt tests use curl.
 # Same, some tests use [file].
+
+# Use alpine /bin/ash and set shell options
+# See https://docs.docker.com/build/building/best-practices/#using-pipes
+SHELL ["/bin/ash", "-euo", "pipefail", "-c"]
 
 # hadolint ignore=DL3018,DL3019
 RUN apk update \
