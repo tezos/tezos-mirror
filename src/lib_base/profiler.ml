@@ -452,6 +452,7 @@ type 'a section_maker = 'a * metadata -> unit
 
 let section_maker equal to_string profiler : 'a section_maker =
   let last = ref None in
+  let () = at_exit (fun () -> Option.iter (fun _ -> stop profiler) !last) in
   fun (id, metadata) ->
     match !last with
     | None ->
