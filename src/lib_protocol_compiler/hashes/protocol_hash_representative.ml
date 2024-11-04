@@ -8,7 +8,18 @@
 (** Maps protocol hashes to their representative. *)
 module Representatives = Map.Make (Protocol_hash)
 
-let representatives = Representatives.empty
+let register_protocol_hash computed_hash declared_hash map =
+  Representatives.add
+    (Protocol_hash.of_b58check_exn computed_hash)
+    (Protocol_hash.of_b58check_exn declared_hash)
+    map
+
+let representatives =
+  Representatives.empty
+  (* Protocol used in tests only, see `tezt/test/injection.ml`. *)
+  |> register_protocol_hash
+       "Pry4stD6qN1ZagUX6YCHvMxA1xvSjARkdt8bhs86j74JGLoLDKN"
+       "Ps8MVx2JuQaFrXpbuwSeBvXmi1xraGmXuJZHULEbPBY7mzFchxz"
 
 (* Resolve is not transitive on purpose: there is no reason a protocol hash is
    represented by another protocol hash that has itself a representative. *)
