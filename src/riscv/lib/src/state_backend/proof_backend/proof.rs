@@ -128,7 +128,7 @@ fn serialise_proof_values(proof: &MerkleProof) -> impl Iterator<Item = u8> + '_ 
         .copied()
 }
 
-/// Serialise a merkle proof to an array of bytes.
+/// Serialise a Merkle proof to an array of bytes.
 ///
 /// In the encoding, lengths are not necessary, but tags are,
 /// since the tags depend on runtime information and events
@@ -192,7 +192,7 @@ mod tests {
         /// Generate the serialisation bound for a [`MerkleProof`] leaf.
         fn from_merkle_leaf(leaf: &MerkleProof) -> Self {
             match leaf {
-                MerkleProof::Node(_) => panic!("Expected a merkle proof leaf"),
+                MerkleProof::Node(_) => panic!("Expected a Merkle proof leaf"),
                 MerkleProof::Leaf(MerkleProofLeaf::Blind(hash)) => Self {
                     nodes_count: 1,
                     content_size: hash.as_ref().len() as u64,
@@ -333,7 +333,7 @@ mod tests {
 
     #[test]
     fn bounds_n_levels() {
-        // Check size of serialisation of a randomly generated merkle tree.
+        // Check size of serialisation of a randomly generated Merkle tree.
 
         // Starting from an array of leaves, combine a randomly generated number of consecutive nodes
         // into a node for the level above, This will continue until only a node is left, which is the root.
