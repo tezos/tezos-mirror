@@ -90,14 +90,12 @@ let profiler ?(suffix = "")
   in
   Profiler.instance
     backend
-    Filename.Infix.(output_dir // (name ^ suffix), max_verbosity)
+    Filename.Infix.(output_dir // (name ^ "_profiling" ^ suffix), max_verbosity)
 
 let () =
   register_backend
     ["json+ext"]
-    (profiler
-       ~suffix:"_profiling.json"
-       Simple_profiler.auto_write_as_json_to_file)
+    (profiler ~suffix:".json" Simple_profiler.auto_write_as_json_to_file)
 
 let () =
   register_backend
@@ -107,9 +105,7 @@ let () =
 let () =
   register_backend
     ["text+ext"; "txt+ext"]
-    (profiler
-       ~suffix:"_profiling.txt"
-       Simple_profiler.auto_write_as_txt_to_file)
+    (profiler ~suffix:".txt" Simple_profiler.auto_write_as_txt_to_file)
 
 let () =
   register_backend
