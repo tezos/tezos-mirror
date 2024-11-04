@@ -270,11 +270,6 @@ val span_f : profiler -> ?verbosity:verbosity -> ids -> (unit -> 'a) -> 'a
 val span_s :
   profiler -> ?verbosity:verbosity -> ids -> (unit -> 'a Lwt.t) -> 'a Lwt.t
 
-val with_new_profiler : 'a driver -> 'a -> (profiler -> 'r) -> 'r * report list
-
-val with_new_profiler_s :
-  'a driver -> 'a -> (profiler -> 'r Lwt.t) -> ('r * report list) Lwt.t
-
 (** [unplugged ()] returns a new profiler *)
 val unplugged : unit -> profiler
 
