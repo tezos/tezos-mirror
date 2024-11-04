@@ -1160,15 +1160,6 @@ function misc_updates() {
   log_blue "add octez-activate-${label} command to client sandbox"
 
   if [[ ${is_snapshot} == true ]]; then
-    sed -e "s@${protocol_source}_parameters_file=.*@${label}_parameters_file=\"\$bin_dir/../../_build/default/src/proto_${version}_${short_hash}/lib_parameters/sandbox-parameters.json\"@" \
-      -e "s/alias octez-activate-${protocol_source}=.*/alias octez-activate-${label}=\"\$client -block genesis activate protocol ${long_hash} with fitness 1 and key activator and parameters \$${label}_parameters_file\";/" -i src/bin_client/octez-init-sandboxed-client.sh
-  else
-    sed "/parameters_file=\"\$bin_dir.*/i \    ${label}_parameters_file=\"\$bin_dir/../../_build/default/src/proto_${label}/lib_parameters/sandbox-parameters.json\"" -i src/bin_client/octez-init-sandboxed-client.sh
-    sed "/alias octez-activate-${protocol_source}=.*/i \alias octez-activate-${label}=\"\$client -block genesis activate protocol ${long_hash} with fitness 1 and key activator and parameters \$${label}_parameters_file\";" -i src/bin_client/octez-init-sandboxed-client.sh
-  fi
-  commit_no_hooks "sandbox: add octez-activate-${label} command to client sandbox"
-
-  if [[ ${is_snapshot} == true ]]; then
     sed "/let protocol_${protocol_source}_parameters_template =/,/^$/d" -i devtools/testnet_experiment_tools/testnet_experiment_tools.ml
     sed -i.old -e "s/${capitalized_source}/${capitalized_label}/g" \
       -e "s/protocol_${protocol_source}_parameters_template/(Filename.concat network_parameters_templates_dir \"proto_${version}_${short_hash}_mainnet.json\")/" \
@@ -1512,9 +1503,6 @@ function misc_removals() {
     rm -rf "client-libs/kaitai-struct-files/files/${protocol_source}*"
   fi
   commit_if_changes "kaitai: update structs"
-
-  sed -i.old -e "/.*${source_label}.*/d" src/bin_client/octez-init-sandboxed-client.sh
-  commit_no_hooks "sandbox: remove ${source_label} from client sandbox"
 
   #if deleting a protocol in stabilisation
   if [[ ${source_label} == "${protocol_source}" ]]; then
@@ -1979,9 +1967,6 @@ function hash() {
     make kaitai-struct-files-update
     commit_if_changes "kaitai: update structs"
   fi
-
-  update_files src/bin_client/octez-init-sandboxed-client.sh
-  commit_no_hooks_if_changes "sandbox: update octez-activate-${label} command to client sandbox"
 
   update_files devtools/testnet_experiment_tools/testnet_experiment_tools.ml
   ocamlformat -i devtools/testnet_experiment_tools/testnet_experiment_tools.ml
