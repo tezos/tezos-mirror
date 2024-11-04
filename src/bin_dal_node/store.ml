@@ -591,6 +591,7 @@ let cache_entry node_store commitment slot shares shard_proofs =
 let upgrade_from_v0_to_v1 ~base_dir =
   let open Lwt_syntax in
   let ( // ) = Filename.Infix.( // ) in
+  let* () = Event.(emit store_upgrade_start (Version.make 0, Version.make 1)) in
   let rec move_directory_contents src dst =
     let stream = Lwt_unix.files_of_directory src in
     Lwt_stream.iter_s
