@@ -44,7 +44,7 @@ let keep_alive =
     ~section
     ~set_long:"keep-alive"
     ~description:
-      "If set, the test will promt the user to press <enter> to end the test. \
+      "If set, the test will prompt the user to press <enter> to end the test. \
        This option can be used to inspect VMs state at the end of a scenrio."
     false
 
@@ -148,7 +148,7 @@ let website =
     ~set_long:"website"
     ~unset_long:"no-website"
     ~description:
-      "A webpage is up on localhost to summarize various informations related \
+      "A webpage is up on localhost to summarize various information related \
        to the experiment"
     prometheus
 
@@ -219,6 +219,13 @@ let dns =
     ~unset_long:"no-dns"
     ~description:"Associate a domain name with the website"
     (proxy && website)
+
+let dns_zones =
+  Clap.list_string
+    ~section
+    ~long:"dns-zone"
+    ~description:"DNS zones to register the entries into"
+    ()
 
 let octez_release =
   Clap.optional_string

@@ -77,6 +77,8 @@ val dns_domain : string option
 
 val dns : bool
 
+val dns_zones : string list
+
 val os : string
 
 val open_telemetry : bool

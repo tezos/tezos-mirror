@@ -68,6 +68,8 @@ let dns_domain = Cli.dns_domain
 
 let dns = Cli.dns
 
+let dns_zones = Cli.dns_zones
+
 let os = Cli.os
 
 let open_telemetry = Cli.open_telemetry

@@ -324,7 +324,7 @@ let attach agent =
       let* uri =
         if Env.dns then
           let* domain =
-            Gcloud.DNS.get_domain ~tezt_cloud:Env.tezt_cloud ~zone:"tezt-cloud"
+            Gcloud.DNS.get_fqdn ~name:Env.tezt_cloud ~zone:"tezt-cloud"
           in
           Lwt.return (Format.asprintf "http://%s" domain)
         else

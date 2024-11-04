@@ -120,25 +120,25 @@ module DNS = struct
         "gcloud"
         ["dns"; "record-sets"; "transaction"; "start"; "--zone"; zone]
 
-    let add ?(ttl = 300) ?(typ = "A") ~domain ~zone ~ip () =
+    let add ?(ttl = 300) ?(typ = "A") ~zone ~name ~value () =
       let ttl = ["--ttl"; Format.asprintf "%d" ttl] in
       let typ = ["--type"; Format.asprintf "%s" typ] in
-      let domain = ["--name"; domain] in
+      let name = ["--name"; name] in
       let zone = ["--zone"; zone] in
       Process.run
         "gcloud"
         (["dns"; "record-sets"; "transaction"; "add"]
-        @ zone @ ttl @ typ @ domain @ [ip])
+        @ zone @ ttl @ typ @ name @ [value])
 
-    let remove ?(ttl = 300) ?(typ = "A") ~domain ~zone ~ip () =
+    let remove ?(ttl = 300) ?(typ = "A") ~zone ~name ~value () =
       let ttl = ["--ttl"; Format.asprintf "%d" ttl] in
       let typ = ["--type"; Format.asprintf "%s" typ] in
-      let domain = ["--name"; domain] in
+      let name = ["--name"; name] in
       let zone = ["--zone"; zone] in
       Process.run
         "gcloud"
         (["dns"; "record-sets"; "transaction"; "remove"]
-        @ zone @ ttl @ typ @ domain @ [ip])
+        @ zone @ ttl @ typ @ name @ [value])
 
     let execute ~zone () =
       Process.run
@@ -149,9 +149,18 @@ module DNS = struct
       Process.run
         "gcloud"
         ["dns"; "record-sets"; "transaction"; "abort"; "--zone"; zone]
+
+    let try_update ~zone fn args =
+      Lwt.catch
+        (fun () ->
+          let* () = start ~zone () in
+          let* () = fn args in
+          let* () = execute ~zone () in
+          unit)
+        (fun _ -> abort ~zone ())
   end
 
-  let get_domain ~tezt_cloud ~zone =
+  let get_fqdn ~zone ~name =
     let* output = describe ~zone () in
     let line =
       String.trim output |> String.split_on_char '\n'
@@ -163,31 +172,11 @@ module DNS = struct
         Lwt.return
           (Format.asprintf
              "%s.%s"
-             tezt_cloud
+             name
              (String.split_on_char ' ' line |> Fun.flip List.nth 1))
 
-  let add ~tezt_cloud ~zone ~ip =
-    let* domain = get_domain ~tezt_cloud ~zone in
-    Lwt.catch
-      (fun () ->
-        let* () = Transaction.start ~zone () in
-        let* () = Transaction.add ~domain ~zone ~ip () in
-        let* () = Transaction.execute ~zone () in
-        unit)
-      (fun _ -> Transaction.abort ~zone ())
-
-  let remove ~tezt_cloud ~zone ~ip =
-    let* domain = get_domain ~tezt_cloud ~zone in
-    Lwt.catch
-      (fun () ->
-        let* () = Transaction.start ~zone () in
-        let* () = Transaction.remove ~domain ~zone ~ip () in
-        let* () = Transaction.execute ~zone () in
-        unit)
-      (fun _ -> Transaction.abort ~zone ())
-
-  let get_ip ~tezt_cloud ~zone =
-    let* domain = get_domain ~tezt_cloud ~zone in
+  let get_value ~zone ~domain =
+    let* domain = get_fqdn ~zone ~name:domain in
     let* output = list ~name_filter:domain ~zone () in
     (* Example of output
        NAME                           TYPE  TTL  DATA
@@ -202,4 +191,12 @@ module DNS = struct
         | [_domain; _type; _ttl; ip] -> Lwt.return_some ip
         | _ -> assert false)
     | _ -> Lwt.return_none
+
+  let add_subdomain ~zone ~name ~value =
+    let* name = get_fqdn ~zone ~name in
+    Transaction.(try_update ~zone @@ add ~zone ~name ~value) ()
+
+  let remove_subdomain ~zone ~name ~value =
+    let* name = get_fqdn ~zone ~name in
+    Transaction.(try_update ~zone @@ remove ~zone ~name ~value) ()
 end
