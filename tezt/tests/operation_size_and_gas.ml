@@ -492,9 +492,7 @@ let test_staking_operations =
   let* () = Process.check finalize_unstake in
   unit
 
-let register ~protocols:_ =
-  (* We run tests only for proto_alpha atm *)
-  let protocols = [Protocol.Alpha] in
+let register ~protocols =
   test_reveal protocols ;
   test_simple_transfer protocols ;
   test_delegation protocols ;
