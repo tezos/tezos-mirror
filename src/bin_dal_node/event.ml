@@ -568,6 +568,17 @@ let store_upgrade_error_creating_directory =
     ("path", Data_encoding.string)
     ("exn", Data_encoding.string)
 
+let store_upgrade_start =
+  declare_2
+    ~section
+    ~name:"store_upgrading"
+    ~msg:
+      "Starting to upgrade the store from version {old_version} to \
+       {new_version}."
+    ~level:Notice
+    ("old_version", Data_encoding.int31)
+    ("new_version", Data_encoding.int31)
+
 let store_upgraded =
   declare_2
     ~section
