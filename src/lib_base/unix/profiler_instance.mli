@@ -30,9 +30,8 @@ val max_verbosity : Profiler.verbosity
     one for [PROFILING_BACKEND=txt] and [PROFILING_BACKEND=text] that output
     plain text formatted reports.
 
-    The module also registers [json+ext], [text+ext] and [txt+ext] variants
-    that are the same as their counterparts without the [+ext] but that add
-    [_profiling.txt] or [_profiling.json] suffix to the file name. *)
+    Note that these profilers add [_profiling.txt] or [_profiling.json]
+    suffix to the file name. *)
 val register_backend :
   string list ->
   (Profiler.verbosity -> directory:string -> name:string -> Profiler.instance) ->

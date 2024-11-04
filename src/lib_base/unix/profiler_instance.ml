@@ -94,20 +94,10 @@ let profiler ?(suffix = "")
 
 let () =
   register_backend
-    ["json+ext"]
+    ["json"]
     (profiler ~suffix:".json" Simple_profiler.auto_write_as_json_to_file)
 
 let () =
   register_backend
-    ["json"]
-    (profiler Simple_profiler.auto_write_as_json_to_file)
-
-let () =
-  register_backend
-    ["text+ext"; "txt+ext"]
-    (profiler ~suffix:".txt" Simple_profiler.auto_write_as_txt_to_file)
-
-let () =
-  register_backend
     ["text"; "txt"]
-    (profiler Simple_profiler.auto_write_as_txt_to_file)
+    (profiler ~suffix:".txt" Simple_profiler.auto_write_as_txt_to_file)
