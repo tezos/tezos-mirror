@@ -442,13 +442,11 @@ impl BlockInProgress {
         self,
         host: &mut Host,
         block_constants: &BlockConstants,
-        previous_receipts_root: &[u8],
-        previous_transactions_root: &[u8],
     ) -> Result<L2Block, anyhow::Error> {
         let state_root = Self::safe_store_get_hash(host, &EVM_ACCOUNTS_PATH)?;
-        let receipts_root = self.receipts_root(host, previous_receipts_root)?;
+        let receipts_root = self.receipts_root(host, &self.previous_receipts_root)?;
         let transactions_root =
-            self.transactions_root(host, previous_transactions_root)?;
+            self.transactions_root(host, &self.previous_transactions_root)?;
         let base_fee_per_gas = base_fee_per_gas(
             host,
             self.timestamp,

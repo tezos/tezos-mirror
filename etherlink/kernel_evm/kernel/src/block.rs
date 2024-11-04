@@ -310,8 +310,6 @@ fn compute_bip<Host: Runtime>(
     host: &mut Host,
     outbox_queue: &OutboxQueue<'_, impl Path>,
     mut block_in_progress: BlockInProgress,
-    previous_receipts_root: &[u8],
-    previous_transactions_root: &[u8],
     precompiles: &PrecompileBTreeMap<Host>,
     evm_account_storage: &mut EthereumAccountStorage,
     tick_counter: &mut TickCounter,
@@ -360,12 +358,7 @@ fn compute_bip<Host: Runtime>(
             *tick_counter =
                 TickCounter::finalize(block_in_progress.estimated_ticks_in_run);
             let new_block = block_in_progress
-                .finalize_and_store(
-                    host,
-                    &constants,
-                    previous_receipts_root,
-                    previous_transactions_root,
-                )
+                .finalize_and_store(host, &constants)
                 .context("Failed to finalize the block in progress")?;
             Ok(BlockComputationResult::Finished {
                 included_delayed_transactions,
@@ -549,8 +542,6 @@ pub fn produce<Host: Runtime>(
         &mut safe_host,
         &outbox_queue,
         block_in_progress,
-        &previous_receipts_root,
-        &previous_transactions_root,
         &precompiles,
         &mut evm_account_storage,
         &mut tick_counter,
