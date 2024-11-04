@@ -33,7 +33,7 @@ let register_backend env driver =
           (fun acc k ->
             BackendMap.add
               k
-              (fun ~directory ~name -> driver max_verbosity ~directory ~name)
+              (fun ~directory ~name -> driver ~directory ~name)
               acc)
           !registered_backends
           env
@@ -70,8 +70,8 @@ let selected_backend () =
 (** Default profilers. *)
 
 let profiler ?(suffix = "")
-    (backend : (module DRIVER with type config = string * verbosity))
-    max_verbosity ~directory ~name =
+    (backend : (module DRIVER with type config = string * verbosity)) ~directory
+    ~name =
   let output_dir =
     (* If [PROFILING_OUTPUT_DIR] environment variable is set, it overwrites the
        directory provided by the application *)

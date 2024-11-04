@@ -33,9 +33,7 @@ val max_verbosity : Profiler.verbosity
     Note that these profilers add [_profiling.txt] or [_profiling.json]
     suffix to the file name. *)
 val register_backend :
-  string list ->
-  (Profiler.verbosity -> directory:string -> name:string -> Profiler.instance) ->
-  unit
+  string list -> (directory:string -> name:string -> Profiler.instance) -> unit
 
 (** [selected_backend ()] returns the backend selected using the environment
     variable [PROFILING_BACKEND]. *)
