@@ -218,7 +218,11 @@ type reveal =
   | Reveal_raw_data of Sc_rollup_reveal_hash.t
   | Reveal_metadata
   | Request_dal_page of Dal_slot_repr.Page.t
-  | Request_adal_page of unit (* TODO in next commit *)
+  | Request_adal_page of {
+      page_id : Dal_slot_repr.Page.t;
+      min_attested_shards : int;
+      expected_total_shards : int;
+    }
   | Reveal_dal_parameters
       (** Request DAL parameters that were used for the slots published at
           the current inbox level. *)
@@ -265,9 +269,18 @@ let reveal_encoding =
     case
       ~title:"Request_adaptive_dal_page"
       (Tag 4)
-      (obj2 (kind "request_adaptive_dal_page") (req "todo" Data_encoding.unit))
-      (function Request_adal_page () -> Some ((), ()) | _ -> None)
-      (fun ((), ()) -> Request_adal_page ())
+      (obj4
+         (kind "request_adaptive_dal_page")
+         (req "page_id" Dal_slot_repr.Page.encoding)
+         (req "min_attested_shards" Data_encoding.uint16)
+         (req "expected_total_shards" Data_encoding.uint16))
+      (function
+        | Request_adal_page
+            {page_id; min_attested_shards; expected_total_shards} ->
+            Some ((), page_id, min_attested_shards, expected_total_shards)
+        | _ -> None)
+      (fun ((), page_id, min_attested_shards, expected_total_shards) ->
+        Request_adal_page {page_id; min_attested_shards; expected_total_shards})
   in
   union
     [
@@ -363,7 +376,14 @@ let pp_reveal fmt = function
   | Reveal_raw_data hash -> Sc_rollup_reveal_hash.pp fmt hash
   | Reveal_metadata -> Format.pp_print_string fmt "Reveal metadata"
   | Request_dal_page id -> Format.fprintf fmt "DAL:%a" Dal_slot_repr.Page.pp id
-  | Request_adal_page () -> Format.fprintf fmt "ADAL:TODO"
+  | Request_adal_page {page_id; min_attested_shards; expected_total_shards} ->
+      Format.fprintf
+        fmt
+        "ADAL:{page:%a; min_attested_shards:%d; expected_total_shards:%d}"
+        Dal_slot_repr.Page.pp
+        page_id
+        min_attested_shards
+        expected_total_shards
   | Reveal_dal_parameters -> Format.pp_print_string fmt "Reveal DAL parameters"
 
 (** [pp_input_request fmt i] pretty prints the given input [i] to the formatter
@@ -391,7 +411,11 @@ let reveal_equal p1 p2 =
   | Reveal_metadata, _ -> false
   | Request_dal_page a, Request_dal_page b -> Dal_slot_repr.Page.equal a b
   | Request_dal_page _, _ -> false
-  | Request_adal_page (), Request_adal_page () -> true
+  | ( Request_adal_page {page_id; min_attested_shards; expected_total_shards},
+      Request_adal_page b ) ->
+      Dal_slot_repr.Page.equal page_id b.page_id
+      && Compare.Int.equal min_attested_shards b.min_attested_shards
+      && Compare.Int.equal expected_total_shards b.expected_total_shards
   | Request_adal_page _, _ -> false
   | Reveal_dal_parameters, Reveal_dal_parameters -> true
   | Reveal_dal_parameters, _ -> false
