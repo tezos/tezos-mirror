@@ -9,7 +9,7 @@ open Profiler
 module BackendMap = Map.Make (String)
 
 let registered_backends :
-    (directory:string -> name:string -> instance) BackendMap.t ref =
+    (directory:string -> name:string -> instance option) BackendMap.t ref =
   ref BackendMap.empty
 
 let max_verbosity =
@@ -88,9 +88,11 @@ let profiler ?(suffix = "")
         Tezos_stdlib_unix.Utils.create_dir ~perm:0o777 output_dir ;
         output_dir
   in
-  Profiler.instance
-    backend
-    Filename.Infix.(output_dir // (name ^ "_profiling" ^ suffix), max_verbosity)
+  Some
+    (Profiler.instance
+       backend
+       Filename.Infix.
+         (output_dir // (name ^ "_profiling" ^ suffix), max_verbosity))
 
 let () =
   register_backend

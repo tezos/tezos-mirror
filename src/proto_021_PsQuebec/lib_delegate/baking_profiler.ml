@@ -24,12 +24,20 @@ let all_profilers =
     ("baker", baker_profiler);
   ]
 
-let init profiler_maker =
-  List.iter (fun (name, p) -> plug p (profiler_maker ~name)) all_profilers ;
-  (* This environment profiler was added to get insights on the signature checking. *)
-  plug
-    Tezos_protocol_environment.Environment_profiler.environment_profiler
-    (profiler_maker ~name:"baker")
+let activate_all ~profiler_maker =
+  List.iter
+    (fun (name, p) ->
+      match profiler_maker ~name with
+      | Some instance ->
+          plug p instance ;
+          (* This environment profiler was added to get insights on the signature checking. *)
+          if name = "baker" then
+            plug
+              Tezos_protocol_environment.Environment_profiler
+              .environment_profiler
+              instance
+      | None -> ())
+    all_profilers
 
 let create_reset_block_section =
   Profiler.section_maker Block_hash.equal Block_hash.to_b58check

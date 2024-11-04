@@ -45,4 +45,9 @@ let all_profilers =
   ]
 
 let activate_all ~profiler_maker =
-  List.iter (fun (name, p) -> plug p (profiler_maker ~name)) all_profilers
+  List.iter
+    (fun (name, p) ->
+      match profiler_maker ~name with
+      | Some instance -> plug p instance
+      | None -> ())
+    all_profilers
