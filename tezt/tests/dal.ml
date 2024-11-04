@@ -4827,24 +4827,50 @@ let test_attestation_through_p2p _protocol dal_parameters _cryptobox node client
   unit
 
 module History_rpcs = struct
-  let scenario ~slot_index ~first_cell_level ~first_dal_level
-      ~last_confirmed_published_level ~initial_blocks_to_bake protocol
-      dal_parameters client node dal_node =
+  (* In the following function, no migration is performed (expect from genesis
+     to alpha) when [migration_level] is equal to or smaller than 1. *)
+  let scenario ?(migration_level = 1) ~slot_index ~first_cell_level
+      ~first_dal_level ~last_confirmed_published_level protocol dal_parameters
+      client node dal_node =
+    let module Map_int = Map.Make (Int) in
     Log.info "slot_index = %d" slot_index ;
     let client = Client.with_dal_node client ~dal_node in
     let slot_size = dal_parameters.Dal.Parameters.cryptobox.slot_size in
+    let* starting_level = Client.level client in
 
-    (* [bake_for ~count] doesn't work across the migration block, so we bake in
-       two steps *)
-    let* () =
-      if initial_blocks_to_bake > 0 then
-        bake_for ~count:initial_blocks_to_bake client
-      else unit
+    let rec publish ~max_level level commitments =
+      (* Try to publish a slot at each level *)
+      if level > max_level then return commitments
+      else
+        let published_level = level + 1 in
+        let* commitment =
+          Helpers.publish_and_store_slot
+            client
+            dal_node
+            Constant.bootstrap1
+            ~index:slot_index
+            ~force:true
+          @@ Helpers.make_slot ~slot_size ("slot " ^ string_of_int level)
+        in
+        Log.info
+          "Publish commitment %s at published_level %d@."
+          commitment
+          published_level ;
+        let* () = bake_for client in
+        let* _level = Node.wait_for_level node (level + 1) in
+        publish
+          ~max_level
+          (level + 1)
+          (Map_int.add published_level commitment commitments)
     in
-    let* () = bake_for client in
+    Log.info "Publishing some commitments in the previous protocol@." ;
+    let* commitments =
+      publish ~max_level:migration_level starting_level Map_int.empty
+    in
 
     let* dal_parameters = Dal.Parameters.from_client client in
     let lag = dal_parameters.attestation_lag in
+
     let number_of_slots = dal_parameters.number_of_slots in
     Log.info "attestation_lag = %d, number_of_slots = %d" lag number_of_slots ;
 
@@ -4857,28 +4883,9 @@ module History_rpcs = struct
       wait_for_layer1_final_block dal_node last_attested_level
     in
 
-    let* first_level = Client.level client in
-    Log.info "No slot published at level %d" first_level ;
-    Log.info "Publishing slots and baking up to level %d" max_level ;
-    let rec publish level commitments =
-      (* Try to publish a slot at each level *)
-      if level > max_level then return @@ List.rev commitments
-      else
-        let* commitment =
-          Helpers.publish_and_store_slot
-            client
-            dal_node
-            Constant.bootstrap1
-            ~index:slot_index
-            ~force:true
-          @@ Helpers.make_slot ~slot_size ("slot " ^ string_of_int level)
-        in
-        let* () = bake_for client in
-        let* _level = Node.wait_for_level node (level + 1) in
-        publish (level + 1) (commitment :: commitments)
-    in
-    let* commitments = publish first_level [] in
-    let commitments = Array.of_list commitments in
+    let* first_level_new_proto = Client.level client in
+    Log.info "Publishing some commitments in the new protocol@." ;
+    let* commitments = publish ~max_level first_level_new_proto commitments in
 
     let module SeenIndexes = Set.Make (struct
       type t = int
@@ -4946,8 +4953,30 @@ module History_rpcs = struct
         let content_is_legacy =
           cell_kind = "attested" || cell_kind = "unattested"
         in
+        let published_or_attested cell_level =
+          (*
+             - Cond 1 : we publish at [slot_index]
+
+             - Cond 2: the (published) [cell_level] is greater than
+             [starting_level]
+
+             - Cond 3: either the cell is published in the new protocol
+             ([>=first_level_new_proto]) or in the previous protocol, but
+             [attestation_lag] before the activation of the new one. In fact,
+             for the migration, we invalidate all publications in the previous
+             protocol that would be attested in the new one.
+
+             ADAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/7554
+
+             The second part of Cond 3 needs to be adapted when the migration
+             test is from protocol R to Alpha. *)
+          cell_slot_index = slot_index
+          && cell_level > starting_level
+          && (cell_level >= first_level_new_proto
+             || cell_level < first_level_new_proto - lag)
+        in
         let expected_kind =
-          if cell_level <= first_level || cell_slot_index != slot_index then
+          if not (published_or_attested cell_level) then
             if content_is_legacy then "unattested" else "unpublished"
           else (
             at_least_one_attested_status := true ;
@@ -4960,7 +4989,7 @@ module History_rpcs = struct
         (if cell_kind = "published" || cell_kind = "attested" then
            let commitment = JSON.(content |-> "commitment" |> as_string) in
            Check.(
-             (commitment = commitments.(cell_level - (first_level + 1)))
+             (commitment = Map_int.find cell_level commitments)
                string
                ~error_msg:"Unexpected commitment: got %L, expected %R")) ;
         let back_pointers =
@@ -5020,7 +5049,6 @@ module History_rpcs = struct
           ~first_cell_level:0
           ~first_dal_level:1
           ~last_confirmed_published_level:3
-          ~initial_blocks_to_bake:0
           protocol
           dal_parameters
           node
@@ -5069,13 +5097,12 @@ module History_rpcs = struct
          doesn't have the DAL activated. *)
       (* We'll have 3 levels with a published and attested slot. *)
       let last_confirmed_published_level = migration_level + 3 in
-      let initial_blocks_to_bake = migration_level - 1 in
       scenario
         ~slot_index
         ~first_cell_level:0
         ~first_dal_level:1
         ~last_confirmed_published_level
-        ~initial_blocks_to_bake
+        ~migration_level
         migrate_to
         dal_parameters
     in
