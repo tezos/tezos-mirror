@@ -687,6 +687,51 @@ let upgrade_from_v0_to_v1 ~base_dir =
   in
   Event.(emit store_upgraded (Version.make 0, Version.make 1))
 
+let upgrade_from_v1_to_v2 ~base_dir =
+  let open Lwt_result_syntax in
+  let*! () =
+    Event.(emit store_upgrade_start (Version.make 1, Version.make 2))
+  in
+  (* Initialize both stores and migrate. *)
+  let* kvs_store = init_skip_list_cells_store base_dir in
+  let* sql_store =
+    Dal_store_sqlite3.init ~data_dir:base_dir ~perm:`Read_write ()
+  in
+  let* storage_backend_store = Storage_backend.init ~root_dir:base_dir in
+  let*! res = Store_migrations.migrate_skip_list_store kvs_store sql_store in
+  let* () = Kvs_skip_list_cells_store.close kvs_store in
+  match res with
+  | Ok () ->
+      (* Set the new storage backend to sqlite3. *)
+      let* (_ : Storage_backend.kind) =
+        Storage_backend.set
+          storage_backend_store
+          ~sqlite3_backend:true
+          ~force:true
+      in
+      (* Remove the Stores_dirs.skip_list_cells directory. *)
+      let*! () =
+        Lwt_utils_unix.remove_dir
+          Filename.Infix.(base_dir // Stores_dirs.skip_list_cells)
+      in
+      (* The storage upgrade has been done. *)
+      let*! () = Event.(emit store_upgraded (Version.make 1, Version.make 2)) in
+      return_unit
+  | Error err ->
+      (* Clean the sqlite store unless the storage backend was already set to sqlite. *)
+      let* storage_backend = Storage_backend.load storage_backend_store in
+      let*! () =
+        match storage_backend with
+        | None | Some Legacy ->
+            Lwt_utils_unix.remove_dir
+              Filename.Infix.(base_dir // Dal_store_sqlite3.sqlite_file_name)
+        | Some SQLite3 -> Lwt.return_unit
+      in
+      (* The store upgrade failed. *)
+      let*! () = Event.(emit store_upgrade_error ()) in
+      Format.eprintf "%a" Error_monad.pp_print_trace err ;
+      fail err
+
 (* Returns [upgradable old_version new_version] returns an upgrade function if
    the store is upgradable from [old_version] to [new_version]. Otherwise it
    returns [None]. *)
