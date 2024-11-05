@@ -91,6 +91,10 @@ type t = Worker.dropbox Worker.t
 
 let metrics = Shell_metrics.Peer_validator.init Name.base
 
+let get_last_advertised_head w =
+  let pv = Worker.state w in
+  pv.last_advertised_head
+
 let bootstrap_new_branch w unknown_prefix =
   let open Lwt_result_syntax in
   let pv = Worker.state w in

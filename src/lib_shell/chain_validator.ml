@@ -1063,6 +1063,25 @@ let force_bootstrapped w b =
     state.synchronisation_state
     b
 
+let active_peers_heads w =
+  let open Lwt_syntax in
+  let state = Worker.state w in
+  P2p_peer.Error_table.fold_promises
+    (fun peer_id pv acc ->
+      let* acc in
+      let* pv in
+      match pv with
+      | Error _ ->
+          (* Ignoring peer validators with error status. *) Lwt.return acc
+      | Ok pv ->
+          let block_hash, head = Peer_validator.get_last_advertised_head pv in
+          Lwt.return
+            (Chain_services.
+               {peer_id; block_hash; block_level = head.shell.level}
+            :: acc))
+    state.active_peers
+    Lwt.return_nil
+
 let received_block_watcher w =
   let {received_block_input; _} = Worker.state w in
   Lwt_watcher.create_stream received_block_input
