@@ -11,6 +11,11 @@ let mempool_profiler = unplugged ()
 
 let store_profiler = unplugged ()
 
+(** [merge_profiler] needs to be distinct from {!store_profiler} because
+    {!Block_store.merge_stores} creates an asynchronous thread where
+    [merge_profiler] is used. *)
+let merge_profiler = unplugged ()
+
 let chain_validator_profiler = unplugged ()
 
 let block_validator_profiler = unplugged ()
@@ -19,8 +24,6 @@ let rpc_server_profiler = unplugged ()
 
 let create_reset_block_section =
   Profiler.section_maker Block_hash.equal Block_hash.to_b58check
-
-let merge_profiler = unplugged ()
 
 let p2p_reader_profiler = unplugged ()
 
