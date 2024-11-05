@@ -355,6 +355,7 @@ let apply_transaction_to_implicit ~ctxt ~sender ~amount ~pkh ~before_operation =
   let*? () = error_when Tez.(amount = zero) (Empty_transaction contract) in
   (* If the implicit contract is not yet allocated at this point then
      the next transfer of tokens will allocate it. *)
+  let*? ctxt = Gas.consume ctxt Michelson_v1_gas.Cost_of.transfer_operation in
   let*! already_allocated = Contract.allocated ctxt contract in
   let* ctxt, balance_updates =
     Token.transfer ctxt (`Contract sender) (`Contract contract) amount
@@ -544,6 +545,7 @@ let transfer_from_any_address ctxt sender destination amount =
 let apply_transaction_to_implicit_with_ticket ~sender ~destination ~ty ~ticket
     ~amount ~before_operation ctxt =
   let open Lwt_result_syntax in
+  let*? ctxt = Gas.consume ctxt Michelson_v1_gas.Cost_of.transfer_operation in
   let destination = Contract.Implicit destination in
   let*! already_allocated = Contract.allocated ctxt destination in
   let ex_token, ticket_amount =

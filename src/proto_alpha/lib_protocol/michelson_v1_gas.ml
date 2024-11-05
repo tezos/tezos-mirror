@@ -42,6 +42,10 @@ module Cost_of = struct
 
   let manager_operation = step_cost @@ S.safe_int manager_operation_int
 
+  let transfer_operation_int = 2000
+
+  let transfer_operation = step_cost @@ S.safe_int transfer_operation_int
+
   module Interpreter = struct
     open Michelson_v1_gas_costs
 
