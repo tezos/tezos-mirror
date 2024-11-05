@@ -67,13 +67,14 @@ let test_versions commands =
   let node = Node.create [] in
   let* node_version = Node.get_version node in
   let loop cmd =
+    let executable_name = Filename.basename (Uses.path cmd) in
     Log.info
       "Check that %s supports %s as version flag, and returns version %s."
-      (Uses.path cmd)
+      executable_name
       version_flag
       node_version ;
     let* r = spawn_command cmd in
-    let error_msg = "%s: expected version %L, got version %R" in
+    let error_msg = executable_name ^ ": expected version %L, got version %R" in
     Check.((node_version = String.trim r) ~__LOC__ string ~error_msg) ;
     unit
   in
