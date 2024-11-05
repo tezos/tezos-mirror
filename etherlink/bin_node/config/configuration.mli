@@ -64,6 +64,7 @@ type experimental_features = {
   overwrite_simulation_tick_limit : bool;
   garbage_collector : garbage_collector option;
   next_wasm_runtime : bool;
+  enable_websocket : bool;
 }
 
 type sequencer = {
