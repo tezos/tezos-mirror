@@ -333,7 +333,9 @@ let partition_unrevealed_nonces {cctxt; chain; _} nonces current_cycle
                 (Alpha_services.Nonce.get
                    cctxt
                    (chain, `Head 0)
-                   level [@profiler.aggregate_s "get nonce information"])
+                   level
+                 [@profiler.aggregate_s
+                   {verbosity = Debug} "get nonce information"])
               in
               match (nonce_state, nonce_info) with
               | Committed, Missing expected_nonce_hash
@@ -406,10 +408,12 @@ let register_nonce (cctxt : #Protocol_client_context.full) ~chain_id block_hash
    let orphaned_location =
      Baking_files.resolve_location ~chain_id `Orphaned_nonce
    in
-   () [@profiler.record_f "waiting lock"] ;
+   () [@profiler.record_f {verbosity = Info} "waiting lock"] ;
    cctxt#with_lock @@ fun () ->
    let* nonces =
-     (load cctxt ~stateful_location [@profiler.record_s "load nonces"])
+     (load
+        cctxt
+        ~stateful_location [@profiler.record_s {verbosity = Info} "load nonces"])
    in
    let nonces =
      (add
@@ -422,15 +426,15 @@ let register_nonce (cctxt : #Protocol_client_context.full) ~chain_id block_hash
           level;
           round = Some round;
           nonce_state = Committed;
-        } [@profiler.record_f "add nonces"])
+        } [@profiler.record_f {verbosity = Info} "add nonces"])
    in
    (save
       cctxt
       ~legacy_location
       ~stateful_location
       nonces
-      ~orphaned_location [@profiler.record_s "save nonces"]))
-  [@profiler.record_s "register nonce"]
+      ~orphaned_location [@profiler.record_s {verbosity = Info} "save nonces"]))
+  [@profiler.record_s {verbosity = Notice} "register nonce"]
 
 (** [inject_seed_nonce_revelation cctxt ~chain ~block ~branch nonces] forges one 
     [Seed_nonce_revelation] operation per each nonce to be revealed, together with
@@ -452,7 +456,9 @@ let inject_seed_nonce_revelation (cctxt : #Protocol_client_context.full) ~chain
                ~branch
                ~level
                ~nonce
-               () [@profiler.aggregate_s "forge seed nonce revelation"])
+               ()
+             [@profiler.aggregate_s
+               {verbosity = Debug} "forge seed nonce revelation"])
           in
           let bytes = Signature.concat bytes Signature.zero in
           let* oph =
@@ -460,7 +466,9 @@ let inject_seed_nonce_revelation (cctxt : #Protocol_client_context.full) ~chain
                ~async:true
                cctxt
                ~chain
-               bytes [@profiler.aggregate_s "inject seed nonce revelation"])
+               bytes
+             [@profiler.aggregate_s
+               {verbosity = Debug} "inject seed nonce revelation"])
           in
           let*! () =
             Events.(
@@ -497,10 +505,13 @@ let reveal_potential_nonces state new_proposal =
     let block = `Head 0 in
     let branch = new_predecessor_hash in
     (* improve concurrency *)
-    () [@profiler.record_f "waiting lock"] ;
+    () [@profiler.record_f {verbosity = Info} "waiting lock"] ;
     cctxt#with_lock @@ fun () ->
     let*! nonces =
-      (load cctxt ~stateful_location [@profiler.record_s "load nonce file"])
+      (load
+         cctxt
+         ~stateful_location
+       [@profiler.record_s {verbosity = Info} "load nonce file"])
     in
     match nonces with
     | Error err ->
@@ -515,7 +526,8 @@ let reveal_potential_nonces state new_proposal =
              state
              nonces
              cycle
-             level [@profiler.record_s "partition unrevealed nonces"])
+             level
+           [@profiler.record_s {verbosity = Info} "partition unrevealed nonces"])
         in
         match partitioned_nonces with
         | Error err ->
@@ -537,7 +549,8 @@ let reveal_potential_nonces state new_proposal =
                    ~block
                    ~branch
                    prepared_nonces
-                 [@profiler.record_s "inject seed nonce revelation"])
+                 [@profiler.record_s
+                   {verbosity = Info} "inject seed nonce revelation"])
               in
               match result with
               | Error err ->
@@ -561,7 +574,8 @@ let reveal_potential_nonces state new_proposal =
                      ~legacy_location
                      ~stateful_location
                      ~orphaned_location
-                     updated_nonces [@profiler.record_s "save nonces"]))))
+                     updated_nonces
+                   [@profiler.record_s {verbosity = Info} "save nonces"]))))
   else return_unit
 
 (* We suppose that the block stream is cloned by the caller *)
@@ -607,14 +621,16 @@ let start_revelation_worker cctxt config chain_id constants block_stream =
         Option.iter (fun _ -> (() [@profiler.stop])) !last_proposal ;
         ()
         [@profiler.record
-          Block_hash.to_b58check new_proposal.Baking_state.block.hash] ;
+          {verbosity = Notice}
+            (Block_hash.to_b58check new_proposal.Baking_state.block.hash)] ;
         last_proposal := Some new_proposal.Baking_state.block.hash ;
         if !should_shutdown then return_unit
         else
           let* _ =
             (reveal_potential_nonces
                state
-               new_proposal [@profiler.record_s "reveal potential nonces"])
+               new_proposal
+             [@profiler.record_s {verbosity = Notice} "reveal potential nonces"])
           in
           worker_loop ()
   in
