@@ -349,7 +349,7 @@ module For_RPC = struct
     in
     let* unstaked_frozen =
       let* result =
-        Unstake_requests_storage.prepare_finalize_unstake
+        Unstake_requests_storage.For_RPC.prepare_finalize_unstake
           ctxt
           (Contract_repr.Implicit delegate)
       in

@@ -46,33 +46,6 @@ type finalizable =
 
 type transfer_result = Raw_context.t * Receipt_repr.balance_update_item list
 
-type stored_requests = Storage.Unstake_request.t = {
-  delegate : Signature.Public_key_hash.t;
-  requests : (Cycle_repr.t * Tez_repr.t) list;
-}
-
-type prepared_finalize_unstake = {
-  finalizable : finalizable;
-  unfinalizable : stored_requests;
-}
-
-val prepared_finalize_unstake_encoding :
-  prepared_finalize_unstake Data_encoding.encoding
-
-(** [prepare_finalize_unstake ctxt contract]
-    preprocesses a [finalize_unstake] for [contract]. It returns a
-    list of transfers [(d, c, a)] to do from delegate's [d] unstaked frozen
-    deposits for cycle [c] of amount [a] in the [finalizable_field] as well as
-    the remaining unfinalizable requests that should be kept in the storage in
-    [unfinalizable].
-
-    It returns [None] if there are no unstake requests.
-*)
-val prepare_finalize_unstake :
-  Raw_context.t ->
-  Contract_repr.t ->
-  prepared_finalize_unstake option tzresult Lwt.t
-
 (** [handle_finalizable_and_clear ctxt ~check_delegate_of_unfinalizable_requests ~handle_finalizable contract] will update the storage
     by removing all finalizable unstake request and calling [handle_finalizable]
     on each of them.
@@ -147,6 +120,33 @@ val add :
 
 (** Slow functions only used for RPCs *)
 module For_RPC : sig
+  type stored_requests = Storage.Unstake_request.t = {
+    delegate : Signature.Public_key_hash.t;
+    requests : (Cycle_repr.t * Tez_repr.t) list;
+  }
+
+  type prepared_finalize_unstake = {
+    finalizable : finalizable;
+    unfinalizable : stored_requests;
+  }
+
+  val prepared_finalize_unstake_encoding :
+    prepared_finalize_unstake Data_encoding.encoding
+
+  (** [prepare_finalize_unstake ctxt contract]
+    preprocesses a [finalize_unstake] for [contract]. It returns a
+    list of transfers [(d, c, a)] to do from delegate's [d] unstaked frozen
+    deposits for cycle [c] of amount [a] in the [finalizable_field] as well as
+    the remaining unfinalizable requests that should be kept in the storage in
+    [unfinalizable].
+
+    It returns [None] if there are no unstake requests.
+  *)
+  val prepare_finalize_unstake :
+    Raw_context.t ->
+    Contract_repr.t ->
+    prepared_finalize_unstake option tzresult Lwt.t
+
   (** Apply current slash history to unfinalizable unstake requests.
       [prepare_finalize_unstake] does not compute this value because it is never
       used internally. However, we need to apply slashes anyways when trying to

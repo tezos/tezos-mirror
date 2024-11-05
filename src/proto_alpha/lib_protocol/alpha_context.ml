@@ -747,6 +747,8 @@ module Unstake_requests = struct
   include Unstake_requests_storage
 
   module For_RPC = struct
+    include Unstake_requests_storage.For_RPC
+
     let apply_slash_to_unstaked_unfinalizable ctxt ~delegate ~requests =
       Unstake_requests_storage.For_RPC.apply_slash_to_unstaked_unfinalizable
         ctxt

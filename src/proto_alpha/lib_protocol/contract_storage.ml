@@ -881,7 +881,9 @@ module For_RPC = struct
     | Contract_repr.Originated _ -> return_none
     | Implicit _ as contract -> (
         let* result =
-          Unstake_requests_storage.prepare_finalize_unstake ctxt contract
+          Unstake_requests_storage.For_RPC.prepare_finalize_unstake
+            ctxt
+            contract
         in
         match result with
         | None -> return_some (Tez_repr.zero, Tez_repr.zero)

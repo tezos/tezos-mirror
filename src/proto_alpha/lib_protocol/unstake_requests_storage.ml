@@ -426,11 +426,25 @@ let remove_from_unfinalizable_requests_and_finalize ctxt ~contract ~delegate
           ( (ctxt, balance_updates @ balance_updates_finalisation),
             remaining_amount_to_transfer )
 
-let prepare_finalize_unstake =
-  prepare_finalize_unstake_uncarbonated
-    ~check_delegate_of_unfinalizable_requests:(fun _ -> return_unit)
-
 module For_RPC = struct
+  type nonrec prepared_finalize_unstake = prepared_finalize_unstake = {
+    finalizable : finalizable;
+    unfinalizable : stored_requests;
+  }
+
+  type nonrec stored_requests = stored_requests = {
+    delegate : Signature.Public_key_hash.t;
+    requests : (Cycle_repr.t * Tez_repr.t) list;
+  }
+
+  let prepared_finalize_unstake_encoding :
+      prepared_finalize_unstake Data_encoding.t =
+    prepared_finalize_unstake_encoding
+
+  let prepare_finalize_unstake =
+    prepare_finalize_unstake_uncarbonated
+      ~check_delegate_of_unfinalizable_requests:(fun _ -> return_unit)
+
   let apply_slash_to_unstaked_unfinalizable ctxt {requests; delegate} =
     let open Lwt_result_syntax in
     let slashable_deposits_period =

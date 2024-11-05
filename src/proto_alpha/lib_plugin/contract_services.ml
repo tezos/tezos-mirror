@@ -146,7 +146,8 @@ module S = struct
          spendable balance with a [finalize_unstake] operation call. Returns \
          None if there is no unstake request pending."
       ~query:RPC_query.empty
-      ~output:(option Unstake_requests.prepared_finalize_unstake_encoding)
+      ~output:
+        (option Unstake_requests.For_RPC.prepared_finalize_unstake_encoding)
       RPC_path.(custom_root /: Contract.rpc_arg / "unstake_requests")
 
   let full_balance =
@@ -520,17 +521,17 @@ let register () =
     Contract.For_RPC.get_unstaked_finalizable_balance ;
   register_field ~chunked:false S.full_balance Contract.For_RPC.get_full_balance ;
   register1 ~chunked:false S.unstake_requests (fun ctxt contract () () ->
-      let* result = Unstake_requests.prepare_finalize_unstake ctxt contract in
+      let open Unstake_requests.For_RPC in
+      let* result = prepare_finalize_unstake ctxt contract in
       match result with
       | None -> return_none
       | Some {finalizable; unfinalizable} ->
           let* unfinalizable =
-            Unstake_requests.For_RPC
-            .apply_slash_to_unstaked_unfinalizable_stored_requests
+            apply_slash_to_unstaked_unfinalizable_stored_requests
               ctxt
               unfinalizable
           in
-          return_some Unstake_requests.{finalizable; unfinalizable}) ;
+          return_some {finalizable; unfinalizable}) ;
   opt_register1 ~chunked:false S.manager_key (fun ctxt contract () () ->
       match contract with
       | Originated _ -> return_none
