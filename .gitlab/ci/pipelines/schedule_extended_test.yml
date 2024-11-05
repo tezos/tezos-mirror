@@ -755,6 +755,29 @@ build_octez_source:
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
 
+build_grafazos_dashboards:
+  image: ${jsonnet_image_name}:${jsonnet_image_tag}
+  stage: build
+  tags:
+  - gcp
+  rules:
+  - when: always
+  dependencies:
+  - oc.docker:jsonnet:amd64
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - cd grafazos/
+  - jb install github.com/grafana/grafonnet/gen/grafonnet-v11.1.0@1ce5aec
+  script:
+  - make
+  artifacts:
+    name: grafazos-dashboards
+    expire_in: 1 day
+    paths:
+    - grafazos/output/**/*.json
+    when: on_success
+
 oc.build:rpm:amd64:
   image: $DISTRIBUTION
   stage: build

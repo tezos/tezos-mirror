@@ -725,6 +725,22 @@ let jobs pipeline_type =
         ]
       |> enable_cargo_cache |> enable_sccache
     in
+    let job_build_grafazos =
+      match pipeline_type with
+      | Merge_train | Before_merging ->
+          Common.job_build_grafazos
+            ~rules:
+              [
+                job_rule
+                  ~when_:Always
+                  ~changes:(Changeset.encode changeset_grafazos)
+                  ();
+                job_rule ~when_:Manual ();
+              ]
+            ()
+      | Schedule_extended_test ->
+          Common.job_build_grafazos ~rules:[job_rule ~when_:Always ()] ()
+    in
     [
       job_build_arm64_release;
       job_build_arm64_exp_dev_extra;
@@ -737,6 +753,7 @@ let jobs pipeline_type =
       job_build_dsn_node;
       job_tezt_fetch_records;
       build_octez_source;
+      job_build_grafazos;
     ]
     @ Option.to_list job_select_tezts
     @ bin_packages_jobs
@@ -1820,7 +1837,6 @@ let jobs pipeline_type =
             job_docker_arm64_test_manual;
             job_build_rpm_amd64_manual;
             job_build_homebrew_manual;
-            job_build_grafazos;
           ]
           @ [job_docker_verify_test_arm64; job_docker_verify_test_amd64]
         in
