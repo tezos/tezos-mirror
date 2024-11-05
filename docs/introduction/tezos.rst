@@ -20,9 +20,7 @@ is available at https://gitlab.com/tezos/tezos.
 
 This website contains technical documentation about both Octez and the Tezos protocol.
 
-The current release of Octez is :doc:`../releases/version-20`.
-
-Two release candidates are also available for :doc:`../releases/version-21`.
+The current release of Octez is :doc:`../releases/version-21`.
 
 For installing instructions, see :doc:`./howtoget`.
 
