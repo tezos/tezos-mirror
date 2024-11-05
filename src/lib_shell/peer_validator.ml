@@ -156,8 +156,11 @@ let only_if_fitness_increases w distant_header hash cont =
       cont `Lower_fitness)
     else cont `Ok
 
-let[@warning "-32"] profiling_new_head_prefix hash info =
+let profiling_new_head_prefix hash info =
   Format.sprintf "New head : %s" (Block_hash.to_short_b58check hash) :: info
+
+let[@warning "-32"] profiling_validate_new_head_prefix hash info =
+  profiling_new_head_prefix hash ("validate_new_head" :: info)
 
 let validate_new_head w hash (header : Block_header.t) =
   let open Lwt_result_syntax in
@@ -177,9 +180,7 @@ let validate_new_head w hash (header : Block_header.t) =
         (0 -- (header.shell.validation_passes - 1))
       [@profiler.span_s
         {verbosity = Debug}
-          (profiling_new_head_prefix
-             hash
-             ["validate_new_head"; "operation fetching"])])
+          (profiling_validate_new_head_prefix hash ["operation fetching"])])
    in
    (* We redo a check for the fitness here because while waiting for the
       operations, a new head better than this block might be validated. *)
@@ -196,9 +197,9 @@ let validate_new_head w hash (header : Block_header.t) =
         return_unit)
        [@profiler.span_s
          {verbosity = Debug}
-           (profiling_new_head_prefix
+           (profiling_validate_new_head_prefix
               hash
-              ["validate_new_head"; "fitness does not increase"])]
+              ["fitness does not increase"])]
    | `Ok -> (
        (let*! () =
           Events.(emit requesting_new_head_validation) block_received
@@ -214,13 +215,9 @@ let validate_new_head w hash (header : Block_header.t) =
              operations
            [@profiler.span_s
              {verbosity = Debug}
-               (profiling_new_head_prefix
+               (profiling_validate_new_head_prefix
                   hash
-                  [
-                    "validate_new_head";
-                    "fitness increases";
-                    "validate_and_apply";
-                  ])])
+                  ["fitness increases"; "validate_and_apply"])])
         in
         match v with
         | Invalid errs ->
@@ -246,11 +243,8 @@ let validate_new_head w hash (header : Block_header.t) =
             return_unit)
        [@profiler.span_s
          {verbosity = Debug}
-           (profiling_new_head_prefix
-              hash
-              ["validate_new_head"; "fitness increases"])]))
-  [@profiler.span_s
-    {verbosity = Info} (profiling_new_head_prefix hash ["validate_new_head"])]
+           (profiling_validate_new_head_prefix hash ["fitness increases"])]))
+  [@profiler.span_s {verbosity = Info} (profiling_new_head_prefix hash [])]
 
 let assert_acceptable_head w hash (header : Block_header.t) =
   let open Lwt_result_syntax in
