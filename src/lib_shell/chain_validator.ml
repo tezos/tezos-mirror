@@ -471,6 +471,7 @@ let reset_profilers block =
       [
         p2p_reader_profiler;
         requester_profiler;
+        block_validator_profiler;
         chain_validator_profiler;
         rpc_server_profiler;
         Tezos_protocol_environment.Environment_profiler.context_ops_profiler;
