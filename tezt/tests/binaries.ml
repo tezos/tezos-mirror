@@ -36,12 +36,17 @@
    module, e.g. by exporting make_argument. *)
 let version_flag = "--version"
 
+let version_rex = rex "^[a-f0-9]+ \\([^()]*\\) \\([^()]*\\)\n$"
+
 (* TODO: tezos/tezos#4804
    Should we implement this via Component.run commands when possible?
 *)
-let spawn_command path =
-  let path = Uses.path path in
-  Process.run_and_read_stdout ("./" ^ path) [version_flag]
+let get_and_check_version executable =
+  let* version =
+    Process.run_and_read_stdout ("./" ^ Uses.path executable) [version_flag]
+  in
+  Check.(version =~ version_rex) ~error_msg:"expected version =~ %R, got %L" ;
+  return (String.trim version)
 
 let lookup_or_fail path =
   match Uses.lookup path with
@@ -64,8 +69,7 @@ let read_executable_list path =
   |> List.map lookup_or_fail
 
 let test_versions commands =
-  let node = Node.create [] in
-  let* node_version = Node.get_version node in
+  let* node_version = get_and_check_version Constant.octez_node in
   let loop cmd =
     let executable_name = Filename.basename (Uses.path cmd) in
     Log.info
@@ -73,9 +77,9 @@ let test_versions commands =
       executable_name
       version_flag
       node_version ;
-    let* r = spawn_command cmd in
+    let* r = get_and_check_version cmd in
     let error_msg = executable_name ^ ": expected version %L, got version %R" in
-    Check.((node_version = String.trim r) ~__LOC__ string ~error_msg) ;
+    Check.((node_version = r) ~__LOC__ string ~error_msg) ;
     unit
   in
   Lwt_list.iter_s loop commands
