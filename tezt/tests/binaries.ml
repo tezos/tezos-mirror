@@ -68,46 +68,35 @@ let read_executable_list path =
        && not (String.equal str "octez-node") )
   |> List.map lookup_or_fail
 
-let test_versions commands =
-  let* node_version = get_and_check_version Constant.octez_node in
-  let loop cmd =
-    let executable_name = Filename.basename (Uses.path cmd) in
-    Log.info
-      "Check that %s supports %s as version flag, and returns version %s."
-      executable_name
-      version_flag
-      node_version ;
-    let* r = get_and_check_version cmd in
-    let error_msg = executable_name ^ ": expected version %L, got version %R" in
-    Check.((node_version = r) ~__LOC__ string ~error_msg) ;
-    unit
+(* Test that all released and experimental executables support the --version flag,
+   and that they report the same version as the Octez node executable. *)
+let register_protocol_independent () =
+  let released_executables =
+    read_executable_list Constant.released_executables
   in
-  Lwt_list.iter_s loop commands
-
-(* Test that all released binaries support the --version flag, and
-   that they report the same version value as the Octez node. *)
-let test_released_versions () =
-  let executables = read_executable_list Constant.released_executables in
+  let experimental_executables =
+    read_executable_list Constant.experimental_executables
+  in
+  let executables = released_executables @ experimental_executables in
+  Fun.flip List.iter executables @@ fun executable ->
+  let executable_name = Filename.basename (Uses.path executable) in
+  let compare_with_executable = Constant.octez_node in
   Test.register
     ~__FILE__
-    ~title:"Released binaries: report consistent version"
-    ~tags:["binaries"; "released"; "node"; "baker"; "version"]
-    ~uses:executables
-  @@ fun () -> test_versions executables
-
-(* Test that all experimental binaries support the --version flag, and
-   that they report the same version value as the Octez node. *)
-let test_experimental_versions () =
-  let executables = read_executable_list Constant.experimental_executables in
-  Test.register
-    ~__FILE__
-    ~title:"Experimental binaries: report consistent version"
-    ~tags:["binaries"; "experimental"; "version"]
-    ~uses:executables
+    ~title:(executable_name ^ " --version")
+    ~tags:["version"]
+    ~uses:[executable; compare_with_executable]
+    ~uses_node:false
     ~uses_client:false
     ~uses_admin_client:false
-  @@ fun () -> test_versions executables
-
-let register_protocol_independent () =
-  test_released_versions () ;
-  test_experimental_versions ()
+  @@ fun () ->
+  let* expected_version = get_and_check_version compare_with_executable in
+  Log.info
+    "Check that %s supports %s as version flag, and returns version %s."
+    executable_name
+    version_flag
+    expected_version ;
+  let* version = get_and_check_version executable in
+  let error_msg = executable_name ^ ": expected version %R, got %L" in
+  Check.((version = expected_version) ~__LOC__ string ~error_msg) ;
+  unit
