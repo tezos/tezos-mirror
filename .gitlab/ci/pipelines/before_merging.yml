@@ -2687,6 +2687,56 @@ oc:scripts:release_script_values:
   script:
   - scripts/ci/test_release_values.sh
 
+mir_unit:
+  image: ${ci_image_name}/test:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp
+  rules:
+  - changes:
+    - .gitlab-ci.yml
+    - .gitlab/**/*
+    - contrib/mir/**/*
+    - images/**/*
+    when: on_success
+  needs:
+  - job: oc.docker:ci:amd64
+  - job: trigger
+  - job: datadog_pipeline_trace
+    optional: true
+  - job: sanity_ci
+    optional: true
+  - job: docker:hadolint
+    optional: true
+  - job: oc.ocaml_fmt
+    optional: true
+  - job: oc.semgrep
+    optional: true
+  - job: oc.misc_checks
+    optional: true
+  - job: check_jsonnet
+    optional: true
+  - job: check_rust_fmt
+    optional: true
+  - job: documentation:rst-check
+    optional: true
+  - job: nix
+    optional: true
+  - job: commit_titles
+    optional: true
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  cache:
+    key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  script:
+  - cargo test --manifest-path contrib/mir/Cargo.toml
+  variables:
+    CARGO_NET_OFFLINE: "false"
+
 test_kernels:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
   stage: test

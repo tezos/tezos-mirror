@@ -1561,6 +1561,17 @@ let jobs pipeline_type =
         job_test_evm_compatibility;
       ]
     in
+    let job_mir_unit =
+      job
+        ~__POS__
+        ~name:"mir_unit"
+        ~image:Images.CI.test
+        ~stage:Stages.test
+        ~dependencies:dependencies_needs_start
+        ~rules:(make_rules ~changes:changeset_mir ())
+        ["cargo test --manifest-path contrib/mir/Cargo.toml"]
+      |> enable_cargo_cache
+    in
     let jobs_misc =
       [
         job_kaitai_checks;
@@ -1574,6 +1585,7 @@ let jobs pipeline_type =
         job_oc_script_b58_prefix;
         job_oc_test_liquidity_baking_scripts;
         job_test_release_versions;
+        job_mir_unit;
       ]
     in
     let jobs_debian =
