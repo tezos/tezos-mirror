@@ -174,6 +174,7 @@ let register_protocol_tests_that_use_supports_correctly () =
   Normalize.register ~protocols ;
   Operations_liveness.register ~protocols ;
   Operation_size.register ~protocols ;
+  Operation_size_and_gas.register ~protocols ;
   Order_in_top_level.register ~protocols ;
   P2p.register ~protocols ;
   Prevalidator.register ~protocols ;
