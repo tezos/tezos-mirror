@@ -30,6 +30,11 @@
    Subject:      Perform global coherence tests across released and experimental binaries.
 *)
 
+(* Executables which use the version of octez-evm-node instead of octez-node.
+   If one day one adds script-inputs/octez-etherlink-executables or something,
+   it would be better to read this list from this file. *)
+let evm_executables = ["octez-evm-node"; "etherlink-governance-observer"]
+
 (* TODO: tezos/tezos#4769
 
    We should be able to get the Version flag string from the Node
@@ -69,7 +74,8 @@ let read_executable_list path =
   |> List.map lookup_or_fail
 
 (* Test that all released and experimental executables support the --version flag,
-   and that they report the same version as the Octez node executable. *)
+   and that they report the same version as the main node of the release
+   (Octez node or Octez EVM node). *)
 let register_protocol_independent () =
   let released_executables =
     read_executable_list Constant.released_executables
@@ -80,7 +86,10 @@ let register_protocol_independent () =
   let executables = released_executables @ experimental_executables in
   Fun.flip List.iter executables @@ fun executable ->
   let executable_name = Filename.basename (Uses.path executable) in
-  let compare_with_executable = Constant.octez_node in
+  let compare_with_executable =
+    if List.mem executable_name evm_executables then Constant.octez_evm_node
+    else Constant.octez_node
+  in
   Test.register
     ~__FILE__
     ~title:(executable_name ^ " --version")
