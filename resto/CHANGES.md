@@ -1,3 +1,7 @@
+dev
+
+* Fixed a file descriptor leak in the client when calling streamed RPCs.
+
 v1.2
 
 * Fixed streaming RPCs in servers to be closed as soon as the clients
@@ -40,7 +44,7 @@ v0.6/v0.6.1:
 * Split path before percentage-decoding chunks to allow slash's encoding to
   appear in chunks
 * Added ACL module to allow/deny access to entry points based on path matching
-* The boolean parameter now accepts an empty string, in which case the value is 
+* The boolean parameter now accepts an empty string, in which case the value is
   considered `true`
 * Added support for self-serving client
 * Added support for chunking answers
@@ -68,4 +72,3 @@ v0.3:
 v0.2:
 
 - fork from ocplib-resto: new home, new CI, etc.
-

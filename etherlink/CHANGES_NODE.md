@@ -89,6 +89,8 @@ it is not possible to downgrade to the previous version.
 - The node will now create its daily logs file with Unix read permission
   granted to the group owning them. This makes them easier to collect by
   an external process like `promtail`. (!15227)
+- Fix file descriptor leak in resto for connections with the rollup
+  node. (!15322)
 
 ## Version 0.5 (2024-09-27)
 

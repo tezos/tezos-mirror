@@ -141,6 +141,10 @@ module Make (Encoding : Resto.ENCODING) (Log : Server.LOGGING) = struct
                  (Cohttp.Header.init ())
                  server.medias
                  err
+
+      let call_with_closefn ?headers ?body meth uri =
+        let c = call ?headers ?body meth uri in
+        Lwt.return (c, fun () -> ())
     end : Client.CALL)
 
   let launch ?(cors = Cors.default) ?(agent = Server.Agent.default_agent)

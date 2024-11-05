@@ -140,6 +140,8 @@ Smart Rollup node
 
 - Improved error messages for RPC
   ``/global/block/<block_id>/helpers/proofs/outbox/<outbox_level>/messages?index=<message_index>``. (MR :gl:`!15507`)
+- Fix file descriptor leak in resto for connections with the L1 node.
+  (MR :gl:`!15322`)
 
 Smart Rollup WASM Debugger
 --------------------------
@@ -164,6 +166,9 @@ DAL node
   default behavior is now to list peers only for topics the current peer is
   subscribed to, while the ``all`` flag can be used to recover the previous
   behavior. (MR :gl:`!14518`)
+- Fix file descriptor leak in resto for connections with the L1 node.
+  (MR :gl:`!15322`)
+
 
 Miscellaneous
 -------------
