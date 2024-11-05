@@ -130,11 +130,9 @@ module Request = struct
     | Earliest_state : (Evm_state.t option, tztrace) t
     | Earliest_number : (Ethereum_types.quantity option, tztrace) t
     | Reconstruct : {
-        rollup_node_data_dir : string;
+        rollup_node_store : [`Read] Octez_smart_rollup_node_store.Store.t;
         genesis_level : int32;
         finalized_level : int32;
-        levels_to_hashes : [`Read] Rollup_node_storage.Levels_to_hashes.t;
-        l2_blocks : [`Read] Rollup_node_storage.L2_blocks.t;
       }
         -> (unit, tztrace) t
     | Patch_state : {
@@ -277,16 +275,13 @@ module Request = struct
         case
           (Tag 12)
           ~title:"Reconstruct"
-          (obj4
+          (obj3
              (req "request" (constant "reconstruct"))
-             (req "rollup_node_data_dir" string)
              (req "genesis_level" int32)
              (req "finalized_level" int32))
           (function
-            | View
-                (Reconstruct
-                  {rollup_node_data_dir; genesis_level; finalized_level; _}) ->
-                Some ((), rollup_node_data_dir, genesis_level, finalized_level)
+            | View (Reconstruct {genesis_level; finalized_level; _}) ->
+                Some ((), genesis_level, finalized_level)
             | _ -> None)
           (fun _ ->
             assert false
@@ -1108,28 +1103,28 @@ module State = struct
         return_some
           Blueprint_types.{delayed_transactions; kernel_upgrade; blueprint}
 
-  let messages_of_level ~levels_to_hashes ~l2_blocks ~messages level =
+  let messages_of_level store level =
     let open Lwt_result_syntax in
-    let open Rollup_node_storage in
-    let* hash = Levels_to_hashes.find levels_to_hashes level in
+    let open Octez_smart_rollup_node_store in
+    let* hash = Store.L2_levels.find store level in
     let*? hash =
       Option.to_result
         ~none:[error_of_fmt "Block hash is not found for level %ld" level]
         hash
     in
-    let* block = L2_blocks.read l2_blocks hash in
-    let*? _, header =
+    let* block = Store.L2_blocks.find store hash in
+    let*? block =
       Option.to_result
         ~none:[error_of_fmt "Block is not found for hash %a" Block_hash.pp hash]
         block
     in
-    let* messages = Messages.read messages header.inbox_witness in
-    let*? messages =
+    let* messages = Store.Messages.find store block.header.inbox_witness in
+    let*? _level, messages =
       Option.to_result
         ~none:[error_of_fmt "No messages found for block %a" Block_hash.pp hash]
         messages
     in
-    return (fst messages)
+    return messages
 
   (** [reconstruct_commit_blocks ~current_block_number ctxt execute
       evm_state] loops on [execute evm_state] until no new block is
@@ -1182,27 +1177,18 @@ module State = struct
       return evm_state
     else return evm_state
 
-  let reconstruct_history ctxt ~rollup_node_data_dir ~genesis_level
-      ~finalized_level ~levels_to_hashes ~l2_blocks =
+  let reconstruct_history ctxt ~rollup_node_store ~genesis_level
+      ~finalized_level =
     let open Lwt_result_syntax in
     (* Smart Rollups do not process messages of genesis level. *)
     let first_level = Int32.succ genesis_level in
     assert (finalized_level > first_level) ;
-
-    let* messages =
-      Rollup_node_storage.load_messages ~rollup_node_data_dir ()
-    in
-
-    let messages_of_level =
-      messages_of_level ~levels_to_hashes ~l2_blocks ~messages
-    in
-
     let config = pvm_config ctxt in
     let rec go ~count_progress ~current_block_number evm_state tezos_level =
       if tezos_level > finalized_level then return_unit
       else
         let*! () = count_progress 1 in
-        let* messages = messages_of_level tezos_level in
+        let* messages = messages_of_level rollup_node_store tezos_level in
         (* For now we use the mocked sol, ipl and eol of the debugger. *)
         let messages =
           match messages with
@@ -1470,23 +1456,14 @@ module Handlers = struct
         match checkpoint with
         | Some (level, _checkpoint) -> return_some level
         | None -> return_none)
-    | Reconstruct
-        {
-          rollup_node_data_dir;
-          genesis_level;
-          finalized_level;
-          levels_to_hashes;
-          l2_blocks;
-        } ->
+    | Reconstruct {rollup_node_store; genesis_level; finalized_level} ->
         protect @@ fun () ->
         let ctxt = Worker.state self in
         State.reconstruct_history
           ctxt
-          ~rollup_node_data_dir
+          ~rollup_node_store
           ~genesis_level
           ~finalized_level
-          ~levels_to_hashes
-          ~l2_blocks
     | Patch_state {commit; key; value; block_number} ->
         protect @@ fun () ->
         let ctxt = Worker.state self in
@@ -1620,48 +1597,20 @@ let rollup_node_metadata ~rollup_node_data_dir =
   | Some (V1 {rollup_address; genesis_info = {level; _}; _}) ->
       return (Address.to_string rollup_address, level)
 
-let rollup_node_block_storage ~rollup_node_data_dir =
-  let open Lwt_result_syntax in
-  let open Rollup_node_storage in
-  let* last_finalized_level, levels_to_hashes, l2_blocks =
-    Rollup_node_storage.load ~rollup_node_data_dir ()
-  in
-  let* final_level = Last_finalized_level.read last_finalized_level in
-  let*? final_level =
-    Option.to_result
-      ~none:
-        [error_of_fmt "Rollup node storage is missing the last finalized level"]
-      final_level
-  in
-  return (final_level, levels_to_hashes, l2_blocks)
-
 let init_context_from_rollup_node ~data_dir ~rollup_node_data_dir =
   let open Lwt_result_syntax in
-  let open Rollup_node_storage in
-  let* final_level, levels_to_hashes, l2_blocks =
-    rollup_node_block_storage ~rollup_node_data_dir
+  let open Octez_smart_rollup_node_store in
+  let* rollup_node_store =
+    Store.init Read_only ~data_dir:rollup_node_data_dir
   in
-  let* final_level_hash = Levels_to_hashes.find levels_to_hashes final_level in
-  let*? final_level_hash =
-    Option.to_result
-      ~none:
-        [
-          error_of_fmt
-            "Rollup node has no block hash for the l1 level %ld"
-            final_level;
-        ]
-      final_level_hash
-  in
-  let* final_l2_block = L2_blocks.read l2_blocks final_level_hash in
-  let* checkpoint =
+  let* final_l2_block = Store.L2_blocks.find_finalized rollup_node_store in
+  let* final_l2_block =
     match final_l2_block with
-    | Some Sc_rollup_block.(_, {context; _}) ->
-        Irmin_context.hash_of_context_hash context |> return
-    | None ->
-        failwith
-          "Rollup node has no l2 blocks for the l1 block hash %a"
-          Block_hash.pp
-          final_level_hash
+    | Some b -> return b
+    | None -> failwith "Rollup node has no finalized l2 block"
+  in
+  let checkpoint =
+    Irmin_context.hash_of_context_hash final_l2_block.header.context
   in
   let rollup_node_context_dir =
     Filename.Infix.(rollup_node_data_dir // "context")
@@ -1680,7 +1629,7 @@ let init_context_from_rollup_node ~data_dir ~rollup_node_data_dir =
     let message =
       Format.sprintf
         "Exporting context for %ld in %s"
-        final_level
+        final_l2_block.header.level
         evm_context_dir
     in
     Tezos_stdlib_unix.Utils.copy_dir
@@ -1696,7 +1645,7 @@ let init_context_from_rollup_node ~data_dir ~rollup_node_data_dir =
     Irmin_context.checkout_exn evm_node_index checkpoint
   in
   let*! evm_state = Irmin_context.PVMState.get evm_node_context in
-  return (evm_node_context, evm_state, final_level)
+  return (evm_node_context, evm_state, final_l2_block.header.level)
 
 let init_store_from_rollup_node ~data_dir ~evm_state ~irmin_context =
   let open Lwt_result_syntax in
@@ -1787,8 +1736,15 @@ let apply_evm_events ?finalized_level events =
 let reconstruct ~data_dir ~rollup_node_data_dir ~boot_sector =
   let open Lwt_result_syntax in
   let* () = lock_data_dir ~data_dir in
-  let* finalized_level, levels_to_hashes, l2_blocks =
-    rollup_node_block_storage ~rollup_node_data_dir
+  let open Octez_smart_rollup_node_store in
+  let* rollup_node_store =
+    Store.init Read_only ~data_dir:rollup_node_data_dir
+  in
+  let* finalized = Store.State.Finalized_level.get rollup_node_store in
+  let* finalized_level =
+    match finalized with
+    | Some (_block, l) -> return l
+    | None -> failwith "Rollup node has no finalized l2 block"
   in
   let* smart_rollup_address, genesis_level =
     rollup_node_metadata ~rollup_node_data_dir
@@ -1806,14 +1762,7 @@ let reconstruct ~data_dir ~rollup_node_data_dir ~boot_sector =
       ()
   in
   worker_wait_for_request
-    (Reconstruct
-       {
-         rollup_node_data_dir;
-         genesis_level;
-         finalized_level;
-         levels_to_hashes;
-         l2_blocks;
-       })
+    (Reconstruct {rollup_node_store; genesis_level; finalized_level})
 
 let init_from_rollup_node ~omit_delayed_tx_events ~data_dir
     ~rollup_node_data_dir () =

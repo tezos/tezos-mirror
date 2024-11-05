@@ -7,6 +7,7 @@ It contains the following libraries:
 - {{!module-Octez_smart_rollup}Octez_smart_rollup}: Library for Smart Rollups
 - {{!module-Octez_smart_rollup_wasm_benchmark_lib}Octez_smart_rollup_wasm_benchmark_lib}: Smart Rollup WASM benchmark library
 - {{!module-Octez_sqlite}Octez_sqlite}: SQLite wrappers and helpers
+- {{!module-Rollup_node_sqlite_migrations}Rollup_node_sqlite_migrations}: SQL migrations for the Rollup node store
 - {{!module-Tezos_layer2_store}Tezos_layer2_store}: layer2 storage utils
 - {{!module-Tezos_scoru_wasm}Tezos_scoru_wasm}
 - {{!module-Tezos_scoru_wasm_durable_snapshot}Tezos_scoru_wasm_durable_snapshot}: Durable storage reference implementation

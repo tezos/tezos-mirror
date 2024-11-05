@@ -72,3 +72,8 @@ let cardinal =
   Z.popcount
 
 let to_z z = z
+
+let from_z z =
+  if Z.sign z < 0 then
+    error_with "Bitset.from_z: argument %a is negative" Z.pp_print z
+  else Ok z

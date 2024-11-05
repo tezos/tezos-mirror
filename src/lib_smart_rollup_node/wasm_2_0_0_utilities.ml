@@ -13,12 +13,10 @@ let load_context ~data_dir (module Plugin : Protocol_plugin_sig.S) mode =
     mode
     (Configuration.default_context_dir data_dir)
 
-(** [get_wasm_pvm_state ~l2_header data_dir] reads the WASM PVM state in
-    [data_dir] for the given [l2_header].*)
-let get_wasm_pvm_state ~(l2_header : Sc_rollup_block.header) context =
+(** [get_wasm_pvm_state ctxt block_hash context_hash] reads the WASM PVM state
+    in [ctxt] for the given [context_hash].*)
+let get_wasm_pvm_state context block_hash context_hash =
   let open Lwt_result_syntax in
-  let context_hash = l2_header.context in
-  let block_hash = l2_header.block_hash in
   (* Now, we can checkout the state of the rollup of the given block hash *)
   let*! ctxt = Context.checkout context context_hash in
   let* ctxt =
@@ -95,13 +93,7 @@ let generate_durable_storage ~(plugin : (module Protocol_plugin_sig.S)) tree =
 
 let dump_durable_storage ~block ~data_dir ~file =
   let open Lwt_result_syntax in
-  let* store =
-    Store.load
-      Tezos_layer2_store.Store_sigs.Read_only
-      ~index_buffer_size:0
-      ~l2_blocks_cache_size:5
-      (Configuration.default_storage_dir data_dir)
-  in
+  let* store = Store.init Read_only ~data_dir in
   let get name load =
     let* value = load () in
     match value with
@@ -110,33 +102,31 @@ let dump_durable_storage ~block ~data_dir ~file =
   in
   let hash_from_level l =
     get (Format.asprintf "Block hash for level %ld" l) (fun () ->
-        Store.Levels_to_hashes.find store.levels_to_hashes l)
+        Store.L2_levels.find store l)
   in
   let block_from_hash h =
     get (Format.asprintf "Block with hash %a" Block_hash.pp h) (fun () ->
-        Store.L2_blocks.read store.l2_blocks h)
+        Store.L2_blocks.find store h)
   in
   let get_l2_head () =
-    get "Processed L2 head" (fun () -> Store.L2_head.read store.l2_head)
+    get "Processed L2 head" (fun () -> Store.State.L2_head.get store)
   in
   let* block_hash, block_level =
     match block with
     | `Genesis -> failwith "Genesis not supported"
-    | `Head 0 ->
-        let* {header = {block_hash; level; _}; _} = get_l2_head () in
-        return (block_hash, level)
+    | `Head 0 -> get_l2_head ()
     | `Head offset ->
-        let* {header = {level; _}; _} = get_l2_head () in
+        let* _, level = get_l2_head () in
         let l = Int32.(sub level (of_int offset)) in
         let* h = hash_from_level l in
         return (h, l)
     | `Alias (_, _) -> failwith "Alias not supported"
     | `Hash (h, 0) ->
-        let* _block, {block_hash; level; _} = block_from_hash h in
+        let* {header = {block_hash; level; _}; _} = block_from_hash h in
         return (block_hash, level)
     | `Hash (h, offset) ->
-        let* _block, block_header = block_from_hash h in
-        let l = Int32.(sub block_header.level (of_int offset)) in
+        let* block = block_from_hash h in
+        let l = Int32.(sub block.header.level (of_int offset)) in
         let* h = hash_from_level l in
         return (h, l)
     | `Level l ->
@@ -146,14 +136,14 @@ let dump_durable_storage ~block ~data_dir ~file =
   let* (plugin : (module Protocol_plugin_sig.S)) =
     Protocol_plugins.proto_plugin_for_level_with_store store block_level
   in
-  let* l2_header = Store.L2_blocks.header store.l2_blocks block_hash in
-  let* l2_header =
-    match l2_header with
+  let* context_hash = Store.L2_blocks.find_context store block_hash in
+  let* context_hash =
+    match context_hash with
     | None -> tzfail Rollup_node_errors.Cannot_checkout_l2_header
-    | Some header -> return header
+    | Some c -> return c
   in
   let* context = load_context ~data_dir plugin Store_sigs.Read_only in
-  let* state = get_wasm_pvm_state ~l2_header context in
+  let* state = get_wasm_pvm_state context block_hash context_hash in
   let* instrs = generate_durable_storage ~plugin state in
   let* () = Installer_config.to_file instrs ~output:file in
   return_unit
@@ -162,37 +152,24 @@ let patch_durable_storage ~data_dir ~key ~value =
   let open Lwt_result_syntax in
   (* Loads the state of the head. *)
   let* _lock = Node_context_loader.lock ~data_dir in
-  let* store =
-    Store.load
-      Tezos_layer2_store.Store_sigs.Read_write
-      ~index_buffer_size:0
-      ~l2_blocks_cache_size:1
-      (Configuration.default_storage_dir data_dir)
-  in
+  let* store = Store.init Read_write ~data_dir in
   let* ({header = {block_hash; level = block_level; _}; _} as l2_block) =
-    let* r = Store.L2_head.read store.l2_head in
+    let* r = Store.L2_blocks.find_head store in
     match r with
     | Some v -> return v
     | None ->
         failwith "Processed L2 head is not found in the rollup node storage"
   in
-
   let* ((module Plugin) as plugin) =
     Protocol_plugins.proto_plugin_for_level_with_store store block_level
   in
-  let* l2_header = Store.L2_blocks.header store.l2_blocks block_hash in
-  let* l2_header =
-    match l2_header with
-    | None -> tzfail Rollup_node_errors.Cannot_checkout_l2_header
-    | Some header -> return header
-  in
   let* () =
     fail_when
-      (Option.is_some l2_header.commitment_hash)
+      (Option.is_some l2_block.header.commitment_hash)
       (Rollup_node_errors.Patch_durable_storage_on_commitment block_level)
   in
   let* context = load_context ~data_dir plugin Store_sigs.Read_write in
-  let* state = get_wasm_pvm_state ~l2_header context in
+  let* state = get_wasm_pvm_state context block_hash l2_block.header.context in
 
   (* Patches the state via an unsafe patch. *)
   let* patched_state =
@@ -205,14 +182,7 @@ let patch_durable_storage ~data_dir ~key ~value =
   (* Replaces the PVM state. *)
   let*! context = Context.PVMState.set context patched_state in
   let*! new_commit = Context.commit context in
-  let new_l2_header = {l2_header with context = new_commit} in
-  let new_l2_block = {l2_block with header = (); content = ()} in
-  let* () =
-    Store.L2_blocks.append
-      store.l2_blocks
-      ~key:new_l2_header.block_hash
-      ~header:new_l2_header
-      ~value:new_l2_block
+  let new_l2_block =
+    {l2_block with header = {l2_block.header with context = new_commit}}
   in
-  let new_l2_block_with_header = {l2_block with header = new_l2_header} in
-  Store.L2_head.write store.l2_head new_l2_block_with_header
+  Store.L2_blocks.store store new_l2_block

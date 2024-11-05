@@ -63,6 +63,8 @@ val octez_signer_services : Manifest.target
 
 val octez_smart_rollup_lib : Manifest.target
 
+val octez_smart_rollup_node_store_lib : Manifest.target
+
 val octez_stdlib_unix : Manifest.target
 
 val octez_test_helpers : Manifest.target

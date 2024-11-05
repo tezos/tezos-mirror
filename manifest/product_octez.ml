@@ -4642,12 +4642,65 @@ let octez_smart_rollup_lib =
         yaml;
       ]
 
+let rollup_node_sqlite_migrations =
+  octez_l2_lib
+    "rollup_node_sqlite_migrations"
+    ~path:"src/lib_smart_rollup_node/migrations"
+    ~synopsis:"SQL migrations for the Rollup node store"
+    ~deps:[octez_base |> open_ ~m:"TzPervasives"; caqti_lwt; crunch; re]
+    ~dune:
+      Dune.
+        [
+          [
+            S "rule";
+            [S "target"; S "migrations.ml"];
+            [S "deps"; [S "glob_files"; S "*.sql"]];
+            [
+              S "action";
+              [
+                S "run";
+                S "ocaml-crunch";
+                S "-e";
+                S "sql";
+                S "-m";
+                S "plain";
+                S "-o";
+                S "%{target}";
+                S "-s";
+                S ".";
+              ];
+            ];
+          ];
+        ]
+
+let octez_smart_rollup_node_store_lib_modules =
+  ["store_version"; "sql_store"; "store_v5"; "store"]
+
+let octez_smart_rollup_node_store_lib =
+  octez_l2_lib
+    "octez-smart-rollup-node-lib.store"
+    ~internal_name:"octez_smart_rollup_node_store"
+    ~path:"src/lib_smart_rollup_node"
+    ~synopsis:"Octez: library for accessing the store of the Smart Rollup node"
+    ~modules:octez_smart_rollup_node_store_lib_modules
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives" |> open_;
+        octez_base_unix;
+        octez_stdlib_unix |> open_;
+        octez_layer2_store |> open_;
+        rollup_node_sqlite_migrations;
+        octez_sqlite |> open_;
+        octez_smart_rollup_lib |> open_;
+      ]
+
 let octez_smart_rollup_node_lib =
   public_lib
     "octez-smart-rollup-node-lib"
     ~internal_name:"octez_smart_rollup_node"
     ~path:"src/lib_smart_rollup_node"
     ~synopsis:"Octez: library for Smart Rollup node"
+    ~all_modules_except:octez_smart_rollup_node_store_lib_modules
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives" |> open_;
@@ -4666,6 +4719,7 @@ let octez_smart_rollup_node_lib =
         octez_injector_lib |> open_;
         octez_version_value |> open_;
         octez_layer2_store |> open_;
+        octez_smart_rollup_node_store_lib |> open_;
         octez_crawler |> open_;
         octez_workers |> open_;
         octez_smart_rollup_lib |> open_;
@@ -8154,6 +8208,7 @@ let _octez_smart_rollup_node_lib_tests =
         octez_test_helpers |> open_;
         octez_layer2_store |> open_;
         octez_smart_rollup_lib |> open_;
+        octez_smart_rollup_node_store_lib |> open_;
         octez_smart_rollup_node_lib |> open_;
         helpers |> open_;
         alcotezt;

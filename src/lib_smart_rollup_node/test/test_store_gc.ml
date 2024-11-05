@@ -19,9 +19,9 @@ let build_chain node_ctxt ~genesis ~length =
   return (genesis :: blocks)
 
 let check_raw_read name store ~gc_level (block : Sc_rollup_block.t)
-    ?(should_exist = block.header.level >= gc_level) proj read key =
+    ?(should_exist = block.header.level >= gc_level) read key =
   let open Lwt_result_syntax in
-  let+ res = read (proj store) key in
+  let+ res = read store key in
   match res with
   | None when should_exist ->
       Assert.fail_msg
@@ -49,8 +49,7 @@ let check_chain_ok ~gc_level node_ctxt store chain =
           store
           ~gc_level
           block
-          (fun s -> s.Store.l2_blocks)
-          Store.L2_blocks.read
+          Store.L2_blocks.find
           block.header.block_hash
       in
       let* () =
@@ -59,8 +58,7 @@ let check_chain_ok ~gc_level node_ctxt store chain =
           store
           ~gc_level
           block
-          (fun s -> s.Store.messages)
-          Store.Messages.read
+          Store.Messages.find
           block.header.inbox_witness
       in
       let* () =
@@ -69,8 +67,7 @@ let check_chain_ok ~gc_level node_ctxt store chain =
           store
           ~gc_level
           block
-          (fun s -> s.Store.inboxes)
-          Store.Inboxes.read
+          Store.Inboxes.find
           block.header.inbox_hash
       in
       let* () =
@@ -82,8 +79,7 @@ let check_chain_ok ~gc_level node_ctxt store chain =
               store
               ~gc_level
               block
-              (fun s -> s.Store.commitments)
-              Store.Commitments.read
+              Store.Commitments.find
               commitment_hash
       in
       let* () =
@@ -92,8 +88,7 @@ let check_chain_ok ~gc_level node_ctxt store chain =
           store
           ~gc_level
           block
-          (fun s -> s.Store.levels_to_hashes)
-          Store.Levels_to_hashes.find
+          Store.L2_levels.find
           block.header.level
       in
       (* Checking access through Node_context *)
@@ -132,9 +127,9 @@ let gc_test node_ctxt ~genesis =
   let* chain = build_chain node_ctxt ~genesis ~length in
   (* Garbage collecting everything below level 50 *)
   let store = Node_context.Internal_for_tests.unsafe_get_store node_ctxt in
-  let* () = Store.gc store ~level:gc_level in
+  let gc = Store.gc store ~level:gc_level in
   let* last_block = Helpers.append_l2_block node_ctxt ["\001I'm new"] in
-  let*! () = Store.wait_gc_completion store in
+  let* () = gc in
   (* Checking result of GC *)
   let* () = check_chain_ok ~gc_level node_ctxt store (chain @ [last_block]) in
   return_unit
@@ -169,13 +164,13 @@ let gc_test_reorg node_ctxt ~genesis =
   in
   (* Garbage collecting everything below level 50 *)
   let store = Node_context.Internal_for_tests.unsafe_get_store node_ctxt in
-  let* () = Store.gc store ~level:gc_level in
+  let gc = Store.gc store ~level:gc_level in
   (* Trigger a reorganization by adding a new block on top of the alternative
      head. *)
   let* last_block =
     Helpers.add_l2_block node_ctxt ["\001Reorged"] ~predecessor_l2_block:head
   in
-  let*! () = Store.wait_gc_completion store in
+  let* () = gc in
   (* Ensure both forked blocks are available *)
   let* reorged_block_by_hash =
     Node_context.find_l2_block node_ctxt head.header.block_hash
