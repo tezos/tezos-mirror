@@ -178,7 +178,8 @@ let generate_seed_nonce_hash config delegate level =
       (Baking_nonces.generate_seed_nonce
          config
          delegate
-         level.level [@profiler.record_s "generate seed nonce"])
+         level.level
+       [@profiler.record_s {verbosity = Debug} "generate seed nonce"])
     in
     return_some seed_nonce
   else return_none
@@ -210,7 +211,7 @@ let sign_block_header global_state proposer unsigned_block_header =
              block_location
              ~delegate:proposer.public_key_hash
              ~level
-             ~round [@profiler.record_s "may sign"])
+             ~round [@profiler.record_s {verbosity = Debug} "may sign"])
         in
         match may_sign with
         | true ->
@@ -220,7 +221,7 @@ let sign_block_header global_state proposer unsigned_block_header =
                  block_location
                  ~delegate:proposer.public_key_hash
                  ~level
-                 ~round [@profiler.record_s "record block"])
+                 ~round [@profiler.record_s {verbosity = Debug} "record block"])
             in
             return_true
         | false ->
@@ -235,7 +236,8 @@ let sign_block_header global_state proposer unsigned_block_header =
            cctxt
            proposer.secret_key_uri
            ~watermark:Block_header.(to_watermark (Block_header chain_id))
-           unsigned_header [@profiler.record_s "sign : block header"])
+           unsigned_header
+         [@profiler.record_s {verbosity = Debug} "sign : block header"])
       in
       return {Block_header.shell; protocol_data = {contents; signature}}
 
@@ -307,7 +309,8 @@ let prepare_block (global_state : global_state) (block_to_bake : block_to_bake)
     (generate_seed_nonce_hash
        global_state.config.Baking_configuration.nonce
        consensus_key
-       injection_level [@profiler.record_s "generate seed nonce hash"])
+       injection_level
+     [@profiler.record_s {verbosity = Info} "generate seed nonce hash"])
   in
   let seed_nonce_hash = Option.map fst seed_nonce_opt in
   let user_activated_upgrades = global_state.config.user_activated_upgrades in
@@ -329,7 +332,8 @@ let prepare_block (global_state : global_state) (block_to_bake : block_to_bake)
     | Some per_block_vote_file ->
         Per_block_vote_file.read_per_block_votes_no_fail
           ~default
-          ~per_block_vote_file [@profiler.record_s "read per block votes file"]
+          ~per_block_vote_file
+        [@profiler.record_s {verbosity = Info} "read per block votes file"]
     | None -> Lwt.return default
   in
   let*! () =
@@ -343,14 +347,14 @@ let prepare_block (global_state : global_state) (block_to_bake : block_to_bake)
        cctxt
        ~chain
        ~block:pred_block
-       () [@profiler.record_s "pred resulting context hash"])
+       () [@profiler.record_s {verbosity = Info} "pred resulting context hash"])
   in
   let* pred_live_blocks =
     (Chain_services.Blocks.live_blocks
        cctxt
        ~chain
        ~block:pred_block
-       () [@profiler.record_s "live blocks"])
+       () [@profiler.record_s {verbosity = Info} "live blocks"])
   in
   let* {unsigned_block_header; operations} =
     (Block_forge.forge
@@ -370,13 +374,15 @@ let prepare_block (global_state : global_state) (block_to_bake : block_to_bake)
        global_state.config.fees
        simulation_mode
        simulation_kind
-       global_state.constants.parametric [@profiler.record_s "forge block"])
+       global_state.constants.parametric
+     [@profiler.record_s {verbosity = Info} "forge block"])
   in
   let* signed_block_header =
     (sign_block_header
        global_state
        consensus_key
-       unsigned_block_header [@profiler.record_s "sign block header"])
+       unsigned_block_header
+     [@profiler.record_s {verbosity = Info} "sign block header"])
   in
   let* () =
     match seed_nonce_opt with
@@ -392,7 +398,7 @@ let prepare_block (global_state : global_state) (block_to_bake : block_to_bake)
            nonce
            ~cycle:injection_level.cycle
            ~level:injection_level.level
-           ~round [@profiler.record_s "register nonce"])
+           ~round [@profiler.record_s {verbosity = Info} "register nonce"])
   in
   let baking_votes =
     {Per_block_votes.liquidity_baking_vote; adaptive_issuance_vote}
@@ -656,7 +662,7 @@ let sign_consensus_votes (global_state : global_state)
     (authorized_consensus_votes
        global_state
        unsigned_consensus_vote_batch
-     [@profiler.record_s "authorized consensus votes"])
+     [@profiler.record_s {verbosity = Info} "authorized consensus votes"])
   in
   let* signed_consensus_votes =
     List.filter_map_es
@@ -668,7 +674,8 @@ let sign_consensus_votes (global_state : global_state)
              global_state
              ~branch:batch_branch
              unsigned_consensus_vote
-           [@profiler.record_s "forge and sign consensus vote"])
+           [@profiler.record_s
+             {verbosity = Info} "forge and sign consensus vote"])
         in
         match signed_consensus_vote_r with
         | Error err ->
@@ -723,11 +730,12 @@ let inject_consensus_vote state (signed_consensus_vote : signed_consensus_vote)
            ~chain:(`Hash chain_id)
            signed_consensus_vote.signed_operation
          [@profiler.record_s
-           Format.sprintf
-             "injecting consensus vote: %s"
-             (match unsigned_consensus_vote.vote_kind with
-             | Preattestation -> "preattestation"
-             | Attestation -> "attestation")])
+           {verbosity = Debug}
+             (Format.sprintf
+                "injecting consensus vote: %s"
+                (match unsigned_consensus_vote.vote_kind with
+                | Preattestation -> "preattestation"
+                | Attestation -> "attestation"))])
       in
       let*! () =
         Events.(
@@ -779,7 +787,7 @@ let inject_block ?(force_injection = false) ?(asynchronous = true) state
          ~force:state.global_state.config.force
          ~chain:(`Hash state.global_state.chain_id)
          signed_block_header
-         operations [@profiler.record_s "injecting block"])
+         operations [@profiler.record_s {verbosity = Info} "injecting block"])
     in
     let*! () =
       Events.(
@@ -907,26 +915,30 @@ let update_to_level state level_update =
         cctxt
         delegates
         ~level:new_level
-        ~chain [@profiler.record_s "compute predecessor delegate slots"]
+        ~chain
+      [@profiler.record_s
+        {verbosity = Debug} "compute predecessor delegate slots"]
   in
   let* next_level_delegate_slots =
     (Baking_state.compute_delegate_slots
        cctxt
        delegates
        ~level:(Int32.succ new_level)
-       ~chain [@profiler.record_s "compute current delegate slots"])
+       ~chain
+     [@profiler.record_s {verbosity = Debug} "compute current delegate slots"])
   in
   let round_durations = state.global_state.round_durations in
   let*? current_round =
     (compute_round
        new_level_proposal
-       round_durations [@profiler.record_f "compute round"])
+       round_durations [@profiler.record_f {verbosity = Debug} "compute round"])
   in
   let*! new_state =
     (compute_new_state
        ~current_round
        ~delegate_slots
-       ~next_level_delegate_slots [@profiler.record_s "compute new state"])
+       ~next_level_delegate_slots
+     [@profiler.record_s {verbosity = Debug} "compute new state"])
   in
   return new_state
 
@@ -939,7 +951,7 @@ let synchronize_round state {new_round_proposal; handle_proposal} =
   let*? current_round =
     (compute_round
        new_round_proposal
-       round_durations [@profiler.record_f "compute round"])
+       round_durations [@profiler.record_f {verbosity = Debug} "compute round"])
   in
   if Round.(current_round < new_round_proposal.block.round) then
     (* impossible *)
@@ -1002,13 +1014,15 @@ let rec perform_action state (action : action) =
   | Prepare_block {block_to_bake} ->
       prepare_block_request
         state
-        block_to_bake [@profiler.record_s "action : prepare block"]
+        block_to_bake
+      [@profiler.record_s {verbosity = Info} "action : prepare block"]
   | Prepare_preattestations {preattestations} ->
       let* new_state =
         (prepare_preattestations_request
            state
            preattestations
-         [@profiler.record_s "action : prepare preattestations"])
+         [@profiler.record_s
+           {verbosity = Info} "action : prepare preattestations"])
       in
       (* We wait for preattestations to trigger the [Prequorum_reached]
          event *)
@@ -1017,7 +1031,8 @@ let rec perform_action state (action : action) =
       let* new_state =
         (prepare_attestations_request
            state
-           attestations [@profiler.record_s "action : prepare attestations"])
+           attestations
+         [@profiler.record_s {verbosity = Info} "action : prepare attestations"])
       in
       (* We wait for attestations to trigger the [Quorum_reached]
          event *)
@@ -1027,12 +1042,14 @@ let rec perform_action state (action : action) =
         (prepare_preattestations_request
            state
            preattestations
-         [@profiler.record_s "action : prepare preattestations"])
+         [@profiler.record_s
+           {verbosity = Info} "action : prepare preattestations"])
       in
       let* state =
         (prepare_attestations_request
            state
-           attestations [@profiler.record_s "action : prepare attestations"])
+           attestations
+         [@profiler.record_s {verbosity = Info} "action : prepare attestations"])
       in
       (* We wait for preattestations to trigger the [Prequorum_reached]
          event *)
@@ -1043,7 +1060,8 @@ let rec perform_action state (action : action) =
            ~force_injection
            ~asynchronous
            state
-           prepared_block [@profiler.record_s "action : inject block"])
+           prepared_block
+         [@profiler.record_s {verbosity = Info} "action : inject block"])
       in
       return new_state
   | Inject_preattestation {signed_preattestation} ->
@@ -1051,7 +1069,8 @@ let rec perform_action state (action : action) =
         (inject_consensus_vote
            state
            signed_preattestation
-         [@profiler.record_s "action : inject preattestation"])
+         [@profiler.record_s
+           {verbosity = Info} "action : inject preattestation"])
       in
       (* Here, we do not need to wait for the prequorum, it has
          already been triggered by the
@@ -1062,7 +1081,7 @@ let rec perform_action state (action : action) =
         (inject_consensus_votes
            state
            signed_attestations
-         [@profiler.record_s "action : inject attestations"])
+         [@profiler.record_s {verbosity = Info} "action : inject attestations"])
       in
       (* We wait for attestations to trigger the [Quorum_reached]
          event *)
@@ -1071,25 +1090,31 @@ let rec perform_action state (action : action) =
       let* new_state, new_action =
         (update_to_level
            state
-           level_update [@profiler.record_s "action : update to level"])
+           level_update
+         [@profiler.record_s {verbosity = Info} "action : update to level"])
       in
       perform_action new_state new_action
   | Synchronize_round round_update ->
       let* new_state, new_action =
         (synchronize_round
            state
-           round_update [@profiler.record_s "action : synchronize round"])
+           round_update
+         [@profiler.record_s {verbosity = Info} "action : synchronize round"])
       in
       perform_action new_state new_action
   | Watch_prequorum ->
       let*! () =
         (start_waiting_for_preattestation_quorum
-           state [@profiler.record_s "action : wait for preattestation quorum"])
+           state
+         [@profiler.record_s
+           {verbosity = Info} "action : wait for preattestation quorum"])
       in
       return state
   | Watch_quorum ->
       let*! () =
         (start_waiting_for_attestation_quorum
-           state [@profiler.record_s "action : wait for attestation quorum"])
+           state
+         [@profiler.record_s
+           {verbosity = Info} "action : wait for attestation quorum"])
       in
       return state

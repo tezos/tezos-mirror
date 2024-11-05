@@ -1020,12 +1020,13 @@ let compute_delegate_slots (cctxt : Protocol_client_context.full)
     (Plugin.RPC.Validators.get
        cctxt
        (chain, block)
-       ~levels:[level] [@profiler.record_s "RPC: get attesting rights"])
+       ~levels:[level]
+     [@profiler.record_s {verbosity = Debug} "RPC: get attesting rights"])
   in
   let delegate_slots =
     (delegate_slots
        attesting_rights
-       delegates [@profiler.record_f "delegate_slots"])
+       delegates [@profiler.record_f {verbosity = Debug} "delegate_slots"])
   in
   return delegate_slots
 
