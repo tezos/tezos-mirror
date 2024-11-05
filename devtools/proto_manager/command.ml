@@ -7,6 +7,12 @@
 
 type t = {describe : State.t -> State.t; execute : State.t -> State.t}
 
+let create ~desc execute = {describe = desc; execute}
+
+let execute c state = c.execute state
+
+let describe c state = c.describe state
+
 module FIFO = struct
   type elt = t
 
@@ -14,23 +20,23 @@ module FIFO = struct
 
   let empty = []
 
-  let register c l = c :: l
-
   let describe l state =
     List.fold_right (fun c state -> c.describe state) l state
 
   let execute l state = List.fold_right (fun c state -> c.execute state) l state
-
-  let to_command ?desc t =
-    let describe =
-      match desc with Some describe -> describe | None -> describe t
-    in
-    {describe; execute = execute t}
 end
+
+let register c l = c :: l
+
+let of_fifo ?desc t =
+  let describe =
+    match desc with Some describe -> describe | None -> FIFO.describe t
+  in
+  {describe; execute = FIFO.execute t}
 
 module Shell = struct
   let create ~__LOC__ ?desc ?error_msg shell =
-    let describe =
+    let desc =
       match desc with
       | Some desc -> desc
       | None ->
@@ -48,7 +54,7 @@ module Shell = struct
         State.exit ~__LOC__ state) ;
       state
     in
-    {describe; execute}
+    create ~desc execute
 end
 
 module File = struct
@@ -86,12 +92,31 @@ module File = struct
             Stdlib.exit 1) ;
           state);
     }
+
+  let ocamlformat ~__LOC__ files =
+    let desc state =
+      Log.printfln
+        "Format %a"
+        Format.(
+          pp_print_list
+            ~pp_sep:(fun fmt () -> pp_print_string fmt ", ")
+            pp_print_string)
+        (files state) ;
+      state
+    in
+    let execute state =
+      Utils.File.Content.ocamlformat
+        ~error:(fun () -> State.exit ~__LOC__ state)
+        (files state) ;
+      state
+    in
+    create ~desc execute
 end
 
 module Git = struct
-  let git ({git_dir; _} : State.t) cmd = "git -C " ^ git_dir ^ " " ^ cmd
+  let git state cmd = "git -C " ^ State.get_git_dir state ^ " " ^ cmd
 
-  let check_no_uncommitted_changes =
+  let check_no_uncommitted_changes ~__LOC__ =
     Shell.create
       ~__LOC__
       ~error_msg:"Git tree is not clean, please commit or stash your changes"
@@ -105,20 +130,26 @@ module Git = struct
              fi|}
           (git state "status --porcelain"))
 
-  let commit_no_hooks message =
-    let open FIFO in
+  let commit ~__LOC__ ?no_verify get_msg =
     let commands =
       FIFO.empty
-      |> register (Shell.create ~__LOC__ (fun state -> git state {|add ."|}))
+      |> register (Shell.create ~__LOC__ (fun state -> git state {|add .|}))
       |> register
            (Shell.create ~__LOC__ (fun state ->
-                (* if pre-commit hooks are enabled, do not run them *)
+                let no_verify =
+                  match no_verify with
+                  | Some () ->
+                      (* if pre-commit hooks are enabled, do not run them *)
+                      " --no-verify"
+                  | None -> ""
+                in
                 git
                   state
                   (Format.asprintf
-                     {|commit -m "%s/%s" --no-verify|}
-                     state.capitalize_label
-                     message)))
+                     {|commit -m "%s/%s"%s|}
+                     (State.Target.get_constructor state)
+                     (get_msg state)
+                     no_verify)))
       |> register
            {
              describe =
@@ -129,8 +160,8 @@ module Git = struct
                (fun state ->
                  Log.printfln
                    "@{<blue>Created commit:@{<cyan> %s/%s@}@}"
-                   state.capitalize_label
-                   message ;
+                   (State.Target.get_constructor state)
+                   (get_msg state) ;
                  state);
            }
       |> register
@@ -138,13 +169,61 @@ module Git = struct
              describe =
                (fun state ->
                  Log.printfln "increment commit counter" ;
-                 {state with commits = state.commits + 1});
-             execute = (fun state -> {state with commits = state.commits + 1});
+                 State.incr_commit_count state);
+             execute = (fun state -> State.incr_commit_count state);
            }
     in
-    to_command
+    of_fifo
       ~desc:(fun state ->
-        Log.printfln "commit no hooks with message %s" message ;
+        Log.printfln "commit no hooks with message %s" (get_msg state) ;
         state)
       commands
+
+  let cp ~__LOC__ get_src get_dest =
+    Shell.create
+      ~__LOC__
+      ~desc:(fun state ->
+        Log.printfln "copy versioned files of %s" (get_src state) ;
+        state)
+      (fun state ->
+        git state (Format.asprintf {|archive HEAD "%s"|} (get_src state))
+        ^ Format.asprintf {| | tar -x -C "%s"|} (get_dest state))
+end
+
+module Log = struct
+  let printfln get_msg =
+    let desc state =
+      Log.printfln "Log: %s" (get_msg state) ;
+      state
+    in
+    create ~desc (fun state ->
+        Log.printfln "%s" (get_msg state) ;
+        state)
+
+  let cyan get_msg =
+    let desc state =
+      Log.printfln "Log: %s" (get_msg state) ;
+      state
+    in
+    create ~desc (fun state ->
+        Log.cyan "%s" (get_msg state) ;
+        state)
+
+  let yellow get_msg =
+    let desc state =
+      Log.printfln "Log: %s" (get_msg state) ;
+      state
+    in
+    create ~desc (fun state ->
+        Log.yellow "%s" (get_msg state) ;
+        state)
+
+  let blue get_msg =
+    let desc state =
+      Log.printfln "Log: %s" (get_msg state) ;
+      state
+    in
+    create ~desc (fun state ->
+        Log.blue "%s" (get_msg state) ;
+        state)
 end
