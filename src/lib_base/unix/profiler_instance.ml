@@ -7,21 +7,56 @@
 
 open Profiler
 module BackendMap = Map.Make (String)
+module VerbosityMap = Map.Make (String)
 
 let registered_backends :
     (directory:string -> name:string -> instance option) BackendMap.t ref =
   ref BackendMap.empty
 
-let max_verbosity =
-  match Sys.getenv_opt "PROFILING" |> Option.map String.lowercase_ascii with
-  | Some "debug" -> Debug
-  | Some "info" -> Info
-  | Some ("true" | "on" | "yes" | "notice") -> Notice
-  | Some invalid_value ->
-      Fmt.failwith
-        "Invalid PROFILING value '%s', disabling profiling."
-        invalid_value
-  | None -> Notice
+(** Get the verbosity map from the contents of the PROFILING environment
+    variable. The contents are expected to be of the following form:
+
+    {[
+    PROFILING="<profiler_i>-><verbosity_i>; ..."
+    ]}
+
+    where [profiler_i] is the name of the profiler that we want to be reported
+    about with level of detail given by [verbosity_i]. *)
+let get_verbosity_map () : verbosity option VerbosityMap.t =
+  let parse_rules =
+    match Sys.getenv_opt "PROFILING" |> Option.map String.lowercase_ascii with
+    | None -> []
+    | Some rules -> (
+        try Tezos_stdlib_unix.Level_config_rules.parse_rules rules
+        with _exn ->
+          Printf.ksprintf
+            Stdlib.failwith
+            "Incorrect profiling rules defined in PROFILING variable!")
+  in
+  let level_to_verbosity : Internal_event.level option -> verbosity option =
+    function
+    | Some Debug -> Some Debug
+    | Some Info -> Some Info
+    | Some Notice -> Some Notice
+    | _ -> None
+  in
+  List.fold_left
+    (fun acc (name, rule) ->
+      VerbosityMap.add name (level_to_verbosity rule) acc)
+    VerbosityMap.empty
+    parse_rules
+
+(** [get_profiler_verbosity ~name] returns the level of detail associated to the profiler
+    given by [~name], as dictated by the PROFILING environment variable. *)
+let get_profiler_verbosity =
+  let profiler_verbosity_map = get_verbosity_map () in
+  fun ~name ->
+    match VerbosityMap.find name profiler_verbosity_map with
+    | Some verbosity -> verbosity
+    | None ->
+        (* In the case that a profiler is not assigned any verbosity, we try to check whether
+           the catch-all case, represented by "", has any verbosity assigned. *)
+        Option.join @@ VerbosityMap.find "" profiler_verbosity_map
 
 let register_backend env driver =
   match List.find (fun k -> BackendMap.mem k !registered_backends) env with
@@ -58,8 +93,9 @@ let selected_backend () =
   | None -> (
       match Sys.getenv_opt "PROFILING" with
       | None -> None
-      | Some v ->
-          Format.sprintf "No backend selected but verbosity is set to \"%s\"" v
+      | Some _ ->
+          Format.sprintf
+            "No backend selected but profilers were enabled in PROFILING."
           |> fail)
   | Some b -> (
       match BackendMap.find b !registered_backends with
@@ -88,11 +124,14 @@ let profiler ?(suffix = "")
         Tezos_stdlib_unix.Utils.create_dir ~perm:0o777 output_dir ;
         output_dir
   in
-  Some
-    (Profiler.instance
-       backend
-       Filename.Infix.
-         (output_dir // (name ^ "_profiling" ^ suffix), max_verbosity))
+  match get_profiler_verbosity ~name with
+  | None -> None
+  | Some max_verbosity ->
+      Some
+        (Profiler.instance
+           backend
+           Filename.Infix.
+             (output_dir // (name ^ "_profiling" ^ suffix), max_verbosity))
 
 let () =
   register_backend
