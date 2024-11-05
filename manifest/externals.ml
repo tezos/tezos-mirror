@@ -77,9 +77,9 @@ let cmdliner = external_lib "cmdliner" V.(at_least "1.1.0")
 
 let cohttp = external_lib "cohttp" V.(at_least "5.3.1")
 
-let conduit_lwt = external_lib "conduit-lwt" V.(exactly "6.2.2")
+let conduit_lwt = external_lib "conduit-lwt" V.(at_least "7.1.0")
 
-let conduit_lwt_unix = external_lib "conduit-lwt-unix" V.(exactly "6.2.2")
+let conduit_lwt_unix = external_lib "conduit-lwt-unix" V.(at_least "7.1.0")
 
 let compiler_libs_common = external_lib "compiler-libs.common" V.True ~opam:""
 
@@ -102,6 +102,8 @@ let ctypes_foreign =
 let ctypes_stubs = external_sublib ctypes "ctypes.stubs"
 
 let digestif = external_lib "digestif" V.(at_least "0.9.0")
+
+let dream = external_lib "dream" V.(at_least "1.0.0~alpha7")
 
 let dune_configurator = external_lib "dune-configurator" V.True
 
@@ -264,7 +266,7 @@ let tar_unix = external_lib "tar-unix" V.(at_least "2.0.1" && less_than "3.0.0")
 let tezos_sapling_parameters =
   opam_only ~can_vendor:false "tezos-sapling-parameters" V.(at_least "1.1.0")
 
-let tls_lwt = external_lib "tls-lwt" V.(at_least "0.16.0")
+let tls_lwt = external_lib "tls-lwt" V.(at_least "1.0.4")
 
 let trace = external_lib "trace" V.True
 
@@ -308,7 +310,7 @@ let tezt_lib =
 let tezt_core_lib =
   external_sublib tezt_lib "tezt.core" ~main_module:"Tezt_core"
 
-let x509 = external_lib "x509" V.(less_than "1.0.0")
+let x509 = external_lib "x509" V.(at_least "1.0.0")
 
 let tezt_json_lib = external_sublib tezt_lib "tezt.json" ~main_module:"JSON"
 

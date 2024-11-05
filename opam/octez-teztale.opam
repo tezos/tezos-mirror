@@ -23,9 +23,9 @@ depends: [
   "cmdliner" { >= "1.1.0" }
   "octez-rust-deps"
   "octez-shell-libs"
-  "tls-lwt" { >= "0.16.0" }
-  "conduit-lwt-unix" { = "6.2.2" }
-  "x509" { < "1.0.0" }
+  "tls-lwt" { >= "1.0.4" }
+  "conduit-lwt-unix" { >= "7.1.0" }
+  "x509" { >= "1.0.0" }
 ]
 depopts: [
   "octez-protocol-001-PtCJ7pwo-libs"
