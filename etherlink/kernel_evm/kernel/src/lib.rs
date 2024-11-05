@@ -282,7 +282,6 @@ pub fn main<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
         return Ok(());
     };
 
-    let block_fees = retrieve_block_fees(host)?;
     let trace_input = read_tracer_input(host)?;
 
     // Start processing blueprints
@@ -292,7 +291,6 @@ pub fn main<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
         if let block::ComputationResult::RebootNeeded = block::produce(
             host,
             chain_id,
-            block_fees,
             &mut configuration,
             sequencer_pool_address,
             trace_input,
@@ -603,11 +601,19 @@ mod tests {
             ..Configuration::default()
         };
 
+        crate::storage::store_minimum_base_fee_per_gas(
+            &mut host,
+            block_fees.minimum_base_fee_per_gas(),
+        )
+        .unwrap();
+        crate::storage::store_base_fee_per_gas(&mut host, block_fees.base_fee_per_gas())
+            .unwrap();
+        crate::storage::store_da_fee(&mut host, block_fees.da_fee_per_byte()).unwrap();
+
         // If the upgrade is started, it should raise an error
         let computation_result = crate::block::produce(
             &mut host,
             DUMMY_CHAIN_ID,
-            block_fees,
             &mut configuration,
             None,
             None,

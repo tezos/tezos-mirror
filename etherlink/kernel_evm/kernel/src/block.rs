@@ -391,11 +391,12 @@ const AT_MOST_ONE_BLOCK: RefPath = RefPath::assert_from(b"/__at_most_one_block")
 pub fn produce<Host: Runtime>(
     host: &mut Host,
     chain_id: U256,
-    mut block_fees: BlockFees,
     config: &mut Configuration,
     sequencer_pool_address: Option<H160>,
     tracer_input: Option<TracerInput>,
 ) -> Result<ComputationResult, anyhow::Error> {
+    let mut block_fees: BlockFees = crate::retrieve_block_fees(host)?;
+
     let kernel_upgrade = upgrade::read_kernel_upgrade(host)?;
 
     // If there's a pool address, the coinbase in block constants and miner
@@ -786,6 +787,19 @@ mod tests {
         }
     }
 
+    fn store_block_fees<Host: Runtime>(
+        host: &mut Host,
+        block_fees: &BlockFees,
+    ) -> anyhow::Result<()> {
+        storage::store_minimum_base_fee_per_gas(
+            host,
+            block_fees.minimum_base_fee_per_gas(),
+        )?;
+        storage::store_base_fee_per_gas(host, block_fees.base_fee_per_gas())?;
+        storage::store_da_fee(host, block_fees.da_fee_per_byte())?;
+        Ok(())
+    }
+
     fn produce_block_with_several_valid_txs<Host: Runtime>(
         host: &mut Host,
         evm_account_storage: &mut EthereumAccountStorage,
@@ -813,11 +827,11 @@ mod tests {
             &sender,
             U256::from(10000000000000000000u64),
         );
+        store_block_fees(host, &dummy_block_fees()).unwrap();
 
         produce(
             host,
             DUMMY_CHAIN_ID,
-            dummy_block_fees(),
             &mut Configuration::default(),
             None,
             None,
@@ -862,10 +876,10 @@ mod tests {
             &sender,
             U256::from(30000u64),
         );
+        store_block_fees(&mut host, &dummy_block_fees()).unwrap();
         produce(
             &mut host,
             DUMMY_CHAIN_ID,
-            dummy_block_fees(),
             &mut Configuration::default(),
             None,
             None,
@@ -906,11 +920,11 @@ mod tests {
             &sender,
             U256::from(1_000_000_000_000_000_000u64),
         );
+        store_block_fees(&mut host, &dummy_block_fees()).unwrap();
 
         produce(
             &mut host,
             DUMMY_CHAIN_ID,
-            dummy_block_fees(),
             &mut Configuration::default(),
             None,
             None,
@@ -954,11 +968,11 @@ mod tests {
             &sender,
             U256::from(5000000000000000u64),
         );
+        store_block_fees(&mut host, &dummy_block_fees()).unwrap();
 
         produce(
             &mut host,
             DUMMY_CHAIN_ID,
-            dummy_block_fees(),
             &mut Configuration::default(),
             None,
             None,
@@ -1035,11 +1049,11 @@ mod tests {
             &sender,
             U256::from(10000000000000000000u64),
         );
+        store_block_fees(&mut host, &dummy_block_fees()).unwrap();
 
         produce(
             &mut host,
             DUMMY_CHAIN_ID,
-            dummy_block_fees(),
             &mut Configuration::default(),
             None,
             None,
@@ -1094,11 +1108,11 @@ mod tests {
             &sender,
             U256::from(10000000000000000000u64),
         );
+        store_block_fees(&mut host, &dummy_block_fees).unwrap();
 
         produce(
             &mut host,
             DUMMY_CHAIN_ID,
-            dummy_block_fees,
             &mut Configuration::default(),
             None,
             None,
@@ -1159,11 +1173,11 @@ mod tests {
             &sender,
             initial_sender_balance,
         );
+        store_block_fees(&mut host, &dummy_block_fees()).unwrap();
 
         produce(
             &mut host,
             DUMMY_CHAIN_ID,
-            dummy_block_fees(),
             &mut Configuration::default(),
             None,
             None,
@@ -1213,10 +1227,10 @@ mod tests {
             &sender,
             U256::from(10000000000000000000u64),
         );
+        store_block_fees(&mut host, &dummy_block_fees()).unwrap();
         produce(
             &mut host,
             DUMMY_CHAIN_ID,
-            dummy_block_fees(),
             &mut Configuration::default(),
             None,
             None,
@@ -1366,10 +1380,10 @@ mod tests {
         store_blueprints(&mut host, vec![blueprint(vec![transaction])]);
 
         // Apply the transaction
+        store_block_fees(&mut host, &dummy_block_fees()).unwrap();
         produce(
             &mut host,
             DUMMY_CHAIN_ID,
-            dummy_block_fees(),
             &mut Configuration::default(),
             None,
             None,
@@ -1413,10 +1427,10 @@ mod tests {
         // first block should be 0
         let blueprint = almost_empty_blueprint();
         store_inbox_blueprint(&mut host, blueprint).expect("Should store a blueprint");
+        store_block_fees(&mut host, &dummy_block_fees()).unwrap();
         produce(
             &mut host,
             DUMMY_CHAIN_ID,
-            dummy_block_fees(),
             &mut Configuration::default(),
             None,
             None,
@@ -1430,7 +1444,6 @@ mod tests {
         produce(
             &mut host,
             DUMMY_CHAIN_ID,
-            dummy_block_fees(),
             &mut Configuration::default(),
             None,
             None,
@@ -1444,7 +1457,6 @@ mod tests {
         produce(
             &mut host,
             DUMMY_CHAIN_ID,
-            dummy_block_fees(),
             &mut Configuration::default(),
             None,
             None,
@@ -1584,15 +1596,10 @@ mod tests {
             ..Configuration::default()
         };
 
-        let computation_result = produce(
-            &mut host,
-            DUMMY_CHAIN_ID,
-            dummy_block_fees(),
-            &mut configuration,
-            None,
-            None,
-        )
-        .expect("Should have produced");
+        store_block_fees(&mut host, &dummy_block_fees()).unwrap();
+        let computation_result =
+            produce(&mut host, DUMMY_CHAIN_ID, &mut configuration, None, None)
+                .expect("Should have produced");
 
         // test no new block
         assert!(
@@ -1669,15 +1676,10 @@ mod tests {
             limits,
             ..Configuration::default()
         };
-        let computation_result = produce(
-            &mut host,
-            DUMMY_CHAIN_ID,
-            dummy_block_fees(),
-            &mut configuration,
-            None,
-            None,
-        )
-        .expect("Should have produced");
+        store_block_fees(&mut host, &dummy_block_fees()).unwrap();
+        let computation_result =
+            produce(&mut host, DUMMY_CHAIN_ID, &mut configuration, None, None)
+                .expect("Should have produced");
 
         // test no new block
         assert_eq!(
@@ -1720,8 +1722,6 @@ mod tests {
 
         // init host
         let mut host = MockKernelHost::default();
-        // ensure we're using the default block fees to test.
-        let block_fees = crate::retrieve_block_fees(&mut host).unwrap();
 
         // see
         // https://basescan.org/tx/0x07471adfe8f4ec553c1199f495be97fc8be8e0626ae307281c22534460184ed1
@@ -1763,7 +1763,6 @@ mod tests {
         produce(
             &mut host,
             DUMMY_CHAIN_ID,
-            block_fees,
             &mut Configuration::default(),
             None,
             None,
@@ -1836,15 +1835,9 @@ mod tests {
             block_storage::read_current_number(&host).is_err(),
             "Should not have found current block number"
         );
-        produce(
-            &mut host,
-            DUMMY_CHAIN_ID,
-            dummy_block_fees(),
-            &mut configuration,
-            None,
-            None,
-        )
-        .expect("Should have produced");
+        store_block_fees(&mut host, &dummy_block_fees()).unwrap();
+        produce(&mut host, DUMMY_CHAIN_ID, &mut configuration, None, None)
+            .expect("Should have produced");
 
         assert!(
             block_storage::read_current_number(&host).is_ok(),
@@ -1856,16 +1849,10 @@ mod tests {
         let proposals_second_reboot = vec![wrap_transaction(2, loop_5800_tx)];
 
         store_inbox_blueprint(&mut host, blueprint(proposals_second_reboot)).unwrap();
+        store_block_fees(&mut host, &dummy_block_fees()).unwrap();
 
-        produce(
-            &mut host,
-            DUMMY_CHAIN_ID,
-            dummy_block_fees(),
-            &mut configuration,
-            None,
-            None,
-        )
-        .expect("Should have produced");
+        produce(&mut host, DUMMY_CHAIN_ID, &mut configuration, None, None)
+            .expect("Should have produced");
 
         let block =
             block_storage::read_current(&mut host).expect("Should have found a block");
@@ -1944,11 +1931,11 @@ mod tests {
             &sender,
             U256::from(1_000_000_000_000_000_000u64),
         );
+        store_block_fees(&mut host, &dummy_block_fees()).unwrap();
 
         produce(
             &mut host,
             DUMMY_CHAIN_ID,
-            dummy_block_fees(),
             &mut Configuration::default(),
             None,
             None,
