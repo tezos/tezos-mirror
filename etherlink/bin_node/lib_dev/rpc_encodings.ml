@@ -921,6 +921,8 @@ let unsupported_methods : string list =
     "eth_newPendingTransactionFilter";
     "eth_uninstallFilter";
     "eth_sendTransaction";
+    "eth_subscribe";
+    "eth_unsubscribe";
     (* debug *)
     "debug_getBadBlocks";
     "debug_getRawBlock";
