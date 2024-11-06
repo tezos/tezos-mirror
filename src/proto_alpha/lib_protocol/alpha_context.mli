@@ -193,6 +193,8 @@ module Period : sig
 
   val one_hour : period
 
+  val one_day : period
+
   val compare : period -> period -> int
 end
 

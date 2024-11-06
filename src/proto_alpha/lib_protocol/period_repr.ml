@@ -165,3 +165,5 @@ let one_second = Internal.one
 let one_minute = of_seconds_exn 60L
 
 let one_hour = of_seconds_exn 3600L
+
+let one_day = of_seconds_exn 86400L
