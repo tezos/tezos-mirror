@@ -992,6 +992,15 @@ let import ~apply_unsafe_patches ~no_checks ~force cctxt ~data_dir
     try Unix.unlink f with Unix.Unix_error (Unix.ENOENT, _, _) -> ()
   in
   List.iter rm Store.extra_sqlite_files ;
+  let* () =
+    let* metadata = Metadata.read_metadata_file ~dir:data_dir in
+    let*? metadata =
+      match metadata with
+      | Some m -> Ok m
+      | None -> error_with "No rollup node metadata in snapshot."
+    in
+    Store_migration.maybe_run_migration metadata Store.version ~data_dir
+  in
   let* () = maybe_reconstruct_context cctxt ~data_dir ~apply_unsafe_patches in
   let* () =
     correct_history_mode ~data_dir snapshot_header original_history_mode
