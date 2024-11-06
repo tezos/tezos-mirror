@@ -67,12 +67,13 @@ module Prometheus = struct
         "Total time passed in a function and number of times it has been called"
         "time"
 
+    (** Because prometheus can't handle high cardinality in metrics names,
+        we treat only those who are specifically marked for the prometheus backend.
+        Returns a boolean that indicate if the entry has been registered or not. *)
     let output_entry subsystem (id, metadata) n d =
       let namespace = "profiling" in
-      (* because prometheus can't handle high cardinality in metrics names,
-         we treat only those who are specifically marked for the prometheus backend *)
       match Stdlib.List.assoc_opt "prometheus" metadata with
-      | None -> ()
+      | None -> false
       | Some id' ->
           let id = if id' = "" then id else id' in
           if d.wall = 0. then
@@ -83,7 +84,8 @@ module Prometheus = struct
             Prometheus.Summary.observe
               (summary ~namespace ~subsystem id)
               ~n:(Float.of_int n)
-              d.wall
+              d.wall ;
+          true
 
     let output_report =
       let output t r =
@@ -96,17 +98,19 @@ module Prometheus = struct
                 | (_, {start; _}) :: _ -> start
                 | [] -> {wall = 0.; cpu = 0.})
           in
+          (* For each node in both [aggregated] and [recorded] lists,
+             we only output the children nodes if the parent has been marked for
+             promotheus backend. This is similar to verbosity filtering where a child is
+             only recorded if the parent is. *)
           IdMap.iter
             (fun id {count = n; total = Span d; node_verbosity = _; children} ->
-              output_entry t.name id n d ;
-              output ~t0 {recorded = []; aggregated = children})
+              if output_entry t.name id n d then
+                output ~t0 {recorded = []; aggregated = children})
             aggregated ;
           List.iter
             (fun ( id,
                    {start = t0; duration = Span d; contents; item_verbosity = _}
-                 ) ->
-              output_entry t.name id 1 d ;
-              output ~t0 contents)
+                 ) -> if output_entry t.name id 1 d then output ~t0 contents)
             recorded
         in
         output r
