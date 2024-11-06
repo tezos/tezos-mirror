@@ -23,12 +23,16 @@ type alert =
   | Delay_validation_pqc of float
   | Delay_validation_qc of float
   | Delay_pqc_qc of float
+  | Attestation_rate of float
+  | Pre_attestation_only of int
+  | Attestation_only of int
   | No_data
 
 let strings_of_alert =
   let msg fmt name v = (name, fmt v) in
   let int32 = msg Int32.to_string in
   let float = msg string_of_float in
+  let int = msg string_of_int in
   function
   | Latest_canonical_block t -> int32 "Last canonical block" t
   | Timestamp t -> int32 "Time between blocks" t
@@ -42,6 +46,11 @@ let strings_of_alert =
   | Delay_validation_pqc t -> float "Delay between validation and PQC" t
   | Delay_validation_qc t -> float "Delay between validation and QC" t
   | Delay_pqc_qc t -> float "Delay between PQC and QC" t
+  | Attestation_rate t -> float "Attestation rate" t
+  | Pre_attestation_only t ->
+      int "Number of delegates that pre-attested but didn't attest" t
+  | Attestation_only t ->
+      int "Number of delegates that attested but didn't pre-attest" t
   | No_data -> ("No data available in teztale", "")
 
 (** [gen_alerts ?prev r t]
@@ -82,6 +91,16 @@ let gen_alerts ?prev r t =
          r.delay_validation_qc
          t.delay_validation_qc
     @? alert (fun x -> Delay_pqc_qc x) r.delay_pqc_qc t.delay_pqc_qc
+    @? alert
+         ~op:( <= )
+         (fun x -> Attestation_rate x)
+         r.attestation_rate
+         t.attestation_rate
+    @? alert
+         (fun x -> Pre_attestation_only x)
+         r.pre_attestation_only
+         t.pre_attestation_only
+    @? alert (fun x -> Attestation_only x) r.attestation_only t.attestation_only
     @? [] )
 
 (** [print_alerts alerts]

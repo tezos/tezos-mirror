@@ -56,7 +56,7 @@ let gen_report level (block : Block.t) ops =
     let attestation = times Consensus_ops.Attestation ops block.round in
     {attestation; preattestation}
   in
-  block_report level block delays attesting_power
+  block_report level block ops delays attesting_power
 
 (** Filter data, compute report (use it to update context) and compute alert for
     this report. *)
@@ -248,9 +248,13 @@ let alert_cmd =
   let delay_validation_pqc = t "delay_validation_pqc" Arg.float in
   let delay_validation_qc = t "delay_validation_qc" Arg.float in
   let delay_pqc_qc = t "delay_pqc_qc" Arg.float in
+  let attestation_rate = t ~lower:true "attestation_rate" Arg.float in
+  let pre_attestation_only = t "pre_attestation_only" Arg.int in
+  let attestation_only = t "attestation_only" Arg.int in
   let format timestamp round validation_delay application_delay delay_66
       delay_90 delay_66_pre delay_90_pre delay_validation_pqc
-      delay_validation_qc delay_pqc_qc =
+      delay_validation_qc delay_pqc_qc attestation_rate pre_attestation_only
+      attestation_only =
     {
       level = ();
       timestamp;
@@ -264,13 +268,17 @@ let alert_cmd =
       delay_validation_pqc;
       delay_validation_qc;
       delay_pqc_qc;
+      attestation_rate;
+      pre_attestation_only;
+      attestation_only;
     }
   in
   let thresholds =
     Term.(
       const format $ timestamp $ round $ validation_delay $ application_delay
       $ delay_66 $ delay_90 $ delay_66_pre $ delay_90_pre $ delay_validation_pqc
-      $ delay_validation_qc $ delay_pqc_qc)
+      $ delay_validation_qc $ delay_pqc_qc $ attestation_rate
+      $ pre_attestation_only $ attestation_only)
   in
   let url =
     let doc = "The teztale server URL" in

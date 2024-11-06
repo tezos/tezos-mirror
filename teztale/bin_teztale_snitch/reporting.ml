@@ -97,7 +97,7 @@ let times (kind : Consensus_ops.operation_kind)
     ops
 
 (** Generic type, used by both report creation and theshold definition *)
-type ('level, 'round, 'tm, 'delay) report0 = {
+type ('level, 'round, 'tm, 'delay, 'rate, 'int) report0 = {
   level : 'level;
   timestamp : 'tm;
   round : 'round;
@@ -110,16 +110,86 @@ type ('level, 'round, 'tm, 'delay) report0 = {
   delay_validation_pqc : 'delay;
   delay_validation_qc : 'delay;
   delay_pqc_qc : 'delay;
+  attestation_rate : 'rate;
+  pre_attestation_only : 'int;
+  attestation_only : 'int;
 }
 
-type report = (int32, int32, Time.Protocol.t, float option) report0
+type report =
+  ( int32,
+    int32,
+    Time.Protocol.t,
+    float option,
+    float option,
+    int option )
+  report0
 
-type thresholds = (unit, int32 option, int32 option, float option) report0
+type thresholds =
+  ( unit,
+    int32 option,
+    int32 option,
+    float option,
+    float option,
+    int option )
+  report0
 
-(** [block_report level block distribution attestingPower]
+(** [filter_ops ~round ops] filters out all operation that are not concerning round [round] *)
+let filter_ops :
+    round:int32 -> Delegate_operations.t list -> Delegate_operations.t list =
+ fun ~round ops ->
+  List.filter_map
+    (fun (e : Delegate_operations.t) ->
+      let operations =
+        List.filter
+          (fun (o : Delegate_operations.operation) ->
+            Option.value ~default:0l o.round = round)
+          e.operations
+      in
+      match operations with
+      | [] -> None
+      | operations -> Some {e with operations})
+    ops
+
+(** [(pre_attestation_only, attestation_only, included) = ops_consistency ops]
+    [pre_attestation_only]: number of delegates that pre-attested but did not attest
+    [attestation_only]: number of delegates that attested but did not pre-attest
+    [included]: number of attested slots fullfiled that was included in the next block
+*)
+let ops_consistency ops =
+  let open Delegate_operations in
+  List.fold_left
+    (fun (pa, a, r) ({operations; attesting_power; _} : Delegate_operations.t) ->
+      let r =
+        if
+          List.exists
+            (fun o ->
+              o.kind = Consensus_ops.Attestation && o.block_inclusion <> [])
+            operations
+        then r + attesting_power
+        else r
+      in
+      let pa, a =
+        let exists k =
+          List.exists
+            (fun (oo : Delegate_operations.operation) -> oo.kind = k)
+            operations
+        in
+        match
+          (exists Consensus_ops.Preattestation, exists Consensus_ops.Attestation)
+        with
+        | true, false -> (pa + 1, a)
+        | false, true -> (pa, a + 1)
+        | _ -> (pa, a)
+      in
+      (pa, a, r))
+    (0, 0, 0)
+    ops
+
+(** [block_report level block ops distribution attestingPower]
     Compute report for a given block
 *)
 let block_report (level : int32) (block : Block.t)
+    (ops : Delegate_operations.t list)
     (distribution : Ptime.t Signature.Public_key_hash.Map.t partitioned)
     (attestingPower : int Signature.Public_key_hash.Map.t) : report =
   let round = block.round in
@@ -157,6 +227,19 @@ let block_report (level : int32) (block : Block.t)
   let delay_pqc_qc =
     Option.bind delay_66_pre (fun t -> delay_with t delay_66)
   in
+  let ops = filter_ops ~round ops in
+  let pre_attestation_only, attestation_only, attestation_rate0 =
+    ops_consistency ops
+  in
+  let attestation_rate =
+    match
+      Signature.Public_key_hash.Map.fold (fun _ -> ( + )) attestingPower 0
+    with
+    | 0 -> None
+    | total_attestingPower ->
+        Some
+          (float_of_int attestation_rate0 /. float_of_int total_attestingPower)
+  in
   {
     level;
     timestamp;
@@ -170,4 +253,9 @@ let block_report (level : int32) (block : Block.t)
     delay_validation_pqc;
     delay_validation_qc;
     delay_pqc_qc;
+    attestation_rate;
+    pre_attestation_only =
+      (if pre_attestation_only = 0 then None else Some pre_attestation_only);
+    attestation_only =
+      (if attestation_only = 0 then None else Some attestation_only);
   }
