@@ -45,6 +45,7 @@ type experimental_features = {
   overwrite_simulation_tick_limit : bool;
   garbage_collector : garbage_collector option;
   next_wasm_runtime : bool;
+  enable_websocket : bool;
 }
 
 type sequencer = {
@@ -137,6 +138,7 @@ let default_experimental_features =
     overwrite_simulation_tick_limit = false;
     garbage_collector = None;
     next_wasm_runtime = false;
+    enable_websocket = false;
   }
 
 let default_data_dir = Filename.concat (Sys.getenv "HOME") ".octez-evm-node"
@@ -687,6 +689,7 @@ let experimental_features_encoding =
            overwrite_simulation_tick_limit;
            garbage_collector;
            next_wasm_runtime;
+           enable_websocket;
          } ->
       ( drop_duplicate_on_injection,
         enable_send_raw_transaction,
@@ -694,14 +697,16 @@ let experimental_features_encoding =
         block_storage_sqlite3,
         overwrite_simulation_tick_limit,
         garbage_collector,
-        next_wasm_runtime ))
+        next_wasm_runtime,
+        enable_websocket ))
     (fun ( drop_duplicate_on_injection,
            enable_send_raw_transaction,
            node_transaction_validation,
            block_storage_sqlite3,
            overwrite_simulation_tick_limit,
            garbage_collector,
-           next_wasm_runtime ) ->
+           next_wasm_runtime,
+           enable_websocket ) ->
       {
         drop_duplicate_on_injection;
         enable_send_raw_transaction;
@@ -710,8 +715,9 @@ let experimental_features_encoding =
         overwrite_simulation_tick_limit;
         garbage_collector;
         next_wasm_runtime;
+        enable_websocket;
       })
-    (obj7
+    (obj8
        (dft
           ~description:
             "Request the rollup node to filter messages it has already \
@@ -755,6 +761,11 @@ let experimental_features_encoding =
           ~description:
             "Enable or disable the experimental WASM runtime that is expected \
              to replace the Smart Rollup’s Fast Exec runtime"
+          bool
+          false)
+       (dft
+          "enable_websocket"
+          ~description:"Enable or disable the experimental websocket server"
           bool
           false))
 

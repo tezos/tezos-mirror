@@ -678,6 +678,13 @@ let snapshot_file_arg =
        is based on the snapshot information."
     Params.string
 
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/7591
+   Remove this whenever we have an experimental websocket server ready to
+   be tested. *)
+let fail_if_websocket_is_enabled ~config =
+  if config.experimental_features.enable_websocket then
+    Stdlib.failwith "The experimental websocket server is not implemented yet."
+
 let start_proxy ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?rpc_batch_limit
     ?cors_origins ?cors_headers ?log_filter_max_nb_blocks
     ?log_filter_max_nb_logs ?log_filter_chunk_size ?rollup_node_endpoint
@@ -708,6 +715,7 @@ let start_proxy ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?rpc_batch_limit
       ~verbose
       ()
   in
+  fail_if_websocket_is_enabled ~config ;
   (* We patch [config] to take into account the proxy-specific argument
      [--read-only]. *)
   let config =
@@ -815,6 +823,7 @@ let start_sequencer ?password_filename ~wallet_dir ~data_dir ?rpc_addr ?rpc_port
       ~finalized_view
       ()
   in
+  fail_if_websocket_is_enabled ~config:configuration ;
   let*! () =
     let open Tezos_base_unix.Internal_event_unix in
     let config =
@@ -896,6 +905,7 @@ let start_threshold_encryption_sequencer ?password_filename ~wallet_dir
       ~finalized_view
       ()
   in
+  fail_if_websocket_is_enabled ~config:configuration ;
   let*! () =
     let open Tezos_base_unix.Internal_event_unix in
     let config =
@@ -1090,6 +1100,7 @@ let start_observer ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?rpc_batch_limit
       ~finalized_view
       ()
   in
+  fail_if_websocket_is_enabled ~config ;
   let*! () =
     let open Tezos_base_unix.Internal_event_unix in
     let config =
