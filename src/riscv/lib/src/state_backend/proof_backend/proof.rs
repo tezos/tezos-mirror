@@ -28,6 +28,7 @@ use itertools::Itertools;
 /// The proof needs to be able to:
 /// - Contain enough information to be able to run a single step on A
 /// - Obtain the hash of the state after the step
+#[derive(Clone, Debug, PartialEq)]
 pub struct Proof {
     /// State of the final state B
     final_state_hash: Hash,
@@ -110,13 +111,13 @@ impl MerkleProof {
     }
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Tag {
     Node,
     Leaf(LeafTag),
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum LeafTag {
     Blind,
     Read,
@@ -215,6 +216,7 @@ pub fn serialise_proof(proof: &Proof) -> impl Iterator<Item = u8> + '_ {
         .chain(nodes_encoding)
 }
 
+#[derive(Debug, PartialEq)]
 pub enum DeserialiseError {
     ExpectedLeaf,
     InvalidTag,
@@ -222,10 +224,10 @@ pub enum DeserialiseError {
     TooManyBytes,
 }
 
-/// Tree structure specifying the shape of a merkle tree.
+/// Tree structure specifying the shape of a Merkle tree.
 ///
 /// Leaves contain a [`usize`] representing the amount of bytes
-/// held in the merkle tree leaf as raw data.
+/// held in the Merkle tree leaf as raw data.
 pub type Shape = Tree<usize>;
 
 impl Shape {
@@ -317,8 +319,8 @@ fn deserialise_merkle_proof(
 
 /// Given a [`Iterator<Item = u8>`], parse the contents into a [`Proof`].
 ///
-/// A [`Shape`] of the full merkle tree has to be provided to account for the proof being
-/// only a subtree of the actual full merkle tree.
+/// A [`Shape`] of the full Merkle tree has to be provided to account for the proof being
+/// only a subtree of the actual full Merkle tree.
 /// Knowing the initial shape statically helps improve size of the encoding by
 /// not needing to know arity of different subtrees / different leaf sizes.
 ///
@@ -341,16 +343,16 @@ pub fn deserialise_proof(
 
 #[cfg(test)]
 mod tests {
-    use super::{serialise_proof, MerkleProof, MerkleProofLeaf, TAG_BLIND, TAG_NODE, TAG_READ};
+    use super::{
+        serialise_proof, CompressedAccessInfo, DeserialiseError, MerkleProof, MerkleProofLeaf,
+        Shape, TAG_BLIND, TAG_NODE, TAG_READ,
+    };
     use crate::{
-        state_backend::proof_backend::{
-            merkle::CompressedAccessInfo,
-            proof::{CompressedMerkleTree, Proof},
-        },
+        state_backend::proof_backend::proof::{deserialise_proof, CompressedMerkleTree, Proof},
         storage::{Hash, DIGEST_SIZE},
     };
     use proptest::proptest;
-    use rand::Fill;
+    use rand::{thread_rng, Fill};
 
     /// Utility struct that computes the bounds of a [`MerkleProof`] serialisation
     /// based on total number of nodes in the tree and total size of raw data in the leafs.
@@ -637,5 +639,256 @@ mod tests {
         let t_root = CompressedMerkleTree::Node(d8.1, vec![t6, t7]);
 
         check(t_root, root);
+    }
+
+    fn check_deserialisation(raw_bytes: &[u8], full_shape: Shape, expected_proof: Proof) {
+        let proof = deserialise_proof(raw_bytes.iter().copied(), full_shape).unwrap();
+        assert_eq!(proof, expected_proof);
+    }
+
+    fn check_bad_deserialisation(
+        raw_bytes: &[u8],
+        full_shape: Shape,
+        expected_error: DeserialiseError,
+    ) {
+        let proof = deserialise_proof(raw_bytes.iter().copied(), full_shape);
+        assert_eq!(proof, Err(expected_error));
+    }
+
+    #[test]
+    fn deserialise_leaf_trees() {
+        // Serialisation represents a leaf
+        // Original shape can be a leaf or a tree with multiple children.
+
+        let gen_hash_data = |length| {
+            let mut data = vec![0; length];
+            data.try_fill(&mut thread_rng()).unwrap();
+            let hash = Hash::blake2b_hash_bytes(&data).unwrap();
+            (data, hash)
+        };
+
+        // Blind leaf, given shape is exact / bigger
+        let final_hash_bytes = rand::random::<[u8; DIGEST_SIZE]>();
+        let (data, hash) = gen_hash_data(12);
+        let bytes = [final_hash_bytes.as_ref(), &[TAG_BLIND << 6], hash.as_ref()].concat();
+        // When a leaf / subtree is blinded, the size is disregarded
+        let shape = Shape::Leaf(40);
+        let bigger_shape = Shape::Node(vec![
+            Shape::Leaf(30),
+            Shape::Node(vec![Shape::Leaf(1), Shape::Leaf(10)]),
+        ]);
+        let exp_proof = Proof::new(
+            MerkleProof::Leaf(MerkleProofLeaf::Blind(hash)),
+            final_hash_bytes.into(),
+        );
+
+        check_deserialisation(&bytes, shape, exp_proof.clone());
+        check_deserialisation(&bytes, bigger_shape, exp_proof);
+
+        // Read leaf
+        let bytes = [final_hash_bytes.as_ref(), &[TAG_READ << 6], &data].concat();
+        let shape = Shape::Leaf(12);
+        let bigger_shape = Shape::Node(vec![
+            Shape::Leaf(5),
+            Shape::Node(vec![Shape::Leaf(4), Shape::Leaf(3)]),
+        ]);
+        let exp_proof = Proof::new(
+            MerkleProof::Leaf(MerkleProofLeaf::Read(data.clone())),
+            final_hash_bytes.into(),
+        );
+
+        check_deserialisation(&bytes, shape, exp_proof.clone());
+        check_deserialisation(&bytes, bigger_shape, exp_proof);
+    }
+
+    #[test]
+    fn deserialise_trees_exact_shape() {
+        // Serialisation represents (((B),(R-40)), ((R-32),(B),(R-16)), (B))
+        //                             1     2         3    4     5      6
+        // Traversal will be:    root (12) 1 2 (345) 3 4 5 6
+        // Originial shapes
+
+        // For readability (tag << 0 operations)
+        #![allow(clippy::identity_op)]
+
+        let gen_hash_data = |length| {
+            let mut data = vec![0; length];
+            data.try_fill(&mut thread_rng()).unwrap();
+            let hash = Hash::blake2b_hash_bytes(&data).unwrap();
+            (data, hash)
+        };
+
+        let (_, fh) = gen_hash_data(32);
+        let [(_, h0), (d1, _), (d2, _), (_, h3), (d4, _), (_, h5)] =
+            [16, 40, 32, 100, 16, 200].map(gen_hash_data);
+        let tag_bytes = [
+            TAG_NODE << 6 | TAG_NODE << 4 | TAG_BLIND << 2 | TAG_READ << 0,
+            TAG_NODE << 6 | TAG_READ << 4 | TAG_BLIND << 2 | TAG_READ << 0,
+            TAG_BLIND << 6,
+        ];
+        let val_bytes = [h0.as_ref(), &d1, &d2, h3.as_ref(), &d4, h5.as_ref()].concat();
+
+        let n1 = Shape::Node(vec![Shape::Leaf(32), Shape::Leaf(40)]);
+        let n2 = Shape::Node(vec![Shape::Leaf(32), Shape::Leaf(10), Shape::Leaf(16)]);
+        let n3 = Shape::Leaf(100);
+        let root = Shape::Node(vec![n1, n2, n3]);
+
+        let merkle_proof = MerkleProof::Node(vec![
+            MerkleProof::Node(vec![
+                MerkleProof::Leaf(MerkleProofLeaf::Blind(h0)),
+                MerkleProof::Leaf(MerkleProofLeaf::Read(d1)),
+            ]),
+            MerkleProof::Node(vec![
+                MerkleProof::Leaf(MerkleProofLeaf::Read(d2)),
+                MerkleProof::Leaf(MerkleProofLeaf::Blind(h3)),
+                MerkleProof::Leaf(MerkleProofLeaf::Read(d4)),
+            ]),
+            MerkleProof::Leaf(MerkleProofLeaf::Blind(h5)),
+        ]);
+
+        let raw_bytes = [fh.as_ref(), &tag_bytes, &val_bytes].concat();
+        check_deserialisation(&raw_bytes, root.clone(), Proof::new(merkle_proof, fh));
+
+        // check not enough bytes errors are generated
+        // values cutoff
+        check_bad_deserialisation(
+            &raw_bytes[..100],
+            root.clone(),
+            DeserialiseError::NotEnoughBytes,
+        );
+        // tags cutoff
+        check_bad_deserialisation(
+            &raw_bytes[..33],
+            root.clone(),
+            DeserialiseError::NotEnoughBytes,
+        );
+        // hash cutoff
+        check_bad_deserialisation(
+            &raw_bytes[..20],
+            root.clone(),
+            DeserialiseError::NotEnoughBytes,
+        );
+    }
+
+    #[test]
+    fn deserialise_trees_bigger_shape() {
+        // Serialisation represents ( ( ((R-20),(B)),(B),(R-16) ), ( (R-30),(B) ) )
+        //                                  1    2    3    4           5    6
+        // Traversal will be:    root (1234) (12) 1 2 3 4 (56) 5 6
+        // Originial shapes
+
+        // For readability (tag << 0 operations)
+        #![allow(clippy::identity_op)]
+
+        let gen_hash_data = |length| {
+            let mut data = vec![0; length];
+            data.try_fill(&mut thread_rng()).unwrap();
+            let hash = Hash::blake2b_hash_bytes(&data).unwrap();
+            (data, hash)
+        };
+
+        let (_, fh) = gen_hash_data(32);
+        let [(d0, _), (_, h1), (_, h2), (d3, _), (d4, _), (_, h5)] =
+            [20, 100, 100, 16, 30, 200].map(gen_hash_data);
+        let tag_bytes = [
+            TAG_NODE << 6 | TAG_NODE << 4 | TAG_NODE << 2 | TAG_READ << 0,
+            TAG_BLIND << 6 | TAG_BLIND << 4 | TAG_READ << 2 | TAG_NODE << 0,
+            TAG_READ << 6 | TAG_BLIND << 4,
+        ];
+        let val_bytes = [&d0, h1.as_ref(), h2.as_ref(), &d3, &d4, h5.as_ref()].concat();
+
+        let blind_subtree_1 = Shape::Node(vec![
+            Shape::Node(vec![Shape::Leaf(200), Shape::Leaf(300)]),
+            Shape::Leaf(400),
+            Shape::Node(vec![Shape::Leaf(50), Shape::Leaf(50), Shape::Leaf(50)]),
+        ]);
+        let blind_subtree_2 = Shape::Node(vec![
+            Shape::Node(vec![Shape::Leaf(200), Shape::Leaf(300)]),
+            Shape::Leaf(400),
+            Shape::Node(vec![
+                Shape::Leaf(50),
+                Shape::Node(vec![Shape::Leaf(50), Shape::Leaf(400)]),
+                Shape::Leaf(50),
+            ]),
+        ]);
+        let subtree_size_16 = Shape::Node(vec![
+            Shape::Leaf(10),
+            Shape::Node(vec![Shape::Leaf(2), Shape::Leaf(4)]),
+        ]);
+
+        let n1 = Shape::Node(vec![Shape::Leaf(20), blind_subtree_1]);
+        let n11 = Shape::Node(vec![n1, blind_subtree_2, subtree_size_16]);
+        let n12 = Shape::Node(vec![Shape::Leaf(30), Shape::Leaf(100)]);
+        let root = Shape::Node(vec![n11, n12]);
+
+        let merkle_proof = MerkleProof::Node(vec![
+            MerkleProof::Node(vec![
+                MerkleProof::Node(vec![
+                    MerkleProof::Leaf(MerkleProofLeaf::Read(d0.clone())),
+                    MerkleProof::Leaf(MerkleProofLeaf::Blind(h1)),
+                ]),
+                MerkleProof::Leaf(MerkleProofLeaf::Blind(h2)),
+                MerkleProof::Leaf(MerkleProofLeaf::Read(d3.clone())),
+            ]),
+            MerkleProof::Node(vec![
+                MerkleProof::Leaf(MerkleProofLeaf::Read(d4.clone())),
+                MerkleProof::Leaf(MerkleProofLeaf::Blind(h5)),
+            ]),
+        ]);
+
+        let raw_bytes = [fh.as_ref(), &tag_bytes, &val_bytes].concat();
+        check_deserialisation(&raw_bytes, root.clone(), Proof::new(merkle_proof, fh));
+
+        // ExpectedLeaf tag error
+        let tag_bytes_bad = [
+            TAG_NODE << 6 | TAG_NODE << 4 | TAG_NODE << 2 | TAG_READ << 0,
+            TAG_BLIND << 6 | TAG_NODE << 4 /* Expected Leaf */ | TAG_READ << 2 | TAG_NODE << 0,
+            TAG_READ << 6 | TAG_BLIND << 4,
+        ];
+        let raw_bytes = [fh.as_ref(), &tag_bytes_bad, &val_bytes].concat();
+        check_bad_deserialisation(&raw_bytes, root.clone(), DeserialiseError::ExpectedLeaf);
+    }
+
+    #[test]
+    fn deserialise_too_many_bytes() {
+        let gen_hash_data = || {
+            let data = rand::random::<[u8; 12]>().to_vec();
+            let hash = Hash::blake2b_hash_bytes(&data).unwrap();
+            (data, hash)
+        };
+
+        let (data, _hash) = gen_hash_data();
+        let final_hash_bytes = rand::random::<[u8; DIGEST_SIZE]>();
+
+        let shape = Shape::Leaf(12);
+
+        let extra_bytes = [120, 200, 50, 10];
+        let bytes = [
+            final_hash_bytes.as_ref(),
+            &[TAG_READ << 6],
+            &data,
+            &extra_bytes,
+        ]
+        .concat();
+
+        check_bad_deserialisation(&bytes, shape, DeserialiseError::TooManyBytes);
+    }
+
+    #[test]
+    fn deserialise_invalid_tag() {
+        let gen_hash_data = || {
+            let data = rand::random::<[u8; 12]>().to_vec();
+            let hash = Hash::blake2b_hash_bytes(&data).unwrap();
+            (data, hash)
+        };
+
+        let (_data, hash) = gen_hash_data();
+        let final_hash_bytes = rand::random::<[u8; DIGEST_SIZE]>();
+
+        let shape = Shape::Leaf(12);
+
+        let bytes = [final_hash_bytes.as_ref(), &[0b01 << 6], hash.as_ref()].concat();
+
+        check_bad_deserialisation(&bytes, shape, DeserialiseError::InvalidTag);
     }
 }
