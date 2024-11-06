@@ -3,6 +3,23 @@
 Changelog
 '''''''''
 
+Version 21.0
+============
+
+Smart Rollup node
+-----------------
+
+- Storage now uses SQLite as a backend instead of the custom indexed-file based
+  store. This change makes the rollup node more robust but entails a migration
+  of the store data. (MRs :gl:`!15053`, :gl:`!15026`, :gl:`!15059`,
+  :gl:`!15073`, :gl:`!15218`, :gl:`!15257`)
+
+- Allow to import snaphosts for older stores by migrating the data on import.
+  (MR :gl:`!15422`)
+
+- Fixed a bug which would make injection of messages in the batcher with the RPC
+  ``/local/batcher/injection`` fail if called too early. (MR :gl:`!15459`)
+
 Version 21.0~rc3
 ================
 

@@ -30,7 +30,7 @@ Node
 
 - Introduced a specific exit code for the ``octez-node upgrade storage
   --status`` command. It now returns the exit code 1 when an upgrade
-  is availalbe. 0 is returned when the storage is up to date. (MR :gl:`!TBD`)
+  is available. 0 is returned when the storage is up to date. (MR :gl:`!15152`)
 
 - New RPCs ``/chain/{chain_id}/protocols`` (and
   ``/chain/{chain_id}/protocols/{protocol_hash}``) to retrieve protocol
@@ -129,17 +129,6 @@ Smart Rollup node
 
 - RPC ``/global/block/<block_id>/outbox/<outbox_level>/messages`` now fails if
   ``outbox_level`` is above the level of ``block_id``. (MR :gl:`!14911`)
-
-- Storage now uses SQLite as a backend instead of the custom indexed-file based
-  store. This change makes the rollup node more robust but entails a migration
-  of the store data. (MRs :gl:`!15053`, :gl:`!15026`, :gl:`!15059`,
-  :gl:`!15073`, :gl:`!15218`, :gl:`!15257`)
-
-- Allow to import snaphosts for older stores by migrating the data on import.
-  (MR :gl:`!15422`)
-
-- Fixed a bug which would make injection of messages in the batcher with the RPC
-  ``/local/batcher/injection`` fail if called too early. (MR :gl:`!15459`)
 
 - Improved error messages for RPC
   ``/global/block/<block_id>/helpers/proofs/outbox/<outbox_level>/messages?index=<message_index>``. (MR :gl:`!15507`)
