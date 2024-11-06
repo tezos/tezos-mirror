@@ -728,7 +728,7 @@ let cement_blocks ?(check_consistency = true) (cemented_store : t)
                metadata_offset
                (total_block_length - metadata_offset) ;
              finish ())
-           () [@profiler.record_s "finalize metadata"])
+           () [@profiler.aggregate_f {verbosity = Debug} "metadata_writer"])
       in
       let metadata_finalizer () =
         (let*! () = Lwt_preemptive.detach Zip.close_out out_file in
@@ -738,7 +738,7 @@ let cement_blocks ?(check_consistency = true) (cemented_store : t)
          in
          let*! () = Lwt_unix.rename tmp_metadata_file_path metadata_file_path in
          return_unit)
-        [@profiler.record_s "finalize metadata"]
+        [@profiler.aggregate_s {verbosity = Debug} "metadata_finalizer"]
       in
       return (metadata_writer, metadata_finalizer)
     else return ((fun _ -> Lwt.return_unit), fun () -> return_unit)
@@ -765,7 +765,8 @@ let cement_blocks ?(check_consistency = true) (cemented_store : t)
                  (* This call rewrites [block_bytes] to a pruned block
                     (with its size modified) *)
                  (Block_repr_unix.prune_raw_block_bytes
-                    block_bytes [@profiler.aggregate_f "prune raw block"])
+                    block_bytes
+                  [@profiler.aggregate_f {verbosity = Debug} "prune raw block"])
                in
                (* We start by blitting the corresponding offset in the preamble part *)
                Bytes.set_int64_be
@@ -778,7 +779,9 @@ let cement_blocks ?(check_consistency = true) (cemented_store : t)
                     ~pos:0
                     ~len:pruned_block_length
                     fd
-                    block_bytes [@profiler.aggregate_s "write pruned block"])
+                    block_bytes
+                  [@profiler.aggregate_s
+                    {verbosity = Debug} "write pruned block"])
                in
                let block_level = Int32.(add first_block_level (of_int i)) in
                let* () =
@@ -797,18 +800,18 @@ let cement_blocks ?(check_consistency = true) (cemented_store : t)
                      else return_unit)
                in
                (* We also populate the indexes *)
-               ((Cemented_block_level_index.replace
-                   cemented_store.cemented_block_level_index
-                   block_hash
-                   block_level ;
-                 Cemented_block_hash_index.replace
-                   cemented_store.cemented_block_hash_index
-                   block_level
-                   block_hash ;
-                 return (succ i, current_offset + pruned_block_length))
-               [@profiler.record_s "write cemented cycle"]))
+               Cemented_block_level_index.replace
+                 cemented_store.cemented_block_level_index
+                 block_hash
+                 block_level ;
+               Cemented_block_hash_index.replace
+                 cemented_store.cemented_block_hash_index
+                 block_level
+                 block_hash ;
+               return (succ i, current_offset + pruned_block_length))
              (0, first_offset)
-             reading_sequence [@profiler.record_s "write cemented cycle"])
+             reading_sequence
+           [@profiler.record_s {verbosity = Debug} "write cemented cycle"])
         in
         (* We now write the real offsets in the preamble *)
         let*! _ofs = Lwt_unix.lseek fd 0 Unix.SEEK_SET in
@@ -816,7 +819,8 @@ let cement_blocks ?(check_consistency = true) (cemented_store : t)
            ~pos:0
            ~len:preamble_length
            fd
-           offsets_buffer [@profiler.record_s "blit cemented cycle offsets"]))
+           offsets_buffer
+         [@profiler.record_s {verbosity = Debug} "blit cemented cycle offsets"]))
       (fun () ->
         let*! _ = Lwt_utils_unix.safe_close fd in
         Lwt.return_unit)
@@ -824,7 +828,8 @@ let cement_blocks ?(check_consistency = true) (cemented_store : t)
   let*! () =
     (Lwt_unix.rename
        tmp_file_path
-       final_path [@profiler.record_s "mv temp file to final file"])
+       final_path
+     [@profiler.record_s {verbosity = Debug} "mv temp file to final file"])
   in
   (* Flush the indexes to make sure that the data is stored on disk *)
   (Cemented_block_level_index.flush
@@ -833,7 +838,7 @@ let cement_blocks ?(check_consistency = true) (cemented_store : t)
    Cemented_block_hash_index.flush
      ~with_fsync:true
      cemented_store.cemented_block_hash_index)
-  [@profiler.record_f "flush indexes"] ;
+  [@profiler.record_f {verbosity = Debug} "flush indexes"] ;
   (* Update table *)
   let cemented_block_interval =
     {start_level = first_block_level; end_level = last_block_level; file}
@@ -855,7 +860,7 @@ let cement_blocks ?(check_consistency = true) (cemented_store : t)
 let trigger_full_gc cemented_store cemented_blocks_files offset =
   let open Lwt_syntax in
   let nb_files = Array.length cemented_blocks_files in
-  () [@profiler.mark ["trigger full gc"]] ;
+  () [@profiler.mark {verbosity = Debug} ["trigger full gc"]] ;
   if nb_files <= offset then Lwt.return_unit
   else
     let cemented_files = Array.to_list cemented_blocks_files in
@@ -883,7 +888,7 @@ let trigger_full_gc cemented_store cemented_blocks_files offset =
 let trigger_rolling_gc cemented_store cemented_blocks_files offset =
   let open Lwt_syntax in
   let nb_files = Array.length cemented_blocks_files in
-  () [@profiler.mark ["trigger rolling gc"]] ;
+  () [@profiler.mark {verbosity = Debug} ["trigger rolling gc"]] ;
   if nb_files <= offset then Lwt.return_unit
   else
     let {end_level = last_level_to_purge; _} =
@@ -925,7 +930,7 @@ let trigger_rolling_gc cemented_store cemented_blocks_files offset =
 let trigger_gc cemented_store history_mode =
   let open Lwt_syntax in
   let* () = Store_events.(emit start_store_garbage_collection) () in
-  match[@profiler.record_s "trigger gc"]
+  match[@profiler.record_s {verbosity = Debug} "trigger gc"]
     cemented_store.cemented_blocks_files
   with
   | None -> return_unit
