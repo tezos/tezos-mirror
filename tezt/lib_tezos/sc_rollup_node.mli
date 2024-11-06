@@ -69,7 +69,6 @@ type argument =
   | Metrics_addr of string
   | Injector_attempts of int
   | Boot_sector_file of string
-  | Dac_observer of Dac_node.t
   | Loser_mode of string
   | No_degraded
   | Gc_frequency of int

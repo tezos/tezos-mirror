@@ -8,7 +8,6 @@ It contains the following libraries:
 - {{!module-Tezos_baking_021_PsQuebec}Tezos_baking_021_PsQuebec}: Base library for `tezos-baker/accuser`
 - {{!module-Tezos_baking_021_PsQuebec_commands}Tezos_baking_021_PsQuebec_commands}: Protocol-specific commands for baking
 - {{!module-Tezos_client_021_PsQuebec}Tezos_client_021_PsQuebec}: Protocol specific library for `octez-client`
-- {{!module-Tezos_dac_021_PsQuebec}Tezos_dac_021_PsQuebec}: Protocol specific library for the Data availability Committee
 - {{!module-Tezos_dal_021_PsQuebec}Tezos_dal_021_PsQuebec}: Protocol specific library for the Data availability Layer
 - {{!module-Tezos_layer2_utils_021_PsQuebec}Tezos_layer2_utils_021_PsQuebec}: Protocol specific library for Layer 2 utils
 - {{!module-Tezos_protocol_plugin_021_PsQuebec}Tezos_protocol_plugin_021_PsQuebec}: Protocol plugin

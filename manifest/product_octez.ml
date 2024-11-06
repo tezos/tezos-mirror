@@ -4722,50 +4722,6 @@ let octez_dal_node_gossipsub_lib =
         octez_crypto |> open_;
       ]
 
-let octez_dac_lib =
-  public_lib
-    "tezos-dac-lib"
-    ~path:"src/lib_dac"
-    ~opam:"tezos-dac-lib"
-    ~synopsis:"Tezos: `tezos-dac` library"
-    ~deps:
-      [octez_base |> open_ ~m:"TzPervasives"; octez_protocol_updater |> open_]
-
-let octez_dac_client_lib =
-  public_lib
-    "tezos-dac-client-lib"
-    ~path:"src/lib_dac_client"
-    ~opam:"tezos-dac-client-lib"
-    ~synopsis:"Tezos: `tezos-dac-client` library"
-    ~deps:
-      [
-        octez_base |> open_ ~m:"TzPervasives";
-        octez_base_unix;
-        octez_client_base |> open_;
-        octez_client_base_unix |> open_;
-        octez_stdlib_unix |> open_;
-        octez_dac_lib |> open_;
-      ]
-
-let octez_dac_node_lib =
-  private_lib
-    "tezos_dac_node_lib"
-    ~path:"src/lib_dac_node"
-    ~opam:"tezos-dac-node-lib"
-    ~synopsis:"Tezos: `tezos-dac-node` library"
-    ~deps:
-      [
-        octez_base |> open_ ~m:"TzPervasives";
-        octez_base_unix;
-        octez_client_base |> open_;
-        octez_client_base_unix |> open_;
-        octez_stdlib_unix |> open_;
-        octez_layer2_store |> open_;
-        octez_rpc_http_server;
-        octez_dac_lib |> open_;
-        octez_dac_client_lib |> open_;
-      ]
-
 let octez_node_config =
   public_lib
     "octez-node-config"
@@ -4947,8 +4903,6 @@ let octez_smart_rollup_node_lib =
         octez_node_config;
         prometheus_app;
         octez_dal_node_lib |> open_;
-        octez_dac_lib |> open_;
-        octez_dac_client_lib |> open_;
         octez_injector_lib |> open_;
         octez_version_value |> open_;
         octez_layer2_store |> open_;
@@ -5165,8 +5119,6 @@ module Protocol : sig
 
   val dal : t -> target option
 
-  val dac : t -> target option
-
   val parameters_exn : t -> target
 
   val benchmarks_proto_exn : t -> target
@@ -5279,7 +5231,6 @@ end = struct
     plugin : target option;
     plugin_registerer : target option;
     dal : target option;
-    dac : target option;
     test_helpers : target option;
     parameters : target option;
     benchmarks_proto : target option;
@@ -5290,7 +5241,7 @@ end = struct
   }
 
   let make ?client ?client_commands ?client_commands_registration
-      ?baking_commands_registration ?plugin ?plugin_registerer ?dal ?dac
+      ?baking_commands_registration ?plugin ?plugin_registerer ?dal
       ?test_helpers ?parameters ?benchmarks_proto ?octez_sc_rollup
       ?octez_sc_rollup_node ?octez_injector ?baking ~status ~name ~main
       ~embedded () =
@@ -5306,7 +5257,6 @@ end = struct
       plugin;
       plugin_registerer;
       dal;
-      dac;
       test_helpers;
       parameters;
       benchmarks_proto;
@@ -5365,8 +5315,6 @@ end = struct
   let plugin_registerer p = p.plugin_registerer
 
   let dal p = p.dal
-
-  let dac p = p.dac
 
   let parameters_exn p = mandatory "parameters" p p.parameters
 
@@ -6866,14 +6814,7 @@ let hash = Protocol.hash
     let _dal_tests =
       only_if (active && N.(number >= 016)) @@ fun () ->
       tezt
-        (* test [test_dac_pages_encoding] was removed after 016 *)
-        (if N.(number == 016) then
-           [
-             "test_dal_slot_frame_encoding";
-             "test_dac_pages_encoding";
-             "test_helpers";
-           ]
-         else ["test_dal_slot_frame_encoding"; "test_helpers"])
+        ["test_dal_slot_frame_encoding"; "test_helpers"]
         ~path:(path // "lib_dal/test")
         ~opam:(sf "octez-protocol-%s-libs" name_dash)
         ~with_macos_security_framework:true
@@ -6888,36 +6829,6 @@ let hash = Protocol.hash
             test_helpers |> if_some |> open_;
             alcotezt;
           ]
-    in
-    let dac =
-      (* [~link_all:true] is necessary to ensure that the dac plugin
-         registration happens when running the dal node. Removing this
-         option would cause DAL related tezts to fail because the DAC
-         plugin cannot be resolved. *)
-      only_if (active && N.(number >= 017)) @@ fun () ->
-      octez_protocol_lib
-        "dac"
-        ~internal_name:(sf "tezos_dac_%s" name_dash)
-        ~path:(path // "lib_dac_plugin")
-        ~synopsis:
-          "Protocol specific library for the Data availability Committee"
-        ~deps:
-          [
-            octez_base |> open_ ~m:"TzPervasives"
-            |> error_monad_module N.(number <= 018);
-            octez_protocol_compiler_registerer |> open_;
-            octez_stdlib_unix |> open_;
-            octez_dac_lib |> open_;
-            octez_dac_client_lib |> open_;
-            client |> if_some |> open_;
-            embedded |> open_;
-            main |> open_;
-          ]
-        ~inline_tests:ppx_expect
-        ~inline_tests_libraries:[bls12_381_archive; octez_rustzcash_deps]
-        ~inline_tests_link_flags:
-          ["-cclib"; "-lblst"; "-cclib"; "-loctez_rustzcash_deps"]
-        ~linkall:true
     in
     let octez_injector =
       only_if N.(active && number >= 017) @@ fun () ->
@@ -6991,11 +6902,6 @@ let hash = Protocol.hash
             octez_workers |> open_;
             octez_dal_node_services;
             octez_dal_node_lib |> open_;
-            (* [dac] is needed for the DAC observer client which is not
-               available in Nairobi and earlier. *)
-            dac |> if_some |> if_ N.(number >= 018) |> open_;
-            octez_dac_lib |> open_;
-            octez_dac_client_lib |> if_ N.(number >= 018) |> open_;
             octez_shell_services |> open_;
             octez_smart_rollup_lib |> open_;
             octez_sc_rollup |> if_some |> open_;
@@ -7227,7 +7133,6 @@ let hash = Protocol.hash
          ?plugin
          ?plugin_registerer
          ?dal
-         ?dac
          ?test_helpers
          ?parameters
          ?benchmarks_proto
@@ -8356,107 +8261,6 @@ let _octez_dal_node =
        ]
       @ protocol_deps)
     ~conflicts:[Conflicts.checkseum]
-
-let _octez_dac_node =
-  let protocol_deps =
-    let deps_for_protocol protocol =
-      let is_optional =
-        match (Protocol.status protocol, Protocol.number protocol) with
-        | _, V 000 ->
-            (* The node always needs to be linked with this protocol for Mainnet. *)
-            false
-        | Active, V _ ->
-            (* Active protocols cannot be optional because of a bug
-               that results in inconsistent hashes. Once this bug is fixed,
-               this exception can be removed. *)
-            false
-        | (Frozen | Overridden | Not_mainnet), _ | Active, (Dev | Other) ->
-            (* Other protocols are optional. *)
-            true
-      in
-      let targets = List.filter_map Fun.id [Protocol.dac protocol] in
-      if is_optional then List.map optional targets else targets
-    in
-    List.map deps_for_protocol Protocol.all |> List.flatten
-  in
-  public_exe
-    "octez-dac-node"
-    ~path:"src/bin_dac_node"
-    ~internal_name:"main_dac"
-    ~synopsis:"Tezos: `octez-dac-node` binary"
-    ~release_status:Released
-    ~with_macos_security_framework:true
-    ~deps:
-      ([
-         octez_rust_deps;
-         bls12_381_archive;
-         octez_base |> open_ ~m:"TzPervasives";
-         octez_base_unix;
-         octez_clic;
-         octez_client_base |> open_;
-         octez_client_base_unix |> open_;
-         octez_client_commands |> open_;
-         octez_rpc_http |> open_;
-         octez_rpc_http_server;
-         octez_protocol_updater;
-         octez_rpc_http_client_unix;
-         octez_stdlib_unix |> open_;
-         octez_stdlib |> open_;
-         octez_dac_lib |> open_;
-         octez_dac_node_lib |> open_;
-         octez_layer2_store |> open_;
-         irmin_pack;
-         irmin_pack_unix;
-         irmin;
-       ]
-      @ protocol_deps)
-    ~conflicts:[Conflicts.checkseum]
-
-let _octez_dac_client =
-  let protocol_deps =
-    let deps_for_protocol protocol =
-      let is_optional =
-        match (Protocol.status protocol, Protocol.number protocol) with
-        | _, V 000 ->
-            (* The node always needs to be linked with this protocol for Mainnet. *)
-            false
-        | Active, V _ ->
-            (* Active protocols cannot be optional because of a bug
-               that results in inconsistent hashes. Once this bug is fixed,
-               this exception can be removed. *)
-            false
-        | (Frozen | Overridden | Not_mainnet), _ | Active, (Dev | Other) ->
-            (* Other protocols are optional. *)
-            true
-      in
-      let targets = List.filter_map Fun.id [Protocol.dac protocol] in
-      if is_optional then List.map optional targets else targets
-    in
-    List.map deps_for_protocol Protocol.all |> List.flatten
-  in
-  public_exe
-    "octez-dac-client"
-    ~path:"src/bin_dac_client"
-    ~internal_name:"main_dac_client"
-    ~synopsis:"Tezos: `octez-dac-client` binary"
-    ~release_status:Released
-    ~with_macos_security_framework:true
-    ~deps:
-      ([
-         octez_rustzcash_deps;
-         bls12_381_archive;
-         octez_base |> open_ ~m:"TzPervasives";
-         octez_base_unix;
-         octez_clic;
-         octez_client_base |> open_;
-         octez_client_base_unix |> open_;
-         octez_client_commands |> open_;
-         octez_stdlib_unix |> open_;
-         octez_stdlib |> open_;
-         octez_dac_lib |> open_;
-         octez_dac_client_lib |> open_;
-       ]
-      @ protocol_deps)
 
 let _octez_smart_rollup_node =
   let protocol_deps =

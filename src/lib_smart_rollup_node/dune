@@ -50,8 +50,6 @@
   octez-node-config
   octez-libs.prometheus-app
   tezos-dal-node-lib
-  tezos-dac-lib
-  tezos-dac-client-lib
   octez-injector
   octez-version.value
   octez-l2-libs.layer2_store
@@ -68,8 +66,6 @@
   -open Tezos_client_base
   -open Tezos_client_base_unix
   -open Tezos_dal_node_lib
-  -open Tezos_dac_lib
-  -open Tezos_dac_client_lib
   -open Octez_injector
   -open Tezos_version_value
   -open Tezos_layer2_store

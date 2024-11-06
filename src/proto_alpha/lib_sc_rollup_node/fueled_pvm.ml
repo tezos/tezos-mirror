@@ -33,21 +33,17 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
 
   type 'a mut_pvm_impl = (module Pvm_sig.MUTABLE_STATE_S with type t = 'a)
 
-  let get_reveal ~dac_client ~pre_images_endpoint ~data_dir ~pvm_kind reveal_map
-      hash =
+  let get_reveal ~pre_images_endpoint ~data_dir ~pvm_kind reveal_map hash =
     let open Lwt_result_syntax in
     let found_in_map =
       match reveal_map with
       | None -> None
       | Some map ->
-          Utils.Reveal_hash_map.find_opt
-            (Reveals.proto_hash_to_dac_hash hash)
-            map
+          Utils.Reveal_hash_map.find_opt (Reveals.proto_hash_to_bytes hash) map
     in
     match found_in_map with
     | Some data -> return data
-    | None ->
-        Reveals.get ~dac_client ~pre_images_endpoint ~data_dir ~pvm_kind hash
+    | None -> Reveals.get ~pre_images_endpoint ~data_dir ~pvm_kind hash
 
   type eval_completion =
     | Aborted of {fuel : fuel; current_tick : int64}
@@ -128,7 +124,6 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
       | Reveal_raw_data hash -> (
           let*! data =
             get_reveal
-              ~dac_client:node_ctxt.dac_client
               ~pre_images_endpoint:node_ctxt.config.pre_images_endpoint
               ~data_dir:node_ctxt.data_dir
               ~pvm_kind:node_ctxt.kind
@@ -261,7 +256,6 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
           | Some fuel ->
               let* data =
                 get_reveal
-                  ~dac_client:node_ctxt.dac_client
                   ~pre_images_endpoint:node_ctxt.config.pre_images_endpoint
                   ~data_dir:node_ctxt.data_dir
                   ~pvm_kind:node_ctxt.kind
