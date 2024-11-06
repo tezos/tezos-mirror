@@ -124,8 +124,8 @@ let error loc err =
         ( "Malformed attribute.",
           Format.asprintf
             "@[<v 2>Accepted attributes payload are:@,\
-             - `[@profiling.mark [<list of strings>]]'@,\
-             - `[@profiling.aggregate_* <string or ident>]@,\
+             - `[@profiler.mark [<list of strings>]]'@,\
+             - `[@profiler.aggregate_* <string or ident>]@,\
              Found %a@.'"
             Ppxlib.Pprintast.expression
             expr )
