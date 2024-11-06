@@ -793,23 +793,17 @@ module Actions = struct
       ~name:"failed_to_get_attestations"
       ~level:Error
       ~msg:"unable to get DAL attestation for {delegate} -- {trace}"
-      ~pp1:Baking_state.pp_consensus_key_and_delegate
-      ("delegate", Baking_state.consensus_key_and_delegate_encoding)
+      ("delegate", Signature.Public_key_hash.encoding)
       ~pp2:Error_monad.pp_print_trace
       ("trace", Error_monad.trace_encoding)
 
   let failed_to_get_dal_attestations_in_time =
-    declare_2
+    declare_1
       ~section
       ~name:"failed_to_get_attestations_in_time"
       ~level:Error
-      ~msg:
-        "unable to get DAL attestation for {delegate} within the {timeout}s \
-         timeout"
-      ~pp1:Baking_state.pp_consensus_key_and_delegate
-      ("delegate", Baking_state.consensus_key_and_delegate_encoding)
-      ~pp2:Format.pp_print_float
-      ("timeout", Data_encoding.float)
+      ~msg:"unable to get DAL attestation for {delegate} in time"
+      ("delegate", Signature.Public_key_hash.encoding)
 
   let failed_to_inject_consensus_vote =
     declare_3
@@ -874,8 +868,7 @@ module Actions = struct
         "ready to attach DAL attestation for level {attestation_level}, round \
          {round}, with bitset {bitset} for {delegate} to attest slots \
          published at level {published_level}"
-      ~pp1:Baking_state.pp_consensus_key_and_delegate
-      ("delegate", Baking_state.consensus_key_and_delegate_encoding)
+      ("delegate", Signature.Public_key_hash.encoding)
       ~pp2:Z.pp_print
       ("bitset", Data_encoding.n)
       ("published_level", Data_encoding.int32)
