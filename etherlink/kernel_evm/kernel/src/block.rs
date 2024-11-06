@@ -210,7 +210,6 @@ fn next_bip_from_blueprints<Host: Runtime>(
     host: &mut Host,
     current_block_number: U256,
     current_block_parent_hash: H256,
-    base_fee_per_gas: &mut U256,
     tick_counter: &TickCounter,
     config: &mut Configuration,
     kernel_upgrade: &Option<KernelUpgrade>,
@@ -228,7 +227,6 @@ fn next_bip_from_blueprints<Host: Runtime>(
                 }
             }
             let gas_price = crate::gas_price::base_fee_per_gas(host, blueprint.timestamp);
-            *base_fee_per_gas = gas_price;
 
             let bip = block_in_progress::BlockInProgress::from_blueprint(
                 blueprint,
@@ -402,8 +400,6 @@ pub fn produce<Host: Runtime>(
     tracer_input: Option<TracerInput>,
 ) -> Result<ComputationResult, anyhow::Error> {
     let minimum_base_fee_per_gas = crate::retrieve_minimum_base_fee_per_gas(host)?;
-    let mut base_fee_per_gas =
-        crate::retrieve_base_fee_per_gas(host, minimum_base_fee_per_gas)?;
     let da_fee_per_byte = crate::retrieve_da_fee(host)?;
 
     let kernel_upgrade = upgrade::read_kernel_upgrade(host)?;
@@ -507,7 +503,6 @@ pub fn produce<Host: Runtime>(
             safe_host.host,
             current_block_number,
             current_block_parent_hash,
-            &mut base_fee_per_gas,
             &tick_counter,
             config,
             &kernel_upgrade,
