@@ -19,6 +19,7 @@ use super::{
     MachineCoreState, ProgramCounterUpdate,
 };
 use crate::{
+    default::ConstDefault,
     machine_state::ProgramCounterUpdate::{Next, Set},
     parser::instruction::{
         AmoArgs, CIBDTypeArgs, CIBTypeArgs, CJTypeArgs, CRJTypeArgs, CRTypeArgs, CSSDTypeArgs,
@@ -36,6 +37,8 @@ use serde::{Deserialize, Serialize};
 ///
 /// This is preferred within the caches, as it enables 'pre-dispatch' of functions
 /// at block construction, rather than during block execution.
+///
+/// Instructions are constructable from [`InstrCacheable`] instructions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Instruction {
     /// The operation (over the machine state) that this instruction represents.
@@ -43,6 +46,43 @@ pub struct Instruction {
     /// Arguments that are passed to the opcode-function. As a flat structure, it contains
     /// all possible arguments. Each instruction will only use a subset.
     pub args: Args,
+}
+
+impl Instruction {
+    /// Returns the width of the instruction: either compressed or uncompressed.
+    pub const fn width(&self) -> InstrWidth {
+        use OpCode::*;
+        match self.opcode {
+            Add | Sub | Xor | Or | And | Sll | Srl | Sra | Slt | Sltu | Addw | Subw | Sllw
+            | Srlw | Sraw | Addi | Addiw | Xori | Ori | Andi | Slli | Srli | Srai | Slliw
+            | Srliw | Sraiw | Slti | Sltiu | Lb | Lh | Lw | Lbu | Lhu | Lwu | Ld | Sb | Sh | Sw
+            | Sd | Beq | Bne | Blt | Bge | Bltu | Bgeu | Lui | Auipc | Jal | Jalr | Lrw | Scw
+            | Amoswapw | Amoaddw | Amoxorw | Amoandw | Amoorw | Amominw | Amomaxw | Amominuw
+            | Amomaxuw | Lrd | Scd | Amoswapd | Amoaddd | Amoxord | Amoandd | Amoord | Amomind
+            | Amomaxd | Amominud | Amomaxud | Rem | Remu | Remw | Remuw | Div | Divu | Divw
+            | Divuw | Mul | Mulh | Mulhsu | Mulhu | Mulw | FclassS | Feqs | Fles | Flts | Fadds
+            | Fsubs | Fmuls | Fdivs | Fsqrts | Fmins | Fmaxs | Fmadds | Fmsubs | Fnmsubs
+            | Fnmadds | Flw | Fsw | Fcvtsw | Fcvtswu | Fcvtsl | Fcvtslu | Fcvtws | Fcvtwus
+            | Fcvtls | Fcvtlus | Fsgnjs | Fsgnjns | Fsgnjxs | FmvXW | FmvWX | FclassD | Feqd
+            | Fled | Fltd | Faddd | Fsubd | Fmuld | Fdivd | Fsqrtd | Fmind | Fmaxd | Fmaddd
+            | Fmsubd | Fnmsubd | Fnmaddd | Fld | Fsd | Fcvtdw | Fcvtdwu | Fcvtdl | Fcvtdlu
+            | Fcvtds | Fcvtsd | Fcvtwd | Fcvtwud | Fcvtld | Fcvtlud | Fsgnjd | Fsgnjnd
+            | Fsgnjxd | FmvXD | FmvDX | Csrrw | Csrrs | Csrrc | Csrrwi | Csrrsi | Csrrci
+            | Unknown => InstrWidth::Uncompressed,
+
+            CLw | CLwsp | CSw | CSwsp | CJ | CJr | CJalr | CBeqz | CBnez | CLi | CLui | CAddi
+            | CAddi16sp | CAddi4spn | CSlli | CSrli | CSrai | CAndi | CMv | CAdd | CAnd | COr
+            | CXor | CSub | CAddw | CSubw | CNop | CLd | CLdsp | CSd | CSdsp | CAddiw | CFld
+            | CFldsp | CFsd | CFsdsp | UnknownCompressed => InstrWidth::Compressed,
+        }
+    }
+}
+
+impl ConstDefault for Instruction {
+    const DEFAULT: Self = Instruction {
+        opcode: OpCode::Unknown,
+        args: Args::DEFAULT,
+    };
 }
 
 /// Opcodes map to the operation performed over the state - allowing us to
@@ -272,7 +312,7 @@ pub enum OpCode {
 impl OpCode {
     /// Dispatch an opcode to the function that will run over the machine state.
     #[inline(always)]
-    fn to_run<ML: MainMemoryLayout, M: ManagerReadWrite>(
+    pub(super) fn to_run<ML: MainMemoryLayout, M: ManagerReadWrite>(
         self,
     ) -> fn(&Args, &mut MachineCoreState<ML, M>) -> Result<ProgramCounterUpdate, Exception> {
         match self {
@@ -499,23 +539,21 @@ pub struct Args {
     pub rl: bool,
 }
 
-impl Default for Args {
-    fn default() -> Self {
-        Self {
-            rd: XRegister::x0,
-            rs1: XRegister::x0,
-            rs2: XRegister::x0,
-            imm: 0,
-            csr: CSRegister::fflags,
-            rdf: FRegister::f0,
-            rs1f: FRegister::f0,
-            rs2f: FRegister::f0,
-            rs3f: FRegister::f0,
-            rm: InstrRoundingMode::Dynamic,
-            aq: false,
-            rl: false,
-        }
-    }
+impl ConstDefault for Args {
+    const DEFAULT: Self = Self {
+        rd: XRegister::x0,
+        rs1: XRegister::x0,
+        rs2: XRegister::x0,
+        imm: 0,
+        csr: CSRegister::fflags,
+        rdf: FRegister::f0,
+        rs1f: FRegister::f0,
+        rs2f: FRegister::f0,
+        rs3f: FRegister::f0,
+        rm: InstrRoundingMode::Dynamic,
+        aq: false,
+        rl: false,
+    };
 }
 
 macro_rules! impl_r_type {
@@ -1843,7 +1881,7 @@ impl From<&InstrCacheable> for Instruction {
             },
             InstrCacheable::CNop => Instruction {
                 opcode: OpCode::CNop,
-                args: Default::default(),
+                args: Args::DEFAULT,
             },
 
             // RV64C compressed instructions
@@ -1896,11 +1934,11 @@ impl From<&InstrCacheable> for Instruction {
 
             InstrCacheable::Unknown { instr: _ } => Instruction {
                 opcode: OpCode::Unknown,
-                args: Default::default(),
+                args: Args::DEFAULT,
             },
             InstrCacheable::UnknownCompressed { instr: _ } => Instruction {
                 opcode: OpCode::UnknownCompressed,
-                args: Default::default(),
+                args: Args::DEFAULT,
             },
         }
     }
@@ -1912,7 +1950,7 @@ impl From<&RTypeArgs> for Args {
             rd: value.rd,
             rs1: value.rs1,
             rs2: value.rs2,
-            ..Default::default()
+            ..Self::DEFAULT
         }
     }
 }
@@ -1923,7 +1961,7 @@ impl From<&ITypeArgs> for Args {
             rd: value.rd,
             rs1: value.rs1,
             imm: value.imm,
-            ..Default::default()
+            ..Self::DEFAULT
         }
     }
 }
@@ -1934,7 +1972,7 @@ impl From<&SBTypeArgs> for Args {
             rs1: value.rs1,
             rs2: value.rs2,
             imm: value.imm,
-            ..Default::default()
+            ..Self::DEFAULT
         }
     }
 }
@@ -1944,7 +1982,7 @@ impl From<&UJTypeArgs> for Args {
         Self {
             rd: value.rd,
             imm: value.imm,
-            ..Default::default()
+            ..Self::DEFAULT
         }
     }
 }
@@ -1957,7 +1995,7 @@ impl From<&AmoArgs> for Args {
             rs2: value.rs2,
             aq: value.aq,
             rl: value.rl,
-            ..Default::default()
+            ..Self::DEFAULT
         }
     }
 }
@@ -1967,7 +2005,7 @@ impl From<&CIBTypeArgs> for Args {
         Self {
             rd: value.rd_rs1,
             imm: value.imm,
-            ..Default::default()
+            ..Self::DEFAULT
         }
     }
 }
@@ -1977,7 +2015,7 @@ impl From<&CRTypeArgs> for Args {
         Self {
             rd: value.rd_rs1,
             rs2: value.rs2,
-            ..Default::default()
+            ..Self::DEFAULT
         }
     }
 }
@@ -1986,7 +2024,7 @@ impl From<&CJTypeArgs> for Args {
     fn from(value: &CJTypeArgs) -> Self {
         Self {
             imm: value.imm,
-            ..Default::default()
+            ..Self::DEFAULT
         }
     }
 }
@@ -1995,7 +2033,7 @@ impl From<&CRJTypeArgs> for Args {
     fn from(value: &CRJTypeArgs) -> Self {
         Self {
             rs1: value.rs1,
-            ..Default::default()
+            ..Self::DEFAULT
         }
     }
 }
@@ -2005,7 +2043,7 @@ impl From<&CSSTypeArgs> for Args {
         Self {
             rs2: value.rs2,
             imm: value.imm,
-            ..Default::default()
+            ..Self::DEFAULT
         }
     }
 }
@@ -2016,7 +2054,7 @@ impl From<&CsrArgs> for Args {
             rd: value.rd,
             rs1: value.rs1,
             csr: value.csr,
-            ..Default::default()
+            ..Self::DEFAULT
         }
     }
 }
@@ -2027,7 +2065,7 @@ impl From<&CsriArgs> for Args {
             rd: value.rd,
             imm: value.imm,
             csr: value.csr,
-            ..Default::default()
+            ..Self::DEFAULT
         }
     }
 }
@@ -2038,7 +2076,7 @@ impl From<&FLoadArgs> for Args {
             imm: value.imm,
             rdf: value.rd,
             rs1: value.rs1,
-            ..Default::default()
+            ..Self::DEFAULT
         }
     }
 }
@@ -2049,7 +2087,7 @@ impl From<&FStoreArgs> for Args {
             imm: value.imm,
             rs1: value.rs1,
             rs2f: value.rs2,
-            ..Default::default()
+            ..Self::DEFAULT
         }
     }
 }
@@ -2059,7 +2097,7 @@ impl From<&CSSDTypeArgs> for Args {
         Self {
             imm: value.imm,
             rs2f: value.rs2,
-            ..Default::default()
+            ..Self::DEFAULT
         }
     }
 }
@@ -2069,7 +2107,7 @@ impl From<&CIBDTypeArgs> for Args {
         Self {
             imm: value.imm,
             rdf: value.rd_rs1,
-            ..Default::default()
+            ..Self::DEFAULT
         }
     }
 }
@@ -2079,7 +2117,7 @@ impl From<&XRegToFRegArgs> for Args {
         Self {
             rdf: value.rd,
             rs1: value.rs1,
-            ..Default::default()
+            ..Self::DEFAULT
         }
     }
 }
@@ -2090,7 +2128,7 @@ impl From<&XRegToFRegArgsWithRounding> for Args {
             rdf: value.rd,
             rs1: value.rs1,
             rm: value.rm,
-            ..Default::default()
+            ..Self::DEFAULT
         }
     }
 }
@@ -2100,7 +2138,7 @@ impl From<&FRegToXRegArgs> for Args {
         Self {
             rd: value.rd,
             rs1f: value.rs1,
-            ..Default::default()
+            ..Self::DEFAULT
         }
     }
 }
@@ -2111,7 +2149,7 @@ impl From<&FRegToXRegArgsWithRounding> for Args {
             rd: value.rd,
             rs1f: value.rs1,
             rm: value.rm,
-            ..Default::default()
+            ..Self::DEFAULT
         }
     }
 }
@@ -2124,7 +2162,7 @@ impl From<&FR3ArgsWithRounding> for Args {
             rs2f: value.rs2,
             rs3f: value.rs3,
             rm: value.rm,
-            ..Default::default()
+            ..Self::DEFAULT
         }
     }
 }
@@ -2135,7 +2173,7 @@ impl From<&FRArgs> for Args {
             rdf: value.rd,
             rs1f: value.rs1,
             rs2f: value.rs2,
-            ..Default::default()
+            ..Self::DEFAULT
         }
     }
 }
@@ -2146,7 +2184,7 @@ impl From<&FR1ArgWithRounding> for Args {
             rdf: value.rd,
             rs1f: value.rs1,
             rm: value.rm,
-            ..Default::default()
+            ..Self::DEFAULT
         }
     }
 }
@@ -2158,7 +2196,7 @@ impl From<&FR2ArgsWithRounding> for Args {
             rs1f: value.rs1,
             rs2f: value.rs2,
             rm: value.rm,
-            ..Default::default()
+            ..Self::DEFAULT
         }
     }
 }
@@ -2169,7 +2207,7 @@ impl From<&FCmpArgs> for Args {
             rd: value.rd,
             rs1f: value.rs1,
             rs2f: value.rs2,
-            ..Default::default()
+            ..Self::DEFAULT
         }
     }
 }

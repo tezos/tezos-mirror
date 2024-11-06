@@ -453,7 +453,7 @@ impl<ML: main_memory::MainMemoryLayout, CL: CacheLayouts, M: backend::ManagerBas
         M: backend::ManagerReadWrite,
     {
         match self.instruction_cache.fetch_instr(phys_addr).as_ref() {
-            Some(instr) => self.core.run_instr_cacheable(instr),
+            Some(instr) => instr.run(&mut self.core),
             None => self
                 .fetch_instr(current_mode, satp, instr_pc, phys_addr)
                 .and_then(|instr| self.run_instr(&instr)),
@@ -669,11 +669,13 @@ pub enum MachineError {
 mod tests {
     use std::ops::Bound;
 
+    use super::instruction::{Args, Instruction, OpCode};
     use super::{bus, bus::main_memory::tests::T1K, MachineState, MachineStateLayout};
     use crate::{
         backend_test,
         bits::{u16, Bits64, FixedWidthBits},
         create_state,
+        default::ConstDefault,
         machine_state::{
             address_translation::{
                 pte::{PPNField, PageTableEntry},
@@ -694,10 +696,7 @@ mod tests {
             DefaultCacheLayouts, TestCacheLayouts,
         },
         parser::{
-            instruction::{
-                CIBTypeArgs, CJTypeArgs, ITypeArgs, Instr, InstrCacheable, RTypeArgs, SBTypeArgs,
-                UJTypeArgs,
-            },
+            instruction::{CIBTypeArgs, ITypeArgs, Instr, InstrCacheable, SBTypeArgs},
             parse_block,
         },
         state_backend::test_helpers::{assert_eq_struct, copy_via_serde, TestBackendFactory},
@@ -1226,11 +1225,15 @@ mod tests {
         let mut state = create_state!(MachineState, MachineStateLayout<M8K, TestCacheLayouts>, F, M8K, TestCacheLayouts);
 
         let uncompressed_bytes = 0x5307b3;
-        let uncompressed = InstrCacheable::Add(RTypeArgs {
-            rd: a5,
-            rs1: t1,
-            rs2: t0,
-        });
+        let uncompressed = Instruction {
+            opcode: OpCode::Add,
+            args: Args {
+                rd: a5,
+                rs1: t1,
+                rs2: t0,
+                ..Args::DEFAULT
+            },
+        };
 
         let start_ram = start_of_main_memory::<M8K>();
 
@@ -1288,8 +1291,21 @@ mod tests {
 
         let block_a = [
             // Store current instruction counter
-            InstrCacheable::Auipc(UJTypeArgs { rd: a0, imm: 0 }),
-            InstrCacheable::CJ(CJTypeArgs { imm: 128 - 4 }),
+            Instruction {
+                opcode: OpCode::Auipc,
+                args: Args {
+                    rd: a0,
+                    imm: 0,
+                    ..Args::DEFAULT
+                },
+            },
+            Instruction {
+                opcode: OpCode::CJ,
+                args: Args {
+                    imm: 128 - 4,
+                    ..Args::DEFAULT
+                },
+            },
         ];
 
         // InstrCacheable::CJ(CJTypeArgs { imm: 1024 })
@@ -1300,25 +1316,41 @@ mod tests {
         let csw_bytes: u16 = 0xc10c;
         let jalr_bytes: u32 = 0x50067;
         let block_b = [
-            InstrCacheable::CLui(CIBTypeArgs {
-                rd_rs1: a1,
-                imm: (u16::bits_subset(overwrite_bytes, 15, 12) as i64) << 12,
-            }),
-            InstrCacheable::Addiw(ITypeArgs {
-                rd: a1,
-                rs1: a1,
-                imm: u16::bits_subset(overwrite_bytes, 11, 0) as i64,
-            }),
-            InstrCacheable::CSw(SBTypeArgs {
-                rs1: a0,
-                rs2: a1,
-                imm: 0,
-            }),
-            InstrCacheable::Jalr(ITypeArgs {
-                rd: zero,
-                rs1: a0,
-                imm: 0,
-            }),
+            Instruction {
+                opcode: OpCode::CLui,
+                args: Args {
+                    rd: a1,
+                    imm: (u16::bits_subset(overwrite_bytes, 15, 12) as i64) << 12,
+                    ..Args::DEFAULT
+                },
+            },
+            Instruction {
+                opcode: OpCode::Addiw,
+                args: Args {
+                    rd: a1,
+                    rs1: a1,
+                    imm: u16::bits_subset(overwrite_bytes, 11, 0) as i64,
+                    ..Args::DEFAULT
+                },
+            },
+            Instruction {
+                opcode: OpCode::CSw,
+                args: Args {
+                    rs1: a0,
+                    rs2: a1,
+                    imm: 0,
+                    ..Args::DEFAULT
+                },
+            },
+            Instruction {
+                opcode: OpCode::Jalr,
+                args: Args {
+                    rd: zero,
+                    rs1: a0,
+                    imm: 0,
+                    ..Args::DEFAULT
+                },
+            },
         ];
 
         let phys_addr = start_of_main_memory::<M8K>();

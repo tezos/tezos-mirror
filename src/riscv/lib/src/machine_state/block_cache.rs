@@ -73,20 +73,18 @@
 
 use super::address_translation::PAGE_OFFSET_WIDTH;
 use super::bus::main_memory::MainMemoryLayout;
+use super::instruction::Instruction;
 use super::instruction_cache::ValidatedCacheEntry;
 use super::MachineCoreState;
 use super::{bus::Address, ProgramCounterUpdate};
+use crate::cache_utils::FenceCounter;
 use crate::cache_utils::Sizes;
+use crate::default::ConstDefault;
 use crate::state_backend::{self, ManagerAlloc, ManagerClone};
-use crate::traps::EnvironException;
-use crate::{
-    cache_utils::FenceCounter,
-    parser::instruction::InstrCacheable,
-    state_backend::{
-        AllocatedOf, Atom, Cell, ManagerBase, ManagerRead, ManagerReadWrite, ManagerWrite, Ref,
-    },
-    traps::Exception,
+use crate::state_backend::{
+    AllocatedOf, Atom, Cell, ManagerBase, ManagerRead, ManagerReadWrite, ManagerWrite, Ref,
 };
+use crate::traps::{EnvironException, Exception};
 use std::marker::PhantomData;
 
 /// Mask for getting the offset within a page
@@ -110,7 +108,7 @@ pub type CachedLayout<ML> = (
     Atom<Address>,
     Atom<FenceCounter>,
     Atom<u8>,
-    [Atom<InstrCacheable>; CACHE_INSTR],
+    [Atom<Instruction>; CACHE_INSTR],
     MLCapture<ML>,
 );
 
@@ -122,7 +120,7 @@ pub struct Cached<ML: MainMemoryLayout, M: ManagerBase> {
     address: Cell<Address, M>,
     fence_counter: Cell<FenceCounter, M>,
     len_instr: Cell<u8, M>,
-    instr: [Cell<InstrCacheable, M>; CACHE_INSTR],
+    instr: [Cell<Instruction, M>; CACHE_INSTR],
     _pd: PhantomData<ML>,
 }
 
@@ -154,7 +152,7 @@ impl<ML: MainMemoryLayout, M: ManagerBase> Cached<ML, M> {
         self.len_instr.write(0);
         self.instr
             .iter_mut()
-            .for_each(|lc| lc.write(InstrCacheable::Unknown { instr: 0 }));
+            .for_each(|lc| lc.write(Instruction::DEFAULT));
     }
 
     fn start_block(&mut self, block_addr: Address, fence_counter: FenceCounter)
@@ -453,7 +451,7 @@ impl<BCL: BlockCacheLayout<MainMemoryLayout = ML>, ML: MainMemoryLayout, M: Mana
     /// Add the instruction into a block.
     ///
     /// If the block is full, a new block will be started.
-    fn cache_inner<const WIDTH: u64>(&mut self, phys_addr: Address, instr: InstrCacheable)
+    fn cache_inner<const WIDTH: u64>(&mut self, phys_addr: Address, instr: Instruction)
     where
         M: ManagerReadWrite,
     {
@@ -579,7 +577,7 @@ impl<BCL: BlockCacheLayout<MainMemoryLayout = ML>, ML: MainMemoryLayout, M: Mana
 
         let range = progress as usize..entry.len_instr.read() as usize;
         for i in entry.instr[range].iter() {
-            match core.run_instr_cacheable(i.as_ref()) {
+            match i.as_ref().run(core) {
                 Ok(ProgramCounterUpdate::Next(width)) => {
                     instr_pc += width as u64;
                     core.hart.pc.write(instr_pc);
@@ -645,7 +643,7 @@ impl<BCL: BlockCacheLayout<MainMemoryLayout = ML>, ML: MainMemoryLayout, M: Mana
 
 /// A block fetched from the block cache, that can be executed against the machine state.
 pub struct Block<'a, ML: MainMemoryLayout, M: ManagerBase> {
-    instr: &'a mut [Cell<InstrCacheable, M>],
+    instr: &'a mut [Cell<Instruction, M>],
     _pd: PhantomData<ML>,
 }
 
@@ -690,7 +688,7 @@ impl<'a, ML: MainMemoryLayout, M: ManagerRead> Block<'a, ML, M> {
         M: ManagerReadWrite,
     {
         for i in self.instr.iter() {
-            match core.run_instr_cacheable(i.as_ref()) {
+            match i.as_ref().run(core) {
                 Ok(ProgramCounterUpdate::Next(width)) => {
                     *instr_pc += width as u64;
                     core.hart.pc.write(*instr_pc);
@@ -722,7 +720,7 @@ impl<'a, ML: MainMemoryLayout, M: ManagerRead> Block<'a, ML, M> {
 
     /// Retrieve the underlying instructions contained in the given block.
     #[cfg(test)]
-    pub(super) fn to_vec(&self) -> Vec<InstrCacheable>
+    pub(super) fn to_vec(&self) -> Vec<Instruction>
     where
         M: ManagerRead,
     {
@@ -738,11 +736,11 @@ mod tests {
         machine_state::{
             address_translation::PAGE_SIZE,
             bus,
+            instruction::{Args, Instruction, OpCode},
             main_memory::tests::T1K,
             registers::{a0, a1, t0, t1},
             MachineCoreState, MachineCoreStateLayout,
         },
-        parser::instruction::{CIBTypeArgs, ITypeArgs, SBTypeArgs},
     };
 
     pub type TestLayout<ML> = Layout<ML, TEST_CACHE_BITS, TEST_CACHE_SIZE>;
@@ -751,11 +749,15 @@ mod tests {
     backend_test!(test_writing_full_block_fetchable_uncompressed, F, {
         let mut state = create_state!(BlockCache, TestLayout<T1K>, F, TestLayout<T1K>, T1K);
 
-        let uncompressed = InstrCacheable::Sd(SBTypeArgs {
-            rs1: t1,
-            rs2: t0,
-            imm: 8,
-        });
+        let uncompressed = Instruction {
+            opcode: OpCode::Sd,
+            args: Args {
+                rs1: t1,
+                rs2: t0,
+                imm: 8,
+                ..Args::DEFAULT
+            },
+        };
 
         let phys_addr = 10;
 
@@ -772,7 +774,14 @@ mod tests {
     backend_test!(test_writing_full_block_fetchable_compressed, F, {
         let mut state = create_state!(BlockCache, TestLayout<T1K>, F, TestLayout<T1K>, T1K);
 
-        let compressed = InstrCacheable::CLi(CIBTypeArgs { rd_rs1: a0, imm: 1 });
+        let compressed = Instruction {
+            opcode: OpCode::CLi,
+            args: Args {
+                rd: a0,
+                imm: 1,
+                ..Args::DEFAULT
+            },
+        };
 
         let phys_addr = 10;
 
@@ -790,7 +799,14 @@ mod tests {
     backend_test!(test_writing_half_block_fetchable_compressed, F, {
         let mut state = create_state!(BlockCache, TestLayout<T1K>, F, TestLayout<T1K>, T1K);
 
-        let compressed = InstrCacheable::CLi(CIBTypeArgs { rd_rs1: a0, imm: 1 });
+        let compressed = Instruction {
+            opcode: OpCode::CLi,
+            args: Args {
+                rd: a0,
+                imm: 1,
+                ..Args::DEFAULT
+            },
+        };
 
         let phys_addr = 10;
 
@@ -807,7 +823,14 @@ mod tests {
     backend_test!(test_writing_two_blocks_fetchable_compressed, F, {
         let mut state = create_state!(BlockCache, TestLayout<T1K>, F, TestLayout<T1K>, T1K);
 
-        let compressed = InstrCacheable::CLi(CIBTypeArgs { rd_rs1: a0, imm: 1 });
+        let compressed = Instruction {
+            opcode: OpCode::CLi,
+            args: Args {
+                rd: a0,
+                imm: 1,
+                ..Args::DEFAULT
+            },
+        };
 
         let phys_addr = 10;
 
@@ -829,7 +852,14 @@ mod tests {
     backend_test!(test_crossing_page_exactly_creates_new_block, F, {
         let mut state = create_state!(BlockCache, TestLayout<T1K>, F, TestLayout<T1K>, T1K);
 
-        let compressed = InstrCacheable::CLi(CIBTypeArgs { rd_rs1: a0, imm: 1 });
+        let compressed = Instruction {
+            opcode: OpCode::CLi,
+            args: Args {
+                rd: a0,
+                imm: 1,
+                ..Args::DEFAULT
+            },
+        };
 
         let phys_addr = PAGE_SIZE - 10;
 
@@ -851,11 +881,15 @@ mod tests {
         let mut core_state = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
         let mut block_state = create_state!(BlockCache, TestLayout<T1K>, F, TestLayout<T1K>, T1K);
 
-        let addiw = InstrCacheable::Addiw(ITypeArgs {
-            rd: a1,
-            rs1: a1,
-            imm: 257,
-        });
+        let addiw = Instruction {
+            opcode: OpCode::Addiw,
+            args: Args {
+                rd: a1,
+                rs1: a1,
+                imm: 257,
+                ..Args::DEFAULT
+            },
+        };
 
         let block_addr = bus::start_of_main_memory::<T1K>();
 
