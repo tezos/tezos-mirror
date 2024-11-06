@@ -4674,7 +4674,19 @@ let rollup_node_sqlite_migrations =
         ]
 
 let octez_smart_rollup_node_store_lib_modules =
-  ["store_version"; "sql_store"; "store_v5"; "store"]
+  [
+    "store_version";
+    "sql_store";
+    "store_sig";
+    "store_v0";
+    "store_v1";
+    "store_v2";
+    "store_v3";
+    "store_v4";
+    "store_v5";
+    "store";
+    "store_migration";
+  ]
 
 let octez_smart_rollup_node_store_lib =
   octez_l2_lib

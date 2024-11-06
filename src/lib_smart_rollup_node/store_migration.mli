@@ -27,4 +27,20 @@
     needed. If there is no possible migration path registered to go from the
     current version to the last {!Store.version}, this function resolves with an
     error. *)
-val maybe_run_migration : Metadata.t -> data_dir:string -> unit tzresult Lwt.t
+val maybe_run_migration :
+  Metadata.t -> Store_version.t -> data_dir:string -> unit tzresult Lwt.t
+
+(** {2 Version specific standalone migration functions} *)
+
+module V5_sqlite_migrations : sig
+  module From_v4 : sig
+    (** Migration between a store V4 and an SQL store (V5) in place. *)
+    val migrate_between_stores :
+      Metadata.t ->
+      data_dir:string ->
+      dest_data_dir:string ->
+      Store_sigs.ro Store_v4.store ->
+      Store_sigs.rw Store_v5.t ->
+      unit tzresult Lwt.t
+  end
+end

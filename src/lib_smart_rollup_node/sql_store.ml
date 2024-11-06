@@ -562,9 +562,9 @@ module Messages = struct
       |sql}
 
     let select =
-      (payload_hashes_hash ->? t2 level messages_list)
+      (payload_hashes_hash ->? messages_list)
       @@ {sql|
-      SELECT inbox_level, message_list
+      SELECT message_list
       FROM messages
       WHERE payload_hashes_hash = ?
       |sql}

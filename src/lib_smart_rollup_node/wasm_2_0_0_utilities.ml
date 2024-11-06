@@ -94,6 +94,7 @@ let generate_durable_storage ~(plugin : (module Protocol_plugin_sig.S)) tree =
 let dump_durable_storage ~block ~data_dir ~file =
   let open Lwt_result_syntax in
   let* store = Store.init Read_only ~data_dir in
+  let store = Store.Normal store in
   let get name load =
     let* value = load () in
     match value with
@@ -153,6 +154,7 @@ let patch_durable_storage ~data_dir ~key ~value =
   (* Loads the state of the head. *)
   let* _lock = Node_context_loader.lock ~data_dir in
   let* store = Store.init Read_write ~data_dir in
+  let store = Store.Normal store in
   let* ({header = {block_hash; level = block_level; _}; _} as l2_block) =
     let* r = Store.L2_blocks.find_head store in
     match r with

@@ -395,12 +395,17 @@ module Last_context_split = Indexed_store.Make_singleton (struct
   let encoding = Data_encoding.int32
 end)
 
+type history_mode = Archive | Full
+
+let history_mode_encoding : history_mode Data_encoding.t =
+  Data_encoding.string_enum [("archive", Archive); ("full", Full)]
+
 module History_mode = Indexed_store.Make_singleton (struct
-  type t = Configuration.history_mode
+  type t = history_mode
 
   let name = "history_mode"
 
-  let encoding = Configuration.history_mode_encoding
+  let encoding = history_mode_encoding
 end)
 
 type 'a store = {

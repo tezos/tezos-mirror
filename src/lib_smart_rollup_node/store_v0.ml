@@ -65,6 +65,27 @@ Indexed_store.Make_index_key (struct
   let equal = H.equal
 end)
 
+module Block_key = struct
+  include Block_hash
+
+  let hash_size = 31
+
+  let t =
+    let open Repr in
+    map
+      (bytes_of (`Fixed hash_size))
+      (fun b -> Block_hash.of_bytes_exn b)
+      (fun bh -> Block_hash.to_bytes bh)
+
+  let encode bh = Block_hash.to_string bh
+
+  let encoded_size = Block_hash.size (* in bytes *)
+
+  let decode str off =
+    let str = String.sub str off encoded_size in
+    Block_hash.of_string_exn str
+end
+
 (** L2 blocks *)
 module L2_blocks =
   Indexed_store.Make_indexed_file
@@ -72,7 +93,7 @@ module L2_blocks =
       let name = "l2_blocks"
     end)
     (struct
-      include Tezos_store_shared.Block_key
+      include Block_key
 
       let pp = Block_hash.pp
     end)
@@ -227,7 +248,7 @@ module Levels_to_hashes =
 
       let equal = Int32.equal
     end))
-    (Tezos_store_shared.Block_key)
+    (Block_key)
 
 (** stores slots whose data have been considered and pages stored to disk (if
     they are confirmed). *)
