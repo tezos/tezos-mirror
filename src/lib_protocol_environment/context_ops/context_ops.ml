@@ -84,6 +84,13 @@ let context_dir root =
          context. Try `irmin` or `brassaia`"
         s
 
+let do_not_use__brassaia_dir root = brassaia_context_dir root
+
+let do_not_use__is_duo () =
+  match Sys.getenv backend_variable |> String.lowercase_ascii with
+  | "duo" -> true
+  | _ | (exception Not_found) -> false
+
 let init ~kind ?patch_context ?readonly ?index_log_size context_root_dir =
   let open Lwt_syntax in
   let irmin_dir = irmin_context_dir context_root_dir in

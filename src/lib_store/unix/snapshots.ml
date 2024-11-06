@@ -3422,7 +3422,9 @@ module Tar_importer : IMPORTER = struct
     let*! context_files =
       Onthefly.find_files_with_common_path t.tar ~pattern:"context"
     in
-    let dst_dir = dst_context_root_dir in
+    let dst_dir =
+      Tezos_context_ops.Context_ops.context_dir dst_context_root_dir
+    in
     let*! () =
       List.iter_s
         (fun file ->
@@ -3431,7 +3433,7 @@ module Tar_importer : IMPORTER = struct
              restore a brassaia context and would want to
              store it in brassaia_context *)
           let dst =
-            Tezos_context_ops.Context_ops.context_dir dst_dir
+            dst_dir
             ^ (String.remove_prefix ~prefix:"context" filename
               |> Option.value ~default:"")
           in
@@ -3955,6 +3957,18 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
           ~msg:"Importing context"
         @@ fun () ->
         Importer.restore_context snapshot_importer ~dst_context_root_dir
+      in
+      let*! () =
+        if Context_ops.do_not_use__is_duo () then
+          (* The way the context is imported make it so that only one context is created
+             In duo mode this will always be the default one "context". We copy this directory
+             in "brassaia_context" *)
+          Lwt_utils_unix.copy_dir
+            (* Copy the context directory in the brassaia_context directory *)
+            (Tezos_context_ops.Context_ops.context_dir dst_context_root_dir)
+            (Tezos_context_ops.Context_ops.do_not_use__brassaia_dir
+               dst_context_root_dir)
+        else Lwt.return_unit
       in
       let*! context_index =
         Context_ops.init
