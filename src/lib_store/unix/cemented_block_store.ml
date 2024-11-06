@@ -115,6 +115,9 @@ let may_synchronize_indexes
    `log_size * log_entry` where a `log_entry` is roughly 56 bytes. *)
 let default_index_log_size = 10_000
 
+(* Default Zip compression level. This is an integer between 0 and 9,
+   with 0 meaning no compression (store as is), 1 lowest compression,
+   9 highest compression. *)
 let default_compression_level = 9
 
 (* Defines the maximum number of file descriptors that are cached to
