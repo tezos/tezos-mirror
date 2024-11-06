@@ -236,6 +236,7 @@ fn next_bip_from_blueprints<Host: Runtime>(
                 current_block_number,
                 current_block_parent_hash,
                 tick_counter.c,
+                gas_price,
             );
 
             tezos_evm_logging::log!(
@@ -1311,7 +1312,11 @@ mod tests {
         let transactions = vec![valid_tx].into();
 
         // init block in progress
-        let mut block_in_progress = BlockInProgress::new(U256::from(1), transactions);
+        let mut block_in_progress = BlockInProgress::new(
+            U256::from(1),
+            transactions,
+            block_constants.block_fees.base_fee_per_gas(),
+        );
         // run is almost full wrt ticks
         let limits = Limits::default();
         block_in_progress.estimated_ticks_in_run = limits.maximum_allowed_ticks - 1000;
