@@ -88,6 +88,14 @@ module Outbox_messages : sig
     outbox_level:int32 ->
     index:int ->
     unit tzresult Lwt.t
+
+  val iter :
+    [> `Read] t ->
+    (outbox_level:int32 ->
+    messages:int list ->
+    executed_messages:int list ->
+    unit tzresult Lwt.t) ->
+    unit tzresult Lwt.t
 end
 
 (** Storage containing the last cemented commitment. *)
