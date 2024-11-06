@@ -48,6 +48,8 @@ module Plugin = struct
       number_of_slots;
       attestation_lag;
       attestation_threshold;
+      minimal_participation_ratio = _;
+      rewards_ratio = _;
       cryptobox_parameters;
     } =
       parametric.dal

@@ -1003,6 +1003,8 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
                  attestation_lag;
                  attestation_threshold;
                  cryptobox_parameters;
+                 minimal_participation_ratio;
+                 rewards_ratio;
                }
                 : Previous.dal) =
             c.dal
@@ -1014,6 +1016,8 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             attestation_lag;
             attestation_threshold;
             cryptobox_parameters;
+            minimal_participation_ratio;
+            rewards_ratio;
           }
         in
         let reveal_activation_level =
@@ -1158,6 +1162,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
                  attesting_reward_weight;
                  seed_nonce_revelation_tip_weight;
                  vdf_revelation_tip_weight;
+                 dal_rewards_weight;
                }
                 : Previous.issuance_weights) =
             c.issuance_weights
@@ -1169,6 +1174,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             attesting_reward_weight;
             seed_nonce_revelation_tip_weight;
             vdf_revelation_tip_weight;
+            dal_rewards_weight;
           }
         in
         let constants =
@@ -1303,6 +1309,8 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             attestation_lag;
             attestation_threshold;
             cryptobox_parameters;
+            minimal_participation_ratio = Q.(64 // 100);
+            rewards_ratio = Q.zero;
           }
         in
         let reveal_activation_level =
@@ -1459,6 +1467,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             attesting_reward_weight;
             seed_nonce_revelation_tip_weight;
             vdf_revelation_tip_weight;
+            dal_rewards_weight = 0;
           }
         in
         let constants =

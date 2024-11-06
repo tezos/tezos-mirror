@@ -49,6 +49,10 @@ types:
       type: u1
     - id: attestation_threshold
       type: u1
+    - id: minimal_participation_ratio
+      type: minimal_participation_ratio_0
+    - id: rewards_ratio
+      type: rewards_ratio
     - id: redundancy_factor
       type: u1
     - id: page_size
@@ -108,12 +112,20 @@ types:
       type: int31
     - id: vdf_revelation_tip_weight
       type: int31
+    - id: dal_rewards_weight
+      type: int31
   minimal_participation_ratio:
     seq:
     - id: numerator
       type: u2be
     - id: denominator
       type: u2be
+  minimal_participation_ratio_0:
+    seq:
+    - id: numerator
+      type: z
+    - id: denominator
+      type: z
   n:
     seq:
     - id: n
@@ -144,6 +156,12 @@ types:
       size: 20
       if: (public_key_hash_tag == public_key_hash_tag::bls)
   radius_dz:
+    seq:
+    - id: numerator
+      type: z
+    - id: denominator
+      type: z
+  rewards_ratio:
     seq:
     - id: numerator
       type: z

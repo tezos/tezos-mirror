@@ -829,6 +829,8 @@ module Constants : sig
       attestation_lag : int;
       attestation_threshold : int;
       cryptobox_parameters : Dal.parameters;
+      minimal_participation_ratio : Q.t;
+      rewards_ratio : Q.t;
     }
 
     val dal_encoding : dal Data_encoding.t
@@ -898,6 +900,7 @@ module Constants : sig
       attesting_reward_weight : int;
       seed_nonce_revelation_tip_weight : int;
       vdf_revelation_tip_weight : int;
+      dal_rewards_weight : int;
     }
 
     type t = {
@@ -967,7 +970,7 @@ module Constants : sig
       max_slashing_threshold : int;
     }
 
-    val generate : consensus_committee_size:int -> t
+    val generate : consensus_committee_size:int -> dal_rewards_ratio:Q.t -> t
   end
 
   val parametric : context -> Parametric.t

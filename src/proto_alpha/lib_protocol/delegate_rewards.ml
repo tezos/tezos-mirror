@@ -32,6 +32,7 @@ let sum_weights
        attesting_reward_weight;
        seed_nonce_revelation_tip_weight;
        vdf_revelation_tip_weight;
+       dal_rewards_weight;
      } :
       Constants_parametric_repr.issuance_weights) =
   let r = baking_reward_fixed_portion_weight in
@@ -39,6 +40,7 @@ let sum_weights
   let r = attesting_reward_weight + r in
   let r = seed_nonce_revelation_tip_weight + r in
   let r = vdf_revelation_tip_weight + r in
+  let r = dal_rewards_weight + r in
   assert (Compare.Int.(r > 0)) ;
   r
 

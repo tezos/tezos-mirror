@@ -145,6 +145,19 @@ let default_dal =
       attestation_lag = 8;
       attestation_threshold = 66;
       cryptobox_parameters = default_cryptobox_parameters;
+      minimal_participation_ratio = Q.(64 // 100);
+      (* Note that other values may make tests in tezt/tests/mockup.ml
+         fail. Indeed, some tests modify the constants' values a bit and then
+         perform some checks on the modified values. In case of [Q.t] values,
+         the numerator and the denominator are increased by 1. For instance,
+         when minimal_attestation_ratio is 60%, we have that the new value is
+         2/3 = 4/6 = (3+1)/(5+1). However, the test fails because it does not
+         realize that 2/3 = 4/6...
+         That is why a value x of [minimal_participation_ratio] was chosen such
+         that we have x = a/b with a and b smallest such that they are relatively
+         prime, and (a+1, b+1) are relatively prime as well. The value x = 63%
+         works as well. *)
+      rewards_ratio = Q.zero;
     }
 
 let constants_mainnet : Constants.Parametric.t =
@@ -161,10 +174,13 @@ let constants_mainnet : Constants.Parametric.t =
               attesting_reward_weight;
               seed_nonce_revelation_tip_weight;
               vdf_revelation_tip_weight;
+              dal_rewards_weight;
             };
           max_slashing_threshold;
         } =
-    Constants.Generated.generate ~consensus_committee_size
+    Constants.Generated.generate
+      ~consensus_committee_size
+      ~dal_rewards_ratio:default_dal.rewards_ratio
   in
   let dal_activation_level =
     if default_dal.feature_enable then Raw_level.succ Raw_level.root
@@ -230,6 +246,8 @@ let constants_mainnet : Constants.Parametric.t =
         (* 1/20480 of block rewards *)
         vdf_revelation_tip_weight;
         (* 1/20480 of block rewards *)
+        dal_rewards_weight;
+        (* 0 for now *)
       };
     hard_storage_limit_per_operation = Z.of_int 60_000;
     cost_per_byte = Tez.of_mutez_exn 250L;
@@ -326,7 +344,9 @@ let constants_sandbox =
   let block_time = 1 in
   let Constants.Generated.
         {max_slashing_threshold; consensus_threshold = _; issuance_weights} =
-    Constants.Generated.generate ~consensus_committee_size
+    Constants.Generated.generate
+      ~consensus_committee_size
+      ~dal_rewards_ratio:default_dal.rewards_ratio
   in
   {
     constants_mainnet with
@@ -362,7 +382,9 @@ let constants_test =
   let consensus_committee_size = 67 in
   let Constants.Generated.
         {max_slashing_threshold = _; consensus_threshold; issuance_weights} =
-    Constants.Generated.generate ~consensus_committee_size
+    Constants.Generated.generate
+      ~consensus_committee_size
+      ~dal_rewards_ratio:default_dal.rewards_ratio
   in
   {
     constants_mainnet with

@@ -25,6 +25,26 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let q_encoding cond error_msg =
+  Data_encoding.(
+    conv_with_guard
+      (fun Q.{num; den} -> (num, den))
+      (fun (num, den) ->
+        if Compare.Z.(den > Z.zero) && cond num den then Ok (Q.make num den)
+        else Error error_msg)
+      (obj2 (req "numerator" z) (req "denominator" z)))
+
+let positive_q_encoding = q_encoding (fun num _den -> Compare.Z.(num > Z.zero))
+
+let non_negative_q_encoding =
+  q_encoding (fun num _den -> Compare.Z.(num >= Z.zero))
+
+let between_zero_and_one_q_encoding =
+  q_encoding (fun num den -> Compare.Z.(num >= Z.zero && num <= den))
+
+let between_zero_and_excluding_one_q_encoding =
+  q_encoding (fun num den -> Compare.Z.(num >= Z.zero && num < den))
+
 type dal = {
   feature_enable : bool;
   incentives_enable : bool;
@@ -32,7 +52,18 @@ type dal = {
   attestation_lag : int;
   attestation_threshold : int;
   cryptobox_parameters : Dal.parameters;
+  minimal_participation_ratio : Q.t;
+  rewards_ratio : Q.t;
 }
+
+let minimal_participation_ratio_encoding =
+  between_zero_and_one_q_encoding
+    "dal.minimal_participation_ratio must be a value between zero and one"
+
+let rewards_ratio_encoding =
+  between_zero_and_excluding_one_q_encoding
+    "dal.rewards_ratio must be a value between zero (inclusive) and one \
+     (exclusive)"
 
 let dal_encoding =
   let open Data_encoding in
@@ -44,18 +75,24 @@ let dal_encoding =
            attestation_lag;
            attestation_threshold;
            cryptobox_parameters;
+           minimal_participation_ratio;
+           rewards_ratio;
          } ->
       ( ( feature_enable,
           incentives_enable,
           number_of_slots,
           attestation_lag,
-          attestation_threshold ),
+          attestation_threshold,
+          minimal_participation_ratio,
+          rewards_ratio ),
         cryptobox_parameters ))
     (fun ( ( feature_enable,
              incentives_enable,
              number_of_slots,
              attestation_lag,
-             attestation_threshold ),
+             attestation_threshold,
+             minimal_participation_ratio,
+             rewards_ratio ),
            cryptobox_parameters ) ->
       {
         feature_enable;
@@ -64,14 +101,20 @@ let dal_encoding =
         attestation_lag;
         attestation_threshold;
         cryptobox_parameters;
+        minimal_participation_ratio;
+        rewards_ratio;
       })
     (merge_objs
-       (obj5
+       (obj7
           (req "feature_enable" bool)
           (req "incentives_enable" bool)
           (req "number_of_slots" uint16)
           (req "attestation_lag" uint8)
-          (req "attestation_threshold" uint8))
+          (req "attestation_threshold" uint8)
+          (req
+             "minimal_participation_ratio"
+             minimal_participation_ratio_encoding)
+          (req "rewards_ratio" rewards_ratio_encoding))
        Dal.parameters_encoding)
 
 (* The encoded representation of this type is stored in the context as
@@ -200,6 +243,7 @@ type issuance_weights = {
   attesting_reward_weight : int;
   seed_nonce_revelation_tip_weight : int;
   vdf_revelation_tip_weight : int;
+  dal_rewards_weight : int;
 }
 
 type t = {
@@ -355,48 +399,20 @@ let zk_rollup_encoding =
        (req "zk_rollup_max_ticket_payload_size" int31))
 
 let extremum_encoding =
-  Data_encoding.(
-    conv_with_guard
-      (fun Q.{num; den} -> (num, den))
-      (fun (num, den) ->
-        if Compare.Z.(num > Z.zero && den > Z.zero) then Ok (Q.make num den)
-        else
-          Error
-            "Invalid Reward Extremum Parameter: only positive values allowed")
-      (obj2 (req "numerator" z) (req "denominator" z)))
+  positive_q_encoding
+    "Invalid Reward Extremum Parameter: only positive values allowed"
 
 let center_encoding =
-  Data_encoding.(
-    conv_with_guard
-      (fun Q.{num; den} -> (num, den))
-      (fun (num, den) ->
-        if Compare.Z.(num >= Z.zero && den > Z.zero && num <= den) then
-          Ok (Q.make num den)
-        else
-          Error
-            "Invalid Reward Parameter: dead zone center can only be between 0 \
-             and 1")
-      (obj2 (req "numerator" z) (req "denominator" z)))
+  between_zero_and_one_q_encoding
+    "Invalid Reward Parameter: dead zone center can only be between 0 and 1"
 
 let radius_encoding =
-  Data_encoding.(
-    conv_with_guard
-      (fun Q.{num; den} -> (num, den))
-      (fun (num, den) ->
-        if Compare.Z.(num >= Z.zero && den > Z.zero) then Ok (Q.make num den)
-        else
-          Error
-            "Invalid Reward Parameter: dead zone radius must be non-negative")
-      (obj2 (req "numerator" z) (req "denominator" z)))
+  non_negative_q_encoding
+    "Invalid Reward Parameter: dead zone radius must be non-negative"
 
 let growth_rate_encoding =
-  Data_encoding.(
-    conv_with_guard
-      (fun Q.{num; den} -> (num, den))
-      (fun (num, den) ->
-        if Compare.Z.(num >= Z.zero && den > Z.zero) then Ok (Q.make num den)
-        else Error "Invalid Reward Parameter: growth rate must be non-negative")
-      (obj2 (req "numerator" z) (req "denominator" z)))
+  non_negative_q_encoding
+    "Invalid Reward Parameter: growth rate must be non-negative"
 
 let adaptive_rewards_params_encoding =
   let open Data_encoding in
@@ -511,6 +527,7 @@ let issuance_weights_encoding =
             attesting_reward_weight;
             seed_nonce_revelation_tip_weight;
             vdf_revelation_tip_weight;
+            dal_rewards_weight;
           } :
            issuance_weights) ->
       ( base_total_issued_per_minute,
@@ -518,13 +535,15 @@ let issuance_weights_encoding =
         baking_reward_bonus_weight,
         attesting_reward_weight,
         seed_nonce_revelation_tip_weight,
-        vdf_revelation_tip_weight ))
+        vdf_revelation_tip_weight,
+        dal_rewards_weight ))
     (fun ( base_total_issued_per_minute,
            baking_reward_fixed_portion_weight,
            baking_reward_bonus_weight,
            attesting_reward_weight,
            seed_nonce_revelation_tip_weight,
-           vdf_revelation_tip_weight ) ->
+           vdf_revelation_tip_weight,
+           dal_rewards_weight ) ->
       {
         base_total_issued_per_minute;
         baking_reward_fixed_portion_weight;
@@ -532,14 +551,16 @@ let issuance_weights_encoding =
         attesting_reward_weight;
         seed_nonce_revelation_tip_weight;
         vdf_revelation_tip_weight;
+        dal_rewards_weight;
       })
-    (obj6
+    (obj7
        (req "base_total_issued_per_minute" Tez_repr.encoding)
        (req "baking_reward_fixed_portion_weight" int31)
        (req "baking_reward_bonus_weight" int31)
        (req "attesting_reward_weight" int31)
        (req "seed_nonce_revelation_tip_weight" int31)
-       (req "vdf_revelation_tip_weight" int31))
+       (req "vdf_revelation_tip_weight" int31)
+       (req "dal_rewards_weight" int31))
 
 let encoding =
   let open Data_encoding in
