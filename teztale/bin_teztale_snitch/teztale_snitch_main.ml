@@ -225,8 +225,15 @@ let alert_cmd =
   in
   let timestamp = t "timestamp" Arg.int32 in
   let round = t "round" Arg.int32 in
-  let format timestamp round = {level = (); timestamp; round} in
-  let thresholds = Term.(const format $ timestamp $ round) in
+  let validation_delay = t "validation_delay" Arg.float in
+  let application_delay = t "application_delay" Arg.float in
+  let format timestamp round validation_delay application_delay =
+    {level = (); timestamp; round; validation_delay; application_delay}
+  in
+  let thresholds =
+    Term.(
+      const format $ timestamp $ round $ validation_delay $ application_delay)
+  in
   let url =
     let doc = "The teztale server URL" in
     Arg.(required & pos 0 (some string) None & info [] ~docv:"URL" ~doc)

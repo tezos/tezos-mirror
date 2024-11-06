@@ -14,15 +14,20 @@ type alert =
   | Latest_canonical_block of int32
   | Timestamp of int32
   | Round of int32
+  | Validation_delay of float
+  | Application_delay of float
   | No_data
 
 let strings_of_alert =
   let msg fmt name v = (name, fmt v) in
   let int32 = msg Int32.to_string in
+  let float = msg string_of_float in
   function
   | Latest_canonical_block t -> int32 "Last canonical block" t
   | Timestamp t -> int32 "Time between blocks" t
   | Round t -> int32 "Round number" t
+  | Validation_delay t -> float "Validation delay" t
+  | Application_delay t -> float "Application delay" t
   | No_data -> ("No data available in teztale", "")
 
 (** [gen_alerts ?prev r t]
@@ -45,6 +50,11 @@ let gen_alerts ?prev r t =
   ( r.level,
     alert (fun x -> Timestamp x) timestamp t.timestamp
     @? alert (fun x -> Round x) (r.round |> Option.some) t.round
+    @? alert (fun x -> Validation_delay x) r.validation_delay t.validation_delay
+    @? alert
+         (fun x -> Application_delay x)
+         r.application_delay
+         t.application_delay
     @? [] )
 
 (** [print_alerts alerts]
