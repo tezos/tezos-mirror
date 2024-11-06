@@ -89,15 +89,7 @@ module Prometheus = struct
 
     let output_report =
       let output t r =
-        let rec output ?t0 {recorded; aggregated} =
-          let t0 =
-            match t0 with
-            | Some t0 -> t0
-            | None -> (
-                match recorded with
-                | (_, {start; _}) :: _ -> start
-                | [] -> {wall = 0.; cpu = 0.})
-          in
+        let rec output {recorded; aggregated} =
           (* For each node in both [aggregated] and [recorded] lists,
              we only output the children nodes if the parent has been marked for
              promotheus backend. This is similar to verbosity filtering where a child is
@@ -105,12 +97,12 @@ module Prometheus = struct
           IdMap.iter
             (fun id {count = n; total = Span d; node_verbosity = _; children} ->
               if output_entry t.name id n d then
-                output ~t0 {recorded = []; aggregated = children})
+                output {recorded = []; aggregated = children})
             aggregated ;
           List.iter
             (fun ( id,
-                   {start = t0; duration = Span d; contents; item_verbosity = _}
-                 ) -> if output_entry t.name id 1 d then output ~t0 contents)
+                   {start = _; duration = Span d; contents; item_verbosity = _}
+                 ) -> if output_entry t.name id 1 d then output contents)
             recorded
         in
         output r
