@@ -69,7 +69,6 @@ let is_delegate ctxt pkh =
 
 let init ctxt contract delegate =
   let open Lwt_result_syntax in
-  let*? () = check_not_tz4 delegate in
   let* ctxt = Storage.Contract.Delegate.init ctxt contract delegate in
   let delegate_contract = Contract_repr.Implicit delegate in
   let*! ctxt =
@@ -97,7 +96,6 @@ let delete ctxt contract =
 
 let set ctxt contract delegate =
   let open Lwt_result_syntax in
-  let*? () = check_not_tz4 delegate in
   let* ctxt = unlink ctxt contract in
   let*! ctxt = Storage.Contract.Delegate.add ctxt contract delegate in
   let delegate_contract = Contract_repr.Implicit delegate in

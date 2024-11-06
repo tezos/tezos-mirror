@@ -208,9 +208,11 @@ let test_drain_empty_delegate ~exclude_ck () =
         "Drain delegate without enough balance for allocation burn or drain \
          fees")
 
-let test_tz4_consensus_key () =
+let test_tz4_consensus_key ~allow_tz4_delegate_enable () =
   let open Lwt_result_syntax in
-  let* genesis, contracts = Context.init_with_constants1 constants in
+  let* genesis, contracts =
+    Context.init_with_constants1 {constants with allow_tz4_delegate_enable}
+  in
   let account1_pkh = Context.Contract.pkh contracts in
   let consensus_account = Account.new_account ~algo:Bls () in
   let delegate = account1_pkh in
@@ -223,26 +225,31 @@ let test_tz4_consensus_key () =
     Op.update_consensus_key (B blk') (Contract.Implicit delegate) consensus_pk
   in
   let tz4_pk = match consensus_pk with Bls pk -> pk | _ -> assert false in
-  let expect_failure = function
-    | [
-        Environment.Ecoproto_error
-          (Delegate_consensus_key.Invalid_consensus_key_update_tz4 pk);
-      ]
-      when Signature.Bls.Public_key.(pk = tz4_pk) ->
-        return_unit
-    | err ->
-        failwith
-          "Error trace:@,\
-          \ %a does not match the \
-           [Delegate_consensus_key.Invalid_consensus_key_update_tz4] error"
-          Error_monad.pp_print_trace
-          err
-  in
   let* inc = Incremental.begin_construction blk' in
-  let* (_i : Incremental.t) =
-    Incremental.validate_operation ~expect_failure inc operation
-  in
-  return_unit
+  if allow_tz4_delegate_enable then
+    let* (_i : Incremental.t) = Incremental.validate_operation inc operation in
+    return_unit
+  else
+    let expect_failure = function
+      | [
+          Environment.Ecoproto_error
+            (Delegate_consensus_key.Invalid_consensus_key_update_tz4 pk);
+        ]
+        when Signature.Bls.Public_key.(pk = tz4_pk) ->
+          return_unit
+      | err ->
+          failwith
+            "Error trace:@,\
+            \ %a does not match the \
+             [Delegate_consensus_key.Invalid_consensus_key_update_tz4] error"
+            Error_monad.pp_print_trace
+            err
+    in
+    let* inc = Incremental.begin_construction blk' in
+    let* (_i : Incremental.t) =
+      Incremental.validate_operation ~expect_failure inc operation
+    in
+    return_unit
 
 let test_attestation_with_consensus_key () =
   let open Lwt_result_syntax in
@@ -336,7 +343,14 @@ let tests =
         "empty drain delegate with ck"
         `Quick
         (test_drain_empty_delegate ~exclude_ck:false);
-      tztest "tz4 consensus key" `Quick test_tz4_consensus_key;
+      tztest
+        "tz4 consensus key (allow_tz4_delegate_enable:false)"
+        `Quick
+        (test_tz4_consensus_key ~allow_tz4_delegate_enable:false);
+      tztest
+        "tz4 consensus key (allow_tz4_delegate_enable:true)"
+        `Quick
+        (test_tz4_consensus_key ~allow_tz4_delegate_enable:true);
       tztest "attestation with ck" `Quick test_attestation_with_consensus_key;
     ]
 

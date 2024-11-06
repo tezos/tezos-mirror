@@ -39,6 +39,9 @@ Node
 Client
 ------
 
+- Allow tz4 (BLS) addresses to be registered as delegate and or as consensus
+  keys. (MR :gl:`!15302`)
+
 Baker
 -----
 

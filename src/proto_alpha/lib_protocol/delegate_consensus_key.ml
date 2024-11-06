@@ -124,7 +124,6 @@ let set_used = Storage.Consensus_keys.add
 
 let init ctxt delegate pk =
   let open Lwt_result_syntax in
-  let*? () = check_not_tz4 pk in
   let pkh = Signature.Public_key.hash pk in
   let* () = check_unused ctxt pkh in
   let*! ctxt = set_used ctxt pkh in
@@ -207,7 +206,6 @@ let register_update ctxt delegate pk =
       Signature.Public_key.(pk = active_pubkey)
       (Invalid_consensus_key_update_noop first_active_cycle)
   in
-  let*? () = check_not_tz4 pk in
   let pkh = Signature.Public_key.hash pk in
   let* () = check_unused ctxt pkh in
   let*! ctxt = set_used ctxt pkh in

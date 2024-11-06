@@ -355,6 +355,7 @@ let constants_sandbox =
     max_slashing_threshold;
     limit_of_delegation_over_baking = 19;
     max_operations_time_to_live = 8;
+    allow_tz4_delegate_enable = true;
   }
 
 let constants_test =

@@ -45,6 +45,9 @@ Operation receipts
 Errors
 ------
 
+- tz4 (BLS) addresses are not forbidden to be registered as delegate and or as
+  consensus keys if the ``allow_tz4_delegate_enable`` feature flag is set. (MR
+  :gl:`!15302`)
 
 Protocol parameters
 -------------------

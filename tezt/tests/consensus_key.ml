@@ -100,6 +100,10 @@ let test_update_consensus_key =
       (["cache_stake_distribution_cycles"], `Int (consensus_rights_delay + 3));
       (["adaptive_issuance_force_activation"], `Bool true);
     ]
+    @
+    if Protocol.(number protocol > number Quebec) then
+      [(["allow_tz4_delegate_enable"], `Bool true)]
+    else []
   in
   let* parameter_file =
     Protocol.write_parameter_file ~base:(Right (protocol, None)) parameters
@@ -166,13 +170,21 @@ let test_update_consensus_key =
       ~pk:Constant.bootstrap1.alias
       client
   in
-  Log.info "Invalid update: changing the consensus key to a BLS key." ;
   let* () =
-    Client.update_consensus_key
-      ~expect_failure:true
-      ~src:Constant.bootstrap1.alias
-      ~pk:key_bls.alias
-      client
+    if Protocol.(number protocol > number Quebec) then (
+      Log.info "Valid update: changing the consensus key to a BLS key." ;
+      Client.update_consensus_key
+        ~expect_failure:false
+        ~src:Constant.bootstrap5.alias
+        ~pk:key_bls.alias
+        client)
+    else (
+      Log.info "Invalid update: changing the consensus key to a BLS key." ;
+      Client.update_consensus_key
+        ~expect_failure:true
+        ~src:Constant.bootstrap1.alias
+        ~pk:key_bls.alias
+        client)
   in
 
   Log.info "Trying a valid consensus key update." ;
