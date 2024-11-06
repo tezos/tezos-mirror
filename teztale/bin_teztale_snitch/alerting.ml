@@ -103,20 +103,85 @@ let gen_alerts ?prev r t =
     @? alert (fun x -> Attestation_only x) r.attestation_only t.attestation_only
     @? [] )
 
-(** [print_alerts alerts]
-    Format human readable alerts print them on stdout. *)
-let print_alerts alerts =
+type vigie = Slack of string * string
+
+(* FIXME: Find a way not to include preview in message *)
+let _tzkt network level = sf "https://%s.tzkt.io/%ld" network level
+
+let teztale network level =
+  sf
+    "https://nomadic-labs.gitlab.io/teztale-dataviz/Level#server=https%%253A%%252F%%252Fteztale-%s.obs.nomadic-labs.cloud%%252F&block=%ld"
+    network
+    level
+
+(** [slack_blocks ~source ~network ~level alerts]
+    Format alerts as javascript object to be sent via slack API.
+*)
+let slack_blocks ~source ~network ~level alerts =
+  let divider = `O [("type", `String "divider")] in
+  let block typ txt = `O [("type", `String typ); ("text", txt)] in
+  let mrkdwn text = block "mrkdwn" (`String text) in
+  let section text = block "section" text in
+  let header =
+    let src = Option.(map (sf " (%s)") source |> value ~default:"") in
+    sf "*%s%s / %ld*" network src level |> mrkdwn |> section
+  in
+  let report =
+    List.map
+      (function
+        | name, "" -> sf "%s" name | name, value -> sf "%s: %s" name value)
+      alerts
+    |> String.concat "\n" |> sf "```%s```" |> mrkdwn |> section
+  in
+  let links = sf "<%s|Teztale>" (teztale network level) |> mrkdwn |> section in
+  [divider; header; report; links; divider]
+
+(** [slack token body]
+    [body] is a javascript object that contains [channel] and [block] fields
+    to be used with the slack API.
+*)
+let slack token body =
+  let open Lwt.Syntax in
+  let headers =
+    Cohttp.Header.init_with "content-type" "application/json; charset=UTF-8"
+  in
+  let headers =
+    Cohttp.Header.add_authorization headers (`Other (sf "Bearer %s" token))
+  in
+  let uri = Uri.of_string "https://slack.com/api/chat.postMessage" in
+  let body = `String (Ezjsonm.value_to_string body) in
+  let* _res, out = Cohttp_lwt_unix.Client.post ~body ~headers uri in
+  let* _ = Cohttp_lwt.Body.to_string out in
+  Lwt.return_unit
+
+(** [send_alerts ~source ~network alerting alerts]
+    Format human readable alerts and send them,
+    or print of stdout if no alerting endpoint is provided.
+*)
+let send_alerts ~source ~network alerting alerts =
   let alerts =
     List.map
       (fun (level, alerts) -> (level, List.map strings_of_alert alerts))
       alerts
   in
   let alerts = List.sort compare alerts in
-  alerts
-  |> List.map (fun (level, alerts) ->
-         List.map
-           (fun (field, threshold) -> sf "\t%s: %s" field threshold)
-           alerts
-         |> String.concat "\n" |> sf "%ld:\n%s\n" level)
-  |> String.concat "\n"
-  |> Lwt_io.printf "----------\n%s----------\n"
+  if [] = alerting then
+    alerts
+    |> List.map (fun (level, alerts) ->
+           List.map
+             (fun (field, threshold) -> sf "\t%s: %s" field threshold)
+             alerts
+           |> String.concat "\n" |> sf "%ld:\n%s\n" level)
+    |> String.concat "\n"
+    |> Lwt_io.printf "----------\n%s----------\n"
+  else
+    let msg channel =
+      List.map
+        (fun (level, alerts) -> slack_blocks ~source ~network ~level alerts)
+        alerts
+      |> List.flatten
+      |> fun blocks -> `O [("channel", `String channel); ("blocks", `A blocks)]
+    in
+    Lwt_list.iter_p
+      (fun (Slack (channel, token)) -> slack token (msg channel))
+      alerting

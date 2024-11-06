@@ -179,7 +179,7 @@ let filter_alerts ctx alerts =
 (** Generate reports and raise alerts according to [ctx].
     This function never returns and loops every [ctx.refresh_rate] seconds. *)
 let report_loop ~network ~endpoint ~refresh_rate ~(thresholds : thresholds)
-    ~source : 'a =
+    ~alerting ~source : 'a =
   let rec loop ctx0 =
     let* ctx, alerts = fetch_and_report endpoint ctx0 in
     let alerts = List.sort (fun a b -> compare b a) alerts in
@@ -198,7 +198,12 @@ let report_loop ~network ~endpoint ~refresh_rate ~(thresholds : thresholds)
     let* () =
       match filter_alerts ctx alerts with
       | [] -> Lwt.return_unit
-      | alerts -> Alerting.print_alerts alerts
+      | alerts ->
+          Alerting.send_alerts
+            ~source:ctx.source
+            ~network:ctx.network
+            alerting
+            alerts
     in
     let ctx = {ctx with latest_alerts = alerts} in
     let delay =
@@ -273,6 +278,17 @@ let alert_cmd =
       attestation_only;
     }
   in
+  let alerts =
+    let doc = "A given endpoint to send alerts" in
+    let arg =
+      Arg.(
+        value
+        & opt_all (t2 ~sep:' ' string string) []
+        & info ["slack"] ~docv:"CHANNEL TOKEN" ~doc)
+    in
+    Term.(
+      const (List.map (fun (channel, token) -> Slack (channel, token))) $ arg)
+  in
   let thresholds =
     Term.(
       const format $ timestamp $ round $ validation_delay $ application_delay
@@ -307,18 +323,28 @@ let alert_cmd =
     in
     Arg.(value & opt (some string) None & info ["source"] ~doc)
   in
-  let action url network refresh_rate thresholds source =
+  let action url network refresh_rate thresholds alerting source =
     let endpoint =
       if String.ends_with ~suffix:"/" url then url else url ^ "/"
     in
     Lwt_main.run
-      (report_loop ~refresh_rate ~endpoint ~network ~thresholds ~source)
+      (report_loop
+         ~refresh_rate
+         ~endpoint
+         ~network
+         ~thresholds
+         ~alerting
+         ~source)
     |> exit
   in
   let term =
-    Term.(const action $ url $ network $ refresh_rate $ thresholds $ source)
+    Term.(
+      const action $ url $ network $ refresh_rate $ thresholds $ alerts $ source)
   in
-  let doc = "Continuously compute and print alerts on stdout." in
+  let doc =
+    "Continuously compute alerts and warn callbacks if at least one threshold \
+     is passed. If no callback is defined, print message on stdout."
+  in
   let section_synopsis = "SYNOPSIS" in
   let paragraph_synopsis =
     "octez-teztale-snitch alert [--network=NETWORK] [--delay=SECONDS] \
