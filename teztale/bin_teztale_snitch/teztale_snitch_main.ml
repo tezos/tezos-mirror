@@ -43,7 +43,20 @@ let get_head = get "head.json" head_encoding
 let get_data_range start stop =
   get (sf "%ld-%ld.json" start stop) batch_encoding
 
-let gen_report level (block : Block.t) = block_report level block
+let gen_report level (block : Block.t) ops =
+  let attesting_power =
+    List.fold_left
+      (fun acc (x : Delegate_operations.t) ->
+        Signature.Public_key_hash.Map.add x.delegate x.attesting_power acc)
+      Signature.Public_key_hash.Map.empty
+      ops
+  in
+  let delays =
+    let preattestation = times Consensus_ops.Preattestation ops block.round in
+    let attestation = times Consensus_ops.Attestation ops block.round in
+    {attestation; preattestation}
+  in
+  block_report level block delays attesting_power
 
 (** Filter data, compute report (use it to update context) and compute alert for
     this report. *)
@@ -58,7 +71,8 @@ let report ctx canonical ({level; data} : batch_item) =
   with
   | None -> (ctx, Some (level, [No_data]))
   | Some block ->
-      let report = gen_report level (block : Block.t) in
+      let ops = data.delegate_operations in
+      let report = gen_report level (block : Block.t) ops in
       let prev =
         (* It is only relevant to use the previous report if it was the previous level *)
         match ctx.latest_report with
@@ -227,12 +241,36 @@ let alert_cmd =
   let round = t "round" Arg.int32 in
   let validation_delay = t "validation_delay" Arg.float in
   let application_delay = t "application_delay" Arg.float in
-  let format timestamp round validation_delay application_delay =
-    {level = (); timestamp; round; validation_delay; application_delay}
+  let delay_66 = t "delay_66" Arg.float in
+  let delay_90 = t "delay_90" Arg.float in
+  let delay_66_pre = t "delay_66_pre" Arg.float in
+  let delay_90_pre = t "delay_90_pre" Arg.float in
+  let delay_validation_pqc = t "delay_validation_pqc" Arg.float in
+  let delay_validation_qc = t "delay_validation_qc" Arg.float in
+  let delay_pqc_qc = t "delay_pqc_qc" Arg.float in
+  let format timestamp round validation_delay application_delay delay_66
+      delay_90 delay_66_pre delay_90_pre delay_validation_pqc
+      delay_validation_qc delay_pqc_qc =
+    {
+      level = ();
+      timestamp;
+      round;
+      validation_delay;
+      application_delay;
+      delay_66;
+      delay_90;
+      delay_66_pre;
+      delay_90_pre;
+      delay_validation_pqc;
+      delay_validation_qc;
+      delay_pqc_qc;
+    }
   in
   let thresholds =
     Term.(
-      const format $ timestamp $ round $ validation_delay $ application_delay)
+      const format $ timestamp $ round $ validation_delay $ application_delay
+      $ delay_66 $ delay_90 $ delay_66_pre $ delay_90_pre $ delay_validation_pqc
+      $ delay_validation_qc $ delay_pqc_qc)
   in
   let url =
     let doc = "The teztale server URL" in

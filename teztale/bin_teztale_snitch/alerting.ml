@@ -16,6 +16,13 @@ type alert =
   | Round of int32
   | Validation_delay of float
   | Application_delay of float
+  | Delay_66 of float
+  | Delay_90 of float
+  | Delay_66_pre of float
+  | Delay_90_pre of float
+  | Delay_validation_pqc of float
+  | Delay_validation_qc of float
+  | Delay_pqc_qc of float
   | No_data
 
 let strings_of_alert =
@@ -28,6 +35,13 @@ let strings_of_alert =
   | Round t -> int32 "Round number" t
   | Validation_delay t -> float "Validation delay" t
   | Application_delay t -> float "Application delay" t
+  | Delay_66 t -> float "Delay until 66% attestations reached" t
+  | Delay_90 t -> float "Delay until 90% attestations reached" t
+  | Delay_66_pre t -> float "Delay until 66% pre-attestations reached" t
+  | Delay_90_pre t -> float "Delay until 90% pre-attestations reached" t
+  | Delay_validation_pqc t -> float "Delay between validation and PQC" t
+  | Delay_validation_qc t -> float "Delay between validation and QC" t
+  | Delay_pqc_qc t -> float "Delay between PQC and QC" t
   | No_data -> ("No data available in teztale", "")
 
 (** [gen_alerts ?prev r t]
@@ -55,6 +69,19 @@ let gen_alerts ?prev r t =
          (fun x -> Application_delay x)
          r.application_delay
          t.application_delay
+    @? alert (fun x -> Delay_66 x) r.delay_66 t.delay_66
+    @? alert (fun x -> Delay_90 x) r.delay_90 t.delay_90
+    @? alert (fun x -> Delay_66_pre x) r.delay_66_pre t.delay_66_pre
+    @? alert (fun x -> Delay_90_pre x) r.delay_90_pre t.delay_90_pre
+    @? alert
+         (fun x -> Delay_validation_pqc x)
+         r.delay_validation_pqc
+         t.delay_validation_pqc
+    @? alert
+         (fun x -> Delay_validation_qc x)
+         r.delay_validation_qc
+         t.delay_validation_qc
+    @? alert (fun x -> Delay_pqc_qc x) r.delay_pqc_qc t.delay_pqc_qc
     @? [] )
 
 (** [print_alerts alerts]
