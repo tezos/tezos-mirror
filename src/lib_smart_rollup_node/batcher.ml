@@ -348,12 +348,12 @@ let init plugin (node_ctxt : _ Node_context.t) =
       else return_unit
 
 (* This is a batcher worker for a single scoru *)
-let worker =
-  lazy
-    (match Lwt.state worker_promise with
-    | Lwt.Return worker -> Ok worker
-    | Lwt.Fail exn -> Error (Error_monad.error_of_exn exn)
-    | Lwt.Sleep -> Error Rollup_node_errors.No_batcher)
+let worker () =
+  let open Result_syntax in
+  match Lwt.state worker_promise with
+  | Lwt.Return worker -> return worker
+  | Lwt.Fail exn -> tzfail (Error_monad.error_of_exn exn)
+  | Lwt.Sleep -> tzfail Rollup_node_errors.No_batcher
 
 let active () =
   match Lwt.state worker_promise with
@@ -362,13 +362,13 @@ let active () =
 
 let find_message id =
   let open Result_syntax in
-  let+ w = Result.map_error TzTrace.make (Lazy.force worker) in
+  let+ w = worker () in
   let state = Worker.state w in
   Message_queue.find_opt state.messages id
 
 let get_queue () =
   let open Result_syntax in
-  let+ w = Result.map_error TzTrace.make (Lazy.force worker) in
+  let+ w = worker () in
   let state = Worker.state w in
   Message_queue.bindings state.messages
 
@@ -384,7 +384,7 @@ let handle_request_error rq =
 
 let register_messages ~drop_duplicate messages =
   let open Lwt_result_syntax in
-  let* w = lwt_map_error TzTrace.make (Lwt.return (Lazy.force worker)) in
+  let*? w = worker () in
   Worker.Queue.push_request_and_wait
     w
     (Request.Register {messages; drop_duplicate})
@@ -392,17 +392,17 @@ let register_messages ~drop_duplicate messages =
 
 let produce_batches () =
   let open Lwt_result_syntax in
-  match Lazy.force worker with
-  | Error Rollup_node_errors.No_batcher ->
+  match worker () with
+  | Error (Rollup_node_errors.No_batcher :: _) ->
       (* There is no batcher, nothing to do *)
       return_unit
-  | Error e -> tzfail e
+  | Error e -> fail e
   | Ok w ->
       Worker.Queue.push_request_and_wait w Request.Produce_batches
       |> handle_request_error
 
 let shutdown () =
-  match Lazy.force worker with
+  match worker () with
   | Error _ ->
       (* There is no batcher, nothing to do *)
       Lwt.return_unit
@@ -418,7 +418,7 @@ let message_status state msg_id =
 
 let message_status msg_id =
   let open Result_syntax in
-  let+ w = Result.map_error TzTrace.make (Lazy.force worker) in
+  let+ w = worker () in
   let state = Worker.state w in
   message_status state msg_id
 

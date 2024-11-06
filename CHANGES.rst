@@ -127,6 +127,9 @@ Smart Rollup node
 - Allow to import snaphosts for older stores by migrating the data on import.
   (MR :gl:`!15422`)
 
+- Fixed a bug which would make injection of messages in the batcher with the RPC
+  ``/local/batcher/injection`` fail if called too early. (MR :gl:`!15459`)
+
 Smart Rollup WASM Debugger
 --------------------------
 
