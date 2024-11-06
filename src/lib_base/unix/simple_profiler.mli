@@ -30,7 +30,7 @@ type state
 
 val empty : Profiler.verbosity -> state
 
-(** The [Base] functor helps to define other backend
+(** The [Base] functor helps to define other backends
     without having to write the same functions again and again.
 
     Given a way to get and set a [state] and an output function,
