@@ -176,7 +176,22 @@ let prepare_finalize_unstake ctxt contract =
           in
           return_some {finalizable; unfinalizable})
 
-let update = Storage.Contract.Unstake_requests.update
+(* Update the storage with the given requests.
+
+   If the given structure contains an empty list of requests, it means that
+   there are no more funds to unstake, and thus there is no need to keep an
+   entry for the contract.
+*)
+let update_stored_request ctxt contract updated_requests =
+  let open Lwt_result_syntax in
+  match updated_requests.requests with
+  | [] ->
+      let*! ctxt = Storage.Contract.Unstake_requests.remove ctxt contract in
+      return ctxt
+  | _ :: _ ->
+      Storage.Contract.Unstake_requests.update ctxt contract updated_requests
+
+let update = update_stored_request
 
 let add ctxt ~contract ~delegate cycle amount =
   let open Lwt_result_syntax in
