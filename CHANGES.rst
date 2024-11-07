@@ -148,5 +148,8 @@ DAL node
   exported by default.
 
 
+- **Breaking change** Removed the baker daemon's ``--dal-node-timeout-percentage``
+  argument. (MR :gl:`!15554`)
+
 Miscellaneous
 -------------
