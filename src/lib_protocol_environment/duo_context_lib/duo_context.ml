@@ -25,12 +25,14 @@ let checkout : C.index -> Context_hash.t -> t option Lwt.t =
   let* irmin_context =
     (Tezos_context.Context.checkout
        index.C.irmin_index
-       context_hash [@profiler.span_s ["irmin"; "checkout"]])
+       context_hash
+     [@profiler.span_s {verbosity = Notice} ["irmin"; "checkout"]])
   in
   let+ brassaia_context =
     (Tezos_context_brassaia.Tezos_context.Context.checkout
        index.brassaia_index
-       context_hash [@profiler.span_s ["brassaia"; "checkout"]])
+       context_hash
+     [@profiler.span_s {verbosity = Notice} ["brassaia"; "checkout"]])
   in
   match (irmin_context, brassaia_context) with
   | Some irmin_context, Some brassaia_context ->
@@ -49,12 +51,14 @@ let checkout_exn : C.index -> Context_hash.t -> t Lwt.t =
   let* irmin_context =
     (Tezos_context.Context.checkout_exn
        index.C.irmin_index
-       context_hash [@profiler.span_s ["irmin"; "checkout_exn"]])
+       context_hash
+     [@profiler.span_s {verbosity = Notice} ["irmin"; "checkout_exn"]])
   in
   let+ brassaia_context =
     (Tezos_context_brassaia.Tezos_context.Context.checkout_exn
        index.C.brassaia_index
-       context_hash [@profiler.span_s ["brassaia"; "checkout_exn"]])
+       context_hash
+     [@profiler.span_s {verbosity = Notice} ["brassaia"; "checkout_exn"]])
   in
   Context.make
     ~ops

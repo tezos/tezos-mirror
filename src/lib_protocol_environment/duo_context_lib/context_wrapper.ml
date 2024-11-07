@@ -103,12 +103,13 @@ struct
       let* bool1 =
         (Irmin_Tree.mem
            t.irmin_tree
-           key [@profiler.span_s ["irmin"; "tree"; "mem"]])
+           key [@profiler.span_s {verbosity = Notice} ["irmin"; "tree"; "mem"]])
       in
       let* bool2 =
         (Brassaia_Tree.mem
            t.brassaia_tree
-           key [@profiler.span_s ["brassaia"; "tree"; "mem"]])
+           key
+         [@profiler.span_s {verbosity = Notice} ["brassaia"; "tree"; "mem"]])
       in
       assert_and_return_result_lwt
         bool1
@@ -124,12 +125,15 @@ struct
       let* bool1 =
         (Irmin_Tree.mem_tree
            t.irmin_tree
-           key [@profiler.span_s ["irmin"; "tree"; "mem tree"]])
+           key
+         [@profiler.span_s {verbosity = Notice} ["irmin"; "tree"; "mem tree"]])
       in
       let* bool2 =
         (Brassaia_Tree.mem_tree
            t.brassaia_tree
-           key [@profiler.span_s ["brassaia"; "tree"; "mem tree"]])
+           key
+         [@profiler.span_s
+           {verbosity = Notice} ["brassaia"; "tree"; "mem tree"]])
       in
       assert_and_return_result_lwt
         bool1
@@ -145,12 +149,13 @@ struct
       let* value1 =
         (Irmin_Tree.find
            t.irmin_tree
-           key [@profiler.span_s ["irmin"; "tree"; "find"]])
+           key [@profiler.span_s {verbosity = Notice} ["irmin"; "tree"; "find"]])
       in
       let* value2 =
         (Brassaia_Tree.find
            t.brassaia_tree
-           key [@profiler.span_s ["brassaia"; "tree"; "find"]])
+           key
+         [@profiler.span_s {verbosity = Notice} ["brassaia"; "tree"; "find"]])
       in
       assert_and_return_result_lwt
         value1
@@ -166,12 +171,15 @@ struct
       let* irmin_tree =
         (Irmin_Tree.find_tree
            t.irmin_tree
-           key [@profiler.span_s ["irmin"; "tree"; "find_tree"]])
+           key
+         [@profiler.span_s {verbosity = Notice} ["irmin"; "tree"; "find_tree"]])
       in
       let* brassaia_tree =
         (Brassaia_Tree.find_tree
            t.brassaia_tree
-           key [@profiler.span_s ["brassaia"; "tree"; "find_tree"]])
+           key
+         [@profiler.span_s
+           {verbosity = Notice} ["brassaia"; "tree"; "find_tree"]])
       in
       let final_res =
         match (irmin_tree, brassaia_tree) with
@@ -197,14 +205,15 @@ struct
            t.irmin_tree
            ?offset
            ?length
-           key [@profiler.span_s ["irmin"; "tree"; "list"]])
+           key [@profiler.span_s {verbosity = Notice} ["irmin"; "tree"; "list"]])
       in
       let* brassaia_list =
         (Brassaia_Tree.list
            t.brassaia_tree
            ?offset
            ?length
-           key [@profiler.span_s ["brassaia"; "tree"; "list"]])
+           key
+         [@profiler.span_s {verbosity = Notice} ["brassaia"; "tree"; "list"]])
       in
       let final_res =
         List.map
@@ -235,12 +244,14 @@ struct
       let* length1 =
         (Irmin_Tree.length
            t.irmin_tree
-           key [@profiler.span_s ["irmin"; "tree"; "length"]])
+           key
+         [@profiler.span_s {verbosity = Notice} ["irmin"; "tree"; "length"]])
       in
       let* length2 =
         (Brassaia_Tree.length
            t.brassaia_tree
-           key [@profiler.span_s ["brassaia"; "tree"; "length"]])
+           key
+         [@profiler.span_s {verbosity = Notice} ["brassaia"; "tree"; "length"]])
       in
       assert_and_return_result_lwt
         length1
@@ -257,13 +268,15 @@ struct
         (Irmin_Tree.add
            t.irmin_tree
            key
-           value [@profiler.span_s ["irmin"; "tree"; "add"]])
+           value
+         [@profiler.span_s {verbosity = Notice} ["irmin"; "tree"; "add"]])
       in
       let+ brassaia_tree =
         (Brassaia_Tree.add
            t.brassaia_tree
            key
-           value [@profiler.span_s ["brassaia"; "tree"; "add"]])
+           value
+         [@profiler.span_s {verbosity = Notice} ["brassaia"; "tree"; "add"]])
       in
       {irmin_tree; brassaia_tree}
 
@@ -273,14 +286,16 @@ struct
         (Irmin_Tree.add_tree
            t.irmin_tree
            key
-           tree.irmin_tree [@profiler.span_s ["irmin"; "tree"; "add_tree"]])
+           tree.irmin_tree
+         [@profiler.span_s {verbosity = Notice} ["irmin"; "tree"; "add_tree"]])
       in
       let+ brassaia_tree =
         (Brassaia_Tree.add_tree
            t.brassaia_tree
            key
            tree.brassaia_tree
-         [@profiler.span_s ["brassaia"; "tree"; "add_tree"]])
+         [@profiler.span_s
+           {verbosity = Notice} ["brassaia"; "tree"; "add_tree"]])
       in
       {irmin_tree; brassaia_tree}
 
@@ -289,12 +304,14 @@ struct
       let* irmin_tree =
         (Irmin_Tree.remove
            t.irmin_tree
-           key [@profiler.span_s ["irmin"; "tree"; "remove"]])
+           key
+         [@profiler.span_s {verbosity = Notice} ["irmin"; "tree"; "remove"]])
       in
       let+ brassaia_tree =
         (Brassaia_Tree.remove
            t.brassaia_tree
-           key [@profiler.span_s ["brassaia"; "tree"; "remove"]])
+           key
+         [@profiler.span_s {verbosity = Notice} ["brassaia"; "tree"; "remove"]])
       in
       {irmin_tree; brassaia_tree}
 
@@ -315,13 +332,15 @@ struct
            key
            ~order
            ~init
-           ~f:f_irmin [@profiler.span_f ["irmin"; "tree"; "fold"]])
+           ~f:f_irmin
+         [@profiler.span_f {verbosity = Notice} ["irmin"; "tree"; "fold"]])
       in
       let f_brassaia key brassaia_tree acc =
         (f
            key
            {t with brassaia_tree}
-           acc [@profiler.span_f ["brassaia"; "tree"; "fold"]])
+           acc
+         [@profiler.span_f {verbosity = Notice} ["brassaia"; "tree"; "fold"]])
       in
       let _res2 =
         Brassaia_Tree.fold ?depth t.brassaia_tree key ~order ~init ~f:f_brassaia
@@ -333,11 +352,13 @@ struct
      fun t ->
       let config1 =
         (Irmin_Tree.config
-           t.irmin_tree [@profiler.span_f ["irmin"; "tree"; "config"]])
+           t.irmin_tree
+         [@profiler.span_f {verbosity = Notice} ["irmin"; "tree"; "config"]])
       in
       let config2 =
         (Brassaia_Tree.config
-           t.brassaia_tree [@profiler.span_f ["brassaia"; "tree"; "config"]])
+           t.brassaia_tree
+         [@profiler.span_f {verbosity = Notice} ["brassaia"; "tree"; "config"]])
       in
       assert_and_return_result
         config1
@@ -352,11 +373,13 @@ struct
      fun t ->
       let irmin_tree =
         (Irmin_Tree.empty
-           t.irmin_context [@profiler.span_f ["irmin"; "tree"; "empty"]])
+           t.irmin_context
+         [@profiler.span_f {verbosity = Notice} ["irmin"; "tree"; "empty"]])
       in
       let brassaia_tree =
         (Brassaia_Tree.empty
-           t.brassaia_context [@profiler.span_f ["brassaia"; "tree"; "empty"]])
+           t.brassaia_context
+         [@profiler.span_f {verbosity = Notice} ["brassaia"; "tree"; "empty"]])
       in
       {irmin_tree; brassaia_tree}
 
@@ -370,11 +393,14 @@ struct
      fun t ->
       let bool1 =
         (Irmin_Tree.is_empty
-           t.irmin_tree [@profiler.span_f ["irmin"; "tree"; "is_empty"]])
+           t.irmin_tree
+         [@profiler.span_f {verbosity = Notice} ["irmin"; "tree"; "is_empty"]])
       in
       let bool2 =
         (Brassaia_Tree.is_empty
-           t.brassaia_tree [@profiler.span_f ["brassaia"; "tree"; "is_empty"]])
+           t.brassaia_tree
+         [@profiler.span_f
+           {verbosity = Notice} ["brassaia"; "tree"; "is_empty"]])
       in
       assert_and_return_result
         bool1
@@ -389,11 +415,13 @@ struct
      fun t ->
       let kind1 =
         (Irmin_Tree.kind
-           t.irmin_tree [@profiler.span_f ["irmin"; "tree"; "kind"]])
+           t.irmin_tree
+         [@profiler.span_f {verbosity = Notice} ["irmin"; "tree"; "kind"]])
       in
       let kind2 =
         (Brassaia_Tree.kind
-           t.brassaia_tree [@profiler.span_f ["brassaia"; "tree"; "kind"]])
+           t.brassaia_tree
+         [@profiler.span_f {verbosity = Notice} ["brassaia"; "tree"; "kind"]])
       in
       let pp_kind ppf = function
         | `Value -> Format.fprintf ppf "value"
@@ -412,11 +440,14 @@ struct
      fun t ->
       let* value1 =
         (Irmin_Tree.to_value
-           t.irmin_tree [@profiler.span_s ["irmin"; "tree"; "to_value"]])
+           t.irmin_tree
+         [@profiler.span_s {verbosity = Notice} ["irmin"; "tree"; "to_value"]])
       in
       let* value2 =
         (Brassaia_Tree.to_value
-           t.brassaia_tree [@profiler.span_s ["brassaia"; "tree"; "to_value"]])
+           t.brassaia_tree
+         [@profiler.span_s
+           {verbosity = Notice} ["brassaia"; "tree"; "to_value"]])
       in
       assert_and_return_result_lwt
         value1
@@ -432,12 +463,15 @@ struct
       let* irmin_tree =
         (Irmin_Tree.of_value
            t.irmin_context
-           value [@profiler.span_s ["irmin"; "tree"; "of_value"]])
+           value
+         [@profiler.span_s {verbosity = Notice} ["irmin"; "tree"; "of_value"]])
       in
       let+ brassaia_tree =
         (Brassaia_Tree.of_value
            t.brassaia_context
-           value [@profiler.span_s ["brassaia"; "tree"; "of_value"]])
+           value
+         [@profiler.span_s
+           {verbosity = Notice} ["brassaia"; "tree"; "of_value"]])
       in
       {irmin_tree; brassaia_tree}
 
@@ -445,11 +479,13 @@ struct
      fun t ->
       let context_hash1 =
         (Irmin_Tree.hash
-           t.irmin_tree [@profiler.span_f ["irmin"; "tree"; "hash"]])
+           t.irmin_tree
+         [@profiler.span_f {verbosity = Notice} ["irmin"; "tree"; "hash"]])
       in
       let context_hash2 =
         (Brassaia_Tree.hash
-           t.brassaia_tree [@profiler.span_f ["brassaia"; "tree"; "hash"]])
+           t.brassaia_tree
+         [@profiler.span_f {verbosity = Notice} ["brassaia"; "tree"; "hash"]])
       in
       assert_and_return_result
         context_hash1
@@ -465,12 +501,14 @@ struct
       let bool1 =
         (Irmin_Tree.equal
            t1.irmin_tree
-           t2.irmin_tree [@profiler.span_f ["irmin"; "tree"; "equal"]])
+           t2.irmin_tree
+         [@profiler.span_f {verbosity = Notice} ["irmin"; "tree"; "equal"]])
       in
       let bool2 =
         (Brassaia_Tree.equal
            t1.brassaia_tree
-           t2.brassaia_tree [@profiler.span_f ["brassaia"; "tree"; "equal"]])
+           t2.brassaia_tree
+         [@profiler.span_f {verbosity = Notice} ["brassaia"; "tree"; "equal"]])
       in
       assert_and_return_result
         bool1
@@ -486,18 +524,24 @@ struct
       let () =
         (Irmin_Tree.clear
            ?depth
-           t.irmin_tree [@profiler.span_f ["irmin"; "tree"; "clear"]])
+           t.irmin_tree
+         [@profiler.span_f {verbosity = Notice} ["irmin"; "tree"; "clear"]])
       in
       (Brassaia_Tree.clear
          ?depth
-         t.brassaia_tree [@profiler.span_f ["brassaia"; "tree"; "clear"]])
+         t.brassaia_tree
+       [@profiler.span_f {verbosity = Notice} ["brassaia"; "tree"; "clear"]])
 
     let pp : Format.formatter -> tree -> unit =
      fun ppf t ->
-      Irmin_Tree.pp ppf t.irmin_tree [@profiler.span_f ["irmin"; "tree"; "pp"]] ;
+      Irmin_Tree.pp
+        ppf
+        t.irmin_tree
+      [@profiler.span_f {verbosity = Notice} ["irmin"; "tree"; "pp"]] ;
       Brassaia_Tree.pp
         ppf
-        t.brassaia_tree [@profiler.span_f ["brassaia"; "tree"; "pp"]]
+        t.brassaia_tree
+      [@profiler.span_f {verbosity = Notice} ["brassaia"; "tree"; "pp"]]
 
     type raw = Irmin_Tree.raw
 
@@ -508,11 +552,13 @@ struct
      fun t ->
       let* raw1 =
         (Irmin_Tree.to_raw
-           t.irmin_tree [@profiler.span_s ["irmin"; "tree"; "to_raw"]])
+           t.irmin_tree
+         [@profiler.span_s {verbosity = Notice} ["irmin"; "tree"; "to_raw"]])
       in
       let+ raw2 =
         (Brassaia_Tree.to_raw
-           t.brassaia_tree [@profiler.span_s ["brassaia"; "tree"; "to_raw"]])
+           t.brassaia_tree
+         [@profiler.span_s {verbosity = Notice} ["brassaia"; "tree"; "to_raw"]])
       in
       let equal raw1 raw2 =
         match (raw1, raw2) with
@@ -529,11 +575,14 @@ struct
     let of_raw : raw -> tree =
      fun raw ->
       let irmin_tree =
-        (Irmin_Tree.of_raw raw [@profiler.span_f ["irmin"; "tree"; "of_raw"]])
+        (Irmin_Tree.of_raw
+           raw
+         [@profiler.span_f {verbosity = Notice} ["irmin"; "tree"; "of_raw"]])
       in
       let brassaia_tree =
         (Brassaia_Tree.of_raw
-           raw [@profiler.span_f ["brassaia"; "tree"; "of_raw"]])
+           raw
+         [@profiler.span_f {verbosity = Notice} ["brassaia"; "tree"; "of_raw"]])
       in
       {irmin_tree; brassaia_tree}
 
@@ -541,11 +590,14 @@ struct
      fun t ->
       let* irmin_tree =
         (Irmin_Tree.unshallow
-           t.irmin_tree [@profiler.span_s ["irmin"; "tree"; "unshallow"]])
+           t.irmin_tree
+         [@profiler.span_s {verbosity = Notice} ["irmin"; "tree"; "unshallow"]])
       in
       let+ brassaia_tree =
         (Brassaia_Tree.unshallow
-           t.brassaia_tree [@profiler.span_s ["brasssaia"; "tree"; "unshallow"]])
+           t.brassaia_tree
+         [@profiler.span_s
+           {verbosity = Notice} ["brasssaia"; "tree"; "unshallow"]])
       in
       {irmin_tree; brassaia_tree}
 
@@ -557,11 +609,14 @@ struct
      fun t ->
       let bool1 =
         (Irmin_Tree.is_shallow
-           t.irmin_tree [@profiler.span_f ["irmin"; "tree"; "is_shallow"]])
+           t.irmin_tree
+         [@profiler.span_f {verbosity = Notice} ["irmin"; "tree"; "is_shallow"]])
       in
       let bool2 =
         (Brassaia_Tree.is_shallow
-           t.brassaia_tree [@profiler.span_f ["brassaia"; "tree"; "is_shallow"]])
+           t.brassaia_tree
+         [@profiler.span_f
+           {verbosity = Notice} ["brassaia"; "tree"; "is_shallow"]])
       in
       assert_and_return_result
         bool1
@@ -576,11 +631,14 @@ struct
      fun t ->
       let kinded_key1 =
         (Irmin_Tree.kinded_key
-           t.irmin_tree [@profiler.span_f ["irmin"; "tree"; "kinded_key"]])
+           t.irmin_tree
+         [@profiler.span_f {verbosity = Notice} ["irmin"; "tree"; "kinded_key"]])
       in
       let kinded_key2 =
         (Brassaia_Tree.kinded_key
-           t.brassaia_tree [@profiler.span_f ["brassaia"; "tree"; "kinded_key"]])
+           t.brassaia_tree
+         [@profiler.span_f
+           {verbosity = Notice} ["brassaia"; "tree"; "kinded_key"]])
       in
       let pp ppf = function
         | `Node _node_key -> Format.fprintf ppf "Node"
@@ -603,12 +661,13 @@ struct
     let* irmin_context =
       (Irmin_Context.add_protocol
          t.irmin_context
-         hash [@profiler.span_s ["irmin"; "add_protocol"]])
+         hash [@profiler.span_s {verbosity = Notice} ["irmin"; "add_protocol"]])
     in
     let+ brassaia_context =
       (Brassaia_Context.add_protocol
          t.brassaia_context
-         hash [@profiler.span_s ["brassaia"; "add_protocol"]])
+         hash
+       [@profiler.span_s {verbosity = Notice} ["brassaia"; "add_protocol"]])
     in
     {irmin_context; brassaia_context}
 
@@ -616,12 +675,14 @@ struct
     let bool1 =
       (Irmin_Context.equal_config
          config1
-         config2 [@profiler.span_f ["irmin"; "equal_config"]])
+         config2
+       [@profiler.span_f {verbosity = Notice} ["irmin"; "equal_config"]])
     in
     let bool2 =
       (Brassaia_Context.equal_config
          config1
-         config2 [@profiler.span_f ["brassaia"; "equal_config"]])
+         config2
+       [@profiler.span_f {verbosity = Notice} ["brassaia"; "equal_config"]])
     in
     assert_and_return_result
       bool1
@@ -637,12 +698,13 @@ struct
     let* bool1 =
       (Irmin_Context.mem
          t.irmin_context
-         key [@profiler.span_s ["irmin"; "mem"]])
+         key [@profiler.span_s {verbosity = Notice} ["irmin"; "mem"]])
     in
     let* bool2 =
       (Brassaia_Context.mem
          t.brassaia_context
-         (Obj.magic key) [@profiler.span_s ["brassaia"; "mem"]])
+         (Obj.magic key)
+       [@profiler.span_s {verbosity = Notice} ["brassaia"; "mem"]])
     in
     assert_and_return_result_lwt
       bool1
@@ -658,12 +720,12 @@ struct
     let* bool1 =
       (Irmin_Context.mem_tree
          t.irmin_context
-         key [@profiler.span_s ["irmin"; "mem_tree"]])
+         key [@profiler.span_s {verbosity = Notice} ["irmin"; "mem_tree"]])
     in
     let* bool2 =
       (Brassaia_Context.mem_tree
          t.brassaia_context
-         key [@profiler.span_s ["brassaia"; "mem_tree"]])
+         key [@profiler.span_s {verbosity = Notice} ["brassaia"; "mem_tree"]])
     in
     assert_and_return_result_lwt
       bool1
@@ -679,12 +741,12 @@ struct
     let* value1 =
       (Irmin_Context.find
          t.irmin_context
-         key [@profiler.span_s ["irmin"; "find"]])
+         key [@profiler.span_s {verbosity = Notice} ["irmin"; "find"]])
     in
     let* value2 =
       (Brassaia_Context.find
          t.brassaia_context
-         key [@profiler.span_s ["brassaia"; "find"]])
+         key [@profiler.span_s {verbosity = Notice} ["brassaia"; "find"]])
     in
     assert_and_return_result_lwt
       value1
@@ -700,12 +762,12 @@ struct
     let* irmin_tree =
       (Irmin_Context.find_tree
          t.irmin_context
-         key [@profiler.span_s ["irmin"; "find_tree"]])
+         key [@profiler.span_s {verbosity = Notice} ["irmin"; "find_tree"]])
     in
     let* brassaia_tree =
       (Brassaia_Context.find_tree
          t.brassaia_context
-         key [@profiler.span_s ["brassaia"; "find_tree"]])
+         key [@profiler.span_s {verbosity = Notice} ["brassaia"; "find_tree"]])
     in
     let final_res =
       match (irmin_tree, brassaia_tree) with
@@ -729,14 +791,14 @@ struct
          t.irmin_context
          ?offset
          ?length
-         key [@profiler.span_s ["irmin"; "list"]])
+         key [@profiler.span_s {verbosity = Notice} ["irmin"; "list"]])
     in
     let* brassaia_list =
       (Brassaia_Context.list
          t.brassaia_context
          ?offset
          ?length
-         key [@profiler.span_s ["brassaia"; "list"]])
+         key [@profiler.span_s {verbosity = Notice} ["brassaia"; "list"]])
     in
     let final_res =
       List.map
@@ -767,12 +829,12 @@ struct
     let* length1 =
       (Irmin_Context.length
          t.irmin_context
-         key [@profiler.span_s ["irmin"; "length"]])
+         key [@profiler.span_s {verbosity = Notice} ["irmin"; "length"]])
     in
     let* length2 =
       (Brassaia_Context.length
          t.brassaia_context
-         key [@profiler.span_s ["brassaia"; "length"]])
+         key [@profiler.span_s {verbosity = Notice} ["brassaia"; "length"]])
     in
     assert_and_return_result_lwt
       length1
@@ -789,13 +851,13 @@ struct
       (Irmin_Context.add
          t.irmin_context
          key
-         value [@profiler.span_s ["irmin"; "add"]])
+         value [@profiler.span_s {verbosity = Notice} ["irmin"; "add"]])
     in
     let+ brassaia_context =
       (Brassaia_Context.add
          t.brassaia_context
          key
-         value [@profiler.span_s ["brassaia"; "add"]])
+         value [@profiler.span_s {verbosity = Notice} ["brassaia"; "add"]])
     in
     {irmin_context; brassaia_context}
 
@@ -805,13 +867,15 @@ struct
       (Irmin_Context.add_tree
          t.irmin_context
          key
-         tree.irmin_tree [@profiler.span_s ["irmin"; "add_tree"]])
+         tree.irmin_tree
+       [@profiler.span_s {verbosity = Notice} ["irmin"; "add_tree"]])
     in
     let+ brassaia_context =
       (Brassaia_Context.add_tree
          t.brassaia_context
          key
-         tree.brassaia_tree [@profiler.span_s ["brassaia"; "add_tree"]])
+         tree.brassaia_tree
+       [@profiler.span_s {verbosity = Notice} ["brassaia"; "add_tree"]])
     in
     {irmin_context; brassaia_context}
 
@@ -820,12 +884,12 @@ struct
     let* irmin_context =
       (Irmin_Context.remove
          t.irmin_context
-         key [@profiler.span_s ["irmin"; "remove"]])
+         key [@profiler.span_s {verbosity = Notice} ["irmin"; "remove"]])
     in
     let+ brassaia_context =
       (Brassaia_Context.remove
          t.brassaia_context
-         key [@profiler.span_s ["brassaia"; "remove"]])
+         key [@profiler.span_s {verbosity = Notice} ["brassaia"; "remove"]])
     in
     {irmin_context; brassaia_context}
 
@@ -848,7 +912,7 @@ struct
          key
          ~order
          ~init
-         ~f:f_irmin [@profiler.span_f ["irmin"; "fold"]])
+         ~f:f_irmin [@profiler.span_f {verbosity = Notice} ["irmin"; "fold"]])
     in
     let f_brassaia key brassaia_tree acc =
       f key {(Tree.empty t) with brassaia_tree} acc
@@ -860,7 +924,8 @@ struct
          key
          ~order
          ~init
-         ~f:f_brassaia [@profiler.span_f ["brassaia"; "fold"]])
+         ~f:f_brassaia
+       [@profiler.span_f {verbosity = Notice} ["brassaia"; "fold"]])
     in
     (* assert (res1 = res2) ; *)
     res1
@@ -869,11 +934,13 @@ struct
    fun t ->
     let config1 =
       (Irmin_Context.config
-         t.irmin_context [@profiler.span_f ["irmin"; "config"]])
+         t.irmin_context
+       [@profiler.span_f {verbosity = Notice} ["irmin"; "config"]])
     in
     let config2 =
       (Brassaia_Context.config
-         t.brassaia_context [@profiler.span_f ["brassaia"; "config"]])
+         t.brassaia_context
+       [@profiler.span_f {verbosity = Notice} ["brassaia"; "config"]])
     in
     assert_and_return_result
       config1
@@ -888,11 +955,13 @@ struct
    fun t ->
     let* hash1 =
       (Irmin_Context.get_protocol
-         t.irmin_context [@profiler.span_s ["irmin"; "get_protocol"]])
+         t.irmin_context
+       [@profiler.span_s {verbosity = Notice} ["irmin"; "get_protocol"]])
     in
     let* hash2 =
       (Brassaia_Context.get_protocol
-         t.brassaia_context [@profiler.span_s ["brassaia"; "get_protocol"]])
+         t.brassaia_context
+       [@profiler.span_s {verbosity = Notice} ["brassaia"; "get_protocol"]])
     in
     assert_and_return_result_lwt
       hash1
@@ -910,13 +979,15 @@ struct
       (Irmin_Context.fork_test_chain
          t.irmin_context
          ~protocol
-         ~expiration [@profiler.span_s ["irmin"; "fork_test_chain"]])
+         ~expiration
+       [@profiler.span_s {verbosity = Notice} ["irmin"; "fork_test_chain"]])
     in
     let+ brassaia_context =
       (Brassaia_Context.fork_test_chain
          t.brassaia_context
          ~protocol
-         ~expiration [@profiler.span_s ["brassaia"; "fork_test_chain"]])
+         ~expiration
+       [@profiler.span_s {verbosity = Notice} ["brassaia"; "fork_test_chain"]])
     in
     {irmin_context; brassaia_context}
 
@@ -926,12 +997,14 @@ struct
     let* irmin_context =
       (Irmin_Context.set_hash_version
          t.irmin_context
-         version [@profiler.span_s ["irmin"; "set_hash_version"]])
+         version
+       [@profiler.span_s {verbosity = Notice} ["irmin"; "set_hash_version"]])
     in
     let+ brassaia_context =
       (Brassaia_Context.set_hash_version
          t.brassaia_context
-         version [@profiler.span_s ["brassaia"; "set_hash_version"]])
+         version
+       [@profiler.span_s {verbosity = Notice} ["brassaia"; "set_hash_version"]])
     in
     {irmin_context; brassaia_context}
 
@@ -939,11 +1012,13 @@ struct
    fun t ->
     let version1 =
       (Irmin_Context.get_hash_version
-         t.irmin_context [@profiler.span_f ["irmin"; "get_hash_version"]])
+         t.irmin_context
+       [@profiler.span_f {verbosity = Notice} ["irmin"; "get_hash_version"]])
     in
     let version2 =
       (Brassaia_Context.get_hash_version
-         t.brassaia_context [@profiler.span_f ["brassaia"; "get_hash_version"]])
+         t.brassaia_context
+       [@profiler.span_f {verbosity = Notice} ["brassaia"; "get_hash_version"]])
     in
     assert_and_return_result
       version1
@@ -973,7 +1048,8 @@ struct
     let* irmin_tree, res1 =
       (Irmin_Context.verify_tree_proof
          proof
-         f_irmin [@profiler.span_s ["irmin"; "verify_tree_proof"]])
+         f_irmin
+       [@profiler.span_s {verbosity = Notice} ["irmin"; "verify_tree_proof"]])
     in
     let f_brassaia brassaia_tree =
       let open Lwt_syntax in
@@ -983,7 +1059,8 @@ struct
     let+ brassaia_tree, res2 =
       (Brassaia_Context.verify_tree_proof
          proof
-         f_brassaia [@profiler.span_s ["brassaia"; "verify_tree_proof"]])
+         f_brassaia
+       [@profiler.span_s {verbosity = Notice} ["brassaia"; "verify_tree_proof"]])
     in
     assert (res1 = res2) ;
     ({irmin_tree; brassaia_tree}, res1)
@@ -1007,7 +1084,8 @@ struct
     let* irmin_tree, res1 =
       (Irmin_Context.verify_stream_proof
          proof
-         f_irmin [@profiler.span_s ["irmin"; "verify_stream_proof"]])
+         f_irmin
+       [@profiler.span_s {verbosity = Notice} ["irmin"; "verify_stream_proof"]])
     in
     let f_brassaia brassaia_tree =
       let open Lwt_syntax in
@@ -1017,7 +1095,9 @@ struct
     let+ brassaia_tree, res2 =
       (Brassaia_Context.verify_stream_proof
          proof
-         f_brassaia [@profiler.span_s ["brassaia"; "verify_stream_proof"]])
+         f_brassaia
+       [@profiler.span_s
+         {verbosity = Notice} ["brassaia"; "verify_stream_proof"]])
     in
     assert (res1 = res2) ;
     ({irmin_tree; brassaia_tree}, res1)
@@ -1027,11 +1107,13 @@ struct
   let index context =
     let irmin_index =
       (Irmin_Context.index
-         context.irmin_context [@profiler.span_f ["irmin"; "index"]])
+         context.irmin_context
+       [@profiler.span_f {verbosity = Notice} ["irmin"; "index"]])
     in
     let brassaia_index =
       (Brassaia_Context.index
-         context.brassaia_context [@profiler.span_f ["brassaia"; "index"]])
+         context.brassaia_context
+       [@profiler.span_f {verbosity = Notice} ["brassaia"; "index"]])
     in
     {irmin_index; brassaia_index}
 
@@ -1042,31 +1124,34 @@ struct
     let* () =
       (Irmin_Context.gc
          index.irmin_index
-         context_hash [@profiler.span_s ["irmin"; "gc"]])
+         context_hash [@profiler.span_s {verbosity = Notice} ["irmin"; "gc"]])
     in
     (Brassaia_Context.gc
        index.brassaia_index
-       context_hash [@profiler.span_f ["brassaia"; "gc"]])
+       context_hash [@profiler.span_f {verbosity = Notice} ["brassaia"; "gc"]])
 
   let wait_gc_completion : index -> unit Lwt.t =
    fun index ->
     let* () =
       (Irmin_Context.wait_gc_completion
-         index.irmin_index [@profiler.span_s ["irmin"; "wait_gc_completion"]])
+         index.irmin_index
+       [@profiler.span_s {verbosity = Notice} ["irmin"; "wait_gc_completion"]])
     in
     (Brassaia_Context.wait_gc_completion
        index.brassaia_index
-     [@profiler.span_f ["brassaia"; "wait_gc_completion"]])
+     [@profiler.span_f {verbosity = Notice} ["brassaia"; "wait_gc_completion"]])
 
   let is_gc_allowed : index -> bool =
    fun index ->
     let bool1 =
       (Irmin_Context.is_gc_allowed
-         index.irmin_index [@profiler.span_f ["irmin"; "is_gc_allowed"]])
+         index.irmin_index
+       [@profiler.span_f {verbosity = Notice} ["irmin"; "is_gc_allowed"]])
     in
     let bool2 =
       (Brassaia_Context.is_gc_allowed
-         index.brassaia_index [@profiler.span_f ["brassaia"; "is_gc_allowed"]])
+         index.brassaia_index
+       [@profiler.span_f {verbosity = Notice} ["brassaia"; "is_gc_allowed"]])
     in
     assert_and_return_result
       bool1
@@ -1081,31 +1166,37 @@ struct
    fun index ->
     let* () =
       (Irmin_Context.split
-         index.irmin_index [@profiler.span_s ["irmin"; "split"]])
+         index.irmin_index
+       [@profiler.span_s {verbosity = Notice} ["irmin"; "split"]])
     in
     (Brassaia_Context.split
-       index.brassaia_index [@profiler.span_f ["brassaia"; "split"]])
+       index.brassaia_index
+     [@profiler.span_f {verbosity = Notice} ["brassaia"; "split"]])
 
   let sync : index -> unit Lwt.t =
    fun index ->
     let* () =
       (Irmin_Context.sync
-         index.irmin_index [@profiler.span_s ["irmin"; "sync"]])
+         index.irmin_index
+       [@profiler.span_s {verbosity = Notice} ["irmin"; "sync"]])
     in
     (Brassaia_Context.sync
-       index.brassaia_index [@profiler.span_f ["brassaia"; "sync"]])
+       index.brassaia_index
+     [@profiler.span_f {verbosity = Notice} ["brassaia"; "sync"]])
 
   let exists : index -> Context_hash.t -> bool Lwt.t =
    fun index context_hash ->
     let* bool1 =
       (Irmin_Context.exists
          index.irmin_index
-         context_hash [@profiler.span_s ["irmin"; "exists"]])
+         context_hash
+       [@profiler.span_s {verbosity = Notice} ["irmin"; "exists"]])
     in
     let* bool2 =
       (Brassaia_Context.exists
          index.brassaia_index
-         context_hash [@profiler.span_s ["brassaia"; "exists"]])
+         context_hash
+       [@profiler.span_s {verbosity = Notice} ["brassaia"; "exists"]])
     in
     assert_and_return_result_lwt
       bool1
@@ -1120,21 +1211,26 @@ struct
    fun index ->
     let* () =
       (Irmin_Context.close
-         index.irmin_index [@profiler.span_s ["irmin"; "close"]])
+         index.irmin_index
+       [@profiler.span_s {verbosity = Notice} ["irmin"; "close"]])
     in
     (Brassaia_Context.close
-       index.brassaia_index [@profiler.span_f ["brassaia"; "close"]])
+       index.brassaia_index
+     [@profiler.span_f {verbosity = Notice} ["brassaia"; "close"]])
 
   let compute_testchain_chain_id : Block_hash.t -> Chain_id.t =
    fun block_hash ->
     let chain_id1 =
       (Irmin_Context.compute_testchain_chain_id
-         block_hash [@profiler.span_f ["irmin"; "compute_testchain_chain_id"]])
+         block_hash
+       [@profiler.span_f
+         {verbosity = Notice} ["irmin"; "compute_testchain_chain_id"]])
     in
     let chain_id2 =
       (Brassaia_Context.compute_testchain_chain_id
          block_hash
-       [@profiler.span_f ["brassaia"; "compute_testchain_chain_id"]])
+       [@profiler.span_f
+         {verbosity = Notice} ["brassaia"; "compute_testchain_chain_id"]])
     in
     assert_and_return_result
       chain_id1
@@ -1154,13 +1250,16 @@ struct
       (Irmin_Context.add_predecessor_block_metadata_hash
          t.irmin_context
          hash
-       [@profiler.span_s ["irmin"; "add_predecessor_block_metadata_hash"]])
+       [@profiler.span_s
+         {verbosity = Notice} ["irmin"; "add_predecessor_block_metadata_hash"]])
     in
     let+ brassaia_context =
       (Brassaia_Context.add_predecessor_block_metadata_hash
          t.brassaia_context
          hash
-       [@profiler.span_s ["brassaia"; "add_predecessor_block_metadata_hash"]])
+       [@profiler.span_s
+         {verbosity = Notice}
+           ["brassaia"; "add_predecessor_block_metadata_hash"]])
     in
     {irmin_context; brassaia_context}
 
@@ -1170,13 +1269,16 @@ struct
     let* irmin_context =
       (Irmin_Context.add_predecessor_ops_metadata_hash
          t.irmin_context
-         hash [@profiler.span_s ["irmin"; "add_predecessor_ops_metadata_hash"]])
+         hash
+       [@profiler.span_s
+         {verbosity = Notice} ["irmin"; "add_predecessor_ops_metadata_hash"]])
     in
     let+ brassaia_context =
       (Brassaia_Context.add_predecessor_ops_metadata_hash
          t.brassaia_context
          hash
-       [@profiler.span_s ["brassaia"; "add_predecessor_ops_metadata_hash"]])
+       [@profiler.span_s
+         {verbosity = Notice} ["brassaia"; "add_predecessor_ops_metadata_hash"]])
     in
     {irmin_context; brassaia_context}
 
@@ -1186,13 +1288,15 @@ struct
       (Irmin_Context.hash
          ~time
          ?message
-         t.irmin_context [@profiler.span_f ["irmin"; "hash"]])
+         t.irmin_context
+       [@profiler.span_f {verbosity = Notice} ["irmin"; "hash"]])
     in
     let context_hash2 =
       (Brassaia_Context.hash
          ~time
          ?message
-         t.brassaia_context [@profiler.span_f ["brassaia"; "hash"]])
+         t.brassaia_context
+       [@profiler.span_f {verbosity = Notice} ["brassaia"; "hash"]])
     in
     assert_and_return_result
       context_hash1
@@ -1208,13 +1312,16 @@ struct
     let* block_header1 =
       (Irmin_Context.commit_test_chain_genesis
          context.irmin_context
-         block_header [@profiler.span_s ["irmin"; "commit_test_chain_genesis"]])
+         block_header
+       [@profiler.span_s
+         {verbosity = Notice} ["irmin"; "commit_test_chain_genesis"]])
     in
     let* block_header2 =
       (Brassaia_Context.commit_test_chain_genesis
          context.brassaia_context
          block_header
-       [@profiler.span_s ["brassaia"; "commit_test_chain_genesis"]])
+       [@profiler.span_s
+         {verbosity = Notice} ["brassaia"; "commit_test_chain_genesis"]])
     in
     assert_and_return_result_lwt
       block_header1
@@ -1229,11 +1336,13 @@ struct
    fun t ->
     let* status1 =
       (Irmin_Context.get_test_chain
-         t.irmin_context [@profiler.span_s ["irmin"; "get_test_chain"]])
+         t.irmin_context
+       [@profiler.span_s {verbosity = Notice} ["irmin"; "get_test_chain"]])
     in
     let+ status2 =
       (Brassaia_Context.get_test_chain
-         t.brassaia_context [@profiler.span_s ["brassaia"; "get_test_chain"]])
+         t.brassaia_context
+       [@profiler.span_s {verbosity = Notice} ["brassaia"; "get_test_chain"]])
     in
     assert (Test_chain_status.equal status1 status2) ;
     status1
@@ -1243,12 +1352,14 @@ struct
     let* irmin_context =
       (Irmin_Context.add_test_chain
          t.irmin_context
-         status [@profiler.span_s ["irmin"; "add_test_chain"]])
+         status
+       [@profiler.span_s {verbosity = Notice} ["irmin"; "add_test_chain"]])
     in
     let+ brassaia_context =
       (Brassaia_Context.add_test_chain
          t.brassaia_context
-         status [@profiler.span_s ["brassaia"; "add_test_chain"]])
+         status
+       [@profiler.span_s {verbosity = Notice} ["brassaia"; "add_test_chain"]])
     in
     {irmin_context; brassaia_context}
 
@@ -1259,13 +1370,15 @@ struct
       (Irmin_Context.commit
          ~time
          ?message
-         t.irmin_context [@profiler.span_s ["irmin"; "commit"]])
+         t.irmin_context
+       [@profiler.span_s {verbosity = Notice} ["irmin"; "commit"]])
     in
     let* context_hash2 =
       (Brassaia_Context.commit
          ~time
          ?message
-         t.brassaia_context [@profiler.span_s ["brassaia"; "commit"]])
+         t.brassaia_context
+       [@profiler.span_s {verbosity = Notice} ["brassaia"; "commit"]])
     in
     assert_and_return_result_lwt
       context_hash1
@@ -1289,14 +1402,16 @@ struct
          index.irmin_index
          ~chain_id
          ~time
-         ~protocol [@profiler.span_s ["irmin"; "commit_genesis"]])
+         ~protocol
+       [@profiler.span_s {verbosity = Notice} ["irmin"; "commit_genesis"]])
     in
     let+ context_hash2 =
       (Brassaia_Context.commit_genesis
          index.brassaia_index
          ~chain_id
          ~time
-         ~protocol [@profiler.span_s ["brassaia"; "commit_genesis"]])
+         ~protocol
+       [@profiler.span_s {verbosity = Notice} ["brassaia"; "commit_genesis"]])
     in
     assert (Context_hash.equal context_hash1 context_hash2) ;
     context_hash1
@@ -1305,11 +1420,15 @@ struct
    fun block_hash ->
     let block_hash1 =
       (Irmin_Context.compute_testchain_genesis
-         block_hash [@profiler.span_f ["irmin"; "compute_testchain_genesis"]])
+         block_hash
+       [@profiler.span_f
+         {verbosity = Notice} ["irmin"; "compute_testchain_genesis"]])
     in
     let block_hash2 =
       (Brassaia_Context.compute_testchain_genesis
-         block_hash [@profiler.span_f ["brassaia"; "compute_testchain_genesis"]])
+         block_hash
+       [@profiler.span_f
+         {verbosity = Notice} ["brassaia"; "compute_testchain_genesis"]])
     in
     assert_and_return_result
       block_hash1
@@ -1338,13 +1457,14 @@ struct
       (Irmin_Context.merkle_tree
          context.irmin_context
          leaf_kind
-         path [@profiler.span_s ["irmin"; "merkle_tree"]])
+         path [@profiler.span_s {verbosity = Notice} ["irmin"; "merkle_tree"]])
     in
     let+ _proof2 =
       (Brassaia_Context.merkle_tree
          context.brassaia_context
          leaf_kind
-         path [@profiler.span_s ["brassaia"; "merkle_tree"]])
+         path
+       [@profiler.span_s {verbosity = Notice} ["brassaia"; "merkle_tree"]])
     in
     proof1
 
@@ -1355,13 +1475,15 @@ struct
       (Irmin_Context.merkle_tree_v2
          context.irmin_context
          leaf_kind
-         path [@profiler.span_s ["irmin"; "merkle_tree_v2"]])
+         path
+       [@profiler.span_s {verbosity = Notice} ["irmin"; "merkle_tree_v2"]])
     in
     let+ _proof2 =
       (Brassaia_Context.merkle_tree_v2
          context.brassaia_context
          leaf_kind
-         path [@profiler.span_s ["brassaia"; "merkle_tree_v2"]])
+         path
+       [@profiler.span_s {verbosity = Notice} ["brassaia"; "merkle_tree_v2"]])
     in
     proof1
 end
