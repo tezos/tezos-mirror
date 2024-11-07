@@ -4,7 +4,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-//! Implementation of [`SmartRollupCore`] used when compiling to **wasm**.
+//! Implementation of [`crate::SmartRollupCore`] for a generic rollup host.
 
 use crate::smart_rollup_core as core;
 use crate::smart_rollup_core::ReadInputMessageInfo;
