@@ -148,7 +148,7 @@ let health_check ?delegate_to dir =
    once. *)
 type 'a batched_request = Singleton of 'a | Batch of 'a list
 
-let request_encoding kind =
+let batch_encoding kind =
   Data_encoding.(
     union
       [
@@ -169,8 +169,15 @@ let request_encoding kind =
 let dispatch_service ~path =
   Service.post_service
     ~query:Query.empty
-    ~input:(request_encoding JSONRPC.request_encoding)
-    ~output:(request_encoding JSONRPC.response_encoding)
+    ~input:JSONRPC.request_encoding
+    ~output:JSONRPC.response_encoding
+    path
+
+let dispatch_batch_service ~path =
+  Service.post_service
+    ~query:Query.empty
+    ~input:(batch_encoding JSONRPC.request_encoding)
+    ~output:(batch_encoding JSONRPC.response_encoding)
     path
 
 let get_block_by_number ~full_transaction_object block_param
@@ -863,9 +870,19 @@ let dispatch_handler (rpc : Configuration.rpc) config ctx dispatch_request
       let* outputs = List.map_s process requests in
       return (Batch outputs)
 
+let websocket_response_of_response response = {response; subscription = None}
+
+let dispatch_private_websocket ~block_production (rpc : Configuration.rpc)
+    config ctx (input : JSONRPC.request) =
+  let open Lwt_syntax in
+  let+ response =
+    dispatch_private_request ~block_production rpc config ctx input
+  in
+  websocket_response_of_response response
+
 let generic_dispatch (rpc : Configuration.rpc) config ctx dir path
     dispatch_request =
-  Evm_directory.register0 dir (dispatch_service ~path) (fun () input ->
+  Evm_directory.register0 dir (dispatch_batch_service ~path) (fun () input ->
       dispatch_handler rpc config ctx dispatch_request input |> Lwt_result.ok)
 
 let dispatch_public (rpc : Configuration.rpc) config ctx dir =
@@ -881,12 +898,38 @@ let dispatch_private (rpc : Configuration.rpc) ~block_production config ctx dir
     Path.(add_suffix root "private")
     (dispatch_private_request rpc ~block_production)
 
+let generic_websocket_dispatch (rpc : Configuration.rpc)
+    (config : Configuration.t) ctx dir path dispatch_request =
+  if config.experimental_features.enable_websocket then
+    Evm_directory.jsonrpc_websocket_register dir path (fun request ->
+        let open Lwt_syntax in
+        let+ response = dispatch_request rpc config ctx request in
+        websocket_response_of_response response)
+  else dir
+
+let dispatch_websocket_public (rpc : Configuration.rpc) config ctx dir =
+  generic_websocket_dispatch rpc config ctx dir "/ws" dispatch_request
+
+let dispatch_websocket_private (rpc : Configuration.rpc) ~block_production
+    config ctx dir =
+  generic_websocket_dispatch
+    rpc
+    config
+    ctx
+    dir
+    "/private/ws"
+    (dispatch_private_request ~block_production)
+
 let directory ?delegate_health_check_to rpc config
     ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address) =
   Evm_directory.empty config.experimental_features.rpc_server
   |> version |> configuration config
   |> health_check ?delegate_to:delegate_health_check_to
   |> dispatch_public
+       rpc
+       config
+       ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address)
+  |> dispatch_websocket_public
        rpc
        config
        ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address)
@@ -897,6 +940,11 @@ let private_directory rpc config
   Evm_directory.empty config.experimental_features.rpc_server
   |> version
   |> dispatch_private
+       rpc
+       config
+       ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address)
+       ~block_production
+  |> dispatch_websocket_private
        rpc
        config
        ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address)
@@ -912,7 +960,7 @@ let call (type input output)
     Rollup_services.call_service
       ~keep_alive
       ~base:evm_node_endpoint
-      (dispatch_service ~path:Resto.Path.root)
+      (dispatch_batch_service ~path:Resto.Path.root)
       ()
       ()
       (Singleton

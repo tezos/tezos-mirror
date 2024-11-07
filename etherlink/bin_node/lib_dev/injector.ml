@@ -26,7 +26,7 @@ let send_raw_transaction ~keep_alive ~base raw_txn =
     call_service
       ~keep_alive
       ~base
-      (Services.dispatch_service ~path:Resto.Path.root)
+      (Services.dispatch_batch_service ~path:Resto.Path.root)
       ()
       ()
       (Singleton (send_raw_transaction_method raw_txn))
