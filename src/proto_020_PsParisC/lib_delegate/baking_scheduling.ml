@@ -698,8 +698,6 @@ let create_initial_state cctxt ?(synchronize = true) ~chain config
   in
   let cache = Baking_state.create_cache () in
   let dal_node_rpc_ctxt =
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/4674
-       Treat case when no endpoint was given and DAL is enabled *)
     Option.map create_dal_node_rpc_ctxt config.dal_node_endpoint
   in
   let global_state =
