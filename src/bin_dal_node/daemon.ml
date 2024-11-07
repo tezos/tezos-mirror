@@ -1161,14 +1161,6 @@ let run ~data_dir ~configuration_override =
       p2p_limits
       ~network_name
   in
-  (* Initialize store *)
-  let* store = Store.init config in
-  let* last_processed_level =
-    let last_processed_level_store = Store.last_processed_level store in
-    Store.Last_processed_level.load last_processed_level_store
-  in
-  let first_seen_level_store = Store.first_seen_level store in
-  let* first_seen_level = Store.First_seen_level.load first_seen_level_store in
   (* Get the current L1 head and its DAL plugin and parameters. *)
   let* header = Shell_services.Blocks.Header.shell_header cctxt () in
   let head_level = header.Block_header.level in
@@ -1190,6 +1182,14 @@ let run ~data_dir ~configuration_override =
       profile_ctxt
       ~number_of_slots:proto_parameters.number_of_slots
   in
+  (* Initialize store *)
+  let* store = Store.init config in
+  let* last_processed_level =
+    let last_processed_level_store = Store.last_processed_level store in
+    Store.Last_processed_level.load last_processed_level_store
+  in
+  let first_seen_level_store = Store.first_seen_level store in
+  let* first_seen_level = Store.First_seen_level.load first_seen_level_store in
   (* Check the DAL node's and L1 node's history mode. *)
   let* () = check_history_mode config profile_ctxt proto_parameters in
   let* () =
