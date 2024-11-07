@@ -613,7 +613,9 @@ module Delegates = struct
           Format.(
             pp_print_list ~pp_sep:pp_print_cut Baking_state.pp_consensus_key)
           delegates)
-      ("delegates", Data_encoding.list Baking_state.consensus_key_encoding)
+      ( "delegates",
+        Data_encoding.list
+          Baking_state.consensus_key_without_sk_encoding__cannot_decode )
 end
 
 module Scheduling = struct

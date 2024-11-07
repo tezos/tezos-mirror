@@ -35,6 +35,12 @@ type consensus_key = {
 
 val consensus_key_encoding : consensus_key Data_encoding.t
 
+(* Encodes the consensus_key but removes the [secret_key_uri] to avoid
+   leaking information.
+   Warning: this encoding was designed to encode, decoding will fail. *)
+val consensus_key_without_sk_encoding__cannot_decode :
+  consensus_key Data_encoding.t
+
 val pp_consensus_key : Format.formatter -> consensus_key -> unit
 
 type consensus_key_and_delegate = consensus_key * Signature.Public_key_hash.t
