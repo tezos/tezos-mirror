@@ -213,6 +213,59 @@ let block_transaction_count block =
   | TxHash l -> List.length l
   | TxFull l -> List.length l
 
+type sub_stream = {
+  kind : Ethereum_types.Subscription.kind;
+  stream : Ethereum_types.Subscription.output Lwt_stream.t;
+  stopper : unit -> unit;
+}
+
+let subscriptions :
+    (Ethereum_types.Subscription.id, sub_stream) Stdlib.Hashtbl.t =
+  (* 10 seems like a reasonable number since there is only
+     four types of subscription, and only `logs` make sense
+     to be sent multiple times. *)
+  Stdlib.Hashtbl.create 10
+
+let () = Random.self_init ()
+
+let encode_id bytes =
+  let id_hex = Hex.of_bytes bytes |> Hex.show in
+  let buf = Buffer.create (String.length id_hex) in
+  (* Trimming leading zeros. *)
+  String.fold_left
+    (fun only_zeros -> function
+      | '0' when only_zeros -> only_zeros
+      | c ->
+          Buffer.add_char buf c ;
+          false)
+    true
+    id_hex
+  |> ignore ;
+  Buffer.contents buf
+
+let make_id ~id = Ethereum_types.Subscription.(Id (Hex id))
+
+(* [generate_id]'s implementation is inspired by geth's one.
+   See:
+   https://github.com/ethereum/go-ethereum/blob/master/rpc/subscription.go *)
+let generate_id () =
+  let id = Bytes.make 16 '\000' in
+  Bytes.iteri (fun i _ -> Bytes.set_uint8 id i (Random.int 256)) id ;
+  encode_id id
+
+let eth_subscribe ~kind =
+  let id = make_id ~id:(generate_id ()) in
+  Stdlib.Hashtbl.add subscriptions id kind ;
+  id
+
+let eth_unsubscribe ~id =
+  match Stdlib.Hashtbl.find_opt subscriptions id with
+  | Some {stopper; _} ->
+      stopper () ;
+      Stdlib.Hashtbl.remove subscriptions id ;
+      true
+  | None -> false
+
 let decode :
     type a. (module METHOD with type input = a) -> Data_encoding.json -> a =
  fun (module M) v -> Data_encoding.Json.destruct M.input_encoding v
