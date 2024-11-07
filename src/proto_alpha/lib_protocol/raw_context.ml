@@ -335,6 +335,8 @@ let[@inline] sampler_state ctxt = ctxt.back.sampler_state
 let[@inline] reward_coeff_for_current_cycle ctxt =
   ctxt.back.reward_coeff_for_current_cycle
 
+let[@inline] dal ctxt = ctxt.back.dal
+
 let[@inline] adaptive_issuance_enable ctxt = ctxt.back.adaptive_issuance_enable
 
 let[@inline] update_back ctxt back = {ctxt with back}
@@ -381,6 +383,8 @@ let[@inline] update_sampler_state ctxt sampler_state =
 let[@inline] update_reward_coeff_for_current_cycle ctxt
     reward_coeff_for_current_cycle =
   update_back ctxt {ctxt.back with reward_coeff_for_current_cycle}
+
+let[@inline] update_dal ctxt dal = update_back ctxt {ctxt.back with dal}
 
 let[@inline] set_adaptive_issuance_enable ctxt =
   update_back ctxt {ctxt.back with adaptive_issuance_enable = true}
@@ -2136,7 +2140,8 @@ module Dal = struct
     let open Result_syntax in
     (* Dal.make takes some time (on the order of 10ms) so we memoize
        its result to avoid calling it more than once per block. *)
-    match ctxt.back.dal.cryptobox with
+    let dal = dal ctxt in
+    match dal.cryptobox with
     | Some cryptobox -> return (ctxt, cryptobox)
     | None -> (
         let Constants_parametric_repr.{dal = {cryptobox_parameters; _}; _} =
@@ -2144,45 +2149,34 @@ module Dal = struct
         in
         match Dal.make cryptobox_parameters with
         | Ok cryptobox ->
-            let back =
-              {
-                ctxt.back with
-                dal = {ctxt.back.dal with cryptobox = Some cryptobox};
-              }
-            in
-            return ({ctxt with back}, cryptobox)
+            let ctxt = update_dal ctxt {dal with cryptobox = Some cryptobox} in
+            return (ctxt, cryptobox)
         | Error (`Fail explanation) ->
             tzfail (Dal_errors_repr.Dal_cryptobox_error {explanation}))
 
-  let number_of_slots ctxt = ctxt.back.constants.dal.number_of_slots
+  let[@inline] number_of_slots ctxt = ctxt.back.constants.dal.number_of_slots
 
-  let number_of_shards ctxt =
+  let[@inline] number_of_shards ctxt =
     ctxt.back.constants.dal.cryptobox_parameters.number_of_shards
 
   let record_number_of_attested_shards ctxt attestation number =
+    let dal = dal ctxt in
     let slot_accountability =
       Dal_attestation_repr.Accountability.record_number_of_attested_shards
-        ctxt.back.dal.slot_accountability
+        dal.slot_accountability
         attestation
         number
     in
-    {
-      ctxt with
-      back = {ctxt.back with dal = {ctxt.back.dal with slot_accountability}};
-    }
+    update_dal ctxt {dal with slot_accountability}
 
   let register_slot_header ctxt slot_header ~source =
     let open Result_syntax in
+    let dal = dal ctxt in
     match
-      Dal_slot_repr.Slot_market.register
-        ctxt.back.dal.slot_fee_market
-        slot_header
-        ~source
+      Dal_slot_repr.Slot_market.register dal.slot_fee_market slot_header ~source
     with
     | None ->
-        let length =
-          Dal_slot_repr.Slot_market.length ctxt.back.dal.slot_fee_market
-        in
+        let length = Dal_slot_repr.Slot_market.length dal.slot_fee_market in
         tzfail
           (Dal_errors_repr.Dal_register_invalid_slot_header
              {length; slot_header})
@@ -2190,26 +2184,24 @@ module Dal = struct
         if not updated then
           tzfail
             (Dal_errors_repr.Dal_publish_commitment_duplicate {slot_header})
-        else
-          return
-            {
-              ctxt with
-              back = {ctxt.back with dal = {ctxt.back.dal with slot_fee_market}};
-            }
+        else return @@ update_dal ctxt {dal with slot_fee_market}
 
-  let candidates ctxt =
-    Dal_slot_repr.Slot_market.candidates ctxt.back.dal.slot_fee_market
+  let[@inline] candidates ctxt =
+    let dal = dal ctxt in
+    Dal_slot_repr.Slot_market.candidates dal.slot_fee_market
 
   let is_slot_index_attested ctxt =
+    let dal = dal ctxt in
+    let constants = constants ctxt in
     let threshold =
-      ctxt.back.constants.Constants_parametric_repr.dal.attestation_threshold
+      constants.Constants_parametric_repr.dal.attestation_threshold
     in
     let number_of_shards =
-      ctxt.back.constants.Constants_parametric_repr.dal.cryptobox_parameters
+      constants.Constants_parametric_repr.dal.cryptobox_parameters
         .number_of_shards
     in
     Dal_attestation_repr.Accountability.is_slot_attested
-      ctxt.back.dal.slot_accountability
+      dal.slot_accountability
       ~threshold
       ~number_of_shards
 end
