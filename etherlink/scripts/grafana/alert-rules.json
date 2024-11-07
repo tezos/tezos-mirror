@@ -662,7 +662,83 @@
           "notification_settings": {
             "receiver": "${receiver}"
           }
-        }
+        },
+        {
+          "uid": "be38enzis2680d",
+          "title": "No L2 block since 5min",
+          "condition": "Condition",
+          "data": [
+            {
+              "refId": "NUM_L2_BLOCK",
+              "relativeTimeRange": {
+                "from": 600,
+                "to": 0
+              },
+              "datasourceUid": "${datasourceUid}",
+              "model": {
+                "editorMode": "code",
+                "expr": "count_over_time(octez_sc_rollup_node_inbox_level[5m])",
+                "instant": true,
+                "intervalMs": 1000,
+                "legendFormat": "__auto",
+                "maxDataPoints": 43200,
+                "range": false,
+                "refId": "NUM_L2_BLOCK"
+              }
+            },
+            {
+              "refId": "Condition",
+              "relativeTimeRange": {
+                "from": 600,
+                "to": 0
+              },
+              "datasourceUid": "__expr__",
+              "model": {
+                "conditions": [
+                  {
+                    "evaluator": {
+                      "params": [
+                        1
+                      ],
+                      "type": "lt"
+                    },
+                    "operator": {
+                      "type": "and"
+                    },
+                    "query": {
+                      "params": [
+                        "C"
+                      ]
+                    },
+                    "reducer": {
+                      "params": [],
+                      "type": "last"
+                    },
+                    "type": "query"
+                  }
+                ],
+                "datasource": {
+                  "type": "__expr__",
+                  "uid": "__expr__"
+                },
+                "expression": "NUM_L2_BLOCK",
+                "intervalMs": 1000,
+                "maxDataPoints": 43200,
+                "refId": "Condition",
+                "type": "threshold"
+              }
+            }
+          ],
+          "noDataState": "NoData",
+          "execErrState": "Error",
+          "for": "0s",
+          "annotations": {},
+          "labels": {},
+          "isPaused": false,
+          "notification_settings": {
+            "receiver": "${receiver}"
+          }
+        }        
       ]
     }
   ]
