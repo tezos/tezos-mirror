@@ -1261,7 +1261,7 @@ struct
          predecessor_context
          cache
          value_of_key)
-      [@profiler.record_s "load_predecessor_cache"]
+      [@profiler.record_s {verbosity = Debug} "load_predecessor_cache"]
 
     let begin_validation ctxt chain_id mode ~predecessor ~cache =
       let open Lwt_result_syntax in

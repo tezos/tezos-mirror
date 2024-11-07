@@ -483,6 +483,7 @@ let[@warning "-32"] reset_profilers block =
       (try Tezos_base.Profiler.stop profiler with _ -> ()) ;
       Tezos_base.Profiler.record
         profiler
+        Notice
         (Block_hash.to_b58check (Store.Block.hash block), []))
     profilers
 

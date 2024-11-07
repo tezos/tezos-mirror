@@ -462,7 +462,7 @@ let launch_rpc_server ?middleware (config : Config_file.t) dir rpc_server_kind
         server
         conn
         req
-        body [@profiler.span_s [path]]
+        body [@profiler.span_s {verbosity = Notice} [path]]
   in
   let update_metrics uri meth =
     Prometheus.Summary.(time (labels rpc_metrics [uri; meth]) Sys.time)
