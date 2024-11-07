@@ -67,6 +67,8 @@ val one_minute : period
 
 val one_hour : period
 
+val one_day : period
+
 (** [compare x y] returns [0] if [x] is equal to [y], a negative
     integer if [x] is shorter than [y], and a positive integer if [x]
     is longer than [y]. *)
