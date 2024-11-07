@@ -410,7 +410,7 @@ let apply_stake ~ctxt ~sender ~amount ~destination ~before_operation =
         error_when forbidden Staking_to_delegate_that_refuses_external_staking
       in
       let* ctxt, balance_updates =
-        Staking.stake ctxt ~amount:(`Exactly amount) ~sender ~delegate
+        Staking.stake ctxt ~amount ~sender ~delegate
       in
       (* Since [delegate] is an already existing delegate, it is already allocated. *)
       let allocated_destination_contract = false in

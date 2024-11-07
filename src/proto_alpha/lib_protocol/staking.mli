@@ -30,7 +30,7 @@ type error +=
     stake to [delegate]. *)
 val stake :
   Raw_context.t ->
-  amount:[`At_most of Tez_repr.t | `Exactly of Tez_repr.t] ->
+  amount:Tez_repr.t ->
   sender:Signature.Public_key_hash.t ->
   delegate:Signature.public_key_hash ->
   (Raw_context.t * Receipt_repr.balance_updates) tzresult Lwt.t
