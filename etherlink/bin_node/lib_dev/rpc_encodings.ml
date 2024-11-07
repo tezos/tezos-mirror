@@ -858,6 +858,38 @@ module Coinbase = struct
   type ('input, 'output) method_ += Method : (input, output) method_
 end
 
+module Subscribe = struct
+  open Ethereum_types
+
+  type input = Subscription.kind
+
+  type output = Subscription.id
+
+  let input_encoding = Subscription.kind_encoding
+
+  let output_encoding = Subscription.id_encoding
+
+  let method_ = "eth_subscribe"
+
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
+module Unsubscribe = struct
+  open Ethereum_types
+
+  type input = Subscription.id
+
+  type output = bool
+
+  let input_encoding = Subscription.id_input_encoding
+
+  let output_encoding = Data_encoding.bool
+
+  let method_ = "eth_unsubscribe"
+
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
 type map_result =
   | Method :
       ('input, 'output) method_
@@ -911,6 +943,8 @@ let supported_methods : (module METHOD) list =
     (module Eth_fee_history);
     (module Coinbase);
     (module Trace_call);
+    (module Subscribe);
+    (module Unsubscribe);
   ]
 
 let unsupported_methods : string list =

@@ -314,6 +314,14 @@ module Eth_fee_history :
 module Coinbase :
   METHOD with type input = unit and type output = Ethereum_types.address
 
+module Subscribe :
+  METHOD
+    with type input = Ethereum_types.Subscription.kind
+     and type output = Ethereum_types.Subscription.id
+
+module Unsubscribe :
+  METHOD with type input = Ethereum_types.Subscription.id and type output = bool
+
 type map_result =
   | Method :
       ('input, 'output) method_
