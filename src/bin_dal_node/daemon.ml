@@ -1176,6 +1176,8 @@ let run ~data_dir ~configuration_override =
   let* proto_parameters =
     Plugin.get_constants `Main (`Level head_level) cctxt
   in
+  (* Set proto number of slots hook. *)
+  Value_size_hooks.set_number_of_slots proto_parameters.number_of_slots ;
   let* profile_ctxt = build_profile_context config in
   let*? () =
     Profile_manager.validate_slot_indexes
@@ -1211,6 +1213,9 @@ let run ~data_dir ~configuration_override =
   let* cryptobox, shards_proofs_precomputation =
     init_cryptobox config proto_parameters
   in
+  (* Set crypto box share size hook. *)
+  Value_size_hooks.set_share_size
+    (Cryptobox.Internal_for_tests.encoded_share_size cryptobox) ;
   let ctxt =
     Node_context.init
       config
@@ -1246,10 +1251,6 @@ let run ~data_dir ~configuration_override =
         let*! _metrics_server = Metrics.launch metrics_addr in
         return_unit
   in
-  (* Set value size hooks. *)
-  Value_size_hooks.set_share_size
-    (Cryptobox.Internal_for_tests.encoded_share_size cryptobox) ;
-  Value_size_hooks.set_number_of_slots proto_parameters.number_of_slots ;
   (* Start RPC server. We do that before the waiting for the L1 node to be
      bootstrapped so that queries can already be issued. Note that that the node
      will thus already respond to the baker about shards status if queried. *)
