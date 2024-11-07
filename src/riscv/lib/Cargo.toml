@@ -24,6 +24,7 @@ tezos-smart-rollup-constants.workspace = true
 tezos-smart-rollup-utils.workspace = true
 thiserror.workspace = true
 vm-fdt.workspace = true
+itertools.workspace = true
 
 [dependencies.ocaml]
 workspace = true
