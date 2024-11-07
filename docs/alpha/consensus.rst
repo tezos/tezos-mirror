@@ -196,7 +196,7 @@ proposer (that is, the one that signs and injects the block): that's
 always true for blocks at round 0; however, in case of re-proposals
 this is not necessarily the case (see the algorithm description above).
 
-Fees are given to the payload producer immediately, that is, they are
+Fees are allocated to the payload producer's available balance immediately, that is, they are
 already reflected in the blockchain state obtained after applying the injected
 block.
 
@@ -216,24 +216,24 @@ the included attestations represent. The bonus is also distributed
 immediately.
 
 The attesting rewards are distributed at the end of the cycle.
-The attesting reward may be received even if not all of the validator's attestations are included in a block and is proportional to the validator's active stake (in other words, to its *expected* number of validator slots, and not its actual number of slots).
+Attesting rewards may be received even if not all of the validator's attestations are included in the cycle's blocks and is proportional to the validator's active stake (in other words, to its *expected* number of validator slots, and not its actual number of slots).
 However, two conditions must be met:
 
-- the validator has revealed its nonce, and
+- the validator has revealed its nonces, and
 - the validator has been present during the cycle.
 
 Not giving rewards in case of missing revelations is not new as it is :ref:`adapted<random_seed_alpha>`
 from Emmy*.
 The second condition is new. We say that a delegate is *present* during a cycle
 if the attesting power (that is, the number of validator slots at the
-corresponding level) of all the attestations included by the delegate during the
+corresponding level) of all the delegate's attestations included during the
 cycle represents at least ``MINIMAL_PARTICIPATION_RATIO`` of the delegate's expected number of
 validator slots for the current cycle (which is ``BLOCKS_PER_CYCLE *
 CONSENSUS_COMMITTEE_SIZE * active_stake / total_active_stake``).
 
-Regarding the concrete values for rewards, before Adaptive Issuance, we first fix the total reward per
+Regarding the concrete values for rewards, before :doc:`adaptive_issuance`, we first fix the total reward per
 level, call it ``total_rewards``, to ``80 / blocks_per_minute`` tez.
-Assuming ``blocks_per_minute = 7.5``, ``total_rewards`` is 10.67 tez. With Adaptive Issuance, this value changes dynamically over time but for the sake of example, we will assume that the reward value stays the same as above.
+Assuming ``blocks_per_minute = 7.5``, ``total_rewards`` is 10.67 tez. With :doc:`adaptive_issuance`, this value changes dynamically over time but for the sake of example, we will assume that the reward value stays the same as above.
 We define:
 
 - ``BAKING_REWARD_FIXED_PORTION := baking_reward_ratio * total_rewards``
@@ -279,7 +279,7 @@ Slashing
 ^^^^^^^^
 
 Like in Emmy*, not revealing nonces and double signing are punishable. If a
-validator does not reveal its nonce by the end of the cycle, it does not receive
+validator does not reveal its nonces by the end of the cycle, it does not receive
 its attesting rewards. If a validator double signs, that is, it double bakes
 (which means signing different blocks at the same level and same round) or it
 double (pre)attests (which means voting on two different proposals at the same
