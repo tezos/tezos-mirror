@@ -211,6 +211,12 @@ fn migrate_to<Host: Runtime>(
             )?;
             Ok(MigrationStatus::Done)
         }
+        StorageVersion::V24 => {
+            const EVM_BASE_FEE_PER_GAS: RefPath =
+                RefPath::assert_from(b"/evm/world_state/fees/base_fee_per_gas");
+            host.store_delete(&EVM_BASE_FEE_PER_GAS)?;
+            Ok(MigrationStatus::Done)
+        }
     }
 }
 
