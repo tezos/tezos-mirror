@@ -23,10 +23,23 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Simple abstraction from low-level storage to handle unstake requests.
+(** Abstraction from low-level storage to handle unstake requests.
 
     This module is responsible for maintaining the
-    {!Storage.Contract.Unstake_requests} table. *)
+    {!Storage.Contract.Unstake_requests} table.
+
+    Unstake requests added to this table are merged on a per-cycle basis,
+    i.e. for a given contract we only retain, for each cycle, the total amount
+    unstaked in the cycle.
+
+    The table cannot contain more than
+    {!Constants_storage.slashable_deposits_period} +
+    {!Constants_repr.max_slashing_period} entries per contract, as one cannot
+    add value without removing the finalizable ones.
+
+    This module is responsible for applying slashing on unstake requests.
+
+ *)
 
 type finalizable =
   (Signature.Public_key_hash.t * Cycle_repr.t * Tez_repr.t) list
