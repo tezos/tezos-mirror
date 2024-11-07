@@ -730,6 +730,7 @@ type configuration = {
   (* Empty list means DAL FF is set to false. *)
   etherlink_dal_slots : int list;
   teztale : bool;
+  memtrace : bool;
 }
 
 type bootstrap = {
@@ -1392,7 +1393,7 @@ let init_testnet cloud (configuration : configuration) teztale agent
         let* () = add_source cloud agent ~job_name:"bootstrap" node dal_node in
         let* () =
           Dal_node.Agent.run
-            ~memtrace:Cli.memtrace
+            ~memtrace:configuration.memtrace
             ~event_level:`Notice
             dal_node
         in
@@ -1598,7 +1599,7 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
   in
   let* () =
     Dal_node.Agent.run
-      ~memtrace:Cli.memtrace
+      ~memtrace:configuration.memtrace
       ~event_level:`Notice
       dal_bootstrap_node
   in
@@ -1664,7 +1665,10 @@ let init_baker cloud (configuration : configuration) ~bootstrap teztale account
         dal_node
     in
     let* () =
-      Dal_node.Agent.run ~memtrace:Cli.memtrace ~event_level:`Notice dal_node
+      Dal_node.Agent.run
+        ~memtrace:configuration.memtrace
+        ~event_level:`Notice
+        dal_node
     in
     Lwt.return dal_node
   in
@@ -1778,7 +1782,10 @@ let init_producer cloud configuration ~bootstrap teztale account i slot_index
      Instead we will publish commitments only once this promise is fulfilled. *)
   let () = toplog "Init producer: wait for DAL node to be ready" in
   let is_ready =
-    Dal_node.Agent.run ~memtrace:Cli.memtrace ~event_level:`Notice dal_node
+    Dal_node.Agent.run
+      ~memtrace:configuration.memtrace
+      ~event_level:`Notice
+      dal_node
   in
   let () = toplog "Init producer: DAL node is ready" in
   let* () =
@@ -1828,7 +1835,10 @@ let init_observer cloud configuration ~bootstrap teztale ~slot_index i agent =
       dal_node
   in
   let* () =
-    Dal_node.Agent.run ~memtrace:Cli.memtrace ~event_level:`Notice dal_node
+    Dal_node.Agent.run
+      ~memtrace:configuration.memtrace
+      ~event_level:`Notice
+      dal_node
   in
   let* () =
     match teztale with
@@ -1842,7 +1852,8 @@ let init_observer cloud configuration ~bootstrap teztale ~slot_index i agent =
   in
   Lwt.return {node; dal_node; slot_index}
 
-let init_etherlink_dal_node ~bootstrap ~next_agent ~name ~dal_slots ~network =
+let init_etherlink_dal_node ~bootstrap ~next_agent ~name ~dal_slots ~network
+    ~memtrace =
   match dal_slots with
   | [] ->
       toplog "Etherlink will run without DAL support" ;
@@ -1903,7 +1914,7 @@ let init_etherlink_dal_node ~bootstrap ~next_agent ~name ~dal_slots ~network =
           ~peers:[bootstrap.dal_node_p2p_endpoint]
           default_dal_node
       in
-      let* () = Dal_node.Agent.run ~memtrace:Cli.memtrace default_dal_node in
+      let* () = Dal_node.Agent.run ~memtrace default_dal_node in
       let default_endpoint = Dal_node.rpc_endpoint default_dal_node in
 
       let* dal_slots_and_nodes =
@@ -1928,7 +1939,7 @@ let init_etherlink_dal_node ~bootstrap ~next_agent ~name ~dal_slots ~network =
                    ~peers:[bootstrap.dal_node_p2p_endpoint]
                    dal_node
                in
-               let* () = Dal_node.Agent.run ~memtrace:Cli.memtrace dal_node in
+               let* () = Dal_node.Agent.run ~memtrace dal_node in
                return (slot_index, Dal_node.rpc_endpoint dal_node))
       in
       let* reverse_proxy_dal_node =
@@ -1997,6 +2008,7 @@ let init_etherlink_operator_setup cloud configuration name ~bootstrap ~dal_slots
       ~name
       ~dal_slots:configuration.etherlink_dal_slots
       ~network:configuration.network
+      ~memtrace:configuration.memtrace
   in
   let* sc_rollup_node =
     Sc_rollup_node.Agent.create
@@ -2431,7 +2443,9 @@ let on_new_level t level =
             let baker_to_reconnect =
               (List.nth t.bakers (b mod nb_bakers)).dal_node
             in
-            Dal_node.Agent.run ~memtrace:Cli.memtrace baker_to_reconnect)
+            Dal_node.Agent.run
+              ~memtrace:t.configuration.memtrace
+              baker_to_reconnect)
       in
       Lwt.return {t with disconnection_state = Some disconnection_state}
 
@@ -2571,6 +2585,7 @@ let configuration =
   let bootstrap = Cli.bootstrap in
   let etherlink_dal_slots = Cli.etherlink_dal_slots in
   let teztale = Cli.teztale in
+  let memtrace = Cli.memtrace in
   {
     stake;
     stake_machine_type;
@@ -2586,6 +2601,7 @@ let configuration =
     bootstrap;
     etherlink_dal_slots;
     teztale;
+    memtrace;
   }
 
 let benchmark () =
