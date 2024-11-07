@@ -93,6 +93,15 @@ let register_metrics path dir =
       let route = Router.make_metrics_route path in
       Dream (route :: routes)
 
+let jsonrpc_websocket_register dir path handler =
+  match dir with
+  | Resto dir ->
+      (* No support for websockets in Resto. *)
+      Resto dir
+  | Dream routes ->
+      let route = Router.make_jsonrpc_websocket_route path handler in
+      Dream (route :: routes)
+
 module Curry = struct
   type (_, _, _, _, _, _) conv =
     | Z : (unit, 'g, 'g, unit, 'f, 'f) conv

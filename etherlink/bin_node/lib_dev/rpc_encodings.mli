@@ -353,3 +353,16 @@ type map_result =
 
 val map_method_name :
   restrict:Configuration.restricted_rpcs -> string -> map_result
+
+type websocket_subscription = {
+  id : Ethereum_types.Subscription.id;
+  stream : Subscription.response Lwt_stream.t;
+  stopper : unit -> unit;
+}
+
+type websocket_response = {
+  response : JSONRPC.response;
+  subscription : websocket_subscription option;
+}
+
+type websocket_handler = JSONRPC.request -> websocket_response Lwt.t

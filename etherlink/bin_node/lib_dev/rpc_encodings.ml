@@ -1048,3 +1048,16 @@ let map_method_name ~restrict method_name =
         if List.mem ~equal:( = ) method_name unsupported_methods then
           Unsupported
         else Unknown
+
+type websocket_subscription = {
+  id : Ethereum_types.Subscription.id;
+  stream : Subscription.response Lwt_stream.t;
+  stopper : unit -> unit;
+}
+
+type websocket_response = {
+  response : JSONRPC.response;
+  subscription : websocket_subscription option;
+}
+
+type websocket_handler = JSONRPC.request -> websocket_response Lwt.t

@@ -32,7 +32,7 @@ val make_opt_tz_route :
 
 (** [make_stream_route service handler] builds a route which streams the
     response from a handler that constructs an {!Lwt_stream.t}. The output
-    stream is streamed as chunks in the response body.. *)
+    stream is streamed as chunks in the response body. *)
 val make_stream_route :
   ([< Resto.meth], unit, 'params, 'query, 'input, 'output) Tezos_rpc.Service.t ->
   (params:'params ->
@@ -44,3 +44,13 @@ val make_stream_route :
 (** [make_metrics_route path] builds a route that returns collected metrics in
     plain text format. *)
 val make_metrics_route : string -> Dream.route
+
+(** {2 JSONRPC specific routes}  *)
+
+(** [make_jsonrpc_websocket_route service handler] builds a route which accepts
+    websocket connections for JSONRPC requests and subscriptions. The server
+    reads requests from this websocket and writes a stream of output in
+    response. Multiple streams can be written and interlaced in the websocket
+    response. *)
+val make_jsonrpc_websocket_route :
+  string -> Rpc_encodings.websocket_handler -> Dream.route
