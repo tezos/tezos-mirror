@@ -489,6 +489,20 @@ module Proto_client = struct
     Operation_kind.Map.iter_e check fee_parameters
 
   let checks state = check_fee_parameters state
+
+  let get_balance_mutez cctxt ?block pkh =
+    let open Lwt_result_syntax in
+    let block = match block with Some b -> `Hash (b, 0) | None -> `Head 0 in
+    let cctxt =
+      new Protocol_client_context.wrap_full (cctxt :> Client_context.full)
+    in
+    let+ balance =
+      Plugin.Alpha_services.Contract.balance
+        cctxt
+        (cctxt#chain, block)
+        (Implicit pkh)
+    in
+    Protocol.Alpha_context.Tez.to_mutez balance
 end
 
 let () = Injector.register_proto_client Protocol.hash (module Proto_client)

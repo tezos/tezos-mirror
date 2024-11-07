@@ -239,6 +239,13 @@ module type PROTOCOL_CLIENT = sig
 
   (** Run protocol specific checks for injector configuration/state. *)
   val checks : state -> unit tzresult
+
+  (** Retrieve the balance in mutez for a given public key hash. *)
+  val get_balance_mutez :
+    #Client_context.full ->
+    ?block:Block_hash.t ->
+    Signature.public_key_hash ->
+    int64 tzresult Lwt.t
 end
 
 (** Output signature for functor {!Injector_functor.Make}. *)

@@ -1094,6 +1094,31 @@ module Make (Parameters : PARAMETERS) = struct
         | Forget -> return_unit)
       (List.rev expired_infos)
 
+  let metrics_get_batchers_balance state level =
+    dont_wait
+      (fun () ->
+        (* It isn't necessary to fetch the balance of signers at each level, to
+           avoid overloading the server with RPCs, we only do it every 5 levels *)
+        let open Lwt_result_syntax in
+        if Int32.rem level 5l = 0l then
+          let module Proto_client = (val state.proto_client) in
+          let tags = Tags.to_seq state.tags |> List.of_seq in
+          let* () =
+            List.iter_ep
+              (fun signer ->
+                let pkh = signer.pkh in
+                let key = Signature.Public_key_hash.to_b58check pkh in
+                let* balance = Proto_client.get_balance_mutez state.cctxt pkh in
+                Metrics.set_gauge_batcher_balance tags key balance ;
+                return_unit)
+              state.signers
+          in
+          return_unit
+        else return_unit)
+      (fun trace ->
+        Event.metrics_error (Format.asprintf "%a" pp_print_trace trace))
+      (fun exn -> Event.metrics_error (Printexc.to_string exn))
+
   let set_metrics state =
     Metrics.wrap @@ fun () ->
     let tags = Tags.to_seq state.tags |> List.of_seq in
@@ -1113,6 +1138,7 @@ module Make (Parameters : PARAMETERS) = struct
       ({block_hash = head_hash; level = head_level} as head) =
     let open Lwt_result_syntax in
     let*! () = Event.(emit1 new_tezos_head) state head_hash in
+    let () = metrics_get_batchers_balance state head.level in
     set_metrics state ;
     let*! reorg =
       match state.last_seen_head with
