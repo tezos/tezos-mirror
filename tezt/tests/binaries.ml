@@ -30,18 +30,28 @@
    Subject:      Perform global coherence tests across released and experimental binaries.
 *)
 
+(* Executables which use the version of octez-evm-node instead of octez-node.
+   If one day one adds script-inputs/octez-etherlink-executables or something,
+   it would be better to read this list from this file. *)
+let evm_executables = ["octez-evm-node"; "etherlink-governance-observer"]
+
 (* TODO: tezos/tezos#4769
 
    We should be able to get the Version flag string from the Node
    module, e.g. by exporting make_argument. *)
 let version_flag = "--version"
 
+let version_rex = rex "^[a-f0-9]+ \\([^()]*\\) \\([^()]*\\)\n$"
+
 (* TODO: tezos/tezos#4804
    Should we implement this via Component.run commands when possible?
 *)
-let spawn_command path =
-  let path = Uses.path path in
-  Process.run_and_read_stdout ("./" ^ path) [version_flag]
+let get_and_check_version executable =
+  let* version =
+    Process.run_and_read_stdout ("./" ^ Uses.path executable) [version_flag]
+  in
+  Check.(version =~ version_rex) ~error_msg:"expected version =~ %R, got %L" ;
+  return (String.trim version)
 
 let lookup_or_fail path =
   match Uses.lookup path with
@@ -63,46 +73,39 @@ let read_executable_list path =
        && not (String.equal str "octez-node") )
   |> List.map lookup_or_fail
 
-let test_versions commands =
-  let node = Node.create [] in
-  let* node_version = Node.get_version node in
-  let loop cmd =
-    Log.info
-      "Check that %s supports %s as version flag, and returns version %s."
-      (Uses.path cmd)
-      version_flag
-      node_version ;
-    let* r = spawn_command cmd in
-    let error_msg = "%s: expected version %L, got version %R" in
-    Check.((node_version = String.trim r) ~__LOC__ string ~error_msg) ;
-    unit
+(* Test that all released and experimental executables support the --version flag,
+   and that they report the same version as the main node of the release
+   (Octez node or Octez EVM node). *)
+let register_protocol_independent () =
+  let released_executables =
+    read_executable_list Constant.released_executables
   in
-  Lwt_list.iter_s loop commands
-
-(* Test that all released binaries support the --version flag, and
-   that they report the same version value as the Octez node. *)
-let test_released_versions () =
-  let executables = read_executable_list Constant.released_executables in
+  let experimental_executables =
+    read_executable_list Constant.experimental_executables
+  in
+  let executables = released_executables @ experimental_executables in
+  Fun.flip List.iter executables @@ fun executable ->
+  let executable_name = Filename.basename (Uses.path executable) in
+  let compare_with_executable =
+    if List.mem executable_name evm_executables then Constant.octez_evm_node
+    else Constant.octez_node
+  in
   Test.register
     ~__FILE__
-    ~title:"Released binaries: report consistent version"
-    ~tags:["binaries"; "released"; "node"; "baker"; "version"]
-    ~uses:executables
-  @@ fun () -> test_versions executables
-
-(* Test that all experimental binaries support the --version flag, and
-   that they report the same version value as the Octez node. *)
-let test_experimental_versions () =
-  let executables = read_executable_list Constant.experimental_executables in
-  Test.register
-    ~__FILE__
-    ~title:"Experimental binaries: report consistent version"
-    ~tags:["binaries"; "experimental"; "version"]
-    ~uses:executables
+    ~title:(executable_name ^ " --version")
+    ~tags:["version"]
+    ~uses:[executable; compare_with_executable]
+    ~uses_node:false
     ~uses_client:false
     ~uses_admin_client:false
-  @@ fun () -> test_versions executables
-
-let register_protocol_independent () =
-  test_released_versions () ;
-  test_experimental_versions ()
+  @@ fun () ->
+  let* expected_version = get_and_check_version compare_with_executable in
+  Log.info
+    "Check that %s supports %s as version flag, and returns version %s."
+    executable_name
+    version_flag
+    expected_version ;
+  let* version = get_and_check_version executable in
+  let error_msg = executable_name ^ ": expected version %R, got %L" in
+  Check.((version = expected_version) ~__LOC__ string ~error_msg) ;
+  unit
