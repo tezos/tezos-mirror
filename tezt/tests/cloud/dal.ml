@@ -732,6 +732,7 @@ type configuration = {
   teztale : bool;
   memtrace : bool;
   data_dir : string option;
+  fundraiser : string;
 }
 
 type bootstrap = {
@@ -1450,7 +1451,7 @@ let init_testnet cloud (configuration : configuration) teztale agent
   let* () =
     Client.import_secret_key
       bootstrap.client
-      (Unencrypted Cli.fundraiser)
+      (Unencrypted configuration.fundraiser)
       ~alias:"fundraiser"
   in
   let () = toplog "Revealing the fundraiser public key" in
@@ -2588,6 +2589,7 @@ let configuration =
   let teztale = Cli.teztale in
   let memtrace = Cli.memtrace in
   let data_dir = Cli.data_dir in
+  let fundraiser = Cli.fundraiser in
   {
     stake;
     stake_machine_type;
@@ -2605,6 +2607,7 @@ let configuration =
     teztale;
     memtrace;
     data_dir;
+    fundraiser;
   }
 
 let benchmark () =
