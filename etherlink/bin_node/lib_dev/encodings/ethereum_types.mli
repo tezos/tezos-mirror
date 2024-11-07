@@ -309,3 +309,19 @@ module From_rlp : sig
 
   val decode_hex : Rlp.item -> hex tzresult
 end
+
+module Subscription : sig
+  exception Unknown_subscription
+
+  type logs = {address : address; topics : hash list}
+
+  type kind = NewHeads | Logs of logs | NewPendingTransactions | Syncing
+
+  val kind_encoding : kind Data_encoding.t
+
+  type id = Id of hex [@@ocaml.unboxed]
+
+  val id_encoding : id Data_encoding.t
+
+  val id_input_encoding : id Data_encoding.t
+end

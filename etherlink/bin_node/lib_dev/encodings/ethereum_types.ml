@@ -1121,3 +1121,58 @@ let state_override_empty = AddressMap.empty
 
 let state_override_encoding =
   AddressMap.associative_array_encoding state_account_override_encoding
+
+module Subscription = struct
+  exception Unknown_subscription
+
+  type logs = {address : address; topics : hash list}
+
+  let logs_encoding =
+    let open Data_encoding in
+    conv
+      (fun {address; topics} -> (address, topics))
+      (fun (address, topics) -> {address; topics})
+      (obj2
+         (req "address" address_encoding)
+         (req "topics" (list hash_encoding)))
+
+  type kind = NewHeads | Logs of logs | NewPendingTransactions | Syncing
+
+  let kind_encoding =
+    let open Data_encoding in
+    union
+      [
+        case
+          ~title:"params_size_two"
+          (Tag 0)
+          (tup2 string logs_encoding)
+          (function Logs logs -> Some ("logs", logs) | _ -> None)
+          (function
+            | "logs", logs -> Logs logs | _ -> raise Unknown_subscription);
+        case
+          ~title:"params_size_one"
+          (Tag 1)
+          (tup1 string)
+          (function
+            | NewHeads -> Some "newHeads"
+            | NewPendingTransactions -> Some "newPendingTransactions"
+            | Syncing -> Some "syncing"
+            | _ -> None)
+          (function
+            | "newHeads" -> NewHeads
+            | "newPendingTransactions" -> NewPendingTransactions
+            | "syncing" -> Syncing
+            | _ -> raise Unknown_subscription);
+      ]
+
+  type id = Id of hex [@@ocaml.unboxed]
+
+  let id_of_string s = Id (hex_of_string (String.lowercase_ascii s))
+
+  let id_to_string (Id a) = hex_to_string a
+
+  let id_encoding = Data_encoding.(conv id_to_string id_of_string string)
+
+  let id_input_encoding =
+    Data_encoding.(conv id_to_string id_of_string (tup1 string))
+end
