@@ -729,6 +729,7 @@ type configuration = {
   bootstrap : bool;
   (* Empty list means DAL FF is set to false. *)
   etherlink_dal_slots : int list;
+  teztale : bool;
 }
 
 type bootstrap = {
@@ -1327,8 +1328,8 @@ let add_etherlink_source cloud agent ~job_name ?dal_node node sc_rollup_node
     ([node_metric_target; sc_rollup_metric_target; evm_node_metric_target]
     @ dal_node_metric_target)
 
-let init_teztale cloud agent =
-  if Cli.teztale then
+let init_teztale (configuration : configuration) cloud agent =
+  if configuration.teztale then
     let* teztale = Teztale.run_server agent in
     let* () = Teztale.wait_server teztale in
     let* () =
@@ -2260,7 +2261,7 @@ let init ~(configuration : configuration) cloud next_agent =
   let* teztale =
     match bootstrap_agent with
     | None -> Lwt.return_none
-    | Some agent -> init_teztale cloud agent
+    | Some agent -> init_teztale configuration cloud agent
   in
   let* ( bootstrap,
          baker_accounts,
@@ -2569,6 +2570,7 @@ let configuration =
   let network = Cli.network in
   let bootstrap = Cli.bootstrap in
   let etherlink_dal_slots = Cli.etherlink_dal_slots in
+  let teztale = Cli.teztale in
   {
     stake;
     stake_machine_type;
@@ -2583,6 +2585,7 @@ let configuration =
     network;
     bootstrap;
     etherlink_dal_slots;
+    teztale;
   }
 
 let benchmark () =
