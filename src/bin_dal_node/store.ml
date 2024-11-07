@@ -527,11 +527,11 @@ module Storage_backend = struct
       let+ () = save store specified in
       specified
     else
-      match (current_opt, specified) with
-      | Some current, specified ->
+      match current_opt with
+      | Some current ->
           if current = specified then return current
           else tzfail (Storage_backend_mismatch {current; specified})
-      | None, specified ->
+      | None ->
           let+ () = save store specified in
           specified
 end
