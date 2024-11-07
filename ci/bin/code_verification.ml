@@ -323,7 +323,7 @@ let jobs pipeline_type =
         let make_dependencies ~before_merging:_ ~schedule_extended_test =
           schedule_extended_test ()
         in
-        ([], make_dependencies)
+        ([job_datadog_pipeline_trace], make_dependencies)
     | Before_merging | Merge_train ->
         (* Define the [start] job.
 
@@ -333,7 +333,7 @@ let jobs pipeline_type =
         let job_start =
           job
             ~__POS__
-            ~image:Images.alpine
+            ~image:Images.datadog_ci
             ~stage:Stages.start
             ~rules:
               [
@@ -346,7 +346,13 @@ let jobs pipeline_type =
               ]
             ~timeout:(Minutes 10)
             ~name:"trigger"
-            ["echo 'Trigger pipeline!'"]
+            [
+              "echo 'Trigger pipeline!'";
+              "CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}";
+              "DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline \
+               --tags pipeline_type:$PIPELINE_TYPE --tags \
+               mr_number:$CI_MERGE_REQUEST_IID";
+            ]
         in
         let make_dependencies ~before_merging ~schedule_extended_test:_ =
           before_merging job_start
@@ -548,7 +554,6 @@ let jobs pipeline_type =
       | Schedule_extended_test -> []
     in
     [
-      job_datadog_pipeline_trace;
       job_sanity_ci;
       job_docker_hadolint;
       job_oc_ocaml_fmt;

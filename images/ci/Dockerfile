@@ -17,7 +17,7 @@ ARG BUILD_IMAGE
 LABEL org.opencontainers.image.base.name="${BUILD_IMAGE}"
 
 # Use alpine /bin/ash and set shell options
-# See https://docs.docker.com/develop/develop-images/dockerfile_best-practices/#run
+# See https://docs.docker.com/build/building/best-practices/#using-pipes
 SHELL ["/bin/ash", "-euo", "pipefail", "-c"]
 
 # Open Container Initiative
@@ -73,10 +73,6 @@ RUN mkdir -p /usr/share/dal-trusted-setup && \
     DAL_TRUSTED_SETUP=/usr/share/dal-trusted-setup \
     sh /tmp/install_dal_trusted_setup.sh && \
     rm /tmp/install_dal_trusted_setup.sh /tmp/version.sh
-
-# source: https://github.com/DataDog/datadog-ci/blob/master/container/Dockerfile
-# hadolint ignore=DL3016,DL3018,DL4006
-RUN apk add --no-cache npm git && npm install -g "@datadog/datadog-ci"
 
 USER tezos
 ENV USER=tezos
@@ -337,10 +333,20 @@ ENV NODE_OPTIONS="--dns-result-order=ipv4first"
 # We need curl since a bunch of tezt tests use curl.
 # Same, some tests use [file].
 
-# hadolint ignore=DL3018,DL3019,DL4006
+# Use alpine /bin/ash and set shell options
+# See https://docs.docker.com/build/building/best-practices/#using-pipes
+SHELL ["/bin/ash", "-euo", "pipefail", "-c"]
+
+# hadolint ignore=DL3018,DL3019
 RUN apk update \
  && apk add --no-cache curl npm git file make jq \
  gcc clang lld ca-certificates build-base musl-dev libusb-dev linux-headers \
+ # We need datadog-ci to send JUnit files to Datadog in tezt
+ # jobs. Cf. [scripts/ci/tezt.sh].
+ # Version number should be kept in sync with the one of the
+ # datadog/ci image used for the [datadog_ci] image
+ # (cf. ci/bin/common.ml)
+ && npm install -g "@datadog/datadog-ci@2.44.0" \
  # We need eth since e2e tests. This requires git as well.
  && npm install -g eth-cli@2.0.2 \
  # We need solc to compile solidity smart-contracts

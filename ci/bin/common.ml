@@ -71,17 +71,6 @@ module Stages = struct
   let manual = Stage.register "manual"
 end
 
-(* Get the [alpine_version] from the environment, which is typically
-   set by sourcing [scripts/version.sh]. This is used to set the tag
-   of the image {!Images.alpine}. *)
-let alpine_version =
-  match Sys.getenv_opt "alpine_version" with
-  | None ->
-      failwith
-        "Please set the environment variable [alpine_version], by e.g. \
-         sourcing [scripts/version.sh] before running."
-  | Some v -> v
-
 (* Register external images.
 
    Use this module to register images that are as built outside the
@@ -102,11 +91,13 @@ module Images_external = struct
     Image.mk_external
       ~image_path:"${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0"
 
-  (* The Alpine version should be kept up to date with the version
-     used for the [ci_image_name] images and specified in the
-     variable [alpine_version] in [scripts/version.sh]. This is
-     checked by the jobs [start] and [sanity_ci]. *)
-  let alpine = Image.mk_external ~image_path:("alpine:" ^ alpine_version)
+  (* Image used in initial pipeline job that sends to Datadog useful
+     info for CI visibility.
+
+     The [datadog-ci] version should be consistent across all CI
+     images that use it. At the moment it is installed in the
+     external image below and the internal image [e2etest]. *)
+  let datadog_ci = Image.mk_external ~image_path:"datadog/ci:v2.44.0"
 
   let debian_bookworm = Image.mk_external ~image_path:"debian:bookworm"
 
@@ -1207,8 +1198,8 @@ let job_datadog_pipeline_trace : tezos_job =
     ~__POS__
     ~allow_failure:Yes
     ~name:"datadog_pipeline_trace"
-    ~image:Images.CI.build
-    ~stage:Stages.sanity
+    ~image:Images.datadog_ci
+    ~stage:Stages.start
     [
       "CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}";
       "DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags \
