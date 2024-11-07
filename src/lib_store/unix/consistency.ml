@@ -29,9 +29,10 @@ open Store_errors
 (* A non-empty store is considered consistent if the following
    invariants hold:
 
-   - genesis, caboose, savepoint, checkpoint, current_head associated
-   files exists, are decodable and the blocks they point to may be
-   read in the block store and are consistent with their definition;
+   - genesis, caboose, savepoint, checkpoint and current_head
+   associated files exists, are decodable and the blocks they are
+   pointing to can be read in the block store and are consistent with
+   their definition;
 
    - genesis ≤ caboose ≤ savepoint ≤ [cementing_highwatermark] ≤
    checkpoint ≤ current_head
@@ -42,9 +43,8 @@ open Store_errors
    store.
 *)
 
-(* [check_cementing_highwatermark ~chain_dir block_store] checks that
-   the cementing_highwatermark is consistent with the cemented
-   store. *)
+(* Checks that [cementing_highwatermark] is consistent with the
+   cemented store. *)
 let check_cementing_highwatermark ~cementing_highwatermark block_store =
   let open Lwt_result_syntax in
   let cemented_store = Block_store.cemented_block_store block_store in
@@ -160,9 +160,9 @@ let create_lockfile path chain_dir =
       in
       return_ok fd)
 
-(* [check_consistency ~store_dir genesis] aims to provide a quick
-   check (in terms of execution time) which checks that files may be
-   read and they are consistent w.r.t to the given invariant.
+(* [check_consistency chain_dir genesis] aims to provide a quick check
+   (in terms of execution time) which checks that files can be read
+   and they are consistent w.r.t to the given invariant.
 
    Hypothesis: an existing store is provided. *)
 let check_consistency chain_dir genesis =
@@ -207,19 +207,18 @@ let check_consistency chain_dir genesis =
     Stored_data.load (Naming.forked_chains_file chain_dir)
   in
   let* _target_data = Stored_data.load (Naming.target_file chain_dir) in
-  (* Open the store and try to read the blocks *)
-  (* [~readonly:false] to recover from a potential interrupted merge *)
+  (* Open the store and try to read the blocks. [readonly] is set to
+     false to avoid the Block_store.load to automatically recover from
+     a potential interrupted merge. *)
   let* block_store = Block_store.load chain_dir ~genesis_block ~readonly:true in
   Lwt.finalize
     (fun () ->
-      (* TODO should we check context as well? *)
       let genesis_descr = Block_repr.descriptor genesis_block in
       let expected_blocks =
         [
           (genesis_descr, false, "genesis");
           (caboose, false, "caboose");
           (savepoint, true, "savepoint");
-          (* is this really true? *)
           (checkpoint, true, "checkpoint");
           (current_head, true, "current_head");
         ]
@@ -265,6 +264,10 @@ let check_consistency chain_dir genesis =
       let*! () = Lwt_unix.close lockfile_fd in
       Block_store.close block_store)
 
+(* [fix_floating_stores chain_dir] fixes the floating store by
+   removing the potential leftover from an interrupted store
+   merge. In addition to that, it fixes the integrity of the existing
+   floating stores. *)
 let fix_floating_stores chain_dir =
   let open Lwt_result_syntax in
   let store_kinds = [Floating_block_store.RO; RW; RW_TMP; RO_TMP] in
@@ -347,10 +350,6 @@ let fix_head chain_dir block_store genesis_block =
               highest_cemented_level
           in
           WithExceptions.Option.get ~loc:__LOC__ o
-          (* If the highest of the floating blocks is genesis and there is
-             at least one cemented file, then it means that the floating
-             blocks were truncated. The head is then chosen as the highest
-             cemented block known. *)
         else return floating_head
   in
   (* Make sure that the inferred head have metadata *)
@@ -383,9 +382,8 @@ let fix_head chain_dir block_store genesis_block =
   in
   return inferred_head
 
-(* Search for the lowest block with metadata (for savepoint) and the
-   lowest block (for caboose) from the cemented store.
-   We assume that the given [cemented_block_files] list is sorted in
+(* Returns the lowest block of the given cemented cycle. As a
+   store invariant, the cemented cycle is expected to be sorted in an
    ascending order (lowest block files comes first). *)
 let lowest_cemented_block cemented_block_files =
   match cemented_block_files with
