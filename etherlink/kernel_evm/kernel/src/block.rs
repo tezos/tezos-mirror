@@ -827,7 +827,6 @@ mod tests {
             host,
             block_fees.minimum_base_fee_per_gas(),
         )?;
-        storage::store_base_fee_per_gas(host, block_fees.base_fee_per_gas())?;
         storage::store_da_fee(host, block_fees.da_fee_per_byte())?;
         Ok(())
     }

@@ -622,8 +622,6 @@ mod tests {
             block_fees.minimum_base_fee_per_gas(),
         )
         .unwrap();
-        crate::storage::store_base_fee_per_gas(&mut host, block_fees.base_fee_per_gas())
-            .unwrap();
         crate::storage::store_da_fee(&mut host, block_fees.da_fee_per_byte()).unwrap();
 
         // If the upgrade is started, it should raise an error
