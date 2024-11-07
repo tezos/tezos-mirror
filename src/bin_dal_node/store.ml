@@ -507,26 +507,33 @@ module Storage_backend = struct
       (fun (current, specified) ->
         Storage_backend_mismatch {current; specified})
 
-  (** [set_store ~sqlite3_backend] configures the storage backend
-      based on the value of [sqlite3_backend]. If [sqlite3_backend] is
-      [true], it sets the [SQLite3] storage backend; otherwise, it sets
-      the [Legacy] backend. This function fails with
-      [Storage_backend_mismatch] if the previously used storage backend
-      does not match the one specified by [sqlite3_backend]. *)
-  let set store ~sqlite3_backend =
+  (** [set ?force store ~sqlite3_backend] configures the storage
+      backend based on the value of [sqlite3_backend]. If
+      [sqlite3_backend] is [true], it sets the [SQLite3] storage
+      backend; otherwise, it sets the [Legacy] backend. This function
+      fails with [Storage_backend_mismatch] if the previously used
+      storage backend does not match the one specified by
+      [sqlite3_backend] and [force] is false. If [force] is true, then
+      overwrite the storage backend without taking into account the
+      previous one. *)
+  let set ?(force = false) store ~sqlite3_backend =
     let open Lwt_result_syntax in
     let* current_opt = load store in
     let specified = if sqlite3_backend then SQLite3 else Legacy in
     (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7528
        Update the following code according to the migration from KVS
        to SQLite3 once it is done.*)
-    match (current_opt, specified) with
-    | Some current, specified ->
-        if current = specified then return current
-        else tzfail (Storage_backend_mismatch {current; specified})
-    | None, specified ->
-        let+ () = save store specified in
-        specified
+    if force then
+      let+ () = save store specified in
+      specified
+    else
+      match (current_opt, specified) with
+      | Some current, specified ->
+          if current = specified then return current
+          else tzfail (Storage_backend_mismatch {current; specified})
+      | None, specified ->
+          let+ () = save store specified in
+          specified
 end
 
 (** Store context *)
