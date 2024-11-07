@@ -731,6 +731,7 @@ type configuration = {
   etherlink_dal_slots : int list;
   teztale : bool;
   memtrace : bool;
+  data_dir : string option;
 }
 
 type bootstrap = {
@@ -1521,7 +1522,7 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
   in
   let name = "bootstrap-node" in
   let data_dir =
-    Cli.data_dir |> Option.map (fun data_dir -> data_dir // name)
+    configuration.data_dir |> Option.map (fun data_dir -> data_dir // name)
   in
   let* bootstrap_node =
     Node.init ?data_dir ~dal_config ~name configuration.network agent
@@ -1640,7 +1641,7 @@ let init_baker cloud (configuration : configuration) ~bootstrap teztale account
   let stake = List.nth configuration.stake i in
   let name = Format.asprintf "baker-node-%d" i in
   let data_dir =
-    Cli.data_dir |> Option.map (fun data_dir -> data_dir // name)
+    configuration.data_dir |> Option.map (fun data_dir -> data_dir // name)
   in
   let* node =
     Node.init
@@ -1720,7 +1721,7 @@ let init_producer cloud configuration ~bootstrap teztale account i slot_index
   let () = toplog "Initializing a DAL producer" in
   let name = Format.asprintf "producer-node-%i" i in
   let data_dir =
-    Cli.data_dir |> Option.map (fun data_dir -> data_dir // name)
+    configuration.data_dir |> Option.map (fun data_dir -> data_dir // name)
   in
   let () = toplog "Init producer: init node" in
   let* node =
@@ -1803,7 +1804,7 @@ let init_producer cloud configuration ~bootstrap teztale account i slot_index
 let init_observer cloud configuration ~bootstrap teztale ~slot_index i agent =
   let name = Format.asprintf "observer-node-%i" i in
   let data_dir =
-    Cli.data_dir |> Option.map (fun data_dir -> data_dir // name)
+    configuration.data_dir |> Option.map (fun data_dir -> data_dir // name)
   in
   let* node =
     Node.init
@@ -1955,7 +1956,7 @@ let init_etherlink_operator_setup cloud configuration name ~bootstrap ~dal_slots
   let is_sequencer = configuration.etherlink_sequencer in
   let name = Format.asprintf "etherlink-%s-node" name in
   let data_dir =
-    Cli.data_dir |> Option.map (fun data_dir -> data_dir // name)
+    configuration.data_dir |> Option.map (fun data_dir -> data_dir // name)
   in
   let* node =
     Node.init
@@ -2586,6 +2587,7 @@ let configuration =
   let etherlink_dal_slots = Cli.etherlink_dal_slots in
   let teztale = Cli.teztale in
   let memtrace = Cli.memtrace in
+  let data_dir = Cli.data_dir in
   {
     stake;
     stake_machine_type;
@@ -2602,6 +2604,7 @@ let configuration =
     etherlink_dal_slots;
     teztale;
     memtrace;
+    data_dir;
   }
 
 let benchmark () =
