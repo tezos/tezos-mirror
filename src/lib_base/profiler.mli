@@ -365,7 +365,7 @@ type 'a section_maker = 'a * metadata -> unit
     Creates a function to open a new section (and close the one opened before) using [record] function
     when a new entity is encountered.
 
-    @param verbosity - usual verbosity argument
+    @param verbosity - usual verbosity argument. Defaults to [Notice]
     @param equal - used for entities comparison.
     @param to_string - used for labeling the entity when using the [record] function.
     @param profiler - profiler instance used to track sections and record profiling data. *)
