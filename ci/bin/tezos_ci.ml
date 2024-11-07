@@ -376,7 +376,7 @@ module Pipeline = struct
     (workflow, includes)
 
   let write ?default ?variables ~filename () =
-    (* Write all registered the pipelines *)
+    (* Write all registered pipelines *)
     ( Fun.flip List.iter (all ()) @@ fun pipeline ->
       let pipeline = add_image_builders pipeline in
       let jobs = jobs pipeline in
