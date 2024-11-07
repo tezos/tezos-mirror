@@ -17,7 +17,7 @@ endif
 CHECK_FEATURES ?= --all-features
 
 .PHONY: build
-build: riscv-dummy.elf riscv-sandbox
+build: riscv-dummy.elf riscv-dummy-sdk.elf riscv-sandbox
 	@cargo build --release --workspace $(NATIVE_OPT)
 	@make -C jstz build
 	@make -C tests build
@@ -35,6 +35,10 @@ riscv-sandbox.prof::
 riscv-dummy.elf::
 	@make -C dummy_kernel build
 	@ln -f dummy_kernel/target/riscv64gc-unknown-hermit/release/riscv-dummy $@
+
+riscv-dummy-sdk.elf::
+	@make -C dummy_sdk_kernel build
+	@ln -f dummy_sdk_kernel/target/riscv64gc-unknown-hermit/release/riscv-dummy-sdk $@
 
 # Update checked-in binaries
 .PHONY: update-assets
@@ -55,6 +59,7 @@ assets/jstz assets/jstz.checksum::
 build-deps:
 	@make -C jstz build-deps
 	@make -C dummy_kernel build-deps
+	@make -C dummy_sdk_kernel build-deps
 	@rustup component add rustfmt clippy
 ifneq ($(NATIVE_TARGET),)
 	@rustup target add $(NATIVE_TARGET)
@@ -84,6 +89,7 @@ check:
 	@cargo clippy --workspace --all-targets $(CHECK_FEATURES) -- --deny warnings
 	@taplo format --check $(shell git ls-files '**/Cargo.toml')
 	@make -C dummy_kernel check
+	@make -C dummy_sdk_kernel check
 	@make -C jstz check
 	@make -C tests check
 
@@ -101,6 +107,7 @@ audit:
 clean:
 	@cargo clean
 	@make -C dummy_kernel clean
+	@make -C dummy_sdk_kernel clean
 	@make -C jstz clean
 	@make -C tests clean
-	@rm -f riscv-sandbox riscv-dummy.elf
+	@rm -f riscv-sandbox riscv-dummy.elf riscv-dummy-sdk.elf

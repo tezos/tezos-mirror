@@ -141,3 +141,4 @@ terraform.rc
 # RISC-V
 /src/riscv/riscv-sandbox
 /src/riscv/riscv-dummy.elf
+/src/riscv/riscv-dummy-sdk.elf
