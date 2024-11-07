@@ -1661,7 +1661,7 @@ let init_baker cloud (configuration : configuration) ~bootstrap teztale account
     in
     let* () =
       Dal_node.init_config
-        ~expected_pow:(Network.expected_pow Cli.network)
+        ~expected_pow:(Network.expected_pow configuration.network)
         ~attester_profiles:[account.Account.public_key_hash]
         ~peers:[bootstrap.dal_node_p2p_endpoint] (* no need for peer *)
         dal_node
@@ -1823,7 +1823,7 @@ let init_observer cloud configuration ~bootstrap teztale ~slot_index i agent =
   in
   let* () =
     Dal_node.init_config
-      ~expected_pow:(Network.expected_pow Cli.network)
+      ~expected_pow:(Network.expected_pow configuration.network)
       ~observer_profiles:[slot_index]
       ~peers:[bootstrap.dal_node_p2p_endpoint]
       dal_node
@@ -1878,7 +1878,7 @@ let init_etherlink_dal_node ~bootstrap ~next_agent ~name ~dal_slots ~network
       let* dal_node = Dal_node.Agent.create ~name ~node agent in
       let* () =
         Dal_node.init_config
-          ~expected_pow:(Network.expected_pow Cli.network)
+          ~expected_pow:(Network.expected_pow network)
           ~producer_profiles:dal_slots
           ~peers:[bootstrap.dal_node_p2p_endpoint]
           dal_node
@@ -1912,7 +1912,7 @@ let init_etherlink_dal_node ~bootstrap ~next_agent ~name ~dal_slots ~network
       let* default_dal_node = Dal_node.Agent.create ~name ~node agent in
       let* () =
         Dal_node.init_config
-          ~expected_pow:(Network.expected_pow Cli.network)
+          ~expected_pow:(Network.expected_pow network)
           ~peers:[bootstrap.dal_node_p2p_endpoint]
           default_dal_node
       in
@@ -1936,7 +1936,7 @@ let init_etherlink_dal_node ~bootstrap ~next_agent ~name ~dal_slots ~network
                let* dal_node = Dal_node.Agent.create ~name ~node agent in
                let* () =
                  Dal_node.init_config
-                   ~expected_pow:(Network.expected_pow Cli.network)
+                   ~expected_pow:(Network.expected_pow network)
                    ~observer_profiles:[slot_index]
                    ~peers:[bootstrap.dal_node_p2p_endpoint]
                    dal_node
@@ -2208,7 +2208,7 @@ let init_etherlink cloud configuration ~bootstrap etherlink_rollup_operator_key
   in
   let accounts = Tezt_etherlink.Eth_account.bootstrap_accounts in
   let* producers_agents =
-    List.init Cli.etherlink_producers (fun i ->
+    List.init configuration.etherlink_producers (fun i ->
         let name = Format.asprintf "etherlink-producer-%d" i in
         next_agent ~name)
     |> Lwt.all
@@ -2245,7 +2245,7 @@ let obtain_some_node_rpc_endpoint agent network (bootstrap : bootstrap)
 let init ~(configuration : configuration) cloud next_agent =
   let () = toplog "Init" in
   let* bootstrap_agent =
-    if Cli.bootstrap then
+    if configuration.bootstrap then
       let* agent = next_agent ~name:"bootstrap" in
       Lwt.return_some agent
     else Lwt.return_none
@@ -2319,7 +2319,7 @@ let init ~(configuration : configuration) cloud next_agent =
   in
   let () = toplog "Init: all producers and observers have been initialized" in
   let* etherlink =
-    if Cli.etherlink then
+    if configuration.etherlink then
       let () = toplog "Init: initializing Etherlink" in
       let () = toplog "Init: Getting Etherlink operator key" in
       let etherlink_rollup_operator_key =
