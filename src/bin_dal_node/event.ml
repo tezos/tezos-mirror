@@ -686,7 +686,9 @@ let warn_attester_not_dal_attesting =
   declare_2
     ~section
     ~name:"attester_not_dal_attesting"
-    ~msg:"Expected {attester} to include DAL content for level {attested_level}"
+    ~msg:
+      "No DAL content was included by {attester} for attested level \
+       {attested_level}"
     ~level:Warning
     ("attester", Signature.Public_key_hash.encoding)
     ("attested_level", Data_encoding.int32)
