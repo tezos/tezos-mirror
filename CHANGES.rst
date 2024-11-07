@@ -179,5 +179,8 @@ DAL node
   (MR :gl:`!15322`)
 
 
+- **Breaking change** The baker daemon ``--dal-node-timeout-percentage``
+  argument has been removed. (MR :gl:`!15554`)
+
 Miscellaneous
 -------------
