@@ -171,4 +171,9 @@ export GOOGLE_OAUTH_ACCESS_TOKEN
 
 echo "Push to $BUCKET"
 
+. scripts/ci/gcslock.sh
+echo "Locking bucket for writing $BUCKET"
+lock "$BUCKET" 120
 gsutil -m cp -r public/* gs://"${BUCKET}"
+unlock "$BUCKET"
+echo "$BUCKET unlocked"
