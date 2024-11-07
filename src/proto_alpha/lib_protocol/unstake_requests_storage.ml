@@ -238,32 +238,35 @@ let handle_finalizable_and_clear ctxt contract
       let* ctxt = update_stored_request ctxt contract unfinalizable in
       return (ctxt, balance_updates_finalized)
 
-let add ctxt ~contract ~delegate cycle amount =
+let finalize_and_add ctxt ~contract ~delegate ~handle_finalizable cycle amount =
   let open Lwt_result_syntax in
-  let* requests_opt = Storage.Contract.Unstake_requests.find ctxt contract in
-  let*? requests =
-    match requests_opt with
-    | None -> Ok []
-    | Some {delegate = request_delegate; requests} -> (
-        match requests with
-        | [] -> Ok []
-        | _ ->
-            if Signature.Public_key_hash.(delegate <> request_delegate) then
-              (* This would happen if the staker was allowed to stake towards
-                 a new delegate while having unfinalizable unstake requests,
-                 which is not allowed: it will fail earlier. Also, unstaking
-                 for 0 tez is a noop and does not change the state of the storage,
-                 so it does not allow to reach this error either. *)
-              Result_syntax.tzfail
-                Cannot_unstake_with_unfinalizable_unstake_requests_to_another_delegate
-            else Ok requests)
+  let* ctxt, prepared_opt =
+    prepare_finalize_unstake
+      ~check_delegate_of_unfinalizable_requests:(fun request_delegate ->
+        if Signature.Public_key_hash.(delegate <> request_delegate) then
+          (* This would happen if the staker was allowed to stake towards
+             a new delegate while having unfinalizable unstake requests,
+             which is not allowed: it will fail earlier. Also, unstaking
+             for 0 tez is a noop and does not change the state of the storage,
+             so it does not allow to reach this error either. *)
+          tzfail
+            Cannot_unstake_with_unfinalizable_unstake_requests_to_another_delegate
+        else return_unit)
+      ctxt
+      contract
+  in
+  let finalizable, requests =
+    match prepared_opt with
+    | None -> ([], [])
+    | Some {finalizable; unfinalizable = {delegate = _; requests}} ->
+        (finalizable, requests)
   in
   let*? requests = Storage.Unstake_request.add cycle amount requests in
   let unstake_request = Storage.Unstake_request.{delegate; requests} in
   let*! ctxt =
     Storage.Contract.Unstake_requests.add ctxt contract unstake_request
   in
-  return ctxt
+  handle_finalizable ctxt finalizable
 
 let can_stake_from_unstake ctxt ~delegate =
   let open Lwt_result_syntax in

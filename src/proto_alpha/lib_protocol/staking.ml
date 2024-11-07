@@ -182,14 +182,13 @@ let request_unstake ctxt ~sender_contract ~delegate requested_amount =
             current_cycle ))
         tez_to_unstake
     in
-    let* ctxt, finalize_balance_updates =
-      finalize_unstake ctxt sender_contract
-    in
-    let+ ctxt =
-      Unstake_requests_storage.add
+    let+ ctxt, finalize_balance_updates =
+      Unstake_requests_storage.finalize_and_add
         ctxt
         ~contract:sender_contract
         ~delegate
+        ~handle_finalizable:
+          (perform_finalizable_unstake_transfers sender_contract)
         current_cycle
         tez_to_unstake
     in

@@ -105,18 +105,22 @@ val remove_from_unfinalizable_requests_and_finalize :
 type error +=
   | Cannot_unstake_with_unfinalizable_unstake_requests_to_another_delegate
 
-(** [add ctxt ~contract ~delegate cycle amount] adds a request from [contract]
+(** [finalize_and_add ctxt ~contract ~delegate ~handle_finalizable cycle amount] adds a request from [contract]
     to unstake [amount] from [delegate] at cycle [cycle].
+
+    It also finalizes all finalizable unstake requests.
 
     @raises Assert_failure if [contract] already has unstake requests from another
       delegate (broken invariant). *)
-val add :
+val finalize_and_add :
   Raw_context.t ->
   contract:Contract_repr.t ->
   delegate:Signature.Public_key_hash.t ->
+  handle_finalizable:
+    (Raw_context.t -> finalizable -> transfer_result tzresult Lwt.t) ->
   Cycle_repr.t ->
   Tez_repr.t ->
-  Raw_context.t tzresult Lwt.t
+  transfer_result tzresult Lwt.t
 
 (** Slow functions only used for RPCs *)
 module For_RPC : sig
