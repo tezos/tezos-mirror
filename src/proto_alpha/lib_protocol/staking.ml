@@ -95,42 +95,44 @@ let transfer_from_unstake_request ctxt cycle delegate sender_contract amount =
   in
   return (ctxt, balance_updates)
 
-let stake ctxt ~(amount : Tez_repr.t) ~sender ~delegate =
+(** [may_stake_from_unstake_for_delegate_and_finalize ctxt ~delegate
+    ~sender_contract amount]
+    tries to transfer the amount to stake from unfinalizable unstake request if possible,
+    and finalize all finalizable unstake requests.
+
+    The conditions that allow a transfer from unfinalizable unstake requests are
+    defined in {!Unstake_requests_storage.remove_from_unfinalizable_requests_and_finalize}.
+
+    It returns the modified context, the balance updates, and the amount that
+    remains to be staked from spendable balance.
+  *)
+let may_stake_from_unstake_for_delegate_and_finalize ctxt ~delegate
+    ~sender_contract amount =
   let open Lwt_result_syntax in
-  let check_delegate_of_unfinalizable_requests unstake_delegate =
-    if Signature.Public_key_hash.(delegate <> unstake_delegate) then
+  let check_delegate_of_unfinalizable_requests requests_delegate =
+    if Signature.Public_key_hash.(delegate <> requests_delegate) then
       tzfail
         Cannot_stake_with_unfinalizable_unstake_requests_to_another_delegate
     else return_unit
   in
+  Unstake_requests_storage.remove_from_unfinalizable_requests_and_finalize
+    ctxt
+    ~delegate
+    ~contract:sender_contract
+    ~transfer_from_unstake_request
+    ~handle_finalizable:(perform_finalizable_unstake_transfers sender_contract)
+    ~check_delegate_of_unfinalizable_requests
+    amount
+
+let stake ctxt ~(amount : Tez_repr.t) ~sender ~delegate =
+  let open Lwt_result_syntax in
   let sender_contract = Contract_repr.Implicit sender in
-  let* ctxt, finalize_balance_updates =
-    Unstake_requests_storage.handle_finalizable_and_clear
-      ~check_delegate_of_unfinalizable_requests
-      ~handle_finalizable:
-        (perform_finalizable_unstake_transfers sender_contract)
+  let* (ctxt, stake_unstaked_and_finalize_balance_updates), amount_from_liquid =
+    may_stake_from_unstake_for_delegate_and_finalize
       ctxt
-      sender_contract
-  in
-  let* unfinalizable_requests_opt =
-    Unstake_requests_storage.prepare_finalize_unstake ctxt sender_contract
-  in
-  let unfinalizable_requests_opt =
-    Option.map
-      (fun Unstake_requests_storage.{unfinalizable; _} -> unfinalizable)
-      unfinalizable_requests_opt
-  in
-  (* stake from unstake for eligible delegates *)
-  let* ctxt, stake_balance_updates1, amount_from_liquid =
-    if Signature.Public_key_hash.(sender <> delegate) then
-      return (ctxt, [], amount)
-    else
-      Unstake_requests_storage.stake_from_unstake_for_delegate
-        ctxt
-        ~delegate
-        ~transfer_from_unstake_request
-        ~unfinalizable_requests_opt
-        amount
+      ~delegate
+      ~sender_contract
+      amount
   in
   (* Issue pseudotokens for delegators *)
   let* ctxt, stake_balance_updates2 =
@@ -151,8 +153,8 @@ let stake ctxt ~(amount : Tez_repr.t) ~sender ~delegate =
       amount_from_liquid
   in
   ( ctxt,
-    stake_balance_updates1 @ stake_balance_updates2 @ stake_balance_updates3
-    @ finalize_balance_updates )
+    stake_unstaked_and_finalize_balance_updates @ stake_balance_updates2
+    @ stake_balance_updates3 )
 
 let request_unstake ctxt ~sender_contract ~delegate requested_amount =
   let open Lwt_result_syntax in

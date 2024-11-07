@@ -300,105 +300,131 @@ let can_stake_from_unstake ctxt ~delegate =
   in
   return @@ not (is_denounced || is_slashed)
 
-let stake_from_unstake_for_delegate ctxt ~delegate
-    ~transfer_from_unstake_request ~unfinalizable_requests_opt amount =
+let remove_from_unfinalizable_requests_and_finalize ctxt ~contract ~delegate
+    ~check_delegate_of_unfinalizable_requests
+    ~(transfer_from_unstake_request :
+       Raw_context.t ->
+       Cycle_repr.t ->
+       Signature.public_key_hash ->
+       Contract_repr.t ->
+       Tez_repr.t ->
+       (Raw_context.t * 'a list) tzresult Lwt.t)
+    ~(handle_finalizable :
+       Raw_context.t -> finalizable -> transfer_result tzresult Lwt.t) amount :
+    (transfer_result * Tez_repr.t) tzresult Lwt.t =
   let open Lwt_result_syntax in
-  match unfinalizable_requests_opt with
-  | None -> return (ctxt, [], amount)
-  | Some {delegate = delegate_requests; requests} ->
-      if
-        Signature.Public_key_hash.(delegate <> delegate_requests)
-        && not (List.is_empty requests)
-      then (* Should not be possible *)
-        return (ctxt, [], Tez_repr.zero)
-      else
-        let* allowed = can_stake_from_unstake ctxt ~delegate in
-        if not allowed then
-          (* a slash could have modified the unstaked frozen deposits: cannot stake from unstake *)
-          return (ctxt, [], amount)
-        else
-          let sender_contract = Contract_repr.Implicit delegate in
-          let requests_sorted =
-            List.sort
-              (fun (cycle1, _) (cycle2, _) ->
-                Cycle_repr.compare cycle2 cycle1
-                (* decreasing cycle order, to release first the tokens
-                   that would be frozen for the longest time *))
-              requests
-          in
-          let rec transfer_from_unstake ctxt balance_updates
-              remaining_amount_to_transfer updated_requests_rev requests =
-            if Tez_repr.(remaining_amount_to_transfer = zero) then
-              return
-                ( ctxt,
-                  balance_updates,
-                  Tez_repr.zero,
-                  List.rev_append requests updated_requests_rev )
-            else
-              match requests with
-              | [] ->
+  let* allowed =
+    match contract with
+    | Contract_repr.Implicit contract
+      when Signature.Public_key_hash.(contract = delegate) ->
+        can_stake_from_unstake ctxt ~delegate
+    | Contract_repr.Originated _ | Contract_repr.Implicit _ -> return false
+  in
+  if not allowed then
+    (* a slash could have modified the unstaked frozen deposits:
+       unfinalizable stake requests cannot be spent *)
+    let* ctxt, balance_updates =
+      handle_finalizable_and_clear
+        ~check_delegate_of_unfinalizable_requests
+        ~handle_finalizable
+        ctxt
+        contract
+    in
+    return ((ctxt, balance_updates), amount)
+  else
+    let* ctxt, prepared_opt =
+      prepare_finalize_unstake
+        ~check_delegate_of_unfinalizable_requests
+        ctxt
+        contract
+    in
+    match prepared_opt with
+    | None -> return ((ctxt, []), amount)
+    | Some {finalizable; unfinalizable = {delegate; requests}} ->
+        let requests_sorted =
+          List.sort
+            (fun (cycle1, _) (cycle2, _) ->
+              Cycle_repr.compare cycle2 cycle1
+              (* decreasing cycle order, to release first the tokens
+                 that would be frozen for the longest time *))
+            requests
+        in
+        let rec transfer_from_all_unstake ctxt balance_updates
+            remaining_amount_to_transfer updated_requests_rev requests =
+          if Tez_repr.(remaining_amount_to_transfer = zero) then
+            return
+              ( ctxt,
+                balance_updates,
+                Tez_repr.zero,
+                List.rev_append requests updated_requests_rev )
+          else
+            match requests with
+            | [] ->
+                return
+                  ( ctxt,
+                    balance_updates,
+                    remaining_amount_to_transfer,
+                    updated_requests_rev )
+            | (cycle, requested_amount) :: t ->
+                if Tez_repr.(remaining_amount_to_transfer >= requested_amount)
+                then
+                  let* ctxt, cycle_balance_updates =
+                    transfer_from_unstake_request
+                      ctxt
+                      cycle
+                      delegate
+                      contract
+                      requested_amount
+                  in
+                  let*? remaining_amount =
+                    Tez_repr.(remaining_amount_to_transfer -? requested_amount)
+                  in
+                  transfer_from_all_unstake
+                    ctxt
+                    (balance_updates @ cycle_balance_updates)
+                    remaining_amount
+                    updated_requests_rev
+                    t
+                else
+                  let* ctxt, cycle_balance_updates =
+                    transfer_from_unstake_request
+                      ctxt
+                      cycle
+                      delegate
+                      contract
+                      remaining_amount_to_transfer
+                  in
+                  let*? new_requested_amount =
+                    Tez_repr.(requested_amount -? remaining_amount_to_transfer)
+                  in
                   return
                     ( ctxt,
-                      balance_updates,
-                      remaining_amount_to_transfer,
-                      updated_requests_rev )
-              | (cycle, requested_amount) :: t ->
-                  if Tez_repr.(remaining_amount_to_transfer >= requested_amount)
-                  then
-                    let* ctxt, cycle_balance_updates =
-                      transfer_from_unstake_request
-                        ctxt
-                        cycle
-                        delegate
-                        sender_contract
-                        requested_amount
-                    in
-                    let*? remaining_amount =
-                      Tez_repr.(
-                        remaining_amount_to_transfer -? requested_amount)
-                    in
-                    transfer_from_unstake
-                      ctxt
-                      (balance_updates @ cycle_balance_updates)
-                      remaining_amount
-                      updated_requests_rev
-                      t
-                  else
-                    let* ctxt, cycle_balance_updates =
-                      transfer_from_unstake_request
-                        ctxt
-                        cycle
-                        delegate
-                        sender_contract
-                        remaining_amount_to_transfer
-                    in
-                    let*? new_requested_amount =
-                      Tez_repr.(
-                        requested_amount -? remaining_amount_to_transfer)
-                    in
-                    return
-                      ( ctxt,
-                        balance_updates @ cycle_balance_updates,
-                        Tez_repr.zero,
-                        List.rev_append
-                          t
-                          ((cycle, new_requested_amount) :: updated_requests_rev)
-                      )
-          in
-          let* ( ctxt,
-                 balance_updates,
-                 remaining_amount_to_transfer,
-                 updated_requests_rev ) =
-            transfer_from_unstake ctxt [] amount [] requests_sorted
-          in
-          let updated_requests = List.rev updated_requests_rev in
-          let* ctxt =
-            update_stored_request
-              ctxt
-              sender_contract
-              {delegate; requests = updated_requests}
-          in
-          return (ctxt, balance_updates, remaining_amount_to_transfer)
+                      balance_updates @ cycle_balance_updates,
+                      Tez_repr.zero,
+                      List.rev_append
+                        t
+                        ((cycle, new_requested_amount) :: updated_requests_rev)
+                    )
+        in
+        let* ( ctxt,
+               balance_updates,
+               remaining_amount_to_transfer,
+               updated_requests_rev ) =
+          transfer_from_all_unstake ctxt [] amount [] requests_sorted
+        in
+        let updated_requests = List.rev updated_requests_rev in
+        let* ctxt =
+          Storage.Contract.Unstake_requests.update
+            ctxt
+            contract
+            {delegate; requests = updated_requests}
+        in
+        let* ctxt, balance_updates_finalisation =
+          handle_finalizable ctxt finalizable
+        in
+        return
+          ( (ctxt, balance_updates @ balance_updates_finalisation),
+            remaining_amount_to_transfer )
 
 let prepare_finalize_unstake =
   prepare_finalize_unstake_uncarbonated

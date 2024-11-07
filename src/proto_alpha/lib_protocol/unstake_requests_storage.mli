@@ -73,20 +73,6 @@ val prepare_finalize_unstake :
   Contract_repr.t ->
   prepared_finalize_unstake option tzresult Lwt.t
 
-val stake_from_unstake_for_delegate :
-  Raw_context.t ->
-  delegate:Signature.public_key_hash ->
-  transfer_from_unstake_request:
-    (Raw_context.t ->
-    Cycle_repr.t ->
-    Signature.public_key_hash ->
-    Contract_repr.t ->
-    Tez_repr.t ->
-    (Raw_context.t * 'a list) tzresult Lwt.t) ->
-  unfinalizable_requests_opt:stored_requests option ->
-  Tez_repr.t ->
-  (Raw_context.t * 'a list * Tez_repr.t) tzresult Lwt.t
-
 (** [handle_finalizable_and_clear ctxt ~check_delegate_of_unfinalizable_requests ~handle_finalizable contract] will update the storage
     by removing all finalizable unstake request and calling [handle_finalizable]
     on each of them.
@@ -105,6 +91,43 @@ val handle_finalizable_and_clear :
   handle_finalizable:
     (Raw_context.t -> finalizable -> transfer_result tzresult Lwt.t) ->
   transfer_result tzresult Lwt.t
+
+(** [remove_from_unfinalizable_requests_and_finalize ctxt ~contract ~delegate
+   ~check_delegate_of_unfinalizable_requests ~transfer_from_unstake_request ~handle_finalizable]
+    allows to spend from unfinalizable unstake requests.
+
+    This function ensures that the transfers from unstake request are licit.
+    If not, it will only finalize the finalizable requests.
+
+    Conditions to allow stake from unstake are the following:
+    - the delegate of the unfinalizable requests is the staker,
+    - the delegate has not been slashed in an unfinalizable cycle and has no
+      pending denunciation.
+
+    Transfers are done using the provided [transfer_from_unstake_request] and
+    [handle_finalizable] functions successively.
+
+    It returns the updated context, the balance updates and the part of the
+    requested amount that could not be taken from the unfinalizable unstake
+    requests.
+*)
+val remove_from_unfinalizable_requests_and_finalize :
+  Raw_context.t ->
+  contract:Contract_repr.t ->
+  delegate:Signature.public_key_hash ->
+  check_delegate_of_unfinalizable_requests:
+    (Signature.public_key_hash -> unit tzresult Lwt.t) ->
+  transfer_from_unstake_request:
+    (Raw_context.t ->
+    Cycle_repr.t ->
+    Signature.public_key_hash ->
+    Contract_repr.t ->
+    Tez_repr.t ->
+    transfer_result tzresult Lwt.t) ->
+  handle_finalizable:
+    (Raw_context.t -> finalizable -> transfer_result tzresult Lwt.t) ->
+  Tez_repr.t ->
+  (transfer_result * Tez_repr.t) tzresult Lwt.t
 
 type error +=
   | Cannot_unstake_with_unfinalizable_unstake_requests_to_another_delegate
