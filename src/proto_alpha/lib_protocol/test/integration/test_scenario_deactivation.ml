@@ -31,6 +31,31 @@ let check_is_not_active ~loc src_name =
   let* b = Context.Delegate.deactivated (B block) src.pkh in
   Assert.is_true ~loc b
 
+let check_rights_aux ~loc ~expect_rights src_name =
+  exec_unit @@ fun (block, state) ->
+  let src = State.find_account src_name state in
+  let current_cycle = Block.current_cycle block in
+  let rights =
+    CycleMap.find current_cycle src.frozen_rights
+    |> Option.value ~default:Tez.zero
+  in
+  if expect_rights then Assert.not_equal_tez ~loc Tez.zero rights
+  else Assert.equal_tez ~loc Tez.zero rights
+
+let check_no_rights = check_rights_aux ~expect_rights:false
+
+let check_has_rights = check_rights_aux ~expect_rights:true
+
+let check_cannot_bake_next_block ~loc src_name =
+  assert_failure
+    ~expected_error:(fun (_, state) errs ->
+      let src = State.find_account src_name state in
+      Error_helpers.expect_no_slots_found_for ~loc ~pkh:src.pkh errs)
+    (next_block_with_baker src_name)
+
+let check_can_bake_next_block ~loc src_name =
+  assert_success ~loc (next_block_with_baker src_name)
+
 let check_grace_period ~loc src_name =
   let open Lwt_result_syntax in
   exec_unit @@ fun (block, state) ->
@@ -98,14 +123,7 @@ let test_baking_deactivation =
          --> exec bake_until_next_cycle_end_but_one)
   --> set_delegate "delegate" (Some "delegate")
   (* No rights yet, but active *)
-  --> assert_failure
-        ~expected_error:(fun (_, state) errs ->
-          let delegate = State.find_account "delegate" state in
-          Error_helpers.expect_no_slots_found_for
-            ~loc:__LOC__
-            ~pkh:delegate.pkh
-            errs)
-        (next_block_with_baker "delegate")
+  --> check_cannot_bake_next_block ~loc:__LOC__ "delegate"
   --> check_is_active ~loc:__LOC__ "delegate"
   --> wait_n_cycles_f (fun (_, state) ->
           state.State.constants.consensus_rights_delay + 1)
@@ -119,16 +137,65 @@ let test_baking_deactivation =
   --> next_cycle
   --> check_is_not_active ~loc:__LOC__ "delegate"
   (* The delegate still has enough rights to bake... *)
-  --> exec_unit (fun (block, state) ->
-          let dlgt = State.find_account "delegate" state in
-          let current_cycle = Block.current_cycle block in
-          let rights =
-            CycleMap.find current_cycle dlgt.frozen_rights
-            |> Option.value ~default:Tez.zero
-          in
-          Assert.not_equal_tez ~loc:__LOC__ Tez.zero rights)
+  --> check_has_rights ~loc:__LOC__ "delegate"
   --> next_block_with_baker "delegate"
   --> check_is_active ~loc:__LOC__ "delegate"
+
+let test_deactivation_timing =
+  let staked_balance_no_change =
+    check_balance_field "delegate" `Staked (Tez.of_mutez 200_000_000_000L)
+  in
+  init_constants () --> activate_ai `Force
+  --> begin_test ["delegate"; "baker"]
+  --> staked_balance_no_change
+  --> (Tag "Delegate is never active" --> set_baker "baker"
+       --> wait_n_cycles_f (fun (_, state) ->
+               state.State.constants.consensus_rights_delay
+               + state.State.constants.tolerated_inactivity_period)
+      |+ Tag "Delegate is active for a few cycles" --> set_baker "delegate"
+         --> wait_n_cycles_f (fun (_, state) ->
+                 state.State.constants.consensus_rights_delay + 1)
+         --> set_baker "baker"
+         --> wait_n_cycles_f (fun (_, state) ->
+                 state.State.constants.tolerated_inactivity_period))
+  --> exec bake_until_next_cycle_end_but_one
+  --> check_is_active ~loc:__LOC__ "delegate"
+  --> staked_balance_no_change --> next_block
+  (* delegate is deactivated at the end of the cycle but it has rights *)
+  --> check_is_not_active ~loc:__LOC__ "delegate"
+  --> check_has_rights ~loc:__LOC__ "delegate"
+  --> staked_balance_no_change
+  (* delegate is removed from the committee after
+     [consensus_rights_delay] cycles *)
+  --> wait_n_cycles_f (fun (_, state) ->
+          state.State.constants.consensus_rights_delay)
+  --> check_is_not_active ~loc:__LOC__ "delegate"
+  --> check_has_rights ~loc:__LOC__ "delegate"
+  --> check_can_bake_next_block ~loc:__LOC__ "delegate"
+  --> next_cycle
+  --> check_cannot_bake_next_block ~loc:__LOC__ "delegate"
+  (* delegate is still deactivated but it also has no rights *)
+  --> check_is_not_active ~loc:__LOC__ "delegate"
+  --> check_no_rights ~loc:__LOC__ "delegate"
+  --> staked_balance_no_change
+  (* reactivate and wait for rights *)
+  --> (Tag "Reactivate in next block" --> Empty
+      |+ Tag "Reactivate in next cycle" --> exec bake_until_dawn_of_next_cycle
+      |+ Tag "Reactivate in last block"
+         --> exec bake_until_next_cycle_end_but_one)
+  --> set_delegate "delegate" (Some "delegate")
+  (* delegate has no rights yet, but it is active *)
+  --> check_is_active ~loc:__LOC__ "delegate"
+  --> check_no_rights ~loc:__LOC__ "delegate"
+  --> staked_balance_no_change
+  --> check_cannot_bake_next_block ~loc:__LOC__ "delegate"
+  --> wait_n_cycles_f (fun (_, state) ->
+          state.State.constants.consensus_rights_delay + 1)
+  (* delegate has rights and it is active *)
+  --> check_is_active ~loc:__LOC__ "delegate"
+  --> check_has_rights ~loc:__LOC__ "delegate"
+  --> staked_balance_no_change
+  --> next_block_with_baker "delegate"
 
 let tests =
   tests_of_scenarios
@@ -136,6 +203,7 @@ let tests =
       ("Test simple deactivation scenario with ai", test_simple_scenario_with_ai);
       ( "Test deactivation and reactivation scenarios with baking",
         test_baking_deactivation );
+      ("Test deactivation timing", test_deactivation_timing);
     ]
 
 let () =
