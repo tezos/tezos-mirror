@@ -114,8 +114,8 @@ let apply_slashes ~slashable_deposits_period slashing_history ~from_cycle amount
     amount
     slashing_history
 
-let prepare_finalize_unstake ctxt ~check_delegate_of_unfinalizable_requests
-    contract =
+let prepare_finalize_unstake_uncarbonated ctxt
+    ~check_delegate_of_unfinalizable_requests contract =
   let open Lwt_result_syntax in
   let slashable_deposits_period =
     Constants_storage.slashable_deposits_period ctxt
@@ -184,6 +184,22 @@ let prepare_finalize_unstake ctxt ~check_delegate_of_unfinalizable_requests
           in
           return_some {finalizable; unfinalizable})
 
+let prepare_finalize_unstake ctxt ~check_delegate_of_unfinalizable_requests
+    contract =
+  let open Lwt_result_syntax in
+  let*? ctxt =
+    Raw_context.consume_gas
+      ctxt
+      Adaptive_issuance_costs.prepare_finalize_unstake_cost
+  in
+  let* prepared =
+    prepare_finalize_unstake_uncarbonated
+      ctxt
+      ~check_delegate_of_unfinalizable_requests
+      contract
+  in
+  return (ctxt, prepared)
+
 (* Update the storage with the given requests.
 
    If the given structure contains an empty list of requests, it means that
@@ -202,12 +218,7 @@ let update_stored_request ctxt contract updated_requests =
 let handle_finalizable_and_clear ctxt contract
     ~check_delegate_of_unfinalizable_requests ~handle_finalizable =
   let open Lwt_result_syntax in
-  let*? ctxt =
-    Raw_context.consume_gas
-      ctxt
-      Adaptive_issuance_costs.prepare_finalize_unstake_cost
-  in
-  let* prepared_opt =
+  let* ctxt, prepared_opt =
     prepare_finalize_unstake
       ~check_delegate_of_unfinalizable_requests
       ctxt
@@ -390,8 +401,8 @@ let stake_from_unstake_for_delegate ctxt ~delegate
           return (ctxt, balance_updates, remaining_amount_to_transfer)
 
 let prepare_finalize_unstake =
-  prepare_finalize_unstake ~check_delegate_of_unfinalizable_requests:(fun _ ->
-      return_unit)
+  prepare_finalize_unstake_uncarbonated
+    ~check_delegate_of_unfinalizable_requests:(fun _ -> return_unit)
 
 module For_RPC = struct
   let apply_slash_to_unstaked_unfinalizable ctxt {requests; delegate} =

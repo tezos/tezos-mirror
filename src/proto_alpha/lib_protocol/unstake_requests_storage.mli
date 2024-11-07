@@ -91,6 +91,9 @@ val stake_from_unstake_for_delegate :
     by removing all finalizable unstake request and calling [handle_finalizable]
     on each of them.
 
+    This operation consumes the cost of the extraction of unstake_requests:
+    {!Adaptive_issuance_costs.prepare_finalize_unstake_cost}.
+
     [check_delegate_of_unfinalizable_requests] can be used to interrupt the current
     finalisation by returning an error if it would be illegal to actually unstake funds from the given delegate.
 *)
