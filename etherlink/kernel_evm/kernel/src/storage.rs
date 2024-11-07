@@ -454,10 +454,6 @@ pub fn store_base_fee_per_gas<Host: Runtime>(
     write_u256_le(host, &EVM_BASE_FEE_PER_GAS, base_fee_per_gas).map_err(Error::from)
 }
 
-pub fn read_base_fee_per_gas<Host: Runtime>(host: &mut Host) -> Result<U256, Error> {
-    read_u256_le(host, &EVM_BASE_FEE_PER_GAS).map_err(Error::from)
-}
-
 pub fn read_minimum_base_fee_per_gas<Host: Runtime>(host: &Host) -> Result<U256, Error> {
     read_u256_le(host, &EVM_MINIMUM_BASE_FEE_PER_GAS).map_err(Error::from)
 }
