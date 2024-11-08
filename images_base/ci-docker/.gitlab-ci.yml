@@ -61,7 +61,7 @@ container_scanning:
     # TODO revisit CS_IMAGE name when integration is more advanced
     CS_IMAGE: ${GCP_ARTIFACT_REGISTRY_IMAGE}:branch-${CI_COMMIT_REF_NAME}
     SECURE_LOG_LEVEL: "debug"
-  # artifacts:
-  #   paths:
-  #   - gl-container-scanning-report.json
-  #   expire_in: 1 week
+  artifacts:
+    paths:
+    - gl-container-scanning-report.json
+    expire_in: 1 week
