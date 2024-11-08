@@ -337,6 +337,7 @@ let constants_mainnet : Constants.Parametric.t =
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/7553
        Enable once we built performance confidance *)
     allow_tz4_delegate_enable = false;
+    all_bakers_attest_enable = false;
   }
 
 let constants_sandbox =

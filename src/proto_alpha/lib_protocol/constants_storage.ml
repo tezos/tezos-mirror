@@ -300,3 +300,6 @@ let aggregate_attestation c = (Raw_context.constants c).aggregate_attestation
 
 let allow_tz4_delegate_enable c =
   (Raw_context.constants c).allow_tz4_delegate_enable
+
+let all_bakers_attest_enable c =
+  (Raw_context.constants c).all_bakers_attest_enable

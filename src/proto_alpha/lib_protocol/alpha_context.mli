@@ -953,6 +953,7 @@ module Constants : sig
       direct_ticket_spending_enable : bool;
       aggregate_attestation : bool;
       allow_tz4_delegate_enable : bool;
+      all_bakers_attest_enable : bool;
     }
 
     val encoding : t Data_encoding.t
@@ -1090,6 +1091,8 @@ module Constants : sig
   val aggregate_attestation : context -> bool
 
   val allow_tz4_delegate_enable : context -> bool
+
+  val all_bakers_attest_enable : context -> bool
 
   (** All constants: fixed and parametric *)
   type t = private {fixed : fixed; parametric : Parametric.t}
