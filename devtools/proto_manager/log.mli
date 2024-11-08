@@ -48,5 +48,8 @@ val green : ('a, Format.formatter, unit) format -> 'a
 (* Same as [printfln] but prints in cyan. *)
 val cyan : ('a, Format.formatter, unit) format -> 'a
 
+(* Same as [printfln] but prints in yellow. *)
+val yellow : ('a, Format.formatter, unit) format -> 'a
+
 (* Same as [printfln] but prints in magenta. *)
 val magenta : ('a, Format.formatter, unit) format -> 'a
