@@ -224,7 +224,8 @@ let test_delegate_forbidden =
          --> wait_n_cycles_f crd
          --> check_is_not_forbidden "delegate"
       |+ Tag "Is not forbidden after a denunciation is outdated"
-         --> double_attest "delegate" --> wait_n_cycles 2
+         --> double_attest "delegate"
+         --> wait_n_cycles Protocol.Constants_repr.max_slashing_period
          --> assert_failure
                ~expected_error:(fun (_block, state) errs ->
                  Error_helpers.expect_outdated_denunciation_state
@@ -332,7 +333,7 @@ let test_slash_timing =
   --> List.fold_left
         (fun acc i ->
           acc |+ Tag (string_of_int i ^ " cycles lag") --> wait_n_cycles i)
-        (wait_n_cycles 2)
+        (wait_n_cycles Protocol.Constants_repr.max_slashing_period)
         [3; 4; 5; 6]
   --> double_bake "delegate"
   --> exclude_bakers ["delegate"]
@@ -484,7 +485,8 @@ let test_mega_slash =
   -->
   (* The "incident" *)
   let incident =
-    double_attest "delegate" --> make_denunciations () --> wait_n_cycles 2
+    double_attest "delegate" --> make_denunciations ()
+    --> wait_n_cycles Protocol.Constants_repr.max_slashing_period
     (* We check stakers can still unstake and change delegates *)
     --> assert_success (unstake "staker1" Half)
     --> assert_success (unstake "staker1" All)
@@ -536,7 +538,8 @@ let test_mega_slash =
   loop 3 incident
   (*  but 4 will. *)
   --> double_attest "delegate"
-  --> make_denunciations () --> wait_n_cycles 2
+  --> make_denunciations ()
+  --> wait_n_cycles Protocol.Constants_repr.max_slashing_period
   (* We check stakers can still unstake and finalize, despite everything *)
   --> assert_success
         (unstake "staker1" Half
