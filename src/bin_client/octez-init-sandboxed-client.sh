@@ -92,10 +92,6 @@ main() {
     local_admin_client="${local_admin_client:-$bin_dir/../../_build/default/src/bin_client/main_admin.exe}"
     local_signer="${local_signer:-$bin_dir/../../_build/default/src/bin_signer/main_signer.exe}"
     local_compiler="${local_compiler:-$bin_dir/../../_build/default/src/lib_protocol_compiler/bin/main_native.exe}"
-
-    quebec_parameters_file="$bin_dir/../../_build/default/src/proto_021_PsQuebec/lib_parameters/sandbox-parameters.json"
-    parameters_file="$bin_dir/../../_build/default/src/proto_alpha/lib_parameters/sandbox-parameters.json"
-
   else
     # we assume a clean install with octez-(admin-)client in the path
     local_client="${local_client:-$(which octez-client)}"
@@ -135,6 +131,8 @@ main() {
     local_baker="$bin_dir/../../_build/default/src/proto_$protocol_underscore/bin_baker/main_baker_$protocol_underscore.exe"
     local_accuser="$bin_dir/../../_build/default/src/proto_$protocol_underscore/bin_accuser/main_accuser_$protocol_underscore.exe"
     local_sc_rollup_node="$bin_dir/../../_build/default/src/proto_$protocol_underscore/bin_sc_rollup_node/main_sc_rollup_node_$protocol_underscore.exe"
+    parameters_file="$bin_dir/../../_build/default/src/proto_$protocol_underscore/lib_parameters/sandbox-parameters.json"
+    hash="$(jq -r ".hash" "$bin_dir"/../../_build/default/src/proto_"$protocol_underscore"/lib_protocol/TEZOS_PROTOCOL)"
 
     if [ -n "$USE_TLS" ]; then
       endpoint="https://$host:$rpc"
@@ -157,6 +155,12 @@ main() {
     echo '#!/bin/sh' > "$client_dir"/bin/octez-accuser-"$protocol_without_number"
     echo "exec $accuser \"\$@\"" >> "$client_dir"/bin/octez-accuser-"$protocol_without_number"
     chmod +x "$client_dir"/bin/octez-accuser-"$protocol_without_number"
+
+    cat << EOF
+alias octez-activate-$protocol="$client -block genesis activate protocol $hash with fitness 1 and key activator and parameters $parameters_file";
+
+EOF
+
   done < "$bin_dir"/../../script-inputs/active_protocol_versions
 
   echo '#!/bin/sh' > "$client_dir"/bin/octez-signer
@@ -170,10 +174,8 @@ main() {
   cat << EOF
 if type octez-client-reset >/dev/null 2>&1 ; then octez-client-reset; fi ;
 PATH="$client_dir/bin:\$PATH" ; export PATH ;
-alias octez-activate-quebec="$client -block genesis activate protocol PsQuebecnLByd3JwTiGadoG4nGWi3HYiLXUjkibeFV8dCFeVMUg with fitness 1 and key activator and parameters $quebec_parameters_file";
-alias octez-activate-alpha="$client  -block genesis activate protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK with fitness 1 and key activator and parameters $parameters_file" ;
-alias octez-client-reset="rm -rf \"$client_dir\"; unalias octez-activate-alpha octez-client-reset" ;
 alias octez-autocomplete="if [ \$ZSH_NAME ] ; then autoload bashcompinit ; bashcompinit ; fi ; source \"$bin_dir/bash-completion.sh\"" ;
+alias octez-client-reset="rm -rf \"$client_dir\"; unalias \$(alias | sed 's/alias //g' | grep -o '^octez-[^=]*' | tr '\n' ' '); unalias octez-client-reset" ;
 trap octez-client-reset EXIT ;
 
 EOF
