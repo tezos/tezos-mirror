@@ -204,7 +204,7 @@ fn interpret_one<'a>(
                 let o1 = pop!(V::Mutez);
                 let o2 = pop!(V::Mutez);
                 ctx.gas.consume(interpret_cost::ADD_TEZ)?;
-                let sum = o1.checked_add(o2).ok_or(InterpretError::MutezOverflow)?;
+                let sum = o1.checked_add(o2).ok_or(InterpretError::Overflow)?;
                 stack.push(V::Mutez(sum));
             }
             overloads::Add::Bls12381Fr => {
@@ -312,15 +312,15 @@ fn interpret_one<'a>(
             overloads::Mul::MutezNat => {
                 ctx.gas.consume(interpret_cost::MUL_TEZ_NAT)?;
                 let x1 = pop!(V::Mutez);
-                let x2 = i64::try_from(pop!(V::Nat)).map_err(|_| InterpretError::MutezOverflow)?;
-                let res = x1.checked_mul(x2).ok_or(InterpretError::MutezOverflow)?;
+                let x2 = i64::try_from(pop!(V::Nat)).map_err(|_| InterpretError::Overflow)?;
+                let res = x1.checked_mul(x2).ok_or(InterpretError::Overflow)?;
                 stack.push(V::Mutez(res));
             }
             overloads::Mul::NatMutez => {
                 ctx.gas.consume(interpret_cost::MUL_NAT_TEZ)?;
-                let x1 = i64::try_from(pop!(V::Nat)).map_err(|_| InterpretError::MutezOverflow)?;
+                let x1 = i64::try_from(pop!(V::Nat)).map_err(|_| InterpretError::Overflow)?;
                 let x2 = pop!(V::Mutez);
-                let res = x1.checked_mul(x2).ok_or(InterpretError::MutezOverflow)?;
+                let res = x1.checked_mul(x2).ok_or(InterpretError::Overflow)?;
                 stack.push(V::Mutez(res));
             }
             overloads::Mul::Bls12381G1Bls12381Fr => {
@@ -1938,7 +1938,7 @@ mod interpreter_tests {
                 &mut ctx,
                 &mut stk![V::Mutez(2i64.pow(62)), V::Mutez(2i64.pow(62))]
             ),
-            Err(InterpretError::MutezOverflow)
+            Err(InterpretError::Overflow)
         );
         assert_eq!(
             interpret_one(
@@ -1949,7 +1949,7 @@ mod interpreter_tests {
                     V::Mutez(1)
                 ]
             ),
-            Err(InterpretError::MutezOverflow)
+            Err(InterpretError::Overflow)
         );
         assert_eq!(
             interpret_one(
@@ -1960,7 +1960,7 @@ mod interpreter_tests {
                     V::Mutez((2u64.pow(63) - 1).try_into().unwrap())
                 ]
             ),
-            Err(InterpretError::MutezOverflow)
+            Err(InterpretError::Overflow)
         );
     }
 
