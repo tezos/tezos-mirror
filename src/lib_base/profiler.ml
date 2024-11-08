@@ -244,19 +244,19 @@ let iter (p : profiler) f =
       r)
     p
 
-let record p ?(verbosity = Notice) id =
+let record p verbosity id =
   iter p (fun (module I) -> I.Driver.record I.state verbosity id)
 
-let aggregate p ?(verbosity = Notice) id =
+let aggregate p verbosity id =
   iter p (fun (module I) -> I.Driver.aggregate I.state verbosity id)
 
-let stamp p ?(verbosity = Notice) ids =
+let stamp p verbosity ids =
   iter p (fun (module I) -> I.Driver.stamp I.state verbosity ids)
 
-let mark p ?(verbosity = Notice) ids =
+let mark p verbosity ids =
   iter p (fun (module I) -> I.Driver.mark I.state verbosity ids)
 
-let span p ?(verbosity = Notice) d ids =
+let span p verbosity d ids =
   iter p (fun (module I) -> I.Driver.span I.state verbosity d ids)
 
 let inc p report = iter p (fun (module I) -> I.Driver.inc I.state report)
@@ -271,12 +271,12 @@ let section p start id f =
   stop p ;
   match r with Ok r -> r | Error exn -> raise exn
 
-let record_f p ?verbosity id f = section p (fun p -> record p ?verbosity) id f
+let record_f p verbosity id f = section p (fun p -> record p verbosity) id f
 
-let aggregate_f p ?verbosity id f =
-  section p (fun p -> aggregate p ?verbosity) id f
+let aggregate_f p verbosity id f =
+  section p (fun p -> aggregate p verbosity) id f
 
-let span_f p ?(verbosity = Notice) ids f =
+let span_f p verbosity ids f =
   let is = plugged p in
   let t0s = List.map (fun i -> (i, time i)) is in
   let r = try Ok (f ()) with exn -> Error exn in
@@ -298,12 +298,12 @@ let section_s p start id f =
       stop p ;
       Lwt.fail exn)
 
-let record_s p ?verbosity id f = section_s p (fun p -> record p ?verbosity) id f
+let record_s p verbosity id f = section_s p (fun p -> record p verbosity) id f
 
-let aggregate_s p ?verbosity id f =
-  section_s p (fun p -> aggregate p ?verbosity) id f
+let aggregate_s p verbosity id f =
+  section_s p (fun p -> aggregate p verbosity) id f
 
-let span_s p ?(verbosity = Notice) ids f =
+let span_s p verbosity ids f =
   let is = plugged p in
   let t0s = List.map (fun i -> (i, time i)) is in
   Lwt.catch
@@ -340,31 +340,31 @@ module type GLOBAL_PROFILER = sig
 
   val plugged : unit -> instance list
 
-  val record : ?verbosity:verbosity -> id -> unit
+  val record : verbosity -> id -> unit
 
-  val aggregate : ?verbosity:verbosity -> id -> unit
+  val aggregate : verbosity -> id -> unit
 
   val stop : unit -> unit
 
-  val stamp : ?verbosity:verbosity -> id -> unit
+  val stamp : verbosity -> id -> unit
 
-  val mark : ?verbosity:verbosity -> ids -> unit
+  val mark : verbosity -> ids -> unit
 
-  val span : ?verbosity:verbosity -> span -> ids -> unit
+  val span : verbosity -> span -> ids -> unit
 
   val inc : report -> unit
 
-  val record_f : ?verbosity:verbosity -> id -> (unit -> 'a) -> 'a
+  val record_f : verbosity -> id -> (unit -> 'a) -> 'a
 
-  val record_s : ?verbosity:verbosity -> id -> (unit -> 'a Lwt.t) -> 'a Lwt.t
+  val record_s : verbosity -> id -> (unit -> 'a Lwt.t) -> 'a Lwt.t
 
-  val aggregate_f : ?verbosity:verbosity -> id -> (unit -> 'a) -> 'a
+  val aggregate_f : verbosity -> id -> (unit -> 'a) -> 'a
 
-  val aggregate_s : ?verbosity:verbosity -> id -> (unit -> 'a Lwt.t) -> 'a Lwt.t
+  val aggregate_s : verbosity -> id -> (unit -> 'a Lwt.t) -> 'a Lwt.t
 
-  val span_f : ?verbosity:verbosity -> ids -> (unit -> 'a) -> 'a
+  val span_f : verbosity -> ids -> (unit -> 'a) -> 'a
 
-  val span_s : ?verbosity:verbosity -> ids -> (unit -> 'a Lwt.t) -> 'a Lwt.t
+  val span_s : verbosity -> ids -> (unit -> 'a Lwt.t) -> 'a Lwt.t
 end
 
 let wrap profiler =
@@ -381,46 +381,47 @@ let wrap profiler =
 
     let plugged () = plugged profiler
 
-    let record ?verbosity id = record profiler ?verbosity id
+    let record verbosity id = record profiler verbosity id
 
-    let record_f ?verbosity id f = record_f profiler ?verbosity id f
+    let record_f verbosity id f = record_f profiler verbosity id f
 
-    let record_s ?verbosity id f = record_s profiler ?verbosity id f
+    let record_s verbosity id f = record_s profiler verbosity id f
 
-    let aggregate ?verbosity id = aggregate profiler ?verbosity id
+    let aggregate verbosity id = aggregate profiler verbosity id
 
-    let aggregate_f ?verbosity id f = aggregate_f profiler ?verbosity id f
+    let aggregate_f verbosity id f = aggregate_f profiler verbosity id f
 
-    let aggregate_s ?verbosity id f = aggregate_s profiler ?verbosity id f
+    let aggregate_s verbosity id f = aggregate_s profiler verbosity id f
 
     let stop () = stop profiler
 
-    let stamp ?verbosity id = stamp profiler ?verbosity id
+    let stamp verbosity id = stamp profiler verbosity id
 
-    let mark ?verbosity ids = mark profiler ?verbosity ids
+    let mark verbosity ids = mark profiler verbosity ids
 
-    let span ?verbosity d ids = span profiler ?verbosity d ids
+    let span verbosity d ids = span profiler verbosity d ids
 
     let inc r = inc profiler r
 
-    let span_f ?verbosity ids f = span_f ?verbosity profiler ids f
+    let span_f verbosity ids f = span_f profiler verbosity ids f
 
-    let span_s ?verbosity ids f = span_s ?verbosity profiler ids f
+    let span_s verbosity ids f = span_s profiler verbosity ids f
   end in
   (module Wrapped : GLOBAL_PROFILER)
 
 type 'a section_maker = 'a * metadata -> unit
 
-let section_maker ?verbosity equal to_string profiler : 'a section_maker =
+let section_maker ?(verbosity = Notice) equal to_string profiler :
+    'a section_maker =
   let last = ref None in
   let () = at_exit (fun () -> Option.iter (fun _ -> stop profiler) !last) in
   fun (id, metadata) ->
     match !last with
     | None ->
-        record ?verbosity profiler (to_string id, metadata) ;
+        record profiler verbosity (to_string id, metadata) ;
         last := Some id
     | Some id' when equal id' id -> ()
     | Some _ ->
         stop profiler ;
-        record ?verbosity profiler (to_string id, metadata) ;
+        record profiler verbosity (to_string id, metadata) ;
         last := Some id

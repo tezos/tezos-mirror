@@ -18,6 +18,7 @@ type error =
   | Improper_let_binding of Ppxlib.expression
   | Improper_record of (Ppxlib.Ast.longident_loc * Ppxlib.expression) list
   | Malformed_attribute of Ppxlib.expression
+  | No_verbosity of Key.t
 
 (** Raise a located error *)
 val error : Location.t -> error -> 'a

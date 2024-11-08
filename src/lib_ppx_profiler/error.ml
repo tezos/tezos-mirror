@@ -18,6 +18,7 @@ type error =
   | Improper_let_binding of Ppxlib.expression
   | Improper_record of (Ppxlib.Ast.longident_loc * Ppxlib.expression) list
   | Malformed_attribute of Ppxlib.expression
+  | No_verbosity of Key.t
 
 let pp_field ppf (lident, expr) =
   Format.fprintf
@@ -129,5 +130,13 @@ let error loc err =
              Found %a@.'"
             Ppxlib.Pprintast.expression
             expr )
+    | No_verbosity key ->
+        ( "Missing mandatory verbosity field",
+          Format.asprintf
+            "@[<v 2>A [@profiler] call requires a {verbosity} field. Available \
+             options are Notice, Info and Debug.@,\
+             Found: @[<v 0>%a@]@."
+            Key.pp
+            key )
   in
   Location.raise_errorf ~loc "profiling_ppx: %s\nHint: %s" msg hint

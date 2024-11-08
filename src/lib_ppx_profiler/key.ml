@@ -27,26 +27,19 @@ let rec embed_list loc = function
   | [e] -> [%expr [[%e e]]]
   | a :: q -> [%expr [%e a] :: [%e embed_list loc q]]
 
-let get_level_of_detail loc {verbosity; _} =
+let get_verbosity loc {verbosity; _} =
   match verbosity with
   | Some name ->
-      Ppxlib.Ast_builder.Default.(
-        econstruct
-          (constructor_declaration
-             ~loc
-             ~name:(Located.mk ~loc name)
-             ~args:(Ppxlib_ast.Ast.Pcstr_tuple [])
-             ~res:None))
-        None
-  | None ->
-      Ppxlib.Ast_builder.Default.(
-        econstruct
-          (constructor_declaration
-             ~loc
-             ~name:(Located.mk ~loc "Notice")
-             ~args:(Ppxlib_ast.Ast.Pcstr_tuple [])
-             ~res:None))
-        None
+      Some
+        (Ppxlib.Ast_builder.Default.(
+           econstruct
+             (constructor_declaration
+                ~loc
+                ~name:(Located.mk ~loc name)
+                ~args:(Ppxlib_ast.Ast.Pcstr_tuple [])
+                ~res:None))
+           None)
+  | None -> None
 
 (* This could return a module_expr instead but right now it works
    and that's all we're asking *)
