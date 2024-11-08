@@ -190,3 +190,6 @@ module State : sig
   (** Path of EVM state store. *)
   val store_path : data_dir:string -> string
 end
+
+(** Watcher that gets notified each time a new block is produced. *)
+val head_watcher : Ethereum_types.Subscription.output Lwt_watcher.input

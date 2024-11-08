@@ -253,16 +253,33 @@ let generate_id () =
   Bytes.iteri (fun i _ -> Bytes.set_uint8 id i (Random.int 256)) id ;
   encode_id id
 
-let eth_subscribe ~kind =
+let eth_subscribe ~(kind : Ethereum_types.Subscription.kind) =
   let id = make_id ~id:(generate_id ()) in
-  Stdlib.Hashtbl.add subscriptions id kind ;
-  id
+  let stream, stopper =
+    match kind with
+    | NewHeads -> Lwt_watcher.create_stream Evm_context.head_watcher
+    | Logs _ ->
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/7640 *)
+        Stdlib.failwith "The websocket event [logs] is not implemented yet."
+    | NewPendingTransactions ->
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/7641 *)
+        Stdlib.failwith
+          "The websocket event [newPendingTransactions] is not implemented yet."
+    | Syncing ->
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/7642 *)
+        Stdlib.failwith "The websocket event [syncing] is not implemented yet."
+  in
+  let stopper () =
+    Stdlib.Hashtbl.remove subscriptions id ;
+    Lwt_watcher.shutdown stopper
+  in
+  Stdlib.Hashtbl.add subscriptions id {kind; stream; stopper} ;
+  (id, (stream, stopper))
 
 let eth_unsubscribe ~id =
   match Stdlib.Hashtbl.find_opt subscriptions id with
   | Some {stopper; _} ->
       stopper () ;
-      Stdlib.Hashtbl.remove subscriptions id ;
       true
   | None -> false
 
