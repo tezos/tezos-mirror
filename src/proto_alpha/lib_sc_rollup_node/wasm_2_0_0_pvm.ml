@@ -201,6 +201,11 @@ module Impl : Pvm_sig.S with type Unsafe_patches.t = unsafe_patch = struct
     | Waiting_for_reveal Sc_rollup.Reveal_dal_parameters ->
         "Waiting for DAL parameters"
     | Computing -> "Computing"
+    | Waiting_for_reveal (Request_adal_page _) ->
+        (* ADAL/FIXME: https://gitlab.com/tezos/tezos/-/milestones/410
+
+           To be implemented. *)
+        assert false
 
   let eval_many ~reveal_builtins ~write_debug ~is_reveal_enabled:_ =
     Backend.compute_step_many
@@ -209,7 +214,7 @@ module Impl : Pvm_sig.S with type Unsafe_patches.t = unsafe_patch = struct
       ~write_debug
       ?hooks:None
 
-  (** WASM PVM Mutable API works by holding a reference to an immutable state 
+  (** WASM PVM Mutable API works by holding a reference to an immutable state
       and wrapping all immutable functionality around the reference *)
   module Mutable_state :
     Pvm_sig.MUTABLE_STATE_S

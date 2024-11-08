@@ -444,10 +444,17 @@ let valid (type state proof output)
     | ( Some (Reveal_proof Dal_parameters_proof),
         Needs_reveal Reveal_dal_parameters ) ->
         return_unit
+    | Some (Reveal_proof _), Needs_reveal (Request_dal_page _pid) ->
+        (* ADAL/FIXME: https://gitlab.com/tezos/tezos/-/milestones/410 implement
+           refutation games for adaptive DAL. *)
+        assert false
     | None, (Initial | First_after _ | Needs_reveal _)
     | Some _, No_input_required
     | Some (Inbox_proof _), Needs_reveal _
     | _ ->
+        (* ADAL/TODO: https://gitlab.com/tezos/tezos/-/milestones/410
+
+           Remove this fragile pattern matching. *)
         proof_error "Inbox proof and input request are dissociated."
   in
   return (input, input_requested)
@@ -569,6 +576,11 @@ let produce ~metadata pvm_and_state commit_inbox_level ~is_reveal_enabled =
           ~get_history
           ~dal_attested_slots_validity_lag
           confirmed_slots_history
+    | Needs_reveal (Request_adal_page _info) ->
+        (* ADAL/FIXME: https://gitlab.com/tezos/tezos/-/milestones/410
+
+           Implement refutations for adaptive DAL *)
+        assert false
     | Needs_reveal Reveal_dal_parameters ->
         let open Dal_with_history in
         return

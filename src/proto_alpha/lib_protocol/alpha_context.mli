@@ -3263,6 +3263,12 @@ module Sc_rollup : sig
     | Reveal_raw_data of Sc_rollup_reveal_hash.t
     | Reveal_metadata
     | Request_dal_page of Dal.Page.t
+    | Request_adal_page of {
+        page_id : Dal.Page.t;
+        min_attested_shards : int;
+        expected_total_shards : int;
+        restricted_commitments_publishers : Contract.t list option;
+      }
     | Reveal_dal_parameters
 
   type is_reveal_enabled = current_block_level:Raw_level.t -> reveal -> bool

@@ -999,6 +999,8 @@ module Make (Context : Sc_rollup_PVM_sig.Generic_pvm_context_sig) :
         return PS.(Needs_reveal Reveal_metadata)
     | Waiting_for_reveal (Request_dal_page page) ->
         return PS.(Needs_reveal (Request_dal_page page))
+    | Waiting_for_reveal (Request_adal_page arg) ->
+        return PS.(Needs_reveal (Request_adal_page arg))
     | Waiting_for_reveal Reveal_dal_parameters ->
         return PS.(Needs_reveal Reveal_dal_parameters)
     | Halted | Parsing | Evaluating -> return PS.No_input_required
@@ -1134,8 +1136,11 @@ module Make (Context : Sc_rollup_PVM_sig.Generic_pvm_context_sig) :
         | None, Some (Request_dal_page page_id) ->
             (* We are in the same level, fetch the next page. *)
             next_dal_page dal_params ~target:(`Page_after page_id)
-        | _, Some Reveal_metadata | _, Some Reveal_dal_parameters ->
+        | _, Some Reveal_metadata
+        | _, Some Reveal_dal_parameters
+        | _, Some (Request_adal_page _) ->
             (* Should not happen. *)
+            (* These cases are not supported by the "toy" Arith PVM. *)
             assert false
         | _, Some (Reveal_raw_data _) ->
             (* Note that, providing a DAC input via a DAL page will interrupt
@@ -1609,7 +1614,11 @@ module Make (Context : Sc_rollup_PVM_sig.Generic_pvm_context_sig) :
           error
             "Invalid set_input: expecting a dal page reveal, got an inbox \
              message or a raw data reveal."
+      | PS.Needs_reveal (PS.Request_adal_page _), _ ->
+          error
+            "Invalid set_input: Flexible DAL is not supported in the arith PVM."
     in
+
     return (state, request)
 
   type error += Arith_proof_verification_failed

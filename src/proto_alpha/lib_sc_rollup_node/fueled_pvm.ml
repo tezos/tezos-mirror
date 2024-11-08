@@ -169,7 +169,13 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
             (Data_encoding.Binary.to_string_exn
                Sc_rollup.Dal_parameters.encoding
                dal_parameters)
+      | Request_adal_page _ ->
+          (* ADAL/FIXME: https://gitlab.com/tezos/tezos/-/milestones/410
+
+             To be implemented. *)
+          assert false
     in
+
     let eval_tick_consume_fuel fuel failing_ticks state =
       let normal_eval state fuel =
         let max_steps = F.max_ticks fuel in
@@ -305,6 +311,11 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
               go fuel (Int64.succ current_tick) failing_ticks state)
       | Initial | First_after _ ->
           return @@ Completed {fuel; current_tick; failing_ticks}
+      | Needs_reveal (Request_adal_page _) ->
+          (* ADAL/FIXME: https://gitlab.com/tezos/tezos/-/milestones/410
+
+             to be implemented. *)
+          assert false
     in
     go fuel start_tick failing_ticks state
 
