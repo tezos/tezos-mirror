@@ -11,13 +11,14 @@ stages:
   - test
 
 variables:
-  HADOLINT_VERSION: 2.10.0
+  HADOLINT_VERSION: 2.10.0 # TODO update to 2.12.0 (9 Nov 2022)
   BINFMT_VERSION: 6.2.0-26
   IMAGE_NAME: "ci-docker" # TODO should be ci/base after more integration work is done
   GCP_ARTIFACT_REGISTRY_IMAGE: "${GCP_REGISTRY}/${CI_PROJECT_PATH}/${IMAGE_NAME}"
   CONTAINER_NAME: "${CI_REGISTRY_IMAGE}/${IMAGE_NAME}"
   # Version of the docker to use, docker daemon and client must have the same
   DOCKER_VERSION: "24.0.7"
+  # TODO check if variable below is used, remove it if it is not
   GCP_PROTECTED_ARTIFACT_REGISTRY_IMAGE: "${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_PATH}/${IMAGE_NAME}"
 
 hadolint:
@@ -29,7 +30,7 @@ hadolint:
 
 docker-buildx:
   stage: build
-  image: "${CI_REGISTRY}/tezos/docker-images/ci-docker:v1.9.0"
+  image: "${CI_REGISTRY}/tezos/docker-images/ci-docker:v1.9.0" # TODO update to 1.12.0
   services:
     - docker:${DOCKER_VERSION}-dind
   before_script:
