@@ -930,6 +930,9 @@ let[@warning "-32"] get_previous_protocol_constants ctxt =
              context."
       | Some constants -> return constants)
 
+(* Start of code to remove at next automatic protocol snapshot *)
+
+(* Please add here any code that should be removed at the next automatic protocol snapshot *)
 let update_cycle_eras ctxt level ~prev_blocks_per_cycle ~blocks_per_cycle
     ~blocks_per_commitment =
   let open Lwt_result_syntax in
@@ -954,10 +957,6 @@ let update_cycle_eras ctxt level ~prev_blocks_per_cycle ~blocks_per_cycle
   in
   let*? new_cycle_eras = Level_repr.add_cycle_era new_cycle_era cycle_eras in
   set_cycle_eras ctxt new_cycle_eras
-
-(* Start of code to remove at next automatic protocol snapshot *)
-
-(* Please add here any code that should be removed at the next automatic protocol snapshot *)
 
 (* End of code to remove at next automatic protocol snapshot *)
 
