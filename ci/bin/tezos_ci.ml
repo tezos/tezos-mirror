@@ -433,6 +433,37 @@ module Pipeline = struct
       to_file ~filename config ) ;
     (* Write top-level configuration. *)
     let workflow, includes = workflow_includes () in
+    (* temporary manual addition *)
+    let ci_docker_branch = "ci-docker-latest-release" in
+    let ci_docker_if_expr =
+      Gitlab_ci.If.(
+        var "CI_PROJECT_NAMESPACE" == str "tezos"
+        && var "CI_PIPELINE_SOURCE" == str "push"
+        && var "CI_COMMIT_BRANCH" == str ci_docker_branch)
+    in
+    let workflow =
+      let ci_docker_workflow_rule : Gitlab_ci.Types.workflow_rule =
+        {
+          changes = None;
+          if_ = Some ci_docker_if_expr;
+          variables = Some [("PIPELINE_TYPE", "ci_docker_release")];
+          when_ = Always;
+          auto_cancel = None;
+        }
+      in
+      {workflow with rules = ci_docker_workflow_rule :: workflow.rules}
+    in
+    let includes =
+      let ci_docker_include_rule : Gitlab_ci.Types.include_ =
+        {
+          local = "images_base/ci-docker/.gitlab-ci.yml";
+          rules =
+            [{changes = None; if_ = Some ci_docker_if_expr; when_ = Always}];
+        }
+      in
+      ci_docker_include_rule :: includes
+    in
+    (* end of temporary manual addition *)
     let config =
       let open Gitlab_ci.Types in
       (* Dummy job.
