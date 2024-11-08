@@ -3930,6 +3930,10 @@ let test_proxy_node_can_forward_to_evm_endpoint =
   in
   let raw_tx, _ = read_tx_from_file () |> List.hd in
 
+  (* Before sending the transaction, we need to wait until the proxy
+     is synced with the sequencer. *)
+  let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
+
   (* We send a transaction through the proxy. *)
   let*@ tx_hash = Rpc.send_raw_transaction ~raw_tx proxy in
 
