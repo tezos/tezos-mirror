@@ -23,7 +23,7 @@ hadolint:
   stage: lint
   image: "hadolint/hadolint:v${HADOLINT_VERSION}-debian"
   script:
-    - hadolint Dockerfile
+    - hadolint ./images_base/ci-docker/Dockerfile
   allow_failure: true
 
 docker-buildx:
