@@ -5,7 +5,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let default_node_addr = "http://127.0.0.1:8732"
+let default_node_endpoint =
+  Format.sprintf
+    "http://localhost:%d"
+    Octez_node_config.Config_file.default_rpc_port
 
 let default_daily_logs_path = Some "octez-agnostic-baker"
 
@@ -54,7 +57,7 @@ let status_encoding =
            ~title:"frozen"
            ~description:
              "Frozen protocols are currently unused on any network, and thus, \
-              they do nothave dedicated delegate binaries."
+              they do not have dedicated delegate binaries."
            (Tag 1)
            (constant "frozen")
            (function Frozen -> Some () | _ -> None)
@@ -93,6 +96,6 @@ let protocol_info = function
   | "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK" -> ("alpha", Active)
   | _ -> (*We assume that unmatched protocols are beta ones*) ("beta", Active)
 
-let protocol_short_hash h = fst (protocol_info h)
+let protocol_short_hash h = fst (protocol_info (Protocol_hash.to_b58check h))
 
-let protocol_status h = snd (protocol_info h)
+let protocol_status h = snd (protocol_info (Protocol_hash.to_b58check h))
