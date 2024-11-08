@@ -45,16 +45,21 @@ container_scanning:
   stage: test
   services:
     - docker:${DOCKER_VERSION}-dind
-  before_script:
-    - ./images_base/ci-docker/scripts/tag.sh
-    # - ./scripts/docker_registry_auth.sh
+  # DOCKER_IMAGE_TAG not available for use in CS_IMAGE
+  # thus pointless to define [before_script] running [tag.sh]
+  # before_script:
+  #   - ./images_base/ci-docker/scripts/tag.sh
+  #   # - ./scripts/docker_registry_auth.sh
   variables:
     GIT_STRATEGY: fetch
     # DOCKERFILE_PATH: "Dockerfile"
     # DOCKER_IMAGE: $CI_REGISTRY_IMAGE/$CI_COMMIT_REF_SLUG:$CI_COMMIT_SHA
     # CS_IMAGE: ${CI_REGISTRY_IMAGE}/${CI_COMMIT_REF_SLUG}
     # CS_IMAGE: "${CI_REGISTRY_IMAGE}/${DOCKER_IMAGE_TAG}"
-    CS_IMAGE: ${GCP_ARTIFACT_REGISTRY_IMAGE}:${DOCKER_IMAGE_TAG}
+    # DOCKER_IMAGE_TAG not available
+    # CS_IMAGE: ${GCP_ARTIFACT_REGISTRY_IMAGE}:${DOCKER_IMAGE_TAG}
+    # TODO revisit CS_IMAGE name when integration is more advanced
+    CS_IMAGE: ${GCP_ARTIFACT_REGISTRY_IMAGE}:branch-${CI_COMMIT_REF_NAME}
     SECURE_LOG_LEVEL: "debug"
   # artifacts:
   #   paths:
