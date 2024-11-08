@@ -1175,4 +1175,77 @@ module Subscription = struct
 
   let id_input_encoding =
     Data_encoding.(conv id_to_string id_of_string (tup1 string))
+
+  type sync_status = {
+    startingBlock : quantity;
+    currentBlock : quantity;
+    highestBlock : quantity;
+    pulledStates : quantity;
+    knownStates : quantity;
+  }
+
+  let sync_status_encoding =
+    let open Data_encoding in
+    conv
+      (fun {
+             startingBlock;
+             currentBlock;
+             highestBlock;
+             pulledStates;
+             knownStates;
+           } ->
+        (startingBlock, currentBlock, highestBlock, pulledStates, knownStates))
+      (fun (startingBlock, currentBlock, highestBlock, pulledStates, knownStates) ->
+        {startingBlock; currentBlock; highestBlock; pulledStates; knownStates})
+      (obj5
+         (req "startingBlock" quantity_encoding)
+         (req "currentBlock" quantity_encoding)
+         (req "highestBlock" quantity_encoding)
+         (req "pulledStates" quantity_encoding)
+         (req "knownStates" quantity_encoding))
+
+  type sync_output = {syncing : bool; status : sync_status}
+
+  let sync_output_encoding =
+    let open Data_encoding in
+    conv
+      (fun {syncing; status} -> (syncing, status))
+      (fun (syncing, status) -> {syncing; status})
+      (obj2 (req "syncing" bool) (req "status" sync_status_encoding))
+
+  type output =
+    | NewHeads of block
+    | Logs of logs
+    | NewPendingTransactions of hash
+    | Syncing of sync_output
+
+  let output_encoding =
+    let open Data_encoding in
+    union
+      [
+        case
+          ~title:"newHeads"
+          (Tag 0)
+          block_encoding
+          (function NewHeads b -> Some b | _ -> None)
+          (fun b -> NewHeads b);
+        case
+          ~title:"logs"
+          (Tag 1)
+          logs_encoding
+          (function Logs l -> Some l | _ -> None)
+          (fun l -> Logs l);
+        case
+          ~title:"pendingTxs"
+          (Tag 2)
+          hash_encoding
+          (function NewPendingTransactions l -> Some l | _ -> None)
+          (fun l -> NewPendingTransactions l);
+        case
+          ~title:"sync"
+          (Tag 3)
+          sync_output_encoding
+          (function Syncing l -> Some l | _ -> None)
+          (fun l -> Syncing l);
+      ]
 end

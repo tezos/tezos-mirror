@@ -324,4 +324,22 @@ module Subscription : sig
   val id_encoding : id Data_encoding.t
 
   val id_input_encoding : id Data_encoding.t
+
+  type sync_status = {
+    startingBlock : quantity;
+    currentBlock : quantity;
+    highestBlock : quantity;
+    pulledStates : quantity;
+    knownStates : quantity;
+  }
+
+  type sync_output = {syncing : bool; status : sync_status}
+
+  type output =
+    | NewHeads of block
+    | Logs of logs
+    | NewPendingTransactions of hash
+    | Syncing of sync_output
+
+  val output_encoding : output Data_encoding.t
 end
