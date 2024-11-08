@@ -65,15 +65,6 @@ impl ManagerRead for Owned {
         region.to_vec()
     }
 
-    fn region_read_some<E: StaticCopy, const LEN: usize>(
-        region: &Self::Region<E, LEN>,
-        offset: usize,
-        buffer: &mut [E],
-    ) {
-        let slice = &region[offset..][..buffer.len()];
-        buffer.copy_from_slice(slice)
-    }
-
     fn dyn_region_read<E: Elem, const LEN: usize>(
         region: &Self::DynRegion<LEN>,
         address: usize,
@@ -123,14 +114,6 @@ impl ManagerWrite for Owned {
         value: &[E],
     ) {
         region.copy_from_slice(value)
-    }
-
-    fn region_write_some<E: StaticCopy, const LEN: usize>(
-        region: &mut Self::Region<E, LEN>,
-        index: usize,
-        buffer: &[E],
-    ) {
-        region[index..][..buffer.len()].copy_from_slice(buffer)
     }
 
     fn dyn_region_write<E: Elem, const LEN: usize>(

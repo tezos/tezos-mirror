@@ -100,13 +100,6 @@ pub trait ManagerRead: ManagerBase {
     /// Read all elements in the region.
     fn region_read_all<E: Copy, const LEN: usize>(region: &Self::Region<E, LEN>) -> Vec<E>;
 
-    /// Read `buffer.len()` elements from the region, starting at `offset`.
-    fn region_read_some<E: Copy, const LEN: usize>(
-        region: &Self::Region<E, LEN>,
-        offset: usize,
-        buffer: &mut [E],
-    );
-
     /// Read an element in the region. `address` is in bytes.
     fn dyn_region_read<E: Elem, const LEN: usize>(
         region: &Self::DynRegion<LEN>,
@@ -132,13 +125,6 @@ pub trait ManagerWrite: ManagerBase {
 
     /// Update all elements in the region.
     fn region_write_all<E: Copy, const LEN: usize>(region: &mut Self::Region<E, LEN>, value: &[E]);
-
-    /// Update a subset of elements in the region starting at `index`.
-    fn region_write_some<E: Copy, const LEN: usize>(
-        region: &mut Self::Region<E, LEN>,
-        index: usize,
-        buffer: &[E],
-    );
 
     /// Update an element in the region. `address` is in bytes.
     fn dyn_region_write<E: Elem, const LEN: usize>(
@@ -245,14 +231,6 @@ impl<M: ManagerRead> ManagerRead for Ref<'_, M> {
 
     fn region_read_all<E: Copy, const LEN: usize>(region: &Self::Region<E, LEN>) -> Vec<E> {
         M::region_read_all(region)
-    }
-
-    fn region_read_some<E: Copy, const LEN: usize>(
-        region: &Self::Region<E, LEN>,
-        offset: usize,
-        buffer: &mut [E],
-    ) {
-        M::region_read_some(region, offset, buffer)
     }
 
     fn dyn_region_read<E: Elem, const LEN: usize>(

@@ -235,15 +235,6 @@ impl<E: Copy, const LEN: usize, M: ManagerBase> Cells<E, LEN, M> {
         M::region_read_all(&self.region)
     }
 
-    /// Read `buffer.len()` elements from the region, starting at `offset`.
-    #[inline]
-    pub fn read_some(&self, offset: usize, buffer: &mut [E])
-    where
-        M: ManagerRead,
-    {
-        M::region_read_some(&self.region, offset, buffer)
-    }
-
     /// Update an element in the region.
     #[inline]
     pub fn write(&mut self, index: usize, value: E)
@@ -260,15 +251,6 @@ impl<E: Copy, const LEN: usize, M: ManagerBase> Cells<E, LEN, M> {
         M: ManagerWrite,
     {
         M::region_write_all(&mut self.region, value)
-    }
-
-    /// Update a subset of elements in the region starting at `index`.
-    #[inline]
-    pub fn write_some(&mut self, index: usize, buffer: &[E])
-    where
-        M: ManagerWrite,
-    {
-        M::region_write_some(&mut self.region, index, buffer)
     }
 
     /// Update the element in the region and return the previous value.
@@ -640,17 +622,6 @@ pub(crate) mod tests {
 
         let buffer = bincode::serialize(&region.struct_ref()).unwrap();
         assert_eq!(buffer[..2], [74, 26]);
-
-        // Writing to sub-section must convert to stored format.
-
-        region.write_some(1, &[Flipper { a: 1, b: 2 }, Flipper { a: 3, b: 4 }]);
-
-        let mut buffer = [Flipper { a: 0, b: 0 }; 2];
-        region.read_some(1, &mut buffer);
-        assert_eq!(buffer, [Flipper { a: 1, b: 2 }, Flipper { a: 3, b: 4 }]);
-
-        let buffer = bincode::serialize(&region.struct_ref()).unwrap();
-        assert_eq!(buffer[2..6], [2, 1, 4, 3]);
 
         // Writing to the entire region must convert properly to stored format.
         region.write_all(&[
