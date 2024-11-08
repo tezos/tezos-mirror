@@ -32,10 +32,10 @@ docker-buildx:
   services:
     - docker:${DOCKER_VERSION}-dind
   before_script:
-    - ./scripts/docker_wait_for_daemon.sh
-    - ./scripts/docker_check_version.sh ${DOCKER_VERSION}
+    - ./scripts/ci/docker_wait_for_daemon.sh
+    - ./scripts/ci/docker_check_version.sh ${DOCKER_VERSION}
   script:
-    - ./scripts/build.sh
+    - ./images_base/ci-docker/scripts/build.sh
 
 include:
   - template: Security/Container-Scanning.gitlab-ci.yml
