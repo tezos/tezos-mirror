@@ -1,5 +1,5 @@
 Name: octez-dal-node
-Version: 0.0.1
+Version: 1.0.0
 Release: 1%{?dist}
 Summary: Octez distribution Availability Layer (DAL) node
 License: MIT
@@ -14,5 +14,16 @@ Suggests: octez-baker
 %install
 mkdir -p %{buildroot}/usr/bin/
 install -m 0755 $HOME/rpmbuild/SPECS/binaries/octez-dal-node %{buildroot}/usr/bin/
+install -D -m 644 $HOME/rpmbuild/SPECS/manpages/octez-dal-node.1 %{buildroot}%{_mandir}/man1/octez-dal-node.1
+gzip %{buildroot}%{_mandir}/man1/octez-dal-node.1
+install -D -m 644 $HOME/rpmbuild/SPECS/octez-dal-node.service %{buildroot}/usr/lib/systemd/system/octez-dal-node.service
+install -D -m 644  $HOME/rpmbuild/SPECS/octez-dal-node.default %{buildroot}/etc/default/octez-dal-node
 %files
+%exclude /usr/lib/.build-id
 /usr/bin/octez-dal-node
+%{_mandir}/man1/octez-dal-node.1*
+/usr/lib/systemd/system/octez-dal-node.service
+/etc/default/octez-dal-node
+%postun
+%post
+%preun
