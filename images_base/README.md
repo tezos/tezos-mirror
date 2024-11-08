@@ -14,3 +14,9 @@ Note that
 contains a third image,
 [ci-package](https://gitlab.com/tezos/docker-images/ci-package). This
 image appears unused in this repository's CI.
+
+
+## [ci-docker]
+
+- Pipeline defined in [./.gitlab-ci.yml] is created when commit is pushed to `ci-docker-latest-release`.
+- At this stage, the pipeline will fail: imported files from `tezos/docker-images/ci-docker` are not adapted yet.
