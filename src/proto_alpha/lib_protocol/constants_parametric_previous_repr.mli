@@ -4,6 +4,7 @@
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2020-2021 Nomadic Labs <contact@nomadic-labs.com>           *)
 (* Copyright (c) 2021-2022 Trili Tech, <contact@trili.tech>                  *)
+(* Copyright (c) 2023 Marigold, <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -231,7 +232,15 @@ type t = {
 
 val encoding : t Data_encoding.encoding
 
-val update_sc_rollup_parameter : block_time:int -> sc_rollup -> sc_rollup
+(** [update_sc_rollup_parameter ratio_f c] updates the smart rollups constants
+    expressed in number of blocks (e.g., [commitment_period_in_blocks]) to
+    preserve their average duration with a new block time.
+
+    This function is primilarly intended to be used by the [Init_storage]
+    module. [ratio_f] is a function used to compute the new constants. For
+    instance, if the block time is multiplied by 4/5, then the constant should
+    be multiplied by 5/4. *)
+val update_sc_rollup_parameter : (int32 -> int32) -> sc_rollup -> sc_rollup
 
 module Internal_for_tests : sig
   val sc_rollup_encoding : sc_rollup Data_encoding.t

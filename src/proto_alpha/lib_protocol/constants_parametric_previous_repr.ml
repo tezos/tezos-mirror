@@ -743,17 +743,29 @@ let encoding =
                             adaptive_issuance_encoding
                             (obj1 (req "direct_ticket_spending_enable" bool))))))))))
 
-let update_sc_rollup_parameter ~block_time c =
-  let seconds_in_a_day = 60 * 60 * 24 in
-  let seconds_in_a_week = seconds_in_a_day * 7 in
+let update_sc_rollup_parameter ratio_i32 c =
+  (* Constants remain small enough to fit in [int32] after update (as a
+     reminder, a Tezos level is encoded in a signed 32-byte integer). *)
+  let ratio_int x = Int32.of_int x |> ratio_i32 |> Int32.to_int in
   {
-    c with
-    challenge_window_in_blocks = seconds_in_a_week * 2 / block_time;
-    (* Same as challenge_window_in_blocks *)
-    max_active_outbox_levels = Int32.of_int (seconds_in_a_week * 2 / block_time);
-    commitment_period_in_blocks = 60 * 15 / block_time;
-    max_lookahead_in_blocks = Int32.of_int (seconds_in_a_day * 30 / block_time);
-    timeout_period_in_blocks = seconds_in_a_week / block_time;
+    (* Constants expressed in number of blocks *)
+    challenge_window_in_blocks = ratio_int c.challenge_window_in_blocks;
+    max_active_outbox_levels = ratio_i32 c.max_active_outbox_levels;
+    commitment_period_in_blocks = ratio_int c.commitment_period_in_blocks;
+    max_lookahead_in_blocks = ratio_i32 c.max_lookahead_in_blocks;
+    timeout_period_in_blocks = ratio_int c.timeout_period_in_blocks;
+    (* Other constants *)
+    max_outbox_messages_per_level = c.max_outbox_messages_per_level;
+    arith_pvm_enable = c.arith_pvm_enable;
+    origination_size = c.origination_size;
+    stake_amount = c.stake_amount;
+    number_of_sections_in_dissection = c.number_of_sections_in_dissection;
+    max_number_of_stored_cemented_commitments =
+      c.max_number_of_stored_cemented_commitments;
+    max_number_of_parallel_games = c.max_number_of_parallel_games;
+    reveal_activation_level = c.reveal_activation_level;
+    private_enable = c.private_enable;
+    riscv_pvm_enable = c.riscv_pvm_enable;
   }
 
 module Internal_for_tests = struct
