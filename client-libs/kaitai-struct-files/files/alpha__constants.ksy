@@ -387,3 +387,6 @@ seq:
 - id: allow_tz4_delegate_enable
   type: u1
   enum: bool
+- id: all_bakers_attest_enable
+  type: u1
+  enum: bool
