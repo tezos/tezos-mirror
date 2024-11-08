@@ -16,7 +16,7 @@
 #![no_std]
 
 // If 'std' is on, pull in the standard library.
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", all(target_arch = "riscv64", target_os = "hermit")))]
 extern crate std;
 
 extern crate alloc;
@@ -46,15 +46,15 @@ pub fn panic_handler(info: &PanicHookArg) {
             alloc::format!("Kernel panic {:?} at {:?}", message, info.location())
         };
 
-        #[cfg(any(target_arch = "wasm32", target_arch = "riscv64"))]
+        #[cfg(target_arch = "wasm32")]
         unsafe {
-            tezos_smart_rollup_core::smart_rollup_core::write_debug(
+            tezos_smart_rollup_core::target_impl::write_debug(
                 message.as_ptr(),
                 message.len(),
             );
         }
 
-        #[cfg(all(feature = "std", not(target_arch = "wasm32")))]
+        #[cfg(any(feature = "std", all(target_arch = "riscv64", target_os = "hermit")))]
         std::eprintln!("{}", message);
     }
 

@@ -13,10 +13,14 @@ pub mod smart_rollup_core;
 
 #[cfg(target_arch = "wasm32")]
 #[path = "wasm_target.rs"]
-mod target_impl;
+#[doc(hidden)]
+// The WebAssembly target implementation is exposed because the panic hook needs access to
+// `write_debug`.
+pub mod target_impl;
 
 #[cfg(all(target_arch = "riscv64", target_os = "hermit", feature = "proto-alpha"))]
 #[path = "riscv_hermit_target.rs"]
+#[doc(hidden)]
 mod target_impl;
 
 #[cfg(not(any(
@@ -24,6 +28,7 @@ mod target_impl;
     all(target_arch = "riscv64", target_os = "hermit", feature = "proto-alpha")
 )))]
 #[path = "fallback_target.rs"]
+#[doc(hidden)]
 mod target_impl;
 
 pub use smart_rollup_core::SmartRollupCore;
