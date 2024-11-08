@@ -46,7 +46,7 @@ container_scanning:
   services:
     - docker:${DOCKER_VERSION}-dind
   before_script:
-    - ./scripts/tag.sh
+    - ./images_base/ci-docker/scripts/tag.sh
     # - ./scripts/docker_registry_auth.sh
   variables:
     GIT_STRATEGY: fetch
