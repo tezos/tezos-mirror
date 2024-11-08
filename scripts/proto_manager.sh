@@ -824,7 +824,7 @@ function update_source() {
     git add "teztale/bin_teztale_archiver/${label}_machine.real.ml"
     sed -e "s/${protocol_source}/${label}/g" -i.old "teztale/bin_teztale_archiver/${label}_machine.real.ml"
     sed -e "s/${protocol_source}/${version}/g" \
-      -e "s/${capitalized_source}/${short_hash}/g" -i.old "teztale/bin_teztale_archiver/teztale_archiver_main.ml"
+      -e "s/${capitalized_source}/${capitalized_label}/g" -i.old "teztale/bin_teztale_archiver/teztale_archiver_main.ml"
     ocamlformat -i "teztale/bin_teztale_archiver/${label}_machine.real.ml"
   fi
   ocamlformat -i "teztale/bin_teztale_archiver/teztale_archiver_main.ml"
