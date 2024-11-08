@@ -992,6 +992,12 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
         return (result, None)
     (* Start of Alpha stitching. Comment used for automatic snapshot *)
     | Alpha ->
+        (*
+            FIXME chain_id is used for Q to Alpha migration and nomore after.
+            We ignored for automatic stabilisation, should it be removed in
+            Beta?
+        *)
+        ignore chain_id ;
         let module Previous = Constants_parametric_repr in
         let* c = get_constants ctxt in
         let dal =
