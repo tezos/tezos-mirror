@@ -830,6 +830,13 @@ function update_source() {
   ocamlformat -i "teztale/bin_teztale_archiver/teztale_archiver_main.ml"
   commit_if_changes "teztale: update teztale_archiver_main.ml"
 
+  if [[ ${is_snapshot} == false ]]; then
+    log_blue "update proto_alpha constants_parametric_previous_repr.ml"
+    # Previous parametrics constants are the same in Alpha and Beta, so it is correct to just replace the Alpha previous one by the Alpha current one
+    cp src/proto_alpha/lib_protocol/constants_parametric_repr.ml src/proto_alpha/lib_protocol/constants_parametric_previous_repr.ml
+    cp src/proto_alpha/lib_protocol/constants_parametric_repr.mli src/proto_alpha/lib_protocol/constants_parametric_previous_repr.mli
+  fi
+
   log_blue "update raw_context.ml"
   # add  "else if Compare.String.(s = "$label") then return ($capitalized_label, ctxt)" before else Lwt.return @@ storage_error (Incompatible_protocol_version s)
   #sed "/else Lwt.return @@ storage_error (Incompatible_protocol_version s)/i \  else if Compare.String.(s = \"${label}\") then return (${capitalized_label}, ctxt)" -i.old "src/proto_${protocol_source}/lib_protocol/raw_context.ml"
