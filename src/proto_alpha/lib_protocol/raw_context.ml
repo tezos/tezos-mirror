@@ -911,7 +911,7 @@ let check_and_update_protocol_version ctxt =
   return (previous_proto, ctxt)
 
 (* only for the migration *)
-let[@warning "-32"] get_previous_protocol_constants ctxt =
+let get_previous_protocol_constants ctxt =
   let open Lwt_syntax in
   let* bytes_opt = Context.find ctxt constants_key in
   match bytes_opt with
