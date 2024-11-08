@@ -10,7 +10,7 @@ set -x
 ./images_base/ci-docker/scripts/docker_registry_auth.sh
 
 ## Build multi-arch Docker image
-gitlab="${CI_REGISTRY_IMAGE}:${DOCKER_IMAGE_TAG}"
+gitlab="${CONTAINER_NAME}:${DOCKER_IMAGE_TAG}"
 gcp="${GCP_ARTIFACT_REGISTRY_IMAGE}:${DOCKER_IMAGE_TAG}"
 
 # Cross-platform emulator collection

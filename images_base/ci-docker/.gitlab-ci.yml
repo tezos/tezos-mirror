@@ -13,11 +13,12 @@ stages:
 variables:
   HADOLINT_VERSION: 2.10.0
   BINFMT_VERSION: 6.2.0-26
-  GCP_ARTIFACT_REGISTRY_IMAGE: "${GCP_REGISTRY}/${CI_PROJECT_PATH}"
-  CONTAINER_NAME: "registry.gitlab.com/${CI_PROJECT_PATH}/${CI_PROJECT_NAME}"
+  IMAGE_NAME: "ci-docker" # TODO should be ci/base after more integration work is done
+  GCP_ARTIFACT_REGISTRY_IMAGE: "${GCP_REGISTRY}/${CI_PROJECT_PATH}/${IMAGE_NAME}"
+  CONTAINER_NAME: "${CI_REGISTRY_IMAGE}/${IMAGE_NAME}"
   # Version of the docker to use, docker daemon and client must have the same
   DOCKER_VERSION: "24.0.7"
-  GCP_PROTECTED_ARTIFACT_REGISTRY_IMAGE: "${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_PATH}"
+  GCP_PROTECTED_ARTIFACT_REGISTRY_IMAGE: "${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_PATH}/${IMAGE_NAME}"
 
 hadolint:
   stage: lint
