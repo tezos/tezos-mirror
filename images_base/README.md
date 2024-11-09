@@ -19,4 +19,9 @@ image appears unused in this repository's CI.
 ## [ci-docker]
 
 - Pipeline defined in [./.gitlab-ci.yml] is created when commit is pushed to `ci-docker-latest-release`.
-- At this stage, the pipeline will fail: imported files from `tezos/docker-images/ci-docker` are not adapted yet.
+- At this stage, the pipeline will succeed and build and push `ci-docker` images to the GCP and GitLab registries.
+```
+docker image pull us-central1-docker.pkg.dev/nl-gitlab-runner/registry/tezos/tezos/ci-docker:branch-ci-docker-latest-release
+docker image pull registry.gitlab.com/tezos/tezos/ci-docker:branch-ci-docker-latest-release
+```
+- However these images are not yet used in the regular CI pipelines.
