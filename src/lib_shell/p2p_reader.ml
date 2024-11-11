@@ -192,13 +192,14 @@ let handle_msg state msg =
             current_head
             seed
           [@profiler.span_s
-            ["Get_current_branch"; "compute_current_branch_locator"]])
+            {verbosity = Info}
+              ["Get_current_branch"; "compute_current_branch_locator"]])
        in
        Peer_metadata.update_responses meta Branch
        @@ P2p.try_send state.p2p state.conn
        @@ Current_branch (chain_id, locator) ;
        Lwt.return_unit)
-      [@profiler.span_s ["Get_current_branch"]]
+      [@profiler.span_s {verbosity = Notice} ["Get_current_branch"]]
   | Current_branch (chain_id, locator) -> (
       (may_handle state chain_id @@ fun chain_db ->
       let {Block_locator.head_hash; head_header; history} = locator in
@@ -228,13 +229,13 @@ let handle_msg state msg =
            and responses? *)
         Peer_metadata.incr meta @@ Received_advertisement Branch ;
         Lwt.return_unit))
-      [@profiler.span_s ["Current_branch"]])
+      [@profiler.span_s {verbosity = Notice} ["Current_branch"]])
   | Deactivate chain_id -> (
       (may_handle state chain_id @@ fun chain_db ->
       deactivate state.gid chain_db ;
       Chain_id.Table.remove state.peer_active_chains chain_id ;
       Lwt.return_unit)
-      [@profiler.span_s ["Deactivate"]])
+      [@profiler.span_s {verbosity = Notice} ["Deactivate"]])
   | Get_current_head chain_id -> (
       (may_handle state chain_id @@ fun chain_db ->
       Peer_metadata.incr meta @@ Received_request Head ;
@@ -252,7 +253,7 @@ let handle_msg state msg =
       @@ P2p.try_send state.p2p state.conn
       @@ Current_head (chain_id, head, mempool) ;
       Lwt.return_unit)
-      [@profiler.span_s ["Get_current_head"]])
+      [@profiler.span_s {verbosity = Notice} ["Get_current_head"]])
   | Current_head (chain_id, header, mempool) -> (
       (may_handle state chain_id @@ fun chain_db ->
       let header_hash = Block_header.hash header in
@@ -288,7 +289,7 @@ let handle_msg state msg =
            and responses? *)
         Peer_metadata.incr meta @@ Received_advertisement Head ;
         Lwt.return_unit))
-      [@profiler.span_s ["Current_head"]])
+      [@profiler.span_s {verbosity = Notice} ["Current_head"]])
   | Get_block_headers hashes ->
       (Peer_metadata.incr meta @@ Received_request Block_header ;
        List.iter_p
@@ -304,7 +305,7 @@ let handle_msg state msg =
                @@ Block_header header ;
                Lwt.return_unit)
          hashes)
-      [@profiler.span_s ["Get_block_headers"]]
+      [@profiler.span_s {verbosity = Notice} ["Get_block_headers"]]
   | Block_header block -> (
       (let hash = Block_header.hash block in
        match find_pending_block_header state hash with
@@ -321,7 +322,7 @@ let handle_msg state msg =
            in
            Peer_metadata.incr meta @@ Received_response Block_header ;
            Lwt.return_unit)
-      [@profiler.span_s ["Block_header"]])
+      [@profiler.span_s {verbosity = Notice} ["Block_header"]])
   | Get_operations hashes ->
       (Peer_metadata.incr meta @@ Received_request Operations ;
        List.iter_p
@@ -338,8 +339,9 @@ let handle_msg state msg =
                Lwt.return_unit)
          hashes
        [@profiler.span_s
-         ["Get_operations"; P2p_peer_id.to_short_b58check state.gid]])
-      [@profiler.span_s ["Get_operations"]]
+         {verbosity = Info}
+           ["Get_operations"; P2p_peer_id.to_short_b58check state.gid]])
+      [@profiler.span_s {verbosity = Notice} ["Get_operations"]]
   | Operation operation -> (
       (let hash = Operation.hash operation in
        let[@warning "-26"] operation_type =
@@ -348,14 +350,17 @@ let handle_msg state msg =
          | 0x15 -> "attestation"
          | _ -> "other"
        in
-       match[@profiler.span_s ["Operation"; operation_type]]
+       match[@profiler.span_s {verbosity = Info} ["Operation"; operation_type]]
          find_pending_operation
            state
            hash
          [@profiler.span_f
-           [
-             "Operation"; operation_type; P2p_peer_id.to_short_b58check state.gid;
-           ]]
+           {verbosity = Debug}
+             [
+               "Operation";
+               operation_type;
+               P2p_peer_id.to_short_b58check state.gid;
+             ]]
        with
        | None ->
            Peer_metadata.incr meta Unexpected_response ;
@@ -370,7 +375,7 @@ let handle_msg state msg =
            in
            Peer_metadata.incr meta @@ Received_response Operations ;
            Lwt.return_unit)
-      [@profiler.span_s ["Operation"]])
+      [@profiler.span_s {verbosity = Notice} ["Operation"]])
   | Get_protocols hashes ->
       (Peer_metadata.incr meta @@ Received_request Protocols ;
        List.iter_p
@@ -386,7 +391,7 @@ let handle_msg state msg =
                @@ Protocol p ;
                Lwt.return_unit)
          hashes)
-      [@profiler.span_s ["Get_protocols"]]
+      [@profiler.span_s {verbosity = Notice} ["Get_protocols"]]
   | Protocol protocol ->
       (let hash = Protocol.hash protocol in
        let* () =
@@ -398,7 +403,7 @@ let handle_msg state msg =
        in
        Peer_metadata.incr meta @@ Received_response Protocols ;
        Lwt.return_unit)
-      [@profiler.span_s ["Protocol"]]
+      [@profiler.span_s {verbosity = Notice} ["Protocol"]]
   | Get_operations_for_blocks blocks ->
       (Peer_metadata.incr meta @@ Received_request Operations_for_block ;
        List.iter_p
@@ -413,9 +418,9 @@ let handle_msg state msg =
                @@ Operations_for_block (hash, ofs, ops, path) ;
                Lwt.return_unit)
          blocks)
-      [@profiler.span_s ["Get_operations_for_blocks"]]
+      [@profiler.span_s {verbosity = Notice} ["Get_operations_for_blocks"]]
   | Operations_for_block (block, ofs, ops, path) -> (
-      match[@profiler.span_s ["Operations_for_block"]]
+      match[@profiler.span_s {verbosity = Notice} ["Operations_for_block"]]
         find_pending_operations state block ofs
       with
       | None ->
@@ -446,13 +451,13 @@ let handle_msg state msg =
            @@ P2p.try_send state.p2p state.conn
            @@ Checkpoint (chain_id, checkpoint_header) ;
            Lwt.return_unit)
-      [@profiler.span_s ["Get_checkpoint"]])
+      [@profiler.span_s {verbosity = Notice} ["Get_checkpoint"]])
   | Checkpoint _ ->
       (* This message is currently unused: it will be used for future
          bootstrap heuristics. *)
       (Peer_metadata.incr meta @@ Received_response Checkpoint ;
        Lwt.return_unit)
-      [@profiler.span_s ["Checkpoint"]]
+      [@profiler.span_s {verbosity = Notice} ["Checkpoint"]]
   | Get_protocol_branch (chain_id, proto_level) -> (
       (Peer_metadata.incr meta @@ Received_request Protocol_branch ;
        may_handle_global state chain_id @@ fun chain_db ->
@@ -473,13 +478,13 @@ let handle_msg state msg =
            @@ Protocol_branch (chain_id, proto_level, locator) ;
            Lwt.return_unit
        | None -> Lwt.return_unit)
-      [@profiler.span_s ["Get_protocol_branch"]])
+      [@profiler.span_s {verbosity = Notice} ["Get_protocol_branch"]])
   | Protocol_branch (_chain, _proto_level, _locator) ->
       (* This message is currently unused: it will be used for future
          multipass. *)
       (Peer_metadata.incr meta @@ Received_response Protocol_branch ;
        Lwt.return_unit)
-      [@profiler.span_s ["Protocol_branch"]]
+      [@profiler.span_s {verbosity = Notice} ["Protocol_branch"]]
   | Get_predecessor_header (block_hash, offset) -> (
       (Peer_metadata.incr meta @@ Received_request Predecessor_header ;
        let* o = read_predecessor_header state block_hash offset in
@@ -494,13 +499,13 @@ let handle_msg state msg =
            @@ P2p.try_send state.p2p state.conn
            @@ Predecessor_header (block_hash, offset, header) ;
            Lwt.return_unit)
-      [@profiler.span_s ["Get_predecessor_header"]])
+      [@profiler.span_s {verbosity = Notice} ["Get_predecessor_header"]])
   | Predecessor_header (_block_hash, _offset, _header) ->
       (* This message is currently unused: it will be used to improve
          bootstrapping. *)
       (Peer_metadata.incr meta @@ Received_response Predecessor_header ;
        Lwt.return_unit)
-      [@profiler.span_s ["Predecessor_header"]]
+      [@profiler.span_s {verbosity = Notice} ["Predecessor_header"]]
 
 let rec worker_loop state =
   let open Lwt_syntax in
@@ -520,7 +525,7 @@ let rec worker_loop state =
 
 let run ~register ~unregister p2p disk protocol_db active_chains gid conn =
   if not !profiler_init then (
-    () [@profiler.record "start"] ;
+    () [@profiler.record {verbosity = Notice} "start"] ;
     profiler_init := true) ;
   let canceler = Lwt_canceler.create () in
   let state =
