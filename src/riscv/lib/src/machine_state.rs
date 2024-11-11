@@ -92,7 +92,7 @@ pub struct MachineState<
 > {
     pub core: MachineCoreState<ML, M>,
     pub instruction_cache: InstructionCache<CL::InstructionCacheLayout, M>,
-    pub block_cache: BlockCache<CL::BlockCacheLayout, M>,
+    pub block_cache: BlockCache<CL::BlockCacheLayout, ML, M>,
 }
 
 impl<ML: main_memory::MainMemoryLayout, CL: CacheLayouts, M: backend::ManagerClone> Clone
