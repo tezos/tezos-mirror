@@ -223,7 +223,7 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::ManagerBase> MachineCoreStat
     /// Reset the machine state.
     pub fn reset(&mut self)
     where
-        M: backend::ManagerWrite,
+        M: backend::ManagerReadWrite,
     {
         self.hart.reset(main_memory::FIRST_ADDRESS);
         self.main_memory.reset();
@@ -268,7 +268,7 @@ impl<ML: main_memory::MainMemoryLayout, CL: CacheLayouts, M: backend::ManagerBas
     /// Reset the machine state.
     pub fn reset(&mut self)
     where
-        M: backend::ManagerWrite,
+        M: backend::ManagerReadWrite,
     {
         self.core.reset();
         self.instruction_cache.reset();

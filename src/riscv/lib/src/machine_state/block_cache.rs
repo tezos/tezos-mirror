@@ -70,6 +70,12 @@
 //!
 //! Since we now guarantee that we always execute the _same_ set of instructions,
 //! no matter how many steps are remaining, we solve this possible divergence.
+//!
+//! # Dispatch
+//!
+//! The block cache uses the [`EnrichedCell`] mechanism, in order to dispatch
+//! opcode to function statically during block construction. This saves time over
+//! dispatching on every 'instruction run'. See [`ICall`] for more information.
 
 use super::address_translation::PAGE_OFFSET_WIDTH;
 use super::bus::main_memory::MainMemoryLayout;
@@ -80,9 +86,10 @@ use super::{bus::main_memory::Address, ProgramCounterUpdate};
 use crate::cache_utils::FenceCounter;
 use crate::cache_utils::Sizes;
 use crate::default::ConstDefault;
+use crate::machine_state::instruction::Args;
 use crate::state_backend::{
-    self, AllocatedOf, Atom, Cell, ManagerAlloc, ManagerBase, ManagerClone, ManagerRead,
-    ManagerReadWrite, ManagerWrite, Ref,
+    self, AllocatedOf, Atom, Cell, EnrichedCell, EnrichedValue, ManagerBase, ManagerClone,
+    ManagerRead, ManagerReadWrite, ManagerWrite, Ref,
 };
 use crate::traps::{EnvironException, Exception};
 use std::marker::PhantomData;
@@ -94,14 +101,63 @@ const PAGE_OFFSET_MASK: usize = (1 << PAGE_OFFSET_WIDTH) - 1;
 /// The maximum number of instructions that may be contained in a block.
 const CACHE_INSTR: usize = 20;
 
-/// Temporary capture used to require ML in block cache layouts
-#[repr(transparent)]
-pub struct MLCapture<ML: MainMemoryLayout>(PhantomData<ML>);
+/// Layout for an [`ICallPlaced`].
+pub struct ICallLayout<ML: MainMemoryLayout> {
+    _pd: PhantomData<ML>,
+}
 
-impl<ML: MainMemoryLayout> state_backend::Layout for MLCapture<ML> {
-    type Allocated<M: ManagerBase> = ();
+impl<ML: MainMemoryLayout> crate::state_backend::Layout for ICallLayout<ML> {
+    type Allocated<M: state_backend::ManagerBase> = EnrichedCell<ICallPlaced<ML>, M>;
 
-    fn allocate<M: ManagerAlloc>(_backend: &mut M) -> Self::Allocated<M> {}
+    fn allocate<M: state_backend::ManagerAlloc>(backend: &mut M) -> Self::Allocated<M> {
+        let value = backend.allocate_enriched_cell(Instruction::DEFAULT);
+        EnrichedCell::bind(value)
+    }
+}
+
+/// Bindings for deriving an [`ICall`] from an [`Instruction`] via the [`EnrichedCell`] mechanism.
+pub struct ICallPlaced<ML: MainMemoryLayout> {
+    _pd: PhantomData<ML>,
+}
+
+impl<ML: MainMemoryLayout> EnrichedValue for ICallPlaced<ML> {
+    type E = Instruction;
+
+    type D<M: ManagerBase> = ICall<ML, M>;
+}
+
+/// A function derived from an [`OpCode`] that can be directly run over the [`MachineCoreState`].
+///
+/// This allows static dispatch of this function during block construction,
+/// rather than for each instruction, during each block execution.
+pub struct ICall<ML: MainMemoryLayout, M: ManagerBase> {
+    run_instr: fn(&Args, &mut MachineCoreState<ML, M>) -> Result<ProgramCounterUpdate, Exception>,
+}
+
+impl<ML: MainMemoryLayout, M: ManagerBase> Clone for ICall<ML, M> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<ML: MainMemoryLayout, M: ManagerBase> Copy for ICall<ML, M> {}
+
+impl<ML: MainMemoryLayout, M: ManagerReadWrite> ICall<ML, M> {
+    #[inline(always)]
+    fn run(
+        &self,
+        args: &Args,
+        core: &mut MachineCoreState<ML, M>,
+    ) -> Result<ProgramCounterUpdate, Exception> {
+        (self.run_instr)(args, core)
+    }
+}
+
+impl<'a, ML: MainMemoryLayout, M: ManagerReadWrite> From<&'a Instruction> for ICall<ML, M> {
+    fn from(value: &'a Instruction) -> Self {
+        let run_instr = value.opcode.to_run::<ML, M>();
+        Self { run_instr }
+    }
 }
 
 /// Layout for an address cell
@@ -120,8 +176,7 @@ pub type CachedLayout<ML> = (
     AddressCellLayout,
     Atom<FenceCounter>,
     Atom<u8>,
-    [Atom<Instruction>; CACHE_INSTR],
-    MLCapture<ML>,
+    [ICallLayout<ML>; CACHE_INSTR],
 );
 
 /// Block cache entry.
@@ -132,8 +187,7 @@ pub struct Cached<ML: MainMemoryLayout, M: ManagerBase> {
     address: Cell<Address, M>,
     fence_counter: Cell<FenceCounter, M>,
     len_instr: Cell<u8, M>,
-    instr: [Cell<Instruction, M>; CACHE_INSTR],
-    _pd: PhantomData<ML>,
+    instr: [EnrichedCell<ICallPlaced<ML>, M>; CACHE_INSTR],
 }
 
 impl<ML: MainMemoryLayout, M: ManagerBase> Cached<ML, M> {
@@ -143,7 +197,6 @@ impl<ML: MainMemoryLayout, M: ManagerBase> Cached<ML, M> {
             fence_counter: space.1,
             len_instr: space.2,
             instr: space.3,
-            _pd: PhantomData,
         }
     }
 
@@ -157,7 +210,7 @@ impl<ML: MainMemoryLayout, M: ManagerBase> Cached<ML, M> {
 
     fn reset(&mut self)
     where
-        M: ManagerWrite,
+        M: ManagerReadWrite,
     {
         self.address.write(!0);
         self.fence_counter.write(FenceCounter::INITIAL);
@@ -182,7 +235,6 @@ impl<ML: MainMemoryLayout, M: ManagerBase> Cached<ML, M> {
     {
         Block {
             instr: &mut self.instr[..self.len_instr.read() as usize],
-            _pd: PhantomData,
         }
     }
 
@@ -191,8 +243,7 @@ impl<ML: MainMemoryLayout, M: ManagerBase> Cached<ML, M> {
             self.address.struct_ref(),
             self.fence_counter.struct_ref(),
             self.len_instr.struct_ref(),
-            self.instr.each_ref().map(Cell::struct_ref),
-            (),
+            self.instr.each_ref().map(EnrichedCell::struct_ref),
         )
     }
 }
@@ -204,7 +255,6 @@ impl<ML: MainMemoryLayout, M: ManagerClone> Clone for Cached<ML, M> {
             fence_counter: self.fence_counter.clone(),
             len_instr: self.len_instr.clone(),
             instr: self.instr.clone(),
-            _pd: PhantomData,
         }
     }
 }
@@ -298,7 +348,7 @@ pub trait BlockCacheLayout: state_backend::Layout {
         phys_addr: Address,
     ) -> &mut Cached<Self::MainMemoryLayout, M>;
 
-    fn entries_reset<M: ManagerWrite>(entries: &mut Self::Entries<M>);
+    fn entries_reset<M: ManagerReadWrite>(entries: &mut Self::Entries<M>);
 
     fn struct_ref<M: ManagerBase>(
         cache: &BlockCache<Self, Self::MainMemoryLayout, M>,
@@ -357,7 +407,7 @@ impl<ML: MainMemoryLayout, const BITS: usize, const SIZE: usize> BlockCacheLayou
         &mut entries[Self::Sizes::cache_index(phys_addr)]
     }
 
-    fn entries_reset<M: ManagerWrite>(entries: &mut Self::Entries<M>) {
+    fn entries_reset<M: ManagerReadWrite>(entries: &mut Self::Entries<M>) {
         entries.iter_mut().for_each(Cached::reset)
     }
 
@@ -419,7 +469,7 @@ impl<BCL: BlockCacheLayout<MainMemoryLayout = ML>, ML: MainMemoryLayout, M: Mana
     /// Reset the underlying storage.
     pub fn reset(&mut self)
     where
-        M: ManagerWrite,
+        M: ManagerReadWrite,
     {
         self.fence_counter.write(FenceCounter::INITIAL);
         self.reset_to(!0);
@@ -515,7 +565,7 @@ impl<BCL: BlockCacheLayout<MainMemoryLayout = ML>, ML: MainMemoryLayout, M: Mana
                 // Need to resolve the adjacent block again because we may only keep one reference at a time
                 // to `self.entries`.
                 let new_block = BCL::entry(&self.entries, next_phys_addr);
-                let new_instr = new_block.instr[i].read();
+                let new_instr = new_block.instr[i].read_stored();
                 // Need to resolve the target block again because we may only keep one reference at a time
                 // to `self.entries`.
                 let current_entry = BCL::entry_mut(&mut self.entries, block_addr);
@@ -620,8 +670,8 @@ impl<BCL: BlockCacheLayout<MainMemoryLayout = ML>, ML: MainMemoryLayout, M: Mana
         let mut instr_pc = core.hart.pc.read();
 
         let range = progress as usize..entry.len_instr.read() as usize;
-        for i in entry.instr[range].iter() {
-            match i.as_ref().run(core) {
+        for instr in entry.instr[range].iter() {
+            match run_instr(instr, core) {
                 Ok(ProgramCounterUpdate::Next(width)) => {
                     instr_pc += width as u64;
                     core.hart.pc.write(instr_pc);
@@ -681,8 +731,7 @@ impl<BCL: BlockCacheLayout<MainMemoryLayout = ML>, ML: MainMemoryLayout, M: Mana
 
 /// A block fetched from the block cache, that can be executed against the machine state.
 pub struct Block<'a, ML: MainMemoryLayout, M: ManagerBase> {
-    instr: &'a mut [Cell<Instruction, M>],
-    _pd: PhantomData<ML>,
+    instr: &'a mut [EnrichedCell<ICallPlaced<ML>, M>],
 }
 
 impl<'a, ML: MainMemoryLayout, M: ManagerRead> Block<'a, ML, M> {
@@ -725,8 +774,8 @@ impl<'a, ML: MainMemoryLayout, M: ManagerRead> Block<'a, ML, M> {
     where
         M: ManagerReadWrite,
     {
-        for i in self.instr.iter() {
-            match i.as_ref().run(core) {
+        for instr in self.instr.iter() {
+            match run_instr(instr, core) {
                 Ok(ProgramCounterUpdate::Next(width)) => {
                     *instr_pc += width as u64;
                     core.hart.pc.write(*instr_pc);
@@ -756,8 +805,20 @@ impl<'a, ML: MainMemoryLayout, M: ManagerRead> Block<'a, ML, M> {
     where
         M: ManagerRead,
     {
-        self.instr.iter().map(|cell| cell.read()).collect()
+        self.instr.iter().map(|cell| cell.read_stored()).collect()
     }
+}
+
+#[inline(always)]
+fn run_instr<ML: MainMemoryLayout, M: ManagerReadWrite>(
+    instr: &EnrichedCell<ICallPlaced<ML>, M>,
+    core: &mut MachineCoreState<ML, M>,
+) -> Result<ProgramCounterUpdate, Exception> {
+    let instr = instr.read_ref();
+    let args = &instr.0.args;
+    let icall = &instr.1;
+
+    icall.run(args, core)
 }
 
 #[cfg(test)]
