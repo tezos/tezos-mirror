@@ -1155,6 +1155,7 @@ let job_build_kernels ?rules () : tezos_job =
       "make -f kernels.mk build";
       "make -f etherlink.mk evm_kernel.wasm";
       "make -C src/riscv riscv-sandbox riscv-dummy.elf";
+      "make -C src/riscv riscv-sandbox riscv-dummy-sdk.elf";
       "make -C src/riscv/tests/ build";
     ]
     ~artifacts:
@@ -1171,6 +1172,7 @@ let job_build_kernels ?rules () : tezos_job =
            "dal_echo_kernel.wasm";
            "src/riscv/riscv-sandbox";
            "src/riscv/riscv-dummy.elf";
+           "src/riscv/riscv-dummy-sdk.elf";
            "src/riscv/tests/inline_asm/rv64-inline-asm-tests";
          ])
   |> enable_kernels

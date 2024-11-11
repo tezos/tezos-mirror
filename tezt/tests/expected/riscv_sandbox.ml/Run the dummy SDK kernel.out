@@ -1,0 +1,16 @@
+
+./src/riscv/riscv-sandbox run --input src/riscv/assets/hermit-loader --initrd src/riscv/riscv-dummy-sdk.elf --max-steps 9223372036854775807 --inbox-file tezt/tests/riscv-tests/dummy-kernel-inbox.json --pvm
+[src/arch/riscv64/kernel/core_local.rs:38] CPU_ONLINE.load(Ordering::Relaxed) = 0
+[0][WARN] Unable to read entropy! Fallback to a naive implementation!
+Starting Dummy SDK Kernel
+Reveal metadata...
+Reveal metadata succeeded, result: 
+Rollup address: RollupMetadata { raw_rollup_address: [244, 228, 124, 179, 196, 58, 104, 176, 212, 142, 48, 148, 9, 44, 164, 45, 113, 58, 221, 181], origination_level: 0 }
+Reveal preimage...
+Reveal pre-image disabled, not supported
+Starting Dummy SDK Kernel
+Reveal metadata...
+Reveal metadata succeeded, result: 
+Rollup address: RollupMetadata { raw_rollup_address: [244, 228, 124, 179, 196, 58, 104, 176, 212, 142, 48, 148, 9, 44, 164, 45, 113, 58, 221, 181], origination_level: 0 }
+Reveal preimage...
+Reveal pre-image disabled, not supported

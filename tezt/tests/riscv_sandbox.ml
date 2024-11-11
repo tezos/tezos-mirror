@@ -36,6 +36,9 @@ let hermit_loader =
 
 let dummy_kernel = Uses.make ~tag:"riscv" ~path:"src/riscv/riscv-dummy.elf" ()
 
+let dummy_sdk_kernel =
+  Uses.make ~tag:"riscv" ~path:"src/riscv/riscv-dummy-sdk.elf" ()
+
 let dummy_kernel_inbox =
   Uses.make
     ~tag:"riscv"
@@ -58,6 +61,13 @@ let test_dummy_kernel_frozen () =
     ~initrd:dummy_kernel_frozen
     ~inbox:dummy_kernel_inbox
     ~print_steps:true
+    ()
+
+let test_dummy_sdk_kernel () =
+  Tezt_riscv_sandbox.run_pvm
+    ~input:hermit_loader
+    ~initrd:dummy_sdk_kernel
+    ~inbox:dummy_kernel_inbox
     ()
 
 let inline_asm_tests =
@@ -95,4 +105,13 @@ let register () =
     ~uses_node:false
     ~uses_client:false
     ~uses_admin_client:false
-    test_inline_asm
+    test_inline_asm ;
+  Regression.register
+    ~__FILE__
+    ~title:"Run the dummy SDK kernel"
+    ~tags:["riscv"; "sandbox"; "dummy_sdk"]
+    ~uses:[Tezt_riscv_sandbox.riscv_sandbox; dummy_sdk_kernel; hermit_loader]
+    ~uses_node:false
+    ~uses_client:false
+    ~uses_admin_client:false
+    test_dummy_sdk_kernel
