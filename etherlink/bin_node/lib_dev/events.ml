@@ -66,26 +66,34 @@ let catching_up_evm_event =
     ("to", Data_encoding.int32)
 
 let event_is_ready =
-  Internal_event.Simple.declare_3
+  Internal_event.Simple.declare_4
     ~section
     ~name:"is_ready"
-    ~msg:"the EVM node RPC server ({backend}) is listening to {addr}:{port}"
+    ~msg:
+      "the EVM node RPC server ({backend}) is listening to {addr}:{port} \
+       {websockets}"
     ~level:Notice
     ("addr", Data_encoding.string)
     ("port", Data_encoding.uint16)
     ("backend", Configuration.rpc_server_encoding)
+    ("websockets", Data_encoding.bool)
+    ~pp4:(fun fmt b ->
+      (if b then Format.fprintf else Format.ifprintf) fmt "(websockets enabled)")
 
 let event_private_server_is_ready =
-  declare_3
+  declare_4
     ~section
     ~name:"private_server_is_ready"
     ~msg:
       "the EVM node private RPC server ({backend}) is listening to \
-       {addr}:{port}"
+       {addr}:{port} {websockets}"
     ~level:Notice
     ("addr", Data_encoding.string)
     ("port", Data_encoding.uint16)
     ("backend", Configuration.rpc_server_encoding)
+    ("websockets", Data_encoding.bool)
+    ~pp4:(fun fmt b ->
+      (if b then Format.fprintf else Format.ifprintf) fmt "(websockets enabled)")
 
 let event_rpc_server_error =
   declare_1
@@ -259,11 +267,11 @@ let ignored_kernel_arg () = emit ignored_kernel_arg ()
 
 let catching_up_evm_event ~from ~to_ = emit catching_up_evm_event (from, to_)
 
-let is_ready ~rpc_addr ~rpc_port ~backend =
-  emit event_is_ready (rpc_addr, rpc_port, backend)
+let is_ready ~rpc_addr ~rpc_port ~websockets ~backend =
+  emit event_is_ready (rpc_addr, rpc_port, backend, websockets)
 
-let private_server_is_ready ~rpc_addr ~rpc_port ~backend =
-  emit event_private_server_is_ready (rpc_addr, rpc_port, backend)
+let private_server_is_ready ~rpc_addr ~rpc_port ~websockets ~backend =
+  emit event_private_server_is_ready (rpc_addr, rpc_port, backend, websockets)
 
 let rpc_server_error exn =
   emit__dont_wait__use_with_care event_rpc_server_error (Printexc.to_string exn)

@@ -139,6 +139,7 @@ let start_public_server ?delegate_health_check_to ?evm_services
       ~rpc_addr:config.public_rpc.addr
       ~rpc_port:config.public_rpc.port
       ~backend:config.experimental_features.rpc_server
+      ~websockets:config.experimental_features.enable_websocket
   in
   return finalizer
 
@@ -156,6 +157,7 @@ let start_private_server ?(block_production = `Disabled) config ctxt =
           ~rpc_addr:private_rpc.addr
           ~rpc_port:private_rpc.port
           ~backend:config.experimental_features.rpc_server
+          ~websockets:config.experimental_features.enable_websocket
       in
       return finalizer
   | None -> return (fun () -> Lwt_syntax.return_unit)
