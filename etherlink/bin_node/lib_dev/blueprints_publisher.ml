@@ -307,9 +307,17 @@ module Handlers = struct
 
   let on_close _self = Lwt.return_unit
 
-  let on_error (type a b) _self _st (_r : (a, b) Request.t) (_errs : b) :
+  let on_error (type a b) _w _st (r : (a, b) Request.t) (errs : b) :
       unit tzresult Lwt.t =
-    Lwt_result_syntax.return_unit
+    let open Lwt_result_syntax in
+    let request_view = Request.view r in
+    let emit_and_return_errors errs =
+      let*! () = Blueprint_events.worker_request_failed request_view errs in
+      fail errs
+    in
+    match r with
+    | Request.Publish _ -> emit_and_return_errors errs
+    | Request.New_rollup_node_block _ -> emit_and_return_errors errs
 end
 
 let table = Worker.create_table Queue

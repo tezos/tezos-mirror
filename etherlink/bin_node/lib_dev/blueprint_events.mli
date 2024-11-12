@@ -64,3 +64,8 @@ val blueprint_proposal :
     produced a blueprint for [level] in [duration] time. *)
 val blueprint_production :
   Ethereum_types.quantity -> Time.System.Span.t -> unit Lwt.t
+
+(** [worker_request_failed request_view state errs] warns that the
+    blueprints_publisher worker encountered errors [errs]. *)
+val worker_request_failed :
+  Blueprints_publisher_types.Request.view -> Error_monad.tztrace -> unit Lwt.t
