@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2024 TriliTech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
 
@@ -103,6 +104,12 @@ impl<T: RootHashable> RootHashable for &T {
 impl RootHashable for Hash {
     fn hash(&self) -> Result<Hash, HashError> {
         Ok(*self)
+    }
+}
+
+impl RootHashable for () {
+    fn hash(&self) -> Result<Hash, HashError> {
+        Hash::blake2b_hash(())
     }
 }
 

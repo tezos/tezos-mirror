@@ -77,7 +77,7 @@ use super::instruction_cache::ValidatedCacheEntry;
 use super::MachineCoreState;
 use super::{bus::Address, ProgramCounterUpdate};
 use crate::cache_utils::Sizes;
-use crate::state_backend::{self, ManagerClone};
+use crate::state_backend::{self, ManagerAlloc, ManagerClone};
 use crate::traps::EnvironException;
 use crate::{
     cache_utils::FenceCounter,
@@ -95,12 +95,23 @@ const PAGE_OFFSET_MASK: usize = (1 << PAGE_OFFSET_WIDTH) - 1;
 /// The maximum number of instructions that may be contained in a block.
 const CACHE_INSTR: usize = 20;
 
+/// Temporary capture used to require ML in block cache layouts
+#[repr(transparent)]
+pub struct MLCapture<ML: MainMemoryLayout>(PhantomData<ML>);
+
+impl<ML: MainMemoryLayout> state_backend::Layout for MLCapture<ML> {
+    type Allocated<M: ManagerBase> = ();
+
+    fn allocate<M: ManagerAlloc>(_backend: &mut M) -> Self::Allocated<M> {}
+}
+
 /// The layout of block cache entries, see [`Cached`] for more information.
-pub type CachedLayout = (
+pub type CachedLayout<ML> = (
     Atom<Address>,
     Atom<FenceCounter>,
     Atom<u8>,
     [Atom<InstrCacheable>; CACHE_INSTR],
+    MLCapture<ML>,
 );
 
 /// Block cache entry.
@@ -116,7 +127,7 @@ pub struct Cached<ML: MainMemoryLayout, M: ManagerBase> {
 }
 
 impl<ML: MainMemoryLayout, M: ManagerBase> Cached<ML, M> {
-    fn bind(space: AllocatedOf<CachedLayout, M>) -> Self {
+    fn bind(space: AllocatedOf<CachedLayout<ML>, M>) -> Self {
         Self {
             address: space.0,
             fence_counter: space.1,
@@ -165,12 +176,13 @@ impl<ML: MainMemoryLayout, M: ManagerBase> Cached<ML, M> {
         }
     }
 
-    fn struct_ref(&self) -> AllocatedOf<CachedLayout, Ref<'_, M>> {
+    fn struct_ref(&self) -> AllocatedOf<CachedLayout<ML>, Ref<'_, M>> {
         (
             self.address.struct_ref(),
             self.fence_counter.struct_ref(),
             self.len_instr.struct_ref(),
             self.instr.each_ref().map(Cell::struct_ref),
+            (),
         )
     }
 }
@@ -256,54 +268,58 @@ impl<M: ManagerBase> PartialBlock<M> {
 /// Trait for capturing the different possible layouts of the instruction cache (i.e.
 /// controlling the number of cache entries present).
 pub trait BlockCacheLayout: state_backend::Layout {
-    type Entries<ML: MainMemoryLayout, M: ManagerBase>;
+    type MainMemoryLayout: MainMemoryLayout;
+    type Entries<M: ManagerBase>;
     type Sizes;
 
-    fn bind<ML: MainMemoryLayout, M: state_backend::ManagerBase>(
+    fn bind<M: state_backend::ManagerBase>(
         space: state_backend::AllocatedOf<Self, M>,
-    ) -> BlockCache<Self, ML, M>
+    ) -> BlockCache<Self, Self::MainMemoryLayout, M>
     where
         Self: Sized;
 
-    fn entry<ML: MainMemoryLayout, M: ManagerBase>(
-        entries: &Self::Entries<ML, M>,
+    fn entry<M: ManagerBase>(
+        entries: &Self::Entries<M>,
         phys_addr: Address,
-    ) -> &Cached<ML, M>;
+    ) -> &Cached<Self::MainMemoryLayout, M>;
 
-    fn entry_mut<ML: MainMemoryLayout, M: ManagerBase>(
-        entries: &mut Self::Entries<ML, M>,
+    fn entry_mut<M: ManagerBase>(
+        entries: &mut Self::Entries<M>,
         phys_addr: Address,
-    ) -> &mut Cached<ML, M>;
+    ) -> &mut Cached<Self::MainMemoryLayout, M>;
 
-    fn entries_reset<ML: MainMemoryLayout, M: ManagerWrite>(entries: &mut Self::Entries<ML, M>);
+    fn entries_reset<M: ManagerWrite>(entries: &mut Self::Entries<M>);
 
-    fn struct_ref<ML: MainMemoryLayout, M: ManagerBase>(
-        cache: &BlockCache<Self, ML, M>,
+    fn struct_ref<M: ManagerBase>(
+        cache: &BlockCache<Self, Self::MainMemoryLayout, M>,
     ) -> AllocatedOf<Self, Ref<'_, M>>
     where
         Self: Sized;
 
-    fn clone_entries<ML: MainMemoryLayout, M: ManagerClone>(
-        entries: &Self::Entries<ML, M>,
-    ) -> Self::Entries<ML, M>;
+    fn clone_entries<M: ManagerClone>(entries: &Self::Entries<M>) -> Self::Entries<M>;
 }
 
 /// The layout of the block cache.
-pub type Layout<const BITS: usize, const SIZE: usize> = (
+pub type Layout<ML, const BITS: usize, const SIZE: usize> = (
     Atom<Address>,
     Atom<Address>,
     Atom<FenceCounter>,
     PartialBlockLayout,
-    Sizes<BITS, SIZE, CachedLayout>,
+    Sizes<BITS, SIZE, CachedLayout<ML>>,
 );
 
-impl<const BITS: usize, const SIZE: usize> BlockCacheLayout for Layout<BITS, SIZE> {
-    type Entries<ML: MainMemoryLayout, M: ManagerBase> = Box<[Cached<ML, M>; SIZE]>;
-    type Sizes = Sizes<BITS, SIZE, CachedLayout>;
+impl<ML: MainMemoryLayout, const BITS: usize, const SIZE: usize> BlockCacheLayout
+    for Layout<ML, BITS, SIZE>
+{
+    type MainMemoryLayout = ML;
 
-    fn bind<ML: MainMemoryLayout, M: ManagerBase>(
+    type Entries<M: ManagerBase> = Box<[Cached<ML, M>; SIZE]>;
+
+    type Sizes = Sizes<BITS, SIZE, CachedLayout<ML>>;
+
+    fn bind<M: ManagerBase>(
         space: AllocatedOf<Self, M>,
-    ) -> BlockCache<Self, ML, M> {
+    ) -> BlockCache<Self, Self::MainMemoryLayout, M> {
         BlockCache {
             current_block_addr: space.0,
             next_instr_addr: space.1,
@@ -320,25 +336,22 @@ impl<const BITS: usize, const SIZE: usize> BlockCacheLayout for Layout<BITS, SIZ
         }
     }
 
-    fn entry<ML: MainMemoryLayout, M: ManagerBase>(
-        entries: &Self::Entries<ML, M>,
-        phys_addr: Address,
-    ) -> &Cached<ML, M> {
+    fn entry<M: ManagerBase>(entries: &Self::Entries<M>, phys_addr: Address) -> &Cached<ML, M> {
         &entries[Self::Sizes::cache_index(phys_addr)]
     }
 
-    fn entry_mut<ML: MainMemoryLayout, M: ManagerBase>(
-        entries: &mut Self::Entries<ML, M>,
+    fn entry_mut<M: ManagerBase>(
+        entries: &mut Self::Entries<M>,
         phys_addr: Address,
     ) -> &mut Cached<ML, M> {
         &mut entries[Self::Sizes::cache_index(phys_addr)]
     }
 
-    fn entries_reset<ML: MainMemoryLayout, M: ManagerWrite>(entries: &mut Self::Entries<ML, M>) {
+    fn entries_reset<M: ManagerWrite>(entries: &mut Self::Entries<M>) {
         entries.iter_mut().for_each(Cached::reset)
     }
 
-    fn struct_ref<ML: MainMemoryLayout, M: ManagerBase>(
+    fn struct_ref<M: ManagerBase>(
         cache: &BlockCache<Self, ML, M>,
     ) -> AllocatedOf<Self, Ref<'_, M>> {
         (
@@ -350,9 +363,7 @@ impl<const BITS: usize, const SIZE: usize> BlockCacheLayout for Layout<BITS, SIZ
         )
     }
 
-    fn clone_entries<ML: MainMemoryLayout, M: ManagerClone>(
-        entries: &Self::Entries<ML, M>,
-    ) -> Self::Entries<ML, M> {
+    fn clone_entries<M: ManagerClone>(entries: &Self::Entries<M>) -> Self::Entries<M> {
         entries
             .to_vec()
             .try_into()
@@ -364,15 +375,21 @@ impl<const BITS: usize, const SIZE: usize> BlockCacheLayout for Layout<BITS, SIZ
 /// The block cache - caching sequences of instructions by physical address.
 ///
 /// The number of entries is controlled by the `BCL` layout parameter.
-pub struct BlockCache<BCL: BlockCacheLayout, ML: MainMemoryLayout, M: ManagerBase> {
+pub struct BlockCache<
+    BCL: BlockCacheLayout<MainMemoryLayout = ML>,
+    ML: MainMemoryLayout,
+    M: ManagerBase,
+> {
     current_block_addr: Cell<Address, M>,
     next_instr_addr: Cell<Address, M>,
     fence_counter: Cell<FenceCounter, M>,
     partial_block: PartialBlock<M>,
-    entries: BCL::Entries<ML, M>,
+    entries: BCL::Entries<M>,
 }
 
-impl<BCL: BlockCacheLayout, ML: MainMemoryLayout, M: ManagerBase> BlockCache<BCL, ML, M> {
+impl<BCL: BlockCacheLayout<MainMemoryLayout = ML>, ML: MainMemoryLayout, M: ManagerBase>
+    BlockCache<BCL, ML, M>
+{
     /// Bind the block cache to the given allocated state.
     pub fn bind(space: AllocatedOf<BCL, M>) -> Self {
         BCL::bind(space)
@@ -612,7 +629,7 @@ impl<BCL: BlockCacheLayout, ML: MainMemoryLayout, M: ManagerBase> BlockCache<BCL
     }
 }
 
-impl<BCL: BlockCacheLayout, ML: MainMemoryLayout, M: ManagerClone> Clone
+impl<BCL: BlockCacheLayout<MainMemoryLayout = ML>, ML: MainMemoryLayout, M: ManagerClone> Clone
     for BlockCache<BCL, ML, M>
 {
     fn clone(&self) -> Self {
@@ -728,11 +745,11 @@ mod tests {
         parser::instruction::{CIBTypeArgs, ITypeArgs, SBTypeArgs},
     };
 
-    pub type TestLayout = Layout<TEST_CACHE_BITS, TEST_CACHE_SIZE>;
+    pub type TestLayout<ML> = Layout<ML, TEST_CACHE_BITS, TEST_CACHE_SIZE>;
 
     // writing CACHE_INSTR to the block cache creates new block
     backend_test!(test_writing_full_block_fetchable_uncompressed, F, {
-        let mut state = create_state!(BlockCache, TestLayout, F, TestLayout, T1K);
+        let mut state = create_state!(BlockCache, TestLayout<T1K>, F, TestLayout<T1K>, T1K);
 
         let uncompressed = InstrCacheable::Sd(SBTypeArgs {
             rs1: t1,
@@ -753,7 +770,7 @@ mod tests {
     });
 
     backend_test!(test_writing_full_block_fetchable_compressed, F, {
-        let mut state = create_state!(BlockCache, TestLayout, F, TestLayout, T1K);
+        let mut state = create_state!(BlockCache, TestLayout<T1K>, F, TestLayout<T1K>, T1K);
 
         let compressed = InstrCacheable::CLi(CIBTypeArgs { rd_rs1: a0, imm: 1 });
 
@@ -771,7 +788,7 @@ mod tests {
 
     // writing instructions immediately creates block
     backend_test!(test_writing_half_block_fetchable_compressed, F, {
-        let mut state = create_state!(BlockCache, TestLayout, F, TestLayout, T1K);
+        let mut state = create_state!(BlockCache, TestLayout<T1K>, F, TestLayout<T1K>, T1K);
 
         let compressed = InstrCacheable::CLi(CIBTypeArgs { rd_rs1: a0, imm: 1 });
 
@@ -788,7 +805,7 @@ mod tests {
     });
 
     backend_test!(test_writing_two_blocks_fetchable_compressed, F, {
-        let mut state = create_state!(BlockCache, TestLayout, F, TestLayout, T1K);
+        let mut state = create_state!(BlockCache, TestLayout<T1K>, F, TestLayout<T1K>, T1K);
 
         let compressed = InstrCacheable::CLi(CIBTypeArgs { rd_rs1: a0, imm: 1 });
 
@@ -810,7 +827,7 @@ mod tests {
 
     // writing across pages offset two blocks next to each other
     backend_test!(test_crossing_page_exactly_creates_new_block, F, {
-        let mut state = create_state!(BlockCache, TestLayout, F, TestLayout, T1K);
+        let mut state = create_state!(BlockCache, TestLayout<T1K>, F, TestLayout<T1K>, T1K);
 
         let compressed = InstrCacheable::CLi(CIBTypeArgs { rd_rs1: a0, imm: 1 });
 
@@ -832,7 +849,7 @@ mod tests {
 
     backend_test!(test_partial_block_executes, F, {
         let mut core_state = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
-        let mut block_state = create_state!(BlockCache, TestLayout, F, TestLayout, T1K);
+        let mut block_state = create_state!(BlockCache, TestLayout<T1K>, F, TestLayout<T1K>, T1K);
 
         let addiw = InstrCacheable::Addiw(ITypeArgs {
             rd: a1,
