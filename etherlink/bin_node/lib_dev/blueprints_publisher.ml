@@ -277,9 +277,11 @@ module Handlers = struct
     let open Lwt_result_syntax in
     match request with
     | Publish {level; payload} ->
+        protect @@ fun () ->
         let* () = Worker.publish self payload level ~use_dal_if_enabled:true in
         return_unit
     | New_rollup_node_block rollup_block_lvl -> (
+        protect @@ fun () ->
         let* () =
           Worker.retrieve_and_set_latest_level_confirmed self rollup_block_lvl
         in
