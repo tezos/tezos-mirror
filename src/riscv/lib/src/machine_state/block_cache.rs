@@ -747,7 +747,7 @@ mod tests {
         backend_test, create_state,
         machine_state::{
             address_translation::PAGE_SIZE,
-            bus,
+            bus::main_memory,
             instruction::{Args, Instruction, OpCode},
             instruction_cache::cacheable_uncompressed,
             main_memory::tests::T1K,
@@ -905,7 +905,7 @@ mod tests {
             },
         };
 
-        let block_addr = bus::start_of_main_memory::<T1K>();
+        let block_addr = main_memory::FIRST_ADDRESS;
 
         for offset in 0..10 {
             block_state.push_instr::<4>(ValidatedCacheEntry::from_raw(

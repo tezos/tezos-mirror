@@ -78,7 +78,7 @@ mod test {
         bits::Bits64,
         create_state,
         machine_state::{
-            bus::{devices::DEVICES_ADDRESS_SPACE_LENGTH, main_memory::tests::T1K},
+            bus::main_memory::tests::T1K,
             csregisters::{
                 xstatus::{ExtensionValue, MStatus},
                 CSRegister,
@@ -99,7 +99,7 @@ mod test {
         let state_cell = std::cell::RefCell::new(state);
 
         proptest!(|(
-            base_addr in (DEVICES_ADDRESS_SPACE_LENGTH..(DEVICES_ADDRESS_SPACE_LENGTH+504_u64)),
+            base_addr in (0..504_u64),
             base_imm in (0..=64i64).prop_map(|x| x * 8), // multiples of 8 in the 0..512 range
             val in any::<f64>().prop_map(f64::to_bits),
             rs1 in (1_u8..31).prop_map(u5::new).prop_map(parse_xregister),
@@ -138,7 +138,7 @@ mod test {
         let state_cell = std::cell::RefCell::new(state);
 
         proptest!(|(
-            base_addr in (DEVICES_ADDRESS_SPACE_LENGTH..(DEVICES_ADDRESS_SPACE_LENGTH+504_u64)),
+            base_addr in (0..504_u64),
             base_imm in (0..=64i64).prop_map(|x| x * 8), // multiples of 8 in the 0..512 range
             val in any::<f64>().prop_map(f64::to_bits),
         )| {

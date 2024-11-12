@@ -25,7 +25,7 @@ where
     ) -> Result<T, Exception> {
         let address = self.translate(address, AccessType::Load)?;
 
-        self.bus
+        self.main_memory
             .read(address)
             .map_err(|_: OutOfBounds| Exception::LoadAccessFault(address))
     }
@@ -48,7 +48,7 @@ where
     ) -> Result<(), Exception> {
         let address = self.translate(address, AccessType::Store)?;
 
-        self.bus
+        self.main_memory
             .write(address, value)
             .map_err(|_: OutOfBounds| Exception::StoreAMOAccessFault(address))
     }

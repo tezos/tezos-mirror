@@ -99,7 +99,7 @@ impl<'a, ML: MainMemoryLayout> Program<'a, ML> {
     /// representation. The main memory layout `ML` is used to compute the
     /// correct addresses
     pub fn from_elf(elf: &'a [u8]) -> Result<Self, kernel_loader::Error> {
-        let start_if_reloc = bus::start_of_main_memory::<ML>();
+        let start_if_reloc = bus::main_memory::FIRST_ADDRESS;
 
         let mut myself = Self {
             _pd: PhantomData,
@@ -114,7 +114,7 @@ impl<'a, ML: MainMemoryLayout> Program<'a, ML> {
 
     /// Construct a program from raw RISC-V machine code.
     pub fn from_raw(code: &'a [u8]) -> Self {
-        let entrypoint = bus::start_of_main_memory::<ML>();
+        let entrypoint = bus::main_memory::FIRST_ADDRESS;
         Self {
             _pd: PhantomData,
             entrypoint,
@@ -140,7 +140,7 @@ impl<'a, ML: MainMemoryLayout> Program<'a, ML> {
 mod tests {
     use crate::{
         kernel_loader::{self, Memory},
-        machine_state::bus::{main_memory::M1M, start_of_main_memory},
+        machine_state::bus::main_memory::{self, M1M},
         program::Program,
     };
     use std::{cell::RefCell, collections::BTreeMap, fs, io::Cursor, marker::PhantomData};
@@ -179,7 +179,7 @@ mod tests {
             fs::read(PATH).expect("Failed read dummy RISC-V kernel (try: make -C src/riscv build)");
 
         let mut buffer = Cursor::new(Vec::new());
-        kernel_loader::load_elf(&mut buffer, start_of_main_memory::<M1M>(), &contents).unwrap();
+        kernel_loader::load_elf(&mut buffer, main_memory::FIRST_ADDRESS, &contents).unwrap();
         let buffer = buffer.into_inner();
 
         let program = Program::<M1M>::from_elf(&contents).unwrap();

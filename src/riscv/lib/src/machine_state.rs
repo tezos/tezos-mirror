@@ -21,13 +21,15 @@ pub mod reservation_set;
 extern crate proptest;
 
 pub use self::cache_layouts::{CacheLayouts, DefaultCacheLayouts, TestCacheLayouts};
-use self::instruction_cache::InstructionCache;
-use self::{block_cache::BlockCache, instruction::Instruction};
+use self::{
+    block_cache::BlockCache, bus::main_memory::MainMemory, instruction::Instruction,
+    instruction_cache::InstructionCache,
+};
 use crate::{
     bits::u64,
     devicetree,
     machine_state::{
-        bus::{main_memory, Address, AddressableRead, AddressableWrite, Bus, OutOfBounds},
+        bus::{main_memory, Address, AddressableRead, AddressableWrite, OutOfBounds},
         csregisters::CSRegister,
         hart_state::{HartState, HartStateLayout},
     },
@@ -51,7 +53,7 @@ use std::ops::Bound;
 
 /// Layout for the machine 'run state' - which contains everything required for the running of
 /// instructions.
-pub type MachineCoreStateLayout<ML> = (HartStateLayout, bus::BusLayout<ML>, TranslationCacheLayout);
+pub type MachineCoreStateLayout<ML> = (HartStateLayout, ML, TranslationCacheLayout);
 
 /// The part of the machine state required to run (almost all) instructions.
 ///
@@ -62,7 +64,7 @@ pub type MachineCoreStateLayout<ML> = (HartStateLayout, bus::BusLayout<ML>, Tran
 /// small in number).
 pub struct MachineCoreState<ML: main_memory::MainMemoryLayout, M: backend::ManagerBase> {
     pub hart: HartState<M>,
-    pub bus: Bus<ML, M>,
+    pub main_memory: MainMemory<ML, M>,
     pub translation_cache: TranslationCache<M>,
 }
 
@@ -72,7 +74,7 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::ManagerClone> Clone
     fn clone(&self) -> Self {
         Self {
             hart: self.hart.clone(),
-            bus: self.bus.clone(),
+            main_memory: self.main_memory.clone(),
             translation_cache: self.translation_cache.clone(),
         }
     }
@@ -200,7 +202,7 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::ManagerBase> MachineCoreStat
     pub fn bind(space: backend::AllocatedOf<MachineCoreStateLayout<ML>, M>) -> Self {
         Self {
             hart: HartState::bind(space.0),
-            bus: Bus::bind(space.1),
+            main_memory: MainMemory::bind(space.1),
             translation_cache: TranslationCache::bind(space.2),
         }
     }
@@ -211,7 +213,7 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::ManagerBase> MachineCoreStat
     ) -> backend::AllocatedOf<MachineCoreStateLayout<ML>, backend::Ref<'_, M>> {
         (
             self.hart.struct_ref(),
-            self.bus.struct_ref(),
+            self.main_memory.struct_ref(),
             self.translation_cache.struct_ref(),
         )
     }
@@ -221,8 +223,8 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::ManagerBase> MachineCoreStat
     where
         M: backend::ManagerWrite,
     {
-        self.hart.reset(bus::start_of_main_memory::<ML>());
-        self.bus.reset();
+        self.hart.reset(main_memory::FIRST_ADDRESS);
+        self.main_memory.reset();
         self.translation_cache.reset();
     }
 
@@ -324,7 +326,7 @@ impl<ML: main_memory::MainMemoryLayout, CL: CacheLayouts, M: backend::ManagerBas
         M: backend::ManagerRead,
     {
         self.core
-            .bus
+            .main_memory
             .read(phys_addr)
             .map_err(|_: OutOfBounds| Exception::InstructionAccessFault(phys_addr))
     }
@@ -605,7 +607,7 @@ impl<ML: main_memory::MainMemoryLayout, CL: CacheLayouts, M: backend::ManagerBas
         self.core.hart.reset(program.entrypoint);
         // Write program to main memory and point the PC at its start
         for (addr, data) in program.segments.iter() {
-            self.core.bus.write_all(*addr, data)?;
+            self.core.main_memory.write_all(*addr, data)?;
         }
 
         // Set booting Hart ID (a0) to 0
@@ -617,11 +619,11 @@ impl<ML: main_memory::MainMemoryLayout, CL: CacheLayouts, M: backend::ManagerBas
             .iter()
             .map(|(base, data)| base + data.len() as Address)
             .max()
-            .unwrap_or(bus::start_of_main_memory::<ML>());
+            .unwrap_or(main_memory::FIRST_ADDRESS);
 
         // Write initial ramdisk, if any
         let (dtb_addr, initrd) = if let Some(initrd) = initrd {
-            self.core.bus.write_all(initrd_addr, initrd)?;
+            self.core.main_memory.write_all(initrd_addr, initrd)?;
             let length = initrd.len() as u64;
             let dtb_options = devicetree::InitialRamDisk {
                 start: initrd_addr,
@@ -635,7 +637,7 @@ impl<ML: main_memory::MainMemoryLayout, CL: CacheLayouts, M: backend::ManagerBas
 
         // Write device tree to memory
         let fdt = devicetree::generate::<ML>(initrd)?;
-        self.core.bus.write_all(dtb_addr, fdt.as_slice())?;
+        self.core.main_memory.write_all(dtb_addr, fdt.as_slice())?;
 
         // Point DTB boot argument (a1) at the written device tree
         self.core.hart.xregisters.write(registers::a1, dtb_addr);
@@ -667,10 +669,11 @@ pub enum MachineError {
 
 #[cfg(test)]
 mod tests {
-    use std::ops::Bound;
-
-    use super::instruction::{Args, Instruction, OpCode};
-    use super::{bus, bus::main_memory::tests::T1K, MachineState, MachineStateLayout};
+    use super::{
+        bus::main_memory::tests::T1K,
+        instruction::{Args, Instruction, OpCode},
+        MachineState, MachineStateLayout,
+    };
     use crate::{
         backend_test,
         bits::{u16, Bits64, FixedWidthBits},
@@ -682,8 +685,8 @@ mod tests {
                 PAGE_SIZE,
             },
             bus::{
-                main_memory::{M1M, M8K},
-                start_of_main_memory, AddressableWrite,
+                main_memory::{self, M1M, M8K},
+                AddressableWrite,
             },
             cache_layouts,
             csregisters::{
@@ -704,6 +707,7 @@ mod tests {
     };
     use crate::{bits::u64, machine_state::bus::main_memory::M1K};
     use proptest::{prop_assert_eq, proptest};
+    use std::ops::Bound;
 
     backend_test!(test_step, F, {
         let state = create_state!(MachineState, MachineStateLayout<T1K, TestCacheLayouts>, F, T1K, TestCacheLayouts);
@@ -716,8 +720,8 @@ mod tests {
             let mut state = state_cell.borrow_mut();
             state.reset();
 
-            let init_pc_addr = bus::start_of_main_memory::<T1K>() + pc_addr_offset * 4;
-            let jump_addr = bus::start_of_main_memory::<T1K>() + jump_addr * 4;
+            let init_pc_addr = main_memory::FIRST_ADDRESS + pc_addr_offset * 4;
+            let jump_addr = main_memory::FIRST_ADDRESS + jump_addr * 4;
 
             // Instruction which performs a unit op (AUIPC with t0)
             const T2_ENC: u64 = 0b0_0111; // x7
@@ -764,7 +768,7 @@ mod tests {
             let mut state = state_cell.borrow_mut();
             state.reset();
 
-            let init_pc_addr = bus::start_of_main_memory::<T1K>() + pc_addr_offset * 4;
+            let init_pc_addr = main_memory::FIRST_ADDRESS + pc_addr_offset * 4;
             let stvec_addr = init_pc_addr + 4 * stvec_offset;
             let mtvec_addr = init_pc_addr + 4 * mtvec_offset;
 
@@ -799,7 +803,7 @@ mod tests {
             let mut state = state_cell.borrow_mut();
             state.reset();
 
-            let init_pc_addr = bus::start_of_main_memory::<T1K>() + pc_addr_offset * 4;
+            let init_pc_addr = main_memory::FIRST_ADDRESS + pc_addr_offset * 4;
             let mtvec_addr = init_pc_addr + 4 * mtvec_offset;
             const EBREAK: u64 = 1 << 20 | 0b111_0011;
 
@@ -843,13 +847,13 @@ mod tests {
             let mut state = state_cell.borrow_mut();
             state.reset();
 
-            let init_pc_addr = bus::start_of_main_memory::<T1K>() + pc_addr_offset * 4;
+            let init_pc_addr = main_memory::FIRST_ADDRESS + pc_addr_offset * 4;
             let stvec_addr = init_pc_addr + 4 * stvec_offset;
 
             // stvec is in VECTORED mode
             state.core.hart.csregisters.write(CSRegister::stvec, stvec_addr | 1);
 
-            let bad_address = bus::start_of_main_memory::<T1K>() - (pc_addr_offset + 10) * 4;
+            let bad_address = main_memory::FIRST_ADDRESS.wrapping_sub((pc_addr_offset + 10) * 4);
             let medeleg_val = 1 << Exception::IllegalInstruction.exception_code() |
                 1 << Exception::EnvCallFromSMode.exception_code() |
                 1 << Exception::EnvCallFromMMode.exception_code() |
@@ -916,7 +920,7 @@ mod tests {
             let mut state = create_state!(MachineState, LocalLayout, F, M1K, TestCacheLayouts);
             state.reset();
 
-            let start_ram = start_of_main_memory::<M1K>();
+            let start_ram = main_memory::FIRST_ADDRESS;
 
             // Write the instructions to the beginning of the main memory and point the program
             // counter at the first instruction.
@@ -927,7 +931,11 @@ mod tests {
                 .collect::<Vec<_>>()
                 .try_into()
                 .unwrap();
-            state.core.bus.write_all(start_ram, &instrs).unwrap();
+            state
+                .core
+                .main_memory
+                .write_all(start_ram, &instrs)
+                .unwrap();
 
             // Configure the machine in such a way that the first instruction will override the
             // second instruction. The second instruction behaves differently.
@@ -986,7 +994,7 @@ mod tests {
     // reset that may impact instruction address translation caching.
     backend_test!(test_instruction_address_cache, F, {
         // Specify the physcal memory layout.
-        let main_mem_addr = start_of_main_memory::<M1M>();
+        let main_mem_addr = main_memory::FIRST_ADDRESS;
         let code0_addr = main_mem_addr;
         let code1_addr = code0_addr + 4096;
         let root_page_table_addr = main_mem_addr + 16384;
@@ -1149,11 +1157,19 @@ mod tests {
 
             state
                 .core
-                .bus
+                .main_memory
                 .write_all(root_page_table_addr, &init_page_table)
                 .unwrap();
-            state.core.bus.write_all(code0_addr, &instrs0).unwrap();
-            state.core.bus.write_all(code1_addr, &instrs1).unwrap();
+            state
+                .core
+                .main_memory
+                .write_all(code0_addr, &instrs0)
+                .unwrap();
+            state
+                .core
+                .main_memory
+                .write_all(code1_addr, &instrs1)
+                .unwrap();
 
             state.core.hart.pc.write(code_virt_addr);
 
@@ -1235,7 +1251,7 @@ mod tests {
             },
         };
 
-        let start_ram = start_of_main_memory::<M8K>();
+        let start_ram = main_memory::FIRST_ADDRESS;
 
         // Write the instructions to the beginning of the main memory and point the program
         // counter at the first instruction.
@@ -1247,7 +1263,7 @@ mod tests {
         for offset in 0..3 {
             state
                 .core
-                .bus
+                .main_memory
                 .write(phys_addr + offset * 4, uncompressed_bytes)
                 .unwrap();
         }
@@ -1353,7 +1369,7 @@ mod tests {
             },
         ];
 
-        let phys_addr = start_of_main_memory::<M8K>();
+        let phys_addr = main_memory::FIRST_ADDRESS;
 
         let block_b_addr = phys_addr + 128;
 
@@ -1365,19 +1381,43 @@ mod tests {
         state.core.hart.mode.write(Mode::Machine);
 
         // block A
-        state.core.bus.write(phys_addr, auipc_bytes).unwrap();
-        state.core.bus.write(phys_addr + 4, cj_bytes).unwrap();
+        state
+            .core
+            .main_memory
+            .write(phys_addr, auipc_bytes)
+            .unwrap();
+        state
+            .core
+            .main_memory
+            .write(phys_addr + 4, cj_bytes)
+            .unwrap();
 
         // block B
-        state.core.bus.write(block_b_addr, clui_bytes).unwrap();
-        state.core.bus.write(block_b_addr + 2, addiw_bytes).unwrap();
-        state.core.bus.write(block_b_addr + 6, csw_bytes).unwrap();
-        state.core.bus.write(block_b_addr + 8, jalr_bytes).unwrap();
+        state
+            .core
+            .main_memory
+            .write(block_b_addr, clui_bytes)
+            .unwrap();
+        state
+            .core
+            .main_memory
+            .write(block_b_addr + 2, addiw_bytes)
+            .unwrap();
+        state
+            .core
+            .main_memory
+            .write(block_b_addr + 6, csw_bytes)
+            .unwrap();
+        state
+            .core
+            .main_memory
+            .write(block_b_addr + 8, jalr_bytes)
+            .unwrap();
 
         // Overwritten jump dest
         state
             .core
-            .bus
+            .main_memory
             .write(phys_addr + 1024, overwrite_bytes)
             .unwrap();
 

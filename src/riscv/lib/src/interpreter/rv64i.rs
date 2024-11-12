@@ -353,7 +353,7 @@ mod tests {
     use crate::{
         backend_test, create_state,
         machine_state::{
-            bus::{devices::DEVICES_ADDRESS_SPACE_LENGTH, main_memory::tests::T1K},
+            bus::main_memory::tests::T1K,
             hart_state::{HartState, HartStateLayout},
             registers::{a0, a1, a2, a3, a4, t0, t1, t2, t3, t4},
             MachineCoreState, MachineCoreStateLayout,
@@ -809,9 +809,9 @@ mod tests {
                 Ok(())
             };
 
-            let invalid_offset = DEVICES_ADDRESS_SPACE_LENGTH - 1024;
-            let aligned_offset = DEVICES_ADDRESS_SPACE_LENGTH + 512;
-            let misaligned_offset = DEVICES_ADDRESS_SPACE_LENGTH + 513;
+            let invalid_offset = 0u64.wrapping_sub(1024);
+            let aligned_offset = 512;
+            let misaligned_offset = 513;
 
             // Out of bounds loads / stores
             prop_assert!(perform_test(invalid_offset, true).is_err_and(|e|

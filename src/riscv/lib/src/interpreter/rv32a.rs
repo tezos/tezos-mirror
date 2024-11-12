@@ -222,7 +222,7 @@ mod test {
         backend_test, create_state,
         interpreter::atomics::{SC_FAILURE, SC_SUCCESS},
         machine_state::{
-            bus::{devices::DEVICES_ADDRESS_SPACE_LENGTH, main_memory::tests::T1K},
+            bus::main_memory::tests::T1K,
             registers::{a0, a1, a2},
             MachineCoreState, MachineCoreStateLayout,
         },
@@ -238,7 +238,7 @@ mod test {
                 let state_cell = std::cell::RefCell::new(state);
 
                 proptest!(|(
-                    r1_addr in (DEVICES_ADDRESS_SPACE_LENGTH/$align..(DEVICES_ADDRESS_SPACE_LENGTH+1023_u64)/$align).prop_map(|x| x * $align),
+                    r1_addr in (0..1023_u64/$align).prop_map(|x| x * $align),
                     r1_val in any::<u64>(),
                     imm in any::<i64>(),
                 )| {
@@ -280,7 +280,7 @@ mod test {
                 let state_cell = std::cell::RefCell::new(state);
 
                 proptest!(|(
-                    r1_addr in (DEVICES_ADDRESS_SPACE_LENGTH/$align..(DEVICES_ADDRESS_SPACE_LENGTH+1023_u64)/$align).prop_map(|x| x * $align),
+                    r1_addr in (0..1023_u64/$align).prop_map(|x| x * $align),
                     r1_val in any::<u64>(),
                     r2_val in any::<u64>(),
                 )| {

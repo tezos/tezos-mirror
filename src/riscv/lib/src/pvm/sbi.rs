@@ -150,10 +150,10 @@ where
 
         machine
             .core
-            .bus
+            .main_memory
             .write_all(phys_buffer_addr, &payload[..max_buffer_size])?;
-        machine.core.bus.write(phys_level_addr, level)?;
-        machine.core.bus.write(phys_counter_addr, counter)?;
+        machine.core.main_memory.write(phys_level_addr, level)?;
+        machine.core.main_memory.write(phys_counter_addr, counter)?;
 
         // At the moment, this case is unlikely to occur because we cap [max_buffer_size] at
         // [MAX_INPUT_MESSAGE_SIZE].
@@ -196,7 +196,7 @@ where
 
         machine
             .core
-            .bus
+            .main_memory
             .write_all(phys_dest_addr, rollup_address.as_slice())?;
 
         // [origination_level] should not wrap around and become negative.
@@ -246,16 +246,19 @@ where
     let sig_addr = machine.core.translate(arg_sig_addr, AccessType::Store)?;
 
     let mut sk_bytes = [0u8; 32];
-    machine.core.bus.read_all(sk_addr, &mut sk_bytes)?;
+    machine.core.main_memory.read_all(sk_addr, &mut sk_bytes)?;
     let sk = SigningKey::try_from(sk_bytes.as_slice()).map_err(|_| SbiError::Failed)?;
     sk_bytes.fill(0);
 
     let mut msg_bytes = vec![0; arg_msg_len as usize];
-    machine.core.bus.read_all(msg_addr, &mut msg_bytes)?;
+    machine
+        .core
+        .main_memory
+        .read_all(msg_addr, &mut msg_bytes)?;
 
     let sig = sk.sign(msg_bytes.as_slice());
     let sig_bytes: [u8; 64] = sig.to_bytes();
-    machine.core.bus.write_all(sig_addr, &sig_bytes)?;
+    machine.core.main_memory.write_all(sig_addr, &sig_bytes)?;
 
     Ok(sig_bytes.len() as u64)
 }
@@ -280,13 +283,19 @@ where
     let msg_addr = machine.core.translate(arg_msg_addr, AccessType::Load)?;
 
     let mut pk_bytes = [0u8; 32];
-    machine.core.bus.read_all(pk_addr, &mut pk_bytes)?;
+    machine.core.main_memory.read_all(pk_addr, &mut pk_bytes)?;
 
     let mut sig_bytes = [0u8; 64];
-    machine.core.bus.read_all(sig_addr, &mut sig_bytes)?;
+    machine
+        .core
+        .main_memory
+        .read_all(sig_addr, &mut sig_bytes)?;
 
     let mut msg_bytes = vec![0u8; arg_msg_len as usize];
-    machine.core.bus.read_all(msg_addr, &mut msg_bytes)?;
+    machine
+        .core
+        .main_memory
+        .read_all(msg_addr, &mut msg_bytes)?;
 
     let pk = VerifyingKey::try_from(pk_bytes.as_slice()).map_err(|_| SbiError::Failed)?;
     let sig = Signature::from_slice(sig_bytes.as_slice()).map_err(|_| SbiError::Failed)?;
@@ -313,10 +322,16 @@ where
     let msg_addr = machine.core.translate(arg_msg_addr, AccessType::Load)?;
 
     let mut msg_bytes = vec![0u8; arg_msg_len as usize];
-    machine.core.bus.read_all(msg_addr, &mut msg_bytes)?;
+    machine
+        .core
+        .main_memory
+        .read_all(msg_addr, &mut msg_bytes)?;
 
     let hash = tezos_crypto_rs::blake2b::digest_256(msg_bytes.as_slice());
-    machine.core.bus.write_all(out_addr, hash.as_slice())?;
+    machine
+        .core
+        .main_memory
+        .write_all(out_addr, hash.as_slice())?;
 
     Ok(hash.len() as u64)
 }

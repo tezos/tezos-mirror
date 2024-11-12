@@ -12,6 +12,9 @@ use crate::state_backend::{
 use serde::{Deserialize, Serialize};
 use std::mem;
 
+/// The first valid memory address.
+pub const FIRST_ADDRESS: Address = 0;
+
 /// Configuration object for memory size
 #[derive(Clone)]
 pub enum Sizes<const BYTES: usize> {}
