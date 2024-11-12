@@ -85,7 +85,7 @@ parameters:
    default value is 1. This parameter determines the fraction of the
    rewards that accrue to the delegate's frozen deposit – the
    remainder is shared among its stakers.
-- ``limit_of_staking_over_baking``: a non-negative number, denoting
+-  ``limit_of_staking_over_baking``: a non-negative number, denoting
    the maximum portion of external stake by stakers over the
    delegate’s own staked funds. It defaults to 0 – which entails that
    delegates do not accept external stakes by default. It is moreover

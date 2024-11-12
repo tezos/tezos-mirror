@@ -29,9 +29,8 @@ Subsidy
 At every block in the chain, a small amount of tez is minted and credited to the
 CPMM contract, and the CPMM's ``%default`` entrypoint is called to update the
 ``xtz_pool`` balance in its storage. The amount that is minted and sent to the
-CPMM contract is 1/16th of the rewards for a block of round 0 with all
-attestations; currently these rewards are 13.33 tez per block so the amount that is
-sent to the CPMM contract is 0.83 tez per block.
+CPMM contract for each block is a protocol constant (``LIQUIDITY_BAKING_SUBSIDY``), defining a fixed target rate of 5 tez/minute.
+One can easily compute the value of the per block subsidy by taking into account the minimal block time, under the assumption that all blocks are produced at round 0.
 
 So the credits to the CPMM contract can be accounted for by indexers, they are included in block metadata as a balance update with a new constructor for ``update_origin``, ``Subsidy``.
 
@@ -53,12 +52,12 @@ the subsidy, and ``Pass`` to abstain.
 ``e[n+1] = (1999 * e[n] // 2000)`` if the flag is set to ``On``.
 When computing ``e[n+1]``, the division is rounded toward ``1_000_000_000``.
 
-If at any block ``e[n] >= 1_000_000_000`` then it means that an
+If at any block ``e[n] >= LIQUIDITY_BAKING_EMA_THRESHOLD`` (currently ``1_000_000_000``) then it means that an
 exponential moving average with a window size on the order of two
 thousand non-abstaining blocks has had roughly at least a half of the
 blocks demanding the end of the subsidy. If that is the case, the
 subsidy is halted but can be reactivated if for some later block
-``e[n] < 1_000_000_000``.
+``e[n] < LIQUIDITY_BAKING_EMA_THRESHOLD``.
 
 For indicative purposes, if among the non-abstaining blocks a fraction
 ``f`` of blocks use it to request ending the subsidy, the threshold is
