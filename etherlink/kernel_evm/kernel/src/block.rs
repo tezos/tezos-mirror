@@ -237,6 +237,7 @@ fn next_bip_from_blueprints<Host: Runtime>(
     tick_counter: &TickCounter,
     config: &mut Configuration,
     kernel_upgrade: &Option<KernelUpgrade>,
+    minimum_base_fee_per_gas: U256,
 ) -> Result<BlueprintParsing, anyhow::Error> {
     let (blueprint, size) = read_next_blueprint(host, config)?;
     log!(host, Benchmarking, "Size of blueprint: {}", size);
@@ -250,7 +251,11 @@ fn next_bip_from_blueprints<Host: Runtime>(
                     return Ok(BlueprintParsing::None);
                 }
             }
-            let gas_price = crate::gas_price::base_fee_per_gas(host, blueprint.timestamp);
+            let gas_price = crate::gas_price::base_fee_per_gas(
+                host,
+                blueprint.timestamp,
+                minimum_base_fee_per_gas,
+            );
 
             let bip = block_in_progress::BlockInProgress::from_blueprint(
                 blueprint,
@@ -530,6 +535,7 @@ pub fn produce<Host: Runtime>(
             &tick_counter,
             config,
             &kernel_upgrade,
+            minimum_base_fee_per_gas,
         )? {
             BlueprintParsing::Next(bip) => bip,
             BlueprintParsing::None => {
