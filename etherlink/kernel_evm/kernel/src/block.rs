@@ -229,7 +229,8 @@ fn next_bip_from_blueprints<Host: Runtime>(
                 }
             }
             let gas_price = crate::gas_price::base_fee_per_gas(host, blueprint.timestamp);
-            crate::gas_price::store_new_base_fee_per_gas(host, gas_price, block_fees)?;
+            crate::storage::store_base_fee_per_gas(host, gas_price)?;
+            block_fees.set_base_fee_per_gas(gas_price);
 
             let bip = block_in_progress::BlockInProgress::from_blueprint(
                 blueprint,
