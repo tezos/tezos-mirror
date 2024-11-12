@@ -28,12 +28,14 @@ pub fn fetch_proxy_blueprints<Host: Runtime>(
     smart_rollup_address: [u8; RAW_ROLLUP_ADDRESS_SIZE],
     tezos_contracts: &TezosContracts,
     enable_fa_bridge: bool,
+    garbage_collect_blocks: bool,
 ) -> Result<StageOneStatus, anyhow::Error> {
     if let Some(ProxyInboxContent { transactions }) = read_proxy_inbox(
         host,
         smart_rollup_address,
         tezos_contracts,
         enable_fa_bridge,
+        garbage_collect_blocks,
     )? {
         let timestamp = current_timestamp(host);
         let blueprint = Blueprint {
@@ -115,6 +117,7 @@ fn fetch_sequencer_blueprints<Host: Runtime>(
     sequencer: PublicKey,
     dal: Option<DalConfiguration>,
     enable_fa_bridge: bool,
+    garbage_collect_blocks: bool,
 ) -> Result<StageOneStatus, anyhow::Error> {
     match read_sequencer_inbox(
         host,
@@ -125,6 +128,7 @@ fn fetch_sequencer_blueprints<Host: Runtime>(
         delayed_inbox,
         enable_fa_bridge,
         dal,
+        garbage_collect_blocks,
     )? {
         StageOneStatus::Done => {
             // Check if there are timed-out transactions in the delayed inbox
@@ -166,12 +170,14 @@ pub fn fetch_blueprints<Host: Runtime>(
             sequencer.clone(),
             dal.clone(),
             config.enable_fa_bridge,
+            config.garbage_collect_blocks,
         ),
         ConfigurationMode::Proxy => fetch_proxy_blueprints(
             host,
             smart_rollup_address,
             &config.tezos_contracts,
             config.enable_fa_bridge,
+            config.garbage_collect_blocks,
         ),
     }
 }
@@ -255,6 +261,7 @@ mod tests {
             },
             limits: Limits::default(),
             enable_fa_bridge: false,
+            garbage_collect_blocks: false,
         }
     }
 
@@ -268,6 +275,7 @@ mod tests {
             mode: ConfigurationMode::Proxy,
             limits: Limits::default(),
             enable_fa_bridge: false,
+            garbage_collect_blocks: false,
         }
     }
 
@@ -532,6 +540,7 @@ mod tests {
             &mut host,
             DEFAULT_SR_ADDRESS,
             &conf.tezos_contracts,
+            false,
             false,
         )
         .unwrap()

@@ -526,6 +526,7 @@ mod tests {
             },
             limits: Limits::default(),
             enable_fa_bridge: false,
+            garbage_collect_blocks: false,
         };
 
         let dummy_tx_hash = Hash([0u8; TRANSACTION_HASH_SIZE]);

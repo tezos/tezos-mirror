@@ -58,7 +58,7 @@ fn is_etherlink_network(
 }
 
 #[allow(dead_code)]
-fn allow_path_not_found(res: Result<(), RuntimeError>) -> Result<(), RuntimeError> {
+pub fn allow_path_not_found(res: Result<(), RuntimeError>) -> Result<(), RuntimeError> {
     match res {
         Ok(()) => Ok(()),
         Err(RuntimeError::PathNotFound) => Ok(()),
