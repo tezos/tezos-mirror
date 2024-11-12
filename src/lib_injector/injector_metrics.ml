@@ -26,12 +26,6 @@ module Make (P : P) = struct
 
   let subsystem = "injector"
 
-  (** Registers a labeled counter in [injector_registry] *)
-  let v_label_counter = Counter.v_label ~registry ~namespace ~subsystem
-
-  (** Registers a gauge in [injector_registry] *)
-  let v_gauge = Gauge.v ~registry ~namespace ~subsystem
-
   (** Registers a labeled gauge in [injector_registry] *)
   let v_label_gauge = Gauge.v_labels ~registry ~namespace ~subsystem
 
@@ -47,7 +41,7 @@ module Make (P : P) = struct
     String.concat ", "
     @@ List.map (fun t -> Format.asprintf "%a" P.Tag.pp t) tags
 
-  let batchers_balance_gauge_table = Gauge_table.create 7
+  let signer_balance_gauge_table = Gauge_table.create 7
 
   let queue_gauge_table = Gauge_table.create 7
 
@@ -55,74 +49,64 @@ module Make (P : P) = struct
 
   let injected_operations_gauge_table = Gauge_table.create 7
 
+  let queue_gauge =
+    v_label_gauge
+      ~help:"injector worker queue size"
+      ~label_names:["tags"; "index"]
+      "queue_size"
+
+  let injected_operations_gauge =
+    v_label_gauge
+      ~help:"injector injected operations size"
+      ~label_names:["tags"; "index"]
+      "injected_size"
+
+  let included_operations_gauge =
+    v_label_gauge
+      ~help:"injector included operations size"
+      ~label_names:["tags"; "index"]
+      "included_size"
+
+  let signer_balance_gauge =
+    v_label_gauge
+      ~help:"injector signer balance"
+      ~label_names:["tags"; "index"; "pkh"]
+      "signer_balance"
+
   let add_gauge i tags =
-    let tags_str = concat_tags tags in
     let tags = Tags.of_list tags in
-    let _label =
-      v_label_counter
-        ~help:(Format.sprintf "Injector for %s (%d)" tags_str i)
-        ~label_name:"tags"
-        (Format.sprintf "%d_tags" i)
-        tags_str
-    in
-    let queue_gauge =
-      v_gauge
-        ~help:(Format.asprintf "injector worker %s (%d) queue size" tags_str i)
-        (Format.asprintf "%d_queue_size" i)
-    in
-    Gauge_table.add queue_gauge_table tags queue_gauge ;
-    let injected_operations_gauge =
-      v_gauge
-        ~help:
-          (Format.asprintf
-             "injector %s (%d) injected operations size"
-             tags_str
-             i)
-        (Format.asprintf "%d_injected_size" i)
-    in
+    Gauge_table.add queue_gauge_table tags (i, queue_gauge) ;
     Gauge_table.add
       injected_operations_gauge_table
       tags
-      injected_operations_gauge ;
-    let included_operations_gauge =
-      v_gauge
-        ~help:
-          (Format.asprintf
-             "injector %s (%d) included operations size"
-             tags_str
-             i)
-        (Format.asprintf "%d_included_size" i)
-    in
+      (i, injected_operations_gauge) ;
     Gauge_table.add
       included_operations_gauge_table
       tags
-      included_operations_gauge ;
-    let batchers_balance_gauge =
-      v_label_gauge
-        ~help:(Format.sprintf "injector %s (%d) batcher balance" tags_str i)
-        ~label_names:["pkh"; "tags"]
-        (Format.asprintf "%d_batcher_balance" i)
-    in
-    Gauge_table.add batchers_balance_gauge_table tags batchers_balance_gauge
+      (i, included_operations_gauge) ;
+    Gauge_table.add signer_balance_gauge_table tags (i, signer_balance_gauge)
 
-  let set_gauge_batcher_balance tags key balance =
+  let set_gauge_signer_balance tags key balance =
     Option.iter
-      (fun labeled_gauge ->
+      (fun (i, labeled_gauge) ->
         Gauge.set
-          (Gauge.labels labeled_gauge [key; concat_tags tags])
+          (Gauge.labels labeled_gauge [concat_tags tags; Int.to_string i; key])
           (Int64.to_float balance /. 1_000_000.))
-      (Gauge_table.find_opt batchers_balance_gauge_table (Tags.of_list tags))
+      (Gauge_table.find_opt signer_balance_gauge_table (Tags.of_list tags))
 
-  let set_gauge_find_opt table tags len =
+  let set_labeled_gauge_find_opt table tags len =
     Option.iter
-      (fun gauge -> Gauge.set gauge (Int.to_float len))
+      (fun (i, labeled_gauge) ->
+        Gauge.set
+          (Gauge.labels labeled_gauge [concat_tags tags; Int.to_string i])
+          (Int.to_float len))
       (Gauge_table.find_opt table (Tags.of_list tags))
 
-  let set_queue_size = set_gauge_find_opt queue_gauge_table
+  let set_queue_size = set_labeled_gauge_find_opt queue_gauge_table
 
   let set_injected_operations_size =
-    set_gauge_find_opt injected_operations_gauge_table
+    set_labeled_gauge_find_opt injected_operations_gauge_table
 
   let set_included_operations_size =
-    set_gauge_find_opt included_operations_gauge_table
+    set_labeled_gauge_find_opt included_operations_gauge_table
 end

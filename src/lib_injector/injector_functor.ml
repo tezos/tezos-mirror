@@ -1094,7 +1094,7 @@ module Make (Parameters : PARAMETERS) = struct
         | Forget -> return_unit)
       (List.rev expired_infos)
 
-  let metrics_get_batchers_balance state level =
+  let metrics_get_signers_balance state level =
     dont_wait
       (fun () ->
         (* It isn't necessary to fetch the balance of signers at each level, to
@@ -1109,7 +1109,7 @@ module Make (Parameters : PARAMETERS) = struct
                 let pkh = signer.pkh in
                 let key = Signature.Public_key_hash.to_b58check pkh in
                 let* balance = Proto_client.get_balance_mutez state.cctxt pkh in
-                Metrics.set_gauge_batcher_balance tags key balance ;
+                Metrics.set_gauge_signer_balance tags key balance ;
                 return_unit)
               state.signers
           in
@@ -1138,7 +1138,7 @@ module Make (Parameters : PARAMETERS) = struct
       ({block_hash = head_hash; level = head_level} as head) =
     let open Lwt_result_syntax in
     let*! () = Event.(emit1 new_tezos_head) state head_hash in
-    let () = metrics_get_batchers_balance state head.level in
+    let () = metrics_get_signers_balance state head.level in
     set_metrics state ;
     let*! reorg =
       match state.last_seen_head with
