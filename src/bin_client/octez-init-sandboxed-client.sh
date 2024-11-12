@@ -125,6 +125,8 @@ main() {
   echo "exec $compiler \"\$@\"" >> "$client_dir"/bin/octez-protocol-compiler
   chmod +x "$client_dir"/bin/octez-protocol-compiler
 
+  local activate_commands
+
   while IFS= read -r protocol; do
     protocol_underscore=$(echo "$protocol" | tr -- - _)
     protocol_without_number=$(echo "$protocol" | tr -d "\-[0-9]")
@@ -156,6 +158,9 @@ main() {
     echo "exec $accuser \"\$@\"" >> "$client_dir"/bin/octez-accuser-"$protocol_without_number"
     chmod +x "$client_dir"/bin/octez-accuser-"$protocol_without_number"
 
+    # This will be used to print the command on the output
+    activate_commands+="octez-activate-$protocol"$'\n  '
+
     cat << EOF
 alias octez-activate-$protocol="$client -block genesis activate protocol $hash with fitness 1 and key activator and parameters $parameters_file";
 
@@ -182,19 +187,17 @@ EOF
 
   (cat | sed -e 's/^/## /') 1>&2 << EOF
 
-The client is now properly initialized. In the rest of this shell
-session, you might now run \`octez-client\` to communicate with a
-tezos node launched with \`launch-sandboxed-node $1\`. For instance:
+The clients are now properly initialized. In the rest of this shell
+session, you might now run \`octez-client\` to communicate with an
+Octez node launched with \`launch-sandboxed-node $1\`. For instance:
 
   octez-client rpc get /chains/main/blocks/head/metadata
 
-Note: if the current protocol version, as reported by the previous
-command, is "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im", you
-may have to activate in your "sandboxed network" the same economic
-protocol as used by the alphanet by running:
+Note: The protocol version, as reported by the previous
+command, is "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im" when starting the "sandboxed network".
+You may have to activate in your "sandboxed network" another protocol:
 
-  octez-activate-alpha
-
+  $activate_commands
 Warning: all the client data will be removed when you close this shell
 or if you run this command a second time.
 
