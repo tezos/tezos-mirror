@@ -15,6 +15,8 @@ This documentation describes an implementation of the `Tezos blockchain <https:/
 
   For documentation of the whole Tezos ecosystem, including software beyond the Octez & protocol platform, such as smart contracts languages, developer tools, or web3 libraries, see https://docs.tezos.com.
 
+.. Uncomment the following when OpenTezos is updated:
+
   Learning material about the Tezos ecosystem, consisting of training modules with exercises, can be found at https://opentezos.tezos.com.
 
 To start browsing the Octez & Protocol documentation, directly pick any topics in the menu on the left, or click one of the guided paths below:
