@@ -329,16 +329,15 @@ let start ~rollup_node_endpoint ~config ~latest_level_seen ~keep_alive () =
 
 type error += No_worker
 
-let worker =
-  lazy
-    (match Lwt.state worker_promise with
-    | Lwt.Return worker -> Ok worker
-    | Lwt.Fail e -> Result_syntax.tzfail (error_of_exn e)
-    | Lwt.Sleep -> Result_syntax.tzfail No_worker)
+let worker () =
+  match Lwt.state worker_promise with
+  | Lwt.Return worker -> Ok worker
+  | Lwt.Fail e -> Result_syntax.tzfail (error_of_exn e)
+  | Lwt.Sleep -> Result_syntax.tzfail No_worker
 
 let bind_worker f =
   let open Lwt_result_syntax in
-  let res = Lazy.force worker in
+  let res = worker () in
   match res with
   | Error [No_worker] ->
       (* There is no worker, nothing to do *)
