@@ -1408,10 +1408,12 @@ mod tests {
 
         let mut state_step = state.clone();
 
-        state.step_max(Bound::Included(block_a.len()));
+        let result = state.step_max(Bound::Included(block_a.len()));
+        assert_eq!(result.steps, block_a.len());
 
         for _ in 0..block_a.len() {
-            state_step.step_max(Bound::Included(1));
+            let result = state_step.step_max(Bound::Included(1));
+            assert_eq!(result.steps, 1);
         }
 
         assert_eq_struct(&state.struct_ref(), &state_step.struct_ref());

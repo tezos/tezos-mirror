@@ -377,7 +377,7 @@ impl<ICL: InstructionCacheLayout, M: ManagerClone> Clone for InstructionCache<IC
 /// An uncompressed instruction is not cacheable, if it crosses
 /// page boundaries.
 #[inline]
-const fn cacheable_uncompressed(phys_addr: Address) -> bool {
+pub const fn cacheable_uncompressed(phys_addr: Address) -> bool {
     const END_OF_PAGE: Address = PAGE_SIZE - 2;
 
     phys_addr % PAGE_SIZE != END_OF_PAGE
