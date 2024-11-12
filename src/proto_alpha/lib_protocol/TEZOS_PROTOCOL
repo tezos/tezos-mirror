@@ -161,6 +161,7 @@
         "Zk_rollup_storage",
 
         "Stake_context",
+        "Adaptive_issuance_costs",
         "Contract_delegate_storage",
         "Stake_storage",
         "Unstaked_frozen_deposits_storage",
@@ -171,7 +172,6 @@
         "Contract_storage",
         "Token",
         "Fees_storage",
-        "Adaptive_issuance_costs",
         "Adaptive_issuance_storage",
         "Delegate_staking_parameters",
         "Shared_stake",
