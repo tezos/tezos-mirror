@@ -340,7 +340,7 @@ SHELL ["/bin/ash", "-euo", "pipefail", "-c"]
 
 # hadolint ignore=DL3018,DL3019
 RUN apk update \
- && apk add --no-cache curl npm git file make jq \
+ && apk add --no-cache curl npm git file make jq websocat \
  gcc clang lld ca-certificates build-base musl-dev libusb-dev linux-headers \
  # We need datadog-ci to send JUnit files to Datadog in tezt
  # jobs. Cf. [scripts/ci/tezt.sh].
