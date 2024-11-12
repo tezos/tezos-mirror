@@ -231,12 +231,14 @@ cycle represents at least ``MINIMAL_PARTICIPATION_RATIO`` of the delegate's expe
 validator slots for the current cycle (which is ``BLOCKS_PER_CYCLE *
 CONSENSUS_COMMITTEE_SIZE * active_stake / total_active_stake``).
 
-Regarding the concrete values for rewards, before :doc:`adaptive_issuance`, we first fix the total reward per
-level, call it ``total_rewards``, to ``80 / blocks_per_minute`` tez.
-Assuming ``blocks_per_minute = 7.5``, ``total_rewards`` is 10.67 tez. With :doc:`adaptive_issuance`, this value changes dynamically over time but for the sake of example, we will assume that the reward value stays the same as above.
+The concrete values for rewards depend on the issuance which is dynamically adjusted by :ref:`Adaptive Issuance<adaptive_issuance_alpha>`. 
+For each block it issues an amount ``total_rewards`` of rewarded tez, that varies with
+the total amount of tez at stake on the chain.
+To obtain some concrete values, we will use as an example the issuance before Adaptive Issuance,
+which was ``80`` tez per minute. With ``MINIMAL_BLOCK_DELAY = 8s``, this corresponds to a ``total_rewards`` per level of 10.67 tez.
 We define:
 
-- ``BAKING_REWARD_FIXED_PORTION := baking_reward_ratio * total_rewards``
+- ``baking_reward_fixed_portion := baking_reward_ratio * total_rewards``
 - ``bonus := (1 - baking_reward_ratio) * bonus_ratio * total_rewards`` is the max bonus
 - ``attesting_reward := (1 - baking_reward_ratio) * (1 - bonus_ratio) * total_rewards``
 
@@ -245,7 +247,7 @@ where:
 - ``baking_reward_ratio`` to ``1 / 4``,
 - ``bonus_ratio`` to ``1 / 3``.
 
-Thus, we obtain ``BAKING_REWARD_FIXED_PORTION = 2.67`` tez,
+Thus, we obtain ``baking_reward_fixed_portion = 2.67`` tez,
 (maximum) ``bonus = 2.67`` tez, and ``attesting_reward = 5.33`` tez.
 The bonus per additional attestation slot is in turn ``bonus /
 (CONSENSUS_COMMITTEE_SIZE / 3)`` (because there are at most
@@ -259,7 +261,7 @@ rewards per slot of ``5.33 / 7000 = 0.000761`` tez.
 Let's take an example. Say a block has round 1, is proposed by
 delegate B, and contains the payload from round 0 produced by delegate
 A. Also, B includes attestations with attesting power ``5251``. Then A receives
-the fees and 10 tez (the ``BAKING_REWARD_FIXED_PORTION``) as a reward for
+the fees and 10 tez (the ``baking_reward_fixed_portion``) as a reward for
 producing the block's payload. Concerning the bonus, given that
 ``CONSENSUS_COMMITTEE_SIZE = 7000``, the minimum required validator slots is ``4667``, and there are ``2333 = 7000 - 4667`` additional validator slots.
 Therefore B receives the bonus ``(5251 - 4667) * 0.001143 = 0.667512`` tez. (Note
@@ -393,12 +395,6 @@ Consensus related protocol parameters
      - 2 cycles
    * - ``PERCENTAGE_OF_FROZEN_DEPOSITS_SLASHED_PER_DOUBLE_BAKING``
      - 5%
-   * - ``BAKING_REWARD_FIXED_PORTION``
-     - 2.67 tez
-   * - ``BAKING_REWARD_BONUS_PER_SLOT``
-     - ``bonus / (CONSENSUS_COMMITTEE_SIZE / 3)`` = 0.001143 tez
-   * - ``ATTESTING_REWARD_PER_SLOT``
-     - ``attesting_reward / CONSENSUS_COMMITTEE_SIZE`` = 0.000761 tez
 
 The above list of protocol parameters is a subset of the :ref:`protocol constants <protocol_constants_alpha>`.
 
