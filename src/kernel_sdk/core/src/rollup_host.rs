@@ -6,9 +6,10 @@
 
 //! Implementation of [`crate::SmartRollupCore`] for a generic rollup host.
 
-use crate::smart_rollup_core as core;
-use crate::smart_rollup_core::ReadInputMessageInfo;
-use crate::SmartRollupCore;
+use crate::{
+    smart_rollup_core::{ReadInputMessageInfo, SmartRollupCore},
+    target_impl,
+};
 
 /// The runtime host when running in `wasm` rollup.
 ///
@@ -41,19 +42,19 @@ unsafe impl SmartRollupCore for RollupHost {
         dst: *mut u8,
         max_bytes: usize,
     ) -> i32 {
-        core::read_input(message_info, dst, max_bytes)
+        target_impl::read_input(message_info, dst, max_bytes)
     }
 
     unsafe fn write_output(&self, src: *const u8, num_bytes: usize) -> i32 {
-        core::write_output(src, num_bytes)
+        target_impl::write_output(src, num_bytes)
     }
 
     unsafe fn write_debug(&self, src: *const u8, num_bytes: usize) {
-        core::write_debug(src, num_bytes)
+        target_impl::write_debug(src, num_bytes)
     }
 
     unsafe fn store_has(&self, path: *const u8, path_len: usize) -> i32 {
-        core::store_has(path, path_len)
+        target_impl::store_has(path, path_len)
     }
 
     unsafe fn store_read(
@@ -64,7 +65,7 @@ unsafe impl SmartRollupCore for RollupHost {
         dst: *mut u8,
         max_bytes: usize,
     ) -> i32 {
-        core::store_read(path, path_len, offset, dst, max_bytes)
+        target_impl::store_read(path, path_len, offset, dst, max_bytes)
     }
 
     unsafe fn store_write(
@@ -75,19 +76,19 @@ unsafe impl SmartRollupCore for RollupHost {
         src: *const u8,
         num_bytes: usize,
     ) -> i32 {
-        core::store_write(path, path_len, offset, src, num_bytes)
+        target_impl::store_write(path, path_len, offset, src, num_bytes)
     }
 
     unsafe fn store_delete(&self, path: *const u8, len: usize) -> i32 {
-        core::store_delete(path, len)
+        target_impl::store_delete(path, len)
     }
 
     unsafe fn store_delete_value(&self, path: *const u8, len: usize) -> i32 {
-        core::store_delete_value(path, len)
+        target_impl::store_delete_value(path, len)
     }
 
     unsafe fn store_list_size(&self, path: *const u8, path_len: usize) -> i64 {
-        core::store_list_size(path, path_len)
+        target_impl::store_list_size(path, path_len)
     }
 
     unsafe fn store_move(
@@ -97,7 +98,7 @@ unsafe impl SmartRollupCore for RollupHost {
         to_path: *const u8,
         to_path_len: usize,
     ) -> i32 {
-        core::store_move(from_path, from_path_len, to_path, to_path_len)
+        target_impl::store_move(from_path, from_path_len, to_path, to_path_len)
     }
 
     unsafe fn store_copy(
@@ -107,7 +108,7 @@ unsafe impl SmartRollupCore for RollupHost {
         to_path: *const u8,
         to_path_len: usize,
     ) -> i32 {
-        core::store_copy(from_path, from_path_len, to_path, to_path_len)
+        target_impl::store_copy(from_path, from_path_len, to_path, to_path_len)
     }
 
     unsafe fn reveal_preimage(
@@ -117,7 +118,7 @@ unsafe impl SmartRollupCore for RollupHost {
         destination_addr: *mut u8,
         max_bytes: usize,
     ) -> i32 {
-        core::reveal_preimage(hash_addr, hash_len, destination_addr, max_bytes)
+        target_impl::reveal_preimage(hash_addr, hash_len, destination_addr, max_bytes)
     }
 
     unsafe fn reveal(
@@ -127,14 +128,14 @@ unsafe impl SmartRollupCore for RollupHost {
         destination_addr: *mut u8,
         max_bytes: usize,
     ) -> i32 {
-        core::reveal(payload_addr, payload_len, destination_addr, max_bytes)
+        target_impl::reveal(payload_addr, payload_len, destination_addr, max_bytes)
     }
 
     unsafe fn store_value_size(&self, path: *const u8, path_len: usize) -> i32 {
-        core::store_value_size(path, path_len)
+        target_impl::store_value_size(path, path_len)
     }
 
     unsafe fn reveal_metadata(&self, destination_addr: *mut u8, max_bytes: usize) -> i32 {
-        core::reveal_metadata(destination_addr, max_bytes)
+        target_impl::reveal_metadata(destination_addr, max_bytes)
     }
 }
