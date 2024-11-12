@@ -131,7 +131,7 @@ let worker_request_failed =
     ~section
     ~name:"request_failed"
     ~msg:"[Warning]: Request {view} failed: {errors}"
-    ~level:Warning
+    ~level:Error
     ("view", Blueprints_publisher_types.Request.encoding)
     ~pp1:Blueprints_publisher_types.Request.pp
     ("errors", Error_monad.trace_encoding)

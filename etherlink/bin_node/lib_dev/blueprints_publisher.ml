@@ -355,11 +355,24 @@ let bind_worker f =
   | Error errs -> fail errs
   | Ok w -> f w
 
+type error += Worker_queue_is_closed
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"blueprint_publisher_queue_is_closed"
+    ~title:"Blueprint_publisher_queue_is_closed"
+    ~description:
+      "Tried to publish a new blueprint but the publisher queue is closed"
+    Data_encoding.unit
+    (function Worker_queue_is_closed -> Some () | _ -> None)
+    (fun () -> Worker_queue_is_closed)
+
 let worker_add_request ~request =
   let open Lwt_result_syntax in
   bind_worker @@ fun w ->
-  let*! (_pushed : bool) = Worker.Queue.push_request w request in
-  return_unit
+  let*! (pushed : bool) = Worker.Queue.push_request w request in
+  if pushed then return_unit else tzfail Worker_queue_is_closed
 
 let publish level payload =
   worker_add_request ~request:(Publish {level; payload})
