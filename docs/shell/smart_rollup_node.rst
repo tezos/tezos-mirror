@@ -373,6 +373,18 @@ The rollup node can now be run with just:
 
 The configuration will be read from ``${ROLLUP_NODE_DIR}/config.json``.
 
+Monitoring a smart-rollup node
+""""""""""""""""""""""""""""""
+
+The smart-rollup node offers the same :doc:`monitoring features <../user/node-monitoring>` as the Octez node.
+
+For the list of metrics provided by the rollup node see the following page:
+
+.. toctree::
+   :maxdepth: 2
+
+   ../developer/rollup_metrics
+
 Rollup node in a sandbox
 """"""""""""""""""""""""
 
