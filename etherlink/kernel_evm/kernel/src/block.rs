@@ -268,14 +268,12 @@ fn compute_bip<Host: Runtime>(
     tracer_input: Option<TracerInput>,
     chain_id: U256,
     minimum_base_fee_per_gas: U256,
-    base_fee_per_gas: U256,
     da_fee_per_byte: U256,
     coinbase: H160,
 ) -> anyhow::Result<BlockComputationResult> {
     let constants: BlockConstants = block_in_progress.constants(
         chain_id,
         minimum_base_fee_per_gas,
-        base_fee_per_gas,
         da_fee_per_byte,
         GAS_LIMIT,
         coinbase,
@@ -463,7 +461,6 @@ pub fn produce<Host: Runtime>(
                 tracer_input,
                 chain_id,
                 minimum_base_fee_per_gas,
-                base_fee_per_gas,
                 da_fee_per_byte,
                 coinbase,
             ) {
@@ -550,7 +547,6 @@ pub fn produce<Host: Runtime>(
             tracer_input,
             chain_id,
             minimum_base_fee_per_gas,
-            base_fee_per_gas,
             da_fee_per_byte,
             coinbase,
         ) {
