@@ -211,7 +211,7 @@ module Make (Parameters : PARAMETERS) = struct
       emit e (signers_alias signers, state.tags, x, y, z)
   end
 
-  module Metrics = Metrics.Make (struct
+  module Metrics = Injector_metrics.Make (struct
     module Tag = Parameters.Tag
 
     let registry = Parameters.metrics_registry
