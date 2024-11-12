@@ -112,6 +112,38 @@ module JSONRPC = struct
            (req "id" (option id_repr_encoding))))
 end
 
+module Subscription = struct
+  let version = JSONRPC.version
+
+  let method_ = "eth_subscription"
+
+  type result = {
+    result : Data_encoding.json;
+    subscription : Ethereum_types.Subscription.id;
+  }
+
+  let result_encoding =
+    Data_encoding.(
+      conv
+        (fun {result; subscription} -> (result, subscription))
+        (fun (result, subscription) -> {result; subscription})
+        (obj2
+           (req "result" Data_encoding.json)
+           (req "subscription" Ethereum_types.Subscription.id_encoding)))
+
+  type response = {params : result}
+
+  let response_encoding =
+    Data_encoding.(
+      conv
+        (fun {params} -> ((), (), params))
+        (fun ((), (), params) -> {params})
+        (obj3
+           (req "jsonrpc" (constant version))
+           (req "method" (constant method_))
+           (req "params" result_encoding)))
+end
+
 module Error = struct
   type t = unit
 
