@@ -200,17 +200,21 @@ impl BlockInProgress {
     pub fn constants(
         &self,
         chain_id: U256,
-        block_fees: &BlockFees,
+        minimum_base_fee_per_gas: U256,
+        base_fee_per_gas: U256,
+        da_fee_per_byte: U256,
         gas_limit: u64,
         coinbase: H160,
     ) -> BlockConstants {
         let timestamp = U256::from(self.timestamp.as_u64());
+        let block_fees =
+            BlockFees::new(minimum_base_fee_per_gas, base_fee_per_gas, da_fee_per_byte);
         BlockConstants {
             number: self.number,
             coinbase,
             timestamp,
             gas_limit,
-            block_fees: *block_fees,
+            block_fees,
             chain_id,
             prevrandao: None,
         }

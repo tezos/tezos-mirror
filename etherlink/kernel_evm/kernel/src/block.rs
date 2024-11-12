@@ -27,7 +27,6 @@ use evm_execution::precompiles;
 use evm_execution::precompiles::PrecompileBTreeMap;
 use evm_execution::trace::TracerInput;
 use primitive_types::{H160, H256, U256};
-use tezos_ethereum::block::BlockFees;
 use tezos_ethereum::transaction::TransactionHash;
 use tezos_evm_logging::{log, Level::*, Verbosity};
 use tezos_evm_runtime::runtime::Runtime;
@@ -211,7 +210,7 @@ fn next_bip_from_blueprints<Host: Runtime>(
     host: &mut Host,
     current_block_number: U256,
     current_block_parent_hash: H256,
-    block_fees: &mut BlockFees,
+    base_fee_per_gas: &mut U256,
     tick_counter: &TickCounter,
     config: &mut Configuration,
     kernel_upgrade: &Option<KernelUpgrade>,
@@ -230,7 +229,7 @@ fn next_bip_from_blueprints<Host: Runtime>(
             }
             let gas_price = crate::gas_price::base_fee_per_gas(host, blueprint.timestamp);
             crate::storage::store_base_fee_per_gas(host, gas_price)?;
-            block_fees.set_base_fee_per_gas(gas_price);
+            *base_fee_per_gas = gas_price;
 
             let bip = block_in_progress::BlockInProgress::from_blueprint(
                 blueprint,
@@ -267,11 +266,19 @@ fn compute_bip<Host: Runtime>(
     limits: &Limits,
     tracer_input: Option<TracerInput>,
     chain_id: U256,
-    block_fees: &BlockFees,
+    minimum_base_fee_per_gas: U256,
+    base_fee_per_gas: U256,
+    da_fee_per_byte: U256,
     coinbase: H160,
 ) -> anyhow::Result<BlockComputationResult> {
-    let constants: BlockConstants =
-        block_in_progress.constants(chain_id, block_fees, GAS_LIMIT, coinbase);
+    let constants: BlockConstants = block_in_progress.constants(
+        chain_id,
+        minimum_base_fee_per_gas,
+        base_fee_per_gas,
+        da_fee_per_byte,
+        GAS_LIMIT,
+        coinbase,
+    );
     let result = compute(
         host,
         outbox_queue,
@@ -396,7 +403,10 @@ pub fn produce<Host: Runtime>(
     sequencer_pool_address: Option<H160>,
     tracer_input: Option<TracerInput>,
 ) -> Result<ComputationResult, anyhow::Error> {
-    let mut block_fees: BlockFees = crate::retrieve_block_fees(host)?;
+    let minimum_base_fee_per_gas = crate::retrieve_minimum_base_fee_per_gas(host)?;
+    let mut base_fee_per_gas =
+        crate::retrieve_base_fee_per_gas(host, minimum_base_fee_per_gas)?;
+    let da_fee_per_byte = crate::retrieve_da_fee(host)?;
 
     let kernel_upgrade = upgrade::read_kernel_upgrade(host)?;
 
@@ -451,7 +461,9 @@ pub fn produce<Host: Runtime>(
                 &config.limits,
                 tracer_input,
                 chain_id,
-                &block_fees,
+                minimum_base_fee_per_gas,
+                base_fee_per_gas,
+                da_fee_per_byte,
                 coinbase,
             ) {
                 Ok(BlockComputationResult::Finished {
@@ -498,7 +510,7 @@ pub fn produce<Host: Runtime>(
             safe_host.host,
             current_block_number,
             current_block_parent_hash,
-            &mut block_fees,
+            &mut base_fee_per_gas,
             &tick_counter,
             config,
             &kernel_upgrade,
@@ -536,7 +548,9 @@ pub fn produce<Host: Runtime>(
             &config.limits,
             tracer_input,
             chain_id,
-            &block_fees,
+            minimum_base_fee_per_gas,
+            base_fee_per_gas,
+            da_fee_per_byte,
             coinbase,
         ) {
             Ok(BlockComputationResult::Finished {
@@ -604,6 +618,7 @@ mod tests {
     };
     use primitive_types::{H160, U256};
     use std::str::FromStr;
+    use tezos_ethereum::block::BlockFees;
     use tezos_ethereum::transaction::{
         TransactionHash, TransactionStatus, TransactionType, TRANSACTION_HASH_SIZE,
     };
