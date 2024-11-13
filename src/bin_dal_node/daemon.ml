@@ -457,9 +457,9 @@ module Handler = struct
     in
     if Signature.Public_key_hash.Set.is_empty attesters then return_unit
     else
-      let attested_level = Int32.pred block_level in
+      let attestation_level = Int32.pred block_level in
       let* committee =
-        Node_context.fetch_committee node_ctxt ~level:attested_level
+        Node_context.fetch_committee node_ctxt ~level:attestation_level
       in
       let attestations = get_attestations () in
       let attestable_slots =
@@ -496,7 +496,7 @@ module Handler = struct
                       Event.(
                         emit
                           warn_attester_not_dal_attesting
-                          (delegate, attested_level))
+                          (delegate, block_level))
                     else (* no assigned shards... *)
                       Lwt.return_unit
                 | Some bitset ->
@@ -509,7 +509,7 @@ module Handler = struct
                           Event.(
                             emit
                               warn_attester_did_not_attest_slot
-                              (delegate, index, attested_level))
+                              (delegate, index, block_level))
                         else Lwt.return_unit)
                       (0 -- (parameters.number_of_slots - 1)))
             | None | Some _ ->
