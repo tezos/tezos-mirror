@@ -45,6 +45,7 @@ fn debug_test(
         initrd,
         posix_exit_mode(&opts.common.posix_exit_mode),
         opts.demangle,
+        opts.common.max_steps,
     )?)
 }
 
@@ -68,8 +69,7 @@ fn debug_pvm(
             initrd,
             inbox.build(),
             rollup_address.into_hash().as_ref().try_into().unwrap(),
-            opts.common.inbox.origination_level,
-            opts.demangle,
+            opts,
         )?,
     )
 }
