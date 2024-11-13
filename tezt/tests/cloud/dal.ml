@@ -78,15 +78,16 @@ module Disconnect = struct
 end
 
 module Network = struct
-  type testnet = Ghostnet | Weeklynet of string
+  type public_network = Mainnet | Ghostnet | Weeklynet of string
   (* This string is the date of the genesis block of the current
      weeklynet; typically it is last wednesday. *)
 
-  type t = Testnet of testnet | Sandbox
+  type t = Public of public_network | Sandbox
 
   let to_string = function
-    | Testnet Ghostnet -> "ghostnet"
-    | Testnet (Weeklynet date) -> sf "weeklynet-%s" date
+    | Public Mainnet -> "mainnet"
+    | Public Ghostnet -> "ghostnet"
+    | Public (Weeklynet date) -> sf "weeklynet-%s" date
     | Sandbox -> "sandbox"
 
   let public_rpc_endpoint testnet =
@@ -95,25 +96,30 @@ module Network = struct
         scheme = "https";
         host =
           (match testnet with
+          | Mainnet -> "rpc.tzbeta.net"
           | Ghostnet -> "rpc.ghostnet.teztnets.com"
           | Weeklynet date -> sf "rpc.weeklynet-%s.teztnets.com" date);
         port = 443;
       }
 
   let snapshot_service = function
+    | Mainnet -> "https://snapshots.eu.tzinit.org/mainnet"
     | Ghostnet -> "https://snapshots.eu.tzinit.org/ghostnet"
     | Weeklynet _ -> "https://snapshots.eu.tzinit.org/weeklynet"
 
   (* Argument to give to the --network option of `octez-node config init`. *)
   let to_octez_network_options = function
+    | Mainnet -> "mainnet"
     | Ghostnet -> "ghostnet"
     | Weeklynet date -> sf "https://teztnets.com/weeklynet-%s" date
 
   let default_bootstrap = function
+    | Mainnet -> "boot.tzinit.org"
     | Ghostnet -> "ghostnet.tzinit.org" (* Taken from ghostnet configuration *)
     | Weeklynet date -> sf "weeklynet-%s.teztnets.com" date
 
   let default_dal_bootstrap = function
+    | Mainnet -> "dalboot.mainnet.tzboot.net"
     | Ghostnet ->
         "dalboot.ghostnet.tzboot.net" (* Taken from ghostnet configuration *)
     | Weeklynet date -> sf "dal.weeklynet-%s.teztnets.com" date
@@ -121,13 +127,13 @@ module Network = struct
   let get_level network endpoint =
     match network with
     | Sandbox -> Lwt.return 1
-    | Testnet _ ->
+    | Public _ ->
         let* json =
           RPC_core.call endpoint (RPC.get_chain_block_header_shell ())
         in
         JSON.(json |-> "level" |> as_int) |> Lwt.return
 
-  let expected_pow = function Testnet _ -> 26. | Sandbox -> 0.
+  let expected_pow = function Public _ -> 26. | Sandbox -> 0.
 end
 
 module Node = struct
@@ -138,7 +144,7 @@ module Node = struct
   let init ?(arguments = []) ?data_dir ?dal_config ~name network agent =
     toplog "Inititializing a L1 node" ;
     match network with
-    | Network.Testnet network -> (
+    | Network.Public network -> (
         match data_dir with
         | Some data_dir ->
             let* node = Node.Agent.create ~arguments ~data_dir ~name agent in
@@ -499,12 +505,13 @@ module Cli = struct
   let network_typ =
     Clap.typ
       ~name:"network"
-      ~dummy:Network.(Testnet Ghostnet)
+      ~dummy:Network.(Public Ghostnet)
       ~parse:(function
-        | "ghostnet" -> Some (Testnet Ghostnet)
+        | "mainnet" -> Some (Public Mainnet)
+        | "ghostnet" -> Some (Public Ghostnet)
         | s when String.length s = 20 && String.sub s 0 10 = "weeklynet-" ->
             let date = String.sub s 10 10 in
-            Some (Testnet (Weeklynet date))
+            Some (Public (Weeklynet date))
         | "sandbox" -> Some Sandbox
         | _ -> None)
       ~show:Network.to_string
@@ -522,7 +529,7 @@ module Cli = struct
     Clap.flag
       ~section
       ~set_long:"bootstrap"
-      (match network with Sandbox -> true | Testnet _ -> false)
+      (match network with Sandbox -> true | Public _ -> false)
 
   let stake =
     let stake_typ =
@@ -544,7 +551,7 @@ module Cli = struct
          shares old by one baker. The total stake is given by the sum of all \
          shares."
       stake_typ
-      (match network with Sandbox -> [100] | Testnet _ -> [])
+      (match network with Sandbox -> [100] | Public _ -> [])
 
   let stake_machine_type =
     let stake_machine_type_typ =
@@ -654,8 +661,9 @@ module Cli = struct
       protocol_typ
       (match network with
       | Sandbox -> Alpha
-      | Testnet Ghostnet -> ParisC
-      | Testnet (Weeklynet _) -> Alpha)
+      | Public Mainnet -> ParisC
+      | Public Ghostnet -> ParisC
+      | Public (Weeklynet _) -> Alpha)
 
   let data_dir =
     Clap.optional_string ~section ~long:"data-dir" ~placeholder:"<data_dir>" ()
@@ -1349,9 +1357,9 @@ let init_teztale (configuration : configuration) cloud agent =
     Lwt.return_some teztale
   else Lwt.return_none
 
-let init_testnet cloud (configuration : configuration) teztale agent
-    (network : Network.testnet) =
-  toplog "Init testnet" ;
+let init_public_network cloud (configuration : configuration) teztale agent
+    (network : Network.public_network) =
+  toplog "Init public network" ;
   let* bootstrap =
     match agent with
     | None ->
@@ -2232,7 +2240,7 @@ let obtain_some_node_rpc_endpoint agent network (bootstrap : bootstrap)
     (bakers : baker list) (producers : producer list)
     (observers : observer list) etherlink =
   match (agent, network) with
-  | None, Network.Testnet _ -> (
+  | None, Network.Public _ -> (
       match (bakers, producers, observers, etherlink) with
       | baker :: _, _, _, _ -> Node.as_rpc_endpoint baker.node
       | [], producer :: _, _, _ -> Node.as_rpc_endpoint producer.node
@@ -2285,8 +2293,8 @@ let init ~(configuration : configuration) cloud next_agent =
     | Network.Sandbox ->
         let bootstrap_agent = Option.get bootstrap_agent in
         init_sandbox_and_activate_protocol cloud configuration bootstrap_agent
-    | Testnet testnet ->
-        init_testnet cloud configuration teztale bootstrap_agent testnet
+    | Public network ->
+        init_public_network cloud configuration teztale bootstrap_agent network
   in
   let* bakers =
     Lwt_list.mapi_p
@@ -2455,7 +2463,7 @@ let ensure_enough_funds t i =
   let producer = List.nth t.producers i in
   match t.configuration.network with
   | Sandbox -> (* Producer has enough money *) Lwt.return_unit
-  | Testnet _ ->
+  | Public _ ->
       let* balance =
         Node.RPC.call producer.node
         @@ RPC.get_chain_block_context_contract_balance
