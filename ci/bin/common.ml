@@ -124,7 +124,7 @@ module Images_external = struct
     Image.mk_external
       ~image_path:"${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.6.0"
 
-  let hadolint = Image.mk_external ~image_path:"hadolint/hadolint:2.9.3-debian"
+  let hadolint = Image.mk_external ~image_path:"hadolint/hadolint:2.12.0-alpine"
 
   (* We specify the semgrep image by hash to avoid flakiness. Indeed, if we took the
      latest release, then an update in the parser or analyser could result in new
