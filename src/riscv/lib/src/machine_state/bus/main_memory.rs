@@ -7,7 +7,7 @@ use super::{Address, AddressableRead, AddressableWrite};
 use crate::state_backend::{
     self as backend,
     hash::{Hash, HashError, RootHashable},
-    ManagerDeserialise, ManagerSerialise,
+    ManagerDeserialise, ManagerRead, ManagerSerialise,
 };
 use serde::{Deserialize, Serialize};
 use std::mem;
@@ -100,7 +100,7 @@ pub trait MainMemoryLayout: backend::Layout {
     /// Clone the dynamic region.
     fn clone_data<M: backend::ManagerClone>(data: &Self::Data<M>) -> Self::Data<M>;
 
-    fn hash_data<M: ManagerSerialise>(data: &Self::Data<M>) -> Result<Hash, HashError>;
+    fn hash_data<M: backend::ManagerRead>(data: &Self::Data<M>) -> Result<Hash, HashError>;
 }
 
 impl<const BYTES: usize> MainMemoryLayout for Sizes<BYTES> {
@@ -168,7 +168,7 @@ impl<const BYTES: usize> MainMemoryLayout for Sizes<BYTES> {
         data.clone()
     }
 
-    fn hash_data<M: ManagerSerialise>(data: &Self::Data<M>) -> Result<Hash, HashError> {
+    fn hash_data<M: backend::ManagerRead>(data: &Self::Data<M>) -> Result<Hash, HashError> {
         data.hash()
     }
 }
@@ -283,7 +283,7 @@ where
     }
 }
 
-impl<L: MainMemoryLayout, M: ManagerSerialise> RootHashable for MainMemory<L, M> {
+impl<L: MainMemoryLayout, M: ManagerRead> RootHashable for MainMemory<L, M> {
     fn hash(&self) -> Result<Hash, HashError> {
         L::hash_data(&self.data)
     }

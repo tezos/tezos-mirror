@@ -534,13 +534,48 @@ pub const MERKLE_LEAF_SIZE: NonZeroUsize =
 /// Arity of the Merkle tree used for Merkleising [`DynCells`].
 const MERKLE_ARITY: usize = 3;
 
-impl<const LEN: usize, M: ManagerSerialise> RootHashable for DynCells<LEN, M> {
+/// Helper function which allows iterating over chunks of a dynamic region
+/// and writing them to a writer. The last chunk may be smaller than the
+/// Merkle leaf size. The implementations of `RootHashable` and `Merkleisable`
+/// for dynamic regions both use it, ensuring consistency between the two.
+fn chunks_to_writer<
+    const LEN: usize,
+    T: std::io::Write,
+    F: Fn(usize) -> [u8; MERKLE_LEAF_SIZE.get()],
+>(
+    writer: &mut T,
+    read: F,
+) -> Result<(), std::io::Error> {
+    let merkle_leaf_size = MERKLE_LEAF_SIZE.get();
+    assert!(LEN >= merkle_leaf_size);
+    let mut address = 0;
+
+    while address + merkle_leaf_size <= LEN {
+        writer.write_all(read(address).as_slice())?;
+        address += merkle_leaf_size;
+    }
+
+    // When the last chunk is smaller than `MERKLE_LEAF_SIZE`,
+    // read the last `MERKLE_LEAF_SIZE` bytes and pass a subslice containing
+    // only the bytes not previously read to the writer.
+    if address != LEN {
+        address += merkle_leaf_size;
+        let buffer = read(LEN.saturating_sub(merkle_leaf_size));
+        writer.write_all(&buffer[address.saturating_sub(LEN)..])?;
+    };
+
+    Ok(())
+}
+
+// TODO RV-305: Specialise implementation for `DynCells<LEN, ProofGen<'_, M>>`
+// when feature becomes stable.
+impl<const LEN: usize, M: ManagerRead> RootHashable for DynCells<LEN, M> {
     fn hash(&self) -> Result<Hash, HashError> {
-        let hashes = {
-            let mut writer = HashWriter::new(MERKLE_LEAF_SIZE);
-            binary::serialise_into(&self, &mut writer)?;
-            writer.finalise()?
-        };
+        let mut writer = HashWriter::new(MERKLE_LEAF_SIZE);
+        let read =
+            |address| -> [u8; MERKLE_LEAF_SIZE.get()] { M::dyn_region_read(&self.region, address) };
+        chunks_to_writer::<LEN, _, _>(&mut writer, read)?;
+        let hashes = writer.finalise()?;
         hash::build_custom_merkle_hash(MERKLE_ARITY, hashes)
     }
 }
