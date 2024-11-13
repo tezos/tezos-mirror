@@ -437,7 +437,7 @@ let check_balance_updates balance_updates (predicates : bu_check list) =
   List.iter
     (fun {pred; change; msg} ->
       let pre_filtered = List.filter pred balance_updates in
-      if pre_filtered = [] then Test.fail "Inconsistant balance update: %s" msg
+      if pre_filtered = [] then Test.fail "Inconsistent balance update: %s" msg
       else if
         not
           (List.exists
@@ -448,13 +448,13 @@ let check_balance_updates balance_updates (predicates : bu_check list) =
              pre_filtered)
       then
         Test.fail
-          "@[<v 2>Inconsistant balance update, could it be a regression.@. \
+          "@[<v 2>Inconsistent balance update, could it be a regression.@. \
            Expected:@ @[%s, change amount: %d@]@.Got:@ @[%s@]@]"
           msg
           change
           (List.fold_left
              (fun acc x ->
-               acc ^ "@ " ^ Operation_receipt.Balance_updates.to_string x)
+               acc ^ "\nor\n " ^ Operation_receipt.Balance_updates.to_string x)
              ""
              pre_filtered))
     predicates
@@ -1130,9 +1130,16 @@ let test_staking =
   let* bu = Operation_receipt.Balance_updates.from_result [bu] in
 
   (* check slashed and rewarded amounts *)
-  (* total amounts *)
-  let total_amount_rewarded = 1450001868 in
-  let total_amount_slashed = 8700011216 in
+  let global_limit_of_staking_over_baking =
+    if Protocol.(number protocol <= 020) then 5 else 9
+  in
+  (* It's critical that the rewarded amount cannot exceed the amount
+     slashed from the baker's own deposits; otherwise, the baker may
+     actually gain tez by purposefully double signing and denuncing
+     itself. Therefore, the rewarded part is set to 1 /
+     (global_limit_of_staking_over_baking + 2) of the slashed
+     amount. *)
+  let reward_denominator = global_limit_of_staking_over_baking + 2 in
 
   (* slashed stakers (including baker) unstake deposit *)
   let amount_slashed_from_unstake_stakers_deposits =
@@ -1171,34 +1178,24 @@ let test_staking =
     | _ -> Test.fail "Unexpected edge_of_staking_over_baking value: %d" eosod
   in
 
-  assert_with_roundings
-    ~__LOC__
+  let amount_rewarded_from_baker_deposits =
+    amount_slashed_from_baker_deposits / reward_denominator
+  in
+  let amount_burned_from_baker_deposits =
+    amount_slashed_from_baker_deposits - amount_rewarded_from_baker_deposits
+  in
+
+  (* total amounts *)
+  let total_amount_rewarded =
     amount_rewarded_from_unstake_stakers_deposits
-    (int_of_float (float amount_slashed_from_unstake_stakers_deposits /. 6.)) ;
+    + amount_rewarded_from_stakers_deposits
+    + amount_rewarded_from_baker_deposits
+  in
+  let total_amount_burned =
+    amount_burned_from_unstake_stakers_deposits
+    + amount_burned_from_stakers_deposits + amount_burned_from_baker_deposits
+  in
 
-  assert_with_roundings
-    ~__LOC__
-    amount_rewarded_from_stakers_deposits
-    (int_of_float (float amount_slashed_from_stakers_deposits /. 6.)) ;
-
-  assert_with_roundings
-    ~__LOC__
-    amount_rewarded_from_baker_deposits
-    (int_of_float (float amount_slashed_from_baker_deposits /. 6.)) ;
-
-  assert_with_roundings
-    ~margin:3 (* as we sum 3 amounts *)
-    ~__LOC__
-    (amount_rewarded_from_unstake_stakers_deposits
-   + amount_rewarded_from_stakers_deposits + amount_rewarded_from_baker_deposits
-    )
-    total_amount_rewarded ;
-  assert_with_roundings
-    ~margin:3 (* as we sum 3 amounts *)
-    ~__LOC__
-    (amount_slashed_from_unstake_stakers_deposits
-   + amount_slashed_from_stakers_deposits + amount_slashed_from_baker_deposits)
-    total_amount_slashed ;
   let check_opr ~kind ~category ~change ~staker ~msg ~delayed_operation_hash =
     let open Operation_receipt.Balance_updates in
     {
@@ -1220,7 +1217,7 @@ let test_staking =
       check_opr
         ~kind:"freezer"
         ~category:(Some "unstaked_deposits")
-        ~change:(-amount_slashed_from_unstake_stakers_deposits)
+        ~change:(-amount_burned_from_unstake_stakers_deposits)
         ~staker:
           (Some
              (Delegate
@@ -1233,7 +1230,7 @@ let test_staking =
       check_opr
         ~kind:"freezer"
         ~category:(Some "deposits")
-        ~change:(-amount_slashed_from_baker_deposits)
+        ~change:(-amount_burned_from_baker_deposits)
         ~staker:
           (Some (Baker_own_stake {baker = Constant.bootstrap2.public_key_hash}))
         ~msg:"Slashed from baker deposits"
@@ -1241,7 +1238,7 @@ let test_staking =
       check_opr
         ~kind:"freezer"
         ~category:(Some "deposits")
-        ~change:(-amount_slashed_from_stakers_deposits)
+        ~change:(-amount_burned_from_stakers_deposits)
         ~staker:
           (Some
              (Delegate
@@ -1254,7 +1251,7 @@ let test_staking =
       check_opr
         ~kind:"burned"
         ~category:(Some "punishments")
-        ~change:total_amount_slashed
+        ~change:total_amount_burned
         ~staker:None
         ~delayed_operation_hash:None
         ~msg:"Punishment for double baking";
