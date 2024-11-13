@@ -395,9 +395,9 @@ let find_and_execute_withdrawal ?(outbox_lookup_depth = 10) ~withdrawal_level
   in
   return withdrawal_level
 
-let init_sequencer_sandbox ?genesis_timestamp ?tx_pool_tx_per_addr_limit
-    ?set_account_code ?da_fee_per_byte ?minimum_base_fee_per_gas ?patch_config
-    ?(kernel = Constant.WASM.evm_kernel)
+let init_sequencer_sandbox ?maximum_gas_per_transaction ?genesis_timestamp
+    ?tx_pool_tx_per_addr_limit ?set_account_code ?da_fee_per_byte
+    ?minimum_base_fee_per_gas ?patch_config ?(kernel = Constant.WASM.evm_kernel)
     ?(bootstrap_accounts =
       List.map
         (fun account -> account.Eth_account.address)
@@ -408,6 +408,7 @@ let init_sequencer_sandbox ?genesis_timestamp ?tx_pool_tx_per_addr_limit
 
   let*! () =
     Evm_node.make_kernel_installer_config
+      ?maximum_gas_per_transaction
       ?set_account_code
       ?da_fee_per_byte
       ?minimum_base_fee_per_gas

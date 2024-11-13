@@ -18,9 +18,6 @@ module type SimulationBackend = sig
     bytes tzresult Lwt.t
 end
 
-(* This value is a hard maximum used by estimateGas. Set at Int64.max_int / 2 *)
-let max_gas_limit = Z.of_int64 0x3FFFFFFFFFFFFFFFL
-
 module Make (SimulationBackend : SimulationBackend) = struct
   let call_simulation ?(state_override = Ethereum_types.state_override_empty)
       ~log_file ~input_encoder ~input simulation_state =
@@ -181,12 +178,12 @@ module Make (SimulationBackend : SimulationBackend) = struct
         in
         return_unit)
 
-  let rec confirm_gas ~simulation_version (call : Ethereum_types.call) gas
-      simulation_state =
+  let rec confirm_gas ~maximum_gas_per_transaction ~simulation_version
+      (call : Ethereum_types.call) gas simulation_state =
     let open Ethereum_types in
     let open Lwt_result_syntax in
     let double (Qty z) = Qty Z.(mul (of_int 2) z) in
-    let reached_max (Qty z) = z >= max_gas_limit in
+    let reached_max (Qty z) = z >= maximum_gas_per_transaction in
     let new_call = {call with gas = Some gas} in
     let* result =
       call_estimate_gas
@@ -198,10 +195,27 @@ module Make (SimulationBackend : SimulationBackend) = struct
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/6984
            All errors should not be treated the same *)
         Prometheus.Counter.inc_one Metrics.metrics.simulation.confirm_gas_needed ;
-        let new_gas = double gas in
-        if reached_max new_gas then
-          failwith "Gas estimate reached max gas limit."
-        else confirm_gas ~simulation_version call new_gas simulation_state
+        if reached_max gas then
+          failwith
+            "Gas estimate reached max gas limit of %s"
+            (Z.to_string maximum_gas_per_transaction)
+        else
+          let new_gas = double gas in
+          if reached_max new_gas then
+            (* We try one last time with maximum gas possible. *)
+            confirm_gas
+              ~maximum_gas_per_transaction
+              ~simulation_version
+              call
+              (Qty maximum_gas_per_transaction)
+              simulation_state
+          else
+            confirm_gas
+              ~maximum_gas_per_transaction
+              ~simulation_version
+              call
+              new_gas
+              simulation_state
     | Ok (Ok {gas_used = Some gas_used; _}) ->
         (* The gas returned by confirm gas can be ignored. What we care about
            is only knowing if the gas provided in {!new_call} is enough. The
@@ -251,29 +265,46 @@ module Make (SimulationBackend : SimulationBackend) = struct
        we need to give the block parameter to the call to
        {!simulation_version}. *)
     let* simulation_state = SimulationBackend.get_state () in
-    let* simulation_version = simulation_version simulation_state in
-    let* res =
-      call_estimate_gas
-        (simulation_input ~simulation_version ~with_da_fees:false call)
-        simulation_state
+    let* (Qty maximum_gas_per_transaction) =
+      Durable_storage.maximum_gas_per_transaction
+        (SimulationBackend.read simulation_state)
     in
-    match res with
-    | Ok (Ok {gas_used = Some (Qty gas); value}) ->
-        (* See EIP2200 for reference. But the tl;dr is: we cannot do the
-           opcode SSTORE if we have less than 2300 gas available, even
-           if we don't consume it. The simulated amount then gives an
-           amount of gas insufficient to execute the transaction.
-
-           The extra gas units, i.e. 2300, will be refunded.
-        *)
-        let safe_gas = Z.(add gas (of_int 2300)) in
-        (* add a safety margin of 2%, sufficient to cover a 1/64th difference *)
-        let safe_gas = Z.(add safe_gas (cdiv safe_gas (of_int 50))) in
-        let+ gas_used =
-          confirm_gas ~simulation_version call (Qty safe_gas) simulation_state
+    match call.Ethereum_types.gas with
+    | Some (Qty gas) when gas >= maximum_gas_per_transaction ->
+        return
+          (Error
+             (Format.sprintf
+                "Maximum allowed gas per transaction is %s"
+                (Z.to_string maximum_gas_per_transaction)))
+    | _ -> (
+        let* simulation_version = simulation_version simulation_state in
+        let* res =
+          call_estimate_gas
+            (simulation_input ~simulation_version ~with_da_fees:false call)
+            simulation_state
         in
-        Ok (Ok {Simulation.gas_used = Some gas_used; value})
-    | _ -> return res
+        match res with
+        | Ok (Ok {gas_used = Some (Qty gas); value}) ->
+            (* See EIP2200 for reference. But the tl;dr is: we cannot do the
+               opcode SSTORE if we have less than 2300 gas available, even
+               if we don't consume it. The simulated amount then gives an
+               amount of gas insufficient to execute the transaction.
+
+               The extra gas units, i.e. 2300, will be refunded.
+            *)
+            let safe_gas = Z.(add gas (of_int 2300)) in
+            (* add a safety margin of 2%, sufficient to cover a 1/64th difference *)
+            let safe_gas = Z.(add safe_gas (cdiv safe_gas (of_int 50))) in
+            let+ gas_used =
+              confirm_gas
+                ~maximum_gas_per_transaction
+                ~simulation_version
+                call
+                (Qty safe_gas)
+                simulation_state
+            in
+            Ok (Ok {Simulation.gas_used = Some gas_used; value})
+        | _ -> return res)
 
   let is_tx_valid tx_raw =
     let open Lwt_result_syntax in

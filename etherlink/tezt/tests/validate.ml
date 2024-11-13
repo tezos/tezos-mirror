@@ -16,8 +16,8 @@ let tag = function
   | Eip1559 -> "Eip1559"
   | Eip2930 -> "Eip2930"
 
-let register ?set_account_code ?da_fee_per_byte ?minimum_base_fee_per_gas ~title
-    ~tags f tx_types =
+let register ?maximum_gas_per_transaction ?set_account_code ?da_fee_per_byte
+    ?minimum_base_fee_per_gas ~title ~tags f tx_types =
   List.iter
     (fun tx_type ->
       let tag_tx = tag tx_type in
@@ -43,6 +43,7 @@ let register ?set_account_code ?da_fee_per_byte ?minimum_base_fee_per_gas ~title
       in
       let* sequencer =
         Helpers.init_sequencer_sandbox
+          ?maximum_gas_per_transaction
           ?set_account_code
           ?da_fee_per_byte
           ?minimum_base_fee_per_gas
@@ -480,6 +481,45 @@ let test_validate_gas_limit =
        should fail" ;
   unit
 
+let test_validate_custom_gas_limit =
+  let maximum_gas_per_transaction = 10L in
+  register
+    ~maximum_gas_per_transaction
+    ~title:"Validate custom gas limit"
+    ~tags:["gas_limit"]
+  @@ fun sequencer tx_type ->
+  assert (tx_type = Legacy) ;
+  let source = Eth_account.bootstrap_accounts.(0) in
+  let gas = Int.succ @@ Int64.to_int maximum_gas_per_transaction in
+  let* tx =
+    Cast.craft_tx
+      ~source_private_key:source.private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas_price:1_000_000_000
+      ~legacy:true
+      ~address:"0xd77420f73b4612a7a99dba8c2afd30a1886b0344"
+      ~value:Wei.zero
+      ~gas
+      ()
+  in
+  (* Validation considers the custom gas limit. *)
+  let*@? err = Rpc.send_raw_transaction ~raw_tx:tx sequencer in
+  Check.(err.message =~ rex "Gas limit for execution is too high")
+    ~error_msg:"Gas limit too high for execution, it should fail" ;
+  (* Simulation as well. *)
+  let*@? err =
+    Rpc.estimate_gas
+      [
+        ("to", `String "0xA257edC8ad1D8f8f463aC0D947cc381000b3c863");
+        ("gas", `String (string_of_int gas));
+      ]
+      sequencer
+  in
+  Check.((err.message = "Maximum allowed gas per transaction is 10") string)
+    ~error_msg:"Expected error message %R got %L" ;
+  unit
+
 let test_sender_is_not_contract =
   let source = Eth_account.bootstrap_accounts.(0) in
   register
@@ -534,4 +574,5 @@ let () =
   test_validate_pay_for_fees [Legacy; Eip1559] ;
   test_validate_pay_for_fees_max_fee_per_gas [Legacy; Eip1559] ;
   test_validate_gas_limit all_types ;
+  test_validate_custom_gas_limit [Legacy] ;
   test_sender_is_not_contract all_types
