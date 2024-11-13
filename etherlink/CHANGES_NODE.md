@@ -12,6 +12,9 @@
   `blueprint_applied` event. (!15505)
 - The gas estimation exits earlier if the simulation needs more than the
   gas limit per transaction. It also supports custom maximum gas limit. (!15468)
+- Modify the blueprints publisher worker to log error when it crash
+  and make the node crash when it fails to add a blueprints into its
+  queue. (!15600)
 
 ## Version 0.7 (2024-10-28)
 
