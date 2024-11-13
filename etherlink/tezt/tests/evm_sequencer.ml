@@ -6924,14 +6924,6 @@ let test_finalized_block_param =
   let* () =
     check_block_consistency
       ~block:`Finalized
-      ~left:proxy
-      ~right:sequencer
-      ~error_msg:"Sequencer and proxy should have the same last finalized"
-      ()
-  in
-  let* () =
-    check_block_consistency
-      ~block:`Finalized
       ~left:rpc
       ~right:sequencer
       ~error_msg:"Sequencer and rpc should have the same last finalized"
@@ -6942,17 +6934,6 @@ let test_finalized_block_param =
   let* () = Evm_node.terminate sequencer in
   (* Restart it. *)
   let* () = Evm_node.run sequencer in
-
-  let* () =
-    check_block_consistency
-      ~block:`Finalized
-      ~left:proxy
-      ~right:sequencer
-      ~error_msg:
-        "Sequencer and proxy should have the same last finalized after \
-         sequencer reboot"
-      ()
-  in
 
   unit
 

@@ -183,7 +183,15 @@ end) : Services_backend_sig.Backend = struct
               Ethereum_types.pp_block_hash
               hash)
     | Block_parameter Latest -> read_from_block_parameter Latest
-    | Block_parameter Finalized -> read_from_block_parameter Finalized
+    | Block_parameter Finalized ->
+        (* It is no longer supported because the shared implementaton takes
+           the finalized block number using an RPC where the block id is finalized.
+           However, when we fetch the content of the block, it's done on latest state,
+           not on the finalized one. This needs to be changed if we want to support
+           this parameter. *)
+        failwith
+          "Finalized block parameter is no longer supported on the EVM node in \
+           proxy mode"
     | Block_parameter Pending ->
         failwith "Pending block parameter is not supported"
     | Block_parameter Earliest ->
