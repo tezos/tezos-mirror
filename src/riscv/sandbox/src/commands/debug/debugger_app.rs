@@ -4,6 +4,7 @@
 // SPDX-License-Identifier: MIT
 
 use super::{errors, tui};
+use crate::commands::debug::DebugOptions;
 use color_eyre::Result;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use goblin::{elf, elf::header::ET_DYN, elf::Elf};
@@ -29,7 +30,6 @@ use std::{
     ops::Bound,
 };
 use tezos_smart_rollup::utils::inbox::Inbox;
-
 mod render;
 mod updates;
 
@@ -157,6 +157,7 @@ pub struct DebuggerApp<'a, S: Stepper> {
     stepper: &'a mut S,
     program: ProgramView<'a>,
     state: DebuggerState,
+    max_steps: Option<usize>,
 }
 
 fn get_elf_symbols<ML: MainMemoryLayout>(
@@ -198,13 +199,15 @@ impl<'a, ML: MainMemoryLayout> DebuggerApp<'a, TestStepper<ML>> {
         initrd: Option<&[u8]>,
         exit_mode: Mode,
         demangle_sybols: bool,
+        max_steps: Option<usize>,
     ) -> Result<()> {
         let (mut interpreter, prog) =
             TestStepper::<ML>::new_with_parsed_program(program, initrd, exit_mode)?;
         let symbols = get_elf_symbols::<ML>(program, demangle_sybols)?;
         errors::install_hooks()?;
         let terminal = tui::init()?;
-        DebuggerApp::new(&mut interpreter, fname, &prog, symbols).run_debugger(terminal)?;
+        DebuggerApp::new(&mut interpreter, fname, &prog, symbols, max_steps)
+            .run_debugger(terminal)?;
         tui::restore()?;
         Ok(())
     }
@@ -218,8 +221,7 @@ impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts> DebuggerApp<'_, PvmStepper<
         initrd: Option<&[u8]>,
         inbox: Inbox,
         rollup_address: [u8; 20],
-        origination_level: u32,
-        demangle_sybols: bool,
+        opts: &DebugOptions,
     ) -> Result<()> {
         let hooks = PvmHooks::new(|_| {});
 
@@ -229,15 +231,22 @@ impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts> DebuggerApp<'_, PvmStepper<
             inbox,
             hooks,
             rollup_address,
-            origination_level,
+            opts.common.inbox.origination_level,
         )?;
 
-        let symbols = get_elf_symbols::<ML>(program, demangle_sybols)?;
+        let symbols = get_elf_symbols::<ML>(program, opts.demangle)?;
         let program = Program::<ML>::from_elf(program)?.parsed();
 
         errors::install_hooks()?;
         let terminal = tui::init()?;
-        DebuggerApp::new(&mut stepper, fname, &program, symbols).run_debugger(terminal)?;
+        DebuggerApp::new(
+            &mut stepper,
+            fname,
+            &program,
+            symbols,
+            opts.common.max_steps,
+        )
+        .run_debugger(terminal)?;
 
         tui::restore()?;
         Ok(())
@@ -253,6 +262,7 @@ where
         title: &'a str,
         program: &'a BTreeMap<u64, String>,
         symbols: HashMap<u64, Cow<'a, str>>,
+        max_steps: Option<usize>,
     ) -> Self {
         Self {
             title,
@@ -273,6 +283,7 @@ where
                     effective: EffectiveTranslationState::Off,
                 },
             },
+            max_steps,
         }
     }
 
@@ -343,6 +354,9 @@ where
             .step_max(Bound::Included(1))
             .to_stepper_status();
 
+        // usize::MAX is used to represent an infinite number of steps as users will quit well before this.
+        let max_steps = self.max_steps.unwrap_or(usize::MAX);
+
         let should_continue = |machine: &MachineCoreState<_, _>| {
             let raw_pc = machine.hart.pc.read();
             let pc = machine
@@ -352,7 +366,7 @@ where
         };
 
         while should_continue(self.stepper.machine_state())
-            && matches!(result, StepperStatus::Running { .. })
+            && matches!(result, StepperStatus::Running {steps, .. } if steps < max_steps)
         {
             result += self
                 .stepper
@@ -373,6 +387,9 @@ where
             .step_max(Bound::Included(1))
             .to_stepper_status();
 
+        // usize::MAX is used to represent an infinite number of steps as users will quit well before this.
+        let max_steps = self.max_steps.unwrap_or(usize::MAX);
+
         let should_continue = |machine: &MachineCoreState<_, _>| {
             let raw_pc = machine.hart.pc.read();
             let pc = machine
@@ -383,7 +400,7 @@ where
         };
 
         while should_continue(self.stepper.machine_state())
-            && matches!(result, StepperStatus::Running { .. })
+            && matches!(result, StepperStatus::Running { steps, .. } if steps < max_steps)
         {
             result += self
                 .stepper
@@ -464,5 +481,48 @@ impl<'a> ProgramView<'a> {
         });
         self.instructions.append(&mut new_instructions);
         self.instructions.sort_by(|a, b| a.address.cmp(&b.address));
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::{posix_exit_mode, ExitMode};
+    use octez_riscv::machine_state::bus::main_memory::M1G;
+    use std::fs;
+
+    #[test]
+    fn test_max_steps_respected() {
+        let progpath = "../assets/hermit-loader";
+        let program = match fs::read(progpath) {
+            Ok(data) => data,
+            Err(e) => panic!("Failed to read program file: {}", e),
+        };
+
+        let (mut interpreter, prog) = TestStepper::<M1G>::new_with_parsed_program(
+            program.as_slice(),
+            None,
+            posix_exit_mode(&ExitMode::User),
+        )
+        .unwrap();
+
+        let symbols: HashMap<u64, Cow<'_, str>> = HashMap::new();
+
+        let maxstep = 10;
+        let mut debugger =
+            DebuggerApp::new(&mut interpreter, progpath, &prog, symbols, Some(maxstep));
+        debugger
+            .program
+            .breakpoints
+            .insert(debugger.program.instructions[1].address);
+
+        debugger.step_until_breakpoint();
+        assert!(matches!(
+            debugger.state.result,
+            StepperStatus::Running { steps: 1, .. }
+        ));
+
+        debugger.step_until_breakpoint();
+        assert_eq!(maxstep, debugger.state.result.steps())
     }
 }
