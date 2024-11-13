@@ -37,6 +37,7 @@ riscv: src/riscv/assets/jstz
 riscv: src/riscv/assets/jstz.checksum
 riscv: src/riscv/assets/riscv-dummy.elf
 riscv: src/riscv/assets/riscv-dummy.elf.checksum
+riscv: src/riscv/riscv-dummy-sdk.elf
 riscv: src/riscv/riscv-dummy.elf
 riscv_sandbox: src/riscv/riscv-sandbox
 riscv: src/riscv/tests/inline_asm/rv64-inline-asm-tests
