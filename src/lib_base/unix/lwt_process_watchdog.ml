@@ -272,13 +272,12 @@ module Daemon (Event : EVENTS) = struct
      dies. *)
   let watch_dog ~start_new_server =
     let open Lwt_result_syntax in
+    let initial_backoff = (Time.System.epoch, 0.5) in
     let rec loop t =
       match t.server with
       | None ->
           let* new_server =
-            run_with_backoff
-              ~backoff:(Time.System.epoch, 0.5)
-              ~f:start_new_server
+            run_with_backoff ~backoff:initial_backoff ~f:start_new_server
           in
           loop new_server
       | Some process -> (
@@ -305,9 +304,7 @@ module Daemon (Event : EVENTS) = struct
                 Event.(emit process_exited_abnormally) (process#pid, status)
               in
               let* new_server =
-                run_with_backoff
-                  ~backoff:(Time.System.epoch, 0.5)
-                  ~f:start_new_server
+                run_with_backoff ~backoff:initial_backoff ~f:start_new_server
               in
               loop new_server)
     in
