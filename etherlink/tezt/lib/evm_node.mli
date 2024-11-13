@@ -517,3 +517,6 @@ val man : ?path:string -> ?hooks:Process_hooks.t -> unit -> unit Lwt.t
 
 val describe_config :
   ?path:string -> ?hooks:Process_hooks.t -> unit -> unit Lwt.t
+
+(** Returns the [mode] with a fresh private RPC port if one was present. *)
+val mode_with_new_private_rpc : mode -> mode

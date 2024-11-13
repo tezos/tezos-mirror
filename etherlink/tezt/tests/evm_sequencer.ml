@@ -779,7 +779,7 @@ let test_snapshots_import_empty =
   in
   Log.info "Create new sequencer from snapshot." ;
   let new_sequencer =
-    let mode = Evm_node.mode sequencer in
+    let mode = Evm_node.mode sequencer |> Evm_node.mode_with_new_private_rpc in
     Evm_node.create ~mode (Sc_rollup_node.endpoint sc_rollup_node)
   in
   let* () = Process.check @@ Evm_node.spawn_init_config new_sequencer in
@@ -860,7 +860,7 @@ let test_snapshots_reexport =
   in
   Log.info "Create new sequencer from snapshot." ;
   let new_sequencer =
-    let mode = Evm_node.mode sequencer in
+    let mode = Evm_node.mode sequencer |> Evm_node.mode_with_new_private_rpc in
     Evm_node.create ~mode (Sc_rollup_node.endpoint sc_rollup_node)
   in
   let* () = Process.check @@ Evm_node.spawn_init_config new_sequencer in
@@ -2133,7 +2133,7 @@ let test_delayed_deposit_from_init_rollup_node =
   (* Run a new sequencer that is initialized from a rollup node that has the
      delayed deposit in its state. *)
   let new_sequencer =
-    let mode = Evm_node.mode sequencer in
+    let mode = Evm_node.mode sequencer |> Evm_node.mode_with_new_private_rpc in
     Evm_node.create ~mode (Sc_rollup_node.endpoint sc_rollup_node)
   in
   let* () = Process.check @@ Evm_node.spawn_init_config new_sequencer in
@@ -5132,20 +5132,25 @@ let test_preimages_endpoint =
   let* () = Process.check @@ Evm_node.spawn_init_config new_sequencer in
   (* Prepares the observer without [preimages-dir], to force the use of
      preimages endpoint. *)
-  let observer_mode_without_preimages_dir =
+  let observer_mode_without_preimages_dir () =
     match Evm_node.mode observer with
     | Evm_node.Observer mode ->
-        Evm_node.Observer {mode with preimages_dir = None}
+        Evm_node.Observer
+          {
+            mode with
+            preimages_dir = None;
+            private_rpc_port = Some (Port.fresh ());
+          }
     | _ -> assert false
   in
   let new_observer =
     Evm_node.create
-      ~mode:observer_mode_without_preimages_dir
+      ~mode:(observer_mode_without_preimages_dir ())
       (Evm_node.endpoint new_sequencer)
   in
   let new_observer2 =
     Evm_node.create
-      ~mode:observer_mode_without_preimages_dir
+      ~mode:(observer_mode_without_preimages_dir ())
       (Evm_node.endpoint new_observer)
   in
 
