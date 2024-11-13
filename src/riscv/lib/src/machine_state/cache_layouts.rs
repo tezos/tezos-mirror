@@ -9,6 +9,7 @@
 
 use super::{
     block_cache::{self, BlockCacheLayout},
+    bus::main_memory::MainMemoryLayout,
     instruction_cache::{self, InstructionCacheLayout},
 };
 
@@ -26,7 +27,7 @@ pub trait CacheLayouts {
     type InstructionCacheLayout: InstructionCacheLayout;
 
     /// Layout for the block cache - controlling the number of entries.
-    type BlockCacheLayout: BlockCacheLayout;
+    type BlockCacheLayout<ML: MainMemoryLayout>: BlockCacheLayout<MainMemoryLayout = ML>;
 }
 
 impl<
@@ -40,7 +41,8 @@ impl<
     type InstructionCacheLayout =
         instruction_cache::Layout<INSTRUCTION_CACHE_BITS, INSTRUCTION_CACHE_SIZE>;
 
-    type BlockCacheLayout = block_cache::Layout<BLOCK_CACHE_BITS, BLOCK_CACHE_SIZE>;
+    type BlockCacheLayout<ML: MainMemoryLayout> =
+        block_cache::Layout<ML, BLOCK_CACHE_BITS, BLOCK_CACHE_SIZE>;
 }
 
 /// The default configuration of cache layouts.
