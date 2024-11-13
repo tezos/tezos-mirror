@@ -37,6 +37,10 @@
     {!Constants_repr.max_slashing_period} entries per contract, as one cannot
     add value without removing the finalizable ones.
 
+    The table cannot contain a request of zero tez.
+    Such a request would prevent a change of delegate while there are no
+    unstaked tez.
+
     This module is responsible for applying slashing on unstake requests.
 
  *)

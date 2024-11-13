@@ -80,10 +80,19 @@ module Slashed_deposits_history__Oxford :
 module Unstake_request : sig
   type request = Cycle_repr.t * Tez_repr.t
 
+  (** List of unstake requests.
+
+      Invariant: there is at most one request per cycle in the
+      list. *)
   type requests = request list
 
   type t = {delegate : Signature.Public_key_hash.t; requests : requests}
 
+  (** [add cycle amount requests] adds [amount] to the tez value
+      associated with [cycle].
+
+      If there was no unstake request for [cycle], a new request for
+      it containing [amount] is added at the beginning of the list. *)
   val add : Cycle_repr.t -> Tez_repr.t -> requests -> requests tzresult
 end
 

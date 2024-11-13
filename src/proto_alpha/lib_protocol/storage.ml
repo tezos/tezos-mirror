@@ -234,17 +234,19 @@ module Unstake_request = struct
 
   let add cycle amount requests =
     let open Result_syntax in
-    let rec loop rev_prefix = function
-      | [] ->
-          (* cycle does not exist -> add at the head *)
-          Ok ((cycle, amount) :: requests)
-      | (c, a) :: tl when Cycle_repr.(c = cycle) ->
-          let+ a = Tez_repr.(a +? amount) in
-          (* cycle found, do not change the order *)
-          List.rev_append rev_prefix ((c, a) :: tl)
-      | hd :: tl -> loop (hd :: rev_prefix) tl
-    in
-    loop [] requests
+    if Tez_repr.(amount > zero) then
+      let rec loop rev_prefix = function
+        | [] ->
+            (* cycle does not exist -> add at the head *)
+            Ok ((cycle, amount) :: requests)
+        | (c, a) :: tl when Cycle_repr.(c = cycle) ->
+            let+ a = Tez_repr.(a +? amount) in
+            (* cycle found, do not change the order *)
+            List.rev_append rev_prefix ((c, a) :: tl)
+        | hd :: tl -> loop (hd :: rev_prefix) tl
+      in
+      loop [] requests
+    else return requests
 end
 
 module Contract = struct

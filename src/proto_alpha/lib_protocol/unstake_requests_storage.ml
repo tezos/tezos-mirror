@@ -206,14 +206,11 @@ let prepare_finalize_unstake ctxt ~check_delegate_of_unfinalizable_requests
    there are no more funds to unstake, and thus there is no need to keep an
    entry for the contract.
 *)
-let update_stored_request ctxt contract updated_requests =
-  let open Lwt_result_syntax in
+let set_stored_requests ctxt contract updated_requests =
   match updated_requests.requests with
-  | [] ->
-      let*! ctxt = Storage.Contract.Unstake_requests.remove ctxt contract in
-      return ctxt
+  | [] -> Storage.Contract.Unstake_requests.remove ctxt contract
   | _ :: _ ->
-      Storage.Contract.Unstake_requests.update ctxt contract updated_requests
+      Storage.Contract.Unstake_requests.add ctxt contract updated_requests
 
 let handle_finalizable_and_clear ctxt contract
     ~check_delegate_of_unfinalizable_requests ~handle_finalizable =
@@ -235,7 +232,7 @@ let handle_finalizable_and_clear ctxt contract
       let* ctxt, balance_updates_finalized =
         handle_finalizable ctxt finalizable
       in
-      let* ctxt = update_stored_request ctxt contract unfinalizable in
+      let*! ctxt = set_stored_requests ctxt contract unfinalizable in
       return (ctxt, balance_updates_finalized)
 
 let finalize_and_add ctxt ~contract ~delegate ~handle_finalizable cycle amount =
@@ -263,9 +260,7 @@ let finalize_and_add ctxt ~contract ~delegate ~handle_finalizable cycle amount =
   in
   let*? requests = Storage.Unstake_request.add cycle amount requests in
   let unstake_request = Storage.Unstake_request.{delegate; requests} in
-  let*! ctxt =
-    Storage.Contract.Unstake_requests.add ctxt contract unstake_request
-  in
+  let*! ctxt = set_stored_requests ctxt contract unstake_request in
   handle_finalizable ctxt finalizable
 
 let can_stake_from_unstake ctxt ~delegate =
@@ -416,8 +411,8 @@ let remove_from_unfinalizable_requests_and_finalize ctxt ~contract ~delegate
           transfer_from_all_unstake ctxt [] amount [] requests_sorted
         in
         let updated_requests = List.rev updated_requests_rev in
-        let* ctxt =
-          Storage.Contract.Unstake_requests.update
+        let*! ctxt =
+          set_stored_requests
             ctxt
             contract
             {delegate; requests = updated_requests}
