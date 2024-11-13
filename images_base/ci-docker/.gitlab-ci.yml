@@ -1,0 +1,61 @@
+---
+default:
+  interruptible: true
+  tags:
+    - gcp
+
+stages:
+  - lint
+  - build
+  - manifest
+  - test
+
+variables:
+  HADOLINT_VERSION: 2.10.0
+  BINFMT_VERSION: 6.2.0-26
+  GCP_ARTIFACT_REGISTRY_IMAGE: "${GCP_REGISTRY}/${CI_PROJECT_PATH}"
+  CONTAINER_NAME: "registry.gitlab.com/${CI_PROJECT_PATH}/${CI_PROJECT_NAME}"
+  # Version of the docker to use, docker daemon and client must have the same
+  DOCKER_VERSION: "24.0.7"
+  GCP_PROTECTED_ARTIFACT_REGISTRY_IMAGE: "${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_PATH}"
+
+hadolint:
+  stage: lint
+  image: "hadolint/hadolint:v${HADOLINT_VERSION}-debian"
+  script:
+    - hadolint Dockerfile
+  allow_failure: true
+
+docker-buildx:
+  stage: build
+  image: "${CI_REGISTRY}/tezos/docker-images/ci-docker:v1.9.0"
+  services:
+    - docker:${DOCKER_VERSION}-dind
+  before_script:
+    - ./scripts/docker_wait_for_daemon.sh
+    - ./scripts/docker_check_version.sh ${DOCKER_VERSION}
+  script:
+    - ./scripts/build.sh
+
+include:
+  - template: Security/Container-Scanning.gitlab-ci.yml
+
+container_scanning:
+  stage: test
+  services:
+    - docker:${DOCKER_VERSION}-dind
+  before_script:
+    - ./scripts/tag.sh
+    # - ./scripts/docker_registry_auth.sh
+  variables:
+    GIT_STRATEGY: fetch
+    # DOCKERFILE_PATH: "Dockerfile"
+    # DOCKER_IMAGE: $CI_REGISTRY_IMAGE/$CI_COMMIT_REF_SLUG:$CI_COMMIT_SHA
+    # CS_IMAGE: ${CI_REGISTRY_IMAGE}/${CI_COMMIT_REF_SLUG}
+    # CS_IMAGE: "${CI_REGISTRY_IMAGE}/${DOCKER_IMAGE_TAG}"
+    CS_IMAGE: ${GCP_ARTIFACT_REGISTRY_IMAGE}:${DOCKER_IMAGE_TAG}
+    SECURE_LOG_LEVEL: "debug"
+  # artifacts:
+  #   paths:
+  #   - gl-container-scanning-report.json
+  #   expire_in: 1 week

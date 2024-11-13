@@ -4,6 +4,11 @@
 workflow:
   name: '[$PIPELINE_TYPE] $CI_COMMIT_TITLE'
   rules:
+  - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
+      == "ci-docker-latest-release"
+    variables:
+      PIPELINE_TYPE: ci_docker_release
+    when: always
   - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "merge_request_event"
       && $CI_MERGE_REQUEST_EVENT_TYPE != "merge_train"
     variables:
@@ -108,6 +113,11 @@ dummy_job:
   - echo "This job will never execute"
 
 include:
+- local: images_base/ci-docker/.gitlab-ci.yml
+  rules:
+  - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
+      == "ci-docker-latest-release"
+    when: always
 - local: .gitlab/ci/pipelines/before_merging.yml
   rules:
   - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "merge_request_event"
