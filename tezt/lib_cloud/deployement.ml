@@ -133,23 +133,35 @@ module Remote = struct
     in
     match agents with [agent] -> Lwt.return agent | _ -> assert false
 
-  (* Adds a dns record for the proxy for each configured zone *)
-  let dns_add_record agent =
-    let name =
-      match Env.dns_domain with None -> Env.tezt_cloud | Some d -> d
-    in
-    let zones = if Env.dns_zones = [] then ["tezt-cloud"] else Env.dns_zones in
-    Lwt_list.iter_s
-      (fun zone ->
-        let* ip = Gcloud.DNS.get_value ~zone ~domain:name in
+  (* Register the specified domain in an appropriate GCP zone *)
+  let dns_add_record agent domain =
+    let* res = Gcloud.DNS.find_zone_for_subdomain domain in
+    match res with
+    | None ->
+        let () =
+          Log.report
+            ~color:Log.Color.FG.yellow
+            "The domain '%s' is not a subdomain of an authorized GCP zone. \
+             Skipping."
+            domain
+        in
+        Lwt.return_unit
+    | Some (zone, _) ->
+        let* ip = Gcloud.DNS.get_value ~zone ~domain in
         let* () =
           match ip with
           | None -> Lwt.return_unit
-          | Some ip -> Gcloud.DNS.remove_subdomain ~zone ~name ~value:ip
+          | Some ip -> Gcloud.DNS.remove_subdomain ~zone ~name:domain ~value:ip
         in
         let ip = Agent.point agent |> Option.get |> fst in
-        Gcloud.DNS.add_subdomain ~zone ~name ~value:ip)
-      zones
+        let* () = Gcloud.DNS.add_subdomain ~zone ~name:domain ~value:ip in
+        let () =
+          Log.report
+            ~color:Log.Color.FG.green
+            "DNS registrered successfully: '%s'"
+            domain
+        in
+        Lwt.return_unit
 
   (*
       Deployment requires to create new VMs and organizing them per group of
@@ -202,7 +214,11 @@ module Remote = struct
     let* t =
       if proxy then
         let* agent = deploy_proxy () in
-        let* () = if Env.dns then dns_add_record agent else Lwt.return_unit in
+        let* () =
+          Lwt_list.iter_s
+            (fun domainname -> dns_add_record agent domainname)
+            Env.dns_domains
+        in
         Lwt.return {agents = agent :: agents}
       else Lwt.return {agents}
     in
