@@ -37,7 +37,7 @@ let assert_dal_feature_enabled ctxt =
 let shards ctxt ~level =
   let open Lwt_result_syntax in
   let*? () = assert_dal_feature_enabled ctxt in
-  let number_of_shards = Dal.number_of_shards ctxt in
+  let number_of_shards = Constants.dal_number_of_shards ctxt in
   let*? slots = Slot.Range.create ~min:0 ~count:number_of_shards in
   Slot.Range.rev_fold_es
     (fun (ctxt, map) slot ->

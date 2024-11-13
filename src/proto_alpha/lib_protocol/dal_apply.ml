@@ -56,7 +56,7 @@ let pkh_of_consensus_key (consensus_key : Consensus_key.pk) =
 let validate_attestation ctxt level slot consensus_key attestation =
   let open Lwt_result_syntax in
   let*? () = assert_dal_feature_enabled ctxt in
-  let number_of_slots = Dal.number_of_slots ctxt in
+  let number_of_slots = Constants.dal_number_of_slots ctxt in
   let*? max_index = number_of_slots - 1 |> slot_of_int_e ~number_of_slots in
   let maximum_size = Dal.Attestation.expected_size_in_bits ~max_index in
   let size = Dal.Attestation.occupied_size_in_bits attestation in
@@ -65,7 +65,7 @@ let validate_attestation ctxt level slot consensus_key attestation =
       Compare.Int.(size <= maximum_size)
       (Dal_attestation_size_limit_exceeded {maximum_size; got = size})
   in
-  let number_of_shards = Dal.number_of_shards ctxt in
+  let number_of_shards = Constants.dal_number_of_shards ctxt in
   fail_when
     Compare.Int.(Slot.to_int slot >= number_of_shards)
     (let attester = pkh_of_consensus_key consensus_key in
@@ -90,7 +90,7 @@ let validate_publish_commitment ctxt _operation =
 let apply_publish_commitment ctxt operation ~source =
   let open Result_syntax in
   let* ctxt = Gas.consume ctxt Dal_costs.cost_Dal_publish_commitment in
-  let number_of_slots = Dal.number_of_slots ctxt in
+  let number_of_slots = Constants.dal_number_of_slots ctxt in
   let* ctxt, cryptobox = Dal.make ctxt in
   let current_level = (Level.current ctxt).level in
   let* slot_header =
@@ -125,7 +125,7 @@ let finalisation ctxt =
          - disallow proofs involving pages of slots that have been confirmed at the
            level where the game started.
       *)
-      let number_of_slots = Dal.number_of_slots ctxt in
+      let number_of_slots = Constants.dal_number_of_slots ctxt in
       let+ ctxt, attestation =
         Dal.Slot.finalize_pending_slot_headers ctxt ~number_of_slots
       in

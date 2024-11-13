@@ -838,8 +838,6 @@ module Constants : sig
       rewards_ratio : Q.t;
     }
 
-    val dal_encoding : dal Data_encoding.t
-
     type sc_rollup_reveal_hashing_schemes = {blake2B : Raw_level.t}
 
     type sc_rollup_reveal_activation_level = {
@@ -1054,11 +1052,15 @@ module Constants : sig
 
   val testnet_dictator : context -> public_key_hash option
 
+  val dal_enable : context -> bool
+
+  val dal_number_of_slots : context -> int
+
+  val dal_number_of_shards : context -> int
+
   val sc_rollup_arith_pvm_enable : context -> bool
 
   val sc_rollup_riscv_pvm_enable : context -> bool
-
-  val dal_enable : context -> bool
 
   val sc_rollup_origination_size : context -> int
 
@@ -2747,10 +2749,6 @@ module Dal : sig
   type cryptobox
 
   val make : context -> (context * cryptobox) tzresult
-
-  val number_of_slots : context -> int
-
-  val number_of_shards : context -> int
 
   (** This module re-exports definitions from {!Dal_slot_index_repr}. *)
   module Slot_index : sig

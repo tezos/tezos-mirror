@@ -432,10 +432,6 @@ module Dal : sig
 
   val make : t -> (t * cryptobox) tzresult
 
-  val number_of_slots : t -> int
-
-  val number_of_shards : t -> int
-
   (** [record_number_of_attested_shards ctxt attestation number_of_shards]
       records that the [number_of_shards] shards were attested (declared
       available by some attester). *)

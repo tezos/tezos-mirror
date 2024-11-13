@@ -2144,20 +2144,12 @@ module Dal = struct
     match dal.cryptobox with
     | Some cryptobox -> return (ctxt, cryptobox)
     | None -> (
-        let Constants_parametric_repr.{dal = {cryptobox_parameters; _}; _} =
-          ctxt.back.constants
-        in
-        match Dal.make cryptobox_parameters with
+        match Dal.make (constants ctxt).dal.cryptobox_parameters with
         | Ok cryptobox ->
             let ctxt = update_dal ctxt {dal with cryptobox = Some cryptobox} in
             return (ctxt, cryptobox)
         | Error (`Fail explanation) ->
             tzfail (Dal_errors_repr.Dal_cryptobox_error {explanation}))
-
-  let[@inline] number_of_slots ctxt = ctxt.back.constants.dal.number_of_slots
-
-  let[@inline] number_of_shards ctxt =
-    ctxt.back.constants.dal.cryptobox_parameters.number_of_shards
 
   let record_number_of_attested_shards ctxt attestation number =
     let dal = dal ctxt in
