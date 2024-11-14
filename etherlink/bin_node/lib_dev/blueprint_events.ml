@@ -126,6 +126,17 @@ let missing_blueprints =
     ("from", Data_encoding.n)
     ("to_", Data_encoding.n)
 
+let worker_request_failed =
+  declare_2
+    ~section
+    ~name:"request_failed"
+    ~msg:"[Warning]: Request {view} failed: {errors}"
+    ~level:Error
+    ("view", Blueprints_publisher_types.Request.encoding)
+    ~pp1:Blueprints_publisher_types.Request.pp
+    ("errors", Error_monad.trace_encoding)
+    ~pp2:Error_monad.pp_print_trace
+
 let publisher_is_ready () = emit publisher_ready ()
 
 let publisher_shutdown () = emit publisher_shutdown ()
@@ -168,3 +179,6 @@ let blueprint_proposal Ethereum_types.(Qty level) time =
 
 let blueprint_production Ethereum_types.(Qty level) time =
   emit blueprint_production (level, time)
+
+let worker_request_failed request_view errs =
+  emit worker_request_failed (request_view, errs)

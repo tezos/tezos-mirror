@@ -277,9 +277,11 @@ module Handlers = struct
     let open Lwt_result_syntax in
     match request with
     | Publish {level; payload} ->
+        protect @@ fun () ->
         let* () = Worker.publish self payload level ~use_dal_if_enabled:true in
         return_unit
     | New_rollup_node_block rollup_block_lvl -> (
+        protect @@ fun () ->
         let* () =
           Worker.retrieve_and_set_latest_level_confirmed self rollup_block_lvl
         in
@@ -305,9 +307,17 @@ module Handlers = struct
 
   let on_close _self = Lwt.return_unit
 
-  let on_error (type a b) _self _st (_r : (a, b) Request.t) (_errs : b) :
+  let on_error (type a b) _w _st (r : (a, b) Request.t) (errs : b) :
       unit tzresult Lwt.t =
-    Lwt_result_syntax.return_unit
+    let open Lwt_result_syntax in
+    let request_view = Request.view r in
+    let emit_and_return_errors errs =
+      let*! () = Blueprint_events.worker_request_failed request_view errs in
+      fail errs
+    in
+    match r with
+    | Request.Publish _ -> emit_and_return_errors errs
+    | Request.New_rollup_node_block _ -> emit_and_return_errors errs
 end
 
 let table = Worker.create_table Queue
@@ -329,16 +339,15 @@ let start ~rollup_node_endpoint ~config ~latest_level_seen ~keep_alive () =
 
 type error += No_worker
 
-let worker =
-  lazy
-    (match Lwt.state worker_promise with
-    | Lwt.Return worker -> Ok worker
-    | Lwt.Fail e -> Result_syntax.tzfail (error_of_exn e)
-    | Lwt.Sleep -> Result_syntax.tzfail No_worker)
+let worker () =
+  match Lwt.state worker_promise with
+  | Lwt.Return worker -> Ok worker
+  | Lwt.Fail e -> Result_syntax.tzfail (error_of_exn e)
+  | Lwt.Sleep -> Result_syntax.tzfail No_worker
 
 let bind_worker f =
   let open Lwt_result_syntax in
-  let res = Lazy.force worker in
+  let res = worker () in
   match res with
   | Error [No_worker] ->
       (* There is no worker, nothing to do *)
@@ -346,11 +355,24 @@ let bind_worker f =
   | Error errs -> fail errs
   | Ok w -> f w
 
+type error += Worker_queue_is_closed
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"blueprint_publisher_queue_is_closed"
+    ~title:"Blueprint_publisher_queue_is_closed"
+    ~description:
+      "Tried to publish a new blueprint but the publisher queue is closed"
+    Data_encoding.unit
+    (function Worker_queue_is_closed -> Some () | _ -> None)
+    (fun () -> Worker_queue_is_closed)
+
 let worker_add_request ~request =
   let open Lwt_result_syntax in
   bind_worker @@ fun w ->
-  let*! (_pushed : bool) = Worker.Queue.push_request w request in
-  return_unit
+  let*! (pushed : bool) = Worker.Queue.push_request w request in
+  if pushed then return_unit else tzfail Worker_queue_is_closed
 
 let publish level payload =
   worker_add_request ~request:(Publish {level; payload})
