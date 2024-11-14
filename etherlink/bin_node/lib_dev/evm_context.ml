@@ -726,7 +726,9 @@ module State = struct
       in
       let*! () =
         Option.iter_s
-          (fun l1_level -> Evm_context_events.processed_l1_level l1_level)
+          (fun l1_level ->
+            Metrics.set_l1_level ~level:l1_level ;
+            Evm_context_events.processed_l1_level l1_level)
           finalized_level
       in
       on_success ctxt.session ;
@@ -1094,10 +1096,10 @@ module State = struct
     Evm_store.use store @@ fun conn ->
     let* pending_upgrade = Evm_store.Kernel_upgrades.find_latest_pending conn in
     let* latest_relationship = Evm_store.L1_l2_levels_relationships.find conn in
-    let finalized_number =
+    let finalized_number, l1_level =
       match latest_relationship with
-      | None -> Ethereum_types.Qty Z.zero
-      | Some {finalized; _} -> finalized
+      | None -> (Ethereum_types.Qty Z.zero, None)
+      | Some {finalized; l1_level; _} -> (finalized, Some l1_level)
     in
     let smart_rollup_address =
       Option.map
@@ -1200,7 +1202,7 @@ module State = struct
         pending_upgrade
     in
 
-    return (ctxt, (init_status, smart_rollup_address))
+    return (ctxt, (init_status, smart_rollup_address, l1_level))
 
   let reset ~data_dir ~l2_level =
     let open Lwt_result_syntax in
@@ -1730,14 +1732,15 @@ let start ?kernel_path ~data_dir ~preimages ~preimages_endpoint
   in
   let*! () = Blueprint_events.publisher_is_ready () in
   Lwt.wakeup worker_waker worker ;
-  let*! init_status in
+  let*! init_status, sr1, l1_level = init_status in
   let*! head_info in
   let (Qty finalized_number) = !head_info.finalized_number in
   let (Qty next_blueprint_number) = !head_info.next_blueprint_number in
   Metrics.set_level ~level:(Z.pred next_blueprint_number) ;
   Metrics.set_confirmed_level ~level:finalized_number ;
+  Option.iter (fun l1_level -> Metrics.set_l1_level ~level:l1_level) l1_level ;
   let*! () = Evm_context_events.ready () in
-  return init_status
+  return (init_status, sr1)
 
 let rollup_node_metadata ~rollup_node_data_dir =
   let open Lwt_result_syntax in
