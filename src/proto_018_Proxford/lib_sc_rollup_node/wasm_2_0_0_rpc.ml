@@ -68,13 +68,32 @@ struct
       let*! leng = Durable_state.value_length (of_node_pvmstate state) key in
       return leng ) ;
 
+    ( Block_directory.register0
+        (Sc_rollup_services.Block.durable_state_subkeys Kind.Wasm_2_0_0)
+    @@ fun (node_ctxt, block) {key} () ->
+      let open Lwt_result_syntax in
+      let* state = get_state node_ctxt block in
+      let*! subkeys = Durable_state.list (of_node_pvmstate state) key in
+      return subkeys ) ;
+
     Block_directory.register0
-      (Sc_rollup_services.Block.durable_state_subkeys Kind.Wasm_2_0_0)
+      (Sc_rollup_services.Block.durable_state_values Kind.Wasm_2_0_0)
     @@ fun (node_ctxt, block) {key} () ->
     let open Lwt_result_syntax in
     let* state = get_state node_ctxt block in
-    let*! subkeys = Durable_state.list (of_node_pvmstate state) key in
-    return subkeys
+    let tree = of_node_pvmstate state in
+    let*! subkeys = Durable_state.list tree key in
+    let*! bindings =
+      List.filter_map_s
+        (fun subkey ->
+          let open Lwt_syntax in
+          let+ value =
+            Durable_state.lookup tree (String.concat "/" [key; subkey])
+          in
+          match value with None -> None | Some value -> Some (subkey, value))
+        subkeys
+    in
+    return bindings
 
   let build_sub_directory node_ctxt =
     register () ;
