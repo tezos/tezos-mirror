@@ -127,15 +127,11 @@ end = struct
   let unexpected_success loc _ _ _ _ _ =
     Alcotest.fail (loc ^ ": Test should not succeed")
 
-  let expected_success _loc baker pred bbad d1 d2 =
+  let expected_success _loc baker pred bbad d1 d2 ~duplicate_op =
     let open Lwt_result_syntax in
     (* same preattesters in case denunciation succeeds*)
     let* () = Assert.equal_pkh ~loc:__LOC__ d1 d2 in
     let* constants = Context.get_constants (B pred) in
-    let p =
-      constants.parametric
-        .percentage_of_frozen_deposits_slashed_per_double_attestation
-    in
     (* let's bake the block on top of pred without denunciating d1 *)
     let* bgood = bake ~policy:(By_account baker) pred in
     (* Slashing hasn't happened yet. *)
@@ -154,6 +150,13 @@ end = struct
     (* the diff of the two balances in normal and in denunciation cases *)
     let diff_end_bal = Tez_helpers.(bal_good -! bal_bad) in
     (* amount lost due to denunciation *)
+    let* p =
+      Slashing_helpers.slashing_percentage
+        (Slashing_helpers.Misbehaviour_repr.from_duplicate_operation
+           duplicate_op)
+        ~block_before_slash:pred
+        ~all_culprits:[d1]
+    in
     let Q.{num; den} = Percentage.to_q p in
     let lost_deposit =
       Tez_helpers.(frozen_deposit *! Z.to_int64 num /! Z.to_int64 den)
@@ -210,9 +213,7 @@ end = struct
 
   (** Helper function for denunciations inclusion *)
   let generic_double_preattestation_denunciation ~nb_blocks_before_double
-      ~nb_blocks_before_denunciation
-      ?(test_expected_ok =
-        fun _loc _baker _pred _bbad _d1 _d2 -> Lwt_result_syntax.return_unit)
+      ~nb_blocks_before_denunciation ~test_expected_ok
       ?(test_expected_ko = fun _loc _res -> Lwt_result_syntax.return_unit)
       ?(pick_attesters =
         let open Lwt_result_syntax in
@@ -249,7 +250,9 @@ end = struct
     let*! head_opt = bake ~policy:(By_account baker) blk ~operations:[op] in
     match head_opt with
     | Ok new_head ->
-        let* () = test_expected_ok loc baker blk new_head d1 d2 in
+        let* () =
+          test_expected_ok loc baker blk new_head d1 d2 ~duplicate_op:op1
+        in
         let op : Operation.packed =
           Op.double_preattestation (B new_head) op2 op1
         in

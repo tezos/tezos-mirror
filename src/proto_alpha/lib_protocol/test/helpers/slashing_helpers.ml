@@ -5,6 +5,21 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let slashing_percentage ~block_before_slash
+    {Protocol.Misbehaviour_repr.level; round = _; kind} ~all_culprits =
+  let open Lwt_result_wrap_syntax in
+  let* ctxt = Block.get_alpha_ctxt block_before_slash in
+  let raw_ctxt = Protocol.Alpha_context.Internal_for_tests.to_raw ctxt in
+  let level =
+    Protocol.Level_repr.level_from_raw
+      ~cycle_eras:(Protocol.Raw_context.cycle_eras raw_ctxt)
+      level
+  in
+  let*@ _, slashing_pct =
+    Protocol.Slash_percentage.get raw_ctxt ~kind ~level all_culprits
+  in
+  return slashing_pct
+
 module Misbehaviour_repr = struct
   open Protocol.Misbehaviour_repr
 
@@ -111,17 +126,7 @@ module Full_denunciation = struct
 
   let slashing_percentage ~block_before_slash
       (misbehaviour : Protocol.Misbehaviour_repr.t) all_denunciations_to_apply =
-    let open Lwt_result_wrap_syntax in
-    let* alpha_ctxt = Context.(get_alpha_ctxt (B block_before_slash)) in
-    let raw_ctxt =
-      Protocol.Alpha_context.Internal_for_tests.to_raw alpha_ctxt
-    in
-    let level =
-      Protocol.Level_repr.level_from_raw
-        ~cycle_eras:(Protocol.Raw_context.cycle_eras raw_ctxt)
-        misbehaviour.level
-    in
-    let delegates =
+    let all_culprits =
       List.filter
         (fun (_, (den : Protocol.Denunciations_repr.item)) ->
           Misbehaviour_repr.equal misbehaviour den.misbehaviour)
@@ -129,14 +134,7 @@ module Full_denunciation = struct
       |> List.map fst
       |> List.sort_uniq Signature.Public_key_hash.compare
     in
-    let*@ _, pct =
-      Protocol.Slash_percentage.get
-        raw_ctxt
-        ~kind:misbehaviour.kind
-        ~level
-        delegates
-    in
-    return pct
+    slashing_percentage ~block_before_slash misbehaviour ~all_culprits
 end
 
 let apply_slashing_account all_denunciations_to_apply

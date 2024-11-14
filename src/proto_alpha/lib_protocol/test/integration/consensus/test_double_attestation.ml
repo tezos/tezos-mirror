@@ -164,10 +164,14 @@ let test_valid_double_attestation_evidence () =
   let frozen_deposits_after =
     Tez_helpers.(frozen_deposits_after -! autostaked)
   in
-  let one_minus_p =
-    Percentage.neg
-      constants.percentage_of_frozen_deposits_slashed_per_double_attestation
+  let* slashing_pct =
+    Slashing_helpers.slashing_percentage
+      (Slashing_helpers.Misbehaviour_repr.from_duplicate_operation
+         attestation_a)
+      ~block_before_slash:blk_a
+      ~all_culprits:[delegate]
   in
+  let one_minus_p = Percentage.neg slashing_pct in
   let {Q.num; den} = Percentage.to_q one_minus_p in
   let expected_frozen_deposits_after =
     Tez_helpers.(frozen_deposits_before *! Z.to_int64 num /! Z.to_int64 den)
@@ -278,7 +282,7 @@ let test_different_slots () =
 (** Say a delegate double-attests twice and say the 2 evidences are timely
    included. Then the delegate can no longer bake. *)
 let test_two_double_attestation_evidences_leadsto_no_bake () =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let issuance_weights =
     {
       Default_parameters.constants_test.issuance_weights with
@@ -352,34 +356,43 @@ let test_two_double_attestation_evidences_leadsto_no_bake () =
         | _ -> false)
   in
   (* Check that all frozen deposits have been slashed at the end of the cycle. *)
-  let* b, metadata, _ =
-    Block.bake_until_n_cycle_end_with_metadata
+  let* b =
+    Block.bake_until_n_cycle_end
       ~policy:(By_account baker)
-      2
+      Constants_repr.max_slashing_period
       blk_with_evidence2
   in
-  let metadata = Option.value_f ~default:(fun () -> assert false) metadata in
-  let autostaked = Block.autostaked delegate metadata in
+  let* slashing_pct1 =
+    Slashing_helpers.slashing_percentage
+      (Slashing_helpers.Misbehaviour_repr.from_duplicate_operation
+         attestation_a)
+      ~block_before_slash:blk_a
+      ~all_culprits:[delegate]
+  in
+  let* slashing_pct2 =
+    Slashing_helpers.slashing_percentage
+      (Slashing_helpers.Misbehaviour_repr.from_duplicate_operation
+         attestation_3)
+      ~block_before_slash:blk_3
+      ~all_culprits:[delegate]
+  in
+  let one_minus_p =
+    Percentage.(neg (add_bounded slashing_pct1 slashing_pct2))
+  in
+  let {Q.num; den} = Percentage.to_q one_minus_p in
+  let expected_frozen_deposits_after =
+    Tez_helpers.(frozen_deposits_before *! Z.to_int64 num /! Z.to_int64 den)
+  in
   let* frozen_deposits_after =
     Context.Delegate.current_frozen_deposits (B b) delegate
   in
-  let frozen_deposits_after =
-    Tez_helpers.(frozen_deposits_after -! autostaked)
+  let* () =
+    Assert.equal_tez
+      ~loc:__LOC__
+      expected_frozen_deposits_after
+      frozen_deposits_after
   in
-  let* base_reward = Context.get_baking_reward_fixed_portion (B genesis) in
-  let* to_liquid =
-    Adaptive_issuance_helpers.portion_of_rewards_to_liquid_for_cycle
-      (B b)
-      (Block.current_cycle b)
-      delegate
-      base_reward
-  in
-  (* [delegate] baked one block. The block rewards for that block should be all
-     that's left *)
-  Assert.equal_tez
-    ~loc:__LOC__
-    Tez_helpers.(base_reward -! to_liquid)
-    frozen_deposits_after
+  return_unit
 
 (** Say a delegate double-attests twice in a cycle,
     and say the 2 evidences are included in different (valid) cycles.
@@ -694,7 +707,10 @@ let test_freeze_more_with_low_balance =
     in
     let* attestation_b = Op.raw_attestation ~delegate:account1 ~slot blk_b in
     let denunciation = double_attestation (B b2) attestation_a attestation_b in
-    Block.bake ~policy:(Excluding [account1]) b2 ~operations:[denunciation]
+    let* b =
+      Block.bake ~policy:(Excluding [account1]) b2 ~operations:[denunciation]
+    in
+    return (b, attestation_a)
   in
   let check_unique_attester b account2 =
     let* attesters_list = Context.get_attesters (B b) in
@@ -715,9 +731,6 @@ let test_freeze_more_with_low_balance =
         consensus_threshold = 0;
         origination_size = 0;
         consensus_rights_delay = 5;
-        percentage_of_frozen_deposits_slashed_per_double_attestation =
-          (* enforce that percentage is 50% in the test's params. *)
-          Percentage.p50;
       }
     in
     let* genesis, (c1, c2) = Context.init_with_constants2 constants in
@@ -746,7 +759,7 @@ let test_freeze_more_with_low_balance =
     let* () =
       Assert.equal_tez ~loc:__LOC__ info1.frozen_deposits info2.frozen_deposits
     in
-    let* b3 = double_attest_and_punish b2 account1 in
+    let* b3, duplicate_op = double_attest_and_punish b2 account1 in
     (* Denunciation has happened but slashing hasn't yet.
        We check that frozen deposits haven't changed and still correspond to the
        full balance and itself hasn't changed. *)
@@ -777,10 +790,14 @@ let test_freeze_more_with_low_balance =
     in
     (* We also check that compared to deposits at block [b2], [account1] lost
        50% of its deposits. *)
-    let one_minus_slash_percentage =
-      Percentage.neg
-        constants.percentage_of_frozen_deposits_slashed_per_double_attestation
+    let* slashing_pct =
+      Slashing_helpers.slashing_percentage
+        (Slashing_helpers.Misbehaviour_repr.from_duplicate_operation
+           duplicate_op)
+        ~block_before_slash:b3
+        ~all_culprits:[account1]
     in
+    let one_minus_slash_percentage = Percentage.neg slashing_pct in
     let {Q.num; den} = Percentage.to_q one_minus_slash_percentage in
     let expected_frozen_deposits_after =
       Tez_helpers.(info2.frozen_deposits *! Z.to_int64 num /! Z.to_int64 den)
@@ -791,7 +808,7 @@ let test_freeze_more_with_low_balance =
         expected_frozen_deposits_after
         info4.current_frozen_deposits
     in
-    let* c2 = double_attest_and_punish c1 account1 in
+    let* c2, _ = double_attest_and_punish c1 account1 in
     (* Second denunciation has happened but slashing not yet, again.
        Current frozen deposits reflect the slashing of 50% of the original
        deposits. *)
