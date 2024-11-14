@@ -16,27 +16,24 @@ let node_rpc_profiler = unplugged ()
 (* This is the main profiler for the baker *)
 let baker_profiler = unplugged ()
 
+(* This environment profiler was added to get insights on the signature checking. *)
+let environment_profiler =
+  Tezos_protocol_environment.Environment_profiler.environment_profiler
+
 let all_profilers =
   [
-    ("nonce", nonce_profiler);
-    ("op_worker", operation_worker_profiler);
-    ("node_rpc", node_rpc_profiler);
-    ("baker", baker_profiler);
+    ("nonce", [nonce_profiler]);
+    ("op_worker", [operation_worker_profiler]);
+    ("node_rpc", [node_rpc_profiler]);
+    ("baker", [baker_profiler; environment_profiler]);
   ]
 
 let activate_all ~profiler_maker =
   List.iter
-    (fun (name, p) ->
-      match profiler_maker ~name with
-      | Some instance ->
-          plug p instance ;
-          (* This environment profiler was added to get insights on the signature checking. *)
-          if name = "baker" then
-            plug
-              Tezos_protocol_environment.Environment_profiler
-              .environment_profiler
-              instance
-      | None -> ())
+    (fun (name, profilers) ->
+      Option.iter
+        (fun instance -> List.iter (fun p -> plug p instance) profilers)
+        (profiler_maker ~name))
     all_profilers
 
 let create_reset_block_section =
