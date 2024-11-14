@@ -12,8 +12,9 @@ use crate::{
         bus::{main_memory::MainMemoryLayout, Address},
         hart_state::HartState,
         registers::{sp, x0, x1, x2, XRegister, XRegisters},
-        MachineCoreState,
+        MachineCoreState, ProgramCounterUpdate,
     },
+    parser::instruction::InstrWidth,
     state_backend as backend,
     traps::Exception,
 };
@@ -51,19 +52,19 @@ where
     /// `C.BEQZ` CB-type compressed instruction
     ///
     /// Performs a conditional ( val(`rs1`) == 0 ) control transfer.
-    /// The offset is sign-extended and added to the pc to form the branch
-    /// target address.
-    pub fn run_cbeqz(&mut self, imm: i64, rs1: XRegister) -> Address {
-        self.run_beq_impl::<2>(imm, rs1, x0)
+    /// If condition met, the offset is sign-extended and added to the pc to form the branch
+    /// target address that is then set, otherwise indicates to proceed to the next instruction.
+    pub fn run_cbeqz(&mut self, imm: i64, rs1: XRegister) -> ProgramCounterUpdate {
+        self.run_beq_impl(imm, rs1, x0, InstrWidth::Compressed)
     }
 
     /// `C.BNEZ` CB-type compressed instruction
     ///
     /// Performs a conditional ( val(`rs1`) != 0 ) control transfer.
-    /// The offset is sign-extended and added to the pc to form the branch
-    /// target address.
-    pub fn run_cbnez(&mut self, imm: i64, rs1: XRegister) -> Address {
-        self.run_bne_impl::<2>(imm, rs1, x0)
+    /// If condition met, the offset is sign-extended and added to the pc to form the branch
+    /// target address that is then set, otherwise indicates to proceed to the next instruction.
+    pub fn run_cbnez(&mut self, imm: i64, rs1: XRegister) -> ProgramCounterUpdate {
+        self.run_bne_impl(imm, rs1, x0, InstrWidth::Compressed)
     }
 
     /// `C.EBREAK` compressed instruction

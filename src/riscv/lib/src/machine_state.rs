@@ -108,8 +108,8 @@ impl<ML: main_memory::MainMemoryLayout, CL: CacheLayouts, M: backend::ManagerClo
 }
 
 /// How to modify the program counter
-#[derive(Debug)]
-enum ProgramCounterUpdate {
+#[derive(Debug, PartialEq)]
+pub enum ProgramCounterUpdate {
     /// Jump to a fixed address
     Set(Address),
     /// Offset to the next instruction by current instruction width
@@ -148,7 +148,7 @@ macro_rules! run_i_type_instr {
 /// Runs a B-type instruction over [`HartState`]
 macro_rules! run_b_type_instr {
     ($state: ident, $args: ident, $run_fn: ident) => {{
-        Ok(Set($state.hart.$run_fn($args.imm, $args.rs1, $args.rs2)))
+        Ok($state.hart.$run_fn($args.imm, $args.rs1, $args.rs2))
     }};
 }
 
@@ -294,7 +294,7 @@ macro_rules! run_css_instr {
 /// Runs a CB-type compressed instruction
 macro_rules! run_cb_type_instr {
     ($state: ident, $args: ident, $run_fn: ident) => {{
-        Ok(Set($state.hart.$run_fn($args.imm, $args.rd_rs1)))
+        Ok($state.hart.$run_fn($args.imm, $args.rd_rs1))
     }};
 }
 
