@@ -129,7 +129,14 @@ module Handlers = struct
       unit tzresult Lwt.t =
    fun _w _ req errs ->
     let open Lwt_result_syntax in
-    match (req, errs) with _ -> return_unit
+    match req with
+    | Request.New_rollup_node_block _ ->
+        let*! () =
+          Evm_events_follower_events.worker_request_failed
+            (Request.view req)
+            errs
+        in
+        return_unit
 
   let on_completion _ _ _ _ = Lwt.return_unit
 
