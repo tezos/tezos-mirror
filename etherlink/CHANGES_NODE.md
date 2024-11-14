@@ -6,6 +6,9 @@
 
 ### Bug fixes
 
+- Fixes a race condition where rollup node follower would process start
+  processing a block before finishing the processing of its predecessor. (!15620)
+
 ### Internals
 
 - Adds the duration of the blueprint application to the

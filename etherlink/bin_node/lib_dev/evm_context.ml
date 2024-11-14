@@ -664,37 +664,72 @@ module State = struct
 
   let apply_evm_events ?finalized_level (ctxt : t) events =
     let open Lwt_result_syntax in
-    let* context, evm_state, on_success =
-      with_store_transaction ctxt @@ fun conn ->
-      let* on_success, ctxt, evm_state =
-        List.fold_left_es
-          (fun (on_success, ctxt, evm_state) event ->
-            let* evm_state, on_success =
-              apply_evm_event_unsafe on_success ctxt conn evm_state event
+    let* needs_process =
+      match finalized_level with
+      | None ->
+          (* We are not taking events from a rollup block, we don't need to check
+             if it's the last known l1 block successor. *)
+          return_true
+      | Some rollup_block_level -> (
+          let* last_known_l1_block =
+            let* level =
+              Evm_store.use ctxt.store @@ fun conn ->
+              Evm_store.L1_l2_levels_relationships.find conn
             in
-            return (on_success, ctxt, evm_state))
-          (ignore, ctxt, ctxt.session.evm_state)
-          events
-      in
-      let* _ =
-        Option.map_es
-          (fun l1_level ->
-            let l2_level = current_blueprint_number ctxt in
-            Evm_store.L1_l2_levels_relationships.store
-              conn
-              ~latest_l2_level:l2_level
-              ~l1_level
-              ~finalized_l2_level:ctxt.session.finalized_number)
-          finalized_level
-      in
-      let* ctxt = replace_current_commit ctxt conn evm_state in
-      return (ctxt, evm_state, on_success)
+            match level with
+            | Some {l1_level; _} -> return_some l1_level
+            | None -> return_none
+          in
+          match last_known_l1_block with
+          | None -> return_true
+          | Some last_known_l1_block ->
+              let level_expected = Int32.succ last_known_l1_block in
+              if Int32.equal rollup_block_level level_expected then return_true
+              else if Compare.Int32.(rollup_block_level < level_expected) then
+                let*! () =
+                  Evm_context_events.unexpected_l1_block
+                    ~expected_level:level_expected
+                    ~provided_level:rollup_block_level
+                in
+                return false
+              else
+                tzfail
+                  (Node_error.Out_of_sync
+                     {level_received = rollup_block_level; level_expected}))
     in
-    on_success ctxt.session ;
-    on_modified_head ctxt evm_state context ;
-    let*! head_info in
-    head_info := session_to_head_info ctxt.session ;
-    return_unit
+    if needs_process then (
+      let* context, evm_state, on_success =
+        with_store_transaction ctxt @@ fun conn ->
+        let* on_success, ctxt, evm_state =
+          List.fold_left_es
+            (fun (on_success, ctxt, evm_state) event ->
+              let* evm_state, on_success =
+                apply_evm_event_unsafe on_success ctxt conn evm_state event
+              in
+              return (on_success, ctxt, evm_state))
+            (ignore, ctxt, ctxt.session.evm_state)
+            events
+        in
+        let* _ =
+          Option.map_es
+            (fun l1_level ->
+              let l2_level = current_blueprint_number ctxt in
+              Evm_store.L1_l2_levels_relationships.store
+                conn
+                ~latest_l2_level:l2_level
+                ~l1_level
+                ~finalized_l2_level:ctxt.session.finalized_number)
+            finalized_level
+        in
+        let* ctxt = replace_current_commit ctxt conn evm_state in
+        return (ctxt, evm_state, on_success)
+      in
+      on_success ctxt.session ;
+      on_modified_head ctxt evm_state context ;
+      let*! head_info in
+      head_info := session_to_head_info ctxt.session ;
+      return_unit)
+    else assert false
 
   type error += Cannot_apply_blueprint of {local_state_level : Z.t}
 
@@ -1591,6 +1626,14 @@ module Handlers = struct
     match (req, errs) with
     | Apply_evm_events _, [Node_error.Diverged _divergence] ->
         Lwt_exit.exit_and_raise Node_error.exit_code_when_diverge
+    | ( Apply_evm_events _,
+        [Node_error.Out_of_sync {level_expected; level_received}] ) ->
+        let*! () =
+          Evm_events_follower_events.out_of_sync
+            ~expected:level_expected
+            ~received:level_received
+        in
+        Lwt_exit.exit_and_raise Node_error.exit_code_when_out_of_sync
     | _ -> return_unit
 end
 

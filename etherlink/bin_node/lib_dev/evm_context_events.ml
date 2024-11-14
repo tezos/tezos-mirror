@@ -86,6 +86,17 @@ let gc_waiter_failed =
     ~msg:"[Warning] Garbage collector waiter failed with an exception:"
     ("exn", Data_encoding.string)
 
+let unexpected_l1_block =
+  declare_2
+    ~section
+    ~name:"evm_context_unexpected_l1_block"
+    ~level:Warning
+    ~msg:
+      "[Warning] Apply EVM events got a block for level {provided_level} but \
+       is older than expected level {expected_level}."
+    ("expected_level", Data_encoding.int32)
+    ("provided_level", Data_encoding.int32)
+
 let ready () = emit ready ()
 
 let shutdown () = emit shutdown ()
@@ -102,3 +113,6 @@ let gc_finished ~gc_level ~head_level duration =
 
 let gc_waiter_failed exn =
   emit__dont_wait__use_with_care gc_waiter_failed (Printexc.to_string exn)
+
+let unexpected_l1_block ~expected_level ~provided_level =
+  emit unexpected_l1_block (expected_level, provided_level)
