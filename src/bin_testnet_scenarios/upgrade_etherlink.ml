@@ -17,7 +17,7 @@ let protocol_of_string s =
   match String.lowercase_ascii s with
   | "alpha" -> Protocol.Alpha
   | "parisc" | "paris" -> Protocol.ParisC
-  | "qena" -> Protocol.Qena
+  | "quebec" -> Protocol.Quebec
   | s -> failwith (sf "%s is an invalid protocol" s)
 
 let bake ~env rollup_node node yes_wallet () =

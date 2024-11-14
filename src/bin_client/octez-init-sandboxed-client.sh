@@ -138,7 +138,7 @@ main() {
     local_signer="${local_signer:-$bin_dir/../../_build/default/src/bin_signer/main_signer.exe}"
     local_compiler="${local_compiler:-$bin_dir/../../_build/default/src/lib_protocol_compiler/bin/main_native.exe}"
 
-    qena_parameters_file="$bin_dir/../../_build/default/src/proto_021_PtQenaB1/lib_parameters/sandbox-parameters.json"
+    quebec_parameters_file="$bin_dir/../../_build/default/src/proto_021_PsQuebec/lib_parameters/sandbox-parameters.json"
     parameters_file="$bin_dir/../../_build/default/src/proto_alpha/lib_parameters/sandbox-parameters.json"
 
   else
@@ -207,7 +207,7 @@ main() {
   cat << EOF
 if type octez-client-reset >/dev/null 2>&1 ; then octez-client-reset; fi ;
 PATH="$client_dir/bin:\$PATH" ; export PATH ;
-alias octez-activate-qena="$client -block genesis activate protocol PtQenaB1PqFEfTe2og7bZTaPvMw2CxRyDFEwWNj3GiWp9ba4bJd with fitness 1 and key activator and parameters $qena_parameters_file";
+alias octez-activate-quebec="$client -block genesis activate protocol PsQuebecnLByd3JwTiGadoG4nGWi3HYiLXUjkibeFV8dCFeVMUg with fitness 1 and key activator and parameters $quebec_parameters_file";
 alias octez-activate-alpha="$client  -block genesis activate protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK with fitness 1 and key activator and parameters $parameters_file" ;
 alias octez-client-reset="rm -rf \"$client_dir\"; unalias octez-activate-alpha octez-client-reset" ;
 alias octez-autocomplete="if [ \$ZSH_NAME ] ; then autoload bashcompinit ; bashcompinit ; fi ; source \"$bin_dir/bash-completion.sh\"" ;

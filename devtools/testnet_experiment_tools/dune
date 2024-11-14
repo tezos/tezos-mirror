@@ -42,10 +42,10 @@
   octez-protocol-020-PsParisC-libs.client
   octez-protocol-020-PsParisC-libs.client.commands
   tezos-protocol-020-PsParisC.protocol
-  octez-protocol-021-PtQenaB1-libs.baking
-  octez-protocol-021-PtQenaB1-libs.client
-  octez-protocol-021-PtQenaB1-libs.client.commands
-  tezos-protocol-021-PtQenaB1.protocol
+  octez-protocol-021-PsQuebec-libs.baking
+  octez-protocol-021-PsQuebec-libs.client
+  octez-protocol-021-PsQuebec-libs.client.commands
+  tezos-protocol-021-PsQuebec.protocol
   octez-protocol-alpha-libs.baking
   octez-protocol-alpha-libs.client
   octez-protocol-alpha-libs.client.commands
@@ -61,7 +61,7 @@
   -open Tezos_store
   -open Tezos_store_shared
   -open Tezos_context)
- (modules sigs tool_020_PsParisC tool_021_PtQenaB1 tool_alpha))
+ (modules sigs tool_020_PsParisC tool_021_PsQuebec tool_alpha))
 
 (executable
  (name simulation_scenario)
