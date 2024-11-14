@@ -32,35 +32,8 @@ module Name = struct
   let equal () () = true
 end
 
-module Request = struct
-  type ('a, 'b) t = New_rollup_node_block : Int32.t -> (unit, error trace) t
-
-  type view = View : _ t -> view
-
-  let view (req : _ t) = View req
-
-  let encoding =
-    let open Data_encoding in
-    union
-      [
-        case
-          (Tag 0)
-          ~title:"New_rollup_node_block"
-          (obj2
-             (req "request" (constant "new_rollup_node_block"))
-             (req "rollup_head" int32))
-          (function
-            | View (New_rollup_node_block rollup_head) -> Some ((), rollup_head))
-          (fun ((), rollup_head) -> View (New_rollup_node_block rollup_head));
-      ]
-
-  let pp ppf (View r) =
-    match r with
-    | New_rollup_node_block rollup_head ->
-        Format.fprintf ppf "New_rollup_node_block (level %ld)" rollup_head
-end
-
-module Worker = Worker.MakeSingle (Name) (Request) (Types)
+module Worker =
+  Worker.MakeSingle (Name) (Evm_events_follower_types.Request) (Types)
 
 type worker = Worker.infinite Worker.queue Worker.t
 
@@ -125,6 +98,8 @@ let on_new_head
       Evm_context.apply_evm_events ~finalized_level:rollup_block_lvl events
 
 module Handlers = struct
+  open Evm_events_follower_types
+
   type self = worker
 
   let on_request :
