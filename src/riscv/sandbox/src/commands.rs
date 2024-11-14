@@ -5,8 +5,10 @@
 
 pub mod bench;
 mod debug;
+mod gdb;
 pub mod run;
 
 pub use bench::bench;
 pub use debug::debug;
+pub use gdb::gdb_server;
 pub use run::run;
