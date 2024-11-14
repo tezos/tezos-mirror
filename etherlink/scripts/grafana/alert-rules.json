@@ -738,7 +738,83 @@
           "notification_settings": {
             "receiver": "${receiver}"
           }
-        }        
+        },
+        {
+          "uid": "ae3q30p2bnoqoe",
+          "title": "Signers' balance too low",
+          "condition": "Condition",
+          "data": [
+            {
+              "refId": "Balance",
+              "relativeTimeRange": {
+                "from": 600,
+                "to": 0
+              },
+              "datasourceUid": "${datasourceUid}",
+              "model": {
+                "editorMode": "code",
+                "expr": "octez_injector_signer_balance",
+                "instant": true,
+                "intervalMs": 1000,
+                "legendFormat": "__auto",
+                "maxDataPoints": 43200,
+                "range": false,
+                "refId": "Balance"
+              }
+            },
+            {
+              "refId": "Condition",
+              "relativeTimeRange": {
+                "from": 600,
+                "to": 0
+              },
+              "datasourceUid": "__expr__",
+              "model": {
+                "conditions": [
+                  {
+                    "evaluator": {
+                      "params": [
+                        100
+                      ],
+                      "type": "lt"
+                    },
+                    "operator": {
+                      "type": "and"
+                    },
+                    "query": {
+                      "params": [
+                        "C"
+                      ]
+                    },
+                    "reducer": {
+                      "params": [],
+                      "type": "last"
+                    },
+                    "type": "query"
+                  }
+                ],
+                "datasource": {
+                  "type": "__expr__",
+                  "uid": "__expr__"
+                },
+                "expression": "Balance",
+                "intervalMs": 1000,
+                "maxDataPoints": 43200,
+                "refId": "Condition",
+                "type": "threshold"
+              }
+            }
+          ],
+          "noDataState": "OK",
+          "execErrState": "Error",
+          "for": "0s",
+          "annotations": {},
+          "labels": {},
+          "isPaused": false,
+          "notification_settings": {
+            "receiver": "${receiver}"
+          }
+        }                
       ]
     }
   ]
