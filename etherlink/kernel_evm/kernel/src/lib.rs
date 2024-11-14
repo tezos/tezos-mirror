@@ -23,8 +23,8 @@ use storage::{
     read_base_fee_per_gas, read_chain_id, read_da_fee, read_kernel_version,
     read_last_info_per_level_timestamp, read_last_info_per_level_timestamp_stats,
     read_minimum_base_fee_per_gas, read_tracer_input, store_base_fee_per_gas,
-    store_chain_id, store_da_fee, store_kernel_version, store_storage_version,
-    STORAGE_VERSION, STORAGE_VERSION_PATH,
+    store_chain_id, store_da_fee, store_kernel_version, store_minimum_base_fee_per_gas,
+    store_storage_version, STORAGE_VERSION, STORAGE_VERSION_PATH,
 };
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_ethereum::block::BlockFees;
@@ -176,8 +176,14 @@ fn retrieve_chain_id<Host: Runtime>(host: &mut Host) -> Result<U256, Error> {
     }
 }
 fn retrieve_block_fees<Host: Runtime>(host: &mut Host) -> Result<BlockFees, Error> {
-    let minimum_base_fee_per_gas = read_minimum_base_fee_per_gas(host)
-        .unwrap_or_else(|_| crate::fees::MINIMUM_BASE_FEE_PER_GAS.into());
+    let minimum_base_fee_per_gas = match read_minimum_base_fee_per_gas(host) {
+        Ok(minimum_base_fee_per_gas) => minimum_base_fee_per_gas,
+        Err(_) => {
+            let minimum_base_fee_per_gas = crate::fees::MINIMUM_BASE_FEE_PER_GAS.into();
+            store_minimum_base_fee_per_gas(host, minimum_base_fee_per_gas)?;
+            minimum_base_fee_per_gas
+        }
+    };
 
     let base_fee_per_gas = match read_base_fee_per_gas(host) {
         Ok(base_fee_per_gas) if base_fee_per_gas > minimum_base_fee_per_gas => {

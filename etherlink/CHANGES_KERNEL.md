@@ -1,5 +1,6 @@
 # Changelog
 
+
 ## Version NEXT
 
 ### Features
@@ -7,6 +8,7 @@
 ### Internal
 
 - Maximum gas per transaction is stored in the durable storage. (!15468)
+- Minimum base fee per gas is stored in the durable storage. (!15475)
 
 ### Bug fixes
 

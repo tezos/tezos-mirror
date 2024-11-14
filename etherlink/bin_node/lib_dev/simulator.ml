@@ -127,6 +127,9 @@ module Make (SimulationBackend : SimulationBackend) = struct
     in
     let* da_fee_per_byte = read_qty Durable_storage_path.da_fee_per_byte in
     let* (Qty gas_price) =
+      (* In future iterations of the kernel, the default value will be
+         written to the storage. This default value will no longer need to
+         be declared here. *)
       let path = Durable_storage_path.minimum_base_fee_per_gas in
       let* gas_price_opt = read_qty path in
       match gas_price_opt with

@@ -481,7 +481,6 @@ pub fn store_tick_backlog_timestamp(
     Ok(())
 }
 
-#[cfg(test)]
 pub fn store_minimum_base_fee_per_gas<Host: Runtime>(
     host: &mut Host,
     price: U256,
