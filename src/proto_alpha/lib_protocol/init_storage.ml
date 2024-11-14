@@ -109,6 +109,22 @@ let patch_script ctxt (address, hash, patched_code) =
         address ;
       return ctxt
 
+let prepare ctxt ~level ~predecessor_timestamp ~timestamp =
+  let open Lwt_result_syntax in
+  let* ctxt =
+    Raw_context.prepare
+      ~level
+      ~predecessor_timestamp
+      ~timestamp
+      ~adaptive_issuance_enable:false
+      ctxt
+  in
+  let* ctxt = Adaptive_issuance_storage.set_adaptive_issuance_enable ctxt in
+  Storage.Pending_migration.remove ctxt
+
+(* Start of code to remove at next automatic protocol snapshot *)
+
+(* Please add here any code that should be removed at the next automatic protocol snapshot *)
 (* This temporary function is meant to be used when migrating from Quebec to R.
    It removes possible entries from the [Storage.Dal.Slot.Headers] map, as the
    type of values in this map evolved. *)
@@ -139,6 +155,8 @@ let remove_old_published_dal_slot_headers ctxt ~level ~attestation_lag =
           aux ctxt (n + 1)
   in
   aux ctxt 0
+
+(* End of code to remove at next automatic protocol snapshot *)
 
 let prepare_first_block chain_id ctxt ~typecheck_smart_contract
     ~typecheck_smart_rollup ~level ~timestamp ~predecessor =
@@ -270,16 +288,3 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
     in
     return ctxt
   else return ctxt
-
-let prepare ctxt ~level ~predecessor_timestamp ~timestamp =
-  let open Lwt_result_syntax in
-  let* ctxt =
-    Raw_context.prepare
-      ~level
-      ~predecessor_timestamp
-      ~timestamp
-      ~adaptive_issuance_enable:false
-      ctxt
-  in
-  let* ctxt = Adaptive_issuance_storage.set_adaptive_issuance_enable ctxt in
-  Storage.Pending_migration.remove ctxt

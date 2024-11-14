@@ -911,7 +911,7 @@ let check_and_update_protocol_version ctxt =
   return (previous_proto, ctxt)
 
 (* only for the migration *)
-let[@warning "-32"] get_previous_protocol_constants ctxt =
+let get_previous_protocol_constants ctxt =
   let open Lwt_syntax in
   let* bytes_opt = Context.find ctxt constants_key in
   match bytes_opt with
@@ -930,6 +930,9 @@ let[@warning "-32"] get_previous_protocol_constants ctxt =
              context."
       | Some constants -> return constants)
 
+(* Start of code to remove at next automatic protocol snapshot *)
+
+(* Please add here any code that should be removed at the next automatic protocol snapshot *)
 let update_cycle_eras ctxt level ~prev_blocks_per_cycle ~blocks_per_cycle
     ~blocks_per_commitment =
   let open Lwt_result_syntax in
@@ -954,10 +957,6 @@ let update_cycle_eras ctxt level ~prev_blocks_per_cycle ~blocks_per_cycle
   in
   let*? new_cycle_eras = Level_repr.add_cycle_era new_cycle_era cycle_eras in
   set_cycle_eras ctxt new_cycle_eras
-
-(* Start of code to remove at next automatic protocol snapshot *)
-
-(* Please add here any code that should be removed at the next automatic protocol snapshot *)
 
 (* End of code to remove at next automatic protocol snapshot *)
 
@@ -993,6 +992,12 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
         return (result, None)
     (* Start of Alpha stitching. Comment used for automatic snapshot *)
     | Alpha ->
+        (*
+            FIXME chain_id is used for Q to Alpha migration and nomore after.
+            We ignored for automatic stabilisation, should it be removed in
+            Beta?
+        *)
+        ignore chain_id ;
         let module Previous = Constants_parametric_repr in
         let* c = get_constants ctxt in
         let dal =
