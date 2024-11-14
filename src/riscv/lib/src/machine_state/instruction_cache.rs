@@ -33,10 +33,12 @@
 //! translation changes - as the upper address may no longer point
 //! to the same relative physical address.
 
+use super::instruction::{Args, Instruction, OpCode};
 use crate::cache_utils::{FenceCounter, Sizes};
+use crate::default::ConstDefault;
 use crate::machine_state::address_translation::PAGE_SIZE;
 use crate::machine_state::bus::Address;
-use crate::parser::instruction::{Instr, InstrCacheable};
+use crate::parser::instruction::Instr;
 use crate::parser::{parse_compressed_instruction, parse_uncompressed_instruction};
 use crate::state_backend::{
     self, AllocatedOf, Atom, Cell, ManagerBase, ManagerClone, ManagerRead, ManagerReadWrite,
@@ -49,11 +51,11 @@ use crate::state_backend::{
 /// - the parsed instruction corresponds to the unparsed bytes
 /// - the instruction does not cross a page boundary (only possible for an uncompressed
 ///   instruction).
-pub struct ValidatedCacheEntry(Address, InstrCacheable);
+pub struct ValidatedCacheEntry(Address, Instruction);
 
 impl ValidatedCacheEntry {
     /// Access the address & instruction (both parsed & unparsed).
-    pub fn to_inner(self) -> (Address, InstrCacheable) {
+    pub fn to_inner(self) -> (Address, Instruction) {
         (self.0, self.1)
     }
 
@@ -62,7 +64,7 @@ impl ValidatedCacheEntry {
     /// # Panics
     /// Panics if the validity checks fail. See [`ValidatedCacheEntry`].
     #[cfg(test)]
-    pub fn from_raw(phys_addr: Address, instr: InstrCacheable) -> Self {
+    pub fn from_raw(phys_addr: Address, instr: Instruction) -> Self {
         use crate::parser::instruction::InstrWidth;
 
         assert!(
@@ -75,13 +77,13 @@ impl ValidatedCacheEntry {
 }
 
 /// The layout of an entry in the instruction cache.
-pub type CachedLayout = (Atom<FenceCounter>, Atom<u64>, Atom<InstrCacheable>);
+pub type CachedLayout = (Atom<FenceCounter>, Atom<u64>, Atom<Instruction>);
 
 /// An entry in the instruction cache - containing both the physical address & instruction.
 pub struct Cached<M: ManagerBase> {
     fence_counter: Cell<FenceCounter, M>,
     phys_addr: Cell<Address, M>,
-    instr: Cell<InstrCacheable, M>,
+    instr: Cell<Instruction, M>,
 }
 
 impl<M: ManagerBase> Cached<M> {
@@ -101,7 +103,10 @@ impl<M: ManagerBase> Cached<M> {
     {
         self.fence_counter.write(FenceCounter::INITIAL);
         self.phys_addr.write(0);
-        self.instr.write(InstrCacheable::Unknown { instr: 0 });
+        self.instr.write(Instruction {
+            opcode: OpCode::Unknown,
+            args: Args::DEFAULT,
+        });
     }
 
     /// Obatin a structure with references to the bound regions of this type.
@@ -279,7 +284,7 @@ impl<ICL: InstructionCacheLayout, M: ManagerBase> InstructionCache<ICL, M> {
 
     /// Fetch the cached instruction at the given address, if an entry exists.
     #[inline(always)]
-    pub fn fetch_instr(&mut self, phys_addr: Address) -> Option<&InstrCacheable>
+    pub fn fetch_instr(&mut self, phys_addr: Address) -> Option<&Instruction>
     where
         M: ManagerRead,
     {
@@ -312,6 +317,7 @@ impl<ICL: InstructionCacheLayout, M: ManagerBase> InstructionCache<ICL, M> {
         let instr = parse_compressed_instruction(raw);
 
         if let Instr::Cacheable(instr) = instr {
+            let instr = (&instr).into();
             self.cache_inner(phys_addr, instr);
             push_to_block(ValidatedCacheEntry(phys_addr, instr));
         };
@@ -335,6 +341,7 @@ impl<ICL: InstructionCacheLayout, M: ManagerBase> InstructionCache<ICL, M> {
         let instr = parse_uncompressed_instruction(raw);
         match instr {
             Instr::Cacheable(instr) if cacheable_uncompressed(phys_addr) => {
+                let instr = Instruction::from(&instr);
                 self.cache_inner(phys_addr, instr);
                 push_to_block(ValidatedCacheEntry(phys_addr, instr));
             }
@@ -345,7 +352,7 @@ impl<ICL: InstructionCacheLayout, M: ManagerBase> InstructionCache<ICL, M> {
     }
 
     #[inline]
-    fn cache_inner(&mut self, phys_addr: Address, instr: InstrCacheable)
+    fn cache_inner(&mut self, phys_addr: Address, instr: Instruction)
     where
         M: ManagerReadWrite,
     {
@@ -382,7 +389,6 @@ mod tests {
     use crate::{
         backend_test, create_state,
         machine_state::registers::{a0, t0, t1},
-        parser::instruction::{CIBTypeArgs, InstrCacheable, SBTypeArgs},
         state_backend::test_helpers::copy_via_serde,
     };
 
@@ -422,7 +428,14 @@ mod tests {
         );
 
         let compressed_bytes = 0x4505;
-        let compressed = InstrCacheable::CLi(CIBTypeArgs { rd_rs1: a0, imm: 1 });
+        let compressed = Instruction {
+            opcode: OpCode::CLi,
+            args: Args {
+                rd: a0,
+                imm: 1,
+                ..Args::DEFAULT
+            },
+        };
 
         let uncompressed_bytes = 0x00533423;
 
@@ -443,14 +456,25 @@ mod tests {
     // - able to cache possibly overlapping instructions
     backend_test!(test_rebind, F, {
         let compressed_bytes = 0x4505;
-        let compressed = InstrCacheable::CLi(CIBTypeArgs { rd_rs1: a0, imm: 1 });
+        let compressed = Instruction {
+            opcode: OpCode::CLi,
+            args: Args {
+                rd: a0,
+                imm: 1,
+                ..Args::DEFAULT
+            },
+        };
 
         let uncompressed_bytes = 0x00533423;
-        let uncompressed = InstrCacheable::Sd(SBTypeArgs {
-            rs1: t1,
-            rs2: t0,
-            imm: 8,
-        });
+        let uncompressed = Instruction {
+            opcode: OpCode::Sd,
+            args: Args {
+                rs1: t1,
+                rs2: t0,
+                imm: 8,
+                ..Args::DEFAULT
+            },
+        };
 
         let phys_addr_uncompressed = 6;
         let phys_addr_compressed = 8;
