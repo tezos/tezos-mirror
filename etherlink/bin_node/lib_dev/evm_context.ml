@@ -736,7 +736,7 @@ module State = struct
       let*! head_info in
       head_info := session_to_head_info ctxt.session ;
       return_unit)
-    else assert false
+    else return_unit
 
   type error += Cannot_apply_blueprint of {local_state_level : Z.t}
 
