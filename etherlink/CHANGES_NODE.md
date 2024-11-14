@@ -25,6 +25,8 @@
 - Modify the blueprints publisher worker to log error when it crash
   and make the node crash when it fails to add a blueprints into its
   queue. (!15600)
+- Adds events for errors in evm events and rollup node
+  followers. (!15622)
 
 ## Version 0.7 (2024-10-28)
 
