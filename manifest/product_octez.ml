@@ -3370,6 +3370,13 @@ let octez_protocol_compiler_registerer =
       [octez_base |> open_ ~m:"TzPervasives"; tezos_protocol_environment_sigs]
     ~flags:(Flags.standard ~opaque:true ())
 
+let octez_protocol_compiler_alternative_hashes =
+  public_lib
+    "octez-protocol-compiler.alternative-hashes"
+    ~path:"src/lib_protocol_compiler/hashes"
+    ~internal_name:"octez_protocol_alternative_hashes"
+    ~deps:[octez_base |> open_ ~m:"TzPervasives"]
+
 let octez_protocol_compiler_compat =
   public_lib
     "octez-protocol-compiler-compat"
@@ -3434,6 +3441,7 @@ let octez_protocol_compiler_lib =
         tezos_protocol_environment_sigs;
         octez_stdlib_unix |> open_;
         octez_protocol_compiler_compat |> open_;
+        octez_protocol_compiler_alternative_hashes |> open_;
         lwt_unix;
         ocplib_ocamlres;
         unix;
@@ -3547,6 +3555,7 @@ let octez_protocol_updater =
         octez_micheline |> open_;
         octez_shell_services |> open_;
         octez_protocol_environment;
+        octez_protocol_compiler_alternative_hashes;
         octez_protocol_compiler_registerer;
         octez_protocol_compiler_native;
         octez_context_ops |> open_;
@@ -3795,6 +3804,7 @@ let octez_shell =
         octez_stdlib_unix |> open_;
         octez_shell_services |> open_;
         octez_p2p_services |> open_;
+        octez_protocol_compiler_alternative_hashes;
         octez_protocol_updater |> open_;
         octez_requester |> open_;
         octez_workers |> open_;

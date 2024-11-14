@@ -137,6 +137,18 @@ type driver = {
 let parse_options errflag s =
   Option.iter Location.(prerr_alert none) (Warnings.parse_options errflag s)
 
+let pp_protocol_hash_result ppf (computed_hash, stored_hash_opt) =
+  match stored_hash_opt with
+  | Some stored_hash when not (Protocol_hash.equal stored_hash computed_hash) ->
+      Format.fprintf
+        ppf
+        "%a as %a"
+        Protocol_hash.pp
+        stored_hash
+        Protocol_hash.pp
+        computed_hash
+  | None | Some _ -> Protocol_hash.pp ppf computed_hash
+
 let main {compile_ml; pack_objects; link_shared} version =
   Random.self_init () ;
   parse_options false default_warnings ;
@@ -217,7 +229,10 @@ let main {compile_ml; pack_objects; link_shared} version =
     | None -> computed_hash
     | Some stored_hash
       when !check_protocol_hash
-           && not (Protocol_hash.equal computed_hash stored_hash) ->
+           && not
+                (Protocol_hash_representative.equivalent
+                   computed_hash
+                   stored_hash) ->
         Format.eprintf
           "Inconsistent hash for protocol in TEZOS_PROTOCOL.@\n\
            Computed hash: %a@\n\
@@ -307,4 +322,7 @@ let main {compile_ml; pack_objects; link_shared} version =
     Format.printf "let src_digest = %S ;;\n" (Digest.to_hex dsrc) ;
     Format.printf "let impl_digest = %S ;;\n" (Digest.to_hex dimpl) ;
     Format.printf "let intf_digest = %S ;;\n" (Digest.to_hex dintf)) ;
-  Format.printf "Success: %a.@." Protocol_hash.pp hash
+  Format.printf
+    "Success: %a.@."
+    pp_protocol_hash_result
+    (computed_hash, stored_hash_opt)

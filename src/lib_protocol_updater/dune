@@ -11,6 +11,7 @@
   octez-libs.micheline
   octez-shell-libs.shell-services
   octez-proto-libs.protocol-environment
+  octez-protocol-compiler.alternative-hashes
   octez-protocol-compiler.registerer
   octez-protocol-compiler.native
   octez-shell-libs.context-ops
