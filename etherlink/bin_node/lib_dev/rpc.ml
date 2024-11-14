@@ -19,11 +19,13 @@ let set_metrics_level (ctxt : Evm_ro_context.t) =
   | Some (Qty latest, _) -> Metrics.set_level ~level:latest
   | None -> ()
 
-let set_metrics_confirmed_level (ctxt : Evm_ro_context.t) =
+let set_metrics_confirmed_levels (ctxt : Evm_ro_context.t) =
   let open Lwt_result_syntax in
-  let+ candidate = Evm_store.(use ctxt.store Context_hashes.find_finalized) in
+  let+ candidate = Evm_store.(use ctxt.store L1_l2_levels_relationships.find) in
   match candidate with
-  | Some (Qty finalized, _) -> Metrics.set_confirmed_level ~level:finalized
+  | Some {l1_level; finalized = Qty finalized; _} ->
+      Metrics.set_confirmed_level ~level:finalized ;
+      Metrics.set_l1_level ~level:l1_level
   | None -> ()
 
 let main ~data_dir ~evm_node_endpoint ~(config : Configuration.t) =
@@ -55,7 +57,7 @@ let main ~data_dir ~evm_node_endpoint ~(config : Configuration.t) =
   in
 
   let* () = set_metrics_level ctxt in
-  let* () = set_metrics_confirmed_level ctxt in
+  let* () = set_metrics_confirmed_levels ctxt in
 
   Metrics.init
     ~mode:"rpc"
@@ -88,5 +90,5 @@ let main ~data_dir ~evm_node_endpoint ~(config : Configuration.t) =
   in
   Blueprints_watcher.notify blueprint ;
   Metrics.set_level ~level:number ;
-  let* () = set_metrics_confirmed_level ctxt in
+  let* () = set_metrics_confirmed_levels ctxt in
   return_unit

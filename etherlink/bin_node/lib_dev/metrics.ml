@@ -270,6 +270,7 @@ type t = {
   block : Block.t;
   simulation : Simulation.t;
   health : Health.t;
+  l1_level : Gauge.t;
 }
 
 module BlueprintChunkSent = struct
@@ -304,7 +305,17 @@ let metrics =
   let block = Block.init name in
   let simulation = Simulation.init name in
   let health = Health.init name in
-  {chain; block; simulation; health}
+  let l1_level =
+    Gauge.v_label
+      ~registry
+      ~label_name:"l1_level"
+      ~help:"Last processed L1 block level"
+      ~namespace
+      ~subsystem
+      "l1_level"
+      name
+  in
+  {chain; block; simulation; health; l1_level}
 
 let init ~mode ~tx_pool_size_info ~smart_rollup_address =
   Info.init ~mode ~smart_rollup_address ;
@@ -316,6 +327,8 @@ let set_gas_price price = Gauge.set metrics.chain.gas_price (Z.to_float price)
 
 let set_confirmed_level ~level =
   Gauge.set metrics.chain.confirmed_head (Z.to_float level)
+
+let set_l1_level ~level = Gauge.set metrics.l1_level (Int32.to_float level)
 
 let start_bootstrapping () = Gauge.set metrics.health.bootstrapping 1.
 

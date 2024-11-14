@@ -4,6 +4,12 @@
 
 ### Features
 
+#### Metrics
+
+- Adds `l1_level` to expose the last processed L1 block. If the node is connected
+  to a rollup node it should be close to the most recent finalized L1 block
+  on the network. (!15623)
+
 ### Bug fixes
 
 - Fixes a race condition where rollup node follower would process start
@@ -13,6 +19,7 @@
 
 - Adds the duration of the blueprint application to the
   `blueprint_applied` event. (!15505)
+- Adds the last processed L1 block in a new event `evm_context_processed_l1_level`. (!15623)
 - The gas estimation exits earlier if the simulation needs more than the
   gas limit per transaction. It also supports custom maximum gas limit. (!15468)
 - Modify the blueprints publisher worker to log error when it crash
