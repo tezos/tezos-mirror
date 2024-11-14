@@ -125,9 +125,6 @@ test_case!(test_suite_rv64mi_p_sh_misaligned, "rv64mi-p-sh-misaligned");
 test_case!(test_suite_rv64mi_p_sw_misaligned, "rv64mi-p-sw-misaligned");
 test_case!(test_suite_rv64mi_p_zicntr, "rv64mi-p-zicntr");
 
-// RV64-MZICBO
-test_case!(#[ignore], test_suite_rv64mzicbo_p_zero, "rv64mzicbo-p-zero");
-
 // RV64-SI
 test_case!(test_suite_rv64si_p_csr, "rv64si-p-csr");
 test_case!(test_suite_rv64si_p_dirty, "rv64si-p-dirty", Mode::Machine);
@@ -145,9 +142,6 @@ test_case!(
     &[(gp, 1)] // This checks TESTNUM == 1, see scall.S in the riscv test suite
 );
 test_case!(test_suite_rv64si_p_wfi, "rv64si-p-wfi");
-
-// RV64-SSVNAPOT
-test_case!(#[ignore], test_suite_rv64ssvnapot_p_napot, "rv64ssvnapot-p-napot");
 
 // RV64-UA
 test_case!(test_suite_rv64ua_p_amoadd_d, "rv64ua-p-amoadd_d");
@@ -382,28 +376,3 @@ test_case!(test_suite_rv64um_v_rem, "rv64um-v-rem");
 test_case!(test_suite_rv64um_v_remu, "rv64um-v-remu");
 test_case!(test_suite_rv64um_v_remuw, "rv64um-v-remuw");
 test_case!(test_suite_rv64um_v_remw, "rv64um-v-remw");
-
-// RV64-UZFH
-test_case!(#[ignore], test_suite_rv64uzfh_p_fadd, "rv64uzfh-p-fadd");
-test_case!(#[ignore], test_suite_rv64uzfh_p_fclass, "rv64uzfh-p-fclass");
-test_case!(#[ignore], test_suite_rv64uzfh_p_fcmp, "rv64uzfh-p-fcmp");
-test_case!(#[ignore], test_suite_rv64uzfh_p_fcvt, "rv64uzfh-p-fcvt");
-test_case!(#[ignore], test_suite_rv64uzfh_p_fcvt_w, "rv64uzfh-p-fcvt_w");
-test_case!(#[ignore], test_suite_rv64uzfh_p_fdiv, "rv64uzfh-p-fdiv");
-test_case!(#[ignore], test_suite_rv64uzfh_p_fmadd, "rv64uzfh-p-fmadd");
-test_case!(#[ignore], test_suite_rv64uzfh_p_fmin, "rv64uzfh-p-fmin");
-test_case!(#[ignore], test_suite_rv64uzfh_p_ldst, "rv64uzfh-p-ldst");
-test_case!(#[ignore], test_suite_rv64uzfh_p_move, "rv64uzfh-p-move");
-test_case!(#[ignore], test_suite_rv64uzfh_p_recoding, "rv64uzfh-p-recoding");
-
-test_case!(#[ignore], test_suite_rv64uzfh_v_fadd, "rv64uzfh-v-fadd");
-test_case!(#[ignore], test_suite_rv64uzfh_v_fclass, "rv64uzfh-v-fclass");
-test_case!(#[ignore], test_suite_rv64uzfh_v_fcmp, "rv64uzfh-v-fcmp");
-test_case!(#[ignore], test_suite_rv64uzfh_v_fcvt, "rv64uzfh-v-fcvt");
-test_case!(#[ignore], test_suite_rv64uzfh_v_fcvt_w, "rv64uzfh-v-fcvt_w");
-test_case!(#[ignore], test_suite_rv64uzfh_v_fdiv, "rv64uzfh-v-fdiv");
-test_case!(#[ignore], test_suite_rv64uzfh_v_fmadd, "rv64uzfh-v-fmadd");
-test_case!(#[ignore], test_suite_rv64uzfh_v_fmin, "rv64uzfh-v-fmin");
-test_case!(#[ignore], test_suite_rv64uzfh_v_ldst, "rv64uzfh-v-ldst");
-test_case!(#[ignore], test_suite_rv64uzfh_v_move, "rv64uzfh-v-move");
-test_case!(#[ignore], test_suite_rv64uzfh_v_recoding, "rv64uzfh-v-recoding");

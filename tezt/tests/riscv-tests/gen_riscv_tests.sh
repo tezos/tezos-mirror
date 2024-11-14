@@ -5,9 +5,11 @@
 # It assumes that a GNU riscv toolchin is installed locally.
 # To install the GNU riscv toolchain, follow the instructions here: https://github.com/riscv-collab/riscv-gnu-toolchain
 
+set -e
+
 build_dir=$(mktemp -d)
 
-self=$(dirname "$0")
+self=$(realpath "$(dirname "$0")")
 target_dir=$(realpath "$self"/generated)
 
 clean_up() {
@@ -38,7 +40,7 @@ autoconf || {
   clean_up 1
 }
 
-make isa -j 8 || {
+make -j 8 -C isa rv64ui rv64uc rv64um rv64ua rv64uf rv64ud rv64si rv64mi || {
   echo "make isa failed" >&2
   clean_up 1
 }
