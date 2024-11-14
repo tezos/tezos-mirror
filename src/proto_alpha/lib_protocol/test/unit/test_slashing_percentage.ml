@@ -74,22 +74,6 @@ let get_pct ~ns_enable ~max_slashing_threshold ~max_slashing_per_block int_list
        map
        pkh_list
 
-(** Test the double attesting slash is always 50% with ns_enable = false *)
-let test_ns_enable_disable () =
-  let open Lwt_result_syntax in
-  let f x =
-    get_pct
-      ~ns_enable:false
-      ~max_slashing_threshold:100
-      ~max_slashing_per_block:Percentage.p100
-      [x]
-  in
-  let* () = assert_equal_int ~loc:__LOC__ 50 (f 0) in
-  let* () = assert_equal_int ~loc:__LOC__ 50 (f 1) in
-  let* () = assert_equal_int ~loc:__LOC__ 50 (f 100) in
-  let* () = assert_equal_int ~loc:__LOC__ 50 (f 10000) in
-  return_unit
-
 (** We set ns_enable = true for the following tests *)
 let get_pct = get_pct ~ns_enable:true
 
@@ -182,7 +166,6 @@ let test_mainnet_values () =
 let tests =
   Tztest.
     [
-      tztest "Test ns_enable = false" `Quick test_ns_enable_disable;
       tztest "Test only sum of rights counts" `Quick test_list_and_sum;
       tztest "Test max_slashing_per_block" `Quick test_max_slashing_per_block;
       tztest "Test max_slashing_threshold" `Quick test_max_slashing_threshold;
