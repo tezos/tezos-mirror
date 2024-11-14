@@ -97,6 +97,14 @@ let unexpected_l1_block =
     ("expected_level", Data_encoding.int32)
     ("provided_level", Data_encoding.int32)
 
+let processed_l1_level =
+  declare_1
+    ~section
+    ~name:"evm_context_processed_l1_level"
+    ~level:Info
+    ~msg:"Processed L1 level {level}"
+    ("level", Data_encoding.int32)
+
 let ready () = emit ready ()
 
 let shutdown () = emit shutdown ()
@@ -116,3 +124,5 @@ let gc_waiter_failed exn =
 
 let unexpected_l1_block ~expected_level ~provided_level =
   emit unexpected_l1_block (expected_level, provided_level)
+
+let processed_l1_level level = emit processed_l1_level level

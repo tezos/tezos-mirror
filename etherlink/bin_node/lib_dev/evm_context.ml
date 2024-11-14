@@ -724,6 +724,11 @@ module State = struct
         let* ctxt = replace_current_commit ctxt conn evm_state in
         return (ctxt, evm_state, on_success)
       in
+      let*! () =
+        Option.iter_s
+          (fun l1_level -> Evm_context_events.processed_l1_level l1_level)
+          finalized_level
+      in
       on_success ctxt.session ;
       on_modified_head ctxt evm_state context ;
       let*! head_info in
