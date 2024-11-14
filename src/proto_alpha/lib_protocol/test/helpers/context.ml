@@ -702,7 +702,7 @@ let init_gen tup ?rng_state ?commitments ?bootstrap_balances
     ?cycles_per_voting_period ?sc_rollup_arith_pvm_enable
     ?sc_rollup_private_enable ?sc_rollup_riscv_pvm_enable ?dal_enable
     ?zk_rollup_enable ?hard_gas_limit_per_block ?nonce_revelation_threshold ?dal
-    ?adaptive_issuance ?allow_tz4_delegate_enable () =
+    ?adaptive_issuance ?allow_tz4_delegate_enable ?aggregate_attestation () =
   let open Lwt_result_syntax in
   let n = tup_n tup in
   let*? accounts = Account.generate_accounts ?rng_state n in
@@ -739,6 +739,7 @@ let init_gen tup ?rng_state ?commitments ?bootstrap_balances
       ?dal
       ?adaptive_issuance
       ?allow_tz4_delegate_enable
+      ?aggregate_attestation
       bootstrap_accounts
   in
   (blk, tup_get tup contracts)

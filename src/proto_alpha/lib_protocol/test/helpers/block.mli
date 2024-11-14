@@ -150,6 +150,7 @@ val genesis :
   ?dal:Constants.Parametric.dal ->
   ?adaptive_issuance:Constants.Parametric.adaptive_issuance ->
   ?allow_tz4_delegate_enable:bool ->
+  ?aggregate_attestation:bool ->
   Parameters.bootstrap_account list ->
   block tzresult Lwt.t
 
@@ -431,6 +432,7 @@ val prepare_initial_context_params :
   ?adaptive_issuance:Constants.Parametric.adaptive_issuance ->
   ?consensus_rights_delay:int ->
   ?allow_tz4_delegate_enable:bool ->
+  ?aggregate_attestation:bool ->
   unit ->
   ( Constants.Parametric.t * Block_header.shell_header * Block_hash.t,
     tztrace )
