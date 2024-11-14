@@ -3,33 +3,59 @@
   "info": {
     "title": "Octez DAL Node RPC",
     "description": "The RPC API for the Octez DAL node.",
-    "version": "Octez 20.3 (4ec59046)"
+    "version": "Octez 21.0 (87e7ddd4)"
   },
   "paths": {
-    "/commitments": {
-      "post": {
-        "description": "Add a slot in the node's context if not already present. The corresponding commitment is returned.",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "string",
-                "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
-              }
-            }
-          }
-        },
+    "/health": {
+      "get": {
+        "description": "Performs health checks on the DAL node, evaluating key components of the DAL node. Returns a health status indicating whether the DAL node is 'Up', 'Down', or 'Degraded' based on the results of these checks.",
         "responses": {
           "200": {
             "description": "",
             "content": {
               "application/json": {
                 "schema": {
-                  "title": "Commitment representation for the DAL (Base58Check-encoded)",
-                  "oneOf": [
-                    {
-                      "$ref": "#/components/schemas/unistring"
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "degraded",
+                        "up",
+                        "ko",
+                        "ok",
+                        "down"
+                      ]
+                    },
+                    "checks": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "$ref": "#/components/schemas/unistring"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "degraded",
+                              "up",
+                              "ko",
+                              "ok",
+                              "down"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "status"
+                        ]
+                      }
                     }
+                  },
+                  "required": [
+                    "status",
+                    "checks"
                   ]
                 }
               }
@@ -48,616 +74,7 @@
         }
       }
     },
-    "/commitments/{DAL_commitment}": {
-      "patch": {
-        "description": "Associate a commitment to a level and a slot index.",
-        "parameters": [
-          {
-            "name": "DAL_commitment",
-            "in": "path",
-            "description": "DAL_commitment (Base58Check-encoded)",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "slot_level": {
-                    "type": "integer",
-                    "minimum": -2147483648,
-                    "maximum": 2147483647
-                  },
-                  "slot_index": {
-                    "type": "integer",
-                    "minimum": 0,
-                    "maximum": 255
-                  }
-                },
-                "required": [
-                  "slot_level",
-                  "slot_index"
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "default": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/commitments/{DAL_commitment}/headers": {
-      "get": {
-        "description": "Return the known headers for the slot whose commitment is given.",
-        "parameters": [
-          {
-            "name": "DAL_commitment",
-            "in": "path",
-            "description": "DAL_commitment (Base58Check-encoded)",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "slot_level",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "slot_index",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "oneOf": [
-                      {
-                        "title": "waiting_attestation",
-                        "type": "object",
-                        "properties": {
-                          "slot_level": {
-                            "type": "integer",
-                            "minimum": -2147483648,
-                            "maximum": 2147483647
-                          },
-                          "slot_index": {
-                            "type": "integer",
-                            "minimum": 0,
-                            "maximum": 255
-                          },
-                          "commitment": {
-                            "$ref": "#/components/schemas/DAL_commitment"
-                          },
-                          "status": {
-                            "type": "string",
-                            "enum": [
-                              "waiting_attestation"
-                            ]
-                          }
-                        },
-                        "required": [
-                          "slot_level",
-                          "slot_index",
-                          "commitment",
-                          "status"
-                        ]
-                      },
-                      {
-                        "title": "attested",
-                        "type": "object",
-                        "properties": {
-                          "slot_level": {
-                            "type": "integer",
-                            "minimum": -2147483648,
-                            "maximum": 2147483647
-                          },
-                          "slot_index": {
-                            "type": "integer",
-                            "minimum": 0,
-                            "maximum": 255
-                          },
-                          "commitment": {
-                            "$ref": "#/components/schemas/DAL_commitment"
-                          },
-                          "status": {
-                            "type": "string",
-                            "enum": [
-                              "attested"
-                            ]
-                          }
-                        },
-                        "required": [
-                          "slot_level",
-                          "slot_index",
-                          "commitment",
-                          "status"
-                        ]
-                      },
-                      {
-                        "title": "unattested",
-                        "type": "object",
-                        "properties": {
-                          "slot_level": {
-                            "type": "integer",
-                            "minimum": -2147483648,
-                            "maximum": 2147483647
-                          },
-                          "slot_index": {
-                            "type": "integer",
-                            "minimum": 0,
-                            "maximum": 255
-                          },
-                          "commitment": {
-                            "$ref": "#/components/schemas/DAL_commitment"
-                          },
-                          "status": {
-                            "type": "string",
-                            "enum": [
-                              "unattested"
-                            ]
-                          }
-                        },
-                        "required": [
-                          "slot_level",
-                          "slot_index",
-                          "commitment",
-                          "status"
-                        ]
-                      },
-                      {
-                        "title": "not_selected",
-                        "type": "object",
-                        "properties": {
-                          "slot_level": {
-                            "type": "integer",
-                            "minimum": -2147483648,
-                            "maximum": 2147483647
-                          },
-                          "slot_index": {
-                            "type": "integer",
-                            "minimum": 0,
-                            "maximum": 255
-                          },
-                          "commitment": {
-                            "$ref": "#/components/schemas/DAL_commitment"
-                          },
-                          "status": {
-                            "type": "string",
-                            "enum": [
-                              "not_selected"
-                            ]
-                          }
-                        },
-                        "required": [
-                          "slot_level",
-                          "slot_index",
-                          "commitment",
-                          "status"
-                        ]
-                      },
-                      {
-                        "title": "unseen_or_not_finalized",
-                        "type": "object",
-                        "properties": {
-                          "slot_level": {
-                            "type": "integer",
-                            "minimum": -2147483648,
-                            "maximum": 2147483647
-                          },
-                          "slot_index": {
-                            "type": "integer",
-                            "minimum": 0,
-                            "maximum": 255
-                          },
-                          "commitment": {
-                            "$ref": "#/components/schemas/DAL_commitment"
-                          },
-                          "status": {
-                            "type": "string",
-                            "enum": [
-                              "unseen"
-                            ]
-                          }
-                        },
-                        "required": [
-                          "slot_level",
-                          "slot_index",
-                          "commitment",
-                          "status"
-                        ]
-                      }
-                    ]
-                  }
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/commitments/{DAL_commitment}/proof": {
-      "get": {
-        "description": "Compute the proof associated with a commitment.",
-        "parameters": [
-          {
-            "name": "DAL_commitment",
-            "in": "path",
-            "description": "DAL_commitment (Base58Check-encoded)",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "string",
-                  "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/commitments/{DAL_commitment}/shards": {
-      "put": {
-        "description": "Compute and save the shards of the slot associated to the given commitment. If the input's flag is true, the shard proofs are also computed.",
-        "parameters": [
-          {
-            "name": "DAL_commitment",
-            "in": "path",
-            "description": "DAL_commitment (Base58Check-encoded)",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "with_proof": {
-                    "type": "boolean"
-                  }
-                },
-                "required": [
-                  "with_proof"
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "default": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/commitments/{DAL_commitment}/slot": {
-      "get": {
-        "description": "Retrieve the content of the slot associated with the given commitment.",
-        "parameters": [
-          {
-            "name": "DAL_commitment",
-            "in": "path",
-            "description": "DAL_commitment (Base58Check-encoded)",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "string",
-                  "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/levels/{int32}/headers": {
-      "get": {
-        "description": "Return the known headers for the given published level.",
-        "parameters": [
-          {
-            "name": "int32",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "status",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "oneOf": [
-                      {
-                        "title": "waiting_attestation",
-                        "type": "object",
-                        "properties": {
-                          "slot_level": {
-                            "type": "integer",
-                            "minimum": -2147483648,
-                            "maximum": 2147483647
-                          },
-                          "slot_index": {
-                            "type": "integer",
-                            "minimum": 0,
-                            "maximum": 255
-                          },
-                          "commitment": {
-                            "$ref": "#/components/schemas/DAL_commitment"
-                          },
-                          "status": {
-                            "type": "string",
-                            "enum": [
-                              "waiting_attestation"
-                            ]
-                          }
-                        },
-                        "required": [
-                          "slot_level",
-                          "slot_index",
-                          "commitment",
-                          "status"
-                        ]
-                      },
-                      {
-                        "title": "attested",
-                        "type": "object",
-                        "properties": {
-                          "slot_level": {
-                            "type": "integer",
-                            "minimum": -2147483648,
-                            "maximum": 2147483647
-                          },
-                          "slot_index": {
-                            "type": "integer",
-                            "minimum": 0,
-                            "maximum": 255
-                          },
-                          "commitment": {
-                            "$ref": "#/components/schemas/DAL_commitment"
-                          },
-                          "status": {
-                            "type": "string",
-                            "enum": [
-                              "attested"
-                            ]
-                          }
-                        },
-                        "required": [
-                          "slot_level",
-                          "slot_index",
-                          "commitment",
-                          "status"
-                        ]
-                      },
-                      {
-                        "title": "unattested",
-                        "type": "object",
-                        "properties": {
-                          "slot_level": {
-                            "type": "integer",
-                            "minimum": -2147483648,
-                            "maximum": 2147483647
-                          },
-                          "slot_index": {
-                            "type": "integer",
-                            "minimum": 0,
-                            "maximum": 255
-                          },
-                          "commitment": {
-                            "$ref": "#/components/schemas/DAL_commitment"
-                          },
-                          "status": {
-                            "type": "string",
-                            "enum": [
-                              "unattested"
-                            ]
-                          }
-                        },
-                        "required": [
-                          "slot_level",
-                          "slot_index",
-                          "commitment",
-                          "status"
-                        ]
-                      },
-                      {
-                        "title": "not_selected",
-                        "type": "object",
-                        "properties": {
-                          "slot_level": {
-                            "type": "integer",
-                            "minimum": -2147483648,
-                            "maximum": 2147483647
-                          },
-                          "slot_index": {
-                            "type": "integer",
-                            "minimum": 0,
-                            "maximum": 255
-                          },
-                          "commitment": {
-                            "$ref": "#/components/schemas/DAL_commitment"
-                          },
-                          "status": {
-                            "type": "string",
-                            "enum": [
-                              "not_selected"
-                            ]
-                          }
-                        },
-                        "required": [
-                          "slot_level",
-                          "slot_index",
-                          "commitment",
-                          "status"
-                        ]
-                      },
-                      {
-                        "title": "unseen_or_not_finalized",
-                        "type": "object",
-                        "properties": {
-                          "slot_level": {
-                            "type": "integer",
-                            "minimum": -2147483648,
-                            "maximum": 2147483647
-                          },
-                          "slot_index": {
-                            "type": "integer",
-                            "minimum": 0,
-                            "maximum": 255
-                          },
-                          "commitment": {
-                            "$ref": "#/components/schemas/DAL_commitment"
-                          },
-                          "status": {
-                            "type": "string",
-                            "enum": [
-                              "unseen"
-                            ]
-                          }
-                        },
-                        "required": [
-                          "slot_level",
-                          "slot_index",
-                          "commitment",
-                          "status"
-                        ]
-                      }
-                    ]
-                  }
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/levels/{int32}/slot_indices/{int}/commitment": {
+    "/levels/{int32}/slots/{int}/commitment": {
       "get": {
         "description": "Return the accepted commitment associated to the given slot index and published at the given level.",
         "parameters": [
@@ -688,6 +105,279 @@
                   "oneOf": [
                     {
                       "$ref": "#/components/schemas/unistring"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/levels/{int32}/slots/{int}/content": {
+      "get": {
+        "description": "Retrieve the content of the slot associated with the given commitment.",
+        "parameters": [
+          {
+            "name": "int32",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "int",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/levels/{int32}/slots/{int}/pages": {
+      "get": {
+        "description": "Fetch slot as list of pages",
+        "parameters": [
+          {
+            "name": "int32",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "int",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/levels/{int32}/slots/{int}/pages/{int}/proof": {
+      "get": {
+        "description": "Compute the proof associated with a page of a given slot.",
+        "parameters": [
+          {
+            "name": "int32",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "int",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Commitment representation for the DAL (Base58Check-encoded)",
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/unistring"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/levels/{int32}/slots/{int}/shards/{int}/content": {
+      "get": {
+        "description": "Fetch shard as bytes",
+        "parameters": [
+          {
+            "name": "int32",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "int",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "oneOf": [
+                      {
+                        "type": "integer",
+                        "minimum": -1073741824,
+                        "maximum": 1073741823
+                      },
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/levels/{int32}/slots/{int}/status": {
+      "get": {
+        "description": "Return the status for the given slot.",
+        "parameters": [
+          {
+            "name": "int32",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "int",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "title": "waiting_attestation",
+                      "type": "string",
+                      "enum": [
+                        "waiting_attestation"
+                      ]
+                    },
+                    {
+                      "title": "attested",
+                      "type": "string",
+                      "enum": [
+                        "attested"
+                      ]
+                    },
+                    {
+                      "title": "unattested",
+                      "type": "string",
+                      "enum": [
+                        "unattested"
+                      ]
                     }
                   ]
                 }
@@ -872,12 +562,16 @@
                           },
                           "outbound": {
                             "type": "boolean"
+                          },
+                          "bootstrap": {
+                            "type": "boolean"
                           }
                         },
                         "required": [
                           "topics",
                           "direct",
-                          "outbound"
+                          "outbound",
+                          "bootstrap"
                         ]
                       }
                     },
@@ -976,6 +670,61 @@
         }
       }
     },
+    "/p2p/gossipsub/pkhs/peers": {
+      "get": {
+        "description": "Get an association list between each topic subscribed to by the connected peers and the remote peers subscribed to that topic. If the 'subscribed' flag is given, then restrict the output to the topics this peer is subscribed to.",
+        "parameters": [
+          {
+            "name": "subscribed",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "pkh": {
+                        "$ref": "#/components/schemas/Signature.Public_key_hash"
+                      },
+                      "peers": {
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                        }
+                      }
+                    },
+                    "required": [
+                      "pkh",
+                      "peers"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/p2p/gossipsub/scores": {
       "get": {
         "description": "Get the scores of the peers with a known score.",
@@ -999,6 +748,63 @@
                     "required": [
                       "peer",
                       "score"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/p2p/gossipsub/slot_indexes/peers": {
+      "get": {
+        "description": "Get an association list between each public key hash part of a topic subscribed to by the connected peers and the remote peers subscribed to such topics. If the 'subscribed' flag is given, then restrict the output to the topics this peer is subscribed to.",
+        "parameters": [
+          {
+            "name": "subscribed",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "slot_index": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 255
+                      },
+                      "peers": {
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                        }
+                      }
+                    },
+                    "required": [
+                      "slot_index",
+                      "peers"
                     ]
                   }
                 }
@@ -1064,7 +870,7 @@
     },
     "/p2p/gossipsub/topics/peers": {
       "get": {
-        "description": "Get an association list between each topic subscribed to by the connected peers and the remote peers subscribed to that topic. If the 'subscribed' flag is given, then restrict the output to the topics this node is subscribed to.",
+        "description": "Get an association list between each topic subscribed to by the connected peers and the remote peers subscribed to that topic. If the 'subscribed' flag is given, then restrict the output to the topics this peer is subscribed to.",
         "parameters": [
           {
             "name": "subscribed",
@@ -1940,58 +1746,6 @@
         }
       }
     },
-    "/pages/{int}/proof": {
-      "post": {
-        "description": "Compute the proof associated with a page of a given slot.",
-        "parameters": [
-          {
-            "name": "int",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "string",
-                "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "title": "Commitment representation for the DAL (Base58Check-encoded)",
-                  "oneOf": [
-                    {
-                      "$ref": "#/components/schemas/unistring"
-                    }
-                  ]
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/profiles": {
       "get": {
         "description": "Return the list of current profiles tracked by the DAL node.",
@@ -2018,87 +1772,125 @@
                       ]
                     },
                     {
-                      "title": "Operator",
+                      "title": "Controller",
                       "type": "object",
                       "properties": {
                         "kind": {
                           "type": "string",
                           "enum": [
-                            "operator"
+                            "controller"
                           ]
                         },
-                        "operator_profiles": {
-                          "type": "array",
-                          "items": {
-                            "oneOf": [
-                              {
-                                "title": "Attester with pkh",
-                                "type": "object",
-                                "properties": {
-                                  "kind": {
-                                    "type": "string",
-                                    "enum": [
-                                      "attester"
-                                    ]
-                                  },
-                                  "public_key_hash": {
+                        "controller_profiles": {
+                          "oneOf": [
+                            {
+                              "title": "profile_encoding",
+                              "type": "object",
+                              "properties": {
+                                "operators": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "integer",
+                                    "minimum": -1073741824,
+                                    "maximum": 1073741823
+                                  }
+                                },
+                                "observers": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "integer",
+                                    "minimum": -1073741824,
+                                    "maximum": 1073741823
+                                  }
+                                },
+                                "attesters": {
+                                  "type": "array",
+                                  "items": {
                                     "$ref": "#/components/schemas/Signature.Public_key_hash"
                                   }
-                                },
-                                "required": [
-                                  "kind",
-                                  "public_key_hash"
-                                ]
+                                }
                               },
-                              {
-                                "title": "Slot producer",
-                                "type": "object",
-                                "properties": {
-                                  "kind": {
-                                    "type": "string",
-                                    "enum": [
-                                      "producer"
+                              "required": [
+                                "operators",
+                                "observers",
+                                "attesters"
+                              ]
+                            },
+                            {
+                              "title": "legacy_profile_encoding",
+                              "type": "array",
+                              "items": {
+                                "oneOf": [
+                                  {
+                                    "title": "Attester with pkh",
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "enum": [
+                                          "attester"
+                                        ]
+                                      },
+                                      "public_key_hash": {
+                                        "$ref": "#/components/schemas/Signature.Public_key_hash"
+                                      }
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "public_key_hash"
                                     ]
                                   },
-                                  "slot_index": {
-                                    "type": "integer",
-                                    "minimum": -1073741824,
-                                    "maximum": 1073741823
-                                  }
-                                },
-                                "required": [
-                                  "kind",
-                                  "slot_index"
-                                ]
-                              },
-                              {
-                                "title": "observer",
-                                "type": "object",
-                                "properties": {
-                                  "kind": {
-                                    "type": "string",
-                                    "enum": [
-                                      "observer"
+                                  {
+                                    "title": "Slot producer",
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "enum": [
+                                          "producer"
+                                        ]
+                                      },
+                                      "slot_index": {
+                                        "type": "integer",
+                                        "minimum": -1073741824,
+                                        "maximum": 1073741823
+                                      }
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "slot_index"
                                     ]
                                   },
-                                  "slot_index": {
-                                    "type": "integer",
-                                    "minimum": -1073741824,
-                                    "maximum": 1073741823
+                                  {
+                                    "title": "observer",
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "enum": [
+                                          "observer"
+                                        ]
+                                      },
+                                      "slot_index": {
+                                        "type": "integer",
+                                        "minimum": -1073741824,
+                                        "maximum": 1073741823
+                                      }
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "slot_index"
+                                    ]
                                   }
-                                },
-                                "required": [
-                                  "kind",
-                                  "slot_index"
                                 ]
                               }
-                            ]
-                          }
+                            }
+                          ]
                         }
                       },
                       "required": [
                         "kind",
-                        "operator_profiles"
+                        "controller_profiles"
                       ]
                     },
                     {
@@ -2139,72 +1931,110 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "array",
-                "items": {
-                  "oneOf": [
-                    {
-                      "title": "Attester with pkh",
-                      "type": "object",
-                      "properties": {
-                        "kind": {
-                          "type": "string",
-                          "enum": [
-                            "attester"
-                          ]
-                        },
-                        "public_key_hash": {
+                "oneOf": [
+                  {
+                    "title": "profile_encoding",
+                    "type": "object",
+                    "properties": {
+                      "operators": {
+                        "type": "array",
+                        "items": {
+                          "type": "integer",
+                          "minimum": -1073741824,
+                          "maximum": 1073741823
+                        }
+                      },
+                      "observers": {
+                        "type": "array",
+                        "items": {
+                          "type": "integer",
+                          "minimum": -1073741824,
+                          "maximum": 1073741823
+                        }
+                      },
+                      "attesters": {
+                        "type": "array",
+                        "items": {
                           "$ref": "#/components/schemas/Signature.Public_key_hash"
                         }
-                      },
-                      "required": [
-                        "kind",
-                        "public_key_hash"
-                      ]
+                      }
                     },
-                    {
-                      "title": "Slot producer",
-                      "type": "object",
-                      "properties": {
-                        "kind": {
-                          "type": "string",
-                          "enum": [
-                            "producer"
+                    "required": [
+                      "operators",
+                      "observers",
+                      "attesters"
+                    ]
+                  },
+                  {
+                    "title": "legacy_profile_encoding",
+                    "type": "array",
+                    "items": {
+                      "oneOf": [
+                        {
+                          "title": "Attester with pkh",
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "attester"
+                              ]
+                            },
+                            "public_key_hash": {
+                              "$ref": "#/components/schemas/Signature.Public_key_hash"
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "public_key_hash"
                           ]
                         },
-                        "slot_index": {
-                          "type": "integer",
-                          "minimum": -1073741824,
-                          "maximum": 1073741823
-                        }
-                      },
-                      "required": [
-                        "kind",
-                        "slot_index"
-                      ]
-                    },
-                    {
-                      "title": "observer",
-                      "type": "object",
-                      "properties": {
-                        "kind": {
-                          "type": "string",
-                          "enum": [
-                            "observer"
+                        {
+                          "title": "Slot producer",
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "producer"
+                              ]
+                            },
+                            "slot_index": {
+                              "type": "integer",
+                              "minimum": -1073741824,
+                              "maximum": 1073741823
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "slot_index"
                           ]
                         },
-                        "slot_index": {
-                          "type": "integer",
-                          "minimum": -1073741824,
-                          "maximum": 1073741823
+                        {
+                          "title": "observer",
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "observer"
+                              ]
+                            },
+                            "slot_index": {
+                              "type": "integer",
+                              "minimum": -1073741824,
+                              "maximum": 1073741823
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "slot_index"
+                          ]
                         }
-                      },
-                      "required": [
-                        "kind",
-                        "slot_index"
                       ]
                     }
-                  ]
-                }
+                  }
+                ]
               }
             }
           }
@@ -2372,69 +2202,7 @@
         }
       }
     },
-    "/shard/{DAL_commitment}/{int}": {
-      "get": {
-        "description": "Fetch shard as bytes",
-        "parameters": [
-          {
-            "name": "DAL_commitment",
-            "in": "path",
-            "description": "DAL_commitment (Base58Check-encoded)",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "int",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "oneOf": [
-                      {
-                        "type": "integer",
-                        "minimum": -1073741824,
-                        "maximum": 1073741823
-                      },
-                      {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
-                        }
-                      }
-                    ]
-                  }
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/slot": {
+    "/slots": {
       "post": {
         "description": "Post a slot to the DAL node, computes its commitment and commitment proof, then computes the correspoding shards with their proof. The result of this RPC can be directly used to publish a slot header.",
         "parameters": [
@@ -2498,48 +2266,6 @@
                     "commitment",
                     "commitment_proof"
                   ]
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/slot/pages/{DAL_commitment}": {
-      "get": {
-        "description": "Fetch slot as list of pages",
-        "parameters": [
-          {
-            "name": "DAL_commitment",
-            "in": "path",
-            "description": "DAL_commitment (Base58Check-encoded)",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
-                  }
                 }
               }
             }

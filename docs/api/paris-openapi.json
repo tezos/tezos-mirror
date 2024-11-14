@@ -3,7 +3,7 @@
   "info": {
     "title": "Octez Protocol paris RPC",
     "description": "The RPC API for protocol paris served by the Octez node.",
-    "version": "Octez 20.3 (4ec59046)"
+    "version": "Octez 21.0 (87e7ddd4)"
   },
   "paths": {
     "/": {
