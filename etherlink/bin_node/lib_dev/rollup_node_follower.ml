@@ -85,7 +85,8 @@ let[@tailrec] rec connect_to_stream ?(count = 0) ~rollup_node_endpoint () =
   | Ok (stream, close) ->
       let*! () = Rollup_node_follower_events.connection_acquired () in
       return {close; stream; rollup_node_endpoint; timeout = 300.}
-  | Error _e ->
+  | Error errs ->
+      let*! () = Rollup_node_follower_events.connection_failed errs in
       (connect_to_stream [@tailcall])
         ~count:(count + 1)
         ~rollup_node_endpoint
@@ -149,8 +150,9 @@ let[@tailrec] rec catchup_and_next_block ~proxy ~catchup_event ~connection =
         else return_unit
       in
       return (block, connection)
-  | Error [Connection_lost] | Error [Connection_timeout] ->
+  | Error ([(Connection_lost | Connection_timeout)] as errs) ->
       connection.close () ;
+      let*! () = Rollup_node_follower_events.connection_failed errs in
       let* connection =
         connect_to_stream
           ~count:1
@@ -164,7 +166,9 @@ let[@tailrec] rec catchup_and_next_block ~proxy ~catchup_event ~connection =
              `evm_context` and would fail to fetch some data. Else
              catchup possible missed event.*)
         ~connection
-  | Error errs -> fail errs
+  | Error errs ->
+      let*! () = Rollup_node_follower_events.stream_failed errs in
+      fail errs
 
 (** [loop_on_rollup_node_stream ~proxy
     ~oldest_rollup_node_known_l1_level ~connection] main loop to
