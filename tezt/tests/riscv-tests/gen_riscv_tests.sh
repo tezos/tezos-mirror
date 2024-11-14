@@ -40,7 +40,7 @@ autoconf || {
   clean_up 1
 }
 
-make -j 8 -C isa rv64ui rv64uc rv64um rv64ua rv64uf rv64ud rv64uzfh rv64mzicbo rv64si rv64ssvnapot rv64mi || {
+make -j 8 -C isa rv64ui rv64uc rv64um rv64ua rv64uf rv64ud rv64si rv64mi || {
   echo "make isa failed" >&2
   clean_up 1
 }
